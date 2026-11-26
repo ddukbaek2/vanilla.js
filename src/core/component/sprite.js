@@ -61,7 +61,27 @@ export const SpriteBlendMode = {
 //==============================================================================
 const spritePosition = Vector2.zero(); // 그리는 왼쪽 위. (늘 0, 0)
 const spriteContentSize = Vector2.zero(); // 노드의 내용 크기.
-const spriteImageSize = Vector2.zero(); // 뒤집기를 곱한 그리는 크기.
+
+
+//==============================================================================
+// 그릴 수 있는 그림 원천인지. (HTMLImageElement, HTMLCanvasElement, OffscreenCanvas, 텍스처 캐시가 올리는 꼴)
+//==============================================================================
+/**
+ * @param { any } image 볼 값.
+ * @returns { boolean } 그릴 수 있는 원천이면 참. (이 꼴이 없는 환경이면 그 꼴은 거짓)
+ */
+function isDrawableImageSource(image) {
+	if (typeof HTMLImageElement !== "undefined" && image instanceof HTMLImageElement) {
+		return true;
+	}
+	if (typeof HTMLCanvasElement !== "undefined" && image instanceof HTMLCanvasElement) {
+		return true;
+	}
+	if (typeof OffscreenCanvas !== "undefined" && image instanceof OffscreenCanvas) {
+		return true;
+	}
+	return false;
+}
 
 
 //==============================================================================
@@ -164,7 +184,7 @@ export class Sprite extends Paint {
 		const node = this.getNode();
 		if (!node) return;
 
-		// 위치, 내용 크기, 그리는 크기는 복제본 없이 모듈의 벡터에 적는다.
+		// 위치와 내용 크기(그리는 크기)는 복제본 없이 모듈의 벡터에 적는다.
 		const position = spritePosition;
 		const contentSize = spriteContentSize;
 		if (typeof node.copyContentSizeTo === "function") {
@@ -174,10 +194,9 @@ export class Sprite extends Paint {
 			const nodeContentSize = node.getContentSize();
 			contentSize.set(nodeContentSize.x, nodeContentSize.y);
 		}
-		const flipX = this.isHorizontalFlip() ? -1 : 1;
-		const flipY = this.isVerticalFlip() ? -1 : 1;
-		const imageSize = spriteImageSize;
-		imageSize.set(contentSize.x * flipX, contentSize.y * flipY);
+		const isHorizontalFlip = this.isHorizontalFlip();
+		const isVerticalFlip = this.isVerticalFlip();
+		const isFlipped = isHorizontalFlip || isVerticalFlip;
 		const spriteBlendMode = this.getSpriteBlendMode();
 		const spriteDrawMode = this.getSpriteDrawMode();
 
@@ -201,6 +220,13 @@ export class Sprite extends Paint {
 			graphic.setImageTintColor(color);
 		}
 
+		// 뒤집기는 내용 영역의 가운데를 축으로 거울처럼 뒤집는다. (그림은 내용 영역 안에 남고, 조각, 나인 슬라이스, 타일 모두 같다)
+		if (isFlipped) {
+			graphic.pushState();
+			graphic.translate(isHorizontalFlip ? contentSize.x : 0, isVerticalFlip ? contentSize.y : 0);
+			graphic.scale(isHorizontalFlip ? -1 : 1, isVerticalFlip ? -1 : 1);
+		}
+
 		// 드로우 모드에 따라 이미지 출력.
 		switch (spriteDrawMode) {
 			case SpriteDrawMode.simple: {
@@ -208,16 +234,16 @@ export class Sprite extends Paint {
 					// 영역이 없으면 사각 영역을 새로 만들지 않고 그림 전체를 바로 그린다.
 					const imageRect = this.getImageRect();
 					if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
-						graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, position.x, position.y, imageSize.x, imageSize.y);
+						graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, position.x, position.y, contentSize.x, contentSize.y);
 					}
 					else {
-						graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+						graphic.drawImageWithImageRect(image, position, contentSize, imageRect);
 					}
 					break;
 				}
 			case SpriteDrawMode.sliced: {
 					const nineSlice = this.getNineSlice();
-					graphic.drawImageWithNineSlice(image, position, imageSize, nineSlice);
+					graphic.drawImageWithNineSlice(image, position, contentSize, nineSlice);
 					break;
 				}
 			case SpriteDrawMode.tiled: {
@@ -229,8 +255,8 @@ export class Sprite extends Paint {
 
 					const tileWidth = Math.ceil(imageRect.width);
 					const tileHeight = Math.ceil(imageRect.height);
-					const fillWidth = Math.abs(imageSize.x);
-					const fillHeight = Math.abs(imageSize.y);
+					const fillWidth = Math.abs(contentSize.x);
+					const fillHeight = Math.abs(contentSize.y);
 
 					// 클리핑 후 수동 타일 반복.
 					graphic.pushState();
@@ -252,6 +278,10 @@ export class Sprite extends Paint {
 				}
 		}
 
+		if (isFlipped) {
+			graphic.popState();
+		}
+
 		// 컬러 틴트 해제.
 		if (color.alpha > 0) {
 			graphic.setImageTintColor(null);
@@ -263,7 +293,7 @@ export class Sprite extends Paint {
 
 	//==============================================================================
 	// 내용 영역 안에서만 그리는지 반환.
-	// - 뒤집으면 내용 영역의 반대쪽(음의 크기)으로 그리므로, 뒤집지 않았을 때만 true. (조각, 나인 슬라이스, 타일은 영역 안이다)
+	// - 조각, 나인 슬라이스, 타일 모두 내용 영역 안에 그리고, 뒤집어도 영역 안에서 뒤집으므로 true.
 	// - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
 	//==============================================================================
 	/**
@@ -274,7 +304,7 @@ export class Sprite extends Paint {
 		if (this.draw !== Sprite.prototype.draw) {
 			return false;
 		}
-		return !this.isHorizontalFlip() && !this.isVerticalFlip();
+		return true;
 	}
 
 	//==============================================================================
@@ -365,17 +395,43 @@ export class Sprite extends Paint {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | ImageAsset } image 그림. (HTMLImageElement 나 ImageAsset, null 이나 undefined 면 비운다, 그 밖의 꼴은 무시한다)
+	 * @param { HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | ImageAsset } image 그림. (그릴 수 있는 원천인 HTMLImageElement, HTMLCanvasElement, OffscreenCanvas 나 ImageAsset, null 이나 undefined 면 비운다, 그 밖의 꼴은 무시한다)
+	 * @example <caption>캔버스에 그린 것을 스프라이트로</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Sprite } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const canvas = document.createElement("canvas");
+	 * 		canvas.width = 64;
+	 * 		canvas.height = 64;
+	 * 		const canvasRenderingContext = canvas.getContext("2d");
+	 * 		canvasRenderingContext.fillStyle = "#ff6600";
+	 * 		canvasRenderingContext.fillRect(0, 0, 64, 64);
+	 * 		const spriteNode = new WorldNode();
+	 * 		spriteNode.setContentSize(Vector2.create(128, 128));
+	 * 		spriteNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		const sprite = spriteNode.addComponent(Sprite);
+	 * 		sprite.setImage(canvas);
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(spriteNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setImage(image) {
 		if (image === null || image === undefined) {
 			this.#image = null;
 		}
-		else if (image instanceof HTMLImageElement) {
-			this.#image = image;
-		}
 		else if (image instanceof ImageAsset) {
 			this.#image = image.image;
+		}
+		else if (isDrawableImageSource(image)) {
+			this.#image = image;
 		}
 	}
 
@@ -383,7 +439,7 @@ export class Sprite extends Paint {
 	// 이미지 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLImageElement } 그림. (없으면 null)
+	 * @returns { HTMLImageElement | HTMLCanvasElement | OffscreenCanvas } 그림. (없으면 null)
 	 */
 	getImage() {
 		return this.#image;

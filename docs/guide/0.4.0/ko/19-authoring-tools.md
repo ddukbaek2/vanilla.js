@@ -93,6 +93,7 @@ engine.run(new TitleScene());
 - `UIScene.loadAssets()` 는 `UIScene` 이 로딩 화면을 보이는 동안 부르는 자리입니다. 덮어쓸 때는 `super.loadAssets()` 를 부릅니다. `Scene` 을 바로 이어받았으면 `load` 에서 읽습니다.
 - 스크롤 뷰처럼 `UIView` 계열 위젯은 붙을 때 안쪽 content 노드를 스스로 만듭니다. 그래서 문서에는 위젯만 적고, content 안에 넣은 자식(목록 항목 등)은 `contentChildren` 으로 따로 적었다가 되살릴 때 content 아래에 붙입니다. content 노드의 이름은 `content` 이므로 경로에 넣어 찾습니다. (예: `/Panel/ItemList/content/Item0`)
 - 다른 노드를 가리키는 값(노드 참조)은 문서에 `$nodeRef` 와 뿌리 기준 경로로 적혀 있고, 트리를 다 만든 뒤 이어 붙입니다.
+- 노드 생성자가 스스로 만드는 컴포넌트와 자식(`UIWindow` 의 제목 막대, `UIImageView` 가 붙이는 `Sprite` 같은)은 문서의 앞에서부터 차례와 종류(자식은 이름)가 맞으면 그것에 문서 값을 넣고 겹쳐 만들지 않습니다. 그래서 읽고 다시 저장하면 같은 문서입니다.
 
 ### 그림 경로 해석
 
@@ -100,9 +101,9 @@ engine.run(new TitleScene());
 
 ### 컴포넌트와 노드 종류 등록
 
-게임 쪽 `UIDocument` 가 처음부터 아는 컴포넌트는 `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView` 이고(`UIDocument.getComponentTypeNames()`), 노드 종류는 `WorldNode` 하나입니다. UI Editor 는 엔진이 내보내는 모든 컴포넌트와 `WorldNode` 파생 노드를 문서 형식에 등록해 씁니다. 그래서 편집기에서 쓴 종류가 게임 쪽 표에 없으면, 그 컴포넌트는 읽을 때 조용히 빠지고 그 노드는 `WorldNode` 로 되살아납니다.
+게임 쪽 `UIDocument` 가 처음부터 아는 컴포넌트는 `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, `ShadowImage` 이고(`UIDocument.getComponentTypeNames()`), 노드 종류는 `WorldNode` 하나입니다. UI Editor 는 엔진이 내보내는 모든 컴포넌트와 `WorldNode` 파생 노드를 문서 형식에 등록해 씁니다. 그래서 편집기에서 쓴 종류가 게임 쪽 표에 없으면, 그 컴포넌트는 읽을 때 경고를 내고 빠지고 그 노드는 경고를 내고 `WorldNode` 로 되살아납니다.
 
-문서에 다른 종류를 썼으면 게임에서도 `fromJsonText` 앞에 같은 이름으로 등록합니다. 예를 들어 입력칸(`UIInputField`)과 스크롤 바(`UIScrollBar`)는 `WorldNode` 를 이어받은 노드이고, 스냅 스크롤 뷰(`UISnapScrollView`)는 컴포넌트입니다.
+편집기가 저장한 문서를 읽는 게임은 `fromJsonText` 앞에 `UIDocument.registerEditorTypes()` 를 한 번 부릅니다. 편집기가 등록하는 종류(컴포넌트 35, 노드 종류 12)를 같은 이름으로 모두 등록하고, 이미 등록한 이름은 그대로 둡니다. 하나씩 등록할 때는 `registerNodeType`, `registerComponentType` 을 씁니다. 예를 들어 입력칸(`UIInputField`)과 스크롤 바(`UIScrollBar`)는 `WorldNode` 를 이어받은 노드이고, 스냅 스크롤 뷰(`UISnapScrollView`)는 컴포넌트입니다.
 
 ```javascript
 import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade } from "./build/vanilla.js";
@@ -110,16 +111,17 @@ import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade } fr
 UIDocument.registerNodeType("UIInputField", UIInputField);
 UIDocument.registerNodeType("UIScrollBar", UIScrollBar);
 UIDocument.registerComponentType("UISnapScrollView", UISnapScrollView);
+UIDocument.registerEditorTypes();
 
 const componentTypeNames = UIDocument.getComponentTypeNames();
-console.log(componentTypeNames.includes("UISnapScrollView"), UIDocument.getComponentType("SoftShade") === SoftShade);
+console.log(componentTypeNames.includes("UISnapScrollView"), componentTypeNames.length, UIDocument.getComponentType("SoftShade") === SoftShade);
 ```
 
 전용 저장 규칙이 없는 컴포넌트는 짝이 맞는 `get`, `set` 메서드로 읽고 쓰는 값(`saveByReflection`, `loadByReflection`)으로 저장되고 되살아납니다.
 
 ### 게임에서 문서 저장하기
 
-`UIDocument.toJsonText(rootNode, isPretty = true)` 는 노드 트리를 같은 꼴의 글로 바꿉니다. 노드와 컴포넌트의 종류 이름을 자바스크립트 클래스 이름(`constructor.name`)으로 적으므로, 저장하는 쪽은 클래스 이름을 지키는 번들(esbuild 의 `--keep-names`)을 씁니다. README 의 `vanilla.min.js` 명령에는 `--keep-names` 가 없어 클래스 이름이 바뀝니다. 읽기(`fromJsonText`)는 문서의 이름으로 표를 찾으므로 어느 번들에서나 됩니다.
+`UIDocument.toJsonText(rootNode, isPretty = true)` 는 노드 트리를 같은 꼴의 글로 바꿉니다. 노드와 컴포넌트의 종류 이름은 표에 등록한 이름으로 적으므로, 클래스 이름을 줄이는 번들(esbuild 의 `--minify`)에서도 같은 문서가 됩니다. 표에 등록하지 않은 종류만 자바스크립트 클래스 이름(`constructor.name`)으로 적으므로, 그런 종류까지 저장하려면 클래스 이름을 지키는 번들(`--keep-names`)을 씁니다. README 의 명령과 `tools/project.cjs build` 는 `--keep-names` 를 붙여 줄입니다. 읽기(`fromJsonText`)는 문서의 이름으로 표를 찾으므로 어느 번들에서나 됩니다.
 
 ## Timeline Editor 문서 재생하기
 

@@ -123,12 +123,13 @@ export class Material extends Object {
 
 	//==============================================================================
 	// 중립 머티리얼 서술로부터 생성. (정적, 이미지 바이트 → GL 텍스처)
+	// - 중간에 이미지를 풀지 못하면 그때까지 지은 텍스처를 지우고 오류를 던진다.
 	//==============================================================================
 	/**
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 * @param { ShaderProgram } shaderProgram 참조할 셰이더 프로그램.
 	 * @param { object } description 중립 머티리얼 서술. (createDefaultDescription 꼴, 이미지 칸이 null 이면 1x1 단색 텍스처)
-	 * @returns { Promise<Material> } 텍스처까지 올린 머티리얼.
+	 * @returns { Promise<Material> } 텍스처까지 올린 머티리얼. (이미지를 풀지 못하면 거절된다)
 	 */
 	static async createFromDescription(webGL2RenderingContext, shaderProgram, description) {
 		const material = new Material(webGL2RenderingContext, shaderProgram);
@@ -138,14 +139,20 @@ export class Material extends Object {
 		material.#emissiveFactor = description.emissiveFactor.slice();
 		material.#useGlossiness = description.glossinessImage !== null;
 		material.#useAlphaCutout = description.opacityImage !== null;
-		material.#baseColorTexture = await material.createTexture(description.baseColorImage, [255, 255, 255, 255]);
-		material.#normalTexture = await material.createTexture(description.normalImage, [128, 128, 255, 255]);
-		material.#metallicRoughnessTexture = await material.createTexture(description.metallicRoughnessImage, [255, 255, 255, 255]);
-		material.#glossinessTexture = await material.createTexture(description.glossinessImage, [255, 255, 255, 255]);
-		material.#occlusionTexture = await material.createTexture(description.occlusionImage, [255, 255, 255, 255]);
-		material.#emissiveTexture = await material.createTexture(description.emissiveImage, [255, 255, 255, 255]);
-		material.#specularTexture = await material.createTexture(description.specularImage, [255, 255, 255, 255]);
-		material.#opacityTexture = await material.createTexture(description.opacityImage, [255, 255, 255, 255]);
+		try {
+			material.#baseColorTexture = await material.createTexture(description.baseColorImage, [255, 255, 255, 255]);
+			material.#normalTexture = await material.createTexture(description.normalImage, [128, 128, 255, 255]);
+			material.#metallicRoughnessTexture = await material.createTexture(description.metallicRoughnessImage, [255, 255, 255, 255]);
+			material.#glossinessTexture = await material.createTexture(description.glossinessImage, [255, 255, 255, 255]);
+			material.#occlusionTexture = await material.createTexture(description.occlusionImage, [255, 255, 255, 255]);
+			material.#emissiveTexture = await material.createTexture(description.emissiveImage, [255, 255, 255, 255]);
+			material.#specularTexture = await material.createTexture(description.specularImage, [255, 255, 255, 255]);
+			material.#opacityTexture = await material.createTexture(description.opacityImage, [255, 255, 255, 255]);
+		}
+		catch (error) {
+			material.destroy();
+			throw error;
+		}
 		return material;
 	}
 
@@ -154,21 +161,22 @@ export class Material extends Object {
 	// - 이미지 서술: { bytes, mimeType, flipY } 또는 { source(캔버스/비트맵), flipY }
 	// - isColorData: sRGB 로 저장된 색 텍스처, 하드웨어 디코드(SRGB8_ALPHA8)로 선형 공간 샘플링.
 	// - anisotropy: 이방성 필터 단계. (확장 미지원 시 무시)
+	// - 그림을 다 푼 뒤에 텍스처를 짓는다. (풀지 못하면 텍스처를 남기지 않고, 기다리는 동안 다른 텍스처가 묶여도 이 텍스처에 올린다)
 	//==============================================================================
 	/**
 	 * @param { object | null } imageDescription 이미지 서술. ({ bytes, mimeType, flipY, isColorData, anisotropy } 나 { source, flipY, isColorData, anisotropy }, null 이거나 비면 단색)
 	 * @param { number[] } fallbackColor 이미지가 없을 때 쓸 1x1 색. ([r, g, b, a], 0 ~ 255)
-	 * @returns { Promise<WebGLTexture> } 지은 GL 텍스처. (이미지면 밉맵과 반복 감싸기)
+	 * @returns { Promise<WebGLTexture> } 지은 GL 텍스처. (이미지면 밉맵과 반복 감싸기, 이미지를 풀지 못하면 거절된다)
 	 */
 	async createTexture(imageDescription, fallbackColor) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const glTexture = webGL2RenderingContext.createTexture();
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
 		const hasBytes = imageDescription && imageDescription.bytes && imageDescription.bytes.length > 0;
 		const hasSource = imageDescription && imageDescription.source;
 		if (!hasBytes && !hasSource) {
+			const fallbackTexture = webGL2RenderingContext.createTexture();
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, fallbackTexture);
 			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System.Uint8Array(fallbackColor));
-			return glTexture;
+			return fallbackTexture;
 		}
 		let imageSource = imageDescription.source;
 		if (!hasSource) {
@@ -182,6 +190,8 @@ export class Material extends Object {
 			bitmapOptions.imageOrientation = "flipY";
 		}
 		const imageBitmap = await System.createImageBitmap(imageSource, bitmapOptions);
+		const glTexture = webGL2RenderingContext.createTexture();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
 		const internalFormat = imageDescription.isColorData ? webGL2RenderingContext.SRGB8_ALPHA8 : webGL2RenderingContext.RGBA8;
 		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, imageBitmap);
 		webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);

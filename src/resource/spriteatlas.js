@@ -103,7 +103,12 @@ export class SpriteAtlas extends Object {
 	 */
 	async load(jsonPath) {
 		const jsonAsset = new JsonAsset();
-		await jsonAsset.load(jsonPath);
+		try {
+			await jsonAsset.load(jsonPath);
+		}
+		catch (error) {
+			// JsonAsset 이 알렸다. 자료 없이 loadData 로 넘겨 알리고 풀린다.
+		}
 		const slashIndex = jsonPath.lastIndexOf("/");
 		const baseDirectory = slashIndex >= 0 ? jsonPath.substring(0, slashIndex + 1) : "";
 		await this.loadData(jsonAsset.data, baseDirectory);

@@ -3,9 +3,13 @@
 ## 이미지 파일 목록을 하나의 텍스쳐로 묶어주는 도구.
 node tools/atlas.cjs <폴더경로> [--extrude 픽셀] [--padding 픽셀] [--max-size 쪽 상한]
 
-## 프로젝트 도구. (빌드 / 자산 현황 체크)
-node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리>
+## 프로젝트 도구. (빌드 / 자산 현황 체크 / 배포 복사)
+node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리> [-t|--template <빌드템플릿경로>]
 node tools/project.cjs check --input <입력디렉토리>
+node tools/project.cjs stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <이름1,이름2,...>]
+- build: 출력 디렉토리를 비우고 빌드 템플릿(기본 tools/buildtemplate, -t 나 --template 로 바꿈)과 <입력>/assets 를 복사한 뒤 진입 파일을 esbuild 로 묶어 <출력>/js/bundle.min.js 에 쓴다. (iife, --minify --keep-names)
+- check: <입력>/assets/sprites 아래 그림과 아틀라스 현황 보고. (npm 패키지 canvas 가 필요하다)
+- stage: 소스 디렉토리를 대상 디렉토리로 복사한다. (대상은 먼저 비운다, --skip 에 쉼표로 준 맨 위 이름은 건너뛴다)
 
 ## 여러 종류의 음원을 webm 형식으로 변환해주는 도구.
 node tools/webm.cjs <폴더경로>  
@@ -25,7 +29,7 @@ node tools/apidoc.cjs <버전> --check-examples [--only <경로 앞>] [--exclude
 - date 는 --date, UPDATE.md 의 "# <버전> (YYYY-MM-DD)", 이미 있는 자료의 날짜, 오늘 차례로 정한다.
 - --missing: 표에 없는 ko 글 목록을 JSON 배열로 낸다. 옮긴 것을 translation.en.json 에 더하고 첫 줄을 다시 돌려 en 빈 칸을 0 으로 만든다.
 - --check: docs/api/<버전>.json 의 꼴(설명 칸이 { ko, en } 인지, kind, since, 예제 칸)을 검사하고 모듈, 클래스, 멤버, 함수, 열거 수와 ko, en 빈 칸 수, 예제 수, since 분포를 찍는다. 필드와 정적 필드의 returns 는 값의 꼴만 담는 칸이라 설명이 비어도 ko 빈 칸으로 세지 않고 따로 센다. (값의 설명은 멤버 설명이 맡는다)
-- --gaps: 소스에서 문서가 빈 곳을 파일마다 찍는다. 공개 API 의 빈 ko 설명(모듈 요약, 클래스 요약, 멤버, 매개변수, 반환, 열거와 그 값), 빈 매개변수 꼴, 값을 돌려주는 return 이 있는데 @returns 가 없는 함수, 예제 없는 클래스, 제 예제도 클래스 예제도 없는 모듈, 그리고 src 의 모든 파일에서 머리 주석 없는 비공개 함수(#이름, 밑줄 이름, @private, 공개 API 가 아닌 클래스의 메서드). 줄 번호를 아는 것은 이름:줄 로 찍는다.
+- --gaps: 소스에서 문서가 빈 곳을 파일마다 찍는다. 공개 API 의 빈 ko 설명(모듈 요약, 클래스 요약, 멤버, 매개변수, 반환, 열거와 그 값), 빈 매개변수 꼴, 값을 돌려주는 return 이 있는데 @returns 가 없는 함수, 예제 없는 클래스, 제 예제도 클래스 예제도 없는 모듈, 그리고 src 의 모든 파일에서 머리 주석 없는 비공개 함수(#이름, 밑줄 이름, @private, 공개 API 가 아닌 클래스의 메서드)와 떨어진 머리 주석(머리 주석과 JSDoc 뒤에 선언 없이 다른 머리 주석이 오는 옛 덩이, "목록" 으로 끝나지 않는 머리 주석 바로 뒤의 머리 주석). 줄 번호를 아는 것은 이름:줄 로 찍는다. 구획 머리말은 "멤버 변수 목록." 처럼 "목록" 으로 끝내야 한다. 아니면 바로 뒤 선언의 설명으로 읽힌다.
 - --only, --exclude: --missing, --gaps, --check-examples 가 볼 파일을 저장소 기준 경로의 앞부분으로 거른다. (src/ui/, docs/guide/0.4.0/en/ 처럼, 여러 번 줄 수 있다)
 
 ### 예제 (@example)

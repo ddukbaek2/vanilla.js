@@ -105,7 +105,7 @@ export class List extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(number, T): boolean } predicate 맞는 요소에 참을 돌려주는 함수. (요소를 첫 인자로 받고 색인은 this 로 받는다)
+	 * @param { function(T, number, List<T>): boolean } predicate 맞는 요소에 참을 돌려주는 함수. (Array.prototype.find 처럼 요소, 색인, 이 리스트를 받는다)
 	 * @returns { T | undefined } 처음 맞는 요소. 없으면 undefined.
 	 * @example <caption>조건에 맞는 첫 요소 찾기</caption>
 	 * import { List } from "./build/vanilla.js";
@@ -119,7 +119,7 @@ export class List extends Object {
 		let index = 0;
 		const items = this.all();
 		for (const item of items) {
-			if (predicate.call(index, item)) {
+			if (predicate(item, index, this)) {
 				return item;
 			}
 			++index;
@@ -131,7 +131,7 @@ export class List extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(number, T): boolean } predicate 맞는 요소에 참을 돌려주는 함수. (요소를 첫 인자로 받고 색인은 this 로 받는다)
+	 * @param { function(T, number, List<T>): boolean } predicate 맞는 요소에 참을 돌려주는 함수. (Array.prototype.find 처럼 요소, 색인, 이 리스트를 받는다)
 	 * @returns { T[] } 맞는 요소를 모두 담은 새 배열.
 	 */
 	findAll(predicate) {
@@ -139,7 +139,7 @@ export class List extends Object {
 		const result = [];
 		const allItems = this.all();
 		for (const item of allItems) {
-			if (predicate.call(index, item)) {
+			if (predicate(item, index, this)) {
 				result.push(item);
 			}
 			++index;

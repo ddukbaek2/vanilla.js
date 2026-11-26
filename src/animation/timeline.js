@@ -17,7 +17,7 @@ import { AudioAsset } from "../resource/audioasset.js";
 
 
 //==============================================================================
-// 이징 이름 목록. ("linear" / "step" / "<종류>.<in|out|inOut>")
+// 이징 이름 목록. ("linear" / "step" / "bezier" / "<종류>.<in|out|inOut>")
 //==============================================================================
 export const TIMELINE_EASING_NAMES = (() => {
 	const nameList = ["linear", "step", "bezier"];
@@ -478,10 +478,14 @@ export class Timeline extends Object {
 	//==============================================================================
 	/**
 	 * @param { string } url 타임라인 문서(*.timeline.json) 주소.
-	 * @returns { Promise<Timeline> } 읽은 문서로 만든 타임라인.
+	 * @returns { Promise<Timeline> } 읽은 문서로 만든 타임라인. (실패 응답(404 등)이나 JSON 이 아니면 거부된다)
 	 */
 	static async loadFromUrl(url) {
 		const response = await System.fetch(url);
+		// 실패 응답(404 등)은 받지 못한 것으로 친다.
+		if (!response.ok) {
+			throw new System.Error(`Timeline: HTTP ${response.status}: ${url}`);
+		}
 		const description = await response.json();
 		return new Timeline(description);
 	}

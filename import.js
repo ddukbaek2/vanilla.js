@@ -139,7 +139,7 @@ export { Set } from "./src/base/collection/set.js";
 //==============================================================================
 // 애니메이션 목록. (src/animation)
 //==============================================================================
-export { Animator, AnimationState, AnimationTransition } from "./src/animation/animator.js";
+export { Animator, AnimationState, AnimationTransition, AnimationConditionMode } from "./src/animation/animator.js";
 export { Action } from "./src/animation/action.js";
 
 

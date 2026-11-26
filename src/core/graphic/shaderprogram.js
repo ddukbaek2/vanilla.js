@@ -78,6 +78,7 @@ export class ShaderProgram extends Object {
 
 	//==============================================================================
 	// 생성.
+	// - 컴파일이나 링크에 실패하면 그때까지 지은 셰이더와 프로그램을 지우고 오류를 던진다.
 	//==============================================================================
 	/**
 	 * @constructor
@@ -94,7 +95,14 @@ export class ShaderProgram extends Object {
 		this.#uniformLocations = new Map();
 
 		const vertexShader = this.createShader(webGL2RenderingContext.VERTEX_SHADER, vertexShaderSource);
-		const fragmentShader = this.createShader(webGL2RenderingContext.FRAGMENT_SHADER, fragmentShaderSource);
+		let fragmentShader = null;
+		try {
+			fragmentShader = this.createShader(webGL2RenderingContext.FRAGMENT_SHADER, fragmentShaderSource);
+		}
+		catch (error) {
+			webGL2RenderingContext.deleteShader(vertexShader);
+			throw error;
+		}
 
 		const program = webGL2RenderingContext.createProgram();
 		webGL2RenderingContext.attachShader(program, vertexShader);
@@ -108,6 +116,8 @@ export class ShaderProgram extends Object {
 		if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
 			const programError = webGL2RenderingContext.getProgramInfoLog(program);
 			webGL2RenderingContext.deleteProgram(program);
+			webGL2RenderingContext.deleteShader(vertexShader);
+			webGL2RenderingContext.deleteShader(fragmentShader);
 			throw new Error(`ShaderProgram link failed: ${programError}`);
 		}
 

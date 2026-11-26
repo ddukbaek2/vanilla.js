@@ -108,13 +108,17 @@ export class UISpinner extends WorldNode {
 
 	//==============================================================================
 	// 점 투명도 계산. (점 순서 비율에서 위상을 뺀 꼬리 비율이 작을수록 밝다)
+	// - 점이 없으면(dotCount 0) 순서 비율을 0 으로 본다.
 	//==============================================================================
 	/**
 	 * @param { number } dotIndex 점 순서. (0 부터, 오른쪽에서 시작해 시계 방향)
 	 * @returns { number } 불투명도. (0.15 ~ 1, 밝기 꼬리의 머리 점이 1)
 	 */
 	calculateDotOpacity(dotIndex) {
-		const orderRatio = dotIndex / this.#dotCount;
+		let orderRatio = 0;
+		if (this.#dotCount > 0) {
+			orderRatio = dotIndex / this.#dotCount;
+		}
 		let tailRatio = (orderRatio - this.#phase) % 1;
 		if (tailRatio < 0) {
 			tailRatio += 1;

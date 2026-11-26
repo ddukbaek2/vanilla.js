@@ -660,14 +660,11 @@ export class Engine extends Object {
 			});
 
 		// 앱이나 창이 전환 될 때.
+		// - 포커스를 잃으면 keyup, mouseup 이 오지 않으므로 키, 마우스 단추, 손가락 눌림을 모두 놓고 터치는 뗀 것으로 넘긴다.
 		System.window.addEventListener("blur", (focusEvent) => {
 			const inputManager = this.getInputManager();
-			inputManager.setTouchMoved(false);
-			inputManager.setTouchDown(false);
+			inputManager.clear();
 			inputManager.setTouchReleased(true);
-			inputManager.setMouseButtonDown(MouseButton.left, false);
-			inputManager.setMouseButtonDown(MouseButton.middle, false);
-			inputManager.setMouseButtonDown(MouseButton.right, false);
 			focusEvent.preventDefault();
 		}, { passive: false });
 

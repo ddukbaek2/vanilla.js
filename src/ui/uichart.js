@@ -172,11 +172,25 @@ export class UILineChart extends Component {
 	//==============================================================================
 
 	//==============================================================================
-	// 표본 수 상한 설정. (2 보다 작으면 2, 이미 든 표본은 다음 pushValue 때 앞에서 밀려난다)
+	// 표본 수 상한 설정. (2 보다 작으면 2, 이미 든 표본이 새 상한보다 많으면 오래된 것부터 버린다)
 	//==============================================================================
-	/** @param { number } maxSampleCount 표본 수 상한. */
+	/**
+	 * @param { number } maxSampleCount 표본 수 상한.
+	 * @example <caption>상한을 줄이면 오래된 표본부터 버리기</caption>
+	 * import { UILineChart } from "./build/vanilla.js";
+	 *
+	 * const lineChart = new UILineChart();
+	 * lineChart.setValueList([1, 2, 3, 4, 5]);
+	 * lineChart.setMaxSampleCount(3);
+	 * const valueList = lineChart.getValueList();
+	 * console.log(valueList.join(", "));
+	 */
 	setMaxSampleCount(maxSampleCount) {
 		this.#maxSampleCount = System.Math.max(2, maxSampleCount);
+		const excessCount = this.#valueList.length - this.#maxSampleCount;
+		if (excessCount > 0) {
+			this.#valueList.splice(0, excessCount);
+		}
 	}
 
 	//==============================================================================

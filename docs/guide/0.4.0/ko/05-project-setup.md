@@ -53,11 +53,11 @@
 
 ```bash
 esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
 ```
 
 - `--format=esm` 은 `import { ... } from` 으로 부를 수 있는 모듈로 묶습니다.
-- `--keep-names` 는 줄이더라도 클래스와 함수의 이름을 지킵니다. 엔진은 실행 중에 클래스 이름을 읽는 곳이 있습니다. (`UIDocument` 가 노드 트리를 문서로 저장할 때 노드와 컴포넌트의 `constructor.name` 을 적고, 개발자 도구는 종류 이름을 따로 정하지 않은 노드와 컴포넌트에 이 이름을 보입니다)
+- `--keep-names` 는 줄이더라도 클래스와 함수의 이름을 지킵니다. 엔진은 실행 중에 클래스 이름을 읽는 곳이 있습니다. (개발자 도구는 종류 이름을 따로 정하지 않은 노드와 컴포넌트에 `constructor.name` 을 보이고, `UIDocument` 는 표에 등록하지 않은 종류를 이 이름으로 적습니다. 등록한 종류는 등록한 이름으로 적어 줄인 번들에서도 같습니다)
 - esbuild 는 따로 깔아 둡니다. (예: `npm install -g esbuild`)
 
 ## 프로젝트 폴더 꼴
@@ -121,7 +121,7 @@ node tools/project.cjs build --script main.js --input . --output build/web --tem
 1. 출력 폴더가 있으면 통째로 지우고 새로 만듭니다.
 2. 템플릿 폴더를 출력 폴더로 복사합니다. 템플릿은 `-t` 또는 `--template` 로 준 폴더이고, 주지 않으면 `project.cjs` 옆의 `tools/buildtemplate` 입니다.
 3. `<입력>/assets` 를 `<출력>/assets` 로 복사합니다. (`.buildignore` 라는 이름의 폴더는 건너뜁니다)
-4. `esbuild <입력>/<진입 파일> --bundle --outfile=<출력>/js/bundle.min.js --format=iife --minify` 를 실행합니다.
+4. `esbuild <입력>/<진입 파일> --bundle --outfile=<출력>/js/bundle.min.js --format=iife --minify --keep-names` 를 실행합니다.
 
 출력은 이런 꼴입니다.
 
@@ -183,7 +183,7 @@ node tools/project.cjs stage --source build/web --destination ../deploy/mygame -
 ## 주의할 점
 
 - `build` 와 `stage` 는 출력(대상) 폴더를 먼저 통째로 지웁니다. 손으로 넣은 파일을 그 안에 두지 않습니다.
-- `build` 는 `--keep-names` 없이 줄입니다. 묶은 게임 안에서는 클래스 이름(`constructor.name`)이 짧은 이름으로 바뀌므로, 실행 중에 노드 트리를 `UIDocument` 로 저장하는 기능은 줄인 이름을 적게 됩니다. 이런 기능은 줄이지 않은 번들로 확인합니다.
+- `build` 는 `--keep-names` 를 붙여 줄입니다. 묶은 게임 안에서도 클래스 이름(`constructor.name`)이 그대로라 개발자 도구와 `UIDocument` 가 같은 이름을 씁니다.
 - esbuild 는 `build` 가 명령줄에서 그대로 부르므로 PATH 에 있어야 합니다.
 - 진입 파일의 맨 바깥에서 top-level await 를 쓰면 `build` 의 esbuild 단계가 실패합니다.
 - `canvasId` 와 같은 아이디의 캔버스가 페이지에 이미 있으면 엔진은 그것을 씁니다. CSS 로 크기를 정하지 않은 캔버스는 브라우저 기본 크기(300 x 150)이므로 `autoResizeOnWindowResize` 를 켜거나 CSS 로 크기를 줍니다.

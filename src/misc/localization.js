@@ -147,13 +147,14 @@ export class Localization extends Object {
 
 	//==============================================================================
 	// 지금 언어가 오른쪽에서 왼쪽으로 쓰는 언어인지. (정적, 글자를 그 방향으로 굽고 배치를 좌우로 뒤집을 때)
+	// - setRightToLeft 처럼 소문자로, 밑줄은 하이픈으로 읽은 첫 조각을 본다. ("ar_EG" 도 ar)
 	//==============================================================================
 	/**
 	 * @returns { boolean } 지금 언어의 첫 조각이 오른쪽에서 왼쪽 목록에 있으면 참.
 	 */
 	static isRightToLeft() {
 		const languageCode = Localization.getLanguage();
-		const primaryCode = languageCode.split("-")[0];
+		const primaryCode = languageCode.toLowerCase().split("_").join("-").split("-")[0];
 		return Localization.#rightToLeftLanguages.has(primaryCode);
 	}
 

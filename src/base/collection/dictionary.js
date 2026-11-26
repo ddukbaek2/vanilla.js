@@ -71,7 +71,7 @@ export class Dictionary extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(K, V): boolean } predicate 맞는 항목에 참을 돌려주는 함수. (값을 첫 인자로 받고 키는 this 로 받는다)
+	 * @param { function(V, K, Dictionary<K, V>): boolean } predicate 맞는 항목에 참을 돌려주는 함수. (Map.prototype.forEach 처럼 값, 키, 이 딕셔너리를 받는다)
 	 * @returns { { key: K, value: V } | null } 처음 맞는 항목의 키와 값. 없으면 null.
 	 * @example <caption>값으로 항목 찾기</caption>
 	 * import { Dictionary } from "./build/vanilla.js";
@@ -85,7 +85,7 @@ export class Dictionary extends Object {
 	find(predicate) {
 		const items = this.getItems();
 		for (const [key, value] of items) {
-			if (predicate.call(key, value)) {
+			if (predicate(value, key, this)) {
 				return {
 					key,
 					value
@@ -99,14 +99,14 @@ export class Dictionary extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(K, V): boolean } predicate 맞는 항목에 참을 돌려주는 함수. (값을 첫 인자로 받고 키는 this 로 받는다)
+	 * @param { function(V, K, Dictionary<K, V>): boolean } predicate 맞는 항목에 참을 돌려주는 함수. (Map.prototype.forEach 처럼 값, 키, 이 딕셔너리를 받는다)
 	 * @returns { { key: K, value: V }[] } 맞는 항목의 키와 값을 모두 담은 새 배열.
 	 */
 	findAll(predicate) {
 		const result = [];
 		const allItems = this.getItems();
 		for (const [key, value] of allItems) {
-			if (predicate.call(key, value)) {
+			if (predicate(value, key, this)) {
 				result.push({
 					key,
 					value

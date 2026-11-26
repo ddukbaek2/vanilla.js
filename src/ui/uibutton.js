@@ -5,7 +5,6 @@ const System = globalThis;
 import { Enum } from "../base/identifier.js";
 import { Graphic } from "../core/graphic.js";
 import { UIControl } from "./uicontrol.js";
-import { WorldNode } from "../core/node/worldnode.js";
 import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
 import { Sprite } from "../core/component/sprite.js";
@@ -204,7 +203,7 @@ export class UIButton extends UIControl {
 	}
 
 	//==============================================================================
-	// 노드에 붙음. (WorldNode 의 isInteractable 을 자동 활성화)
+	// 노드에 붙음. (노드의 isInteractable 을 자동 활성화, WorldNode 와 UINode)
 	//==============================================================================
 	/**
 	 * @override
@@ -212,7 +211,7 @@ export class UIButton extends UIControl {
 	 */
 	attach(node) {
 		super.attach(node);
-		if (node instanceof WorldNode) {
+		if (typeof node.setInteractable === "function") {
 			node.setInteractable(true);
 		}
 	}
@@ -581,15 +580,6 @@ export class UIButton extends UIControl {
 		return this.#buttonState;
 	}
 
-	//==============================================================================
-	// 클릭 이벤트 설정.
-	//==============================================================================
-	/**
-	 * @param { function(UIButton): boolean } callback
-	 */
-	//==============================================================================
-	// 최소 눌림 표시 시간 설정.
-	// - 짧게 톡 눌러도 이 시간만큼 눌린 모습이 보인 뒤 클릭이 실행된다. (기본 0 = 즉시)
 	//==============================================================================
 	// 길게 누름 알림 설정. (임계 시간을 넘기면 한 번 알리고, 그 누름의 클릭은 삼킨다)
 	//==============================================================================

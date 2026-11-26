@@ -15,7 +15,7 @@ import * as Math from "../base/math.js";
 //   rotation 만큼 월드가 화면에서 돈다. (deprecated/camera.js 의 begin 이 scale 뒤 rotate 를 거는 것과 같은 방향)
 // - 사용:
 //     camera.setViewSize(viewSize);            // 매 프레임 또는 리사이즈 시
-//     camera.follow([heroPosition], 6);        // 추적 (선택)
+//     camera.follow([heroPosition], 6, timeDelta);   // 추적 (선택)
 //     camera.tick(timeDelta);
 //     camera.applyTransform(graphic);          // 월드 그리기 전에
 //     ...월드 렌더...
@@ -412,7 +412,7 @@ export class Camera2D extends Object {
 	}
 
 	//==============================================================================
-	// 접근자.
+	// 바라볼 월드 위치 설정. (화면 가운데, 월드 경계가 있으면 자른다)
 	//==============================================================================
 	/** @param { Vector2 } position 바라볼 월드 위치. (월드 경계가 있으면 자른다) */
 	setPosition(position) {

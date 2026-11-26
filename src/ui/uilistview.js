@@ -24,6 +24,52 @@ import { UIDocument } from "./uidocument.js";
 //     listView.setItemCount(500);
 //     listView.setReachEndEvent(() => { ... });
 //==============================================================================
+/**
+ * @example <caption>500 줄 목록을 템플릿 하나로 보이기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIListView, UILabel, WorldNode, Paint, Color, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class ListScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const listNode = new WorldNode();
+ * 		listNode.setPivot(Pivot.topLeft.clone());
+ * 		listNode.setAnchor(Pivot.topLeft.clone());
+ * 		listNode.setContentSize(Vector2.create(320, 240));
+ * 		listNode.setLocalPosition(Vector2.create(160, 60));
+ *
+ * 		const templateNode = new WorldNode();
+ * 		templateNode.setPivot(Pivot.topLeft.clone());
+ * 		templateNode.setAnchor(Pivot.topLeft.clone());
+ * 		templateNode.setContentSize(Vector2.create(320, 36));
+ * 		const rowPaint = templateNode.addComponent(Paint);
+ * 		rowPaint.setColor(new Color(1, 1, 1, 0.08));
+ * 		const rowLabel = templateNode.addComponent(UILabel);
+ * 		rowLabel.setFontSize(16);
+ * 		listNode.addChild(templateNode);
+ *
+ * 		const listView = listNode.addComponent(UIListView);
+ * 		listView.setTemplateNode(templateNode);
+ * 		listView.setSpacing(4);
+ * 		listView.setBindItemEvent((itemNode, itemIndex) => {
+ * 			const itemLabel = itemNode.getComponent(UILabel);
+ * 			itemLabel.setText("Row " + itemIndex);
+ * 		});
+ * 		listView.setItemCount(500);
+ * 		listView.setReachEndEvent(() => {
+ * 			const itemCount = listView.getItemCount();
+ * 			listView.setItemCount(itemCount + 100);
+ * 		});
+ * 		const root = this.getRoot();
+ * 		root.addChild(listNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ListScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIListView extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -71,7 +117,7 @@ export class UIListView extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { Function[] }
+	 * @returns { Function[] } 같은 노드에 함께 붙어야 하는 컴포넌트. (UIScrollView, 없으면 addComponent 가 먼저 붙인다)
 	 */
 	require() {
 		return [UIScrollView];
@@ -83,7 +129,7 @@ export class UIListView extends Component {
 	//   항목 크기는 템플릿의 contentSize 진행 축 값에서 읽는다.
 	//==============================================================================
 	/**
-	 * @param { import("../core/node/worldnode.js").WorldNode } templateNode
+	 * @param { import("../core/node/worldnode.js").WorldNode } templateNode 항목의 본이 될 노드. (UIDocument 로 직렬화해 쥐고 이 노드는 끈다, 항목 크기를 정하지 않았으면 이 노드의 contentSize 진행 축 값을 쓴다, 앞서 준 만들기 함수는 지운다)
 	 */
 	setTemplateNode(templateNode) {
 		this.#createItemEvent = null;
@@ -99,7 +145,27 @@ export class UIListView extends Component {
 	// 항목 노드 만들기 함수 설정. (템플릿 대신, () => WorldNode. 만든 노드는 content 노드의 자식으로 붙인다)
 	//==============================================================================
 	/**
-	 * @param { Function | null } createItemEvent
+	 * @param { Function | null } createItemEvent 항목 노드를 만들어 돌려줄 함수. (() => WorldNode, 함수를 주면 앞서 준 템플릿을 버리고, null 이면 만들기 함수를 지운다)
+	 * @example <caption>만들기 함수로 보이는 줄만 노드 만들기</caption>
+	 * import { UIListView, UIScrollView, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const listNode = new WorldNode();
+	 * listNode.setContentSize(Vector2.create(200, 100));
+	 * const listView = listNode.addComponent(UIListView);
+	 * listView.setCreateItemEvent(() => {
+	 * 	const itemNode = new WorldNode();
+	 * 	itemNode.setPivot(Pivot.topLeft.clone());
+	 * 	itemNode.setAnchor(Pivot.topLeft.clone());
+	 * 	itemNode.setContentSize(Vector2.create(200, 20));
+	 * 	return itemNode;
+	 * });
+	 * listView.setItemCount(100);
+	 * listView.tick(0);
+	 * console.log(listView.getItemSize(), listView.getActiveItemCount());
+	 * const scrollView = listNode.getComponent(UIScrollView);
+	 * scrollView.setScrollOffset(Vector2.create(0, -500));
+	 * listView.tick(0);
+	 * console.log(listView.getItemNode(0), listView.getItemNode(25) !== null);
 	 */
 	setCreateItemEvent(createItemEvent) {
 		this.#createItemEvent = createItemEvent;
@@ -113,7 +179,7 @@ export class UIListView extends Component {
 	// 항목 수 설정. (스크롤 영역 갱신 + 끝 알림 재무장)
 	//==============================================================================
 	/**
-	 * @param { number } itemCount
+	 * @param { number } itemCount 항목 수. (0 보다 작으면 0, 늘어나면 끝 알림을 다시 무장하고, 스크롤 영역을 다시 재고 보이는 항목을 다시 바인딩한다)
 	 */
 	setItemCount(itemCount) {
 		const previousItemCount = this.#itemCount;
@@ -130,7 +196,7 @@ export class UIListView extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초, 쓰지 않는다)
 	 */
 	tick(timeDelta) {
 		if (!this.#templateData && !this.#createItemEvent) {
@@ -289,8 +355,8 @@ export class UIListView extends Component {
 	// 특정 항목의 실제 노드 반환. (화면 밖이면 null)
 	//==============================================================================
 	/**
-	 * @param { number } itemIndex
-	 * @returns { import("../core/node/worldnode.js").WorldNode | null }
+	 * @param { number } itemIndex 항목 순서. (0 부터)
+	 * @returns { import("../core/node/worldnode.js").WorldNode | null } 그 항목을 보이는 노드. (보이는 범위와 여유 항목 밖이라 노드가 없으면 null, 노드는 범위를 벗어나면 다른 항목에 다시 쓰인다)
 	 */
 	getItemNode(itemIndex) {
 		const itemNode = this.#activeItemMap.get(itemIndex);
@@ -300,39 +366,100 @@ export class UIListView extends Component {
 	//==============================================================================
 	// 설정 메서드 목록.
 	//==============================================================================
-	/** @param { Function } bindItemEvent (itemNode, itemIndex) */
+
+	//==============================================================================
+	// 항목 바인딩 함수 설정.
+	//==============================================================================
+	/** @param { Function } bindItemEvent 항목 노드에 내용을 채울 함수. ((itemNode, itemIndex) => void, 노드를 그 항목에 새로 꺼내 쓸 때와 refresh, setItemCount 때 부른다) */
 	setBindItemEvent(bindItemEvent) {
 		this.#bindItemEvent = bindItemEvent;
 	}
 
-	/** @param { Function } reachEndEvent */
+	//==============================================================================
+	// 끝 알림 함수 설정. (무한 스크롤, 더 불러오기)
+	//==============================================================================
+	/**
+	 * @param { Function } reachEndEvent 남은 길이가 setReachEndThreshold 안에 들면 한 번 부를 함수. (() => void, setItemCount 로 항목이 늘면 다시 부를 수 있다)
+	 * @example <caption>끝에 닿으면 다음 20 개 붙이기</caption>
+	 * import { UIListView, UIScrollView, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const listNode = new WorldNode();
+	 * listNode.setContentSize(Vector2.create(200, 100));
+	 * const listView = listNode.addComponent(UIListView);
+	 * listView.setItemSize(20);
+	 * listView.setCreateItemEvent(() => {
+	 * 	const itemNode = new WorldNode();
+	 * 	itemNode.setPivot(Pivot.topLeft.clone());
+	 * 	itemNode.setAnchor(Pivot.topLeft.clone());
+	 * 	itemNode.setContentSize(Vector2.create(200, 20));
+	 * 	return itemNode;
+	 * });
+	 * let reachEndCount = 0;
+	 * listView.setReachEndEvent(() => {
+	 * 	reachEndCount += 1;
+	 * 	const itemCount = listView.getItemCount();
+	 * 	listView.setItemCount(itemCount + 20);
+	 * });
+	 * listView.setReachEndThreshold(40);
+	 * listView.setItemCount(20);
+	 * listView.tick(0);
+	 * console.log(reachEndCount, listView.getItemCount());
+	 * const scrollView = listNode.getComponent(UIScrollView);
+	 * scrollView.setScrollOffset(Vector2.create(0, -280));
+	 * listView.tick(0);
+	 * console.log(reachEndCount, listView.getItemCount());
+	 */
 	setReachEndEvent(reachEndEvent) {
 		this.#reachEndEvent = reachEndEvent;
 	}
 
-	/** @param { number } reachEndThreshold 픽셀. */
+	//==============================================================================
+	// 끝 알림 거리 설정.
+	//==============================================================================
+	/** @param { number } reachEndThreshold 끝에서 이 길이 안에 들면 알린다. (픽셀, 기본 120) */
 	setReachEndThreshold(reachEndThreshold) {
 		this.#reachEndThreshold = reachEndThreshold;
 	}
 
-	/** @param { number } itemSize 진행 축 방향 항목 크기. */
+	//==============================================================================
+	// 항목 크기 설정.
+	//==============================================================================
+	/** @param { number } itemSize 진행 축 방향 항목 크기. (픽셀, 0 이하면 템플릿이나 처음 만든 항목의 크기를 읽는다, 스크롤 영역을 다시 잰다) */
 	setItemSize(itemSize) {
 		this.#itemSize = itemSize;
 		this.updateScrollContentSize();
 	}
 
-	/** @param { number } spacing 항목 사이 간격. */
+	//==============================================================================
+	// 항목 간격 설정.
+	//==============================================================================
+	/** @param { number } spacing 항목 사이 간격. (픽셀, 기본 0, 스크롤 영역을 다시 잰다) */
 	setSpacing(spacing) {
 		this.#spacing = spacing;
 		this.updateScrollContentSize();
 	}
 
-	/** @param { boolean } isHorizontal 가로 진행 여부. (기본 세로) */
+	//==============================================================================
+	// 진행 방향 설정.
+	//==============================================================================
+	/** @param { boolean } isHorizontal 참이면 항목을 가로로 늘어놓는다. (기본 세로, 바뀌면 스크롤 영역을 다시 재고 보이는 항목을 새 축에 다시 놓는다, 템플릿이나 항목 크기를 읽기 전에 정한다, 스크롤 뷰의 축은 따로 정한다) */
 	setHorizontal(isHorizontal) {
+		if (this.#isHorizontal === isHorizontal) {
+			return;
+		}
 		this.#isHorizontal = isHorizontal;
+		for (const itemNode of this.#activeItemMap.values()) {
+			itemNode.setActive(false);
+			this.#freeItemList.push(itemNode);
+		}
+		this.#activeItemMap.clear();
+		this.updateScrollContentSize();
 	}
 
-	/** @param { number } bufferItemCount 화면 밖 여유 항목 수. */
+	//==============================================================================
+	// 화면 밖 여유 항목 수 설정.
+	//==============================================================================
+	/** @param { number } bufferItemCount 보이는 범위 앞뒤로 더 만들어 둘 항목 수. (0 보다 작으면 0, 기본 1) */
 	setBufferItemCount(bufferItemCount) {
 		this.#bufferItemCount = System.Math.max(0, bufferItemCount);
 	}
@@ -340,27 +467,43 @@ export class UIListView extends Component {
 	//==============================================================================
 	// 조회 메서드 목록.
 	//==============================================================================
-	/** @returns { number } */
+
+	//==============================================================================
+	// 항목 수 반환.
+	//==============================================================================
+	/** @returns { number } setItemCount 로 정한 항목 수. */
 	getItemCount() {
 		return this.#itemCount;
 	}
 
-	/** @returns { number } */
+	//==============================================================================
+	// 항목 크기 반환.
+	//==============================================================================
+	/** @returns { number } 진행 축 방향 항목 크기. (픽셀, 아직 모르면 0) */
 	getItemSize() {
 		return this.#itemSize;
 	}
 
-	/** @returns { number } */
+	//==============================================================================
+	// 항목 간격 반환.
+	//==============================================================================
+	/** @returns { number } 항목 사이 간격. (픽셀) */
 	getSpacing() {
 		return this.#spacing;
 	}
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 가로 진행 여부 반환.
+	//==============================================================================
+	/** @returns { boolean } 항목을 가로로 늘어놓으면 참. (기본 거짓) */
 	isHorizontal() {
 		return this.#isHorizontal;
 	}
 
-	/** @returns { number } */
+	//==============================================================================
+	// 보이는 항목 노드 수 반환.
+	//==============================================================================
+	/** @returns { number } 지금 항목을 맡은 노드 수. (보이는 범위와 여유 항목, 회수해 둔 노드는 세지 않는다) */
 	getActiveItemCount() {
 		return this.#activeItemMap.size;
 	}

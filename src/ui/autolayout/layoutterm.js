@@ -38,7 +38,7 @@ export class LayoutTerm {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { LayoutVariable } variable 항의 변수. (undefined 나 null 이면 null 로 두고 값은 0)
+	 * @param { LayoutVariable } variable 항의 변수. (undefined 나 null 이면 null 로 두고 값은 0, 솔버는 이런 항을 건너뛴다)
 	 * @param { number } [coefficient] 계수. (숫자가 아니면 1)
 	 */
 	constructor(variable, coefficient) {

@@ -7,7 +7,25 @@ import * as Math from "../base/math.js";
 
 
 //==============================================================================
+// 전역 함수 목록.
+//==============================================================================
+//==============================================================================
+// 성분을 0 ~ 255 정수로. (반올림해 0 ~ 255 로 자른다)
+//==============================================================================
+/**
+ * @param { number } component 성분. (보통 0 ~ 1)
+ * @returns { number }
+ */
+function toByteComponent(component) {
+	const byteValue = Math.clamp(Math.round(component * 255), 0, 255);
+	return byteValue;
+}
+
+
+//==============================================================================
 // 색상.
+// - 성분은 0 ~ 1 이 보통이지만 밖의 값도 자르지 않고 그대로 담는다. (빛나는 색처럼 1 을 넘는 HDR 색, 유니티 Color 와 같다)
+// - 0 ~ 255 의 글로 낼 때(toRGBAString, toHEXString)만 0 ~ 255 와 알파 0 ~ 1 로 자른다. (유니티 Color32 로 바꿀 때와 같다)
 //==============================================================================
 /**
  * @example <caption>문자열로 만들고 섞어 문자열로 내기</caption>
@@ -34,10 +52,10 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { number } red 빨강. (0 ~ 1, 기본 1, 범위 밖은 자른다)
-	 * @param { number } green 초록. (0 ~ 1, 기본 1, 범위 밖은 자른다)
-	 * @param { number } blue 파랑. (0 ~ 1, 기본 1, 범위 밖은 자른다)
-	 * @param { number } alpha 알파. (0 ~ 1, 기본 1, 범위 밖은 자른다)
+	 * @param { number } red 빨강. (보통 0 ~ 1, 기본 1, 밖의 값도 그대로 담는다)
+	 * @param { number } green 초록. (보통 0 ~ 1, 기본 1, 밖의 값도 그대로 담는다)
+	 * @param { number } blue 파랑. (보통 0 ~ 1, 기본 1, 밖의 값도 그대로 담는다)
+	 * @param { number } alpha 알파. (보통 0 ~ 1, 기본 1, 밖의 값도 그대로 담는다)
 	 */
 	constructor(red = 1.0, green = 1.0, blue = 1.0, alpha = 1.0) {
 		super();
@@ -55,7 +73,7 @@ export class Color extends Object {
 	 * @param { number } value
 	 */
 	set red(value) {
-		this.#red = Math.clamp(value, 0.0, 1.0);
+		this.#red = value;
 	}
 
 	//==============================================================================
@@ -63,7 +81,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number } 빨강. (0 ~ 1)
+	 * @returns { number } 빨강. (보통 0 ~ 1, HDR 색이면 1 을 넘을 수 있다)
 	 */
 	get red() {
 		return this.#red;
@@ -77,7 +95,7 @@ export class Color extends Object {
 	 * @param { number } value
 	 */
 	set blue(value) {
-		this.#blue = Math.clamp(value, 0.0, 1.0);
+		this.#blue = value;
 	}
 
 	//==============================================================================
@@ -85,7 +103,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number } 파랑. (0 ~ 1)
+	 * @returns { number } 파랑. (보통 0 ~ 1, HDR 색이면 1 을 넘을 수 있다)
 	 */
 	get blue() {
 		return this.#blue;
@@ -99,7 +117,7 @@ export class Color extends Object {
 	 * @param { number } value
 	 */
 	set green(value) {
-		this.#green = Math.clamp(value, 0.0, 1.0);
+		this.#green = value;
 	}
 
 	//==============================================================================
@@ -107,7 +125,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number } 초록. (0 ~ 1)
+	 * @returns { number } 초록. (보통 0 ~ 1, HDR 색이면 1 을 넘을 수 있다)
 	 */
 	get green() {
 		return this.#green;
@@ -121,7 +139,7 @@ export class Color extends Object {
 	 * @param { number } value
 	 */
 	set alpha(value) {
-		this.#alpha = Math.clamp(value, 0.0, 1.0);
+		this.#alpha = value;
 	}
 
 	//==============================================================================
@@ -129,7 +147,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number } 알파. (0 ~ 1)
+	 * @returns { number } 알파. (보통 0 ~ 1, 담은 값 그대로)
 	 */
 	get alpha() {
 		return this.#alpha;
@@ -140,14 +158,14 @@ export class Color extends Object {
 	// - rgba(255, 255, 255, 1.0)
 	//==============================================================================
 	/**
-	 * @returns { string } "rgb(r, g, b)", 알파가 1 보다 작으면 "rgba(r, g, b, a)". (r, g, b 는 0 ~ 255 정수)
+	 * @returns { string } "rgb(r, g, b)", 알파가 1 보다 작으면 "rgba(r, g, b, a)". (r, g, b 는 0 ~ 255 로 자른 정수, a 는 0 ~ 1 로 자른다)
 	 */
 	toRGBAString() {
-		const red = Math.round(this.red * 255);
-		const green = Math.round(this.green * 255);
-		const blue = Math.round(this.blue * 255);
+		const red = toByteComponent(this.red);
+		const green = toByteComponent(this.green);
+		const blue = toByteComponent(this.blue);
 		if (this.alpha < 1.0) {
-			const alpha = this.alpha;
+			const alpha = Math.clamp(this.alpha, 0.0, 1.0);
 			return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 		}
 		else {
@@ -161,14 +179,14 @@ export class Color extends Object {
 	// - #ffffffff
 	//==============================================================================
 	/**
-	 * @returns { string } "#rrggbb", 알파가 1 보다 작으면 "#rrggbbaa".
+	 * @returns { string } "#rrggbb", 알파가 1 보다 작으면 "#rrggbbaa". (성분마다 0 ~ 255 로 자른 두 자리)
 	 */
 	toHEXString() {
-		const red = Math.round(this.red * 255).toString(16).padStart(2, "0");
-		const green = Math.round(this.green * 255).toString(16).padStart(2, "0");
-		const blue = Math.round(this.blue * 255).toString(16).padStart(2, "0");
+		const red = toByteComponent(this.red).toString(16).padStart(2, "0");
+		const green = toByteComponent(this.green).toString(16).padStart(2, "0");
+		const blue = toByteComponent(this.blue).toString(16).padStart(2, "0");
 		if (this.alpha < 1.0) {
-			const alpha = Math.round(this.alpha * 255).toString(16).padStart(2, "0");
+			const alpha = toByteComponent(this.alpha).toString(16).padStart(2, "0");
 			return `#${red}${green}${blue}${alpha}`;
 		}
 		else {
@@ -225,17 +243,6 @@ export class Color extends Object {
 		return color;
 	}
 
-	//==============================================================================
-	// 생성.
-	// - #fff
-	// - #ffff
-	// - #ffffff
-	// - #ffffffff
-	//==============================================================================
-	/**
-	 * @param { string } colorString 
-	 * @returns { Color }
-	 */
 	//==============================================================================
 	// 캐시를 거치는 HEX 색 생성. (정적)
 	// - 매 프레임 같은 문자열로 Color 를 새로 만들며 생기는 GC 압박을 줄인다.

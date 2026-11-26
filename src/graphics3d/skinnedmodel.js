@@ -106,6 +106,28 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
 }
 
 //==============================================================================
+// 애니메이션 FBX 의 클립 이름. (채널이 있는 스택이 하나면 받은 이름 그대로, 여럿이면 "받은 이름/스택 이름")
+// - 스택 이름은 FBX 이름에서 "\u0000\u0001AnimStack" 같은 종류 꼬리를 뗀 것이다. (비었으면 채널 있는 스택 사이의 차례 번호)
+// - 받은 이름이 비었으면 스택 이름만 쓴다.
+//==============================================================================
+/**
+ * @param { string } clipName 부르는 쪽이 준 클립 이름.
+ * @param { string } stackName FBX 스택 이름. (종류 꼬리가 붙은 그대로)
+ * @param { number } stackIndex 채널이 있는 스택 사이의 차례. (0 부터)
+ * @param { number } stackCount 채널이 있는 스택 수.
+ * @returns { string } 클립 이름.
+ */
+function createFbxClipName(clipName, stackName, stackIndex, stackCount) {
+	if (stackCount <= 1) {
+		return clipName;
+	}
+	const separatorIndex = stackName.indexOf("\u0000");
+	const displayName = separatorIndex !== -1 ? stackName.substring(0, separatorIndex) : stackName;
+	const stackLabel = displayName !== "" ? displayName : `${stackIndex}`;
+	return clipName !== "" ? `${clipName}/${stackLabel}` : stackLabel;
+}
+
+//==============================================================================
 // 접근자 CPU 읽기. (촘촘한 배치 + 인터리브(byteStride) 배치 + 희소(sparse) 접근자 지원, GL 무관)
 //==============================================================================
 /**
@@ -863,7 +885,7 @@ export class SkinnedModel extends Object {
 	//==============================================================================
 	/**
 	 * @param { string } url 애니메이션 FBX 파일 주소.
-	 * @param { string } clipName 더할 클립 이름. (채널이 있는 애니메이션마다 같은 이름이 붙는다)
+	 * @param { string } clipName 더할 클립 이름. (채널이 있는 스택이 하나면 이 이름, 여럿이면 스택마다 "이 이름/스택 이름")
 	 * @param { boolean } ignoreTranslation 참이면 이동 채널을 버린다. (기본 false)
 	 */
 	async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false) {
@@ -876,7 +898,7 @@ export class SkinnedModel extends Object {
 	//==============================================================================
 	/**
 	 * @param { ArrayBuffer } arrayBuffer 애니메이션 FBX 파일 바이트.
-	 * @param { string } clipName 더할 클립 이름. (채널이 있는 애니메이션마다 같은 이름이 붙는다)
+	 * @param { string } clipName 더할 클립 이름. (채널이 있는 스택이 하나면 이 이름, 여럿이면 스택마다 "이 이름/스택 이름")
 	 * @param { boolean } ignoreTranslation 참이면 이동 채널을 버린다. (기본 false)
 	 */
 	async addAnimationsFromFbxBytes(arrayBuffer, clipName, ignoreTranslation = false) {
@@ -889,7 +911,7 @@ export class SkinnedModel extends Object {
 	//==============================================================================
 	/**
 	 * @param { object } sceneData FbxLoader 가 읽은 중간 표현.
-	 * @param { string } clipName 더할 클립 이름. (채널이 있는 애니메이션마다 같은 이름이 붙는다)
+	 * @param { string } clipName 더할 클립 이름. (채널이 있는 스택이 하나면 이 이름, 여럿이면 스택마다 "이 이름/스택 이름")
 	 * @param { boolean } ignoreTranslation 참이면 이동 채널을 버린다. (기본 false)
 	 */
 	addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation = false) {
@@ -898,10 +920,10 @@ export class SkinnedModel extends Object {
 		for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
 			nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
 		}
-		for (const fbxAnimation of sceneData.animationList) {
-			if (fbxAnimation.channels.length === 0) {
-				continue;
-			}
+		// 채널이 있는 스택만 클립이 된다. (스택이 여럿이면 스택마다 제 이름의 클립)
+		const channelAnimationList = sceneData.animationList.filter((fbxAnimation) => fbxAnimation.channels.length > 0);
+		for (let stackIndex = 0; stackIndex < channelAnimationList.length; ++stackIndex) {
+			const fbxAnimation = channelAnimationList[stackIndex];
 			let channels = convertFbxAnimationChannels(sceneData, fbxAnimation, (nodeIndex) => {
 				const sourceNode = sceneData.nodeList[nodeIndex];
 				return sourceNode ? nodeIndexByName.get(sourceNode.name) : undefined;
@@ -909,12 +931,14 @@ export class SkinnedModel extends Object {
 			if (ignoreTranslation) {
 				channels = channels.filter((channel) => channel.path !== "translation");
 			}
-			this.#animationList.push({ name: clipName, duration: fbxAnimation.duration, channels: channels });
+			const animationName = createFbxClipName(clipName, fbxAnimation.name, stackIndex, channelAnimationList.length);
+			this.#animationList.push({ name: animationName, duration: fbxAnimation.duration, channels: channels });
 		}
 	}
 
 	//==============================================================================
 	// 중립 메시/머티리얼 서술 업로드. (공용, Material 생성 + VAO/드로어블 구성)
+	// - 예전 드로어블의 GL 리소스와 이 모델이 지은 머티리얼은 먼저 지운다. (destroy, 다시 불러도 새지 않는다)
 	//==============================================================================
 	/**
 	 * @param { object[] } meshDescriptionList 중립 메시 서술 목록.
@@ -926,6 +950,7 @@ export class SkinnedModel extends Object {
 		if (!webGL2RenderingContext || !shaderProgram) {
 			throw new Error("SkinnedModel: no shader program to upload with.");
 		}
+		this.destroy();
 		const materialList = [];
 		for (const materialDescription of materialDescriptionList) {
 			const material = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, materialDescription);
@@ -999,12 +1024,17 @@ export class SkinnedModel extends Object {
 	//==============================================================================
 	// 와이어프레임 인덱스 업로드. (삼각형 인덱스 → 중복 없는 모서리 선 인덱스, 비인덱스 메시는 삼각형별 3변)
 	// - 드로어블의 버텍스 어레이와 무관한 별도 엘리먼트 버퍼. 렌더러가 선 출력 시 잠시 바꿔 끼운다.
+	// - 이미 올린 선 버퍼가 있으면 지우고 새로 올린다.
 	//==============================================================================
 	/**
 	 * @param { object } drawable 선 인덱스를 올릴 드로어블.
 	 */
 	uploadWireframeIndices(drawable) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		if (drawable.wireframeIndexBuffer) {
+			webGL2RenderingContext.deleteBuffer(drawable.wireframeIndexBuffer);
+			drawable.wireframeIndexBuffer = null;
+		}
 		const vertexCount = drawable.vertexCount;
 		const edgeList = SkinnedModel.buildWireframeEdgeList(drawable.meshDescription.indices, vertexCount);
 		const useUnsignedInt = vertexCount > 65535;

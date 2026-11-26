@@ -16,6 +16,7 @@
 | `node tools/atlas.cjs <폴더>` | 이미지 여러 장을 텍스처로 묶기 (MaxRects, 넘치면 여러 장, `SpriteAtlas` 가 읽음) |
 | `node tools/project.cjs build --script <진입> --input <입력> --output <출력>` | 템플릿 복사와 esbuild 번들링 |
 | `node tools/project.cjs check --input <입력>` | 자산 현황 점검 |
+| `node tools/project.cjs stage --source <소스> --destination <대상>` | 배포할 폴더로 복사 |
 | `node tools/webm.cjs <폴더>` | 음원을 webm 으로 변환 |
 | `node tools/mangle.cjs <입력> <출력> <제외 문자열>` | 코드 내 문자열 정리 |
 | `node tools/apidoc.cjs <버전>` | 공개 API 문서 자료(`docs/api/<버전>.json`) 뽑기 |
@@ -29,11 +30,15 @@
 node tools/atlas.cjs <폴더경로> [--extrude 픽셀] [--padding 픽셀] [--max-size 쪽 상한]
 ```
 
-### 프로젝트 도구. (빌드 / 자산 현황 체크)
+### 프로젝트 도구. (빌드 / 자산 현황 체크 / 배포 복사)
 ```bash
-node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리>
+node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리> [-t|--template <빌드템플릿경로>]
 node tools/project.cjs check --input <입력디렉토리>
+node tools/project.cjs stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <이름1,이름2,...>]
 ```
+- build: 출력 디렉토리를 비우고 빌드 템플릿(기본 tools/buildtemplate, -t 나 --template 로 바꿈)과 <입력>/assets 를 복사한 뒤 진입 파일을 esbuild 로 묶어 <출력>/js/bundle.min.js 에 쓴다. (iife, --minify --keep-names)
+- check: <입력>/assets/sprites 아래 그림과 아틀라스 현황 보고. (npm 패키지 canvas 가 필요하다)
+- stage: 소스 디렉토리를 대상 디렉토리로 복사한다. (대상은 먼저 비운다, --skip 에 쉼표로 준 맨 위 이름은 건너뛴다)
 
 ### 여러 종류의 음원을 webm 형식으로 변환해주는 도구.
 ```bash

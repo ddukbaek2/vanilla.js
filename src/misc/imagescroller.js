@@ -5,6 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
+import { ImageAsset } from "../resource/imageasset.js";
 
 
 //==============================================================================
@@ -124,17 +125,26 @@ export class ImageScroller extends Object {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | ImageAsset } image 바둑판으로 이어 그릴 이미지. (null 이면 그리지 않는다)
+	 * @param { HTMLImageElement | HTMLCanvasElement | ImageAsset | null } image 바둑판으로 이어 그릴 이미지. (ImageAsset 이면 그 이미지 요소를 쥐고, 그 밖의 그림은 그대로 쥔다, null 이면 그리지 않는다)
+	 * @example <caption>읽은 ImageAsset 을 그대로 넘기기</caption>
+	 * import { ImageScroller, ImageAsset } from "./build/vanilla.js";
+	 *
+	 * const imageAsset = new ImageAsset();
+	 * await imageAsset.load("examples/assets/spritesheet.png");
+	 * const imageScroller = new ImageScroller();
+	 * imageScroller.setImage(imageAsset);
+	 * const image = imageScroller.getImage();
+	 * console.log(image === imageAsset.getImage(), image.width, image.height);
 	 */
 	setImage(image) {
 		if (image === null || image === undefined) {
 			this.#image = null;
 		}
-		else if (image instanceof HTMLImageElement) {
-			this.#image = image;
-		}
 		else if (image instanceof ImageAsset) {
-			this.#image = image.image;
+			this.#image = image.getImage();
+		}
+		else {
+			this.#image = image;
 		}
 	}
 

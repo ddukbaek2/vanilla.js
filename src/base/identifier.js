@@ -121,9 +121,10 @@ export class Enum extends Object {
 	/**
 	 * @static
 	 * @param { object } dictionary 얼릴 열거 객체. (그 자리에서 Object.freeze 한다)
-	 * @returns { System.Object } 돌려주는 값이 없어 undefined 다. (dictionary 를 그 자리에서 얼린다)
+	 * @returns { object } 얼린 dictionary 그 객체. (Object.freeze 처럼 받은 객체를 그대로 돌려준다)
 	 */
 	static readonly(dictionary) {
-		System.Object.freeze(dictionary);
+		const frozenDictionary = System.Object.freeze(dictionary);
+		return frozenDictionary;
 	}
 }

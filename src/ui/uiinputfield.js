@@ -10,7 +10,8 @@ import { WorldNode } from "../core/node/worldnode.js";
 import { Component } from "../core/component.js";
 import { Paint } from "../core/component/paint.js";
 import { UILabel } from "./uilabel.js";
-import { SYSTEM_FONT_STRING } from "../base/platform.js";
+import { buildFontString } from "../core/component/text.js";
+import { FontAsset } from "../resource/fontasset.js";
 
 
 //==============================================================================
@@ -30,6 +31,8 @@ export const UIInputFieldMenuAction = {
 // - DOM <input> 사용 여부는 옵션 (setUseDOMInput, 기본 false). true 일 때만 한글 IME /
 //   모바일 소프트 키보드 / 시스템 클립보드가 동작. false 면 ASCII 위주 키보드 직접 처리.
 // - 우클릭 시 컨텍스트 메뉴 (잘라내기 / 복사 / 붙여넣기).
+// - 커서 이동과 Delete 는 크롬처럼 글자 묶음 단위, 뒤로 지우기는 블링크 BackspaceStateMachine 처럼 코드 포인트 하나(이모지 묶음은 통째로).
+// - DOM 입력은 크롬 입력 칸처럼 마우스로 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체를 고른다. (누름 수는 mousedown 의 detail)
 //==============================================================================
 /**
  * @example <caption>이름 입력칸 만들기</caption>
@@ -92,6 +95,8 @@ export class UIInputField extends WorldNode {
 	/** @private @type { number } */ #cursorIndex;
 	/** @private @type { number } */ #selectionStart;
 	/** @private @type { number } */ #dragStartIndex;
+	/** @private @type { number } */ #pointerClickCount; // 마지막 캔버스 mousedown 을 브라우저가 센 수. (detail, DOM 입력의 두 번, 세 번 누르기)
+	/** @private @type { object | null } */ #dragGranularity; // 두 번, 세 번 누른 뒤 끌기의 단위와 처음 고른 범위. ({ granularity, start, end }, null 이면 글자 단위)
 	/** @private @type { boolean } */ #focused;
 	/** @private @type { boolean } */ #isFocusedWithoutActivation; // 사용자 활성화가 한 번도 없던 때에 얻은 포커스인지. (모바일 브라우저가 키보드를 띄우지 않음)
 	/** @private @type { number } */ #blinkTimer;
@@ -149,6 +154,8 @@ export class UIInputField extends WorldNode {
 		this.#cursorIndex = 0;
 		this.#selectionStart = 0;
 		this.#dragStartIndex = -1;
+		this.#pointerClickCount = 1;
+		this.#dragGranularity = null;
 		this.#focused = false;
 		this.#isFocusedWithoutActivation = false;
 		this.#blinkTimer = 0;
@@ -299,15 +306,15 @@ export class UIInputField extends WorldNode {
 	isUsingDirectTouch() { return this.#useDirectTouch; }
 
 	//==============================================================================
-	// 값 설정. (최대 길이를 넘으면 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다)
+	// 값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다)
 	//==============================================================================
 	/**
 	 * @param { string } text 넣을 글. (거짓 값이면 빈 글, 그 밖은 String 으로 바꾼다)
 	 */
 	setText(text) {
 		this.#value = String(text || "");
-		if (this.#maxLength > 0 && this.#value.length > this.#maxLength) {
-			this.#value = this.#value.slice(0, this.#maxLength);
+		if (this.#maxLength > 0) {
+			this.#value = limitTextLength(this.#value, this.#maxLength);
 		}
 		this.#cursorIndex = this.#value.length;
 		this.#selectionStart = this.#cursorIndex;
@@ -360,12 +367,23 @@ export class UIInputField extends WorldNode {
 	// 글꼴 설정.
 	//==============================================================================
 	/**
-	 * @param { FontFace | null } fontFace 글꼴. (null 이면 시스템 글꼴)
+	 * @param { FontFace | FontAsset | null } font 글꼴. (FontAsset 이면 그 fontFace, null 이나 undefined 면 시스템 글꼴, 그 밖의 꼴은 무시한다)
 	 */
-	setFont(fontFace) {
-		this.#fontFace = fontFace;
-		this.#textUILabel.setFont(fontFace);
-		this.#placeholderUILabel.setFont(fontFace);
+	setFont(font) {
+		if (font === null || font === undefined) {
+			this.#fontFace = null;
+		}
+		else if (font instanceof System.FontFace) {
+			this.#fontFace = font;
+		}
+		else if (font instanceof FontAsset) {
+			this.#fontFace = font.fontFace;
+		}
+		else {
+			return;
+		}
+		this.#textUILabel.setFont(font);
+		this.#placeholderUILabel.setFont(font);
 	}
 	//==============================================================================
 	// 안쪽 여백 설정.
@@ -707,7 +725,23 @@ export class UIInputField extends WorldNode {
 		this.#dragStartIndex = index;
 		this.#cursorIndex = index;
 		this.#selectionStart = index;
-		if (this.#domInput) this.#domInput.setSelectionRange(index, index);
+		this.#dragGranularity = null;
+		// DOM 입력은 크롬 입력 칸처럼 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체(한 줄의 문단)를 고른다. (블링크 SelectionController)
+		const clickCount = this.#domInput ? this.#pointerClickCount : 1;
+		if (clickCount >= 2) {
+			const range = clickCount === 2 ? findWordRangeAt(this.#value, index) : { start: 0, end: this.#value.length };
+			if (clickCount === 2 && isWindowsPlatform() && range.end > range.start) {
+				range.end = skipTrailingWhitespace(this.#value, range.end);
+			}
+			this.#selectionStart = range.start;
+			this.#cursorIndex = range.end;
+			this.#dragGranularity = { granularity: clickCount === 2 ? "word" : "paragraph", start: range.start, end: range.end };
+		}
+		if (this.#domInput) {
+			const selectionStart = System.Math.min(this.#selectionStart, this.#cursorIndex);
+			const selectionEnd = System.Math.max(this.#selectionStart, this.#cursorIndex);
+			this.#domInput.setSelectionRange(selectionStart, selectionEnd);
+		}
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
 	}
@@ -725,9 +759,22 @@ export class UIInputField extends WorldNode {
 		// 커서가 마우스를 따라간다.) DOM API 는 start ≤ end 를 요구하므로 변환.
 		this.#selectionStart = this.#dragStartIndex;
 		this.#cursorIndex = index;
+		// 두 번, 세 번 누른 뒤 끌기는 블링크 ExtendSelectionAsDirectional 처럼 처음 범위를 지키고 끄는 자리의 낱말(문단) 끝까지 넓힌다.
+		const dragGranularity = this.#dragGranularity;
+		if (dragGranularity) {
+			const unitRange = dragGranularity.granularity === "word" ? findWordRangeAt(this.#value, index) : { start: 0, end: this.#value.length };
+			if (index < dragGranularity.start) {
+				this.#selectionStart = dragGranularity.end;
+				this.#cursorIndex = unitRange.start;
+			}
+			else {
+				this.#selectionStart = dragGranularity.start;
+				this.#cursorIndex = System.Math.max(unitRange.end, dragGranularity.end);
+			}
+		}
 		if (this.#domInput) {
-			const selStart = System.Math.min(this.#dragStartIndex, index);
-			const selEnd = System.Math.max(this.#dragStartIndex, index);
+			const selStart = System.Math.min(this.#selectionStart, this.#cursorIndex);
+			const selEnd = System.Math.max(this.#selectionStart, this.#cursorIndex);
 			this.#domInput.setSelectionRange(selStart, selEnd);
 		}
 		this.#blinkTimer = 0;
@@ -748,7 +795,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { number } localX 노드 안의 X. (내용 영역 왼쪽이 0)
-	 * @returns { number } 그 자리에 가장 가까운 글자 사이의 자리. (0 ~ 값 길이, 잴 컨텍스트가 없으면 값 길이)
+	 * @returns { number } 그 자리에 가장 가까운 글자 묶음 경계. (UTF-16 단위, 0 ~ 값 길이, 잴 컨텍스트가 없으면 값 길이)
 	 */
 	measureIndexAtLocalX(localX) {
 		const value = this.#value;
@@ -756,22 +803,25 @@ export class UIInputField extends WorldNode {
 		const ctx = this.getMeasureContext();
 		if (!ctx) return value.length;
 		ctx.save();
-		const fontFamily = this.#fontFace ? this.#fontFace.family : SYSTEM_FONT_STRING;
-		ctx.font = `${this.#fontSize}px ${fontFamily}`;
+		ctx.font = buildFontString(this.#fontFace, this.#fontSize, false, false);
 		const targetX = localX - this.#padding;
 		if (targetX <= 0) {
 			ctx.restore();
 			return 0;
 		}
 		let prevWidth = 0;
+		let previousBoundary = 0;
 		let result = value.length;
-		for (let i = 1; i <= value.length; ++i) {
-			const width = ctx.measureText(value.slice(0, i)).width;
+		const boundaryList = collectGraphemeBoundaries(value);
+		for (let boundaryIndex = 1; boundaryIndex < boundaryList.length; ++boundaryIndex) {
+			const boundary = boundaryList[boundaryIndex];
+			const width = ctx.measureText(value.slice(0, boundary)).width;
 			if (width >= targetX) {
-				result = (targetX - prevWidth) < (width - targetX) ? (i - 1) : i;
+				result = (targetX - prevWidth) < (width - targetX) ? previousBoundary : boundary;
 				break;
 			}
 			prevWidth = width;
+			previousBoundary = boundary;
 		}
 		ctx.restore();
 		return result;
@@ -943,6 +993,13 @@ export class UIInputField extends WorldNode {
 				return;
 			}
 			if (!this.#domInput) return;
+			// 브라우저가 센 누름 수. (mousedown 의 detail, 손가락은 1)
+			if (pointerEvent.type === "mousedown") {
+				this.#pointerClickCount = System.Math.max(1, pointerEvent.detail || 1);
+			}
+			else if (pointerEvent.type === "touchstart") {
+				this.#pointerClickCount = 1;
+			}
 			const canvasRect = canvas.getBoundingClientRect();
 			const canvasPosition = Vector2.create(clientX - canvasRect.left, clientY - canvasRect.top);
 			const viewInputPosition = viewManager.canvasPositionToViewPosition(canvasPosition);
@@ -994,10 +1051,13 @@ export class UIInputField extends WorldNode {
 		const canvasRect = canvas.getBoundingClientRect();
 		const targetScale = viewManager.getTargetResolutionScale() || 1;
 
+		// 숨은 입력은 body 에 붙은 absolute 라 문서 좌표다. (getBoundingClientRect 는 뷰포트 좌표라 스크롤한 만큼 더한다)
+		const scrollX = System.scrollX || 0;
+		const scrollY = System.scrollY || 0;
 		const globalPos = this.getPosition();
 		const contentSize = this.getContentSize();
-		this.#domInput.style.left = `${canvasRect.left + globalPos.x * targetScale}px`;
-		this.#domInput.style.top = `${canvasRect.top + globalPos.y * targetScale}px`;
+		this.#domInput.style.left = `${canvasRect.left + scrollX + globalPos.x * targetScale}px`;
+		this.#domInput.style.top = `${canvasRect.top + scrollY + globalPos.y * targetScale}px`;
 		this.#domInput.style.width = `${contentSize.x * targetScale}px`;
 		this.#domInput.style.height = `${contentSize.y * targetScale}px`;
 		if (this.#useDirectTouch) {
@@ -1066,21 +1126,44 @@ export class UIInputField extends WorldNode {
 
 		if (event.key === "Backspace") {
 			event.preventDefault();
-			if (this.hasSelection()) this.replaceSelection("");
-			else if (this.#cursorIndex > 0) this.deleteCharAt(this.#cursorIndex - 1);
+			if (this.hasSelection()) {
+				this.replaceSelection("");
+			}
+			else if (this.#cursorIndex > 0) {
+				const deletionStart = findBackwardDeletionBoundary(this.#value, this.#cursorIndex);
+				this.deleteRange(deletionStart, this.#cursorIndex);
+			}
 		}
 		else if (event.key === "Delete") {
 			event.preventDefault();
-			if (this.hasSelection()) this.replaceSelection("");
-			else if (this.#cursorIndex < this.#value.length) this.deleteCharAt(this.#cursorIndex);
+			if (this.hasSelection()) {
+				this.replaceSelection("");
+			}
+			else if (this.#cursorIndex < this.#value.length) {
+				this.deleteCharAt(this.#cursorIndex);
+			}
 		}
 		else if (event.key === "ArrowLeft") {
 			event.preventDefault();
-			this.moveCursor(this.#cursorIndex - 1, event.shiftKey);
+			const selectionRange = this.getSelectionRange();
+			if (selectionRange && !event.shiftKey) {
+				this.moveCursor(selectionRange.start, false);
+			}
+			else {
+				const previousIndex = findPreviousGraphemeBoundary(this.#value, this.#cursorIndex);
+				this.moveCursor(previousIndex, event.shiftKey);
+			}
 		}
 		else if (event.key === "ArrowRight") {
 			event.preventDefault();
-			this.moveCursor(this.#cursorIndex + 1, event.shiftKey);
+			const selectionRange = this.getSelectionRange();
+			if (selectionRange && !event.shiftKey) {
+				this.moveCursor(selectionRange.end, false);
+			}
+			else {
+				const nextIndex = findNextGraphemeBoundary(this.#value, this.#cursorIndex);
+				this.moveCursor(nextIndex, event.shiftKey);
+			}
 		}
 		else if (event.key === "Home") {
 			event.preventDefault();
@@ -1105,27 +1188,53 @@ export class UIInputField extends WorldNode {
 	// 커서 옮기기.
 	//==============================================================================
 	/**
-	 * @param { number } newIndex 옮길 자리. (0 ~ 값 길이로 자른다)
+	 * @param { number } newIndex 옮길 자리. (UTF-16 단위, 0 ~ 값 길이로 자른다, 서로게이트 쌍 가운데면 그 글자 뒤로 본다)
 	 * @param { boolean } extendSelection 참이면 선택의 고정 끝을 두고 선택을 늘린다.
 	 */
 	moveCursor(newIndex, extendSelection) {
-		const clamped = System.Math.max(0, System.Math.min(this.#value.length, newIndex));
+		let clamped = System.Math.max(0, System.Math.min(this.#value.length, newIndex));
+		if (isInsideSurrogatePair(this.#value, clamped)) {
+			clamped += 1;
+		}
 		this.#cursorIndex = clamped;
 		if (!extendSelection) this.#selectionStart = clamped;
 		this.refreshTexts();
 	}
 	//==============================================================================
-	// 한 글자 지우기. (바뀜 콜백을 부른다)
+	// 한 글자 지우기. (그 자리부터 글자 묶음 하나, 크롬 Delete 키처럼 이모지나 결합 부호를 쪼개지 않는다, 바뀜 콜백을 부른다)
 	//==============================================================================
 	/**
-	 * @param { number } index 지울 글자의 자리.
+	 * @param { number } index 지울 글자의 자리. (UTF-16 단위)
 	 */
 	deleteCharAt(index) {
-		this.#value = this.#value.slice(0, index) + this.#value.slice(index + 1);
-		if (this.#cursorIndex > index) this.#cursorIndex -= 1;
+		const endIndex = findNextGraphemeBoundary(this.#value, index);
+		this.deleteRange(index, endIndex);
+	}
+	//==============================================================================
+	// 글 범위 지우기. (커서는 지운 자리로 당기고 선택은 접는다, 바뀜 콜백을 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } startIndex 지울 범위의 앞. (UTF-16 단위)
+	 * @param { number } endIndex 지울 범위의 뒤. (UTF-16 단위, 앞보다 크지 않으면 아무것도 하지 않는다)
+	 */
+	deleteRange(startIndex, endIndex) {
+		const start = System.Math.max(0, startIndex);
+		const end = System.Math.min(this.#value.length, endIndex);
+		if (end <= start) {
+			return;
+		}
+		this.#value = this.#value.slice(0, start) + this.#value.slice(end);
+		if (this.#cursorIndex >= end) {
+			this.#cursorIndex -= end - start;
+		}
+		else if (this.#cursorIndex > start) {
+			this.#cursorIndex = start;
+		}
 		this.#selectionStart = this.#cursorIndex;
 		this.refreshTexts();
-		if (this.#onChangeCallback) this.#onChangeCallback(this.#value);
+		if (this.#onChangeCallback) {
+			this.#onChangeCallback(this.#value);
+		}
 	}
 
 	//==============================================================================
@@ -1186,17 +1295,22 @@ export class UIInputField extends WorldNode {
 		return this.#value.slice(range.start, range.end);
 	}
 	//==============================================================================
-	// 선택을 글로 바꾸기. (선택이 없으면 커서 자리에 끼운다, 최대 길이로 자르고 바뀜 콜백을 부른다)
+	// 선택을 글로 바꾸기. (선택이 없으면 커서 자리에 끼운다, 바뀜 콜백을 부른다)
+	// - 최대 길이가 있으면 블링크 입력 칸처럼 넣는 글을 남은 길이까지만 넣는다. (서로게이트 쌍은 쪼개지 않는다)
 	//==============================================================================
 	/**
 	 * @param { string } text 넣을 글. (빈 글이면 선택을 지운다)
 	 */
 	replaceSelection(text) {
 		const range = this.getSelectionRange() || { start: this.#cursorIndex, end: this.#cursorIndex };
-		let next = this.#value.slice(0, range.start) + text + this.#value.slice(range.end);
-		if (this.#maxLength > 0 && next.length > this.#maxLength) next = next.slice(0, this.#maxLength);
+		let insertedText = text;
+		if (this.#maxLength > 0) {
+			const appendableLength = System.Math.max(0, this.#maxLength - (this.#value.length - (range.end - range.start)));
+			insertedText = limitTextLength(text, appendableLength);
+		}
+		const next = this.#value.slice(0, range.start) + insertedText + this.#value.slice(range.end);
 		this.#value = next;
-		this.#cursorIndex = System.Math.min(range.start + text.length, next.length);
+		this.#cursorIndex = System.Math.min(range.start + insertedText.length, next.length);
 		this.#selectionStart = this.#cursorIndex;
 		if (this.#domInput) {
 			this.#domInput.value = this.#value;
@@ -1367,18 +1481,21 @@ export class UIInputField extends WorldNode {
 	}
 	//==============================================================================
 	// 문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기 DOM 메뉴, 메뉴 밖을 누르면 닫는다)
+	// - 메뉴는 body 에 붙은 absolute 라 문서 좌표로 놓는다. (뷰포트 좌표인 clientX, clientY 에 스크롤한 만큼 더한다)
 	//==============================================================================
 	/**
-	 * @param { number } clientX 메뉴 왼쪽 위의 X. (CSS 픽셀, clientX)
-	 * @param { number } clientY 메뉴 왼쪽 위의 Y. (CSS 픽셀, clientY)
+	 * @param { number } clientX 메뉴 왼쪽 위의 X. (CSS 픽셀, 뷰포트 좌표 clientX)
+	 * @param { number } clientY 메뉴 왼쪽 위의 Y. (CSS 픽셀, 뷰포트 좌표 clientY)
 	 */
 	showContextMenu(clientX, clientY) {
 		this.hideContextMenu();
 		const doc = System.document;
+		const scrollX = System.scrollX || 0;
+		const scrollY = System.scrollY || 0;
 		const menu = doc.createElement("div");
 		menu.style.position = "absolute";
-		menu.style.left = `${clientX}px`;
-		menu.style.top = `${clientY}px`;
+		menu.style.left = `${clientX + scrollX}px`;
+		menu.style.top = `${clientY + scrollY}px`;
 		menu.style.zIndex = "10000";
 		menu.style.background = "#ffffff";
 		menu.style.color = "#222222";
@@ -1477,8 +1594,7 @@ class BackgroundLayerRenderer extends Component {
 		// 선택 영역 (조합 중엔 표시 안 함).
 		if (state.composition.length === 0 && state.selectionStart !== state.cursorIndex) {
 			graphic.pushState();
-			const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
-			graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
+			graphic.setFontString(buildFontString(state.fontFace, state.fontSize, false, false));
 			const selStart = System.Math.min(state.selectionStart, state.cursorIndex);
 			const selEnd = System.Math.max(state.selectionStart, state.cursorIndex);
 			const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
@@ -1521,8 +1637,7 @@ class OverlayLayerRenderer extends Component {
 		if (contentSize.x <= 0 || contentSize.y <= 0) return;
 
 		graphic.pushState();
-		const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
-		graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
+		graphic.setFontString(buildFontString(state.fontFace, state.fontSize, false, false));
 		const drawY = contentSize.y * 0.5;
 		const padding = state.padding;
 		const before = state.value.slice(0, state.cursorIndex);
@@ -1566,6 +1681,432 @@ class OverlayLayerRenderer extends Component {
 
 		graphic.popState();
 	}
+}
+
+
+//==============================================================================
+// 글자 묶음(확장 자소 묶음, UAX #29) 나누개. (Intl.Segmenter 가 없는 브라우저는 null, 처음 부를 때 만든다)
+//==============================================================================
+let graphemeSegmenter = undefined;
+//==============================================================================
+// 글자 묶음 나누개 반환.
+//==============================================================================
+/**
+ * @returns { Intl.Segmenter | null }
+ */
+function getGraphemeSegmenter() {
+	if (graphemeSegmenter === undefined) {
+		const intl = System.Intl;
+		const segmenterClass = intl ? intl.Segmenter : undefined;
+		graphemeSegmenter = typeof segmenterClass === "function" ? new segmenterClass(undefined, { granularity: "grapheme" }) : null;
+	}
+	return graphemeSegmenter;
+}
+
+//==============================================================================
+// 자리가 서로게이트 쌍 가운데인지. (앞 글자가 앞 서로게이트, 뒤 글자가 뒤 서로게이트)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index UTF-16 자리.
+ * @returns { boolean }
+ */
+function isInsideSurrogatePair(text, index) {
+	if (index <= 0 || index >= text.length) {
+		return false;
+	}
+	const previousCodeUnit = text.charCodeAt(index - 1);
+	const nextCodeUnit = text.charCodeAt(index);
+	return previousCodeUnit >= 0xD800 && previousCodeUnit <= 0xDBFF && nextCodeUnit >= 0xDC00 && nextCodeUnit <= 0xDFFF;
+}
+
+//==============================================================================
+// 앞 글자 묶음 경계. (크롬 왼쪽 화살표의 PositionMoveType::kGraphemeCluster, Intl.Segmenter 가 없으면 코드 포인트 단위)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index UTF-16 자리.
+ * @returns { number } 앞 경계의 UTF-16 자리. (0 이면 0)
+ */
+function findPreviousGraphemeBoundary(text, index) {
+	if (index <= 0) {
+		return 0;
+	}
+	const segmenter = getGraphemeSegmenter();
+	if (segmenter) {
+		const segment = segmenter.segment(text).containing(index - 1);
+		return segment ? segment.index : index - 1;
+	}
+	return isInsideSurrogatePair(text, index - 1) ? index - 2 : index - 1;
+}
+
+//==============================================================================
+// 뒤 글자 묶음 경계. (크롬 오른쪽 화살표와 Delete 키의 PositionMoveType::kGraphemeCluster, Intl.Segmenter 가 없으면 코드 포인트 단위)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index UTF-16 자리.
+ * @returns { number } 뒤 경계의 UTF-16 자리. (글 끝이면 글 길이)
+ */
+function findNextGraphemeBoundary(text, index) {
+	if (index >= text.length) {
+		return text.length;
+	}
+	const segmenter = getGraphemeSegmenter();
+	if (segmenter) {
+		const segment = segmenter.segment(text).containing(index);
+		return segment ? segment.index + segment.segment.length : index + 1;
+	}
+	return isInsideSurrogatePair(text, index + 1) ? index + 2 : index + 1;
+}
+
+//==============================================================================
+// 글자 묶음 경계 목록. (0 과 글 길이를 넣는다, Intl.Segmenter 가 없으면 코드 포인트 경계)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @returns { number[] } 경계의 UTF-16 자리 목록. (오름차순)
+ */
+function collectGraphemeBoundaries(text) {
+	const boundaryList = [0];
+	let index = 0;
+	while (index < text.length) {
+		index = findNextGraphemeBoundary(text, index);
+		boundaryList.push(index);
+	}
+	return boundaryList;
+}
+
+/** 뒤로 지우기 상태. (블링크 backspace_state_machine.cc 의 BackspaceState) */
+const BackspaceState = {
+	start: 0,
+	beforeLineFeed: 1,
+	beforeKeycap: 2,
+	beforeVariationSelectorAndKeycap: 3,
+	beforeEmojiModifier: 4,
+	beforeVariationSelectorAndEmojiModifier: 5,
+	beforeVariationSelector: 6,
+	beforeZeroWidthJoinerEmoji: 7,
+	beforeZeroWidthJoiner: 8,
+	beforeVariationSelectorAndZeroWidthJoiner: 9,
+	oddNumberedRegionalIndicator: 10,
+	evenNumberedRegionalIndicator: 11,
+	beforeTagTerm: 12,
+	inTagSequence: 13,
+};
+const VARIATION_SELECTOR_PATTERN = /^\p{Variation_Selector}$/u;
+const REGIONAL_INDICATOR_PATTERN = /^\p{Regional_Indicator}$/u;
+const EXTENDED_PICTOGRAPHIC_GB11_PATTERN = /^[\p{Extended_Pictographic}\p{Emoji}]$/u;
+const EMOJI_MODIFIER_BASE_PATTERN = /^\p{Emoji_Modifier_Base}$/u;
+const MARK_PATTERN = /^\p{M}$/u;
+
+//==============================================================================
+// 뒤로 지우기(Backspace)로 지울 범위의 앞. (블링크 BackspaceStateMachine 을 옮긴 것)
+// - 크롬은 뒤로 지우기를 글자 묶음이 아니라 코드 포인트 하나씩 지운다. 다만 CR LF, 이모지 표현 선택자(VS)와 그 바탕,
+//   피부색 조정자와 그 바탕, ZWJ 로 이은 이모지, 국기(지역 표시 글자 둘), 키캡, 태그 묶음은 통째로 지운다.
+// - VS 앞 글자의 결합 등급(canonical combining class)이 0 인지는 브라우저가 알려 주지 않아 결합 부호(일반 범주 M)가 아닌지로 본다.
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index 커서의 UTF-16 자리.
+ * @returns { number } 지울 범위 앞의 UTF-16 자리.
+ */
+function findBackwardDeletionBoundary(text, index) {
+	let state = BackspaceState.start;
+	let deleteCount = 0;
+	let lastSeenVariationSelectorCount = 0;
+	let isProcessingTagSequenceBase = false;
+	let position = index;
+	while (position > 0) {
+		let codePointLength = 1;
+		if (isInsideSurrogatePair(text, position - 1)) {
+			codePointLength = 2;
+		}
+		const codePoint = text.codePointAt(position - codePointLength);
+		const character = System.String.fromCodePoint(codePoint);
+		position -= codePointLength;
+		const isVariationSelector = VARIATION_SELECTOR_PATTERN.test(character);
+		const isExtendedPictographic = EXTENDED_PICTOGRAPHIC_GB11_PATTERN.test(character);
+		const isEmojiModifier = codePoint >= 0x1F3FB && codePoint <= 0x1F3FF;
+		const isKeycapBase = (codePoint >= 0x30 && codePoint <= 0x39) || codePoint === 0x23 || codePoint === 0x2A;
+		const isTagSequence = (codePoint >= 0xE0030 && codePoint <= 0xE0039) || (codePoint >= 0xE0061 && codePoint <= 0xE007A);
+		let isFinished = false;
+		switch (state) {
+			case BackspaceState.start: {
+				deleteCount = codePointLength;
+				if (codePoint === 0x0A) {
+					state = BackspaceState.beforeLineFeed;
+				}
+				else if (isVariationSelector) {
+					state = BackspaceState.beforeVariationSelector;
+				}
+				else if (REGIONAL_INDICATOR_PATTERN.test(character)) {
+					state = BackspaceState.oddNumberedRegionalIndicator;
+				}
+				else if (isEmojiModifier) {
+					state = BackspaceState.beforeEmojiModifier;
+				}
+				else if (isExtendedPictographic) {
+					state = BackspaceState.beforeZeroWidthJoinerEmoji;
+				}
+				else if (codePoint === 0x20E3) {
+					state = BackspaceState.beforeKeycap;
+				}
+				else if (codePoint === 0xE007F) {
+					state = BackspaceState.beforeTagTerm;
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.beforeLineFeed: {
+				if (codePoint === 0x0D) {
+					deleteCount += 1;
+				}
+				isFinished = true;
+				break;
+			}
+			case BackspaceState.beforeKeycap: {
+				if (isVariationSelector) {
+					lastSeenVariationSelectorCount = codePointLength;
+					state = BackspaceState.beforeVariationSelectorAndKeycap;
+				}
+				else {
+					if (isKeycapBase) {
+						deleteCount += codePointLength;
+					}
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.beforeVariationSelectorAndKeycap: {
+				if (isKeycapBase) {
+					deleteCount += lastSeenVariationSelectorCount + codePointLength;
+				}
+				isFinished = true;
+				break;
+			}
+			case BackspaceState.beforeEmojiModifier: {
+				if (isVariationSelector) {
+					lastSeenVariationSelectorCount = codePointLength;
+					state = BackspaceState.beforeVariationSelectorAndEmojiModifier;
+				}
+				else if (EMOJI_MODIFIER_BASE_PATTERN.test(character)) {
+					deleteCount += codePointLength;
+					if (isProcessingTagSequenceBase) {
+						isFinished = true;
+					}
+					else {
+						state = BackspaceState.beforeZeroWidthJoinerEmoji;
+					}
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.beforeVariationSelectorAndEmojiModifier: {
+				if (EMOJI_MODIFIER_BASE_PATTERN.test(character)) {
+					deleteCount += lastSeenVariationSelectorCount + codePointLength;
+				}
+				isFinished = true;
+				break;
+			}
+			case BackspaceState.beforeVariationSelector: {
+				if (isExtendedPictographic) {
+					deleteCount += codePointLength;
+					if (isProcessingTagSequenceBase) {
+						isFinished = true;
+					}
+					else {
+						state = BackspaceState.beforeZeroWidthJoinerEmoji;
+					}
+				}
+				else {
+					if (!isVariationSelector && !MARK_PATTERN.test(character)) {
+						deleteCount += codePointLength;
+					}
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.beforeZeroWidthJoinerEmoji: {
+				if (codePoint === 0x200D) {
+					state = BackspaceState.beforeZeroWidthJoiner;
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.beforeZeroWidthJoiner: {
+				if (isExtendedPictographic) {
+					deleteCount += codePointLength + 1;
+					state = isEmojiModifier ? BackspaceState.beforeEmojiModifier : BackspaceState.beforeZeroWidthJoinerEmoji;
+				}
+				else if (isVariationSelector) {
+					lastSeenVariationSelectorCount = codePointLength;
+					state = BackspaceState.beforeVariationSelectorAndZeroWidthJoiner;
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.beforeVariationSelectorAndZeroWidthJoiner: {
+				if (isExtendedPictographic) {
+					deleteCount += codePointLength + 1 + lastSeenVariationSelectorCount;
+					lastSeenVariationSelectorCount = 0;
+					state = BackspaceState.beforeZeroWidthJoinerEmoji;
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.oddNumberedRegionalIndicator: {
+				if (REGIONAL_INDICATOR_PATTERN.test(character)) {
+					deleteCount += 2;
+					state = BackspaceState.evenNumberedRegionalIndicator;
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.evenNumberedRegionalIndicator: {
+				if (REGIONAL_INDICATOR_PATTERN.test(character)) {
+					deleteCount -= 2;
+					state = BackspaceState.oddNumberedRegionalIndicator;
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.beforeTagTerm: {
+				if (isTagSequence) {
+					deleteCount += codePointLength;
+					state = BackspaceState.inTagSequence;
+				}
+				else {
+					isFinished = true;
+				}
+				break;
+			}
+			case BackspaceState.inTagSequence: {
+				if (isTagSequence) {
+					deleteCount += codePointLength;
+				}
+				else if (isEmojiModifier) {
+					deleteCount += codePointLength;
+					isProcessingTagSequenceBase = true;
+					state = BackspaceState.beforeEmojiModifier;
+				}
+				else if (isVariationSelector) {
+					deleteCount += codePointLength;
+					isProcessingTagSequenceBase = true;
+					state = BackspaceState.beforeVariationSelector;
+				}
+				else {
+					if (isExtendedPictographic) {
+						deleteCount += codePointLength;
+					}
+					isFinished = true;
+				}
+				break;
+			}
+		}
+		if (isFinished) {
+			break;
+		}
+	}
+	return System.Math.max(0, index - deleteCount);
+}
+
+//==============================================================================
+// 낱말 나누개. (Intl.Segmenter 의 granularity "word", 크롬은 ICU 낱말 나누기라 블링크 WordBreakIterator 와 같다, 없으면 null)
+//==============================================================================
+let wordSegmenter = undefined;
+//==============================================================================
+// 자리의 낱말 범위. (블링크 selection_adjuster.cc 의 ExpandWithGranularity kWord)
+// - 공백 덩어리도 한 조각이라 공백을 누르면 공백을 고른다. 경계 자리는 뒤 조각을 고르고, 글 끝이면 앞 조각을 고른다. (ChooseWordSide)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index 누른 자리. (UTF-16 단위)
+ * @returns { { start: number, end: number } } 낱말 범위. (UTF-16 단위, 나누개가 없으면 글 전체)
+ */
+function findWordRangeAt(text, index) {
+	if (wordSegmenter === undefined) {
+		const intl = System.Intl;
+		const segmenterClass = intl ? intl.Segmenter : undefined;
+		wordSegmenter = typeof segmenterClass === "function" ? new segmenterClass(undefined, { granularity: "word" }) : null;
+	}
+	if (!wordSegmenter || text.length === 0) {
+		return { start: 0, end: text.length };
+	}
+	const probeIndex = index >= text.length ? text.length - 1 : index;
+	const segment = wordSegmenter.segment(text).containing(probeIndex);
+	if (!segment) {
+		return { start: index, end: index };
+	}
+	return { start: segment.index, end: segment.index + segment.segment.length };
+}
+
+//==============================================================================
+// 뒤 공백 건너뛰기. (블링크 visible_units.cc 의 SkipWhitespace: 공백과 NBSP 는 넘고 줄바꿈에서 멈춘다)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index 시작 자리. (UTF-16 단위)
+ * @returns { number } 공백 뒤 자리.
+ */
+function skipTrailingWhitespace(text, index) {
+	let position = index;
+	while (position < text.length) {
+		const character = text.charAt(position);
+		if (character === "\n" || !(/\s/u.test(character) || character === "\u00A0")) {
+			break;
+		}
+		position += 1;
+	}
+	return position;
+}
+
+//==============================================================================
+// 윈도우인지. (navigator.platform 이 Win 으로 시작, 크롬 윈도우는 두 번 누른 낱말에 뒤 공백을 붙인다)
+//==============================================================================
+/**
+ * @returns { boolean }
+ */
+function isWindowsPlatform() {
+	const navigator = System.navigator;
+	const platform = navigator && typeof navigator.platform === "string" ? navigator.platform : "";
+	return platform.startsWith("Win");
+}
+
+//==============================================================================
+// 글을 최대 길이로 자르기. (UTF-16 단위, 끝이 앞 서로게이트면 하나 더 줄인다, 블링크 text_field_input_type.cc 의 LimitLength)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } maxLength 최대 길이. (UTF-16 단위)
+ * @returns { string } 자른 글.
+ */
+function limitTextLength(text, maxLength) {
+	let newLength = System.Math.min(maxLength, text.length);
+	if (newLength === text.length) {
+		return text;
+	}
+	if (newLength > 0) {
+		const lastCodeUnit = text.charCodeAt(newLength - 1);
+		if (lastCodeUnit >= 0xD800 && lastCodeUnit <= 0xDBFF) {
+			newLength -= 1;
+		}
+	}
+	return text.slice(0, newLength);
 }
 
 

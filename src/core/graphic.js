@@ -1886,7 +1886,7 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 화면 밖 거르기 설정. (기본 false)
+	// 화면 밖 거르기 설정. (기본 true)
 	// - 켜면 WorldNode 가 컴포넌트를 그리기 전에, 켜진 컴포넌트가 모두 내용 영역 안에서만 그린다고 알리면(Component.isDrawnInsideContent)
 	//   내용 영역이 화면 밖일 때 그 노드의 컴포넌트 그리기를 건너뛴다. 자식은 저마다 따로 보고 그대로 그린다.
 	// - 판정은 그릴 때의 지금 변환(부모의 위치, 배율, 회전과 pushState 로 건 것 모두)으로 옮긴 영역의 경계 상자로 한다.
@@ -2434,6 +2434,7 @@ export class Graphic extends Object {
 	//==============================================================================
 	// 폴리라인 출력. (세그먼트별 두께 확장 쿼드)
 	// - 내부 조인트는 반두께 연장으로 이음새를 메운다.
+	// - 정점 버퍼가 차면 쌓인 것을 그리고 비운 뒤 이어 적는다. (점이 많아도 선분을 버리지 않는다)
 	//==============================================================================
 	/**
 	 * @param { Vector2[] } positions 선이 지날 점 목록. (2 개보다 적으면 그리지 않는다)
@@ -2446,6 +2447,8 @@ export class Graphic extends Object {
 		}
 
 		const halfSize = size / 2;
+		const strokeColor = this.getStrokeColor();
+		const whiteTexture = this.getWhiteTexture();
 		const vertexData = this.getVertexData();
 		const segmentCount = isClosed ? positions.length : positions.length - 1;
 		let offset = 0;
@@ -2477,7 +2480,9 @@ export class Graphic extends Object {
 
 			// 쿼드(삼각형 2개) 기록.
 			if ((vertexCount + 6) * FLOATS_PER_VERTEX > vertexData.length) {
-				break;
+				this.drawVertices(vertexCount, whiteTexture, strokeColor);
+				offset = 0;
+				vertexCount = 0;
 			}
 			vertexData[offset++] = extendedStartX + normalX;
 			vertexData[offset++] = extendedStartY + normalY;
@@ -2506,8 +2511,7 @@ export class Graphic extends Object {
 			vertexCount += 6;
 		}
 
-		const strokeColor = this.getStrokeColor();
-		this.drawVertices(vertexCount, this.getWhiteTexture(), strokeColor);
+		this.drawVertices(vertexCount, whiteTexture, strokeColor);
 	}
 
 	//==============================================================================
@@ -2607,6 +2611,7 @@ export class Graphic extends Object {
 
 	//==============================================================================
 	// 볼록 다각형 채움 출력. (첫 점 기준 팬 분할)
+	// - 정점 버퍼가 차면 쌓인 삼각형을 그리고 비운 뒤 이어 적는다. (점이 많아도 삼각형을 버리지 않는다)
 	//==============================================================================
 	/**
 	 * @param { Vector2[] } positions 볼록 다각형의 점 목록. (3 개보다 적으면 그리지 않는다)
@@ -2617,13 +2622,16 @@ export class Graphic extends Object {
 			return;
 		}
 
+		const whiteTexture = this.getWhiteTexture();
 		const vertexData = this.getVertexData();
 		let offset = 0;
 		let vertexCount = 0;
 		const firstPosition = positions[0];
 		for (let positionIndex = 1; positionIndex < positions.length - 1; ++positionIndex) {
 			if ((vertexCount + 3) * FLOATS_PER_VERTEX > vertexData.length) {
-				break;
+				this.drawVertices(vertexCount, whiteTexture, color);
+				offset = 0;
+				vertexCount = 0;
 			}
 			const secondPosition = positions[positionIndex];
 			const thirdPosition = positions[positionIndex + 1];
@@ -2642,7 +2650,7 @@ export class Graphic extends Object {
 			vertexCount += 3;
 		}
 
-		this.drawVertices(vertexCount, this.getWhiteTexture(), color);
+		this.drawVertices(vertexCount, whiteTexture, color);
 	}
 
 	//==============================================================================
@@ -3589,8 +3597,9 @@ export class Graphic extends Object {
 			return;
 		}
 
+		// 그리다 예외가 나도 넣은 변환을 꺼내 변환 스택을 맞춘다. (예외는 그대로 위로 간다)
+		node.pushTransform(this);
 		try {
-			node.pushTransform(this);
 			// 배율이 움직이는 노드의 글은 묶은 배율로 굽는다. (자식은 저마다 다시 정한다, 다 그리면 푼다)
 			this.#isTextBakeScaleMoving = this.readNodeTextBakeScaleMoving(node);
 			node.draw(this);
@@ -3601,10 +3610,10 @@ export class Graphic extends Object {
 			if (isGizmoVisible) {
 				node.drawGizmos(this);
 			}
-			node.popTransform(this);
 		}
-		catch (error) {
-			throw error;
+		finally {
+			this.#isTextBakeScaleMoving = false;
+			node.popTransform(this);
 		}
 	}
 

@@ -1,6 +1,6 @@
 # Tweens and Timelines
 
-This chapter covers changing values over time. It goes through `Tween`, which moves values or node properties from a start value to a target value; `Animation` and `SpriteAnimator`, which flip through frame images; `Timeline`, which plays documents saved by the Timeline Editor; and `Animator`, a container of states. Nodes themselves are covered in the "Nodes and Components" chapter, bone animation of 3D models in the "3D" chapter, and the editor in the "Authoring Tools" chapter.
+This chapter covers changing values over time. It goes through `Tween`, which moves values or node properties from a start value to a target value; `Animation` and `SpriteAnimator`, which flip through frame images; `Timeline`, which plays documents saved by the Timeline Editor; and `Animator`, a state machine. Nodes themselves are covered in the "Nodes and Components" chapter, bone animation of 3D models in the "3D" chapter, and the editor in the "Authoring Tools" chapter.
 
 ## Tween
 
@@ -392,38 +392,53 @@ engine.run(new BindScene());
 
 ## Animator
 
-`Animator`, `AnimationState`, `AnimationTransition`, and `AnimationClip` are still only a skeleton. For now they are containers for states, transitions, and properties.
+`Animator`, `AnimationState`, `AnimationTransition`, and `AnimationClip` form a state machine that attaches a frame clip to each state, moves between states by parameter conditions, and blends two states. (the same structure as Unity's Animator state machine)
 
-- `animator.addState(state)` and `addTransition(transition)` add to their lists and return the index. `getStates()` and `getTransitions()` return the engine's `List`.
-- `AnimationState.setClip(clip)` attaches an `AnimationClip` to a state. `AnimationTransition` connects two state indices with `setFrom(stateIndex)` and `setTo(stateIndex)`.
-- `setProperty(name, value)` and `getProperty(name)` hold named values.
+- `animator.addState(state)` and `addTransition(transition)` add to their lists and return the index. `getStates()` and `getTransitions()` return the engine's `List`. It starts in the first state added.
+- `AnimationState` holds a clip (`setClip`), a speed (`setSpeed`), and looping (`setLoop`, `null` follows the clip).
+- `AnimationTransition` connects two states with `setFrom(stateIndex)` and `setTo(stateIndex)`. With `setFrom(null)` it can be taken from any state (Any State). Add conditions with `addCondition(name, AnimationConditionMode, threshold)`; with `setExitTime(normalizedTime)` it is taken only when that time is passed, and the two states blend for `setDuration(seconds)`.
+- Parameters are set with `setFloat`, `setInteger`, `setBool`, and `setTrigger`. A trigger used in a condition is reset when the transition is taken.
+- `animator.tick(timeDelta)` advances the state time, checks Any State transitions first and then the rest in the order added, and takes the first one that matches. No new transition is checked while blending.
+- Read the chosen frame with `getCurrentFrame()`, and while blending with `getNextFrame()` and `getTransitionWeight()`.
 - `AnimationClip` holds a list of frame regions, a duration (seconds), and a loop flag. `AnimationClip.fromAtlas(atlasJson, frameIds, framesPerSecond, isLoop)` takes regions from an atlas table and sets the duration to the frame count divided by frames per second.
-- `animator.tick(timeDelta)` only updates the inner `Animation` (`getAnimation()`). Transitions have no place for conditions, and the animator does not change states by itself.
 
 ```javascript
-import { Animator, AnimationState, AnimationTransition, AnimationClip } from "./build/vanilla.js";
+import { Animator, AnimationState, AnimationTransition, AnimationClip, AnimationConditionMode, Rect } from "./build/vanilla.js";
+
+const walkClip = new AnimationClip();
+walkClip.setFrames([Rect.create(0, 0, 32, 32), Rect.create(32, 0, 32, 32)]);
+walkClip.setDuration(1);
+walkClip.setLoop(true);
+const runClip = AnimationClip.fromAtlas({ frames: { run0: { frame: { x: 0, y: 32, w: 32, h: 32 } }, run1: { frame: { x: 32, y: 32, w: 32, h: 32 } } } }, ["run0", "run1"], 4, true);
 
 const animator = new Animator();
-const idleClip = AnimationClip.fromAtlas({ frames: { idle0: { frame: { x: 0, y: 0, w: 200, h: 200 } } } }, ["idle0"], 10, true);
-const runClip = new AnimationClip();
-runClip.setLoop(true);
-const idleState = new AnimationState();
-idleState.setClip(idleClip);
+const walkState = new AnimationState();
+walkState.setClip(walkClip);
 const runState = new AnimationState();
 runState.setClip(runClip);
-const idleIndex = animator.addState(idleState);
+const walkIndex = animator.addState(walkState);
 const runIndex = animator.addState(runState);
-const transition = new AnimationTransition();
-transition.setFrom(idleIndex);
-transition.setTo(runIndex);
-animator.addTransition(transition);
-animator.setProperty("speed", 2);
-animator.tick(1 / 60);
-const states = animator.getStates();
-console.log(states.getCount(), idleClip.getDuration(), animator.getProperty("speed"));
+const toRun = new AnimationTransition();
+toRun.setFrom(walkIndex);
+toRun.setTo(runIndex);
+toRun.setDuration(0.25);
+toRun.addCondition("speed", AnimationConditionMode.greater, 3);
+animator.addTransition(toRun);
+const toWalk = new AnimationTransition();
+toWalk.setFrom(runIndex);
+toWalk.setTo(walkIndex);
+toWalk.addCondition("speed", AnimationConditionMode.less, 1);
+animator.addTransition(toWalk);
+
+animator.setFloat("speed", 5);
+animator.tick(0.125);
+console.log(animator.getCurrentStateIndex(), animator.getNextStateIndex(), animator.getTransitionWeight());
+animator.tick(0.25);
+const frame = animator.getCurrentFrame();
+console.log(animator.getCurrentStateIndex(), animator.isInTransition(), frame.position.y);
 ```
 
-For now, switching clips by character state is done with `FiniteStateMachine` and `SpriteAnimator` together, for example by calling `play` in a state's `enter`.
+`Animator` only picks frame regions and does not draw, so the game puts the chosen region on a `Sprite`. For the simple case of only switching clips by character state, you can also combine `FiniteStateMachine` and `SpriteAnimator`, calling `play` in a state's `enter`.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, FiniteStateMachine, ImageAsset, Vector2, Rect } from "./build/vanilla.js";

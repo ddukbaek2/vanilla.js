@@ -11,7 +11,7 @@ import { AudioBus } from "./audiobus.js";
 //
 // 엔진의 AudioManager(공유 AudioContext)와 AudioAsset(MP3)을 쓴다. 받은 소리 버퍼를 Web Audio 로 튼다. (소리를 합성하지 않고 파일만 튼다)
 // 소리 표를 넘긴다. 줄마다 { id, path 나 paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds } 이다.
-//   volume: 소리마다의 크기. (0 ~ 1)  minimumInterval: 같은 소리를 다시 낼 수 있는 간격. (초, 한꺼번에 몰려 시끄럽지 않게)
+//   volume: 소리마다의 크기. (0 ~ 1, 없으면 1)  minimumInterval: 같은 소리를 다시 낼 수 있는 간격. (초, 한꺼번에 몰려 시끄럽지 않게)
 //   paths: 같은 소리를 여러 번 녹음한 무리. 낼 때마다 하나를 고르고 바로 앞과 같은 것은 고르지 않는다. (하나면 path)
 //   maximumVoices: 같은 소리가 한꺼번에 날 수 있는 수. (넘으면 가장 오래된 것을 끊음, 없으면 효과음 전체의 수까지)
 //   pitchVariation: 낼 때마다 음 높이를 흔드는 비. (0.05 면 ±5%, 없으면 0)
@@ -222,8 +222,6 @@ export class SoundSystem {
 		assets.push(audioAsset);
 	}
 
-	//==============================================================================
-	// 엔진의 AudioManager.
 	//==============================================================================
 	// 바깥의 음소거를 읽는 함수 설정. (플랫폼 SDK 의 음소거, 보상형 광고를 보이는 동안 등, 매 프레임 읽는다, null 이면 없음)
 	//==============================================================================
@@ -570,7 +568,8 @@ export class SoundSystem {
 		if (soundRow === undefined || assets === undefined) {
 			return;
 		}
-		const effectVolume = clampVolume(soundRow.volume * volume);
+		const rowVolume = readSoundRowVolume(soundRow);
+		const effectVolume = clampVolume(rowVolume * volume);
 		if (effectVolume <= 0.001) {
 			return;
 		}
@@ -937,7 +936,7 @@ export class SoundSystem {
 		source.buffer = audioBuffer;
 		source.loop = true;
 		const gainNode = audioContext.createGain();
-		const rowVolume = clampVolume(soundRow.volume);
+		const rowVolume = clampVolume(readSoundRowVolume(soundRow));
 		if (fadeSeconds > 0) {
 			gainNode.gain.setValueAtTime(0, now);
 			gainNode.gain.linearRampToValueAtTime(rowVolume, now + fadeSeconds);
@@ -1013,6 +1012,20 @@ function clampVolume(volume) {
 		return 0;
 	}
 	return System.Math.max(0, System.Math.min(1, volume));
+}
+
+//==============================================================================
+// 소리 줄의 크기. (volume 이 없으면 1, 있으면 그 값, 다듬기는 쓰는 쪽이 한다)
+//==============================================================================
+/**
+ * @param { object } soundRow
+ * @returns { number }
+ */
+function readSoundRowVolume(soundRow) {
+	if (soundRow.volume === undefined || soundRow.volume === null) {
+		return 1;
+	}
+	return soundRow.volume;
 }
 
 //==============================================================================

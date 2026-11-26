@@ -17,7 +17,7 @@ import { SeededRandom } from "../base/seededrandom.js";
 // - circle: 반지름 안 무작위 위치, 바깥 방향.
 // - cone: 위쪽(-y) 기준 각도 부채꼴 방향, 반지름 안 위치.
 // - box: 사각 영역 안 무작위 위치, 위쪽 방향.
-// - edge: 가로 선분 위 무작위 위치, 위쪽 방향. (눈 / 비처럼 위에서 뿌릴 때)
+// - edge: 가로 선분 위 무작위 위치, 아래쪽(+y) 방향. (눈 / 비처럼 위에서 뿌릴 때)
 //==============================================================================
 export const ParticleEmitterShape = {
 	point: "point", // 노드 원점 한 점에서 무작위 방향.
@@ -41,6 +41,33 @@ export const ParticleRenderShape = {
 	streak: "streak", // 진행 방향으로 늘인 띠.
 	image: "image", // setImage 로 넣은 이미지.
 };
+
+
+//==============================================================================
+// 버스트가 이번 시간 구간에 터질 횟수.
+// - 구간은 (previousTime, currentTime] 이다. 재생 뒤 처음이면 [previousTime, currentTime] 이라 0 초의 버스트도 든다.
+// - 루프면 burstTime + duration x k (k = 0, 1, 2, ...) 가 모두 버스트 시각이다. (루프 이음매를 건너는 프레임에서도 터지고, 한 프레임에 여러 주기를 건너면 그 수만큼)
+//==============================================================================
+/**
+ * @param { number } burstTime 버스트 시각. (초, 재생 시작부터)
+ * @param { number } previousTime 지난 프레임의 재생 경과. (초)
+ * @param { number } currentTime 이번 재생 경과. (초)
+ * @param { boolean } isStartIncluded 구간의 시작 시각도 드는지. (재생 뒤 처음)
+ * @param { number } loopDuration 루프 주기. (초, 0 이하면 루프가 아니라 한 번)
+ * @returns { number } 터질 횟수.
+ */
+function countBurstFires(burstTime, previousTime, currentTime, isStartIncluded, loopDuration) {
+	if (!(loopDuration > 0)) {
+		const isAfterStart = isStartIncluded ? burstTime >= previousTime : burstTime > previousTime;
+		return isAfterStart && burstTime <= currentTime ? 1 : 0;
+	}
+	let firstCycle = 0;
+	if (!isStartIncluded) {
+		firstCycle = System.Math.max(0, System.Math.floor((previousTime - burstTime) / loopDuration) + 1);
+	}
+	const lastCycle = System.Math.floor((currentTime - burstTime) / loopDuration);
+	return System.Math.max(0, lastCycle - firstCycle + 1);
+}
 
 
 //==============================================================================
@@ -293,24 +320,14 @@ export class ParticleSystem extends Component {
 				}
 			}
 
-			// 버스트. (루프면 duration 주기로 반복)
+			// 버스트. (이번에 지난 시간 구간에 든 버스트 시각마다 터뜨린다, 루프면 duration 주기로 되풀이한 시각마다, 루프 이음매에서도)
+			const loopDuration = this.#isLooping ? this.#duration : 0;
 			for (const burst of this.#burstList) {
-				let burstTime = burst.time;
-				let currentTime = this.#playElapsedSeconds;
-				let previousTime = previousElapsed;
-				if (this.#isLooping && this.#duration > 0) {
-					currentTime = this.#playElapsedSeconds % this.#duration;
-					previousTime = previousElapsed % this.#duration;
-					if (currentTime < previousTime) {
-						burst.fired = false;
-					}
-				}
-				if (!burst.fired && previousTime <= burstTime && currentTime >= burstTime) {
-					burst.fired = this.#isLooping ? false : true;
-					if (this.#isLooping && currentTime >= burstTime) {
-						burst.fired = true;
-					}
-					this.emit(burst.count);
+				const isStartIncluded = previousElapsed <= 0 && !burst.fired;
+				const fireCount = countBurstFires(burst.time, previousElapsed, this.#playElapsedSeconds, isStartIncluded, loopDuration);
+				if (fireCount > 0) {
+					burst.fired = true;
+					this.emit(burst.count * fireCount);
 				}
 			}
 		}
@@ -982,9 +999,10 @@ export class ParticleSystem extends Component {
 	//==============================================================================
 	// 서술(JSON) 적용., vfx 애셋 로드 / 파티클 편집기 공용.
 	// - 모든 항목은 선택 사항이며 준 것만 반영한다. 색은 [r, g, b, a] 배열.
+	// - imageDataUrl 은 파티클 편집기가 고른 그림의 data: 주소다. 그 그림을 입자 이미지로 걸고(브라우저가 다 풀면 그린다), 비었거나 null 이면 그림을 비운다.
 	//==============================================================================
 	/**
-	 * @param { object } description 서술 객체. (looping, duration, maxParticleCount, emissionRate, bursts, shape, shapeRadius, coneAngle, boxSize, edgeWidth, lifetime, speed, size, rotation, angularVelocity, startColorA, startColorB, colorOverLifetime, sizeOverLifetime, gravity, damping, attractor, wobble, renderShape, blendMode, streakScale, worldSpace)
+	 * @param { object } description 서술 객체. (looping, duration, maxParticleCount, emissionRate, bursts, shape, shapeRadius, coneAngle, boxSize, edgeWidth, lifetime, speed, size, rotation, angularVelocity, startColorA, startColorB, colorOverLifetime, sizeOverLifetime, gravity, damping, attractor, wobble, renderShape, blendMode, streakScale, worldSpace, imageDataUrl)
 	 * @example <caption>JSON 서술로 설정하기</caption>
 	 * import { ParticleSystem } from "./build/vanilla.js";
 	 *
@@ -1094,6 +1112,17 @@ export class ParticleSystem extends Component {
 		}
 		if (description.worldSpace !== undefined) {
 			this.setWorldSpace(description.worldSpace);
+		}
+		// 파티클 편집기가 고른 그림. (비었거나 글이 아니면 그림을 비운다)
+		if (description.imageDataUrl !== undefined) {
+			if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System.Image === "function") {
+				const imageElement = new System.Image();
+				imageElement.src = description.imageDataUrl;
+				this.setImage(imageElement);
+			}
+			else {
+				this.setImage(null);
+			}
 		}
 	}
 
