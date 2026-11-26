@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>DevTools Showcase</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1e1915; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 개발자 도구 예제. (러스트 예제 devtoolsshowcase 와 같은 장면, DEVTools 의 F2 하이어라키/인스펙터 패널)
+// - 씬이 DEVTools 를 품고 tick 에서 tick, postDraw 에서 draw 를 부른다. 시작하면 패널을 연다. (F2 로 닫고 연다)
+// - 노드 몇 개(Paint, Text, 직접 만든 Spin 컴포넌트, 비활성 노드, 중첩)를 놓고 "card" 를 골라 인스펙터에 보인다.
+// - Spin 은 게터(getDegreesPerSecond)를 두어, 인스펙터가 엔진 컴포넌트처럼 불러 보인다.
+// - 주소 ?devtoolsTab= 에 0 ~ 3 을 주면 그 탭으로 연다. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings, 러스트 VANILLA_DEVTOOLS_TAB)
+//==============================================================================
+const { Engine, EngineConfiguration, Scene, WorldNode, Component, Paint, Text, TextAlign, Pivot, Vector2, Rect, LocalStorage } = await import("../../import.js");
+const { DEVTools } = await import("../../src/misc/devtools.js");
+
+// 배경색과 글 색.
+const BACKGROUND_COLOR = "#1e1915";
+const LABEL_COLOR = "#f3e5ab";
+
+//==============================================================================
+// 노드를 돌리는 컴포넌트. (게터가 인스펙터에 보인다)
+//==============================================================================
+class Spin extends Component {
+	/** @private @type { number } */ #degreesPerSecond;
+
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.setComponentType("Spin");
+		this.#degreesPerSecond = 0;
+	}
+
+	//==============================================================================
+	// 초당 도는 각도 설정.
+	//==============================================================================
+	/**
+	 * @param { number } degreesPerSecond
+	 */
+	setDegreesPerSecond(degreesPerSecond) {
+		this.#degreesPerSecond = degreesPerSecond;
+	}
+
+	//==============================================================================
+	// 초당 도는 각도 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getDegreesPerSecond() {
+		return this.#degreesPerSecond;
+	}
+
+	//==============================================================================
+	// 주기적 갱신. (자기 노드를 돌린다)
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta
+	 */
+	tick(timeDelta) {
+		const node = this.getNode();
+		node.setLocalRotation(node.getLocalRotation() + this.#degreesPerSecond * timeDelta);
+	}
+}
+
+//==============================================================================
+// 노드 만들기. (Paint 색이 있으면 붙인다)
+//==============================================================================
+/**
+ * @param { WorldNode } parent
+ * @param { string } name
+ * @param { Vector2 } position
+ * @param { Vector2 } contentSize
+ * @param { object } pivot
+ * @param { string | null } paintColor
+ * @returns { WorldNode }
+ */
+function createNode(parent, name, position, contentSize, pivot, paintColor) {
+	const node = new WorldNode();
+	node.setName(name);
+	node.setLocalPosition(position);
+	node.setPivot(pivot);
+	node.setContentSize(contentSize);
+	if (paintColor !== null) {
+		node.addComponent(Paint).setColor(paintColor);
+	}
+	parent.addChild(node);
+	return node;
+}
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class MainScene extends Scene {
+	/** @private @type { DEVTools } */ #devTools;
+	/** @private @type { boolean } */ #isDevToolsOpened;
+	/** @private @type { WorldNode | null } */ #selectedNode;
+
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.#devTools = new DEVTools();
+		this.#isDevToolsOpened = false;
+		this.#selectedNode = null;
+	}
+
+	//==============================================================================
+	// 글 노드 만들기.
+	//==============================================================================
+	createLabel(parent, name, text, position) {
+		const labelNode = createNode(parent, name, position, Vector2.create(360, 32), Pivot.topLeft, null);
+		const labelText = labelNode.addComponent(Text);
+		labelText.setText(text);
+		labelText.setFontSize(24);
+		labelText.setTextColor(LABEL_COLOR);
+		labelText.setTextAlign(TextAlign.left);
+		return labelNode;
+	}
+
+	//==============================================================================
+	// 초기화. (노드 트리를 만들고 DEVTools 에 루트를 준다)
+	//==============================================================================
+	/**
+	 * @param { Engine } engine
+	 */
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		this.createLabel(root, "title", "개발자 도구 (F2)", Vector2.create(40, 30));
+
+		// 카드: 바탕 Paint 와 그 안의 글, 도는 사각형.
+		const cardNode = createNode(root, "card", Vector2.create(40, 90), Vector2.create(380, 220), Pivot.topLeft, "#3a2f22");
+		cardNode.getComponent(Paint).setRoundSize(12);
+		this.createLabel(cardNode, "caption", "카드 안의 글", Vector2.create(20, 20));
+		const spinnerNode = createNode(cardNode, "spinner", Vector2.create(300, 150), Vector2.create(60, 60), Pivot.middleCenter, "#d4b46a");
+		spinnerNode.addComponent(Spin).setDegreesPerSecond(60);
+		createNode(spinnerNode, "badge", Vector2.create(30, 30), Vector2.create(16, 16), Pivot.middleCenter, "#a8c870");
+
+		// 비활성 노드.
+		const hiddenNode = createNode(root, "hidden", Vector2.create(40, 340), Vector2.create(200, 60), Pivot.topLeft, "#c87878");
+		hiddenNode.setActive(false);
+		this.createLabel(hiddenNode, "hiddenLabel", "숨은 노드", Vector2.create(10, 10));
+
+		// 빈 묶음 노드.
+		const groupNode = new WorldNode();
+		groupNode.setName("group");
+		root.addChild(groupNode);
+		for (let itemIndex = 0; itemIndex < 3; itemIndex++) {
+			createNode(groupNode, `item${itemIndex}`, Vector2.create(60 + itemIndex * 50, 450), Vector2.create(36, 36), Pivot.middleCenter, "#7a6a50");
+		}
+
+		// 로컬 스토리지 탭에 보일 값.
+		LocalStorage.setString("showcase.playerName", "바닐라");
+		LocalStorage.setNumber("showcase.bestScore", 1234);
+
+		this.#devTools.setEngine(engine);
+		this.#devTools.setRootNodes([root]);
+		this.#devTools.setNodeExpanded(cardNode, true);
+		this.#devTools.setNodeExpanded(spinnerNode, true);
+		this.#selectedNode = cardNode;
+	}
+
+	//==============================================================================
+	// 주기적 갱신. (노드 다음에 DEVTools, 처음 한 번 패널을 연다)
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta
+	 */
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		if (!this.#isDevToolsOpened) {
+			this.#isDevToolsOpened = true;
+			this.#devTools.setVisible(true);
+			this.#devTools.setSelectedNode(this.#selectedNode);
+			const query = new System.URLSearchParams(System.location.search);
+			const tabIndex = query.has("devtoolsTab") ? System.Number.parseInt(query.get("devtoolsTab"), 10) : 1;
+			this.#devTools.setActiveTab(System.Number.isFinite(tabIndex) ? tabIndex : 1);
+		}
+		const unscaledTimeDelta = this.getEngine().getTimeManager().getUnscaleDeltaTime();
+		this.#devTools.tick(unscaledTimeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (캔버스 전체를 배경색으로 칠하고 기준 해상도 좌표계를 건다)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	preDraw(graphic) {
+		super.preDraw(graphic);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+
+	//==============================================================================
+	// 이후 출력. (DEVTools 패널)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	postDraw(graphic) {
+		super.postDraw(graphic);
+		this.#devTools.draw(graphic);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.run(new MainScene());
+</script>
+</body>
+</html>
