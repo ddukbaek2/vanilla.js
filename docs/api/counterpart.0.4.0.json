@@ -17849,6 +17849,42 @@
 			"vanilla-engine": {
 				"module": "graphics3d/material",
 				"class": "Material",
+				"name": "set_base_color_factor"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/material",
+				"class": "Material",
+				"name": "setBaseColorFactor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/material",
+				"class": "Material",
+				"name": "create_instance"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/material",
+				"class": "Material",
+				"name": "createInstance"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/material",
+				"class": "Material",
+				"name": "get_texture_byte_count"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/material",
+				"class": "Material",
+				"name": "getTextureByteCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/material",
+				"class": "Material",
 				"name": "get_metallic_factor"
 			},
 			"vanilla.js": {
@@ -18713,6 +18749,42 @@
 			"vanilla-engine": {
 				"module": "graphics3d/skinnedmodel",
 				"class": "SkinnedModel",
+				"name": "create_from_asset"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "createFromAsset"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "create_instance"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "createInstance"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "get_asset"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "getAsset"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
 				"name": "upload_wireframe_indices"
 			},
 			"vanilla.js": {
@@ -18815,6 +18887,30 @@
 				"module": "graphics3d/skinnedmodel",
 				"class": "SkinnedModel",
 				"name": "setMaterial"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "get_material"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "getMaterial"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "get_shared_material"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "getSharedMaterial"
 			}
 		},
 		{
@@ -19053,6 +19149,244 @@
 			"vanilla.js": {
 				"module": "graphics3d/skinnedmodel",
 				"name": "MORPH_TARGET_MAXIMUM"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "normalize_key"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "normalizeKey"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "find"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "find"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "register"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "register"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "clear_cache"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "clearCache"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_cached_count"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getCachedCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "retain"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "retain"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "release"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "release"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_key"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getKey"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_reference_count"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getReferenceCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "is_destroyed"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "isDestroyed"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_gpu_byte_count"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getGpuByteCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_shader_program"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getShaderProgram"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_drawable_list"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getDrawableList"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_material_list"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getMaterialList"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_node_list"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getNodeList"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_root_node_indices"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getRootNodeIndices"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_skin_list"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getSkinList"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "get_animation_list"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodelasset",
+				"class": "SkinnedModelAsset",
+				"name": "getAnimationList"
 			}
 		},
 		{

@@ -56609,7 +56609,13 @@
 								"en": "Create an instance from an asset. (static, shares the asset's buffers, material prototypes and clips, keeps its own pose and playback state, no GPU upload)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodel.js"
+							"source": "src/graphics3d/skinnedmodel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodel",
+								"class": "SkinnedModel",
+								"name": "create_from_asset"
+							}
 						},
 						{
 							"kind": "method",
@@ -56629,6 +56635,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/skinnedmodel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodel",
+								"class": "SkinnedModel",
+								"name": "create_instance"
+							},
 							"examples": [
 								{
 									"title": {
@@ -56657,7 +56669,13 @@
 								"en": "Return the asset."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodel.js"
+							"source": "src/graphics3d/skinnedmodel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodel",
+								"class": "SkinnedModel",
+								"name": "get_asset"
+							}
 						},
 						{
 							"kind": "static",
@@ -57564,6 +57582,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/skinnedmodel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodel",
+								"class": "SkinnedModel",
+								"name": "get_material"
+							},
 							"examples": [
 								{
 									"title": {
@@ -57601,7 +57625,13 @@
 								"en": "Return the material on the drawable. (Unity Renderer.sharedMaterial, does not fork. If it is the asset's prototype, changing it changes every instance of that asset)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodel.js"
+							"source": "src/graphics3d/skinnedmodel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodel",
+								"class": "SkinnedModel",
+								"name": "get_shared_material"
+							}
 						},
 						{
 							"kind": "method",
@@ -58233,6 +58263,11 @@
 						}
 					],
 					"extends": "Object",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/skinnedmodelasset",
+						"class": "SkinnedModelAsset"
+					},
 					"members": [
 						{
 							"kind": "constructor",
@@ -58269,7 +58304,13 @@
 								"en": "Constructor. (built by SkinnedModel.uploadMeshesAndMaterials after uploading, reference count 1)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "new"
+							}
 						},
 						{
 							"kind": "static",
@@ -58298,6 +58339,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "normalize_key"
+							},
 							"examples": [
 								{
 									"title": {
@@ -58343,7 +58390,13 @@
 								"en": "Find in the cache. (static, a live asset with the same shader program and key)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "find"
+							}
 						},
 						{
 							"kind": "static",
@@ -58373,6 +58426,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "register"
+							},
 							"examples": [
 								{
 									"title": {
@@ -58395,6 +58454,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "clear_cache"
+							},
 							"examples": [
 								{
 									"title": {
@@ -58423,7 +58488,13 @@
 								"en": "Number of assets in the cache. (static, sum over all shader programs)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_cached_count"
+							}
 						},
 						{
 							"kind": "method",
@@ -58442,7 +58513,13 @@
 								"en": "Add a reference. (when an instance starts sharing the asset, called by SkinnedModel.createFromAsset)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "retain"
+							}
 						},
 						{
 							"kind": "method",
@@ -58461,7 +58538,13 @@
 								"en": "Remove a reference. (when an instance calls destroy; at 0 the GPU resources are deleted and the asset leaves the cache)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "release"
+							}
 						},
 						{
 							"kind": "method",
@@ -58480,7 +58563,13 @@
 								"en": "Return the asset key."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_key"
+							}
 						},
 						{
 							"kind": "method",
@@ -58499,7 +58588,13 @@
 								"en": "Return the reference count. (number of live instances sharing this asset)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_reference_count"
+							}
 						},
 						{
 							"kind": "method",
@@ -58518,7 +58613,13 @@
 								"en": "Whether destroyed."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "is_destroyed"
+							}
 						},
 						{
 							"kind": "method",
@@ -58537,7 +58638,13 @@
 								"en": "GPU byte count. (vertex and index buffers, morph textures and material prototype textures including mipmaps, one copy regardless of the instance count)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_gpu_byte_count"
+							}
 						},
 						{
 							"kind": "method",
@@ -58575,7 +58682,13 @@
 								"en": "Returns the shader program."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_shader_program"
+							}
 						},
 						{
 							"kind": "method",
@@ -58594,7 +58707,13 @@
 								"en": "Return the prototype drawable list. (instances copy it to share the buffers and material prototypes; do not change it)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_drawable_list"
+							}
 						},
 						{
 							"kind": "method",
@@ -58613,7 +58732,13 @@
 								"en": "Return the material prototype list. (the default material is last; this asset created them and deletes them when the last instance calls destroy)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_material_list"
+							}
 						},
 						{
 							"kind": "method",
@@ -58632,7 +58757,13 @@
 								"en": "Return the node prototype list. (the nodes at upload; instances copy them and keep their own pose)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_node_list"
+							}
 						},
 						{
 							"kind": "method",
@@ -58651,7 +58782,13 @@
 								"en": "Return the root node list."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_root_node_indices"
+							}
 						},
 						{
 							"kind": "method",
@@ -58670,7 +58807,13 @@
 								"en": "Return the skin prototype list. (joints and inverse bind matrices are shared, the joint matrix array is per instance)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_skin_list"
+							}
 						},
 						{
 							"kind": "method",
@@ -58689,7 +58832,13 @@
 								"en": "Return the animation clip list. (all instances share the same list; clips added with addAnimationsFromFbx* are visible to all)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/skinnedmodelasset.js"
+							"source": "src/graphics3d/skinnedmodelasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodelasset",
+								"class": "SkinnedModelAsset",
+								"name": "get_animation_list"
+							}
 						}
 					]
 				}
@@ -69360,6 +69509,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/material.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/material",
+								"class": "Material",
+								"name": "set_base_color_factor"
+							},
 							"examples": [
 								{
 									"title": {
@@ -69388,7 +69543,13 @@
 								"en": "Create a material copy. (like Unity's material and sharedMaterial, only the values fork and the textures are borrowed from the original)\n- Copies the factors, flags, default slot textures and extra textures added with setTexture. No GPU texture is uploaded again.\n- The copy's destroy does not delete the borrowed textures. Finish using the copies before destroying the original (the material that created the textures)."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/material.js"
+							"source": "src/graphics3d/material.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/material",
+								"class": "Material",
+								"name": "create_instance"
+							}
 						},
 						{
 							"kind": "method",
@@ -69407,7 +69568,13 @@
 								"en": "Return the texture byte count. (GPU bytes of the default slot textures this material created, including mipmaps; 0 for a copy)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/material.js"
+							"source": "src/graphics3d/material.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/material",
+								"class": "Material",
+								"name": "get_texture_byte_count"
+							}
 						},
 						{
 							"kind": "method",
