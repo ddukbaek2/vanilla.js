@@ -101,7 +101,7 @@ engine.run(new TitleScene());
 
 ### 컴포넌트와 노드 종류 등록
 
-게임 쪽 `UIDocument` 가 처음부터 아는 컴포넌트는 `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, `ShadowImage` 이고(`UIDocument.getComponentTypeNames()`), 노드 종류는 `WorldNode` 하나입니다. UI Editor 와 Visual Editor 는 엔진이 내보내는 모든 컴포넌트와 `WorldNode` 파생 노드를 문서 형식에 등록해 씁니다. 그래서 편집기에서 쓴 종류가 게임 쪽 표에 없으면, 그 컴포넌트는 읽을 때 경고를 내고 빠지고 그 노드는 경고를 내고 `WorldNode` 로 되살아납니다.
+게임 쪽 `UIDocument` 가 처음부터 아는 컴포넌트는 `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, `ShadowImage` 이고(`UIDocument.getComponentTypeNames()`), 노드 종류는 `WorldNode` 하나입니다. UI Editor 는 엔진이 내보내는 모든 컴포넌트와 `WorldNode` 파생 노드를 문서 형식에 등록해 씁니다. 그래서 편집기에서 쓴 종류가 게임 쪽 표에 없으면, 그 컴포넌트는 읽을 때 경고를 내고 빠지고 그 노드는 경고를 내고 `WorldNode` 로 되살아납니다.
 
 편집기가 저장한 문서를 읽는 게임은 `fromJsonText` 앞에 `UIDocument.registerEditorTypes()` 를 한 번 부릅니다. 편집기가 등록하는 종류(컴포넌트 35, 노드 종류 12)를 같은 이름으로 모두 등록하고, 이미 등록한 이름은 그대로 둡니다. 하나씩 등록할 때는 `registerNodeType`, `registerComponentType` 을 씁니다. 예를 들어 입력칸(`UIInputField`)과 스크롤 바(`UIScrollBar`)는 `WorldNode` 를 이어받은 노드이고, 스냅 스크롤 뷰(`UISnapScrollView`)는 컴포넌트입니다.
 
