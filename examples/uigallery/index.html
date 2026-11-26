@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Gallery</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1d1814; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// UI 위젯 갤러리. (러스트 예제 uigallery 와 같은 장면)
+// - 위젯을 한 화면에 모두 놓는다: UIView, UILabel, UIButton, UIToggleButton, UISlider, UIProgressView, UIImageView, UIScrollView + UIScrollBar.
+// - 터치는 TouchRecognizer 로 받는다. (스크롤 뷰 안의 버튼을 끌어도 스크롤된다)
+// - 사람이 없어도 확인할 수 있게, 정해 둔 프레임에 입력을 흉내 낸다:
+//   휠로 스크롤 → 버튼 클릭 → 슬라이더 누름 → 토글 클릭 → 스크롤 뷰 안 버튼을 위로 끌기 → 버튼을 누른 채 두기.
+// - 240 프레임이 지나면 멈춘다. (화면 저장: ?capture=120,200)
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Rect, Color, Pivot, Paint, Sprite, TextAlign, TextBaseline, TouchRecognizer, ViewScaleMode, UIView, UILabel, UIButton, UIToggleButton, UISlider, UIProgressView, ProgressDirection, UIImageView, UIScrollView } from "../../import.js";
+
+//==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const BACKGROUND_COLOR = "#1d1814";
+const PANEL_COLOR = "#2c241e";
+const ACCENT_COLOR = "#f3e5ab";
+const DARK_TEXT_COLOR = "#2b2118";
+const LIGHT_TEXT_COLOR = "#f1e9d8";
+const CAPTION_TEXT_COLOR = "#b8a690";
+const SCROLL_ROW_COUNT = 14;
+const SCROLL_ROW_HEIGHT = 52;
+const SCROLL_ROW_GAP = 8;
+const EXIT_FRAME_COUNT = 240;
+
+//==============================================================================
+// 원 그림 만들기. (가운데가 밝은 둥근 무늬. 코드로 픽셀을 찍는다)
+//==============================================================================
+function createDiscImage(imageSize, innerColor, outerColor) {
+	const canvas = new System.OffscreenCanvas(imageSize, imageSize);
+	const context = canvas.getContext("2d");
+	const imageData = context.createImageData(imageSize, imageSize);
+	const pixels = imageData.data;
+	const halfSize = imageSize * 0.5;
+	for (let pixelY = 0; pixelY < imageSize; pixelY++) {
+		for (let pixelX = 0; pixelX < imageSize; pixelX++) {
+			const deltaX = (pixelX + 0.5 - halfSize) / halfSize;
+			const deltaY = (pixelY + 0.5 - halfSize) / halfSize;
+			const distance = System.Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+			const coverage = System.Math.min(1, System.Math.max(0, (1 - distance) * halfSize));
+			if (coverage <= 0) {
+				continue;
+			}
+			const stripe = System.Math.floor((deltaX + deltaY) * 4) % 2 === 0 ? 1 : 0.85;
+			const pixelColor = Color.lerp(innerColor, outerColor, distance);
+			const pixelIndex = (pixelY * imageSize + pixelX) * 4;
+			pixels[pixelIndex] = System.Math.trunc(pixelColor.red * stripe * 255);
+			pixels[pixelIndex + 1] = System.Math.trunc(pixelColor.green * stripe * 255);
+			pixels[pixelIndex + 2] = System.Math.trunc(pixelColor.blue * stripe * 255);
+			pixels[pixelIndex + 3] = System.Math.trunc(coverage * 255);
+		}
+	}
+	context.putImageData(imageData, 0, 0);
+	return canvas;
+}
+
+//==============================================================================
+// 왼쪽 위 기준 상자 노드 만들기.
+//==============================================================================
+function createBoxNode(parentNode, name, position, size) {
+	const node = new WorldNode();
+	node.setName(name);
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(position);
+	node.setContentSize(size);
+	return node;
+}
+
+//==============================================================================
+// 글자 노드 만들기. (UILabel)
+//==============================================================================
+function createLabelNode(parentNode, name, position, size, text, fontSize, color, textAlign) {
+	const labelNode = createBoxNode(parentNode, name, position, size);
+	const label = labelNode.addComponent(UILabel);
+	label.setText(text);
+	label.setFontSize(fontSize);
+	label.setTextColor(color);
+	label.setTextAlign(textAlign);
+	label.setTextBaseline(TextBaseline.middle);
+	return labelNode;
+}
+
+//==============================================================================
+// 글자 버튼 만들기. (둥근 Paint 바탕 + UIButton + 같은 노드의 UILabel)
+//==============================================================================
+function createTextButtonNode(parentNode, name, position, size, text, fillColor) {
+	const buttonNode = createBoxNode(parentNode, name, position, size);
+	const buttonPaint = buttonNode.addComponent(Paint);
+	buttonPaint.setColor(fillColor);
+	buttonPaint.setRoundSize(size.y * 0.5);
+	const label = buttonNode.addComponent(UILabel);
+	label.setText(text);
+	label.setFontSize(22);
+	label.setTextColor(DARK_TEXT_COLOR);
+	label.setBold(true);
+	buttonNode.addComponent(UIButton);
+	return buttonNode;
+}
+
+//==============================================================================
+// 노드 내용 좌표 → 뷰 좌표. (노드의 뷰 네 귀로 셈한다)
+//==============================================================================
+function convertNodePositionToViewPosition(node, localPosition) {
+	const worldCorners = node.getWorldCorners();
+	const topLeft = worldCorners[0];
+	const topRight = worldCorners[1];
+	const bottomLeft = worldCorners[3];
+	const contentSize = node.getContentSize();
+	const ratioX = contentSize.x > 0 ? localPosition.x / contentSize.x : 0;
+	const ratioY = contentSize.y > 0 ? localPosition.y / contentSize.y : 0;
+	return Vector2.create(topLeft.x + (topRight.x - topLeft.x) * ratioX + (bottomLeft.x - topLeft.x) * ratioY, topLeft.y + (topRight.y - topLeft.y) * ratioX + (bottomLeft.y - topLeft.y) * ratioY);
+}
+
+//==============================================================================
+// 노드 가운데의 뷰 좌표. (흉내 낸 입력이 누를 자리)
+//==============================================================================
+function calculateNodeCenter(node) {
+	const contentSize = node.getContentSize();
+	return convertNodePositionToViewPosition(node, Vector2.create(contentSize.x * 0.5, contentSize.y * 0.5));
+}
+
+//==============================================================================
+// 갤러리 씬.
+//==============================================================================
+class UIGalleryScene extends Scene {
+	#frameCount = 0;
+	#elapsedSeconds = 0;
+	#clickCount = 0;
+	#clickButtonNode = null;
+	#holdButtonNode = null;
+	#sliderNode = null;
+	#toggleNode = null;
+	#scrollNode = null;
+	#scrollRowNode = null;
+	#dragStartPosition = null;
+	#progressNode = null;
+	#verticalProgressNode = null;
+
+	//==============================================================================
+	// 구역 판 만들기. (배경색을 정한 UIView + 구역 이름)
+	//==============================================================================
+	static createSectionPanel(parentNode, name, position, size, caption) {
+		const panelNode = createBoxNode(parentNode, name, position, size);
+		const panelView = panelNode.addComponent(UIView);
+		panelView.setBackgroundColor(Color.createFromHEX(PANEL_COLOR));
+		createLabelNode(panelNode, "caption", Vector2.create(14, 6), Vector2.create(size.x - 28, 26), caption, 17, CAPTION_TEXT_COLOR, TextAlign.left);
+		return panelNode;
+	}
+
+	//==============================================================================
+	// 버튼 구역. (클릭 셈, 누른 채 두는 버튼, 쓸 수 없는 그림 버튼)
+	//==============================================================================
+	createButtonSection(root) {
+		const panelNode = UIGalleryScene.createSectionPanel(root, "buttonSection", Vector2.create(40, 90), Vector2.create(380, 250), "UIButton");
+		const counterLabelNode = createLabelNode(panelNode, "clickCounter", Vector2.create(210, 44), Vector2.create(160, 48), "클릭 0번", 22, LIGHT_TEXT_COLOR, TextAlign.left);
+		const clickButtonNode = createTextButtonNode(panelNode, "clickButton", Vector2.create(20, 44), Vector2.create(180, 48), "눌러 보세요", ACCENT_COLOR);
+		clickButtonNode.getComponent(UIButton).setClickedEvent(() => {
+			this.#clickCount += 1;
+			counterLabelNode.getComponent(UILabel).setText(`클릭 ${this.#clickCount}번`);
+		});
+
+		const holdButtonNode = createTextButtonNode(panelNode, "holdButton", Vector2.create(20, 108), Vector2.create(180, 48), "누르고 있어요", ACCENT_COLOR);
+		createLabelNode(panelNode, "holdCaption", Vector2.create(210, 108), Vector2.create(160, 48), "눌림 틴트", 18, CAPTION_TEXT_COLOR, TextAlign.left);
+
+		// 쓸 수 없는 그림 버튼. (스프라이트에 어두운 덮는 색)
+		const discImage = createDiscImage(96, Color.createFromHEX("#9ad0ff"), Color.createFromHEX("#3060c0"));
+		const disabledButtonNode = createBoxNode(panelNode, "disabledButton", Vector2.create(20, 172), Vector2.create(64, 64));
+		disabledButtonNode.addComponent(Sprite).setImage(discImage);
+		disabledButtonNode.addComponent(UIButton).setInteractable(false);
+		const enabledButtonNode = createBoxNode(panelNode, "enabledButton", Vector2.create(100, 172), Vector2.create(64, 64));
+		enabledButtonNode.addComponent(Sprite).setImage(discImage);
+		enabledButtonNode.addComponent(UIButton);
+		createLabelNode(panelNode, "disabledCaption", Vector2.create(180, 180), Vector2.create(190, 48), "왼쪽: 쓸 수 없음", 18, CAPTION_TEXT_COLOR, TextAlign.left);
+
+		this.#clickButtonNode = clickButtonNode;
+		this.#holdButtonNode = holdButtonNode;
+	}
+
+	//==============================================================================
+	// 토글 구역. (처음부터 켠 것, 흉내 낸 클릭으로 켜지는 것)
+	//==============================================================================
+	createToggleSection(root) {
+		const panelNode = UIGalleryScene.createSectionPanel(root, "toggleSection", Vector2.create(40, 360), Vector2.create(380, 130), "UIToggleButton");
+		const toggleNodeList = [];
+		const toggleTextList = ["켜 둠", "클릭으로 켬", "꺼짐"];
+		for (let toggleIndex = 0; toggleIndex < toggleTextList.length; toggleIndex++) {
+			const toggleNode = createBoxNode(panelNode, "toggle", Vector2.create(20 + toggleIndex * 118, 50), Vector2.create(106, 56));
+			const togglePaint = toggleNode.addComponent(Paint);
+			togglePaint.setColor("#e8d9c4");
+			togglePaint.setRoundSize(12);
+			const label = toggleNode.addComponent(UILabel);
+			label.setText(toggleTextList[toggleIndex]);
+			label.setFontSize(18);
+			label.setTextColor(DARK_TEXT_COLOR);
+			const toggleButton = toggleNode.addComponent(UIToggleButton);
+			toggleButton.setOnTintColor(new Color(0.85, 0.45, 0.1, 0.6));
+			// 글자까지 같은 색으로 물들면 읽기 어려워 글자는 틴트에서 뺀다.
+			toggleButton.excludeComponentFromTint(label);
+			if (toggleIndex === 0) {
+				toggleButton.setIsOn(true);
+			}
+			toggleNodeList.push(toggleNode);
+		}
+		this.#toggleNode = toggleNodeList[1];
+	}
+
+	//==============================================================================
+	// 슬라이더 / 진행률 구역.
+	//==============================================================================
+	createValueSection(root) {
+		const panelNode = UIGalleryScene.createSectionPanel(root, "valueSection", Vector2.create(440, 90), Vector2.create(380, 400), "UISlider / UIProgressView");
+
+		// 가로 슬라이더. (값이 바뀌면 값 글자를 바꾼다)
+		const valueLabelNode = createLabelNode(panelNode, "sliderValue", Vector2.create(250, 48), Vector2.create(110, 40), "값 0.30", 20, LIGHT_TEXT_COLOR, TextAlign.left);
+		const sliderNode = createBoxNode(panelNode, "slider", Vector2.create(30, 58), Vector2.create(200, 20));
+		const slider = sliderNode.addComponent(UISlider);
+		slider.setValue(0.3);
+		slider.setTrackThickness(8);
+		slider.setCornerRadius(4);
+		slider.setThumbRadius(12);
+		slider.setFillColor(Color.createFromHEX(ACCENT_COLOR));
+		slider.setTrackColor(Color.createFromHEX("#5a4a3c"));
+		slider.setValueChangedEvent((changedSlider) => {
+			valueLabelNode.getComponent(UILabel).setText(`값 ${changedSlider.getValue().toFixed(2)}`);
+		});
+
+		// 손잡이 노드를 쓰는 세로 슬라이더.
+		const verticalSliderNode = createBoxNode(panelNode, "verticalSlider", Vector2.create(330, 110), Vector2.create(12, 260));
+		const thumbNode = createBoxNode(verticalSliderNode, "thumb", Vector2.create(0, 0), Vector2.create(28, 28));
+		const thumbPaint = thumbNode.addComponent(Paint);
+		thumbPaint.setColor("#ff9a5a");
+		thumbPaint.setRoundSize(8);
+		const verticalSlider = verticalSliderNode.addComponent(UISlider);
+		verticalSlider.setDirection(ProgressDirection.vertical);
+		verticalSlider.setCornerRadius(6);
+		verticalSlider.setValue(0.65);
+		verticalSlider.setThumbNode(thumbNode);
+
+		// 가로 진행률. (반대편 값도 함께)
+		const progressNode = createBoxNode(panelNode, "progress", Vector2.create(30, 120), Vector2.create(260, 24));
+		const progressView = progressNode.addComponent(UIProgressView);
+		progressView.setCornerRadius(12);
+		progressView.setTrackColor(Color.createFromHEX("#5a4a3c"));
+		progressView.setFillColor(Color.createFromHEX("#7fd38a"));
+		progressView.setSecondaryValue(0.2);
+		createLabelNode(panelNode, "progressCaption", Vector2.create(30, 150), Vector2.create(260, 24), "초록은 차오르고, 빨강은 반대편 값", 15, CAPTION_TEXT_COLOR, TextAlign.left);
+
+		// 세로 진행률 셋.
+		const progressValueList = [0.25, 0.6, 0.9];
+		for (let progressIndex = 0; progressIndex < progressValueList.length; progressIndex++) {
+			const barNode = createBoxNode(panelNode, "verticalProgress", Vector2.create(40 + progressIndex * 50, 190), Vector2.create(28, 180));
+			const barView = barNode.addComponent(UIProgressView);
+			barView.setDirection(ProgressDirection.vertical);
+			barView.setCornerRadius(6);
+			barView.setTrackColor(Color.createFromHEX("#5a4a3c"));
+			barView.setValue(progressValueList[progressIndex]);
+			if (progressIndex === 0) {
+				this.#verticalProgressNode = barNode;
+			}
+		}
+
+		// 이미지 뷰 둘. (그대로, 좌우 뒤집고 색 입힘. 뒤집은 스프라이트는 노드 왼쪽으로 그려져 노드를 한 폭 오른쪽에 둔다)
+		const imageViewImage = createDiscImage(128, Color.createFromHEX("#ffe6a0"), Color.createFromHEX("#d0702a"));
+		const imageViewNode = createBoxNode(panelNode, "imageView", Vector2.create(190, 200), Vector2.create(110, 80));
+		const imageView = imageViewNode.addComponent(UIImageView);
+		imageView.setImage(imageViewImage);
+		imageView.setBackgroundColor(new Color(1, 1, 1, 0.08));
+		const tintedImageViewNode = createBoxNode(panelNode, "tintedImageView", Vector2.create(300, 290), Vector2.create(110, 80));
+		const tintedImageView = tintedImageViewNode.addComponent(UIImageView);
+		tintedImageView.setImage(imageViewImage);
+		tintedImageView.setHorizontalFlip(true);
+		tintedImageView.setColor(new Color(0.3, 0.6, 1, 0.5));
+
+		this.#sliderNode = sliderNode;
+		this.#progressNode = progressNode;
+	}
+
+	//==============================================================================
+	// 스크롤 뷰 구역. (줄 버튼 목록 + 세로 스크롤바)
+	//==============================================================================
+	createScrollSection(root) {
+		createLabelNode(root, "scrollCaption", Vector2.create(840, 90), Vector2.create(400, 26), "UIScrollView + UIScrollBar (휠, 끌기)", 17, CAPTION_TEXT_COLOR, TextAlign.left);
+		const scrollWidth = 400;
+		const scrollHeight = 470;
+		const scrollNode = createBoxNode(root, "scroll", Vector2.create(840, 120), Vector2.create(scrollWidth, scrollHeight));
+		const scrollContentHeight = SCROLL_ROW_GAP + SCROLL_ROW_COUNT * (SCROLL_ROW_HEIGHT + SCROLL_ROW_GAP);
+		const scrollView = scrollNode.addComponent(UIScrollView);
+		scrollView.setBackgroundColor(Color.createFromHEX(PANEL_COLOR));
+		scrollView.setScrollContentSize(Vector2.create(scrollWidth, scrollContentHeight));
+		scrollView.setShowsVerticalScrollBar(true);
+		scrollView.setHorizontal(false);
+		const contentNode = scrollView.getContent();
+		const rowWidth = scrollWidth - 24 - SCROLL_ROW_GAP * 2;
+		for (let rowIndex = 0; rowIndex < SCROLL_ROW_COUNT; rowIndex++) {
+			const rowColor = rowIndex % 2 === 0 ? "#4a3c30" : "#5a4a3c";
+			const rowPosition = Vector2.create(SCROLL_ROW_GAP, SCROLL_ROW_GAP + rowIndex * (SCROLL_ROW_HEIGHT + SCROLL_ROW_GAP));
+			const rowNode = createBoxNode(contentNode, "row", rowPosition, Vector2.create(rowWidth, SCROLL_ROW_HEIGHT));
+			const rowPaint = rowNode.addComponent(Paint);
+			rowPaint.setColor(rowColor);
+			rowPaint.setRoundSize(8);
+			const rowLabel = rowNode.addComponent(UILabel);
+			rowLabel.setText(`  ${rowIndex + 1}번째 줄 (눌러도 되고 끌어도 돼요)`);
+			rowLabel.setFontSize(18);
+			rowLabel.setTextAlign(TextAlign.left);
+			rowLabel.setTextColor(LIGHT_TEXT_COLOR);
+			rowNode.addComponent(UIButton);
+			if (rowIndex === 3) {
+				this.#scrollRowNode = rowNode;
+			}
+		}
+		this.#scrollNode = scrollNode;
+	}
+
+	//==============================================================================
+	// 흉내 낸 입력. (정해 둔 프레임에 누름 / 이동 / 뗌 / 휠)
+	//==============================================================================
+	simulateInput() {
+		const frameCount = this.#frameCount;
+		const scrollCenter = calculateNodeCenter(this.#scrollNode);
+		const clickButtonCenter = calculateNodeCenter(this.#clickButtonNode);
+		const holdButtonCenter = calculateNodeCenter(this.#holdButtonNode);
+		const toggleCenter = calculateNodeCenter(this.#toggleNode);
+		const sliderPosition = convertNodePositionToViewPosition(this.#sliderNode, Vector2.create(200 * 0.7, 10));
+		const scrollRowCenter = calculateNodeCenter(this.#scrollRowNode);
+		// 끄는 동안 줄도 따라 움직이므로, 누른 자리는 누를 때 한 번만 정한다.
+		if (frameCount === 58) {
+			this.#dragStartPosition = scrollRowCenter;
+		}
+		const dragStartPosition = this.#dragStartPosition;
+
+		const inputManager = this.getEngine().getInputManager();
+		let inputPosition = null;
+		if (frameCount >= 20 && frameCount < 30) {
+			inputPosition = scrollCenter;
+			if (frameCount === 20) {
+				inputManager.addWheelDelta(0, 120);
+			}
+		}
+		else if (frameCount >= 30 && frameCount < 40) {
+			inputPosition = clickButtonCenter;
+		}
+		else if (frameCount >= 40 && frameCount < 50) {
+			inputPosition = sliderPosition;
+		}
+		else if (frameCount >= 50 && frameCount < 58) {
+			inputPosition = toggleCenter;
+		}
+		else if (frameCount >= 58 && frameCount < 75) {
+			// 줄 버튼을 누르고 10 프레임 동안 60 픽셀 위로 끈다. (임계를 넘으면 스크롤 뷰가 가져간다)
+			const dragFrameCount = System.Math.min(10, System.Math.max(0, frameCount - 59));
+			inputPosition = dragStartPosition !== null ? Vector2.create(dragStartPosition.x, dragStartPosition.y - dragFrameCount * 6) : null;
+		}
+		else if (frameCount >= 75) {
+			inputPosition = holdButtonCenter;
+		}
+		inputManager.setViewInputPosition(inputPosition !== null ? inputPosition : Vector2.create(-100, -100));
+
+		const pressFrames = [30, 40, 50, 58, 75];
+		const releaseFrames = [33, 43, 53, 70];
+		if (pressFrames.includes(frameCount)) {
+			inputManager.setTouchPressed(true);
+			inputManager.setTouchDown(true);
+		}
+		if (frameCount >= 59 && frameCount <= 69) {
+			inputManager.setTouchMoved(true);
+		}
+		if (releaseFrames.includes(frameCount)) {
+			inputManager.setTouchReleased(true);
+			inputManager.setTouchDown(false);
+		}
+	}
+
+	//==============================================================================
+	// 진행률을 시간에 따라 움직인다.
+	//==============================================================================
+	animateProgress() {
+		const progressValue = 0.15 + 0.5 * (0.5 + 0.5 * System.Math.sin(this.#elapsedSeconds * 1.5));
+		this.#progressNode.getComponent(UIProgressView).setValue(progressValue);
+		this.#verticalProgressNode.getComponent(UIProgressView).setValue(1 - progressValue);
+	}
+
+	//==============================================================================
+	// 초기화. (위젯을 모두 놓고 TouchRecognizer 를 건다)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		const touchRecognizer = new TouchRecognizer();
+		touchRecognizer.setRootNode(root);
+		this.setTouchRaycaster(touchRecognizer);
+		const titleNode = createLabelNode(root, "title", Vector2.create(40, 24), Vector2.create(800, 50), "바닐라엔진 UI 위젯 갤러리", 34, ACCENT_COLOR, TextAlign.left);
+		titleNode.getComponent(UILabel).setBold(true);
+		createLabelNode(root, "help", Vector2.create(40, 650), Vector2.create(1200, 40), "입력은 흉내 낸 것: 휠 스크롤 → 버튼 클릭 → 슬라이더 70% → 토글 클릭 → 목록 끌기 → 버튼 누른 채", 17, CAPTION_TEXT_COLOR, TextAlign.left);
+		this.createButtonSection(root);
+		this.createToggleSection(root);
+		this.createValueSection(root);
+		this.createScrollSection(root);
+	}
+
+	//==============================================================================
+	// 주기적 갱신. (흉내 낸 입력 → 노드 갱신 → TouchRecognizer)
+	//==============================================================================
+	tick(timeDelta) {
+		this.#frameCount += 1;
+		this.#elapsedSeconds += timeDelta;
+		if (this.#frameCount >= EXIT_FRAME_COUNT) {
+			return;
+		}
+		this.simulateInput();
+		this.animateProgress();
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (배경 칠하기)
+	//==============================================================================
+	preDraw(graphic) {
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "UI 위젯 갤러리 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.autoResizeOnWindowResize = true;
+// 화면 저장 때도 프레임 간격이 일정하도록 60 FPS 로 묶는다. (틴트 트랜지션이 프레임 수와 맞게)
+engineConfiguration.maximumFramePerSecond = 60;
+const engine = new Engine(engineConfiguration);
+// 뷰 모드는 엔진 설정에 칸이 없어 뷰 관리자에 건다.
+engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
+engine.run(new UIGalleryScene());
+</script>
+</body>
+</html>
