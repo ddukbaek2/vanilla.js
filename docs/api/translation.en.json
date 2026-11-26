@@ -9426,5 +9426,12 @@
 	"세이브 실패 까닭. (러스트 판 SaveGameError 의 이름과 같다)": "Why a save failed. (Same names as SaveGameError in the Rust edition)",
 	"자료를 JSON 으로 바꿀 수 없다. (순환, BigInt, 맨 위 undefined. 러스트는 Serialize 가 실패할 때) NaN, Infinity 는 두 엔진 모두 null 로 쓴다.": "The data cannot be converted to JSON. (A cycle, a BigInt, or a top-level undefined; in Rust, when Serialize fails) NaN and Infinity are written as null in both engines.",
 	"제약 번호. (없으면 -1)": "The constraint index. (-1 if not found)",
-	"IK 제약 번호 찾기. (없으면 -1, 러스트 판 find_ik_constraint_index 와 apply_ik_constraint(번호) 자리)": "Finds an IK constraint index. (-1 if not found; corresponds to find_ik_constraint_index and apply_ik_constraint(index) in the Rust edition)"
+	"IK 제약 번호 찾기. (없으면 -1, 러스트 판 find_ik_constraint_index 와 apply_ik_constraint(번호) 자리)": "Finds an IK constraint index. (-1 if not found; corresponds to find_ik_constraint_index and apply_ik_constraint(index) in the Rust edition)",
+	"이번에 콜백과 조건 함수에 넘길 대상.": "The target to pass to the callbacks and condition functions this time.",
+	"대상을 들지 않고 실행 시작. (처음 스텝부터)\n- 첫 스텝의 시작 콜백까지 이 자리에서 target 으로 부르고, 대상은 들지 않는다. (getTarget 은 그대로)\n- 뒤로는 stepWith 에 매번 대상을 넘긴다. repeat, forever, loop 의 안쪽 액션도 이렇게 돈다.": "Starts running without holding the target. (from the first step)\n- Calls up to the first step's started callback right here with target, and does not hold the target. (getTarget stays as it was)\n- After this, pass the target to stepWith every time. The inner actions of repeat, forever and loop run this way too.",
+	"대상을 매번 넘겨 돌리기": "Running by passing the target every time",
+	"대상을 넘겨 갱신. (매 프레임 호출)\n- start 전이거나 끝났으면 아무것도 하지 않는다. 든 대상 대신 target 을 콜백에 넘긴다.": "Updates with a given target. (call every frame)\n- Does nothing before start or after it is done. Passes target to the callbacks instead of the held target.",
+	"장면 갱신에서 대상을 넘겨 돌리기": "Running by passing the target from a scene update",
+	"실행 시작. (처음 스텝부터)\n- 대상을 들고 있다가 step 이 그 대상을 콜백에 넘기고 getTarget 이 돌려준다. (러스트 판 start(node_tree, Some(node_id)))": "Starts running. (from the first step)\n- Holds the target, so step passes it to the callbacks and getTarget returns it. (start(node_tree, Some(node_id)) in the Rust edition)",
+	"갱신. (매 프레임 호출)\n- start 로 든 대상을 콜백에 넘긴다. (러스트 판 step(node_tree, time_delta))": "Updates. (call every frame)\n- Passes the target held by start to the callbacks. (step(node_tree, time_delta) in the Rust edition)"
 }

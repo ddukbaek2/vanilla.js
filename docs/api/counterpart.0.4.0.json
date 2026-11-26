@@ -89,12 +89,12 @@
 			"vanilla-engine": {
 				"module": "animation/action",
 				"class": "Action",
-				"name": "start"
+				"name": "start_with"
 			},
 			"vanilla.js": {
 				"module": "animation/action",
 				"class": "Action",
-				"name": "start"
+				"name": "startWith"
 			}
 		},
 		{
@@ -113,12 +113,12 @@
 			"vanilla-engine": {
 				"module": "animation/action",
 				"class": "Action",
-				"name": "step"
+				"name": "step_with"
 			},
 			"vanilla.js": {
 				"module": "animation/action",
 				"class": "Action",
-				"name": "step"
+				"name": "stepWith"
 			}
 		},
 		{
@@ -143,6 +143,30 @@
 				"module": "animation/action",
 				"class": "Action",
 				"name": "isRunning"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "animation/action",
+				"class": "Action",
+				"name": "start"
+			},
+			"vanilla.js": {
+				"module": "animation/action",
+				"class": "Action",
+				"name": "start"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "animation/action",
+				"class": "Action",
+				"name": "step"
+			},
+			"vanilla.js": {
+				"module": "animation/action",
+				"class": "Action",
+				"name": "step"
 			}
 		},
 		{

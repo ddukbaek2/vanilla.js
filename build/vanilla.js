@@ -412,10 +412,6 @@ var Object2 = class {
    * @virtual
    */
   destroy() {
-    const isDestroyed = this.isDestroyed();
-    if (isDestroyed) {
-      return;
-    }
   }
   //==============================================================================
   // 동등성 비교.
@@ -447,16 +443,6 @@ var Object2 = class {
       instanceIdTable.set(this, instanceId);
     }
     return instanceId;
-  }
-  //==============================================================================
-  // 파괴 여부 반환.
-  // - destroy() 가 파괴 표시를 남기지 않으므로 늘 false 다.
-  //==============================================================================
-  /**
-   * @returns { boolean } 파괴되었으면 참. (기반 오브젝트는 늘 false)
-   */
-  isDestroyed() {
-    return false;
   }
   //==============================================================================
   // 인스턴스 얕은 복제.
@@ -52402,8 +52388,8 @@ var Action = class extends Object2 {
   //==============================================================================
   // 현재 스텝 시작 처리.
   //==============================================================================
-  /** @private */
-  #startCurrentStep() {
+  /** @private @param { System.Object } target 콜백에 넘길 대상. */
+  #startCurrentStep(target) {
     if (this.#currentStepIndex >= this.#steps.length) {
       this.#isRunning = false;
       this.#isDone = true;
@@ -52412,10 +52398,9 @@ var Action = class extends Object2 {
     const step = this.#steps[this.#currentStepIndex];
     this.#currentStepElapsed = 0;
     this.#currentStepState = {};
-    const target = this.getTarget();
     if (step.type === "call") {
       step.fn(target);
-      this.#advanceStep();
+      this.#advanceStep(target);
       return;
     }
     if (step.callbacks && step.callbacks.started) {
@@ -52423,28 +52408,28 @@ var Action = class extends Object2 {
     }
     if (step.type === "repeat") {
       if (step.times <= 0) {
-        this.#advanceStep();
+        this.#advanceStep(target);
         return;
       }
       this.#currentStepState.completedCount = 0;
-      step.innerAction.start(target);
+      step.innerAction.startWith(target);
     } else if (step.type === "forever") {
-      step.innerAction.start(target);
+      step.innerAction.startWith(target);
     } else if (step.type === "loop") {
       if (!step.conditionFn(target)) {
-        this.#advanceStep();
+        this.#advanceStep(target);
         return;
       }
-      step.innerAction.start(target);
+      step.innerAction.startWith(target);
     }
   }
   //==============================================================================
   // 다음 스텝으로 이동.
   //==============================================================================
-  /** @private */
-  #advanceStep() {
+  /** @private @param { System.Object } target 콜백에 넘길 대상. */
+  #advanceStep(target) {
     this.#currentStepIndex++;
-    this.#startCurrentStep();
+    this.#startCurrentStep(target);
   }
   //==============================================================================
   // 일정 시간 대기.
@@ -52560,7 +52545,8 @@ var Action = class extends Object2 {
     return this;
   }
   //==============================================================================
-  // 실행 시작.
+  // 실행 시작. (처음 스텝부터)
+  // - 대상을 들고 있다가 step 이 그 대상을 콜백에 넘기고 getTarget 이 돌려준다. (러스트 판 start(node_tree, Some(node_id)))
   //==============================================================================
   /**
    * @param { System.Object } target 콜백과 조건 함수에 넘길 대상. (undefined 이면 전의 대상을 그대로 쓴다)
@@ -52569,12 +52555,37 @@ var Action = class extends Object2 {
   start(target) {
     const currentTarget = this.getTarget();
     this.#target = target !== void 0 ? target : currentTarget;
+    return this.startWith(this.#target);
+  }
+  //==============================================================================
+  // 대상을 들지 않고 실행 시작. (처음 스텝부터)
+  // - 첫 스텝의 시작 콜백까지 이 자리에서 target 으로 부르고, 대상은 들지 않는다. (getTarget 은 그대로)
+  // - 뒤로는 stepWith 에 매번 대상을 넘긴다. repeat, forever, loop 의 안쪽 액션도 이렇게 돈다.
+  //==============================================================================
+  /**
+   * @param { System.Object } target 이번에 콜백과 조건 함수에 넘길 대상.
+   * @returns { Action } 이어 쓸 수 있게 이 액션.
+   * @example <caption>대상을 매번 넘겨 돌리기</caption>
+   * import { Action } from "./build/vanilla.js";
+   *
+   * const target = { opacity: 0 };
+   * const action = new Action();
+   * action.wait(1, {
+   * 	updated: (progress, actionTarget) => {
+   * 		actionTarget.opacity = progress;
+   * 	}
+   * });
+   * action.startWith(target);
+   * action.stepWith(target, 0.5);
+   * console.log(target.opacity, action.getTarget());
+   */
+  startWith(target) {
     this.#currentStepIndex = 0;
     this.#currentStepElapsed = 0;
     this.#currentStepState = null;
     this.#isRunning = true;
     this.#isDone = false;
-    this.#startCurrentStep();
+    this.#startCurrentStep(target);
     return this;
   }
   //==============================================================================
@@ -52586,11 +52597,37 @@ var Action = class extends Object2 {
   }
   //==============================================================================
   // 갱신. (매 프레임 호출)
+  // - start 로 든 대상을 콜백에 넘긴다. (러스트 판 step(node_tree, time_delta))
   //==============================================================================
   /**
    * @param { number } timeDelta 지난 프레임부터의 시간. (초)
    */
   step(timeDelta) {
+    this.stepWith(this.getTarget(), timeDelta);
+  }
+  //==============================================================================
+  // 대상을 넘겨 갱신. (매 프레임 호출)
+  // - start 전이거나 끝났으면 아무것도 하지 않는다. 든 대상 대신 target 을 콜백에 넘긴다.
+  //==============================================================================
+  /**
+   * @param { System.Object } target 이번에 콜백과 조건 함수에 넘길 대상.
+   * @param { number } timeDelta 지난 프레임부터의 시간. (초)
+   * @example <caption>장면 갱신에서 대상을 넘겨 돌리기</caption>
+   * import { Action } from "./build/vanilla.js";
+   *
+   * const logo = { opacity: 0 };
+   * const action = new Action();
+   * action.wait(2, {
+   * 	updated: (progress, actionTarget) => {
+   * 		actionTarget.opacity = progress;
+   * 	}
+   * });
+   * action.startWith(logo);
+   * action.stepWith(logo, 1);
+   * action.stepWith(logo, 1);
+   * console.log(logo.opacity, action.isDone());
+   */
+  stepWith(target, timeDelta) {
     if (!this.isRunning() || this.isDone()) {
       return;
     }
@@ -52600,7 +52637,6 @@ var Action = class extends Object2 {
       return;
     }
     const step = this.#steps[this.#currentStepIndex];
-    const target = this.getTarget();
     switch (step.type) {
       case "wait": {
         this.#currentStepElapsed += timeDelta;
@@ -52612,7 +52648,7 @@ var Action = class extends Object2 {
           if (step.callbacks && step.callbacks.completed) {
             step.callbacks.completed(target);
           }
-          this.#advanceStep();
+          this.#advanceStep(target);
         }
         break;
       }
@@ -52624,39 +52660,39 @@ var Action = class extends Object2 {
           if (step.callbacks && step.callbacks.completed) {
             step.callbacks.completed(target);
           }
-          this.#advanceStep();
+          this.#advanceStep(target);
         }
         break;
       }
       case "repeat": {
         const repeatAction = step.innerAction;
-        repeatAction.step(timeDelta);
+        repeatAction.stepWith(target, timeDelta);
         if (repeatAction.isDone()) {
           this.#currentStepState.completedCount++;
           if (this.#currentStepState.completedCount >= step.times) {
-            this.#advanceStep();
+            this.#advanceStep(target);
           } else {
-            repeatAction.start(target);
+            repeatAction.startWith(target);
           }
         }
         break;
       }
       case "forever": {
         const foreverAction = step.innerAction;
-        foreverAction.step(timeDelta);
+        foreverAction.stepWith(target, timeDelta);
         if (foreverAction.isDone()) {
-          foreverAction.start(target);
+          foreverAction.startWith(target);
         }
         break;
       }
       case "loop": {
         const loopAction = step.innerAction;
-        loopAction.step(timeDelta);
+        loopAction.stepWith(target, timeDelta);
         if (loopAction.isDone()) {
           if (step.conditionFn(target)) {
-            loopAction.start(target);
+            loopAction.startWith(target);
           } else {
-            this.#advanceStep();
+            this.#advanceStep(target);
           }
         }
         break;

@@ -54527,8 +54527,8 @@
 								}
 							},
 							"description": {
-								"ko": "실행 시작.",
-								"en": "Starts running."
+								"ko": "실행 시작. (처음 스텝부터)\n- 대상을 들고 있다가 step 이 그 대상을 콜백에 넘기고 getTarget 이 돌려준다. (러스트 판 start(node_tree, Some(node_id)))",
+								"en": "Starts running. (from the first step)\n- Holds the target, so step passes it to the callbacks and getTarget returns it. (start(node_tree, Some(node_id)) in the Rust edition)"
 							},
 							"since": "0.0.9",
 							"source": "src/animation/action.js",
@@ -54538,6 +54538,50 @@
 								"class": "Action",
 								"name": "start"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "startWith",
+							"signature": "startWith(target)",
+							"params": [
+								{
+									"name": "target",
+									"type": "System.Object",
+									"description": {
+										"ko": "이번에 콜백과 조건 함수에 넘길 대상.",
+										"en": "The target to pass to the callbacks and condition functions this time."
+									}
+								}
+							],
+							"returns": {
+								"type": "Action",
+								"description": {
+									"ko": "이어 쓸 수 있게 이 액션.",
+									"en": "This action, for chaining."
+								}
+							},
+							"description": {
+								"ko": "대상을 들지 않고 실행 시작. (처음 스텝부터)\n- 첫 스텝의 시작 콜백까지 이 자리에서 target 으로 부르고, 대상은 들지 않는다. (getTarget 은 그대로)\n- 뒤로는 stepWith 에 매번 대상을 넘긴다. repeat, forever, loop 의 안쪽 액션도 이렇게 돈다.",
+								"en": "Starts running without holding the target. (from the first step)\n- Calls up to the first step's started callback right here with target, and does not hold the target. (getTarget stays as it was)\n- After this, pass the target to stepWith every time. The inner actions of repeat, forever and loop run this way too."
+							},
+							"since": "0.4.0",
+							"source": "src/animation/action.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "animation/action",
+								"class": "Action",
+								"name": "start_with"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "대상을 매번 넘겨 돌리기",
+										"en": "Running by passing the target every time"
+									},
+									"code": "import { Action } from \"./build/vanilla.js\";\n\nconst target = { opacity: 0 };\nconst action = new Action();\naction.wait(1, {\n\tupdated: (progress, actionTarget) => {\n\t\tactionTarget.opacity = progress;\n\t}\n});\naction.startWith(target);\naction.stepWith(target, 0.5);\nconsole.log(target.opacity, action.getTarget());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -54572,8 +54616,8 @@
 								}
 							],
 							"description": {
-								"ko": "갱신. (매 프레임 호출)",
-								"en": "Updates. (called every frame)"
+								"ko": "갱신. (매 프레임 호출)\n- start 로 든 대상을 콜백에 넘긴다. (러스트 판 step(node_tree, time_delta))",
+								"en": "Updates. (call every frame)\n- Passes the target held by start to the callbacks. (step(node_tree, time_delta) in the Rust edition)"
 							},
 							"since": "0.0.9",
 							"source": "src/animation/action.js",
@@ -54583,6 +54627,51 @@
 								"class": "Action",
 								"name": "step"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "stepWith",
+							"signature": "stepWith(target, timeDelta)",
+							"params": [
+								{
+									"name": "target",
+									"type": "System.Object",
+									"description": {
+										"ko": "이번에 콜백과 조건 함수에 넘길 대상.",
+										"en": "The target to pass to the callbacks and condition functions this time."
+									}
+								},
+								{
+									"name": "timeDelta",
+									"type": "number",
+									"description": {
+										"ko": "지난 프레임부터의 시간. (초)",
+										"en": "Time since the last frame. (Seconds)"
+									}
+								}
+							],
+							"description": {
+								"ko": "대상을 넘겨 갱신. (매 프레임 호출)\n- start 전이거나 끝났으면 아무것도 하지 않는다. 든 대상 대신 target 을 콜백에 넘긴다.",
+								"en": "Updates with a given target. (call every frame)\n- Does nothing before start or after it is done. Passes target to the callbacks instead of the held target."
+							},
+							"since": "0.4.0",
+							"source": "src/animation/action.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "animation/action",
+								"class": "Action",
+								"name": "step_with"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "장면 갱신에서 대상을 넘겨 돌리기",
+										"en": "Running by passing the target from a scene update"
+									},
+									"code": "import { Action } from \"./build/vanilla.js\";\n\nconst logo = { opacity: 0 };\nconst action = new Action();\naction.wait(2, {\n\tupdated: (progress, actionTarget) => {\n\t\tactionTarget.opacity = progress;\n\t}\n});\naction.startWith(logo);\naction.stepWith(logo, 1);\naction.stepWith(logo, 1);\nconsole.log(logo.opacity, action.isDone());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
