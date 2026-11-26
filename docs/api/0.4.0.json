@@ -48494,7 +48494,7 @@
 								"ko": "JSON 파일 읽고 항목 보기",
 								"en": "Load a JSON file and read entries"
 							},
-							"code": "import { JsonAsset } from \"./build/vanilla.js\";\n\nconst jsonAsset = new JsonAsset();\nawait jsonAsset.load(\"examples/oldface/assets/expressions.json\");\nif (jsonAsset.isLoaded()) {\n\tconst expressionNames = Object.keys(jsonAsset.data);\n\tconsole.log(expressionNames.length, jsonAsset.data.serious.BrowDownLeft);\n}",
+							"code": "import { JsonAsset } from \"./build/vanilla.js\";\n\nconst jsonAsset = new JsonAsset();\nawait jsonAsset.load(\"examples/timelineshowcase/assets/combo.timeline.json\");\nif (jsonAsset.isLoaded()) {\n\tconst timelineKeys = Object.keys(jsonAsset.data);\n\tconsole.log(timelineKeys.length, jsonAsset.data.name);\n}",
 							"language": "javascript"
 						}
 					],
@@ -48660,7 +48660,7 @@
 								"ko": "캐시 없이 글 파일 받기",
 								"en": "Fetch a text file without the cache"
 							},
-							"code": "import { TextAsset } from \"./build/vanilla.js\";\n\nconst textAsset = new TextAsset();\ntextAsset.setNoCache(true);\nawait textAsset.load(\"examples/oldface/assets/expressions.json\");\nconsole.log(textAsset.text.length, textAsset.isNoCache());",
+							"code": "import { TextAsset } from \"./build/vanilla.js\";\n\nconst textAsset = new TextAsset();\ntextAsset.setNoCache(true);\nawait textAsset.load(\"examples/timelineshowcase/assets/combo.timeline.json\");\nconsole.log(textAsset.text.length, textAsset.isNoCache());",
 							"language": "javascript"
 						}
 					],
@@ -66345,8 +66345,7 @@
 								"en": "Draw the opaque and blend passes into an MRT render target"
 							},
 							"code": "import { HumanSkinRenderer, SkinnedModel, RenderTarget, Camera3D, Matrix4, Vector3, SKIN_SHADING_SKIN } from \"./build/vanilla.js\";\n\nconst width = 640;\nconst height = 360;\nconst canvas = document.createElement(\"canvas\");\nconst webGL2RenderingContext = canvas.getContext(\"webgl2\");\nconst humanSkinRenderer = new HumanSkinRenderer(webGL2RenderingContext);\nhumanSkinRenderer.setLight(0, 0.4, 0.7, 0.6, 1.0, 0.95, 0.9, 3.0);\nhumanSkinRenderer.setAmbientColors([0.3, 0.32, 0.38], [0.15, 0.14, 0.15], [0.05, 0.04, 0.04]);\nconst skinnedModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, \"examples/ancientmountain/assets/fox.glb\", humanSkinRenderer);\nconst drawableList = skinnedModel.getDrawableList();\nfor (const drawable of drawableList) {\n\thumanSkinRenderer.setMaterialShading(drawable.material, SKIN_SHADING_SKIN);\n}\nskinnedModel.update(0);\n\nconst geometryRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true, { colorAttachmentCount: 4, useFloatColor: true, useDepthTexture: true });\ngeometryRenderTarget.bind();\nwebGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);\nwebGL2RenderingContext.clearColor(0, 0, 0, 0);\nwebGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);\nconst cameraX = 0;\nconst cameraY = 60;\nconst cameraZ = 200;\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 1, 1000);\ncamera.setAspectRatio(width / height);\nconst eyePosition = Vector3.create(cameraX, cameraY, cameraZ);\nconst targetPosition = Vector3.create(0, 40, 0);\ncamera.lookAt(eyePosition, targetPosition);\nconst viewProjectionMatrix = camera.getViewProjectionMatrix();\nconst viewProjectionElements = viewProjectionMatrix.getElements();\nconst modelMatrix = Matrix4.createIdentity();\nconst modelMatrixElements = modelMatrix.getElements();\nhumanSkinRenderer.draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);\n\nwebGL2RenderingContext.enable(webGL2RenderingContext.BLEND);\nwebGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);\nwebGL2RenderingContext.depthMask(false);\nhumanSkinRenderer.drawBlended(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);\nwebGL2RenderingContext.depthMask(true);\nwebGL2RenderingContext.disable(webGL2RenderingContext.BLEND);\nconst irradianceTexture = geometryRenderTarget.getColorTexture(0);\nconst albedoTexture = geometryRenderTarget.getColorTexture(1);\nconsole.log(irradianceTexture !== null, albedoTexture !== null);",
-							"language": "javascript",
-							"image": "old-face.webp"
+							"language": "javascript"
 						}
 					],
 					"extends": "SkinnedModelRenderer",
@@ -97111,7 +97110,7 @@
 								"ko": "그림, JSON, 소리, 글꼴을 함께 받기",
 								"en": "Fetch an image, JSON, sound and font together"
 							},
-							"code": "import { AssetLoader } from \"./build/vanilla.js\";\n\nconst assetLoader = new AssetLoader();\nassetLoader.setConcurrency(4);\nconst imageAsset = assetLoader.addImage(\"examples/assets/spritesheet.png\");\nconst jsonAsset = assetLoader.addJson(\"examples/oldface/assets/expressions.json\");\nconst audioAsset = assetLoader.addAudio(\"examples/assets/beep.wav\");\nconst fontAsset = assetLoader.addFont(\"DOSGothic\", \"examples/assets/DOSGothic.woff\");\nassetLoader.setProgressHandler((progress, finishedCount, totalCount) => {\n\tconsole.log(progress, finishedCount, totalCount);\n});\nconst failedList = await assetLoader.load();\nconsole.log(failedList.length, imageAsset.isLoaded(), jsonAsset.isLoaded(), audioAsset.getDuration(), fontAsset.family);",
+							"code": "import { AssetLoader } from \"./build/vanilla.js\";\n\nconst assetLoader = new AssetLoader();\nassetLoader.setConcurrency(4);\nconst imageAsset = assetLoader.addImage(\"examples/assets/spritesheet.png\");\nconst jsonAsset = assetLoader.addJson(\"examples/timelineshowcase/assets/combo.timeline.json\");\nconst audioAsset = assetLoader.addAudio(\"examples/assets/beep.wav\");\nconst fontAsset = assetLoader.addFont(\"DOSGothic\", \"examples/assets/DOSGothic.woff\");\nassetLoader.setProgressHandler((progress, finishedCount, totalCount) => {\n\tconsole.log(progress, finishedCount, totalCount);\n});\nconst failedList = await assetLoader.load();\nconsole.log(failedList.length, imageAsset.isLoaded(), jsonAsset.isLoaded(), audioAsset.getDuration(), fontAsset.family);",
 							"language": "javascript"
 						}
 					],

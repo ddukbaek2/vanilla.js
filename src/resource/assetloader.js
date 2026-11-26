@@ -37,7 +37,7 @@ const DEFAULT_CONCURRENCY = 6;
  * const assetLoader = new AssetLoader();
  * assetLoader.setConcurrency(4);
  * const imageAsset = assetLoader.addImage("examples/assets/spritesheet.png");
- * const jsonAsset = assetLoader.addJson("examples/oldface/assets/expressions.json");
+ * const jsonAsset = assetLoader.addJson("examples/timelineshowcase/assets/combo.timeline.json");
  * const audioAsset = assetLoader.addAudio("examples/assets/beep.wav");
  * const fontAsset = assetLoader.addFont("DOSGothic", "examples/assets/DOSGothic.woff");
  * assetLoader.setProgressHandler((progress, finishedCount, totalCount) => {

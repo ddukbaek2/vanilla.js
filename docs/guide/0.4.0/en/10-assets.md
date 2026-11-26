@@ -56,9 +56,9 @@ import { JsonAsset, TextAsset, BlobAsset } from "./build/vanilla.js";
 
 const jsonAsset = new JsonAsset();
 jsonAsset.setNoCache(true);
-await jsonAsset.load("examples/oldface/assets/expressions.json");
-const happyExpression = jsonAsset.data.happy;
-console.log(happyExpression.MouthSmileLeft);
+await jsonAsset.load("examples/timelineshowcase/assets/combo.timeline.json");
+const timelineName = jsonAsset.data.name;
+console.log(timelineName);
 
 const textAsset = new TextAsset();
 await textAsset.load("examples/timelineshowcase/assets/title.timeline.json");
@@ -151,7 +151,7 @@ class LoadingScene extends Scene {
 		const loadingProgress = this.#loadingProgress;
 		assetLoader.setConcurrency(4);
 		const imageAsset = assetLoader.addImage("examples/assets/spritesheet.png");
-		const jsonAsset = assetLoader.addJson("examples/oldface/assets/expressions.json");
+		const jsonAsset = assetLoader.addJson("examples/timelineshowcase/assets/combo.timeline.json");
 		const audioAsset = assetLoader.addAudio("examples/assets/beep.wav");
 		const fontAsset = assetLoader.addFont("DOSGothic", "examples/assets/DOSGothic.woff");
 		assetLoader.setProgressHandler((progress, finishedCount, totalCount) => {

@@ -117,7 +117,6 @@ const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D
 | 샘플 | 설명 | 데모 | 소스 |
 | --- | --- | --- | --- |
 | Toon Shading | VRM 1.0 캐릭터의 애니풍 렌더링. 3 톤 램프, 구면 노멀 얼굴 그림자, 앞머리 그림자, 천사 고리, 화면 공간 림, 아웃라인, 스프링 본, Quaternius(CC0) 본 애니메이션 8 종 | [열기](https://vanillapunch.com/tools/demo/toonshading/) | [`examples/toonshading`](examples/toonshading) |
-| Old Face | 머리 스캔(Lee Perry-Smith, CC BY 3.0)을 ICT FaceKit 얼굴에 입힌 PBR. 서브서피스 스캐터링, 표정 주름 맵, 그룸 카드 머리카락, 눈 굴절, 머티리얼 그래프 패널 | [열기](https://vanillapunch.com/tools/demo/oldface/) | [`examples/oldface`](examples/oldface) |
 | Ancient Mountain | 절차 지형(경사, 고도 3 중 블렌딩)과 하늘, 구름, 섀도우 맵, 걷기 / 달리기 / 등반하는 캐릭터 | [열기](https://vanillapunch.com/tools/demo/ancientmountain/) | [`examples/ancientmountain`](examples/ancientmountain) |
 | Neon Horizon | 절차 하늘(초콜릿 하늘, 바닐라 태양)과 함대 3D 모델, 엔진 글로우, 기함 주포 연출 | [열기](https://vanillapunch.com/tools/demo/neonhorizon/) | [`examples/neonhorizon`](examples/neonhorizon) |
 | UI Showcase | UI 컴포넌트 전시. 버튼, 스크롤 뷰, 리스트, 차트, 다이얼로그, 레이아웃 | [열기](https://vanillapunch.com/tools/demo/uishowcase/) | [`examples/uishowcase`](examples/uishowcase) |
@@ -179,4 +178,4 @@ UPDATE.md       업데이트 기록
 
 - 엔진에 들어간 제3자 코드와 표(크로미엄과 블링크, tween.js, Kiwi, gl-matrix, Separable SSS, 초안의 libtiled 와 Box2D)의 고지는 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 에 모았습니다. 런타임 패키지 의존은 없습니다. 묶음과 웹 도구 html 머리의 한 줄 주석이 엔진 라이선스와 이 파일을 가리킵니다. 엔진을 묶어 낸 게임은 LICENSE 와 이 파일을 함께 냅니다. (`tools/project.cjs build` 가 출력에 두 파일을 복사합니다)
 - 기본 글꼴 DOSGothic(MIT, https://github.com/hurss/fonts)은 묶음에 들지 않고 실행할 때 jsDelivr 에서 받습니다. (`src/core/engine.js`)
-- 예제 자산(`examples/`)의 출처와 라이선스는 THIRD_PARTY_LICENSES.md 의 Example Assets 와 자산 폴더의 README.md 에 있습니다. 3D 캐릭터와 애니메이션은 Quaternius(CC0), 여우는 Khronos 샘플(CC0 과 CC BY 4.0)입니다. oldface 의 얼굴 메시와 표정은 ICT FaceKit(MIT)이고, 머리 꼴과 피부 텍스처는 Lee Perry-Smith 의 Infinite 머리 스캔(CC BY 3.0, based on a work at www.triplegangers.com)을 ICT 얼굴에 감싸 다시 구운 것입니다. 주름, 눈, 머리카락 텍스처와 머리카락 카드는 이 저장소에서 절차로 지었습니다.
+- 예제 자산(`examples/`)의 출처와 라이선스는 THIRD_PARTY_LICENSES.md 의 Example Assets 와 자산 폴더의 README.md 에 있습니다. 3D 캐릭터와 애니메이션은 Quaternius(CC0), 여우는 Khronos 샘플(CC0 과 CC BY 4.0)입니다.

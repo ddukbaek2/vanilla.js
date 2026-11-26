@@ -16,7 +16,7 @@ import { Asset, AssetType } from "../core/asset.js";
  *
  * const textAsset = new TextAsset();
  * textAsset.setNoCache(true);
- * await textAsset.load("examples/oldface/assets/expressions.json");
+ * await textAsset.load("examples/timelineshowcase/assets/combo.timeline.json");
  * console.log(textAsset.text.length, textAsset.isNoCache());
  */
 export class TextAsset extends Asset

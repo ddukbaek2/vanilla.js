@@ -14,10 +14,10 @@ import { AssetType } from "../core/asset.js";
  * import { JsonAsset } from "./build/vanilla.js";
  *
  * const jsonAsset = new JsonAsset();
- * await jsonAsset.load("examples/oldface/assets/expressions.json");
+ * await jsonAsset.load("examples/timelineshowcase/assets/combo.timeline.json");
  * if (jsonAsset.isLoaded()) {
- * 	const expressionNames = Object.keys(jsonAsset.data);
- * 	console.log(expressionNames.length, jsonAsset.data.serious.BrowDownLeft);
+ * 	const timelineKeys = Object.keys(jsonAsset.data);
+ * 	console.log(timelineKeys.length, jsonAsset.data.name);
  * }
  */
 export class JsonAsset extends TextAsset
