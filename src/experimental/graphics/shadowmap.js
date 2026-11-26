@@ -296,6 +296,7 @@ export class ShadowMap extends Object {
 // - 칸은 한 변 gridSize 의 격자다. (gridSize = 올림(칸 수의 제곱근), 칸 한 변 = 내림(해상도 / gridSize))
 // - 그리기: beginRender() 로 판을 비우고, 칸마다 beginTile(칸 번호) 로 뷰포트를 그 칸에 건 뒤 getTile(칸 번호).viewProjectionMatrix 로 깊이를 그린다. (ToonRenderer.beginShadowAtlasPass 와 setShadowAtlasTile 이 이 차례를 한다)
 // - 받기: 셰이더는 빛의 자리에서 면으로의 쪽으로 점광의 면을 고르고(가장 큰 축), 앞쪽, 위쪽, 오른쪽 바탕과 가까운 거리, 먼 거리로 칸 안 자리와 깊이를 셈해 3x3 PCF 로 견준다.
+//   받는 자리는 노멀 쪽으로 그 거리의 칸 텍셀 (1 + 3 x (1 - dot(N, L))) 개만큼 밀어 견준다. (빛에 비스듬한 면일수록 크게, 빛과 그늘 경계의 톱니 같은 그림자 여드름을 막는다)
 //==============================================================================
 /**
  * @example <caption>점광 하나와 스포트라이트 하나의 그림자 칸 짓기</caption>

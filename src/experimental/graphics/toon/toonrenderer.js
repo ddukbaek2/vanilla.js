@@ -386,7 +386,8 @@ float readLocalShadow(int slot, vec3 position, vec3 normal) {
 	if (along <= near || along >= far) {
 		return 1.0;
 	}
-	vec3 offsetPoint = toPoint + normal * (2.0 * along * tangent * texel / tileSize) * 1.5;
+	float slope = 1.0 - clamp(dot(normal, -normalize(toPoint)), 0.0, 1.0);
+	vec3 offsetPoint = toPoint + normal * (2.0 * along * tangent * texel / tileSize) * (1.0 + 3.0 * slope);
 	along = max(dot(forward, offsetPoint), near);
 	vec3 right = cross(forward, up);
 	vec2 projected = vec2(dot(right, offsetPoint), dot(up, offsetPoint)) / (along * tangent);
