@@ -123,7 +123,7 @@ eyeZ = info["eyeCenters"][0][2]
 def scalpAccept(points):
 	x, y, z = points[:, 0], points[:, 1], points[:, 2]
 	frontness = smoothstep(eyeZ - 0.06, eyeZ - 0.01, z)
-	hairline = (browY + 0.068) * frontness + (eyeY - 0.05) * (1 - frontness)
+	hairline = (browY + 0.056) * frontness + (eyeY - 0.05) * (1 - frontness)
 	temple = smoothstep(0.045, 0.07, np.abs(x)) * smoothstep(eyeZ - 0.03, eyeZ - 0.07, z)
 	hairline = np.minimum(hairline, (eyeY + 0.015) * temple + 10 * (1 - temple))
 	return smoothstep(hairline, hairline + 0.012, y)
@@ -150,7 +150,7 @@ def browAccept(points):
 			best = np.minimum(best, distance)
 	return 1 - smoothstep(0.003, 0.0065, best)
 
-LOD_COUNTS = [(3500, 1200, 400, 400, 7), (2400, 800, 300, 280, 6), (1600, 520, 200, 200, 5), (1000, 320, 130, 130, 4), (600, 200, 80, 80, 3)]
+LOD_COUNTS = [(6000, 2400, 900, 1000, 7), (3600, 1400, 520, 560, 6), (2200, 800, 300, 320, 5), (1300, 440, 170, 180, 4), (700, 240, 90, 100, 3)]
 scalpRoots, scalpNormals, scalpVertex = samplePoints(LOD_COUNTS[0][0], scalpAccept)
 beardRoots, beardNormals, beardVertex = samplePoints(LOD_COUNTS[0][1], beardAccept, 400)
 mustacheRoots, mustacheNormals, mustacheVertex = samplePoints(LOD_COUNTS[0][2], mustacheAccept, 2000)
@@ -199,18 +199,24 @@ def strandAtlas(path, tangentPath, size, tangentSize, columns, strandCount, colo
 		x0 = column * columnWidth
 		xs = np.arange(columnWidth)[None, :]
 		for strand in range(strandCount):
-			center = generator.uniform(0.12, 0.88) * columnWidth
-			drift = generator.normal(0, 0.08) * columnWidth
+			# 칸 가운데로 몰린 가닥(칸 가장자리는 비어 카드 모서리가 안 보인다), 뿌리와 끝이 가닥마다 다르고 끝으로 갈수록 가늘고 옅다.
+			center = (0.5 + generator.normal(0, 0.17)) * columnWidth
+			drift = generator.normal(0, 0.1) * columnWidth
 			phase = generator.uniform(0, 6.28)
 			frequency = generator.uniform(2, 6)
-			strandPath = center + drift * v + np.sin(v * frequency + phase) * waviness * columnWidth
-			end = generator.uniform(0.7, 1.0)
-			width = generator.uniform(0.6, 1.4) * columnWidth / 90
-			coverage = np.clip(1 - np.abs(xs - strandPath[:, None]) / width, 0, 1) * (1 - smoothstep(end - 0.15, end, v))[:, None]
+			strandPath = np.clip(center + drift * v + np.sin(v * frequency + phase) * waviness * columnWidth, 2, columnWidth - 3)
+			start = generator.uniform(0.0, 0.12)
+			end = generator.uniform(0.55, 1.0)
+			along = np.clip((v - start) / (end - start), 0, 1)
+			width = generator.uniform(0.5, 1.1) * columnWidth / 150 * (1 - 0.6 * along)
+			fade = smoothstep(start, start + 0.04, v) * (1 - smoothstep(end - 0.2, end, v))
+			coverage = np.clip(1 - np.abs(xs - strandPath[:, None]) / np.maximum(width, 0.35)[:, None], 0, 1) * (fade * generator.uniform(0.75, 1.0))[:, None]
 			brightness = generator.uniform(*colorRange) if generator.random() > darkRatio else generator.uniform(0.18, 0.35)
-			strandColor = np.array([brightness, brightness * 0.97, brightness * 0.93])
+			# 뿌리는 조금 어둡고 누르스름하게, 끝은 밝고 희게.
+			rootToTip = (0.84 + 0.16 * along)[:, None]
+			strandColor = brightness * rootToTip * (np.array([1.0, 0.95, 0.86]) * (1 - along[:, None]) + np.array([1.0, 0.99, 0.97]) * along[:, None])
 			block = slice(x0, x0 + columnWidth)
-			color[:, block] = color[:, block] * (1 - coverage[..., None]) + strandColor * coverage[..., None]
+			color[:, block] = color[:, block] * (1 - coverage[..., None]) + strandColor[:, None, :] * coverage[..., None]
 			alpha[:, block] = np.maximum(alpha[:, block], coverage)
 	filled = alpha > 0.01
 	averageColor = color[filled].mean(0) if filled.any() else np.array([0.5, 0.5, 0.5])
@@ -220,8 +226,8 @@ def strandAtlas(path, tangentPath, size, tangentSize, columns, strandCount, colo
 	tangent = np.stack([0.5 + 0.03 * np.sin(tv * 20), np.full_like(tv, 1.0), np.full_like(tv, 0.5), tv], -1)
 	saveImage(os.path.join(assetDirectory, tangentPath), tangent)
 
-strandAtlas("hair.png", "hair_tangent.png", 2048, 512, 8, 70, (0.62, 0.9), 0.12, 0.03, 101)
-strandAtlas("beard.png", "beard_tangent.png", 2048, 256, 8, 60, (0.7, 0.95), 0.06, 0.05, 103)
-strandAtlas("mustache.png", "mustache_tangent.png", 2048, 256, 8, 60, (0.68, 0.92), 0.1, 0.04, 105)
-strandAtlas("eyebrows.png", "eyebrows_tangent.png", 1024, 256, 4, 40, (0.5, 0.85), 0.3, 0.02, 107)
+strandAtlas("hair.png", "hair_tangent.png", 2048, 512, 8, 150, (0.62, 0.92), 0.12, 0.03, 101)
+strandAtlas("beard.png", "beard_tangent.png", 2048, 256, 8, 110, (0.7, 0.95), 0.06, 0.05, 103)
+strandAtlas("mustache.png", "mustache_tangent.png", 2048, 256, 8, 110, (0.68, 0.92), 0.1, 0.04, 105)
+strandAtlas("eyebrows.png", "eyebrows_tangent.png", 1024, 256, 4, 45, (0.55, 0.88), 0.25, 0.02, 107)
 print("done")

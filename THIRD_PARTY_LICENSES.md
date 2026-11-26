@@ -331,9 +331,20 @@ The files under `examples/` are not part of the bundles or the web tools. They c
 | `examples/ancientmountain/assets/grass.jpg`, `rock.jpg`, `dirt.jpg`, `boulder.jpg` | Made for this repository with Google generative AI (C2PA record in each file: "Created by Google Generative AI") | Google Terms of Service: "Google won't claim ownership over that content." |
 | `examples/toonshading/assets/VRM1_Constraint_Twist_Sample.vrm` | pixiv Inc., the VRM 1.0 sample of https://github.com/pixiv/three-vrm (packages/three-vrm/examples/models, same file) | VRM Public License 1.0, https://vrm.dev/licenses/1.0/ . The file's meta allows redistribution and modified redistribution, commercial use by corporations, and needs no credit ("(c) 2022 pixiv Inc.") |
 | `examples/assets/DOSGothic.woff` | See DOSGothic above | MIT |
-| `examples/oldface/assets/character_lod*.glb` | Face, eyes, teeth, eyelashes, eye occlusion and the 53 expression shapes (renamed to ARKit names) of ICT FaceKit (FaceXModel), https://github.com/USC-ICT/ICT-FaceKit , converted and reduced by `examples/oldface/tools/ictfacekit/` | MIT, Copyright (c) 2020 USC Institute for Creative Technologies (full text below) |
-| `examples/oldface/assets/*` other than the above (skin, wrinkle, eye, teeth and hair textures, `hair_lod*.glb` hair cards, `wrinkles.json`, `expressions.json`), `examples/oldface/favicon.*` | Made for this repository: baked procedurally by `examples/oldface/tools/ictfacekit/` (no source images), favicon captured from the example | MIT (this repository) |
+| `examples/oldface/assets/character_lod*.glb` | Topology, UVs, eyes, teeth, eyelashes, eye occlusion and the 53 expression shapes (renamed to ARKit names) of ICT FaceKit (FaceXModel), https://github.com/USC-ICT/ICT-FaceKit . The neutral head is reshaped to the Infinite head scan below by `examples/oldface/tools/ictfacekit/fit_scan.py`, then converted and reduced | MIT, Copyright (c) 2020 USC Institute for Creative Technologies (full text below); head shape from the scan below, CC BY 3.0 |
+| `examples/oldface/assets/head_albedo.jpg`, `head_normal.jpg`, `skin_detail.jpg`, `head_roughness.jpg`, `head_specular.jpg` | "Infinite, 3D Head Scan" by Lee Perry-Smith (Infinite-Realities, I-R Entertainment Ltd.), based on a work at www.triplegangers.com; taken from the McGuire Computer Graphics Archive copy (`lpshead.zip`, https://casual-effects.com/data/ ). Changed: colour and displacement re-baked onto the ICT FaceKit UVs by `examples/oldface/tools/ictfacekit/bake_scan.py`, stubble and brows removed, beard shadow lifted, tone shifted, displacement split into normal and detail height, roughness and specular derived | CC BY 3.0, https://creativecommons.org/licenses/by/3.0/ (licence note below) |
+| `examples/oldface/assets/*` other than the above (wrinkle, eye, teeth and hair textures, `hair_lod*.glb` hair cards, `wrinkles.json`, `expressions.json`), `examples/oldface/favicon.*` | Made for this repository: baked procedurally by `examples/oldface/tools/ictfacekit/` (no source images), favicon captured from the example | MIT (this repository) |
 | `examples/assets/spritesheet.png`, `beep.wav`, `tabletemplate.xlsx`, `examples/spriteeffects/assets/*.png` (also in `examples/timelineshowcase/assets/`), `examples/tilemapshowcase/assets/*`, `examples/skeleton2d/assets/*`, `examples/neonhorizon/assets/*.glb`, the `.json` scenes, UI assets and timelines, and the favicons other than oldface | Made for this repository (the sprites by `examples/spriteeffects/tools/make_sprites.py`, the tiles by `examples/tilemapshowcase/generate.mjs`, the skeleton by `examples/skeleton2d/tools/makeassets.cjs`, the ships by the vanilla.js battlecruiser generator) | MIT, as the rest of this repository |
+
+Infinite head scan licence note (`Infinite-Scan_License.txt` in the archive, for the oldface head shape and skin textures above):
+
+````text
+Creative Commons Licence
+Infinite, 3D Head Scan by Lee Perry-Smith is licensed under a Creative Commons Attribution 3.0 Unported License.
+Based on a work at www.triplegangers.com.
+Permissions beyond the scope of this license may be available at http://www.ir-ltd.net/
+Please remember: Do what you want with the files, but always mention where you got them from...
+````
 
 ICT FaceKit license (for `examples/oldface/assets/character_lod*.glb`):
 

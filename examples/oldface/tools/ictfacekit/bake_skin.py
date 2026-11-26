@@ -259,13 +259,20 @@ sclera = sclera * (1 - veins[..., None] * 0.5) + veins[..., None] * 0.5 * np.arr
 saveImage(os.path.join(assetDirectory, "eye_sclera.jpg"), sclera)
 saveImage(os.path.join(assetDirectory, "eye_sclera_normal.jpg"), heightToNormal(ndimage.gaussian_filter(veinNoise * 0.4 + veins * 0.3, 2), 6.0) * 0.5 + 0.5)
 fiberNoise = fractalNoise(np.stack([np.cos(angle) * 6, np.sin(angle) * 6, radius * 1.5], -1), 6.0, 4, seed=71)
+fineFiber = fractalNoise(np.stack([np.cos(angle) * 40, np.sin(angle) * 40, radius * 3.0], -1), 3.0, 3, seed=73)
+crypts = smoothstep(0.62, 0.75, fractalNoise(np.stack([np.cos(angle) * 9, np.sin(angle) * 9, radius * 14], -1), 1.0, 2, seed=75))
 irisRadial = radius / 0.5
-iris = np.array([0.30, 0.42, 0.50]) * (0.7 + 0.6 * fiberNoise)[..., None]
-collarette = gauss(irisRadial - 0.42, 0.08)
-iris = iris * (1 - collarette[..., None] * 0.5) + collarette[..., None] * 0.5 * np.array([0.52, 0.48, 0.38])
-iris *= (1 - smoothstep(0.8, 1.0, irisRadial) * 0.55)[..., None]
-saveImage(os.path.join(assetDirectory, "eye_iris.png"), np.concatenate([iris, np.ones_like(radius)[..., None]], -1))
-irisHeight = ndimage.gaussian_filter(fiberNoise * 0.6 - collarette * 0.3, 1.0)
+# 나이 든 회청색 홍채: 동공 둘레는 호박빛(중심 이색), 바깥은 회청, 가는 방사 섬유와 움푹한 틈, 짙은 윤부 고리.
+outer = np.array([0.33, 0.39, 0.42])
+inner = np.array([0.46, 0.38, 0.24])
+iris = outer * (1 - gauss(irisRadial - 0.3, 0.16)[..., None]) + inner * gauss(irisRadial - 0.3, 0.16)[..., None]
+iris = iris * (0.62 + 0.38 * fiberNoise + 0.35 * (fineFiber - 0.5))[..., None]
+iris *= (1 - crypts * 0.35)[..., None]
+collarette = gauss(irisRadial - 0.42, 0.06)
+iris = iris * (1 - collarette[..., None] * 0.35) + collarette[..., None] * 0.35 * np.array([0.58, 0.52, 0.40])
+iris *= (1 - smoothstep(0.78, 1.0, irisRadial) * 0.7)[..., None]
+saveImage(os.path.join(assetDirectory, "eye_iris.png"), np.concatenate([np.clip(iris, 0, 1), np.ones_like(radius)[..., None]], -1))
+irisHeight = ndimage.gaussian_filter(fiberNoise * 0.5 + fineFiber * 0.3 - crypts * 0.3 - collarette * 0.3, 0.8)
 saveImage(os.path.join(assetDirectory, "eye_iris_normal.png"), ndimage.zoom(heightToNormal(irisHeight, 10.0), (0.5, 0.5, 1), order=1) * 0.5 + 0.5)
 
 # 눈꺼풀 차폐. (눈 가림 메시 UV 에 3D 자리로: 위 눈꺼풀 쪽과 눈꼬리가 어둡다)
@@ -277,9 +284,25 @@ lateral = np.abs(shellDelta[..., 0]) / 0.014
 darkness = np.clip(0.06 + 0.3 * smoothstep(0.0, 0.9, elevation) + 0.12 * smoothstep(0.6, 1.0, lateral), 0, 0.45) * shellCovered
 saveImage(os.path.join(assetDirectory, "eye_occlusion.png"), np.repeat(darkness[..., None], 4, -1))
 
-# 속눈썹. (회색 섞인 짙은 갈색, 가닥 결)
-lashNoise = tileNoise(1024, 256, seed=81)
-lashColor = np.array([0.36, 0.34, 0.32]) * (0.8 + 0.5 * lashNoise)[..., None]
-lashAlpha = 0.25 + 0.4 * smoothstep(0.3, 0.7, tileNoise(1024, 128, seed=83))
+# 속눈썹. (ICT 속눈썹 UV 는 v 가 뿌리에서 끝 쪽: v 방향 가는 가닥, 짙은 갈색에 흰 가닥 섞임, 가닥마다 길이와 휨이 다르다)
+lashGenerator = np.random.default_rng(81)
+lashColor = np.zeros((1024, 1024, 3), dtype=np.float32)
+lashAlpha = np.zeros((1024, 1024), dtype=np.float32)
+lashV = (np.arange(1024) + 0.5) / 1024
+lashColumns = np.arange(1024)[None, :]
+for strand in range(900):
+	start = lashGenerator.uniform(0, 1024)
+	bend = lashGenerator.normal(0, 6)
+	segmentStart = lashGenerator.uniform(0, 1)
+	segmentLength = lashGenerator.uniform(0.08, 0.3)
+	path = start + bend * ((lashV - segmentStart) / segmentLength) ** 2
+	along = np.clip((lashV - segmentStart) / segmentLength, 0, 1)
+	inside = (lashV >= segmentStart) & (lashV <= segmentStart + segmentLength)
+	width = 1.6 * (1 - along * 0.7)
+	coverage = np.clip(1 - np.abs(lashColumns - path[:, None]) / width[:, None], 0, 1) * inside[:, None]
+	shade = lashGenerator.uniform(0.12, 0.22) if lashGenerator.random() > 0.25 else lashGenerator.uniform(0.5, 0.7)
+	lashColor = lashColor * (1 - coverage[..., None]) + np.array([shade, shade * 0.92, shade * 0.85]) * coverage[..., None]
+	lashAlpha = np.maximum(lashAlpha, coverage * 0.9)
+lashColor[lashAlpha < 0.01] = np.array([0.2, 0.18, 0.16])
 saveImage(os.path.join(assetDirectory, "eyelash.png"), np.concatenate([lashColor, lashAlpha[..., None]], -1))
 print("done")
