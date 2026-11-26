@@ -2231,14 +2231,17 @@ export class DEVTools extends Object {
 		items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
 
 		items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
+		// 러스트 판과 같은 규칙: 쓰는 중과 잡아 둔 힙을 못 읽으면 셋 다 "(N/A)", 한도만 못 읽으면 그 칸만 "(N/A)".
+		// (러스트 데스크탑은 같은 칸에 운영체제 API 로 읽은 같은 뜻의 값을 적는다)
 		const performanceMemory = System.window.performance ? System.window.performance.memory : null;
-		if (performanceMemory) {
+		const isHeapRead = !!performanceMemory && typeof performanceMemory.usedJSHeapSize === "number" && typeof performanceMemory.totalJSHeapSize === "number";
+		if (isHeapRead) {
 			const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
 			items.push({ key: "usedJSHeapSize", value: `${usedHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
 			const totalHeapMegabytes = (performanceMemory.totalJSHeapSize / (1024 * 1024)).toFixed(2);
 			items.push({ key: "totalJSHeapSize", value: `${totalHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
-			const heapLimitMegabytes = (performanceMemory.jsHeapSizeLimit / (1024 * 1024)).toFixed(2);
-			items.push({ key: "jsHeapSizeLimit", value: `${heapLimitMegabytes} MB`, isSeparator: false, isSectionHeader: false });
+			const heapLimitText = typeof performanceMemory.jsHeapSizeLimit === "number" ? `${(performanceMemory.jsHeapSizeLimit / (1024 * 1024)).toFixed(2)} MB` : "(N/A)";
+			items.push({ key: "jsHeapSizeLimit", value: heapLimitText, isSeparator: false, isSectionHeader: false });
 		}
 		else {
 			items.push({ key: "usedJSHeapSize", value: "(N/A)", isSeparator: false, isSectionHeader: false });
