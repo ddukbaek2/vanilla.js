@@ -9,15 +9,15 @@ import { Object } from "../base/object.js";
 // 애셋 타입.
 //==============================================================================
 export const AssetType = System.Object.freeze({
-	none: "none",
-	image: "image",
-	audio: "audio",
-	json: "json",
-	text: "text",
-	font: "font",
-	blob: "blob",
-	bunch: "bunch",
-	visual: "visual",
+	none: "none", // 애셋 종류 없음.
+	image: "image", // 이미지 애셋.
+	audio: "audio", // 오디오 애셋.
+	json: "json", // JSON 애셋.
+	text: "text", // 텍스트 애셋.
+	font: "font", // 글꼴 애셋.
+	blob: "blob", // 바이너리 덩어리 애셋.
+	bunch: "bunch", // 묶음 애셋.
+	visual: "visual", // 비주얼 애셋.
 });
 
 

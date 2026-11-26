@@ -10,116 +10,117 @@ import { InputActions } from "./inputactions.js";
 
 
 //==============================================================================
-// 키 목록.
+// 키보드 키 식별자. (KeyboardEvent.code 의 값)
 //==============================================================================
+/** @enum { string } */
 export const KeyCode = {
-	a: "KeyA",
-	b: "KeyB",
-	c: "KeyC",
-	d: "KeyD",
-	e: "KeyE",
-	f: "KeyF",
-	g: "KeyG",
-	h: "KeyH",
-	i: "KeyI",
-	j: "KeyJ",
-	k: "KeyK",
-	l: "KeyL",
-	m: "KeyM",
-	n: "KeyN",
-	o: "KeyO",
-	p: "KeyP",
-	q: "KeyQ",
-	r: "KeyR",
-	s: "KeyS",
-	t: "KeyT",
-	u: "KeyU",
-	v: "KeyV",
-	w: "KeyW",
-	x: "KeyX",
-	y: "KeyY",
-	z: "KeyZ",
-	"0": "Digit0",
-	"1": "Digit1",
-	"2": "Digit2",
-	"3": "Digit3",
-	"4": "Digit4",
-	"5": "Digit5",
-	"6": "Digit6",
-	"7": "Digit7",
-	"8": "Digit8",
-	"9": "Digit9",
-	backspace: "Backspace",
-	tab: "Tab",
-	enter: "Enter",
-	shift: "ShiftLeft",
-	ctrl: "ControlLeft",
-	alt: "AltLeft",
-	capslock: "CapsLock",
-	escape: "Escape",
-	space: "Space",
-	pageup: "PageUp",
-	pagedown: "PageDown",
-	end: "End",
-	home: "Home",
-	arrowleft: "ArrowLeft",
-	arrowup: "ArrowUp",
-	arrowright: "ArrowRight",
-	arrowdown: "ArrowDown",
-	insert: "Insert",
-	delete: "Delete",
-	f1: "F1",
-	f2: "F2",
-	f3: "F3",
-	f4: "F4",
-	f5: "F5",
-	f6: "F6",
-	f7: "F7",
-	f8: "F8",
-	f9: "F9",
-	f10: "F10",
-	f11: "F11",
-	f12: "F12",
-	scrolllock: "ScrollLock",
-	semicolon: "Semicolon",
-	equal: "Equal",
-	comma: "Comma",
-	minus: "Minus",
-	period: "Period",
-	slash: "Slash",
-	backquote: "Backquote",
-	bracketleft: "BracketLeft",
-	backslash: "Backslash",
-	bracketright: "BracketRight",
-	quote: "Quote",
-	meta: "MetaLeft",
-	command: "MetaLeft",
-	pause: "Pause",
-	audiovolumeup: "AudioVolumeUp",
-	audiovolumedown: "AudioVolumeDown",
+	a: "KeyA", // A 키.
+	b: "KeyB", // B 키.
+	c: "KeyC", // C 키.
+	d: "KeyD", // D 키.
+	e: "KeyE", // E 키.
+	f: "KeyF", // F 키.
+	g: "KeyG", // G 키.
+	h: "KeyH", // H 키.
+	i: "KeyI", // I 키.
+	j: "KeyJ", // J 키.
+	k: "KeyK", // K 키.
+	l: "KeyL", // L 키.
+	m: "KeyM", // M 키.
+	n: "KeyN", // N 키.
+	o: "KeyO", // O 키.
+	p: "KeyP", // P 키.
+	q: "KeyQ", // Q 키.
+	r: "KeyR", // R 키.
+	s: "KeyS", // S 키.
+	t: "KeyT", // T 키.
+	u: "KeyU", // U 키.
+	v: "KeyV", // V 키.
+	w: "KeyW", // W 키.
+	x: "KeyX", // X 키.
+	y: "KeyY", // Y 키.
+	z: "KeyZ", // Z 키.
+	"0": "Digit0", // 숫자 0 키. (글쇠 윗줄)
+	"1": "Digit1", // 숫자 1 키. (글쇠 윗줄)
+	"2": "Digit2", // 숫자 2 키. (글쇠 윗줄)
+	"3": "Digit3", // 숫자 3 키. (글쇠 윗줄)
+	"4": "Digit4", // 숫자 4 키. (글쇠 윗줄)
+	"5": "Digit5", // 숫자 5 키. (글쇠 윗줄)
+	"6": "Digit6", // 숫자 6 키. (글쇠 윗줄)
+	"7": "Digit7", // 숫자 7 키. (글쇠 윗줄)
+	"8": "Digit8", // 숫자 8 키. (글쇠 윗줄)
+	"9": "Digit9", // 숫자 9 키. (글쇠 윗줄)
+	backspace: "Backspace", // 백스페이스 키.
+	tab: "Tab", // 탭 키.
+	enter: "Enter", // 엔터 키.
+	shift: "ShiftLeft", // 왼쪽 시프트 키.
+	ctrl: "ControlLeft", // 왼쪽 컨트롤 키.
+	alt: "AltLeft", // 왼쪽 알트 키.
+	capslock: "CapsLock", // 캡스락 키.
+	escape: "Escape", // 이스케이프 키.
+	space: "Space", // 스페이스 키.
+	pageup: "PageUp", // 페이지 업 키.
+	pagedown: "PageDown", // 페이지 다운 키.
+	end: "End", // 엔드 키.
+	home: "Home", // 홈 키.
+	arrowleft: "ArrowLeft", // 왼쪽 화살표 키.
+	arrowup: "ArrowUp", // 위쪽 화살표 키.
+	arrowright: "ArrowRight", // 오른쪽 화살표 키.
+	arrowdown: "ArrowDown", // 아래쪽 화살표 키.
+	insert: "Insert", // 인서트 키.
+	delete: "Delete", // 딜리트 키.
+	f1: "F1", // F1 키.
+	f2: "F2", // F2 키.
+	f3: "F3", // F3 키.
+	f4: "F4", // F4 키.
+	f5: "F5", // F5 키.
+	f6: "F6", // F6 키.
+	f7: "F7", // F7 키.
+	f8: "F8", // F8 키.
+	f9: "F9", // F9 키.
+	f10: "F10", // F10 키.
+	f11: "F11", // F11 키.
+	f12: "F12", // F12 키.
+	scrolllock: "ScrollLock", // 스크롤 락 키.
+	semicolon: "Semicolon", // 세미콜론 키.
+	equal: "Equal", // 등호 키.
+	comma: "Comma", // 쉼표 키.
+	minus: "Minus", // 빼기 키.
+	period: "Period", // 마침표 키.
+	slash: "Slash", // 슬래시 키.
+	backquote: "Backquote", // 백쿼트 키.
+	bracketleft: "BracketLeft", // 왼쪽 대괄호 키.
+	backslash: "Backslash", // 역슬래시 키.
+	bracketright: "BracketRight", // 오른쪽 대괄호 키.
+	quote: "Quote", // 따옴표 키.
+	meta: "MetaLeft", // 왼쪽 메타 키. (윈도우 키, 맥의 커맨드 키)
+	command: "MetaLeft", // 왼쪽 커맨드 키. (meta 와 같은 값)
+	pause: "Pause", // 포즈 키.
+	audiovolumeup: "AudioVolumeUp", // 소리 키움 키.
+	audiovolumedown: "AudioVolumeDown", // 소리 줄임 키.
 	audiomute: "AudioVolumeMute", // 음소거. (W3C code 표의 이름)
 	audioplay: "MediaPlayPause", // 재생/멈춤. (W3C code 표의 이름, 표에 MediaPlay 는 없다)
-	audiostop: "MediaStop",
-	audioprev: "MediaTrackPrevious",
-	audionext: "MediaTrackNext",
+	audiostop: "MediaStop", // 미디어 정지 키.
+	audioprev: "MediaTrackPrevious", // 이전 곡 키.
+	audionext: "MediaTrackNext", // 다음 곡 키.
 	
-	numLock: "NumLock",
+	numLock: "NumLock", // 텐키 넘 락 키.
 	numpadDivide: "NumpadDivide", // 텐키 나누기.
 	numpadMultiply: "NumpadMultiply", // 텐키 곱하기.
 	numpadSubtract: "NumpadSubtract", // 텐키 빼기.
 	numpadDecimal: "NumpadDecimal", // 텐키 점.
 	numpadAdd: "NumpadAdd", // 텐키 더하기.
 	numpadEnter: "NumpadEnter", // 텐키 엔터.
-	numpad0: "Numpad0",
-	numpad1: "Numpad1",
-	numpad2: "Numpad2",
-	numpad3: "Numpad3",
-	numpad4: "Numpad4",
-	numpad5: "Numpad5",
-	numpad6: "Numpad6",
-	numpad7: "Numpad7",
-	numpad8: "Numpad8",
-	numpad9: "Numpad9",
+	numpad0: "Numpad0", // 텐키 0.
+	numpad1: "Numpad1", // 텐키 1.
+	numpad2: "Numpad2", // 텐키 2.
+	numpad3: "Numpad3", // 텐키 3.
+	numpad4: "Numpad4", // 텐키 4.
+	numpad5: "Numpad5", // 텐키 5.
+	numpad6: "Numpad6", // 텐키 6.
+	numpad7: "Numpad7", // 텐키 7.
+	numpad8: "Numpad8", // 텐키 8.
+	numpad9: "Numpad9", // 텐키 9.
 };
 
 const AnalogStick = {
