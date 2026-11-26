@@ -14,6 +14,74 @@
   - src/experimental/collection/*.js (List, Dictionary, Queue, Set, Stack) → src/base/collection/*.js
   - src/experimental/camera.js → src/deprecated/camera.js
   - src/experimental/aabb.js, transform2d.js, graphics/gl2d.js, graphics/webgl2.js (죽은 코드, 내보내지 않음) → src/deprecated/
+- UIDocument: 문서에 적는 노드와 컴포넌트 종류 이름을 클래스 이름(constructor.name) 대신 표에 등록한 이름으로 적는다. 번들러가 클래스 이름을 줄여도(esbuild --minify) 같은 문서가 된다. (등록하지 않은 종류만 지금처럼 클래스 이름, 지금까지는 줄인 번들에서 WorldNode 가 "o" 처럼 적혀 다시 읽지 못했다)
+- UIDocument.registerEditorTypes(): UI 에디터가 등록하는 종류(컴포넌트 35, 노드 종류 12)를 한 번에 등록한다. 에디터가 저장한 문서를 읽는 게임은 fromJsonText 앞에 한 번 부른다. 이미 등록한 이름은 그대로 둔다. (러스트 register_editor_types 와 같다) 표에 없는 노드 종류와 컴포넌트를 읽으면 console.warn 으로 알린다. (지금까지는 말없이 WorldNode 로 읽거나 건너뛰어 UIInputField, UIScrollBar 가 빈 노드가 되고 UISnapScrollView 가 빠졌다)
+- UIDocument: 다시 읽을 때 노드 생성자나 위젯이 만든 컴포넌트와 자식(UIWindow 의 제목 막대, UIImageView 가 붙이는 Sprite 같은)은 문서의 앞에서부터 차례와 종류(자식은 이름)가 맞으면 그것에 문서 값을 넣고 겹쳐 만들지 않는다. 읽고 다시 쓰면 같은 문서다. (지금까지는 겹쳐 만들어 UIWindow 를 읽으면 노드와 컴포넌트가 두 벌이었다, 러스트와 같다)
+- tools/project.cjs build 와 README, 가이드의 vanilla.min.js 명령이 --minify 에 --keep-names 를 붙인다. (개발자 도구와 등록하지 않은 UIDocument 종류가 클래스 이름을 읽는다) project.cjs 머리 주석, 사용법 출력, TOOLS.md, 가이드의 도구 장을 코드와 맞췄다. (node tools/project.cjs, 빌드 템플릿의 기본 자리 tools/buildtemplate, -t 와 --template, stage 명령)
+- tools/webm.cjs: fluent-ffmpeg, ffmpeg-static 이 없으면 설치 안내를 보이고 끝낸다. (지금까지는 안내를 보이기 전에 맨 위 require 에서 죽었다)
+- tools/apidoc.cjs --gaps: 떨어진 머리 주석(머리 주석과 JSDoc 뒤에 선언 없이 다른 머리 주석이 오는 옛 덩이, "목록" 으로 끝나지 않는 머리 주석 바로 뒤의 머리 주석)을 찾는다. 찾은 옛 덩이를 지우고(UIButton, UIProgressView, UILabel, Text, Color, LocalStorage, NodeLayout, AnimationClip, SoundSystem) 절 머리처럼 쓰던 머리를 멤버 머리로 바꿨다(UISlider, PlatformerBody, Camera2D). API 문서의 그 멤버 설명이 바로잡힌다
+- Version: 엔진 Object 를 잇는다. (version.js 가 Object 를 import 하지 않고 다시 내보내기만 해서 자바스크립트 내장 Object 를 이었다)
+- Enum.readonly(dictionary): 얼린 dictionary 를 돌려준다. (Object.freeze 처럼, 지금까지는 undefined)
+- Format.formatCompactNumber: 반올림해 1000 이 되면 다음 단위로 올린다. (999999 는 "1000K" 가 아니라 "1M", Intl 의 compact 표기와 같다)
+- Singleton: 인스턴스가 이미 있는 클래스를 다시 new 하면 던진다. getInstance() 로 받는다. (하위 클래스 생성자는 super() 가 돌려준 첫 인스턴스에 제 필드와 생성자 몸통을 다시 돌려 첫 인스턴스를 덮어썼고, 비공개 필드가 있으면 TypeError 였다)
+- Node.setParent, addChild: 자신이나 자기 자손 밑으로는 붙이지 않고 false 를 돌려준다. (고리가 되면 isActiveInHierarchy 같은 위로 오르는 셈이 끝나지 않았다, 자신이면 빈 오류를 던지던 것도 false) 붙였거나 떼었으면 true. removeChild 는 제 자식일 때만 뗀다. (러스트 NodeTree 와 같다)
+- ObjectPool.release: 이미 되돌려 놀고 있는 객체를 또 놓으면 무시한다. (두 번 놓으면 다음에 두 쓰임이 한 객체를 빌렸다)
+- Platform.getSafeAreaRect(canvas): 캔버스의 CSS 크기(clientWidth, clientHeight)로 잰다. 돌려주는 사각형은 모두 CSS 픽셀이고 너비와 높이는 0 이상이다. (여백은 CSS 픽셀인데 그리기 버퍼 크기 width, height 에서 빼서 고해상도 화면에서 섞인 단위였다)
+- 옮기는 법: Singleton 하위 클래스를 new 로 다시 만들던 코드는 getInstance() 로 받는다. 제 자식이 아닌 노드를 removeChild 로 떼던 코드는 node.setParent(null) 로 뗀다. 에디터가 저장한 문서를 읽는 게임은 UIDocument.registerEditorTypes() 를 한 번 부른다
+- Color: 성분을 0 ~ 1 로 자르지 않고 그대로 담는다. (빛나는 색처럼 1 을 넘는 HDR 색, 유니티 Color 처럼, 러스트 판과 같다) 0 ~ 255 글(toRGBAString, toHEXString)로 낼 때만 성분은 0 ~ 255, rgba 의 알파는 0 ~ 1 로 자른다. 옮기는 법: 0 ~ 255 값으로 new Color(255, 128, 0) 처럼 만들던 코드는 Color.createFromBytes 나 0 ~ 1 값으로 바꾼다. (전에는 1 로 잘려 흰색이었고 이제는 그대로 담긴다)
+- UINode: isInteractable, setInteractable, contains, getWorldCorners, convertToViewPosition, touchPress, touchMove, touchRelease, touchCancel. UINode 에 붙인 UIButton 이 솔버가 푼 자리로 눌린다. (TouchRaycaster 가 WorldNode 만 맞히고 UINode 는 누름 판정이 없어 눌리지 않았다, 러스트는 UINode 가 WorldNode 의 컴포넌트라 원래 눌렸다) UIButton 은 setInteractable 이 있는 노드면 붙을 때 켠다
+- UIScrollBar: 자동 숨김이 노드를 끄지 않고 켜 둔 채 숨긴다. (끄면 갱신이 멈춰 콘텐트가 길어져도, setAutoHide(false) 를 해도 다시 나오지 않았다) 숨은 동안 그리지 않고 누름도 받지 않는다. isAutoHidden() 추가
+- LanguagePack, UIFont: JsonAsset.load 가 실패를 거부하게 되어 받기 실패를 못 읽은 것으로 받는다. (지금처럼 경고를 내고 null, false) UIFont 머리 주석의 목록 꼴을 코드와 맞췄다({ fonts: [...] }, { faces: [...] })
+- ShaderSprite.isDrawnInsideContent: 뒤집어도 참이다. (Sprite 가 뒤집어도 내용 영역 안에 그리게 되어 같게)
+- 가이드: 05, 12, 13, 19 장과 도구 장(ko, en)을 바뀐 것(--keep-names, UIDocument 등록 이름과 registerEditorTypes, UINode 누름, Animator 상태 기계)에 맞췄다
+- Engine: 창이 포커스를 잃으면(blur) 터치와 마우스 단추만이 아니라 키도 놓는다. (InputManager.clear 뒤 터치를 뗀 것으로, 러스트와 같다) keyup 이 오지 않아 키가 눌린 채 남던 것을 고쳤다.
+- Sprite: 뒤집기(setHorizontalFlip, setVerticalFlip)가 내용 영역 밖(음의 크기 쪽)에 그리던 것을 내용 영역 안에서 거울처럼 뒤집게 고쳤다. 조각, 나인 슬라이스, 타일 모두 뒤집힌다. (나인 슬라이스는 작게 깨져 그려지고 타일은 뒤집히지 않던 것도 같이) 뒤집어도 isDrawnInsideContent 가 참이라 화면 밖 거르기를 받는다.
+- Sprite.setImage: HTMLCanvasElement, OffscreenCanvas 도 받는다. (전에는 HTMLImageElement 와 ImageAsset 말고는 무시했다, UIImageView.setImage 로 넘긴 OffscreenCanvas 도 이제 그려진다)
+- Graphic.drawNode: 그리다 예외가 나도 try/finally 로 넣은 변환을 꺼내 변환 스택이 어긋나지 않는다.
+- Graphic.drawPolyline, drawLine, drawLineLoop, drawStrokeRoundRect, drawConvexPolygon: 정점 버퍼(4096 정점)가 차면 쌓인 것을 그리고 이어 적는다. 전에는 683 번째 선분(볼록 다각형은 1366 번째 삼각형)부터 버렸다.
+- Graphic.setCullingEnabled: 머리 주석의 기본값을 실제(켬, true)에 맞췄다.
+- AudioPlayer: 멈춘 AudioContext 를 깨우는 동안 stop 하거나 play 를 다시 하면 늦게 끝난 지난 요청이 소리를 내던 것을 고쳤다. (요청 번호, 소리는 늘 하나) resume 거부를 잡아 처리되지 않은 거부가 남지 않는다. getTime 이 재생 중에 오디오 컨텍스트 시계로 흐른다. (재생 빠르기를 곱하고, 루프면 길이로 되감고, 아니면 길이에서 멈춘다, 멈췄거나 끝났으면 setTime 의 시작 위치)
+- SoundSystem: 소리 표 줄에 volume 이 없으면 1 로 낸다. (전에는 NaN 이 되어 0, 소리가 나지 않았다)
+- TouchRaycaster: WorldNode 만 맞히던 것을 노드 종류를 가리지 않게 했다. isInteractable 과 contains 가 있는 노드는 모두 맞고 누름을 받는다.
+- ParticleSystem: 루프 이음매(되풀이 경계)의 버스트가 첫 주기에만 터지던 것을 고쳤다. 0 초 버스트와 경계 바로 앞 버스트도 주기마다 터지고, 한 프레임에 여러 주기를 건너면 그 수만큼 터진다. (시간이 멈춘 0 초 프레임에는 다시 터지지 않는다)
+- ParticleSystem.applyDescription: 서술의 imageDataUrl(파티클 편집기가 고른 그림의 data: 주소)을 읽어 입자 이미지로 건다. (null 이나 빈 글이면 그림을 뗀다) 저장한 서술을 게임에서 다시 불러도 고른 그림이 되살아난다.
+- ParticleEmitterShape: 머리 주석의 edge 방향을 실제(아래쪽 +y)에 맞췄다.
+- FontAsset.load(assetPath): 경로만 정하고 읽지 않던 것을 실제로 읽게 했다. 파일 이름에서 확장자를 뗀 것을 패밀리 이름으로 loadFont 한다. ("assets/DOSGothic.woff" 면 "DOSGothic")
+- JsonAsset.load: 받기나 해석이 실패하면 거부한다. (TextAsset, ImageAsset 과 같다) 옮기는 법: 실패해도 풀린다고 보고 await 뒤 data 가 null 인지 보던 코드는 try/catch 로 감싼다. SpriteAtlas.load 는 그대로 JSON 실패에도 알리고 풀린다.
+- AnimationClip: 프레임 목록의 꼴을 실제로 담는 Rect 로 바로잡았다. (setFrames, getFrame, getFrames 의 JSDoc, 쓰지 않던 Frame 가져오기를 뺐다)
+- Asset.unload: 로드되었을 때는 undefined, 아닐 때는 풀린 프로미스를 돌려주던 것을 두 갈래 모두 아무것도 돌려주지 않게 맞췄다. (덮어쓴 하위 클래스, 러스트와 같다)
+- LayoutSolver: 변수가 없는 항(LayoutTerm(null), 값 0)이 든 식을 받으면 updateVariables 에서 TypeError 를 냈다. 이제 그런 항은 계수가 0 인 항처럼 건너뛴다. (그런 항만 남은 5 == 0 은 모순 제약, 0 == 0 은 받는다)
+- UISnapScrollView: setSnapToNearest, setVelocityThreshold 가 값만 담고 스냅 계산에 쓰이지 않았다. 이제 한 칸 모드(기본)는 놓을 때 드래그 속도가 setVelocityThreshold(기본 200, 스크롤 오프셋의 초당 픽셀) 이상이면 끈 거리와 상관없이 속도 방향으로 한 칸 넘기고(플링), 아니면 지금처럼 setPageChangeThreshold 비율로 정한다. setSnapToNearest(true) 는 끄는 동안 칸 범위를 자르지 않고, 놓으면 스냅 오프셋이 가장 가까운 아이템으로 간다. getDragVelocity() 를 더했다. (마지막으로 끈 tick 의 스크롤 축 오프셋 속도, 다음 칸 쪽이 음수) 느리게 끄는 기존 동작은 그대로다
+- UILineChart: setMaxSampleCount 로 상한을 줄이면 이미 든 표본을 오래된 것부터 버린다. (전에는 다음 pushValue 까지 남아 점이 그래프 폭 밖으로 나갔다)
+- UIView: setBackgroundColor(null 또는 undefined) 가 던지던 것을 고쳤다. 배경을 지운다. (처음 값인 알파 0 흰색으로 돌려 그리지 않는다)
+- ImageScroller: setImage(ImageAsset) 이 import 없는 ImageAsset 을 써서 ReferenceError 였다. 이제 ImageAsset 이면 그 getImage() 를, 그 밖의 그림(HTMLImageElement, 캔버스 등)은 그대로 쥔다. (HTMLImageElement 전역이 없는 곳에서도 된다)
+- NodeLayout: 빌더의 anchoredPosition 이 부모에 붙기 전에 걸려 앵커를 무시했다. 이제 build 에서 부모에 붙인 뒤 부모 contentSize 의 앵커 점 기준으로 건다. (앵커는 anchoredPosition 을 부를 때의 앵커, 나중에 부른 localPosition 이 이긴다, 러스트 판과 같다) 선언 없이 남은 옛 "레이아웃 인스턴스 생성" 주석 덩이를 지웠다
+- Camera2D: 머리 주석의 사용 줄 camera.follow([heroPosition], 6) 에 timeDelta 가 빠져 그대로 쓰면 위치가 NaN 이었다. camera.follow([heroPosition], 6, timeDelta) 로 고쳤다. setPosition 에 제 머리 주석을 달았다. (전에는 "접근자." 절 머리가 설명으로 읽혔다)
+- LanguagePack: loadLanguageList 가 읽은 languages.json 의 줄에 aliases 가 없으면 matchLanguageTag 가 TypeError 였다. 이제 파일에서 읽은 목록도 setLanguageList 를 거친다. code 가 글이 아닌 줄은 빼고, aliases 와 countries 가 없으면 빈 배열, 글은 소문자로 맞춘다. (러스트 판과 같다)
+- DEVTools: Settings 의 Show FPS 가 저장만 되고 쓰이지 않았다. 켜면 패널을 닫아도 창 왼쪽 위에 "FPS 값" 상자(지난 1 초의 프레임 수, canvas-native 좌표)를 그린다. 패널이 보이면 패널 위에 그린다
+- UIScrollBar: 썸 기본 색이 0 ~ 255 를 섞은 Color(255, 255, 255, 0.6) 이던 것을 Color(1, 1, 1, 0.6) 으로 고쳤다. (그려지는 모습은 같고 getThumbColor 값이 러스트 판과 같아진다) 공개 API 의 설명, @param, @returns, 예제를 채웠다
+- UIListView: 공개 API 의 설명, @param, @returns, 예제(500 줄 템플릿 목록, 만들기 함수, 끝 알림)를 채웠다
+- UIInputField 커서와 지우기: 왼쪽, 오른쪽 화살표와 Delete 가 크롬처럼 글자 묶음(확장 자소 묶음, Intl.Segmenter) 단위로 움직이고 지운다. 뒤로 지우기는 블링크 BackspaceStateMachine 을 옮겨 코드 포인트 하나씩 지우되 CR LF, 이모지 표현 선택자와 바탕, 피부색 조정자, ZWJ 이모지, 국기, 키캡, 태그 묶음은 통째로 지운다. 서로게이트 쌍을 쪼개던 버그를 고쳤다. (헤드리스 크롬 textarea 의 execCommand 결과와 같음)
+- UIInputField 선택이 있을 때 Shift 없는 왼쪽, 오른쪽 화살표는 크롬처럼 선택의 앞, 뒤로 접는다. 누른 자리(measureIndexAtLocalX)는 글자 묶음 경계에만 선다. moveCursor 에 서로게이트 쌍 가운데 자리를 주면 그 글자 뒤로 본다.
+- UIInputField.deleteRange(startIndex, endIndex) 추가. deleteCharAt(index) 는 그 자리부터 글자 묶음 하나를 지운다. (전에는 UTF-16 한 칸)
+- UIInputField 최대 길이: setText 는 서로게이트 쌍을 쪼개지 않는 데까지 자르고, 넣기(replaceSelection, 붙여넣기, 글자 치기)는 블링크 입력 칸처럼 넣는 글을 남은 길이까지만 넣는다. (전에는 값 전체를 잘라 커서 뒤 글이 지워질 수 있었다)
+- UIInputField.setFont 에 FontAsset 을 주면 그 fontFace 를 쓴다. (전에는 FontAsset 을 그대로 들어 글꼴을 읽기 전이면 글 재기의 CSS font 가 깨졌다) 글 재기와 선택, 커서 그리기는 UILabel 과 같은 buildFontString 으로 짓는다.
+- UIInputField 문맥 메뉴와 숨은 DOM 입력의 자리: 페이지를 스크롤하면 어긋나던 버그를 고쳤다. body 에 붙은 absolute 요소라 뷰포트 좌표(getBoundingClientRect, clientX)에 window.scrollX, scrollY 를 더해 문서 좌표로 놓는다.
+- UIInputField DOM 입력은 크롬 입력 칸처럼 마우스로 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체를 고르고, 그 뒤 끌면 낱말 단위로 넓힌다. 누름 수는 캔버스 mousedown 의 detail 이다.
+- List, Dictionary: find, findAll 의 콜백이 색인이나 키를 this 로 받던 것을 정석 꼴로 바꿈. List 는 콜백(요소, 색인, 리스트)(Array.prototype.find 처럼), Dictionary 는 콜백(값, 키, 딕셔너리)(Map.prototype.forEach 처럼). 옮기는 법: function 콜백에서 this 로 색인이나 키를 읽던 곳은 두 번째 인자로 받는다. (첫 인자만 쓰던 콜백은 그대로 돈다)
+- Animator: 상태를 바꾸지 않던 뼈대를 정석 상태 기계로 완성. AnimationState 에 속도(setSpeed, getSpeed), 되풀이(setLoop, isLoop, null 이면 클립을 따름), getDuration, getNormalizedTime, getFrameIndex. AnimationTransition 에 종료 시각(setExitTime, getExitTime, 정규화 시간, 되풀이 상태의 1 미만은 바퀴마다), 섞는 시간(setDuration, getDuration, 크로스페이드), setCanTransitionToSelf, canTransitionToSelf, 조건(addCondition(이름, 견주는 법, 기준 값), getConditions), isExitTimeReached, from 이 null 이면 어느 상태에서나(Any State). 새 AnimationConditionMode(if, ifNot, greater, less, equals, notEqual). Animator 에 매개변수(setFloat, getFloat, setInteger, getInteger, setBool, getBool, setTrigger, resetTrigger, getTrigger, getParameters), play, findTransition, startTransition, isConditionSatisfied, getCurrentStateIndex, getCurrentNormalizedTime, getCurrentFrame, isInTransition, getNextStateIndex, getNextNormalizedTime, getNextFrame, getTransitionWeight. tick 이 상태 시간을 흘리고 Any State 를 먼저, 그다음 지금 상태의 전이를 넣은 차례로 보고 처음 맞는 하나를 탄다(조건으로 쓴 트리거는 풀림, 섞는 동안은 새 전이를 보지 않음). 처음 더한 상태에서 시작한다. 옮기는 법: setProperty, getProperty, getProperties 는 없어졌다. 종류에 맞게 setFloat, setInteger, setBool, setTrigger 와 그 게터로 바꾼다. 안의 Animation 처리기(getAnimation)도 없어졌다. 고른 프레임은 getCurrentFrame, getNextFrame 과 getTransitionWeight 로 읽는다.
+- VisualAsset: load 가 파일을 읽지 않던 것을 고침. fetch 로 비주얼 에디터가 저장한 UIDocument JSON(씬, 프리팹)을 받아 꼴을 보고, 그 글을 든 Visual 을 담은 뒤 읽힌 것으로 친다. 실패 응답이나 꼴이 틀린 문서는 거부된다. 정적 createVisualFromText 추가, unload 는 담은 Visual 도 비운다.
+- Visual: 문서 글(setDocumentText, getDocumentText)과 createNode 추가. createNode 가 문서로 새 노드 트리를 지어 뿌리의 로컬 위치를 location 으로 둔다. 공개 API 의 설명과 예제를 채움.
+- Timeline: loadFromUrl 이 실패 응답(404 등)을 보지 않던 것을 고침. 이제 거부된다.
+- SkinnedModel: 애니메이션 FBX 에 채널이 있는 스택이 여럿이면 모두 같은 클립 이름이 붙어 playAnimation 이 마지막 것만 틀던 것을 고침. 스택이 여럿이면 스택마다 "클립 이름/스택 이름"(스택 이름이 비면 차례 번호)이다. 스택이 하나면 전처럼 받은 이름이다.
+- HumanSkinRenderer: 텍스처 유닛 주석의 눈 홍채 차례가 뒤바뀐 것을 바로잡음. (12 홍채 노멀, 13 홍채 색. 동작은 원래 맞았다)
+- SkinnedModel: uploadMeshesAndMaterials 를 다시 부르면 예전 드로어블의 VAO, 버퍼, 모프 텍스처와 이 모델이 지은 머티리얼이 남아 새던 것을 고침. (먼저 destroy) uploadWireframeIndices 도 이미 올린 선 버퍼를 지우고 새로 올린다.
+- Localization.isRightToLeft: setRightToLeft 처럼 소문자로, 밑줄을 하이픈으로 읽는다. ("ar_EG" 를 오른쪽에서 왼쪽 언어로 못 잡던 것)
+- Material.createFromDescription: 중간 이미지를 풀지 못하면 그때까지 지은 텍스처를 지우고 거절된다. createTexture 는 그림을 다 푼 뒤에 텍스처를 지어, 풀지 못하면 텍스처를 남기지 않고 기다리는 동안 다른 텍스처가 묶여도 제 텍스처에 올린다. (예전에는 기다리기 전에 묶어, 그사이 묶인 다른 텍스처에 올릴 수 있었다)
+- ShaderProgram: 프래그먼트 셰이더 컴파일이나 링크에 실패하면 먼저 지은 셰이더(와 프로그램)를 지운다
+- UINode.addConstraint: 솔버가 받지 않은 제약(이미 더한 것, 모순)은 목록에 남기지 않는다. (다음 setSolver 가 같은 오류로 멈추던 것)
+- UISpinner.calculateDotOpacity: 점이 없으면(dotCount 0) 0 나누기로 NaN 이 되지 않는다
+- UIListView.setHorizontal: 바뀌면 스크롤 영역을 다시 재고 보이는 항목을 새 축에 다시 놓는다
 - Camera(src/deprecated/camera.js): 폐기 예정. Camera2D(src/misc/camera2d.js)가 회전과 begin, end 까지 모두 덮는다. import.js 는 아직 Camera 로 내보내고, 다음 판에서 빠질 수 있다
 - Experimental: src/experimental 은 0.4.0 뒤 기능의 초안 자리다. src/experimental/experimental.js 가 초안을 모아 내보내고, import.js 가 Experimental 이름 공간으로 다시 내보낸다. (Experimental.이름) 초안은 API 가 바뀔 수 있다. 지금은 비어 있다
 - import.js: 옛 "실험적 기능 목록" 묶음을 컬렉션, 애니메이션, 셰이더와 풀스크린 패스, 3D 그래픽스, 폐기 예정, 실험 묶음으로 나눴다. Visual 은 기타 기능 묶음, VisualAsset 과 BunchAsset 은 리소스 묶음으로 갔다. 내보내는 이름은 Experimental 하나가 늘었을 뿐 같다
