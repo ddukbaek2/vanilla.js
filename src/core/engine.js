@@ -3,7 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Object } from "../base/object.js";
-import { ModalDialogKind, showBrowserDialog } from "./modaldialog.js";
+import { ModalDialogKind, ModalDialog, ModalDialogHandle, ModalDialogResult } from "./modaldialog.js";
 import { Version } from "../base/version.js";
 import { Colors } from "../base/colors.js";
 import { Vector2 } from "../base/vector2.js";
@@ -159,6 +159,7 @@ export class Engine extends Object {
 	//==============================================================================
 	/** @private @type { EngineConfiguration } */ #engineConfiguration;
 	/** @private @type { Platform } */ #platform;
+	/** @private @type { ModalDialog[] } */ #modalDialogList; // 떠 있는 질문 창. (맨 앞이 보이고, 답하면 다음이 뜬다)
 	/** @private @type { Graphic } */ #graphic;
 	/** @private @type { SceneManager } */ #sceneManager;
 	/** @private @type { TimeManager } */ #timeManager;
@@ -194,6 +195,7 @@ export class Engine extends Object {
 		}
 		this.#engineConfiguration = engineConfiguration;
 		this.#platform = new Platform();
+		this.#modalDialogList = [];
 
 		// 이름 설정.
 		if (engineConfiguration.title !== "") {
@@ -1045,6 +1047,12 @@ export class Engine extends Object {
 		const inputManager = this.getInputManager();
 		inputManager.tick(timeDelta);
 
+		// 질문 창. (떠 있으면 씬을 갱신하지 않고 창이 입력을 받는다, 러스트 판과 같다)
+		const isModalDialogOpen = this.isModalDialogOpen();
+		if (isModalDialogOpen) {
+			this.#tickModalDialog(graphic, timeDelta);
+		}
+
 		// // 화면 더 부드럽게.
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
 		// this.CanvasContext.imageSmoothingEnabled = true;
@@ -1070,8 +1078,10 @@ export class Engine extends Object {
 					continue;
 				}
 
-				// 갱신.
-				loadedScene.tick(timeDelta);
+				// 갱신. (질문 창이 떠 있으면 멈춘 화면 그대로 그리기만 한다)
+				if (!isModalDialogOpen) {
+					loadedScene.tick(timeDelta);
+				}
 
 				// 출력.
 				// 앞 씬의 그리기와 이 씬의 갱신 사이에 바깥 WebGL 이 프로그램과 텍스처를 바꿨을 수 있으므로 Graphic 의 묶음 기억을 잊는다.
@@ -1094,6 +1104,13 @@ export class Engine extends Object {
 		// 개발 정보 출력.
 		if (engineConfiguration.useStatistics) {
 			this.drawStatistics(graphic);
+		}
+
+		// 질문 창. (모든 것 위에, 캔버스 안쪽 CSS 픽셀 좌표)
+		if (this.isModalDialogOpen()) {
+			graphic.invalidateRenderStateCache();
+			viewManager.applyCanvasNativeRect(graphic);
+			this.#modalDialogList[0].draw(graphic, viewManager.getCanvasNativeSize());
 		}
 
 		// 묶어 그리기로 쌓여 남은 것을 그린다.
@@ -1318,30 +1335,30 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
-	// 알림 창. (window.alert, 러스트 판 Engine::alert 와 같다)
-	// - 브라우저 창이 닫힌 뒤 끝난 손잡이를 돌려준다. (답은 늘 확인)
+	// 알림 창. (window.alert 자리, 엔진이 그린 창, 러스트 판 Engine::alert 와 같다)
+	// - 확인을 누르면 끝나는 손잡이를 돌려준다. (답은 늘 확인)
 	//==============================================================================
 	/**
 	 * @param { string } message 알릴 글.
 	 * @returns { ModalDialogHandle } 질문 창 손잡이.
 	 */
 	alert(message) {
-		return showBrowserDialog(ModalDialogKind.alert, message, "");
+		return this.#showModalDialog(ModalDialogKind.alert, message, "");
 	}
 
 	//==============================================================================
-	// 확인 창. (window.confirm, 러스트 판 Engine::confirm 과 같다)
+	// 확인 창. (window.confirm 자리, 엔진이 그린 창, 러스트 판 Engine::confirm 과 같다)
 	//==============================================================================
 	/**
 	 * @param { string } message 물을 글.
 	 * @returns { ModalDialogHandle } 질문 창 손잡이. (확인하면 isConfirmed 가 참)
 	 */
 	confirm(message) {
-		return showBrowserDialog(ModalDialogKind.confirm, message, "");
+		return this.#showModalDialog(ModalDialogKind.confirm, message, "");
 	}
 
 	//==============================================================================
-	// 입력 창. (window.prompt, 러스트 판 Engine::prompt 와 같다)
+	// 입력 창. (window.prompt 자리, 엔진이 그린 창, 러스트 판 Engine::prompt 와 같다)
 	//==============================================================================
 	/**
 	 * @param { string } message 물을 글.
@@ -1349,7 +1366,7 @@ export class Engine extends Object {
 	 * @returns { ModalDialogHandle } 질문 창 손잡이. (확인하면 getPromptText 가 입력한 글)
 	 */
 	prompt(message, defaultValue = "") {
-		return showBrowserDialog(ModalDialogKind.prompt, message, defaultValue);
+		return this.#showModalDialog(ModalDialogKind.prompt, message, defaultValue);
 	}
 
 	//==============================================================================
@@ -1399,13 +1416,57 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
-	// 질문 창이 떠 있는지. (브라우저 창은 떠 있는 동안 자바스크립트가 멈춰 늘 거짓, 러스트 웹 판과 같다)
+	// 질문 창이 떠 있는지. (떠 있는 동안 엔진은 씬을 갱신하지 않는다, 러스트 판 Engine::is_modal_dialog_open 과 같다)
 	//==============================================================================
 	/**
 	 * @returns { boolean } 떠 있으면 참.
 	 */
 	isModalDialogOpen() {
-		return false;
+		return this.#modalDialogList.length > 0;
+	}
+
+	//==============================================================================
+	// 질문 창 띄우기. (목록 끝에 더한다. 캔버스가 없는 곳(node)에서는 그 자리에서 alert 는 확인, confirm 과 prompt 는 취소로 끝난다)
+	//==============================================================================
+	/**
+	 * @param { string } kind 종류. (ModalDialogKind 의 값)
+	 * @param { string } message 묻는 글.
+	 * @param { string } defaultValue prompt 입력 칸의 기본값.
+	 * @returns { ModalDialogHandle } 질문 창 손잡이.
+	 */
+	#showModalDialog(kind, message, defaultValue) {
+		const handle = new ModalDialogHandle();
+		const viewManager = this.getViewManager();
+		if (!System.document || !viewManager || !viewManager.getCanvas()) {
+			handle.finish(kind === ModalDialogKind.alert ? ModalDialogResult.confirmed("") : ModalDialogResult.cancelled());
+			return handle;
+		}
+		this.#modalDialogList.push(new ModalDialog(kind, System.String(message), System.String(defaultValue), handle, this.getPlatform().platformName));
+		return handle;
+	}
+
+	//==============================================================================
+	// 맨 앞 질문 창 갱신. (프레임마다 씬 대신 부른다. 답이 정해지면 창을 내리고 눌린 키와 단추를 비운 뒤 손잡이를 끝낸다)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 글 폭을 잴 그래픽.
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
+	 */
+	#tickModalDialog(graphic, timeDelta) {
+		const dialog = this.#modalDialogList[0];
+		if (!dialog) {
+			return;
+		}
+		const inputManager = this.getInputManager();
+		const answer = dialog.tick(inputManager, graphic, timeDelta);
+		if (dialog.isPointerOverButton()) {
+			PointerCursor.getInstance().markOverButton();
+		}
+		if (answer !== null) {
+			this.#modalDialogList.shift();
+			inputManager.clear();
+			dialog.finish(answer);
+		}
 	}
 
 	//==============================================================================
