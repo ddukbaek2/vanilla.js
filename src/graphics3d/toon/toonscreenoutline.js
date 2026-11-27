@@ -3,7 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
-import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, readInstanceBufferSphere, isSphereInFrustum } from "./toonrenderer.js";
+import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, writeInstanceBufferSphere, isSphereInFrustum, readHypot } from "./toonrenderer.js";
 import { TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_LINE_ID_LOCATION } from "./toonmaterial.js";
 
 
@@ -59,6 +59,7 @@ const NO_SEED = 65535;
 
 // 인스턴스 그리기의 modelMatrix 자리. (단위 행렬)
 const IDENTITY_ELEMENTS = new System.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+const INSTANCE_BUFFER_SPHERE = [0, 0, 0, 0]; // 인스턴스 버퍼 거르기의 경계 구 칸. (다시 쓴다, 그리기마다 짓지 않게)
 
 // 선의 판과 씨앗 판을 묶는 텍스처 유닛. (툰 렌더러의 그림자 유닛 3 과 겹치지 않게, 섞기는 번호 색 표를 4, 선의 판을 6, 깊이를 7 에)
 const LINE_TEXTURE_UNIT = 5;
@@ -1049,7 +1050,7 @@ export class ToonScreenOutline {
 			return;
 		}
 		const isCulled = options.isCulled !== false;
-		if (isCulled && !isSphereInFrustum(this.#frame.frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+		if (isCulled && writeInstanceBufferSphere(INSTANCE_BUFFER_SPHERE, mesh, instanceBuffer) && !isSphereInFrustum(this.#frame.frustumPlanes, INSTANCE_BUFFER_SPHERE)) {
 			return;
 		}
 		// 초점 거리를 모형 거리로 셀 때만 인스턴스마다의 거리를 더한다. (drawMeshInstanced 와 같은 굵기)
@@ -1371,9 +1372,9 @@ export class ToonScreenOutline {
 		const centerX = modelElements[0] * center[0] + modelElements[4] * center[1] + modelElements[8] * center[2] + modelElements[12];
 		const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
 		const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
-		const scaleX = System.Math.hypot(modelElements[0], modelElements[1], modelElements[2]);
-		const scaleY = System.Math.hypot(modelElements[4], modelElements[5], modelElements[6]);
-		const scaleZ = System.Math.hypot(modelElements[8], modelElements[9], modelElements[10]);
+		const scaleX = readHypot(modelElements[0], modelElements[1], modelElements[2]);
+		const scaleY = readHypot(modelElements[4], modelElements[5], modelElements[6]);
+		const scaleZ = readHypot(modelElements[8], modelElements[9], modelElements[10]);
 		const radius = mesh.boundingRadius * System.Math.max(scaleX, scaleY, scaleZ);
 		for (const plane of this.#frame.frustumPlanes) {
 			if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {

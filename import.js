@@ -159,7 +159,7 @@ export { SkinnedModelAsset } from "./src/graphics3d/skinnedmodelasset.js";
 export { SkinnedModelRenderer, MORPH_GLSL } from "./src/graphics3d/skinnedmodelrenderer.js";
 export { MeshBuilder, VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT, readColorValues, createPartMatrix, createBoxGeometry, createRoundedBoxGeometry, createCylinderGeometry, createSphereGeometry, createLatheGeometry, createCapsuleGeometry, createTorusGeometry, createOctahedronGeometry, createFacetedChunkGeometry } from "./src/graphics3d/toon/meshbuilder.js";
 export { readGlbArrays, readGlbImages, decodeGlbImage, readGlbNodeArrays, readGlbNodeInfos, readAnimationSwing, writeSkinPose, adjustBones, BoneModifyMode } from "./src/graphics3d/toon/glbmeshreader.js";
-export { ToonRenderer, extractFrustumPlanes, readInstanceBufferSphere, isSphereInFrustum, TOON_MAXIMUM_JOINTS, TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT } from "./src/graphics3d/toon/toonrenderer.js";
+export { ToonRenderer, extractFrustumPlanes, readInstanceBufferSphere, writeInstanceBufferSphere, isSphereInFrustum, TOON_MAXIMUM_JOINTS, TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT } from "./src/graphics3d/toon/toonrenderer.js";
 export { ToonPostProcess } from "./src/graphics3d/toon/toonpostprocess.js";
 export { HumanSkinRenderer, SKIN_SHADING_SKIN, SKIN_SHADING_EYE, SKIN_SHADING_HAIR, SKIN_SHADING_OCCLUSION, SKIN_SHADING_FLUID, SKIN_SHADING_FACIALHAIR, SKIN_TEXTURE_UNIT_DETAILHEIGHT, SKIN_TEXTURE_UNIT_MICRO, SKIN_TEXTURE_UNIT_MASKATLAS, SKIN_TEXTURE_UNIT_LAYERNORMAL, SKIN_TEXTURE_UNIT_LAYERCOLOR, SKIN_TEXTURE_UNIT_AUXILIARY, WRINKLE_CHANNEL_COUNT } from "./src/graphics3d/humanskinrenderer.js";
 export { AmbientOcclusionEffect } from "./src/graphics3d/ambientocclusioneffect.js";
@@ -270,6 +270,7 @@ export { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from
 export { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_MAXIMUM_INSTANCE_ATTRIBUTES, TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME, TOON_INSTANCE_LINE_ID_NAME, TOON_INSTANCE_LINE_ID_LOCATION } from "./src/graphics3d/toon/toonmaterial.js";
 export { ToonProgramKind, TOON_MAXIMUM_MATERIAL_TEXTURES, composeToonProgramSources, createReflectionMatrix, readFrameCamera, readMatrixDeterminant, readViewRotation, readCameraRoll, readOutlineVertexData, readUvData } from "./src/graphics3d/toon/toonrenderer.js";
 export { ToonDrawStage } from "./src/graphics3d/toon/toondrawqueue.js";
+export { ToonDrawItem } from "./src/graphics3d/toon/toondrawqueue.js";
 export { AudioManager } from "./src/core/audiomanager.js";
 export { DevTools } from "./src/misc/devtools.js";
 export { Pane, PaneStyle, PaneTheme } from "./src/web/pane.js";
