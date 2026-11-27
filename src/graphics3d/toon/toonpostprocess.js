@@ -230,8 +230,9 @@ float readTapWeight(vec3 position, vec3 normal, ivec2 cell, out float occlusion)
 	return exp(-planeDistance * planeDistance) * normalWeight;
 }
 `;
-// 가로 흐림. (반 해상도, 가우스 7 탭)
+// 가로, 세로 흐림. (반 해상도, 가우스 7 탭, 방향은 blurDirection)
 const AMBIENT_OCCLUSION_BLUR_FRAGMENT_SHADER = AMBIENT_OCCLUSION_COMMON_CHUNK + AMBIENT_OCCLUSION_WEIGHT_CHUNK + `
+uniform ivec2 blurDirection;
 const float GAUSSIAN_WEIGHTS[4] = float[4](1.0, 0.8, 0.45, 0.2);
 void main() {
 	ivec2 cell = ivec2(gl_FragCoord.xy);
@@ -247,18 +248,18 @@ void main() {
 	float weightSum = 0.0;
 	for (int offset = -3; offset <= 3; ++offset) {
 		float occlusion;
-		float weight = GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, cell + ivec2(offset, 0), occlusion);
+		float weight = GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, cell + blurDirection * offset, occlusion);
 		occlusionSum += occlusion * weight;
 		weightSum += weight;
 	}
 	fragmentColor = vec4(weightSum > 0.0001 ? occlusionSum / weightSum : 1.0, 0.0, 0.0, 1.0);
 }
 `;
-// 세로 흐림과 온 해상도로 키우기. (화소에서 가까운 반 해상도 두 줄 x 7 탭을 화소의 깊이와 노멀로 고른다, 세기를 걸고 깊이 24 비트를 gba 에)
+// 온 해상도로 키우기. (화소에서 가까운 반 해상도 2 x 2 칸을 쌍선형 무게에 화소의 깊이와 노멀로 고른 무게를 곱해 섞는다, 세기를 걸고 깊이 24 비트를 gba 에)
+// - 가로와 세로 흐림은 반 해상도에서 끝났으니 온 해상도 화소는 탭 넷만 읽는다. (유니티 URP 의 SSAO 처럼 흐림은 줄인 판에서, 키울 때는 깊이를 보는 쌍선형)
 // - 몸 셰이더가 제 깊이와 견주어 같은 면일 때만 읽는다. (비치는 것, 선의 판에 없는 것은 어둡히지 않는다)
 const AMBIENT_OCCLUSION_UPSAMPLE_FRAGMENT_SHADER = AMBIENT_OCCLUSION_COMMON_CHUNK + AMBIENT_OCCLUSION_WEIGHT_CHUNK + `
 uniform float intensity;
-const float GAUSSIAN_WEIGHTS[4] = float[4](1.0, 0.8, 0.45, 0.2);
 vec3 packDepth(float depth) {
 	float value = floor(depth * 16777215.0 + 0.5);
 	float high = floor(value / 65536.0);
@@ -275,25 +276,22 @@ void main() {
 	vec3 position = readViewPosition(pixel, depth);
 	vec3 normal = readViewNormal(pixel);
 	vec2 point = (gl_FragCoord.xy - 0.5) / sourceScale;
-	ivec2 nearestCell = ivec2(floor(point + 0.5));
-	int sideX = point.x >= float(nearestCell.x) ? 1 : -1;
+	ivec2 baseCell = ivec2(floor(point));
+	vec2 fraction = point - vec2(baseCell);
 	float occlusionSum = 0.0;
 	float weightSum = 0.0;
-	for (int column = 0; column < 2; ++column) {
-		int cellX = nearestCell.x + column * sideX;
-		float columnWeight = column == 0 ? 1.0 : 0.5;
-		for (int offset = -3; offset <= 3; ++offset) {
-			float occlusion;
-			float weight = columnWeight * GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, ivec2(cellX, nearestCell.y + offset), occlusion);
-			occlusionSum += occlusion * weight;
-			weightSum += weight;
-		}
+	for (int index = 0; index < 4; ++index) {
+		ivec2 corner = ivec2(index & 1, index >> 1);
+		float bilinear = (corner.x == 1 ? fraction.x : 1.0 - fraction.x) * (corner.y == 1 ? fraction.y : 1.0 - fraction.y);
+		float occlusion;
+		float weight = (bilinear + 0.0001) * readTapWeight(position, normal, baseCell + corner, occlusion);
+		occlusionSum += occlusion * weight;
+		weightSum += weight;
 	}
 	float visibility = weightSum > 0.0001 ? occlusionSum / weightSum : 1.0;
 	fragmentColor = vec4(1.0 - intensity * (1.0 - visibility), packDepth(depth));
 }
 `;
-
 
 //==============================================================================
 // 툰 HDR 마무리. (실수 렌더 타겟에 그린 선형 색을 블룸, 노출, 톤매핑, 감마로 화면에 낸다)
@@ -1072,16 +1070,23 @@ export class ToonPostProcess {
 		webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("pixelsPerUnit"), 0.5 * System.Math.abs(projectionElements[0]) * width);
 		occlusionPass.draw();
 
-		// 2. 가로 흐림. (반 해상도)
+		// 2. 가로 흐림. (반 해상도, GTAO 판에서 흐림 판으로)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.blurFramebuffer);
 		bindCommon(passes.blurPass, target.occlusionTexture);
+		webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 1, 0);
 		passes.blurPass.draw();
 
-		// 3. 세로 흐림과 키우기. (선의 판 해상도, 세기를 건다)
+		// 3. 세로 흐림. (반 해상도, 흐림 판에서 GTAO 판으로, 판 둘을 돌려 쓴다)
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
+		bindCommon(passes.blurPass, target.blurTexture);
+		webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 0, 1);
+		passes.blurPass.draw();
+
+		// 4. 키우기. (선의 판 해상도, 세기를 건다)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.resultFramebuffer);
 		webGL2RenderingContext.viewport(0, 0, width, height);
 		const upsamplePass = passes.upsamplePass;
-		bindCommon(upsamplePass, target.blurTexture);
+		bindCommon(upsamplePass, target.occlusionTexture);
 		webGL2RenderingContext.uniform1f(upsamplePass.getUniformLocation("intensity"), ambientOcclusion.intensity);
 		upsamplePass.draw();
 
