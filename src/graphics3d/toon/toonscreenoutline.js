@@ -523,6 +523,7 @@ export class ToonScreenOutline {
 	/** @private @type { object | null } */ #frame; // 이번 프레임의 카메라. ({ viewProjectionElements, viewElements, projectionElements, frustumPlanes, isPerspective, viewport })
 	/** @private @type { object | null } */ #savedState; // beginLineIds 앞의 그리기 상태.
 	/** @private @type { Float32Array } */ #instanceData;
+	/** @private @type { Float32Array } */ #lineUniformValues; // 선의 판에 올린 instanced, instanceLineIds, skinned, lineFlags. (같으면 건너뜀, beginLineIds 가 잊는다)
 	/** @private @type { number } */ #drawnDistanceSum; // 이번 프레임에 그린 모형의 거리 합과 수. (초점 거리를 주지 않았을 때)
 	/** @private @type { number } */ #drawnDistanceCount;
 	/** @private @type { Array<number> } */ #lineWidths; // 이번 프레임의 바깥 선과 꺾임 선 굵기. (그리는 영역 픽셀)
@@ -560,6 +561,7 @@ export class ToonScreenOutline {
 		this.#frame = null;
 		this.#savedState = null;
 		this.#instanceData = new System.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+		this.#lineUniformValues = new System.Float32Array([System.NaN, System.NaN, System.NaN, System.NaN]);
 		this.#drawnDistanceSum = 0;
 		this.#drawnDistanceCount = 0;
 		this.#lineWidths = [2, 1];
@@ -839,7 +841,65 @@ export class ToonScreenOutline {
 		const lineProgram = this.#lineProgram;
 		lineProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("viewProjectionMatrix"), false, this.#frame.viewProjectionElements);
+		this.#lineUniformValues.fill(System.NaN);
 		return true;
+	}
+
+	//==============================================================================
+	// 모형 하나를 그릴지 가리고 초점 거리에 더하기. (drawMesh 가 그리기 앞에 하는 것, 그리기 줄이 담은 차례로 부르고 그리기는 drawMeshBatch 로 몰아 한다)
+	//==============================================================================
+	/**
+	 * @param { object } mesh - ToonRenderer.createMesh 의 결과.
+	 * @param { Float32Array } modelElements - 모형 행렬의 수 16.
+	 * @param { boolean } isCulled - 화면 밖을 거르는지.
+	 * @returns { boolean } 그릴 것이면 true.
+	 * @private
+	 */
+	acceptMesh(mesh, modelElements, isCulled) {
+		if (this.#savedState === null || (isCulled && !this.isVisible(mesh, modelElements))) {
+			return false;
+		}
+		this.addDrawnDistance(mesh, modelElements);
+		return true;
+	}
+
+	//==============================================================================
+	// 같은 모형과 꼴의 여럿의 번호를 인스턴스 그리기 한 번으로. (그리기 줄의 자동 인스턴싱, acceptMesh 로 고른 것, 감기는 뒤집지 않은 것만)
+	// - 번호는 인스턴스마다 틴트 칸의 x 로. (drawMeshInstanced 와 같은 길, 하나면 보통 그리기)
+	//==============================================================================
+	/**
+	 * @param { object } mesh - ToonRenderer.createMesh 의 결과.
+	 * @param { Array<Matrix4> } modelMatrixList - 모형 행렬 목록.
+	 * @param { Array<number> } lineIdList - 번호 목록. (행렬과 같은 자리)
+	 * @param { number } start - 목록에서 그릴 첫 자리.
+	 * @param { number } count - 그릴 수.
+	 * @param { object } options - 모두에 같은 그리기 꼴.
+	 * @private
+	 */
+	drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options) {
+		if (this.#savedState === null || count <= 0) {
+			return;
+		}
+		if (count === 1) {
+			this.drawWithCount(mesh, modelMatrixList[start].getElements(), 0, lineIdList[start], 0, false, options, mesh.bodyVertexArray);
+			return;
+		}
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		if (this.#instanceData.length < count * TOON_INSTANCE_FLOAT_COUNT) {
+			this.#instanceData = new System.Float32Array(count * TOON_INSTANCE_FLOAT_COUNT);
+		}
+		const instanceData = this.#instanceData;
+		for (let index = 0; index < count; ++index) {
+			const offset = index * TOON_INSTANCE_FLOAT_COUNT;
+			instanceData.set(modelMatrixList[start + index].getElements(), offset);
+			instanceData[offset + 16] = System.Math.max(0, System.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineIdList[start + index]));
+			instanceData[offset + 17] = 0;
+			instanceData[offset + 18] = 0;
+			instanceData[offset + 19] = 1;
+		}
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, count * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
+		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
 	}
 
 	//==============================================================================
@@ -1032,11 +1092,27 @@ export class ToonScreenOutline {
 		const isSkinned = mesh.isSkinned && jointMatrices !== null;
 		const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
 		webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("modelMatrix"), false, modelElements);
-		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanced"), instanceCount > 0 ? 1 : 0);
-		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), lineIdSource);
-		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
+		// 그리기마다 거의 같은 넷은 바뀔 때만 올린다. (beginLineIds 가 잊는다)
+		const lineUniformValues = this.#lineUniformValues;
+		const instancedValue = instanceCount > 0 ? 1 : 0;
+		const skinnedValue = isSkinned ? 1 : 0;
+		if (lineUniformValues[0] !== instancedValue) {
+			lineUniformValues[0] = instancedValue;
+			webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanced"), instancedValue);
+		}
+		if (lineUniformValues[1] !== lineIdSource) {
+			lineUniformValues[1] = lineIdSource;
+			webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), lineIdSource);
+		}
+		if (lineUniformValues[2] !== skinnedValue) {
+			lineUniformValues[2] = skinnedValue;
+			webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), skinnedValue);
+		}
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System.Math.max(0, System.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
-		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
+		if (lineUniformValues[3] !== lineFlags) {
+			lineUniformValues[3] = lineFlags;
+			webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
+		}
 		if (isSkinned) {
 			const jointFloatCount = System.Math.floor(System.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
 			const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);

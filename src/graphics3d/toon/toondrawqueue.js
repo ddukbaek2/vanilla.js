@@ -4,7 +4,7 @@
 const System = globalThis;
 import { ToonBlendMode } from "./toonmaterial.js";
 import { TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID } from "./toonscreenoutline.js";
-import { readInstanceBufferSphere, DRAW_STATE_JOINT_MATRICES, DRAW_STATE_INDEX_START, DRAW_STATE_INDEX_COUNT, DRAW_STATE_IS_MIRRORED, DRAW_STATE_MATERIAL, DRAW_STATE_IS_TRANSPARENT, DRAW_STATE_HAS_OUTLINE, DRAW_STATE_IS_CULLED, DRAW_STATE_CASTS_SHADOW, DRAW_STATE_LINE_ID, DRAW_STATE_GROUP, DRAW_STATE_IS_DEPTH_PREPASSED, DRAW_STATE_BASE_COLOR_TEXTURE, EMPTY_OPTIONS } from "./toonrenderer.js";
+import { readInstanceBufferSphere, readMatrixDeterminant, isSameBatchState, DRAW_STATE_JOINT_MATRICES, DRAW_STATE_INDEX_START, DRAW_STATE_INDEX_COUNT, DRAW_STATE_IS_MIRRORED, DRAW_STATE_MATERIAL, DRAW_STATE_IS_TRANSPARENT, DRAW_STATE_HAS_OUTLINE, DRAW_STATE_IS_CULLED, DRAW_STATE_CASTS_SHADOW, DRAW_STATE_LINE_ID, DRAW_STATE_GROUP, DRAW_STATE_IS_DEPTH_PREPASSED, DRAW_STATE_BASE_COLOR_TEXTURE, EMPTY_OPTIONS } from "./toonrenderer.js";
 import { ShadowUpdateMode } from "../shadowmap.js";
 
 
@@ -64,6 +64,9 @@ function readSortId(value) {
 //==============================================================================
 // 그림자 캐시에서 드리우개를 움직이지 않는 것으로 굽기까지 그대로여야 하는 프레임 수. (자주 섰다 움직이는 것이 구운 판을 자꾸 다시 굽지 않게)
 const SHADOW_STATIC_FRAME_COUNT = 30;
+const DRAW_PART_OUTLINE = 1; // drawMeshBatch 가 그릴 것: 바깥선 껍데기. (ToonRenderer 와 같은 값)
+const DRAW_PART_BODY = 2; // 몸.
+const DRAW_PART_ALL = 3; // 둘 다. (그림자 패스면 깊이)
 
 
 //==============================================================================
@@ -132,6 +135,19 @@ function writeCasterRecord(record, item) {
 	}
 	return isChanged;
 }
+
+//==============================================================================
+// 자동 인스턴싱으로 묶을 수 있는지. (같은 모형, 같은 재질 블록, 같은 감기, 선 번호와 묶음 말고 푼 칸이 모두 같은 보통 모형 하나씩)
+//==============================================================================
+/**
+ * @param { object } item - 담은 것.
+ * @param { object } other - 견줄 담은 것.
+ * @returns { boolean } 묶을 수 있으면 true.
+ */
+function isBatchableItem(item, other) {
+	return other.mesh === item.mesh && other.modelMatrix !== null && other.instances === null && other.instanceBuffer === null && other.materialBlock === item.materialBlock && other.mirrorSign === item.mirrorSign && isSameBatchState(item.state, other.state);
+}
+
 
 //==============================================================================
 // 같은 수 묶음인지. (null 이면 다르다)
@@ -239,6 +255,10 @@ export class ToonDrawQueue {
 	/** @private @type { number } */ #sortCount; // 앞의 정렬의 불투명한 것 수. (-1 이면 없음)
 	/** @private @type { Array<object> } */ #opaqueScratch; // 담은 차례의 불투명한 것. (프레임마다 다시 쓴다)
 	/** @private @type { boolean } */ #isResolved; // 담은 것마다 꼴을 풀었는지. (그리기 앞에 렌더러로 한 번)
+	/** @private @type { Array<object> } */ #batchMatrices; // 자동 인스턴싱으로 묶은 행렬. (프레임마다 다시 쓴다)
+	/** @private @type { Array<any> } */ #outlineBatches; // 바깥선 껍데기를 그릴 것. (담은 것, 행렬 자리, 수를 셋씩)
+	/** @private @type { Array<number> } */ #lineIds; // 선의 판의 묶은 번호. (#lineMatrices 와 같은 자리)
+	/** @private @type { Array<object> } */ #lineMatrices; // 선의 판의 묶은 행렬.
 
 	//==============================================================================
 	// 생성.
@@ -254,6 +274,10 @@ export class ToonDrawQueue {
 		this.#sortCount = -1;
 		this.#opaqueScratch = [];
 		this.#isResolved = false;
+		this.#batchMatrices = [];
+		this.#outlineBatches = [];
+		this.#lineIds = [];
+		this.#lineMatrices = [];
 	}
 
 	//==============================================================================
@@ -272,6 +296,14 @@ export class ToonDrawQueue {
 			const state = renderer.readDrawEntry(item.options).state;
 			item.state = state;
 			item.isTransparent = state[DRAW_STATE_IS_TRANSPARENT];
+			// 자동 인스턴싱의 열쇠. (보통 모형 하나씩인 불투명한 것만, 감기는 0 이나 1)
+			item.materialBlock = null;
+			item.mirrorSign = 0;
+			if (!item.isTransparent && item.modelMatrix !== null) {
+				item.materialBlock = renderer.readMaterialBlock(item.options);
+				const isMirrored = state[DRAW_STATE_IS_MIRRORED];
+				item.mirrorSign = isMirrored >= 0 ? isMirrored : (readMatrixDeterminant(item.modelMatrix.getElements()) < 0 ? 1 : 0);
+			}
 		}
 		this.#isResolved = true;
 		this.#opaqueItemList = null;
@@ -294,7 +326,7 @@ export class ToonDrawQueue {
 		const itemList = this.#itemList;
 		let item = this.#itemPool[itemList.length];
 		if (item === undefined) {
-			item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, state: null, isTransparent: false, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
+			item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
 			this.#itemPool.push(item);
 		}
 		item.mesh = mesh;
@@ -323,6 +355,7 @@ export class ToonDrawQueue {
 			item.instanceBuffer = null;
 			item.options = null;
 			item.state = null;
+			item.materialBlock = null;
 		}
 		this.#itemList.length = 0;
 		this.#passList.length = 0;
@@ -506,9 +539,7 @@ export class ToonDrawQueue {
 			this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, () => {
 				renderer.beginShadowPass(shadowMap);
 			}, (casterList) => {
-				for (const item of casterList) {
-					this.drawItem(renderer, item, item.options);
-				}
+				this.drawCasterList(renderer, casterList);
 			});
 		}
 		finally {
@@ -561,9 +592,7 @@ export class ToonDrawQueue {
 			}, (casterList) => {
 				for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
 					renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-					for (const item of casterList) {
-						this.drawItem(renderer, item, item.options);
-					}
+					this.drawCasterList(renderer, casterList);
 				}
 			});
 		}
@@ -756,6 +785,27 @@ export class ToonDrawQueue {
 			webGL2RenderingContext.viewport(viewport[0] + left, viewport[1] + bottom, System.Math.max(1, System.Math.round(screenRect.width)), System.Math.max(1, System.Math.round(screenRect.height)));
 		}
 		if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
+			// 자동 인스턴싱: 보통 모형은 담은 차례로 거르고 초점 거리에 더한 뒤(acceptMesh), 같은 모형과 선 꼴인 것을 모아 인스턴스 그리기 한 번으로.
+			// (번호는 인스턴스마다, 깊이가 같은 곳이 아니면 그리는 차례와 상관없이 같은 판)
+			// 묶지 않는 것(인스턴스 묶음, 인스턴스 버퍼, 뒤집은 감기, 뼈대)을 만나면 모은 것을 먼저 그려 그것과의 차례는 담은 차례 그대로 둔다. (선의 판은 LEQUAL)
+			const lineMatrices = this.#lineMatrices;
+			const lineIds = this.#lineIds;
+			const groupList = [];
+			const groupTable = new Map();
+			const flushGroups = () => {
+				for (const group of groupList) {
+					const start = lineMatrices.length;
+					for (const index of group.itemIndexList) {
+						lineMatrices.push(lineMatrices[index]);
+						lineIds.push(lineIds[index]);
+					}
+					screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, lineMatrices.length - start, group.item.options);
+				}
+				groupList.length = 0;
+				groupTable.clear();
+				lineMatrices.length = 0;
+				lineIds.length = 0;
+			};
 			let itemIndex = 0;
 			for (const item of this.#itemList) {
 				itemIndex += 1;
@@ -765,15 +815,50 @@ export class ToonDrawQueue {
 				const stateLineId = item.state[DRAW_STATE_LINE_ID];
 				const lineId = stateLineId !== null ? stateLineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
 				if (item.instanceBuffer !== null) {
+					flushGroups();
 					screenOutline.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, lineId, item.options);
+					continue;
 				}
-				else if (item.instances !== null) {
+				if (item.instances !== null) {
+					flushGroups();
 					screenOutline.drawMeshInstanced(item.mesh, item.instances, lineId, item.options);
+					continue;
 				}
-				else {
+				if (item.mirrorSign === 1 || item.state[DRAW_STATE_JOINT_MATRICES] !== null) {
+					flushGroups();
 					screenOutline.drawMesh(item.mesh, item.modelMatrix, lineId, item.options);
+					continue;
 				}
+				if (!screenOutline.acceptMesh(item.mesh, item.modelMatrix.getElements(), item.state[DRAW_STATE_IS_CULLED])) {
+					continue;
+				}
+				const options = item.options;
+				const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
+				const indexStart = options.indexStart;
+				const indexCount = options.indexCount;
+				let groups = groupTable.get(item.mesh);
+				if (groups === undefined) {
+					groups = [];
+					groupTable.set(item.mesh, groups);
+				}
+				let group = null;
+				for (const candidate of groups) {
+					if (candidate.lineFlags === lineFlags && candidate.indexStart === indexStart && candidate.indexCount === indexCount) {
+						group = candidate;
+						break;
+					}
+				}
+				if (group === null) {
+					group = { item: item, lineFlags: lineFlags, indexStart: indexStart, indexCount: indexCount, itemIndexList: [] };
+					groups.push(group);
+					groupList.push(group);
+				}
+				group.itemIndexList.push(lineMatrices.length);
+				lineMatrices.push(item.modelMatrix);
+				lineIds.push(lineId);
 			}
+			// 묶음마다 이어 담아 그린다. (뒤쪽 자리에 차례로 옮겨 담는다)
+			flushGroups();
 			screenOutline.endLineIds();
 		}
 		webGL2RenderingContext.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
@@ -821,8 +906,16 @@ export class ToonDrawQueue {
 		this.runPasses(renderer, ToonDrawStage.beforeOpaque);
 
 		// 1. 불투명한 몸. (인스턴스 묶음과 인스턴스 버퍼는 바깥선까지 한 번에)
-		const outlineItemList = [];
-		for (const item of this.readOpaqueItemList()) {
+		// - 자동 인스턴싱: 정렬로 이어진 같은 모형, 같은 재질 블록의 보통 모형은 인스턴스 그리기 한 번으로. (거르기는 하나씩 먼저)
+		const outlineBatches = this.#outlineBatches;
+		const batchMatrices = this.#batchMatrices;
+		outlineBatches.length = 0;
+		batchMatrices.length = 0;
+		const opaqueItemList = this.readOpaqueItemList();
+		let itemIndex = 0;
+		while (itemIndex < opaqueItemList.length) {
+			const item = opaqueItemList[itemIndex];
+			itemIndex += 1;
 			if (item.instances !== null || item.instanceBuffer !== null) {
 				this.drawItem(renderer, item, item.options);
 				continue;
@@ -832,18 +925,35 @@ export class ToonDrawQueue {
 				this.drawItem(renderer, item, item.options);
 				continue;
 			}
+			const start = batchMatrices.length;
+			batchMatrices.push(item.modelMatrix);
+			itemIndex = this.collectBatch(renderer, opaqueItemList, itemIndex, item, batchMatrices);
+			const count = batchMatrices.length - start;
 			// 몸만. (바깥선 껍데기는 몸을 다 그린 뒤 몰아 그린다, 꼴 객체를 새로 짓지 않아 렌더러가 꼴마다 기억한 재질 블록을 그대로 쓴다)
-			renderer.drawMeshBody(item.mesh, item.modelMatrix, item.options);
+			if (count === 1) {
+				renderer.drawMeshBody(item.mesh, item.modelMatrix, item.options);
+			}
+			else {
+				renderer.drawMeshBatch(item.mesh, batchMatrices, start, count, item.options, DRAW_PART_BODY);
+			}
 			if (item.state[DRAW_STATE_HAS_OUTLINE] && item.mesh.outlineVertexArray !== null) {
-				outlineItemList.push(item);
+				outlineBatches.push(item, start, count);
 			}
 		}
 		this.runPasses(renderer, ToonDrawStage.afterOpaque);
 
-		// 2. 불투명한 것의 바깥선 껍데기와 화면 공간 바깥선.
-		for (const item of outlineItemList) {
-			renderer.drawMeshOutline(item.mesh, item.modelMatrix, item.options);
+		// 2. 불투명한 것의 바깥선 껍데기와 화면 공간 바깥선. (몸과 같은 묶음)
+		for (let batchIndex = 0; batchIndex < outlineBatches.length; batchIndex += 3) {
+			const item = outlineBatches[batchIndex];
+			const count = outlineBatches[batchIndex + 2];
+			if (count === 1) {
+				renderer.drawMeshOutline(item.mesh, item.modelMatrix, item.options);
+			}
+			else {
+				renderer.drawMeshBatch(item.mesh, batchMatrices, outlineBatches[batchIndex + 1], count, item.options, DRAW_PART_OUTLINE);
+			}
 		}
+		outlineBatches.length = 0;
 		if (this.#screenOutline !== null) {
 			this.#screenOutline.drawOutline();
 			renderer.applyFrameState();
@@ -920,8 +1030,8 @@ export class ToonDrawQueue {
 		const count = scratch.length;
 		let keys = this.#sortKeys;
 		let isSame = count === this.#sortCount;
-		if (keys.length < count * 3) {
-			keys = new System.Int32Array(count * 3);
+		if (keys.length < count * 4) {
+			keys = new System.Int32Array(count * 4);
 			this.#sortKeys = keys;
 			this.#sortOrder = new System.Int32Array(count);
 			isSame = false;
@@ -931,11 +1041,13 @@ export class ToonDrawQueue {
 			const materialId = readSortId(item.state[DRAW_STATE_MATERIAL]);
 			const meshId = readSortId(item.mesh);
 			const textureId = readSortId(item.state[DRAW_STATE_BASE_COLOR_TEXTURE]);
-			const offset = index * 3;
-			if (keys[offset] !== materialId || keys[offset + 1] !== meshId || keys[offset + 2] !== textureId) {
+			const blockId = readSortId(item.materialBlock);
+			const offset = index * 4;
+			if (keys[offset] !== materialId || keys[offset + 1] !== meshId || keys[offset + 2] !== textureId || keys[offset + 3] !== blockId) {
 				keys[offset] = materialId;
 				keys[offset + 1] = meshId;
 				keys[offset + 2] = textureId;
+				keys[offset + 3] = blockId;
 				isSame = false;
 			}
 		}
@@ -946,7 +1058,7 @@ export class ToonDrawQueue {
 				indexList.push(index);
 			}
 			indexList.sort((index, other) => {
-				return keys[index * 3] - keys[other * 3] || keys[index * 3 + 1] - keys[other * 3 + 1] || keys[index * 3 + 2] - keys[other * 3 + 2] || index - other;
+				return keys[index * 4] - keys[other * 4] || keys[index * 4 + 1] - keys[other * 4 + 1] || keys[index * 4 + 2] - keys[other * 4 + 2] || keys[index * 4 + 3] - keys[other * 4 + 3] || index - other;
 			});
 			order.set(indexList);
 			this.#sortCount = count;
@@ -957,6 +1069,68 @@ export class ToonDrawQueue {
 		}
 		this.#opaqueItemList = opaqueItemList;
 		return opaqueItemList;
+	}
+
+	//==============================================================================
+	// 자동 인스턴싱으로 묶을 것 모으기. (item 뒤에 이어진 같은 것의 행렬을 matrices 에 더한다, 화면 밖인 것은 drawItem 이 걸러 센다)
+	//==============================================================================
+	/**
+	 * @param { object } renderer - ToonRenderer.
+	 * @param { Array<object> } itemList - 정렬한 담은 것 목록.
+	 * @param { number } itemIndex - item 다음 자리.
+	 * @param { object } item - 묶음의 첫 것. (보통 모형 하나, 걸러 그릴 것)
+	 * @param { Array<object> } matrices - 행렬을 더할 목록.
+	 * @returns { number } 묶지 않은 첫 자리.
+	 * @private
+	 */
+	collectBatch(renderer, itemList, itemIndex, item, matrices) {
+		if (item.materialBlock === null) {
+			return itemIndex;
+		}
+		while (itemIndex < itemList.length) {
+			const other = itemList[itemIndex];
+			if (!isBatchableItem(item, other)) {
+				break;
+			}
+			itemIndex += 1;
+			if (other.state[DRAW_STATE_IS_CULLED] && !renderer.isVisible(other.mesh, other.modelMatrix.getElements())) {
+				this.drawItem(renderer, other, other.options);
+				continue;
+			}
+			matrices.push(other.modelMatrix);
+		}
+		return itemIndex;
+	}
+
+	//==============================================================================
+	// 그림자 드리우개 목록 그리기. (이어진 같은 것은 자동 인스턴싱으로 한 번에, 나머지는 drawItem)
+	//==============================================================================
+	/**
+	 * @param { object } renderer - ToonRenderer. (그림자 패스 안)
+	 * @param { Array<object> } casterList - 정렬한 드리우개 목록.
+	 * @private
+	 */
+	drawCasterList(renderer, casterList) {
+		const batchMatrices = this.#batchMatrices;
+		let itemIndex = 0;
+		while (itemIndex < casterList.length) {
+			const item = casterList[itemIndex];
+			itemIndex += 1;
+			if (item.modelMatrix === null || (item.state[DRAW_STATE_IS_CULLED] && !renderer.isVisible(item.mesh, item.modelMatrix.getElements()))) {
+				this.drawItem(renderer, item, item.options);
+				continue;
+			}
+			batchMatrices.length = 0;
+			batchMatrices.push(item.modelMatrix);
+			itemIndex = this.collectBatch(renderer, casterList, itemIndex, item, batchMatrices);
+			if (batchMatrices.length === 1) {
+				this.drawItem(renderer, item, item.options);
+			}
+			else {
+				renderer.drawMeshBatch(item.mesh, batchMatrices, 0, batchMatrices.length, item.options, DRAW_PART_ALL);
+			}
+		}
+		batchMatrices.length = 0;
 	}
 
 	//==============================================================================

@@ -1415,6 +1415,34 @@ export const DRAW_STATE_IS_DEPTH_PREPASSED = 28;
 const DRAW_STATE_COUNT = 29;
 
 //==============================================================================
+// 자동 인스턴싱으로 묶을 수 있는 푼 칸인지. (그리기 줄이 같은 모형, 같은 재질 블록의 이어진 것을 drawMeshBatch 한 번으로 그린다)
+// - 선 번호, 묶음, 깊이 먼저, 그림자 드리우기, 거르기 말고 모든 칸이 같아야 한다. (거르기는 그리기 줄이 하나씩 먼저 한다)
+// - 뼈대 행렬, 그리기 앞 함수가 있거나 비치는 것은 묶지 않는다. (그리기마다 다를 수 있다)
+//==============================================================================
+/**
+ * @param { Array<any> } state - readDrawEntry 의 푼 칸.
+ * @param { Array<any> } other - 견줄 푼 칸.
+ * @returns { boolean } 묶을 수 있으면 true.
+ */
+export function isSameBatchState(state, other) {
+	if (state === other) {
+		return state[DRAW_STATE_JOINT_MATRICES] === null && state[DRAW_STATE_ON_BEFORE_DRAW] === null && !state[DRAW_STATE_IS_TRANSPARENT];
+	}
+	if (state[DRAW_STATE_JOINT_MATRICES] !== null || state[DRAW_STATE_ON_BEFORE_DRAW] !== null || state[DRAW_STATE_IS_TRANSPARENT]) {
+		return false;
+	}
+	for (let index = 0; index < DRAW_STATE_COUNT; ++index) {
+		if (index === DRAW_STATE_LINE_ID || index === DRAW_STATE_GROUP || index === DRAW_STATE_IS_DEPTH_PREPASSED || index === DRAW_STATE_CASTS_SHADOW || index === DRAW_STATE_IS_CULLED) {
+			continue;
+		}
+		if (state[index] !== other[index]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+//==============================================================================
 // 그리기 꼴 풀기. (칸마다 한 번 읽어 DRAW_STATE_ 자리에 둔다, 기본값은 drawMesh 머리말과 같다)
 //==============================================================================
 /**
@@ -3096,6 +3124,68 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 꼴의 재질 블록 읽기. (값이 같은 꼴은 같은 블록, 그리기 줄이 정렬과 자동 인스턴싱의 열쇠로 쓴다)
+	//==============================================================================
+	/**
+	 * @param { object } options - 그리기 꼴.
+	 * @returns { object } 재질 블록. (값이 같으면 같은 객체)
+	 * @private
+	 */
+	readMaterialBlock(options) {
+		const drawEntry = this.readDrawEntry(options);
+		if (drawEntry.materialBlock === null) {
+			writeMaterialBlockValues(this.#materialBlocks.values, options);
+			drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
+		}
+		return drawEntry.materialBlock;
+	}
+
+	//==============================================================================
+	// 같은 모형과 꼴의 여럿을 인스턴스 그리기 한 번으로. (그리기 줄의 자동 인스턴싱, 유니티 GPU 인스턴싱과 언리얼 auto-instancing 꼴, 거른 뒤 부른다)
+	// - 행렬을 모형의 인스턴스 버퍼에 한 번 올리고 drawElementsInstanced 하나로 그린다. 틴트는 1, 빛남은 0 이라 그리기마다 그린 것과 화면이 같다.
+	//   (instanced 1 은 보통 그리기와 같은 프로그램의 같은 셈이고 모형 행렬만 어트리뷰트에서 읽는다, 행렬은 아핀)
+	// - 감기는 첫 행렬로 가린다. (그리기 줄이 감기가 같은 것만 묶는다)
+	//==============================================================================
+	/**
+	 * @param { object } mesh - createMesh 의 결과.
+	 * @param { Array<Matrix4> } modelMatrixList - 모형 행렬 목록.
+	 * @param { number } start - 목록에서 그릴 첫 자리.
+	 * @param { number } count - 그릴 수.
+	 * @param { object } options - 모두에 같은 그리기 꼴. (isSameBatchState 로 견준 것)
+	 * @param { number } parts - 그릴 것. (1 바깥선 껍데기, 2 몸, 3 둘 다, 그림자 패스면 깊이)
+	 * @private
+	 */
+	drawMeshBatch(mesh, modelMatrixList, start, count, options, parts) {
+		if (mesh === null || count <= 0) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const floatCount = count * TOON_INSTANCE_FLOAT_COUNT;
+		if (this.#instanceData.length < floatCount) {
+			this.#instanceData = new System.Float32Array(floatCount);
+		}
+		const instanceData = this.#instanceData;
+		for (let index = 0; index < count; ++index) {
+			const offset = index * TOON_INSTANCE_FLOAT_COUNT;
+			instanceData.set(modelMatrixList[start + index].getElements(), offset);
+			instanceData[offset + 3] = 0;
+			instanceData[offset + 7] = 0;
+			instanceData[offset + 11] = 0;
+			instanceData[offset + 15] = 1;
+			instanceData[offset + 16] = 1;
+			instanceData[offset + 17] = 1;
+			instanceData[offset + 18] = 1;
+			instanceData[offset + 19] = 1;
+		}
+		if ((parts & DRAW_PART_BODY) !== 0) {
+			this.#frameStatistics.drawnObjectCount += count;
+		}
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+		this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts);
+	}
+
+	//==============================================================================
 	// 프로그램의 프레임 값 올리기. (보기와 투영, 카메라, HDR, 그림자, 바깥선 색, 이번 프레임에 이미 올렸으면 건너뛴다)
 	//==============================================================================
 	/**
@@ -3467,6 +3557,9 @@ export class ToonRenderer {
 		this.#isTrusting = true;
 	}
 
+	//==============================================================================
+	// 맡긴 판 끝. (그리기 줄이 draw, drawShadows 끝에 try/finally 로 부른다)
+	//==============================================================================
 	/**
 	 * @private
 	 */
@@ -3474,6 +3567,9 @@ export class ToonRenderer {
 		this.#isTrusting = false;
 	}
 
+	//==============================================================================
+	// 맡긴 판 멈추기와 다시. (단계 콜백이 렌더러로 바로 그리는 동안 멈춘다)
+	//==============================================================================
 	/**
 	 * @param { boolean } isPaused - 멈출지. (false 면 같은 판으로 다시)
 	 * @private
