@@ -22,6 +22,9 @@ const IMAGE_BITMAP_OPTIONS = { premultiplyAlpha: "premultiply", colorSpaceConver
 //   (크롬은 Blob 을 일꾼 스레드에서 푼다. 그림 요소를 texImage2D 로 올리면 그 자리에서 주 스레드가 다시 푼다)
 // - ImageTextureCache 가 그 그림을 처음 올릴 때 꺼내 올리고 닫는다. (CPU 쪽 사본은 올린 뒤 버린다, 유니티의 읽지 않는 텍스처와 같다)
 // - 읽었지만 아직 어느 Graphic 도 올리지 않은 그림을 모아 둔다. (씬 로딩 화면 동안 Graphic.prepareLoadedImages 가 올린다)
+// - 맡길 때 주인(그림을 쓸 Graphic 의 WebGL 컨텍스트)을 적는다. 주인은 그림을 읽기 시작할 때 씬을 불러오던 Graphic 이다. (SceneManager 가 beginLoading, endLoading 으로 알린다)
+//   Graphic 은 제 것만 미리 올리고, 남의 것은 꺼내지 않는다. (엔진이 둘이면 남의 그림을 제 컨텍스트에 올리고 비트맵을 닫아 버리던 것)
+//   주인을 모르면(씬 불러오기 밖에서 읽었거나 두 엔진이 같이 불러오던 때) Graphic 이 하나뿐일 때만 미리 올리고, 그릴 때는 먼저 그린 쪽이 꺼낸다.
 // - ImageBitmap 결과가 그림 요소를 올린 결과와 화소까지 같은 그림만 미리 푼다. (크롬 158 원문과 실험)
 //   크롬은 ImageBitmap 을 미리 곱한 알파로 푼 뒤 색을 바꾸고, texImage2D 는 곱하지 않은 채 풀어 색을 바꾼 뒤 곱한다.
 //   그래서 알파가 있으면서 sRGB 가 아닌 색 조각(iCCP, gAMA, cHRM, cICP)이 있는 PNG, 16 비트 PNG,
@@ -35,6 +38,9 @@ export class DecodedImageStore {
 	/** @private @type { WeakMap<object, ImageBitmap | null> } */ static #decodedImageMap = new WeakMap(); // 그림 요소 → 미리 푼 그림. (null 이면 미리 풀지 않은 그림, 둘 다 아직 올리지 않은 것)
 	/** @private @type { Array<WeakRef<object>> } */ static #pendingImageReferenceList = []; // 아직 올리지 않은 그림 요소. (약한 참조라 버린 그림은 함께 수거된다)
 	/** @private @type { number } */ static #compactionLength = 64; // 이만큼 쌓이면 수거된 참조와 올린 그림을 걸러 낸다.
+	/** @private @type { WeakMap<object, object | null> } */ static #ownerMap = new WeakMap(); // 그림 요소 → 주인 WebGL 컨텍스트. (null 이면 주인을 모른다)
+	/** @private @type { Array<object> } */ static #loadingOwnerList = []; // 지금 씬을 불러오는 주인. (불러오기마다 하나, 같은 주인이 겹칠 수 있다)
+	/** @private @type { Array<WeakRef<object>> } */ static #ownerReferenceList = []; // 그림을 올릴 수 있는 주인. (Graphic 이 지어질 때 알린다)
 
 	//==============================================================================
 	// 그림 바이트를 ImageBitmap 으로 풀기. (그림 요소를 올린 결과와 같게 풀 수 있는 꼴만, 아니면 null)
@@ -172,10 +178,12 @@ export class DecodedImageStore {
 	/**
 	 * @param { object } image 그림 요소. (ImageAsset 의 HTMLImageElement)
 	 * @param { ImageBitmap | null } imageBitmap 미리 푼 그림. (없으면 null)
+	 * @param { object | null } owner 주인 WebGL 컨텍스트. (getLoadingOwner 로 읽기 시작할 때 받아 둔 것, 모르면 null)
 	 */
-	static register(image, imageBitmap) {
+	static register(image, imageBitmap, owner = null) {
 		DecodedImageStore.release(image);
 		DecodedImageStore.#decodedImageMap.set(image, imageBitmap);
+		DecodedImageStore.#ownerMap.set(image, owner);
 		const pendingImageReferenceList = DecodedImageStore.#pendingImageReferenceList;
 		pendingImageReferenceList.push(new System.WeakRef(image));
 		if (pendingImageReferenceList.length >= DecodedImageStore.#compactionLength) {
@@ -200,11 +208,16 @@ export class DecodedImageStore {
 	//==============================================================================
 	/**
 	 * @param { object } image 그림 요소.
-	 * @returns { ImageBitmap | null } 미리 푼 그림. (없거나 이미 꺼냈으면 null)
+	 * @param { object | null } owner 꺼내는 쪽의 WebGL 컨텍스트. (주인이 적힌 그림은 주인만 꺼낸다, null 이면 가리지 않는다)
+	 * @returns { ImageBitmap | null } 미리 푼 그림. (없거나 이미 꺼냈거나 남의 것이면 null)
 	 */
-	static take(image) {
+	static take(image, owner = null) {
 		const decodedImageMap = DecodedImageStore.#decodedImageMap;
 		if (!decodedImageMap.has(image)) {
+			return null;
+		}
+		const imageOwner = DecodedImageStore.#ownerMap.get(image) ?? null;
+		if (owner !== null && imageOwner !== null && imageOwner !== owner) {
 			return null;
 		}
 		const imageBitmap = decodedImageMap.get(image);
@@ -227,17 +240,91 @@ export class DecodedImageStore {
 
 	//==============================================================================
 	// 아직 올리지 않은 그림 목록. (맡긴 차례)
+	// - 주인을 주면 그 주인의 것만 준다. 주인을 모르는 그림은 알려진 주인이 하나뿐일 때만 넣는다.
 	//==============================================================================
 	/**
+	 * @param { object | null } owner 올릴 쪽의 WebGL 컨텍스트. (null 이면 모두)
 	 * @returns { Array<object> } 그림 요소 목록.
 	 */
-	static getPendingImageList() {
+	static getPendingImageList(owner = null) {
 		DecodedImageStore.compact();
+		const ownerMap = DecodedImageStore.#ownerMap;
+		const isUnknownOwnerIncluded = owner === null || DecodedImageStore.getOwnerCount() <= 1;
 		const pendingImageList = [];
 		for (const imageReference of DecodedImageStore.#pendingImageReferenceList) {
-			pendingImageList.push(imageReference.deref());
+			const image = imageReference.deref();
+			const imageOwner = ownerMap.get(image) ?? null;
+			if (owner === null || imageOwner === owner || (imageOwner === null && isUnknownOwnerIncluded)) {
+				pendingImageList.push(image);
+			}
 		}
 		return pendingImageList;
+	}
+
+	//==============================================================================
+	// 그림을 올릴 수 있는 주인 알리기. (Graphic 이 지어질 때 제 WebGL 컨텍스트로 부른다)
+	//==============================================================================
+	/**
+	 * @param { object } owner WebGL 컨텍스트.
+	 */
+	static addOwner(owner) {
+		const ownerReferenceList = DecodedImageStore.#ownerReferenceList.filter((ownerReference) => ownerReference.deref() !== undefined);
+		if (!ownerReferenceList.some((ownerReference) => ownerReference.deref() === owner)) {
+			ownerReferenceList.push(new System.WeakRef(owner));
+		}
+		DecodedImageStore.#ownerReferenceList = ownerReferenceList;
+	}
+
+	//==============================================================================
+	// 알려진 주인 수. (수거된 것은 세지 않는다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	static getOwnerCount() {
+		let ownerCount = 0;
+		for (const ownerReference of DecodedImageStore.#ownerReferenceList) {
+			if (ownerReference.deref() !== undefined) {
+				ownerCount += 1;
+			}
+		}
+		return ownerCount;
+	}
+
+	//==============================================================================
+	// 씬 불러오기 시작과 끝 알리기. (SceneManager 가 씬의 load 앞뒤로 부른다, 그 사이에 읽기 시작한 그림의 주인이 된다)
+	//==============================================================================
+	/**
+	 * @param { object } owner 불러오는 Graphic 의 WebGL 컨텍스트.
+	 */
+	static beginLoading(owner) {
+		DecodedImageStore.#loadingOwnerList.push(owner);
+	}
+
+	/**
+	 * @param { object } owner beginLoading 에 준 것.
+	 */
+	static endLoading(owner) {
+		const loadingOwnerList = DecodedImageStore.#loadingOwnerList;
+		const ownerIndex = loadingOwnerList.indexOf(owner);
+		if (ownerIndex >= 0) {
+			loadingOwnerList.splice(ownerIndex, 1);
+		}
+	}
+
+	//==============================================================================
+	// 지금 읽기 시작하는 그림의 주인. (씬을 불러오는 주인이 하나면 그 주인, 없거나 둘 이상이면 모른다)
+	//==============================================================================
+	/**
+	 * @returns { object | null } WebGL 컨텍스트. (모르면 null)
+	 */
+	static getLoadingOwner() {
+		const loadingOwnerList = DecodedImageStore.#loadingOwnerList;
+		if (loadingOwnerList.length === 0) {
+			return null;
+		}
+		const owner = loadingOwnerList[0];
+		return loadingOwnerList.every((loadingOwner) => loadingOwner === owner) ? owner : null;
 	}
 
 	//==============================================================================

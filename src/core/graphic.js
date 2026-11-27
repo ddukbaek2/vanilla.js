@@ -933,6 +933,8 @@ export class Graphic extends Object {
 			this.bindTexture(texture);
 		};
 		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
+		// 미리 푼 그림 보관소에 이 컨텍스트를 그림 주인으로 알린다. (주인을 모르는 그림을 미리 올릴지 가를 때 주인 수를 센다)
+		DecodedImageStore.addOwner(webGL2RenderingContext);
 		// 글리프 아틀라스 장을 비워 덮어쓰기 전에 쌓아 둔 묶음을 먼저 그린다. (묶음에 그 장을 쓰는 글자가 있을 수 있다)
 		const beforeTextureOverwrite = () => {
 			this.flushBatch();
@@ -4388,7 +4390,8 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	prepareLoadedImages(timeLimitMilliseconds = System.Infinity) {
-		const pendingImageList = DecodedImageStore.getPendingImageList();
+		// 제 것(이 Graphic 이 불러오던 씬이 읽은 그림)만 올린다. (엔진이 둘이면 남의 그림을 제 컨텍스트에 올리지 않는다)
+		const pendingImageList = DecodedImageStore.getPendingImageList(this.getWebGL2RenderingContext());
 		const startTime = System.performance.now();
 		let imageIndex = 0;
 		while (imageIndex < pendingImageList.length) {

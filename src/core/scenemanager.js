@@ -5,6 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Engine } from "./engine.js";
 import { Scene } from "./scene.js";
+import { DecodedImageStore } from "./graphic/decodedimagestore.js";
 
 
 //==============================================================================
@@ -73,7 +74,20 @@ export class SceneManager extends Object {
 			scene.create();
 			scene.setEngine(engine);
 			loadedScenes.push(scene);
-			await scene.load(engine);
+			// 씬이 load 동안 읽기 시작한 그림은 이 엔진의 Graphic 이 주인이다. (엔진이 둘이면 남의 그림을 미리 올리지 않는다)
+			const loadingGraphic = engine ? engine.getGraphic() : null;
+			const loadingOwner = loadingGraphic ? loadingGraphic.getWebGL2RenderingContext() : null;
+			if (loadingOwner !== null) {
+				DecodedImageStore.beginLoading(loadingOwner);
+			}
+			try {
+				await scene.load(engine);
+			}
+			finally {
+				if (loadingOwner !== null) {
+					DecodedImageStore.endLoading(loadingOwner);
+				}
+			}
 			// 로딩 완료 후 추가 대기. (로딩 화면을 최소 0.3초 더 노출, 그동안 그림을 올린다)
 			const minimumWaitPromise = new System.Promise((resolve) => {
 				System.setTimeout(resolve, 300);
