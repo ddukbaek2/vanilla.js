@@ -3,6 +3,8 @@
 // - 헤드리스 크롬(창을 띄우지 않는다)에서 방 구석(바닥, 뒷벽, 왼벽), 상자, 다리 둘 달린 로봇을 ToonDrawQueue 와 ToonPostProcess 로 그린다. (원근과 직교)
 // - 꺼짐: 켠 적 없음, 켰다 끔 모두 화소가 같다. TOON_AO_BASE_PATH(고치기 전 저장소)를 주면 그 저장소의 같은 장면과 바이트까지 같다.
 // - 켬: 벽과 바닥이 만나는 곳, 상자 옆 바닥, 로봇 발밑이 어두워지고 트인 바닥은 거의 그대로다. 해 칸 경계(로봇 몸의 밝기 단계)는 그 자리 그대로다.
+// - 직접 빛 몫(setAmbientOcclusion 다섯째 인자) 0 은 고치기 전의 켬과 바이트까지 같고, 0.25, 0.5, 1 로 갈수록 해가 비추는 구석이 더 어두워진다.
+//   트인 바닥과 로봇 머리(해 칸 경계)는 몫을 올려도 끔과 바이트까지 같다.
 //   바깥선(ToonScreenOutline)을 켠 장면은 그 선의 판을 다시 쓰고, 끈 장면은 후처리의 미리 그리기(선 없이 선의 판만)를 쓴다. 둘의 모서리 어둠 판은 같다.
 //   TOON_AO_PICTURE_PATH 를 주면 전, 후, AO 판 그림을 그 폴더에 .png 로 남긴다.
 //   puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
@@ -162,7 +164,7 @@ const renderScene = async (page, modulePath, cases) => {
 		for (const caseItem of cases) {
 			const projectionMatrix = caseItem.isOrthographic ? orthographicMatrix : perspectiveMatrix;
 			if (hasPostProcessQueue) {
-				postProcess.setAmbientOcclusion(caseItem.isEnabled, 0.5, 0.5, 0.5);
+				postProcess.setAmbientOcclusion(caseItem.isEnabled, 0.5, 0.5, 0.5, caseItem.directLightingStrength ?? 0);
 			}
 			drawFrame(projectionMatrix, caseItem.hasOutline);
 			const pixels = readPixels();
@@ -258,12 +260,20 @@ try {
 		{ name: "onOutline", isOrthographic: true, hasOutline: true, isEnabled: true, hasPicture: true, hasAmbientOcclusionPicture: true },
 		{ name: "offAgainPerspective", isOrthographic: false, hasOutline: false, isEnabled: false },
 		{ name: "offAgainOutline", isOrthographic: true, hasOutline: true, isEnabled: false },
+		{ name: "directQuarterPerspective", isOrthographic: false, hasOutline: false, isEnabled: true, hasPicture: true, hasAmbientOcclusionPicture: true, directLightingStrength: 0.25 },
+		{ name: "directHalfPerspective", isOrthographic: false, hasOutline: false, isEnabled: true, hasPicture: true, hasAmbientOcclusionPicture: true, directLightingStrength: 0.5 },
+		{ name: "directFullPerspective", isOrthographic: false, hasOutline: false, isEnabled: true, hasPicture: true, hasAmbientOcclusionPicture: true, directLightingStrength: 1 },
+		{ name: "directFullOutline", isOrthographic: true, hasOutline: true, isEnabled: true, hasPicture: true, hasAmbientOcclusionPicture: true, directLightingStrength: 1 },
+		{ name: "offAfterDirectPerspective", isOrthographic: false, hasOutline: false, isEnabled: false },
 	]);
 	if (basePath !== null) {
 		base = await renderScene(page, "/base/import.js", [
 			{ name: "offPerspective", isOrthographic: false, hasOutline: false, isEnabled: false },
 			{ name: "offOrthographic", isOrthographic: true, hasOutline: false, isEnabled: false },
 			{ name: "offOutline", isOrthographic: true, hasOutline: true, isEnabled: false },
+			{ name: "onPerspective", isOrthographic: false, hasOutline: false, isEnabled: true },
+			{ name: "onOrthographic", isOrthographic: true, hasOutline: false, isEnabled: true },
+			{ name: "onOutline", isOrthographic: true, hasOutline: true, isEnabled: true },
 		]);
 	}
 	check(errorList.length === 0, "콘솔 오류 없음 (" + errorList.join(" / ") + ")");
@@ -302,11 +312,18 @@ const countDifferent = (first, second) => {
 // 꺼짐은 바이트까지 같다.
 check(countDifferent(current.captures.offPerspective, current.captures.offAgainPerspective) === 0, "원근: 켰다 끈 화면이 켠 적 없는 화면과 같음");
 check(countDifferent(current.captures.offOutline, current.captures.offAgainOutline) === 0, "바깥선: 켰다 끈 화면이 켠 적 없는 화면과 같음");
+check(countDifferent(current.captures.offPerspective, current.captures.offAfterDirectPerspective) === 0, "원근: 직접 빛 몫 1 로 켰다 끈 화면이 켠 적 없는 화면과 같음");
 if (base !== null) {
 	for (const name of ["offPerspective", "offOrthographic", "offOutline"]) {
 		const different = countDifferent(current.captures[name], base.captures[name]);
 		console.log("  꺼짐 " + name + ": 고치기 전과 다른 바이트 " + different);
 		check(different === 0, name + ": 꺼짐이 고치기 전과 바이트까지 같음");
+	}
+	// 직접 빛 몫 0(기본)의 켬은 고치기 전의 켬과 바이트까지 같다.
+	for (const name of ["onPerspective", "onOrthographic", "onOutline"]) {
+		const different = countDifferent(current.captures[name], base.captures[name]);
+		console.log("  켬(직접 빛 몫 0) " + name + ": 고치기 전과 다른 바이트 " + different);
+		check(different === 0, name + ": 직접 빛 몫 0 의 켬이 고치기 전과 바이트까지 같음");
 	}
 }
 else {
@@ -324,7 +341,8 @@ const readLuminance = (pixels, point) => {
 	}
 	return sum / 9;
 };
-for (const [onName, offName] of [["onPerspective", "offPerspective"], ["onOrthographic", "offOrthographic"], ["onOutline", "offOutline"]]) {
+const darkeningTable = {};
+for (const [onName, offName] of [["onPerspective", "offPerspective"], ["onOrthographic", "offOrthographic"], ["onOutline", "offOutline"], ["directQuarterPerspective", "offPerspective"], ["directHalfPerspective", "offPerspective"], ["directFullPerspective", "offPerspective"], ["directFullOutline", "offOutline"]]) {
 	const probes = current.probes[onName];
 	const onPixels = current.captures[onName];
 	const offPixels = current.captures[offName];
@@ -336,6 +354,7 @@ for (const [onName, offName] of [["onPerspective", "offPerspective"], ["onOrthog
 		lineList.push(probeName + " " + darkening[probeName].toFixed(1) + " (AO " + readLuminance(occlusionPixels, point).toFixed(0) + ")");
 	}
 	console.log("  " + onName + " 어두워진 밝기: " + lineList.join(", "));
+	darkeningTable[onName] = darkening;
 	// 바깥선 장면은 선이 3 x 3 평균에 섞여(선은 켜고 끔이 같다) 덜 드러나므로 1 이상만 본다.
 	const minimumDarkening = onName === "onOutline" ? 1 : 2;
 	for (const probeName of ["wallCorner", "leftCorner", "crateSide", "robotFoot"]) {
@@ -372,10 +391,30 @@ for (const [onName, offName] of [["onPerspective", "offPerspective"], ["onOrthog
 	}
 	console.log("  " + onName + " 해 칸 경계 줄: 끔 " + offEdge + ", 켬 " + onEdge + ", 머리 가운데 다른 바이트 " + headDifferent);
 	check(headDifferent === 0, onName + ": 로봇 머리 가운데(해 칸 경계)는 그대로");
-	if (onName !== "onOutline") {
+	if (onName !== "onOutline" && onName !== "directFullOutline") {
 		check(offEdge === onEdge, onName + ": 해 칸 경계 자리가 그대로");
 	}
+	// 트인 바닥 가운데 9 x 9 는 직접 빛 몫과 상관없이 끔과 바이트까지 같다. (보임이 정확히 1)
+	let openDifferent = 0;
+	for (let offsetY = -4; offsetY <= 4; offsetY++) {
+		for (let offsetX = -4; offsetX <= 4; offsetX++) {
+			const index = ((probes.openFloor[1] + offsetY) * WIDTH + probes.openFloor[0] + offsetX) * 4;
+			for (let channel = 0; channel < 4; channel++) {
+				openDifferent += onPixels[index + channel] !== offPixels[index + channel] ? 1 : 0;
+			}
+		}
+	}
+	check(openDifferent === 0, onName + ": 트인 바닥 가운데는 끔과 바이트까지 같음 (" + openDifferent + ")");
 }
+// 직접 빛 몫을 올릴수록 해가 비추는 구석이 더 어두워진다. (0 → 0.25 → 0.5 → 1)
+for (const probeName of ["wallCorner", "leftCorner", "crateSide", "robotFoot"]) {
+	const steps = ["onPerspective", "directQuarterPerspective", "directHalfPerspective", "directFullPerspective"].map((name) => darkeningTable[name][probeName]);
+	console.log("  직접 빛 몫 0 / 0.25 / 0.5 / 1 의 " + probeName + " 어두워진 밝기: " + steps.map((value) => value.toFixed(1)).join(" / "));
+	for (let index = 1; index < steps.length; index++) {
+		check(steps[index] > steps[index - 1] + 0.5, probeName + ": 직접 빛 몫을 올리면 더 어두워짐 (" + steps[index - 1].toFixed(1) + " → " + steps[index].toFixed(1) + ")");
+	}
+}
+check(darkeningTable.directFullOutline.wallCorner > darkeningTable.onOutline.wallCorner + 0.5, "바깥선 직교: 직접 빛 몫 1 이면 벽 구석이 더 어두워짐");
 // 바깥선의 선의 판을 다시 쓴 AO 판과 미리 그리기의 AO 판은 같다. (같은 직교 장면)
 const occlusionDifferent = countDifferent(current.captures.onOrthographicOcclusion, current.captures.onOutlineOcclusion);
 console.log("  바깥선 선의 판과 미리 그리기의 AO 판 다른 바이트: " + occlusionDifferent);

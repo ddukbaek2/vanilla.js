@@ -317,10 +317,10 @@ void main() {
 //   기본은 밝기 1, 채도 1, 대비 1, 색조 0, 안개빛 0, 가장자리 0 이라 보정이 없다.
 // - 해상도 배율: setResolutionScale(배율) 이면 씬 판을 출력 크기 x 배율로 짓고 end 의 뷰포트로 키워(선형 거르기) 낸다. (3D 만 낮춰 그리고 UI 는 기기 화소 그대로 둘 때, 기본 1)
 // - 노드 사각형 안에 낼 때: resize(사각형 너비, 높이) → begin → 그리기(ToonRenderer 의 화면 사각형은 풀어 둔다) → end(null, [x, 드로잉 버퍼 높이 - y - 높이, 너비, 높이]).
-// - 모서리 어둠(화면 공간 AO): setAmbientOcclusion(켬, 세기, 반지름, 해상도 배율) 로 켠다. (기본 꺼짐, 세기 0.5, 반지름 0.5 월드 길이, 반 해상도)
+// - 모서리 어둠(화면 공간 AO): setAmbientOcclusion(켬, 세기, 반지름, 해상도 배율, 직접 빛 몫) 로 켠다. (기본 꺼짐, 세기 0.5, 반지름 0.5 월드 길이, 반 해상도, 직접 빛 몫 0)
 //   GTAO(Jimenez 2016)를 반 해상도로 셈하고, 접평면 거리와 노멀로 가장자리를 지키며 가로로 흐린 뒤 세로로 흐리며 온 해상도로 키운다. (잡음은 고정 무늬라 멈춘 화면은 흔들리지 않는다)
 //   노멀과 깊이는 화면 바깥선(ToonScreenOutline)의 선의 판을 다시 쓴다. 바깥선이 없는 장면은 선은 긋지 않고 선의 판만 그리는 getAmbientOcclusionPrepass() 를 쓴다.
-//   ToonDrawQueue.setPostProcess(이것) 이면 큐가 선의 판 뒤, 몸 앞에 drawAmbientOcclusion 을 부르고 렌더러에 결과를 건다. 몸 셰이더는 바탕빛(하늘과 땅 빛)에만 곱한다. (해 칸, 채움빛, 점광은 그대로)
+//   ToonDrawQueue.setPostProcess(이것) 이면 큐가 선의 판 뒤, 몸 앞에 drawAmbientOcclusion 을 부르고 렌더러에 결과를 건다. 몸 셰이더는 바탕빛(하늘과 땅 빛)에 곱하고, 직접 빛 몫만큼 해, 채움빛, 점광의 확산과 반사광에도 곱한다. (칸을 고른 뒤라 칸 경계는 그대로, 몫 0 이면 바탕빛에만)
 //   엔진에 있던 AmbientOcclusionEffect 는 원근의 시야각과 가까운, 먼 면으로만 깊이를 풀고 RGB 월드 노멀과 커버리지 알파를 받는 반구 표본 꼴이라 직교 카메라와 선의 판(팔면체 노멀)에 맞지 않아 따로 짓는다.
 //==============================================================================
 /**
@@ -365,7 +365,7 @@ export class ToonPostProcess {
 	/** @private @type { Array<number> } */ #hazeColor;
 	/** @private @type { number } */ #hazeAmount;
 	/** @private @type { number } */ #vignetteStrength;
-	/** @private @type { object } */ #ambientOcclusion; // 모서리 어둠 설정. ({ isEnabled, intensity, radius, resolutionScale })
+	/** @private @type { object } */ #ambientOcclusion; // 모서리 어둠 설정. ({ isEnabled, intensity, radius, resolutionScale, directLightingStrength })
 	/** @private @type { object | null } */ #ambientOcclusionPasses; // 모서리 어둠의 세 패스. ({ occlusionPass, blurPass, upsamplePass }, 처음 셀 때 짓는다)
 	/** @private @type { object | null } */ #ambientOcclusionTarget; // 모서리 어둠 판. ({ occlusionTexture, blurTexture, resultTexture 와 그 프레임버퍼, width, height, cellWidth, cellHeight })
 	/** @private @type { ToonScreenOutline | null } */ #ambientOcclusionPrepass; // 바깥선이 없는 장면의 노멀과 깊이 미리 그리기. (선은 긋지 않는다)
@@ -414,7 +414,7 @@ export class ToonPostProcess {
 		this.#hazeColor = [0, 0, 0];
 		this.#hazeAmount = 0;
 		this.#vignetteStrength = 0;
-		this.#ambientOcclusion = { isEnabled: false, intensity: 0.5, radius: 0.5, resolutionScale: 0.5 };
+		this.#ambientOcclusion = { isEnabled: false, intensity: 0.5, radius: 0.5, resolutionScale: 0.5, directLightingStrength: 0 };
 		this.#ambientOcclusionPasses = null;
 		this.#ambientOcclusionTarget = null;
 		this.#ambientOcclusionPrepass = null;
@@ -882,20 +882,23 @@ export class ToonPostProcess {
 	}
 
 	//==============================================================================
-	// 모서리 어둠(화면 공간 AO) 설정. (기본 꺼짐, 켜면 drawAmbientOcclusion 이 셈하고 몸 셰이더가 바탕빛에만 곱한다)
+	// 모서리 어둠(화면 공간 AO) 설정. (기본 꺼짐, 켜면 drawAmbientOcclusion 이 셈하고 몸 셰이더가 바탕빛에 곱한다)
 	// - 벽과 바닥이 만나는 곳, 물건 밑, 발밑이 엷게 어두워진다. 세기 1 이면 가린 만큼 다 어둡고 0.5 면 그 반이다.
+	// - 직접 빛 몫은 해가 비추는 곳에서 얼마나 보일지다. (유니티 URP SSAO 의 Direct Lighting Strength, HDRP 의 directLightingStrength)
+	//   0 이면 바탕빛에만 곱하고, 1 이면 해, 채움빛, 점광과 스포트라이트의 확산과 반사광에도 보임을 다 곱한다. 칸(밝기 단계)을 고른 뒤에 곱해 칸 경계 자리는 그대로다.
 	//==============================================================================
 	/**
 	 * @param { boolean } isEnabled - 켤지.
 	 * @param { number } [intensity] - 세기 0 ~ 1. (기본 0.5)
 	 * @param { number } [radius] - 가림을 찾는 반지름. (월드 길이, 기본 0.5)
 	 * @param { number } [resolutionScale] - 셈하는 해상도 배율 0.25 ~ 1. (기본 0.5, 흐림과 키우기는 선의 판 해상도)
+	 * @param { number } [directLightingStrength] - 직접 빛에 미치는 몫 0 ~ 1. (기본 0, 바탕빛에만 곱함)
 	 * @example <caption>바깥선 없는 장면에 모서리 어둠 켜기</caption>
 	 * import { ToonRenderer, ToonPostProcess, ToonDrawQueue, MeshBuilder, createBoxGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
 	 * const canvas = Object.assign(document.createElement("canvas"), { width: 320, height: 180 });
 	 * const webGL2RenderingContext = canvas.getContext("webgl2");
 	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, canvas.width, canvas.height, { depthBits: 24 });
-	 * postProcess.setAmbientOcclusion(true, 0.5, 0.5, 0.5);
+	 * postProcess.setAmbientOcclusion(true, 0.5, 0.5, 0.5, 0.5);
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
 	 * renderer.setHdrOutput(postProcess.getUseFloatColor());
 	 * const builder = new MeshBuilder();
@@ -912,16 +915,17 @@ export class ToonPostProcess {
 	 * postProcess.begin([0.05, 0.05, 0.08]);
 	 * queue.draw(renderer, camera);
 	 * postProcess.end(null, [0, 0, canvas.width, canvas.height]);
-	 * if (postProcess.getAmbientOcclusionTexture() === null) {
+	 * if (postProcess.getAmbientOcclusionTexture() === null || postProcess.getAmbientOcclusionDirectLightingStrength() !== 0.5) {
 	 * 	throw new Error("ambient occlusion texture is missing");
 	 * }
 	 */
-	setAmbientOcclusion(isEnabled, intensity = 0.5, radius = 0.5, resolutionScale = 0.5) {
+	setAmbientOcclusion(isEnabled, intensity = 0.5, radius = 0.5, resolutionScale = 0.5, directLightingStrength = 0) {
 		this.#ambientOcclusion = {
 			isEnabled: isEnabled === true,
 			intensity: System.Math.max(0, System.Math.min(1, intensity)),
 			radius: System.Math.max(0.0001, radius),
 			resolutionScale: System.Math.max(0.25, System.Math.min(1, resolutionScale)),
+			directLightingStrength: System.Math.max(0, System.Math.min(1, directLightingStrength)),
 		};
 	}
 
@@ -929,11 +933,21 @@ export class ToonPostProcess {
 	// 모서리 어둠 설정 반환.
 	//==============================================================================
 	/**
-	 * @returns { object } { isEnabled, intensity, radius, resolutionScale } (새 객체)
+	 * @returns { object } { isEnabled, intensity, radius, resolutionScale, directLightingStrength } (새 객체)
 	 */
 	getAmbientOcclusion() {
 		const ambientOcclusion = this.#ambientOcclusion;
-		return { isEnabled: ambientOcclusion.isEnabled, intensity: ambientOcclusion.intensity, radius: ambientOcclusion.radius, resolutionScale: ambientOcclusion.resolutionScale };
+		return { isEnabled: ambientOcclusion.isEnabled, intensity: ambientOcclusion.intensity, radius: ambientOcclusion.radius, resolutionScale: ambientOcclusion.resolutionScale, directLightingStrength: ambientOcclusion.directLightingStrength };
+	}
+
+	//==============================================================================
+	// 모서리 어둠이 직접 빛에 미치는 몫 반환. (setAmbientOcclusion 의 다섯째 인자, 그리기 줄이 렌더러에 건다)
+	//==============================================================================
+	/**
+	 * @returns { number } 0 ~ 1. (기본 0)
+	 */
+	getAmbientOcclusionDirectLightingStrength() {
+		return this.#ambientOcclusion.directLightingStrength;
 	}
 
 	//==============================================================================

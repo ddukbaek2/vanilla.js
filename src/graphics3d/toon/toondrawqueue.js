@@ -810,7 +810,7 @@ export class ToonDrawQueue {
 		if (texture === null) {
 			return false;
 		}
-		renderer.setAmbientOcclusionTexture(texture);
+		renderer.setAmbientOcclusionTexture(texture, postProcess.getAmbientOcclusionDirectLightingStrength());
 		return true;
 	}
 
