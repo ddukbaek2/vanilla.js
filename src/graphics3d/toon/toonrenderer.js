@@ -137,6 +137,7 @@ const FRAME_BLOCK_CHUNK = `layout(std140) uniform ToonFrame {
 	float localShadowTiles[4];
 	float pointLightShadowSlots[8];
 	vec4 shadowBias;
+	float ambientOcclusionDirectLightingStrength;
 };
 `;
 
@@ -582,18 +583,25 @@ ToonLighting readLighting(ToonSurface surface) {
 	float sunCosine = dot(normal, toSun);
 	vec3 sunRamp = readShadeRamp(readToonCoordinate(sunCosine, surface.shadeOffset) * shadow);
 	float sunLevel = readShadeLevel(sunRamp, sunCosine * shadow);
-	vec3 sunLight = sunRamp * mix(readLightColor(sunLightColor, lightColorUsage.y), readLightColor(sunLightColor, lightColorUsage.x), sunLevel);
 #ifdef TOON_AMBIENT_OCCLUSION
-	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5) * readAmbientOcclusion();
+	// 직접 빛의 가림. (1 - 몫 x (1 - 보임), 칸을 고른 뒤 해, 채움빛, 점광의 확산과 반사광에 곱한다, 몫 0 이나 트인 곳은 정확히 1)
+	float ambientOcclusion = readAmbientOcclusion();
+	float directOcclusion = 1.0 - ambientOcclusionDirectLightingStrength * (1.0 - ambientOcclusion);
+#else
+	const float directOcclusion = 1.0;
+#endif
+	vec3 sunLight = sunRamp * directOcclusion * mix(readLightColor(sunLightColor, lightColorUsage.y), readLightColor(sunLightColor, lightColorUsage.x), sunLevel);
+#ifdef TOON_AMBIENT_OCCLUSION
+	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5) * ambientOcclusion;
 #else
 	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5);
 #endif
 	if (hasSpecular) {
-		specularSum += readLightColor(sunLightColor, lightColorUsage.z) * readToonSpecular(normal, toSun, viewDirection) * sunLevel;
+		specularSum += readLightColor(sunLightColor, lightColorUsage.z) * directOcclusion * readToonSpecular(normal, toSun, viewDirection) * sunLevel;
 	}
 	vec3 toFill = -normalize(fillDirection);
 	float fillCosine = dot(normal, toFill);
-	irradiance += readLightColor(readLimitedDirectionalColor(fillColor), lightColorUsage.x) * readShadeLevel(readShadeRamp(readToonCoordinate(fillCosine, surface.shadeOffset)), fillCosine);
+	irradiance += readLightColor(readLimitedDirectionalColor(fillColor), lightColorUsage.x) * directOcclusion * readShadeLevel(readShadeRamp(readToonCoordinate(fillCosine, surface.shadeOffset)), fillCosine);
 	for (int index = 0; index < 8; ++index) {
 		if (index >= pointLightCount) {
 			break;
@@ -623,9 +631,9 @@ ToonLighting readLighting(ToonSurface surface) {
 		float cosine = (dot(normal, lightDirection) + shape.z) / (1.0 + shape.z);
 		float level = readShadeLevel(readShadeRamp(readToonCoordinate(cosine, surface.shadeOffset) * lightShadow), cosine * lightShadow);
 		vec3 pointColor = readLimitedLocalColor(pointLightColors[index] * falloff);
-		irradiance += readLightColor(pointColor, lightColorUsage.x) * level;
+		irradiance += readLightColor(pointColor, lightColorUsage.x) * directOcclusion * level;
 		if (hasSpecular) {
-			specularSum += readLightColor(pointColor, lightColorUsage.z) * readToonSpecular(normal, lightDirection, viewDirection) * level;
+			specularSum += readLightColor(pointColor, lightColorUsage.z) * directOcclusion * readToonSpecular(normal, lightDirection, viewDirection) * level;
 		}
 	}
 	lighting.irradiance = irradiance;
@@ -1314,7 +1322,7 @@ const OUTLINE_BLOCK_BINDING = 1;
 const OUTLINE_BLOCK_FLOAT_COUNT = 12;
 const FRAME_BLOCK_NAME = "ToonFrame"; // 프레임 블록. (FRAME_BLOCK_CHUNK)
 const FRAME_BLOCK_BINDING = 2;
-const FRAME_BLOCK_FLOAT_COUNT = 168;
+const FRAME_BLOCK_FLOAT_COUNT = 172;
 const MATERIAL_BLOCK_LIMIT = 1024;
 const BATCH_SLOT_MESH_LIMIT = 8; // 묶음 자리마다 버텍스 어레이를 지어 둘 모형 수. (넘으면 그 자리의 것을 모두 지우고 다시) // 블록 갈래마다 기억할 블록 수. (넘으면 그 갈래를 모두 지우고 다시 짓는다)
 const DRAW_PART_OUTLINE = 1; // drawWithCount 가 그릴 것: 바깥선 껍데기.
@@ -1739,7 +1747,7 @@ export class ToonRenderer {
 	/** @private @type { Array<number> } */ #outlineColor; // 바깥선 색. (sRGB, 알파)
 	/** @private @type { boolean } */ #isHdrOutput; // 선형 색을 낼지.
 	/** @private @type { object | null } */ #shadowInput; // 받을 그림자. ({ depthTexture, lightViewProjectionMatrix, resolution, strength })
-	/** @private @type { object | null } */ #ambientOcclusionInput; // 모서리 어둠. ({ texture, origin [x, y] 이번 프레임 뷰포트의 왼쪽 아래 }, null 이면 기본 몸 프로그램)
+	/** @private @type { object | null } */ #ambientOcclusionInput; // 모서리 어둠. ({ texture, origin [x, y] 이번 프레임 뷰포트의 왼쪽 아래, directLightingStrength 직접 빛에 미치는 몫 }, null 이면 기본 몸 프로그램)
 	/** @private @type { boolean } */ #isShadowPass; // 그림자 깊이 패스 중인지.
 	/** @private @type { number } */ #frameSerial; // 프레임 값이 바뀔 때마다 오르는 번호. (프로그램마다 마지막으로 올린 번호와 견준다)
 	/** @private @type { object | null } */ #savedState; // 앞의 그리기 상태. (끝이 돌린다)
@@ -3466,6 +3474,8 @@ export class ToonRenderer {
 		const ambientOcclusionInput = this.#ambientOcclusionInput;
 		values[62] = ambientOcclusionInput !== null ? ambientOcclusionInput.origin[0] : 0;
 		values[63] = ambientOcclusionInput !== null ? ambientOcclusionInput.origin[1] : 0;
+		// 모서리 어둠이 직접 빛에 미치는 몫. (걸지 않았으면 0)
+		values[168] = ambientOcclusionInput !== null ? ambientOcclusionInput.directLightingStrength : 0;
 		// 점광 그림자. (칸 넷의 자리, 앞, 위, 첫 칸과 점광마다의 칸 번호, 없으면 0)
 		const localShadowInput = this.#localShadowInput;
 		values.fill(0, 68, 164);
@@ -4614,13 +4624,16 @@ export class ToonRenderer {
 
 	//==============================================================================
 	// 모서리 어둠 텍스처 설정. (ToonPostProcess.drawAmbientOcclusion 의 결과나 null, 다음 beginFrame 부터)
-	// - 텍스처를 건 동안 몸은 모서리 어둠 몸 프로그램(TOON_AMBIENT_OCCLUSION)으로 그리고, 화면 자리의 보임을 바탕빛(하늘과 땅 빛)에만 곱한다.
-	//   해 칸, 채움빛, 점광, 반사광, 테두리빛은 그대로다. 비치는 것(alpha 나 틴트 알파가 1 보다 작음)과 텍스처의 깊이와 다른 면(선의 판에 없던 것)은 곱하지 않는다.
+	// - 텍스처를 건 동안 몸은 모서리 어둠 몸 프로그램(TOON_AMBIENT_OCCLUSION)으로 그리고, 화면 자리의 보임을 바탕빛(하늘과 땅 빛)에 곱한다.
+	// - 직접 빛 몫(directLightingStrength, 0 ~ 1)이 0 보다 크면 해, 채움빛, 점광과 스포트라이트의 확산과 반사광에도 1 - 몫 x (1 - 보임) 을 곱한다. (유니티 URP SSAO 의 Direct Lighting Strength 꼴)
+	//   칸(밝기 단계)을 고른 뒤에 곱해 칸 경계 자리는 옮겨 가지 않는다. 테두리빛, 빛남, 매트캡, 천사 고리는 그대로다. 몫 0 이면 바탕빛에만 곱한다.
+	// - 비치는 것(alpha 나 틴트 알파가 1 보다 작음)과 텍스처의 깊이와 다른 면(선의 판에 없던 것)은 곱하지 않는다.
 	// - null 이면 기본 몸 프로그램으로 돌아가 텍스처를 읽지 않는다. (끈 화면은 건 적이 없을 때와 같다)
 	// - 머티리얼 텍스처 8 개를 다 쓰는 머티리얼은 조각 셰이더 유닛이 16 개인 기기에서 모서리 어둠 없이 그린다.
 	//==============================================================================
 	/**
 	 * @param { WebGLTexture | null } texture - 선의 판 크기의 RGBA8. (r 보임, gba 깊이 24 비트, null 이면 끈다)
+	 * @param { number } [directLightingStrength] - 직접 빛에 미치는 몫 0 ~ 1. (기본 0, 바탕빛에만 곱함)
 	 * @example <caption>모서리 어둠을 걸고 그린 뒤 풀기</caption>
 	 * import { ToonRenderer } from "./vanilla.js";
 	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
@@ -4628,16 +4641,26 @@ export class ToonRenderer {
 	 * const texture = webGL2RenderingContext.createTexture();
 	 * webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 	 * webGL2RenderingContext.texStorage2D(webGL2RenderingContext.TEXTURE_2D, 1, webGL2RenderingContext.RGBA8, 300, 150);
-	 * renderer.setAmbientOcclusionTexture(texture);
-	 * if (renderer.getAmbientOcclusionTexture() !== texture) {
+	 * renderer.setAmbientOcclusionTexture(texture, 0.5);
+	 * if (renderer.getAmbientOcclusionTexture() !== texture || renderer.getAmbientOcclusionDirectLightingStrength() !== 0.5) {
 	 * 	throw new Error("ambient occlusion texture is not set");
 	 * }
 	 * renderer.setAmbientOcclusionTexture(null);
 	 */
-	setAmbientOcclusionTexture(texture) {
+	setAmbientOcclusionTexture(texture, directLightingStrength = 0) {
 		this.#frameSerial += 1;
 		this.#lastProgramKey = null;
-		this.#ambientOcclusionInput = texture !== null && texture !== undefined ? { texture: texture, origin: [0, 0] } : null;
+		this.#ambientOcclusionInput = texture !== null && texture !== undefined ? { texture: texture, origin: [0, 0], directLightingStrength: System.Math.max(0, System.Math.min(1, directLightingStrength)) } : null;
+	}
+
+	//==============================================================================
+	// 모서리 어둠이 직접 빛에 미치는 몫 반환. (setAmbientOcclusionTexture 의 둘째 인자, 걸지 않았으면 0)
+	//==============================================================================
+	/**
+	 * @returns { number } 0 ~ 1.
+	 */
+	getAmbientOcclusionDirectLightingStrength() {
+		return this.#ambientOcclusionInput !== null ? this.#ambientOcclusionInput.directLightingStrength : 0;
 	}
 
 	//==============================================================================
