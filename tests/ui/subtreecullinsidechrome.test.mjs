@@ -135,7 +135,7 @@ class InsideCullScene extends Scene {
 		graphic.setCullingEnabled(isCullingEnabled);
 		graphic.setSubtreeCullingEnabled(isSubtreeCullingEnabled);
 		graphic.setTextBakeScaleStep(0);
-		if (window.frameList.length > 0) {
+		if (frameNumber <= LAST_FRAME + 1 && window.frameList.length > 0 && window.frameList[window.frameList.length - 1].frameNumber === frameNumber - 1) {
 			window.frameList[window.frameList.length - 1].culledSubtreeCount = graphic.getLastFrameCulledSubtreeCount();
 		}
 		this.applyFrameEvent(frameNumber);
@@ -151,7 +151,10 @@ class InsideCullScene extends Scene {
 		};
 		super.draw(graphic);
 		delete graphic.isLocalRectVisible;
-		window.frameList.push({ frameNumber, culledSubtreeCount: -1, visibleCheckCount, drawCountList: window.drawCountList.slice(0, window.counterNameList.length), insideCountList: window.insideCountList.slice(0, window.counterNameList.length) });
+		// 마지막 프레임 뒤에도 엔진은 계속 그리므로(찍은 화면을 읽는 동안 켬과 끔의 프레임 수가 달라짐) 그 뒤 프레임은 남기지 않는다.
+		if (frameNumber <= LAST_FRAME) {
+			window.frameList.push({ frameNumber, culledSubtreeCount: -1, visibleCheckCount, drawCountList: window.drawCountList.slice(0, window.counterNameList.length), insideCountList: window.insideCountList.slice(0, window.counterNameList.length) });
+		}
 		if (frameNumber === LAST_FRAME) {
 			window.isFinished = true;
 		}
@@ -260,6 +263,8 @@ try {
 	checkEqual(onResult.errorList.join("\n"), "", "거르기 켠 길 오류");
 	checkEqual(noneResult.errorList.join("\n"), "", "거르기를 모두 끈 길 오류");
 	checkEqual(onResult.captureResultList.length, 4, "찍은 화면 수");
+	checkEqual(onResult.frameList.length, 66, "켠 길 프레임 수");
+	checkEqual(offResult.frameList.length, 66, "끈 길 프레임 수");
 	const captureNameList = ["멈춤", "스크롤 41", "스크롤 42", "스크롤 63"];
 	for (let captureIndex = 0; captureIndex < onResult.captureResultList.length; ++captureIndex) {
 		const onCapture = onResult.captureResultList[captureIndex];
