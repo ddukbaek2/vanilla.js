@@ -277,7 +277,6 @@ export class RenderTarget extends Object {
 	 * webGL2RenderingContext.clearColor(0.1, 0.2, 0.3, 1.0);
 	 * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
 	 * renderTarget.resolve(true);
-	 * // 남긴 멀티샘플 판에 이어 그린 뒤 다시 푼다. (이번에는 버린다)
 	 * renderTarget.bind();
 	 * renderTarget.resolve();
 	 * webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
