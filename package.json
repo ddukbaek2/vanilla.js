@@ -1,0 +1,3 @@
+{
+	"sideEffects": ["./import.js"]
+}

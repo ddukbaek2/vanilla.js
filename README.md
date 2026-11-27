@@ -21,7 +21,7 @@
 vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하는 웹게임 엔진입니다.
 번들 하나를 모듈로 불러오면 씬, 노드, 입력, UI, 파티클, 오디오가 모두 준비됩니다.
 
-- 런타임 의존성 0. 아래 명령으로 지금 소스(2026-11-27 dev)를 묶으면 `vanilla.min.js` 943,165 바이트, `gzip -9` 271,771 바이트입니다. (초안 src/experimental 은 묶음에 들지 않습니다)
+- 런타임 의존성 0. 아래 명령으로 지금 소스(2026-11-28 dev)를 묶으면 `vanilla.min.js` 1,026,992 바이트, `gzip -9` 297,669 바이트입니다. (초안 src/experimental 은 묶음에 들지 않습니다) 게임을 소스에서 esbuild 로 묶으면 쓰는 것만 듭니다. (2D 와 UI 만 쓰는 게임은 3D 가 빠집니다)
 - WebGL2 렌더러. 스프라이트, 텍스트, 도형, 마스크가 같은 출력 경로를 쓰고, 묶어 그리기와 화면 밖 거르기가 기본으로 켜져 있습니다
 - 블렌드 모드는 Canvas2D 합성 26 가지를 모두 그립니다. overlay, soft-light, hue 같은 13 가지와 렌더 타겟에 그리는 multiply 는 그릴 영역 아래를 떠 와 W3C Compositing and Blending 공식대로 셰이더로 섞습니다
 - 노드 / 컴포넌트 구조, 해상도 대응 뷰, 제약 기반 레이아웃, 창 쌓기를 갖춘 UI 시스템
@@ -53,13 +53,15 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 </script>
 ```
 
-번들을 직접 만들 때는 esbuild 를 씁니다.
+번들을 직접 만들 때는 esbuild 를 씁니다. 아래 명령이 `build/vanilla.js`(와 소스 맵 `vanilla.js.map`), `build/vanilla.min.js` 를 짓습니다.
 
 ```bash
-esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+node tools/bundle.cjs
 ```
 
+- `vanilla.js` 는 읽는 판입니다. 줄과 들여쓰기는 남기고 주석은 뺍니다. 원래 소스와 주석은 소스 맵에 다 들어 있어 브라우저 개발 도구에서는 원래 파일로 보입니다. (esbuild 는 줄이지 않은 묶음에 주석을 그대로 남겨, 주석이 묶음의 40% 쯤 되어 읽는 시간이 늘었습니다. 그래서 공백을 줄여 주석을 뺀 묶음을 한 번 더 esbuild 로 펴서 씁니다)
+- `vanilla.min.js` 는 줄인 판입니다. (`esbuild import.js --bundle --format=esm --minify --keep-names`)
+- 저장소 맨 위 `package.json` 의 `sideEffects` 는 묶는 도구(esbuild, webpack)에 엔진 모듈이 불러올 때 따로 하는 일이 없다고 알립니다. 그래서 게임을 소스에서 묶으면 쓰지 않는 모듈이 통째로 빠집니다. (`import.js` 만 예외로 두어, 초안이 엔진 진입점을 먼저 읽는 `import "../../import.js"` 는 남습니다)
 - 묶음 머리의 `/*! ... */` 한 줄은 엔진 라이선스와 제3자 고지 파일(THIRD_PARTY_LICENSES.md)을 가리킵니다. 줄여도 남습니다.
 - 초안(src/experimental 의 2D 물리, 타일맵, 2D 뼈대, 공간 소리, 세이브)은 진입점 `import.js` 와 묶음에 들지 않습니다. 쓰려면 묶음 대신 소스를 불러옵니다. 초안이 src 의 엔진 모듈을 불러오므로 엔진도 묶음이 아닌 `import.js` 로 불러야 클래스가 하나입니다. 게임을 esbuild 로 묶으면 초안도 함께 묶입니다.
 
@@ -107,6 +109,7 @@ const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D
 | `node tools/webm.cjs <폴더>` | 음원을 webm 으로 변환 |
 | `node tools/mangle.cjs <입력> <출력> <제외 문자열>` | 코드 내 문자열 정리 |
 | `node tools/apidoc.cjs <버전>` | 공개 API 문서 자료(`docs/api/<버전>.json`) 뽑기 |
+| `node tools/bundle.cjs` | 엔진 묶음(`build/vanilla.js`, `build/vanilla.min.js`) 짓기 |
 
 `tools/excel.cjs` 는 엑셀(xlsx)과 JSON, 데이터 클래스 소스를 오가는 함수 모음입니다. `module.exports` 로 함수만 내보내고 명령줄 진입점이 없어서 `node tools/excel.cjs` 로 혼자 실행하면 아무것도 하지 않습니다. 다른 스크립트에서 `require` 로 불러 쓰고, 쓰는 프로젝트에 npm 패키지 `xlsx` 가 깔려 있어야 합니다. `tools/table.cjs` 는 지금 빈 파일입니다.
 

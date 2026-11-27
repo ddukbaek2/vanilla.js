@@ -11,6 +11,12 @@ node tools/project.cjs stage --source <소스디렉토리> --destination <대상
 - check: <입력>/assets/sprites 아래 그림과 아틀라스 현황 보고. (npm 패키지 canvas 가 필요하다)
 - stage: 소스 디렉토리를 대상 디렉토리로 복사한다. (대상은 먼저 비운다, --skip 에 쉼표로 준 맨 위 이름은 건너뛴다)
 
+## 엔진 묶음을 짓는 도구. (esbuild 가 PATH 에 있어야 한다)
+node tools/bundle.cjs
+- build/vanilla.js: 읽는 판. 줄과 들여쓰기는 남기고 주석은 뺀다. 원래 소스와 주석은 소스 맵 build/vanilla.js.map 에 든다. (공백만 줄여 주석을 뺀 묶음을 build 안 임시 폴더에 짓고, esbuild 로 한 번 더 펴서 쓴다, 소스 맵은 원래 소스로 잇는다)
+- build/vanilla.min.js: 줄인 판. (--minify --keep-names)
+- 두 판 다 머리에 엔진 라이선스와 제3자 고지 파일을 가리키는 /*! */ 한 줄을 단다.
+
 ## 여러 종류의 음원을 webm 형식으로 변환해주는 도구.
 node tools/webm.cjs <폴더경로>  
 

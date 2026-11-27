@@ -516,7 +516,14 @@ export class TextStringTextureCache extends Object {
 		layoutCanvasRenderingContext.direction = textDirection;
 		// 경계는 왼쪽 기준으로 잰다. (오른쪽에서 왼쪽 방향의 기본 정렬 "start" 는 오른쪽 기준이다)
 		layoutCanvasRenderingContext.textAlign = "left";
-		const scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
+		// 배율 1 의 왼쪽에서 오른쪽 글은 글 재기 캐시를 거친다. (Text 가 그릴 자리를 잴 때 같은 글꼴 글과 글로 이미 잰 것을 다시 재지 않는다, 캐시 컨텍스트도 왼쪽 기준이다)
+		let scaledTextMetrics = null;
+		if (scale === 1 && textDirection === "ltr") {
+			scaledTextMetrics = measureTextMetrics(fontString, text);
+		}
+		if (scaledTextMetrics === null) {
+			scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
+		}
 
 		// 글리프 실측 경계. (측정 미지원 브라우저는 전진폭 기반 근사)
 		const actualLeft = Math.ceil(Math.max(scaledTextMetrics.actualBoundingBoxLeft || 0, 0));
