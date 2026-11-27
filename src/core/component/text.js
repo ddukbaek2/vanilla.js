@@ -219,6 +219,8 @@ let fontLoadCount = 0;
 if (System.document !== undefined && System.document.fonts !== undefined) {
 	System.document.fonts.addEventListener("loadingdone", () => {
 		fontLoadCount += 1;
+		// 글꼴이 바뀌면 잰 너비가 달라지므로 노드들이 셈해 둔 그리기 경계를 모두 다시 셈하게 한다.
+		Component.markAllDrawnRectsDirty();
 	});
 }
 
@@ -835,6 +837,7 @@ export class Text extends Component {
 	setFitWidth(width, minimumRatio = 0.55) {
 		this.#fitWidth = System.Math.max(0, width);
 		this.#fitMinimumRatio = System.Math.min(1, System.Math.max(0, minimumRatio));
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1229,6 +1232,7 @@ export class Text extends Component {
 		else if (font instanceof FontAsset) {
 			this.#fontFace = font.fontFace;
 		}
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1275,6 +1279,7 @@ export class Text extends Component {
 	 */
 	setWordWrapWidth(wordWrapWidth) {
 		this.#wordWrapWidth = System.Math.max(0, wordWrapWidth);
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1295,6 +1300,7 @@ export class Text extends Component {
 	 */
 	setWrapMode(wrapMode) {
 		this.#wrapMode = wrapMode;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1315,6 +1321,7 @@ export class Text extends Component {
 	 */
 	setLineSpacing(lineSpacing) {
 		this.#lineSpacing = System.Math.max(0.1, lineSpacing);
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1388,6 +1395,7 @@ export class Text extends Component {
 			return;
 		}
 		this.#text = text;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1408,6 +1416,7 @@ export class Text extends Component {
 	 */
 	setFontSize(fontSize) {
 		this.#fontSize = fontSize;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1505,6 +1514,7 @@ export class Text extends Component {
 	 */
 	setStrokeWidth(width) {
 		this.#strokeWidth = width;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1525,6 +1535,7 @@ export class Text extends Component {
 	 */
 	setBold(bold) {
 		this.#bold = bold === true;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1545,6 +1556,7 @@ export class Text extends Component {
 	 */
 	setItalic(italic) {
 		this.#italic = italic === true;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1605,6 +1617,7 @@ export class Text extends Component {
 	 */
 	setTextAlign(align) {
 		this.#textAlign = align;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1647,6 +1660,7 @@ export class Text extends Component {
 	 */
 	setTextBaseline(baseline) {
 		this.#textBaseline = baseline;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================

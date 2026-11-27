@@ -6,6 +6,19 @@ import { Vector2 } from "../../base/vector2.js";
 import { Graphic } from "../graphic.js";
 import * as Math from "../../base/math.js";
 import { ComponentNode } from "./componentnode.js";
+import { Component } from "../component.js";
+import { Rect } from "../../base/rect.js";
+
+
+//==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 하위 트리 그리기 경계의 상태.
+const DRAW_BOUNDS_DIRTY = 0; // 다시 셈해야 한다.
+const DRAW_BOUNDS_KNOWN = 1; // 셈해 둔 경계가 맞다.
+const DRAW_BOUNDS_UNKNOWN = 2; // 하위 트리에 어디에 그리는지 모르는 것이 있다. (그리기를 건너뛰지 않는다)
+// 자식의 하위 트리 경계를 읽어 두는 칸. (읽은 바로 뒤에 쓰고 버리므로 재귀에도 같이 쓴다)
+const childDrawBounds = new Rect();
 
 
 //==============================================================================
@@ -43,6 +56,10 @@ export class TransformNode extends ComponentNode {
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 	/** @private @type { boolean } */ #isOpacityLayer; // 투명도를 노드와 자손에 묶어 한 번에 얹을지. (CSS opacity)
 	/** @private @type { number } */ #lastDrawnMaximumScale; // 지난번 그릴 때 변환의 가장 큰 배율. (0 이면 아직 모른다, Graphic 이 글 굽기 배율에 쓴다)
+	/** @private @type { number } */ #lastDrawnFrameNumber; // 지난번 그린 프레임 번호. (-1 이면 그린 적 없다, Graphic 이 글 굽기 배율에 쓴다)
+	/** @private @type { number } */ #drawBoundsState; // 하위 트리 그리기 경계의 상태. (DRAW_BOUNDS_DIRTY, KNOWN, UNKNOWN)
+	/** @private @type { number } */ #drawBoundsGeneration; // 경계를 셈한 때의 컴포넌트 그리는 사각형 세대. (Component.getDrawnRectGeneration)
+	/** @private @type { Rect | null } */ #drawBounds; // 셈해 둔 하위 트리 그리기 경계. (이 노드의 내용 좌표, 처음 읽을 때 만든다)
 
 	//==============================================================================
 	// 생성.
@@ -61,6 +78,10 @@ export class TransformNode extends ComponentNode {
 		this.#localOpacity = 1.0;
 		this.#isVisible = true;
 		this.#lastDrawnMaximumScale = 0;
+		this.#lastDrawnFrameNumber = -1;
+		this.#drawBoundsState = DRAW_BOUNDS_DIRTY;
+		this.#drawBoundsGeneration = -1;
+		this.#drawBounds = null;
 	}
 
 	//==============================================================================
@@ -328,6 +349,7 @@ export class TransformNode extends ComponentNode {
 		// 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (가진 벡터는 밖으로 내주지 않는다, getLocalPosition() 은 복제해 준다)
 		this.#localPosition.x = position.x;
 		this.#localPosition.y = position.y;
+		this.markParentDrawBoundsDirty();
 	}
 
 	//==============================================================================
@@ -346,6 +368,7 @@ export class TransformNode extends ComponentNode {
 		}
 		this.#localPosition.x = x;
 		this.#localPosition.y = y;
+		this.markParentDrawBoundsDirty();
 	}
 
 	//==============================================================================
@@ -368,6 +391,7 @@ export class TransformNode extends ComponentNode {
 		// 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getLocalScale() 은 복제해 준다)
 		this.#localScale.x = scale.x;
 		this.#localScale.y = scale.y;
+		this.markParentDrawBoundsDirty();
 	}
 
 	//==============================================================================
@@ -386,6 +410,7 @@ export class TransformNode extends ComponentNode {
 		}
 		this.#localScale.x = x;
 		this.#localScale.y = y;
+		this.markParentDrawBoundsDirty();
 	}
 
 	//==============================================================================
@@ -406,6 +431,7 @@ export class TransformNode extends ComponentNode {
 	 */
 	setLocalRotation(rotation) {
 		this.#localRotation = rotation;
+		this.markParentDrawBoundsDirty();
 	}
 
 	//==============================================================================
@@ -435,6 +461,7 @@ export class TransformNode extends ComponentNode {
 	 */
 	setVisible(isVisible) {
 		this.#isVisible = isVisible;
+		this.markParentDrawBoundsDirty();
 	}
 
 	//==============================================================================
@@ -521,13 +548,25 @@ export class TransformNode extends ComponentNode {
 	}
 
 	//==============================================================================
-	// 지난번 그릴 때 변환의 가장 큰 배율 설정. (Graphic.drawNode 가 부른다)
+	// 지난번 그릴 때 변환의 가장 큰 배율과 그 프레임 번호 설정. (Graphic.drawNode 가 부른다)
 	//==============================================================================
 	/**
 	 * @param { number } maximumScale 변환의 가장 큰 배율.
+	 * @param { number } frameNumber 그린 프레임 번호. (Graphic 이 프레임마다 하나씩 올리는 번호, 기본 0)
 	 */
-	setLastDrawnMaximumScale(maximumScale) {
+	setLastDrawnMaximumScale(maximumScale, frameNumber = 0) {
 		this.#lastDrawnMaximumScale = maximumScale;
+		this.#lastDrawnFrameNumber = frameNumber;
+	}
+
+	//==============================================================================
+	// 지난번 그린 프레임 번호 반환. (setLastDrawnMaximumScale 로 적은 번호, -1 이면 그린 적 없다)
+	//==============================================================================
+	/**
+	 * @returns { number } 지난번 그린 프레임 번호.
+	 */
+	getLastDrawnFrameNumber() {
+		return this.#lastDrawnFrameNumber;
 	}
 
 	//==============================================================================
@@ -548,6 +587,7 @@ export class TransformNode extends ComponentNode {
 	 */
 	setGizmoVisible(isVisible) {
 		this.#isGizmoVisible = isVisible;
+		this.markDrawBoundsDirty();
 	}
 
 	//==============================================================================
@@ -587,5 +627,164 @@ export class TransformNode extends ComponentNode {
 	 */
 	isOpacityLayer() {
 		return this.#isOpacityLayer;
+	}
+
+	//==============================================================================
+	// 부모 설정. (오버라이드: 옛 부모와 새 부모의 하위 트리 그리기 경계가 바뀐다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Node | null } parent 새 부모. (null 이면 떼어 낸다)
+	 * @returns { boolean } 붙였거나 떼었으면 참. (자기 자손을 부모로 주면 거짓)
+	 */
+	setParent(parent) {
+		const previousParent = this.getParent();
+		const isAttached = super.setParent(parent);
+		if (isAttached && previousParent !== parent) {
+			if (previousParent !== null && previousParent !== undefined) {
+				previousParent.markDrawBoundsDirty();
+			}
+			this.markParentDrawBoundsDirty();
+		}
+		return isAttached;
+	}
+
+	//==============================================================================
+	// 켜짐 설정. (오버라이드: 꺼진 자식은 부모의 하위 트리 그리기 경계에 들지 않는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { boolean } active 켤지.
+	 */
+	setActive(active) {
+		const isChanged = this.isActive() !== active;
+		super.setActive(active);
+		if (isChanged) {
+			this.markParentDrawBoundsDirty();
+		}
+	}
+
+	//==============================================================================
+	// 하위 트리 그리기 경계가 바뀌었음을 표시. (이 노드와 조상이 다음에 그릴 때 경계를 다시 셈한다)
+	// - 변환, 내용 크기, 자식 더함과 뺌, 켜짐과 보임, 컴포넌트가 바뀌면 엔진이 부른다. 조상으로 번지다 이미 표시된 노드에서 멈춘다.
+	// - draw 를 덮어쓴 노드는 calculateDrawnRect 가 알리는 사각형이 바뀔 때 부른다.
+	//==============================================================================
+	/**
+	 * @override
+	 * @example <caption>스스로 그리는 노드가 그리는 곳이 바뀌었음을 알리기</caption>
+	 * import { WorldNode, Rect, Colors } from "./build/vanilla.js";
+	 *
+	 * class Ripple extends WorldNode {
+	 * 	radius = 10;
+	 * 	setRadius(radius) {
+	 * 		this.radius = radius;
+	 * 		this.markDrawBoundsDirty();
+	 * 	}
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.setFillColor(Colors.white);
+	 * 		graphic.drawRect(Rect.create(-this.radius, -this.radius, this.radius * 2, this.radius * 2));
+	 * 	}
+	 * 	calculateDrawnRect(rect) {
+	 * 		rect.position.set(-this.radius, -this.radius);
+	 * 		rect.size.set(this.radius * 2, this.radius * 2);
+	 * 		return true;
+	 * 	}
+	 * }
+	 *
+	 * const ripple = new Ripple();
+	 * ripple.setRadius(40);
+	 * const drawBounds = Rect.zero();
+	 * console.log(ripple.readSubtreeDrawBounds(drawBounds), drawBounds.size.x);
+	 */
+	markDrawBoundsDirty() {
+		let node = this;
+		while (node !== null && node !== undefined && #drawBoundsState in node) {
+			if (node.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+				break;
+			}
+			node.#drawBoundsState = DRAW_BOUNDS_DIRTY;
+			node = node.getParent();
+		}
+	}
+
+	//==============================================================================
+	// 부모의 하위 트리 그리기 경계가 바뀌었음을 표시. (이 노드의 변환, 켜짐, 보임이 바뀌면 이 노드의 경계는 그대로이고 부모의 경계가 바뀐다)
+	//==============================================================================
+	markParentDrawBoundsDirty() {
+		const parent = this.getParent();
+		if (parent !== null && parent !== undefined && typeof parent.markDrawBoundsDirty === "function") {
+			parent.markDrawBoundsDirty();
+		}
+	}
+
+	//==============================================================================
+	// 하위 트리 그리기 경계 읽기. (이 노드의 내용 좌표, pushTransform 을 건 뒤의 좌표, 알면 true)
+	// - 이 노드와 켜지고 보이는 자손이 그리는 곳을 모두 품는 사각형이다. 크기가 0 이면 아무것도 그리지 않는다.
+	// - 바뀐 때만 다시 셈하고(calculateSubtreeDrawBounds) 그 밖에는 셈해 둔 것을 준다. 그리기 순회가 이 사각형이 화면과 자르기 밖이면 하위 트리를 통째로 건너뛴다.
+	// - 어디에 그리는지 모르는 것(경계를 알리지 않는 컴포넌트, draw 를 덮어쓰고 calculateDrawnRect 를 알리지 않는 노드)이 들면 false.
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 경계를 적을 곳.
+	 * @returns { boolean } 경계를 알면 참. (모르면 rect 를 건드리지 않는다)
+	 * @example <caption>줄 노드의 하위 트리 경계 읽기</caption>
+	 * import { WorldNode, Paint, Rect, Vector2, Pivot } from "./build/vanilla.js";
+	 *
+	 * const rowNode = new WorldNode();
+	 * rowNode.setPivot(Pivot.topLeft);
+	 * rowNode.setContentSize(Vector2.create(300, 40));
+	 * rowNode.addComponent(Paint);
+	 * const iconNode = new WorldNode();
+	 * iconNode.setPivot(Pivot.topLeft);
+	 * iconNode.setRect(-20, 4, 32, 32);
+	 * iconNode.addComponent(Paint);
+	 * rowNode.addChild(iconNode);
+	 * const drawBounds = Rect.zero();
+	 * const isKnown = rowNode.readSubtreeDrawBounds(drawBounds);
+	 * console.log(isKnown, drawBounds.position.x, drawBounds.size.x);
+	 */
+	readSubtreeDrawBounds(rect) {
+		let drawBounds = this.#drawBounds;
+		if (drawBounds === null) {
+			drawBounds = new Rect();
+			this.#drawBounds = drawBounds;
+		}
+		const drawnRectGeneration = Component.getDrawnRectGeneration();
+		if (this.#drawBoundsState === DRAW_BOUNDS_DIRTY || this.#drawBoundsGeneration !== drawnRectGeneration) {
+			const isKnown = this.calculateSubtreeDrawBounds(drawBounds) === true;
+			const leftX = drawBounds.position.x;
+			const topY = drawBounds.position.y;
+			const width = drawBounds.size.x;
+			const height = drawBounds.size.y;
+			const isFinite = System.Number.isFinite(leftX) && System.Number.isFinite(topY) && System.Number.isFinite(width) && System.Number.isFinite(height);
+			this.#drawBoundsState = (isKnown && isFinite) ? DRAW_BOUNDS_KNOWN : DRAW_BOUNDS_UNKNOWN;
+			this.#drawBoundsGeneration = drawnRectGeneration;
+		}
+		if (this.#drawBoundsState !== DRAW_BOUNDS_KNOWN) {
+			return false;
+		}
+		rect.position.set(drawBounds.position.x, drawBounds.position.y);
+		rect.size.set(drawBounds.size.x, drawBounds.size.y);
+		return true;
+	}
+
+	//==============================================================================
+	// 하위 트리 그리기 경계 셈하기. (readSubtreeDrawBounds 가 바뀐 때만 부른다, 알면 true)
+	// - TransformNode 는 내용 영역이 없어 컴포넌트가 어디에 그리는지 모르므로 false. (WorldNode 가 덮어쓴다)
+	// - 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Rect } rect 셈한 경계를 적을 곳. (이 노드의 내용 좌표)
+	 * @returns { boolean } 경계를 알면 참.
+	 */
+	calculateSubtreeDrawBounds(rect) {
+		const children = this.getChildren();
+		for (const child of children) {
+			if (child instanceof TransformNode && child.isActive() && child.isVisible()) {
+				child.readSubtreeDrawBounds(childDrawBounds);
+			}
+		}
+		return false;
 	}
 }

@@ -7,6 +7,13 @@ import { Graphic } from "../core/graphic.js";
 
 
 //==============================================================================
+// 전역 변수 목록.
+//==============================================================================
+// 그리는 사각형 세대. (글꼴 적재처럼 모든 컴포넌트의 그리는 사각형이 한꺼번에 바뀔 수 있으면 올린다, 노드가 셈해 둔 그리기 경계와 견준다)
+let drawnRectGeneration = 0;
+
+
+//==============================================================================
 // 컴포넌트.
 //==============================================================================
 /**
@@ -138,6 +145,7 @@ export class Component extends Object {
 	// - isDrawnInsideContent 가 false 인 컴포넌트만 묻는다. true 를 돌려주면 화면 밖 거르기가 이 사각형으로 본다.
 	// - 크기가 0 인 사각형은 아무것도 그리지 않는다는 뜻이다.
 	// - 모르면 false 로 둔다. (그 노드는 거르지 않는다)
+	// - 노드는 이 사각형을 하위 트리 그리기 경계에 셈해 두고 바뀐 때만 다시 묻는다. 사각형을 바꾸는 값(글, 글꼴 크기 등)이 바뀌면 markDrawnRectDirty 를 부른다.
 	//==============================================================================
 	/**
 	 * @virtual
@@ -165,6 +173,70 @@ export class Component extends Object {
 	 */
 	calculateDrawnRect(rect) {
 		return false;
+	}
+
+	//==============================================================================
+	// 그리는 사각형(calculateDrawnRect)이 바뀌었음을 노드에 알리기. (노드가 셈해 둔 하위 트리 그리기 경계를 다시 셈하게 한다)
+	// - calculateDrawnRect 를 덮어쓴 컴포넌트는 그 사각형을 바꾸는 값이 바뀔 때 부른다. (Godot 의 item_rect_changed, 유니티의 SetVerticesDirty 와 같은 자리)
+	// - 내용 영역 안에서만 그리는 컴포넌트(isDrawnInsideContent)는 노드의 내용 크기를 보므로 부르지 않아도 된다.
+	// - 노드에 붙지 않았으면 아무것도 하지 않는다.
+	//==============================================================================
+	/**
+	 * @example <caption>번지는 너비가 바뀌면 알리기</caption>
+	 * import { WorldNode, Component, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class Glow extends Component {
+	 * 	glowSize = 10;
+	 * 	setGlowSize(glowSize) {
+	 * 		this.glowSize = glowSize;
+	 * 		this.markDrawnRectDirty();
+	 * 	}
+	 * 	calculateDrawnRect(rect) {
+	 * 		const contentSize = this.getNode().getContentSize();
+	 * 		rect.position.set(-this.glowSize, -this.glowSize);
+	 * 		rect.size.set(contentSize.x + this.glowSize * 2, contentSize.y + this.glowSize * 2);
+	 * 		return true;
+	 * 	}
+	 * }
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(100, 50));
+	 * const glow = node.addComponent(Glow);
+	 * glow.setGlowSize(20);
+	 * const drawBounds = Rect.zero();
+	 * const isKnown = node.readSubtreeDrawBounds(drawBounds);
+	 * console.log(isKnown, drawBounds.size.x, drawBounds.size.y);
+	 */
+	markDrawnRectDirty() {
+		const node = this.#node;
+		if (node !== null && node !== undefined && typeof node.markDrawBoundsDirty === "function") {
+			node.markDrawBoundsDirty();
+		}
+	}
+
+	//==============================================================================
+	// 모든 컴포넌트의 그리는 사각형이 바뀌었을 수 있음을 알리기. (글꼴 적재처럼 한꺼번에 바뀌는 때, 노드들은 다음에 그릴 때 경계를 다시 셈한다)
+	//==============================================================================
+	/**
+	 * @example <caption>글꼴을 바꾼 뒤 모든 노드의 그리기 경계를 다시 셈하게 하기</caption>
+	 * import { Component } from "./build/vanilla.js";
+	 *
+	 * const generationBefore = Component.getDrawnRectGeneration();
+	 * Component.markAllDrawnRectsDirty();
+	 * console.log(Component.getDrawnRectGeneration() === generationBefore + 1);
+	 */
+	static markAllDrawnRectsDirty() {
+		drawnRectGeneration += 1;
+	}
+
+	//==============================================================================
+	// 그리는 사각형 세대 반환. (markAllDrawnRectsDirty 를 부를 때마다 하나씩 오른다, 노드가 셈해 둔 경계와 견준다)
+	//==============================================================================
+	/**
+	 * @returns { number } 그리는 사각형 세대.
+	 */
+	static getDrawnRectGeneration() {
+		return drawnRectGeneration;
 	}
 
 	//==============================================================================
@@ -294,7 +366,11 @@ export class Component extends Object {
 	 * @param { boolean } isEnable 켤지. (꺼지면 노드가 draw 를 부르지 않는다)
 	 */
 	setEnable(isEnable) {
+		if (this.#isEnable === isEnable) {
+			return;
+		}
 		this.#isEnable = isEnable;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
