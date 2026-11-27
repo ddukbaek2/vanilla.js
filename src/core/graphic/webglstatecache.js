@@ -202,7 +202,8 @@ export class WebGLStateCache extends Object {
 		this.reset();
 		this.installTrackers();
 
-		// 컨텍스트를 잃거나 되살리면 GL 상태가 처음으로 돌아가므로 잊는다.
+		// 컨텍스트를 잃으면 기억한 GL 상태를 잊는다. (되살리면 GL 상태가 처음으로 돌아가므로 그때도 잊는다)
+		// 엔진은 컨텍스트를 되살리지 않는다. (preventDefault 를 하지 않아 webglcontextrestored 가 오지 않는다, 게임이 되살려도 엔진 자원은 다시 짓지 않는다, Graphic 생성자 참고)
 		const canvas = webGL2RenderingContext.canvas;
 		if (canvas && typeof canvas.addEventListener === "function") {
 			const contextChangeCallback = () => {

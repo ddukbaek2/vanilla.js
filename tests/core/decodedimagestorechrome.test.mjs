@@ -3,6 +3,8 @@
 // - ImageAsset 이 읽은 그림을 Graphic 이 올린 텍스처가 그림 요소를 texImage2D(미리 곱한 알파) 로 올린 텍스처와 바이트까지 같은지 본다.
 //   미리 푸는 꼴(8 비트 PNG, sRGB 조각 PNG, JPEG, 알파 없는 WebP)과 미리 풀지 않는 꼴(gAMA 1.0 PNG, 16 비트 PNG, 알파 WebP) 모두.
 // - 미리 푸는 꼴은 ImageBitmap 을 맡기고, 아닌 꼴은 맡기지 않는지 본다. prepareLoadedImages 가 올리고 맡긴 것을 비우는지 본다.
+// - 엔진이 둘이면 그림을 읽기 시작할 때 씬을 불러오던 Graphic 만 그 그림을 미리 올리고, 다른 Graphic 은 미리 올리지도 꺼내지도 않는지 본다.
+//   주인을 모르는 그림(씬 불러오기 밖에서 읽은 것)은 Graphic 이 둘이면 어느 쪽도 미리 올리지 않는지 본다.
 // - RenderTarget.resolve 가 첨부를 버려도 푼 텍스처가 맞고, resolve(true) 로 남긴 멀티샘플 판에 이어 그린 것이 남는지 본다.
 //   puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
@@ -229,6 +231,31 @@ try {
 			isMissingRejected = String(error.message).includes("Load fail");
 		}
 
+		// 엔진 둘: 주인 Graphic 만 제 그림을 미리 올린다. (SceneManager 가 씬의 load 앞뒤로 beginLoading, endLoading 을 부르는 것과 같게)
+		const otherCanvas = document.createElement("canvas");
+		otherCanvas.width = 64;
+		otherCanvas.height = 64;
+		document.body.appendChild(otherCanvas);
+		const otherGraphic = new Graphic(otherCanvas, false);
+		const ownedAsset = new ImageAsset();
+		DecodedImageStore.beginLoading(gl);
+		await ownedAsset.load("/image/rgba.png");
+		DecodedImageStore.endLoading(gl);
+		const ownedImage = ownedAsset.getImage();
+		otherGraphic.prepareLoadedImages();
+		const isOwnedPendingAfterOther = DecodedImageStore.isPending(ownedImage);
+		const otherTexture = otherGraphic.getImageTextureCache().getTexture(ownedImage, true);
+		const isOwnedPendingAfterOtherDraw = DecodedImageStore.isPending(ownedImage);
+		graphic.prepareLoadedImages();
+		const isOwnedPendingAfterOwner = DecodedImageStore.isPending(ownedImage);
+		const unknownAsset = new ImageAsset();
+		await unknownAsset.load("/image/srgb.png");
+		otherGraphic.prepareLoadedImages();
+		graphic.prepareLoadedImages();
+		const isUnknownPendingAfterBoth = DecodedImageStore.isPending(unknownAsset.getImage());
+		unknownAsset.unload();
+		const twoEngineResult = { isOwnedPendingAfterOther, isOtherTextureMade: otherTexture !== null, isOwnedPendingAfterOtherDraw, isOwnedPendingAfterOwner, isUnknownPendingAfterBoth };
+
 		// RenderTarget.resolve: 버려도 푼 색이 맞고, 남기면 이어 그린 것이 남는다.
 		const readColor = (renderTarget) => {
 			const pixels = readTexture(renderTarget.getColorTexture(0), 1, 1);
@@ -272,7 +299,7 @@ try {
 		const singleColor = readColor(singleTarget);
 		const glError = gl.getError();
 		return {
-			caseResultList, remainingCount, remainingAgainCount, isPreparedPendingBefore, isPreparedPendingAfter, isUnloadedPending, isMissingRejected,
+			twoEngineResult, caseResultList, remainingCount, remainingAgainCount, isPreparedPendingBefore, isPreparedPendingAfter, isUnloadedPending, isMissingRejected,
 			multisampleSampleCount: multisampleTarget.getSampleCount(), discardedColor, keptColor, keptCorner, singleColor, glError,
 		};
 	});
@@ -305,6 +332,10 @@ check(result.isPreparedPendingBefore && !result.isPreparedPendingAfter, "prepare
 check(result.remainingCount === 0 && result.remainingAgainCount === 0, "prepareLoadedImages 남은 수 " + result.remainingCount + ", 다시 " + result.remainingAgainCount);
 check(!result.isUnloadedPending, "unload 하면 맡긴 그림을 놓음");
 check(result.isMissingRejected, "없는 그림은 Load fail 로 거부");
+check(result.twoEngineResult.isOwnedPendingAfterOther, "엔진 둘: 남의 Graphic 의 prepareLoadedImages 가 주인 있는 그림을 올리지 않음");
+check(result.twoEngineResult.isOtherTextureMade && result.twoEngineResult.isOwnedPendingAfterOtherDraw, "엔진 둘: 남의 Graphic 이 그려도 주인의 미리 푼 그림을 꺼내지 않음");
+check(!result.twoEngineResult.isOwnedPendingAfterOwner, "엔진 둘: 주인 Graphic 의 prepareLoadedImages 가 제 그림을 올림");
+check(result.twoEngineResult.isUnknownPendingAfterBoth, "엔진 둘: 주인을 모르는 그림은 어느 Graphic 도 미리 올리지 않음");
 console.log("  멀티샘플 표본 " + result.multisampleSampleCount + ", 버린 뒤 " + result.discardedColor.join(",") + ", 남긴 뒤 " + result.keptColor.join(",") + " 구석 " + result.keptCorner.join(",") + ", 한 표본 " + result.singleColor.join(","));
 check(result.discardedColor.join(",") === "255,0,0,255", "버린 판의 푼 색 " + result.discardedColor.join(","));
 check(result.keptColor.join(",") === "0,255,0,255", "남긴 판의 푼 색 " + result.keptColor.join(","));

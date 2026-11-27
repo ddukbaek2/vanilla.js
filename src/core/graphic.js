@@ -13,7 +13,7 @@ import { TransformMatrix } from "../base/transformmatrix.js";
 import { ShaderProgram } from "./graphic/shaderprogram.js";
 import { ImageTextureCache } from "./graphic/imagetexturecache.js";
 import { DecodedImageStore } from "./graphic/decodedimagestore.js";
-import { TextStringTextureCache, setTextAntialiasEnabled, isTextAntialiasOn } from "./graphic/textstringtexturecache.js";
+import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
 import { WebGLStateCache } from "./graphic/webglstatecache.js";
 import * as Math from "../base/math.js";
 
@@ -852,7 +852,9 @@ export class Graphic extends Object {
 		this.#boundShaderProgram = null;
 		this.#boundTexture = null;
 
-		// 컨텍스트를 잃거나 되살리면 GL 의 묶음이 처음으로 돌아가므로 기억을 잊는다. (기하 캐시가 든 텍스처도 다시 적게 한다)
+		// 컨텍스트를 잃으면 GL 묶음 기억과 기하 캐시, 남긴 묶음을 잊는다. (잃은 뒤의 호출이 옛 기억을 믿지 않게 하는 것뿐이다)
+		// 엔진은 컨텍스트를 되살리지 않는다. webglcontextlost 에서 preventDefault 를 하지 않아 브라우저가 webglcontextrestored 를 보내지 않는다.
+		// 게임이 preventDefault 로 되살려도 셰이더 프로그램, 버텍스 어레이, 흰 텍스처, 글자 아틀라스, 그림 텍스처는 잃은 컨텍스트의 객체라 그려지지 않는다. (되살림은 아직 없다)
 		const contextChangeCallback = () => {
 			this.invalidateRenderStateCache();
 			this.#geometryCacheGeneration += 1;
@@ -933,6 +935,8 @@ export class Graphic extends Object {
 			this.bindTexture(texture);
 		};
 		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
+		// 미리 푼 그림 보관소에 이 컨텍스트를 그림 주인으로 알린다. (주인을 모르는 그림을 미리 올릴지 가를 때 주인 수를 센다)
+		DecodedImageStore.addOwner(webGL2RenderingContext);
 		// 글리프 아틀라스 장을 비워 덮어쓰기 전에 쌓아 둔 묶음을 먼저 그린다. (묶음에 그 장을 쓰는 글자가 있을 수 있다)
 		const beforeTextureOverwrite = () => {
 			this.flushBatch();
@@ -1784,7 +1788,11 @@ export class Graphic extends Object {
 		webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
 		webGL2RenderingContext.scissor(backdropRect.x, backdropRect.y, backdropRect.width, backdropRect.height);
 		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
+		// 비운 가위를 셰이더 자르기 가위로 되돌린다. (자르기가 없으면 가위를 끈다)
+		// 떠 오기는 가위에 잘려 자르기 안만 떠 왔으므로, 옮겨 섞을 때 가위가 없으면 자르기 밖을 낡은 떠 온 값으로 덮는다.
 		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		this.#isClipScissorEnabled = false;
+		this.applyClipScissor();
 		this.useShaderProgram(shaderProgramOverride);
 		this.uploadDrawUniforms(shaderProgramOverride, color);
 		this.bindTexture(texture);
@@ -4384,7 +4392,8 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	prepareLoadedImages(timeLimitMilliseconds = System.Infinity) {
-		const pendingImageList = DecodedImageStore.getPendingImageList();
+		// 제 것(이 Graphic 이 불러오던 씬이 읽은 그림)만 올린다. (엔진이 둘이면 남의 그림을 제 컨텍스트에 올리지 않는다)
+		const pendingImageList = DecodedImageStore.getPendingImageList(this.getWebGL2RenderingContext());
 		const startTime = System.performance.now();
 		let imageIndex = 0;
 		while (imageIndex < pendingImageList.length) {
@@ -4882,7 +4891,7 @@ export class Graphic extends Object {
 	// 글자 안티앨리어싱 켬 / 끔. (러스트 Graphic::set_text_antialias_enabled 와 같다)
 	//
 	// 끄면 구운 글자의 알파를 문턱값 128 로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다. (도트 글꼴용)
-	// 켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다. (기본 켬)
+	// 이 Graphic 에만 걸린다. 바꾼 뒤 그리는 글부터 새 꼴이다. (이미 만든 글도 다음 그리기부터, 구운 글은 꼴마다 따로 남아 되돌리면 다시 굽지 않는다, 기본 켬)
 	//==============================================================================
 	/**
 	 * @param { boolean } isTextAntialiasEnabled 켜면 참.
@@ -4910,7 +4919,16 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	setTextAntialiasEnabled(isTextAntialiasEnabled) {
-		setTextAntialiasEnabled(isTextAntialiasEnabled);
+		const textStringTextureCache = this.getTextStringTextureCache();
+		const isEnabled = isTextAntialiasEnabled !== false;
+		if (textStringTextureCache.isTextAntialiasOn() === isEnabled) {
+			return;
+		}
+		// 남긴 묶음과 기하 캐시에 든 글은 옛 꼴의 글자 칸을 짚으므로 다시 적게 한다.
+		this.breakGeometryRecord();
+		this.flushBatch();
+		textStringTextureCache.setTextAntialiasEnabled(isEnabled);
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -4920,7 +4938,7 @@ export class Graphic extends Object {
 	 * @returns { boolean } 켜졌으면 참.
 	 */
 	isTextAntialiasEnabled() {
-		return isTextAntialiasOn();
+		return this.getTextStringTextureCache().isTextAntialiasOn();
 	}
 
 	//==============================================================================
@@ -5421,7 +5439,7 @@ export class Graphic extends Object {
 	//==============================================================================
 	// 투명도 층 시작. (CSS opacity, 어도비 투명도 묶음처럼 endOpacityLayer 까지 그린 것을 따로 칸에 모았다가 지금 전역 알파로 한 번에 얹는다)
 	// - 층 안의 그림은 서로 겹친 자리가 비치지 않는다. (노드마다 투명도를 곱해 따로 얹으면 겹친 자리에서 아래 그림이 비친다)
-	// - 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기도 그대로 된다.
+	// - 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 깊이를 비우고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기와 3D 패스(clearDepth: false)도 그대로 된다.
 	//   바깥 자르기는 얹을 때 걸린다. 층은 겹쳐 열 수 있다. 칸을 지을 수 없으면 층 없이 그대로 그린다.
 	// - 노드는 setOpacityLayer 를 켜고 투명도가 1 보다 작으면 그 노드와 자손을 층으로 그린다.
 	//==============================================================================
@@ -5460,8 +5478,10 @@ export class Graphic extends Object {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
 			webGL2RenderingContext.colorMask(true, true, true, true);
 			webGL2RenderingContext.stencilMask(0xFF);
+			webGL2RenderingContext.depthMask(true);
 			webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
-			webGL2RenderingContext.clearBufferiv(webGL2RenderingContext.STENCIL, 0, new Int32Array([this.#stencilClipDepth]));
+			// 깊이는 1 로, 스텐실은 지금 자르기 깊이로 비운다. (지난 층의 깊이가 남거나 판 끝에 버린 깊이는 정해지지 않은 값이라, 층 안의 clearDepth: false 3D 가 읽으면 가려진다)
+			webGL2RenderingContext.clearBufferfi(webGL2RenderingContext.DEPTH_STENCIL, 0, 1.0, this.#stencilClipDepth);
 			this.#globalAlpha = 1.0;
 		}
 		this.#opacityLayerStack.push({ target, previousFramebuffer, globalAlpha });
@@ -5483,7 +5503,7 @@ export class Graphic extends Object {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		// 층 칸의 깊이와 스텐실은 다시 읽지 않으므로 판 끝에 버린다. (모바일 타일 GPU 가 메모리에 쓰지 않는다, 다음 층은 스텐실을 비우고 쓴다)
+		// 층 칸의 깊이와 스텐실은 다시 읽지 않으므로 판 끝에 버린다. (모바일 타일 GPU 가 메모리에 쓰지 않는다, 다음 층은 깊이와 스텐실을 비우고 쓴다)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
 		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);

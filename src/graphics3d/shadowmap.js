@@ -87,6 +87,7 @@ function createShadowCache(resolution) {
 
 //==============================================================================
 // 그림자 깊이 판 묶기. (캐시의 renderTarget 대로 판이나 구운 판을 묶고 비우거나, 구운 판을 판에 옮긴다, 뷰포트는 판 전체)
+// - 가위 시험을 끈다. (2D 자르기 안의 바깥 패스에서 불려도 판 전체를 비우고 옮기고 그린다, 해 그림자 판과 점광 판이 같다)
 //==============================================================================
 /**
  * @param { WebGL2RenderingContext } webGL2RenderingContext - 렌더링 컨텍스트.
@@ -101,16 +102,12 @@ function bindShadowTarget(webGL2RenderingContext, shadowCache, framebuffer) {
 	if (renderTarget === "cache" && shadowCache.cacheTarget === null) {
 		shadowCache.cacheTarget = createDepthTarget(webGL2RenderingContext, resolution);
 	}
+	// 비우기와 깊이 옮기기는 가위 시험을 받는다.
+	webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
 	if (renderTarget === "copy" && shadowCache.cacheTarget !== null) {
-		// 깊이 옮기기는 가위 시험을 받는다. (판 전체를 옮기고 앞의 가위 시험은 돌린다)
-		const isScissorEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.SCISSOR_TEST);
-		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, shadowCache.cacheTarget.framebuffer);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.DRAW_FRAMEBUFFER, framebuffer);
 		webGL2RenderingContext.blitFramebuffer(0, 0, resolution, resolution, 0, 0, resolution, resolution, webGL2RenderingContext.DEPTH_BUFFER_BIT, webGL2RenderingContext.NEAREST);
-		if (isScissorEnabled) {
-			webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
-		}
 	}
 	webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, renderTarget === "cache" ? shadowCache.cacheTarget.framebuffer : framebuffer);
 	webGL2RenderingContext.viewport(0, 0, resolution, resolution);
@@ -574,9 +571,7 @@ export class ShadowAtlas extends Object {
 	// 깊이 패스 시작. (프레임버퍼를 묶고 판 전체를 비운다, 칸마다 beginTile, ToonDrawQueue 가 캐시를 쓸 때는 구운 판에 그리거나 구운 판을 옮겨 그 위에 덧그린다)
 	//==============================================================================
 	beginRender() {
-		const webGL2RenderingContext = this.#webGL2RenderingContext;
-		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
-		bindShadowTarget(webGL2RenderingContext, this.#shadowCache, this.#framebuffer);
+		bindShadowTarget(this.#webGL2RenderingContext, this.#shadowCache, this.#framebuffer);
 	}
 
 	//==============================================================================

@@ -32,34 +32,8 @@ const STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hi
 const COMBINING_MARK_PATTERN = /\p{M}/u;
 const EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
 const BLANK_CHUNK_PATTERN = /^[\u0009\u0020\u00A0\u2000-\u200B\u202F\u205F\u3000]+$/u; // 그릴 잉크가 없는 공백 덩어리. (굽지 않는다, 오검 공백 U+1680 처럼 꼴이 보이는 공백은 넣지 않는다)
-// 글자 안티앨리어싱. 끄면 구운 글자의 알파를 문턱값으로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다.
-// 도트 글꼴을 설계 크기의 정수 배로 그리는 프로젝트가 끈다. 기본은 켜짐이라 동작이 바뀌지 않는다.
-let isTextAntialiasEnabled = true;
+// 글자 안티앨리어싱을 껐을 때 구운 글자의 알파를 0 과 255 로 가르는 문턱값.
 const ALPHA_THRESHOLD = 128;
-
-
-//==============================================================================
-// 글자 안티앨리어싱 켬 / 끔.
-//
-// 켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다.
-//==============================================================================
-/**
- * @param { boolean } value
- */
-export function setTextAntialiasEnabled(value) {
-	isTextAntialiasEnabled = value;
-}
-
-
-//==============================================================================
-// 글자 안티앨리어싱이 켜져 있는지.
-//==============================================================================
-/**
- * @returns { boolean }
- */
-export function isTextAntialiasOn() {
-	return isTextAntialiasEnabled;
-}
 
 
 //==============================================================================
@@ -327,6 +301,7 @@ export class TextStringTextureCache extends Object {
 	/** @private @type { Map<string, object> } */ #glyphs; // 구운 글리프. (열쇠: 글꼴 열쇠, 글자 덩어리, 자리 열쇠)
 	/** @private @type { object[] } */ #atlasPages; // 아틀라스 장 목록.
 	/** @private @type { number } */ #useSerial; // 엔트리를 줄 때마다 늘리는 번호. (장의 LRU)
+	/** @private @type { boolean } */ #isTextAntialiasEnabled; // 글자 안티앨리어싱. (끄면 구운 글자의 알파를 문턱값으로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다, 도트 글꼴용, 기본 켬)
 	/** @private @type { number } */ #bakedGlyphCount; // 지금까지 구운 글리프 수. (통계)
 	/** @private @type { number } */ #uploadCount; // 지금까지 아틀라스에 올린 수. (통계, 굽기 캔버스 한 장이 한 번)
 	/** @private @type { object | null } */ #segmenter; // 글자 덩어리 나누기. (Intl.Segmenter, 없으면 null)
@@ -355,6 +330,7 @@ export class TextStringTextureCache extends Object {
 		this.#glyphs = new Map();
 		this.#atlasPages = [];
 		this.#useSerial = 0;
+		this.#isTextAntialiasEnabled = true;
 		this.#bakedGlyphCount = 0;
 		this.#uploadCount = 0;
 		this.#textureBinder = textureBinder;
@@ -436,11 +412,13 @@ export class TextStringTextureCache extends Object {
 		const useSerial = this.#useSerial;
 
 		// 그릴 때마다 열쇠 문자열을 만들지 않고, 문자열로 엔트리 목록을 찾아 나머지 값을 견준다. (열쇠 문자열은 배치할 때 한 번 만들어 엔트리에 둔다)
+		// 안티앨리어싱 켬과 끔은 구운 꼴이 달라 따로 둔다. (글리프 열쇠와 같다, 도중에 바꾸면 그 뒤 그리는 글부터 새 꼴이다)
+		const isNearest = !this.#isTextAntialiasEnabled;
 		const entries = this.getEntries();
 		const entryList = this.#entriesByText.get(text);
 		if (entryList !== undefined) {
 			for (const entry of entryList) {
-				if (entry.mode !== mode || entry.textDirection !== textDirection || entry.scale !== scale || entry.lineWidth !== lineWidth || entry.colorString !== colorString || entry.fontString !== fontString) {
+				if (entry.isNearest !== isNearest || entry.mode !== mode || entry.textDirection !== textDirection || entry.scale !== scale || entry.lineWidth !== lineWidth || entry.colorString !== colorString || entry.fontString !== fontString) {
 					continue;
 				}
 				// LRU 갱신. (재삽입으로 최신화, 쓴 아틀라스 장도)
@@ -454,13 +432,14 @@ export class TextStringTextureCache extends Object {
 			}
 		}
 
-		const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
+		const entryKey = `${mode}|${isNearest ? 1 : 0}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
 		const entry = this.buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
 		if (!entry) {
 			return null;
 		}
 
 		entry.entryKey = entryKey;
+		entry.isNearest = isNearest;
 		entry.mode = mode;
 		entry.text = text;
 		entry.fontString = fontString;
@@ -569,7 +548,7 @@ export class TextStringTextureCache extends Object {
 
 		// 글리프 칸의 가로 여유. (바깥선은 꺾인 모서리가 miterLimit 까지 뻗으므로 넉넉히, 문자열 사각형 밖은 잘린다)
 		const cellPadding = mode === "stroke" ? Math.ceil((lineWidth * scale * STROKE_MITER_LIMIT) / 2) + 2 : scaledPadding + 1;
-		const isNearest = !isTextAntialiasEnabled;
+		const isNearest = !this.#isTextAntialiasEnabled;
 		const strikeKey = `${mode}|${lineWidth * scale}|${isNearest ? 1 : 0}|${textDirection}|${scaledFontString}\u0002`;
 		const useSerial = this.#useSerial;
 
@@ -802,7 +781,7 @@ export class TextStringTextureCache extends Object {
 	 * @param { string } textDirection
 	 */
 	bakeGlyphs(glyphList, mode, colorString, scaledLineWidth, textDirection) {
-		const isNearest = !isTextAntialiasEnabled;
+		const isNearest = !this.#isTextAntialiasEnabled;
 		const spans = [];
 		let currentSpan = null;
 		for (const glyph of glyphList) {
@@ -1050,6 +1029,27 @@ export class TextStringTextureCache extends Object {
 			this.#atlasPages.splice(atlasPageIndex, 1);
 		}
 		this.getWebGL2RenderingContext().deleteTexture(atlasPage.texture);
+	}
+
+	//==============================================================================
+	// 글자 안티앨리어싱 켬 / 끔. (러스트 TextStringTextureCache::set_text_antialias_enabled 와 같다)
+	// - 바꾼 뒤 그리는 글부터 새 꼴로 굽는다. 구운 글은 꼴마다 따로 남아 되돌리면 다시 굽지 않는다.
+	//==============================================================================
+	/**
+	 * @param { boolean } value 켜면 참.
+	 */
+	setTextAntialiasEnabled(value) {
+		this.#isTextAntialiasEnabled = value !== false;
+	}
+
+	//==============================================================================
+	// 글자 안티앨리어싱이 켜져 있는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 켜졌으면 참.
+	 */
+	isTextAntialiasOn() {
+		return this.#isTextAntialiasEnabled;
 	}
 
 	//==============================================================================

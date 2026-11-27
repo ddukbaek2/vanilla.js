@@ -4,6 +4,7 @@
 //   상자는 움직이다 서고(구워질 만큼 오래) 다시 움직이고, 인스턴스 하나가 한 번 옮겨 가고, 해와 점광이 한 번씩 움직이고, 모형 하나가 빠졌다 돌아온다.
 //   프레임마다 두 벌로 장면을 그려 화소가 모두 같은지 본다. (onChange 의 그림자가 한 프레임도 늦게 따라오지 않는다)
 // - 모두 그대로인 프레임은 onChange 가 그림자 깊이를 하나도 그리지 않고, 움직이는 것만 있는 프레임은 그것만 그리는지 셈한다.
+// - 가위 시험을 켠 채(2D 자르기 안의 바깥 패스처럼) beginRender 를 불러도 해 그림자 판과 점광 판 모두 가위를 끄고 판 전체를 비우는지 본다.
 // - interval 4 는 0, 4, 8 프레임에만 그리고 그 프레임의 화면이 everyFrame 과 같은지 본다.
 //   puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
@@ -172,8 +173,18 @@ try {
 			}
 			frameList.push({ frame: frame, isSame: isSame(everyPixels, changePixels), isIntervalSame: intervalPixels === null ? null : isSame(everyPixels, intervalPixels), changeDrawCount: changeDrawCount, intervalDrawCount: intervalDrawCount, litCount: litCount, error: gl.getError() });
 		}
+		// 가위 시험을 켠 채 beginRender. (판 전체를 비우고 그려야 한다, 해 그림자 판과 점광 판 같게)
+		const scissorResult = {};
+		for (const [name, shadowTarget] of [["shadowMap", everyShadowMap], ["shadowAtlas", everyAtlas]]) {
+			gl.enable(gl.SCISSOR_TEST);
+			gl.scissor(0, 0, 8, 8);
+			shadowTarget.beginRender();
+			scissorResult[name] = gl.isEnabled(gl.SCISSOR_TEST);
+			gl.disable(gl.SCISSOR_TEST);
+			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		}
 		// 움직이는 상자의 그림자가 화면에 드러나는지. (이 시험이 그림자 차이를 볼 수 있는지)
-		return { frameList: frameList };
+		return { frameList: frameList, scissorResult: scissorResult };
 	});
 	await page.close();
 }
@@ -203,4 +214,6 @@ for (let frame = 62; frame < 70; ++frame) {
 // 첫 프레임은 전부 그린다.
 check(frameList[0].changeDrawCount > 7, "첫 프레임은 전부 그림 (" + frameList[0].changeDrawCount + ")");
 // 상자가 움직인 프레임끼리는 화면이 다르다. (그림자 차이를 보는 시험인지)
+check(result.scissorResult.shadowMap === false, "ShadowMap.beginRender 가 가위 시험을 끔");
+check(result.scissorResult.shadowAtlas === false, "ShadowAtlas.beginRender 가 가위 시험을 끔");
 console.log("그림자 갱신 방식 크롬 시험 통과 (" + checkCount + " 개 확인)");

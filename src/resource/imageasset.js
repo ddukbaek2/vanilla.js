@@ -56,6 +56,8 @@ export class ImageAsset extends Asset {
 		if (isLoaded) {
 			return Promise.resolve();
 		}
+		// 그림의 주인은 읽기 시작할 때 씬을 불러오던 Graphic 이다. (기다린 뒤에는 다른 엔진이 불러오기 시작했을 수 있어 먼저 받아 둔다)
+		const owner = DecodedImageStore.getLoadingOwner();
 
 		await super.load(assetPath);
 
@@ -72,7 +74,7 @@ export class ImageAsset extends Asset {
 				throw new Error(`Load fail: ${assetPath}`);
 			}
 			const blob = await response.blob();
-			await this.loadFromBlob(assetPath, blob);
+			await this.loadFromBlob(assetPath, blob, owner);
 			this.setLoaded(true);
 			return;
 		}
@@ -85,7 +87,7 @@ export class ImageAsset extends Asset {
 		// 불러오기.
 		await new Promise((resolve, reject) => {
 			this.image.onload = () => {
-				DecodedImageStore.register(this.image, null);
+				DecodedImageStore.register(this.image, null, owner);
 				this.setLoaded(true);
 				resolve();
 			};
@@ -116,8 +118,9 @@ export class ImageAsset extends Asset {
 	async loadFromBytes(assetPath, bytes) {
 		this.setLoaded(false);
 		this.setAssetPath(assetPath);
+		const owner = DecodedImageStore.getLoadingOwner();
 		const blob = bytes instanceof System.Blob ? bytes : new System.Blob([bytes]);
-		await this.loadFromBlob(assetPath, blob);
+		await this.loadFromBlob(assetPath, blob, owner);
 		this.setLoaded(true);
 	}
 
@@ -130,9 +133,10 @@ export class ImageAsset extends Asset {
 	 * @private
 	 * @param { string } assetPath 실패 알림에 쓸 이름.
 	 * @param { Blob } blob 그림 파일의 바이트.
+	 * @param { object | null } owner 그림 주인. (읽기 시작할 때 DecodedImageStore.getLoadingOwner 로 받은 것)
 	 * @returns { Promise<void> } 그림이 다 풀리면 풀리는 프로미스. (그림 요소가 풀지 못하면 거부된다)
 	 */
-	async loadFromBlob(assetPath, blob) {
+	async loadFromBlob(assetPath, blob, owner) {
 		DecodedImageStore.release(this.image);
 		const objectUrl = System.URL.createObjectURL(blob);
 		const image = new System.window.Image();
@@ -172,7 +176,7 @@ export class ImageAsset extends Asset {
 			}
 			return;
 		}
-		DecodedImageStore.register(image, imageBitmap);
+		DecodedImageStore.register(image, imageBitmap, owner);
 	}
 
 	//==============================================================================
