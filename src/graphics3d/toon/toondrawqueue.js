@@ -4,7 +4,7 @@
 const System = globalThis;
 import { ToonBlendMode } from "./toonmaterial.js";
 import { TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID } from "./toonscreenoutline.js";
-import { readInstanceBufferSphere } from "./toonrenderer.js";
+import { readInstanceBufferSphere, DRAW_STATE_JOINT_MATRICES, DRAW_STATE_INDEX_START, DRAW_STATE_INDEX_COUNT, DRAW_STATE_IS_MIRRORED, DRAW_STATE_MATERIAL, DRAW_STATE_IS_TRANSPARENT, DRAW_STATE_HAS_OUTLINE, DRAW_STATE_IS_CULLED, DRAW_STATE_CASTS_SHADOW, DRAW_STATE_LINE_ID, DRAW_STATE_GROUP, DRAW_STATE_IS_DEPTH_PREPASSED, DRAW_STATE_BASE_COLOR_TEXTURE, EMPTY_OPTIONS } from "./toonrenderer.js";
 import { ShadowUpdateMode } from "../shadowmap.js";
 
 
@@ -76,15 +76,16 @@ const SHADOW_STATIC_FRAME_COUNT = 30;
  * @returns { boolean } 앞의 프레임과 다르면 true.
  */
 function writeCasterRecord(record, item) {
-	const options = item.options;
-	const jointMatrices = options.jointMatrices !== undefined && options.jointMatrices !== null ? options.jointMatrices : null;
+	const state = item.state;
+	const material = state[DRAW_STATE_MATERIAL];
+	const jointMatrices = state[DRAW_STATE_JOINT_MATRICES];
 	const instanceBuffer = item.instanceBuffer;
 	const matrixCount = instanceBuffer !== null ? 0 : (item.instances !== null ? item.instances.length : 1);
 	const valueCount = 6 + matrixCount * 16 + (instanceBuffer !== null ? 1 : 0) + (jointMatrices !== null ? jointMatrices.length : 0);
 	const generation = instanceBuffer !== null ? instanceBuffer.generation : -1;
-	let isChanged = record.mesh !== item.mesh || record.material !== options.material || record.instanceBuffer !== instanceBuffer || record.generation !== generation;
+	let isChanged = record.mesh !== item.mesh || record.material !== material || record.instanceBuffer !== instanceBuffer || record.generation !== generation;
 	record.mesh = item.mesh;
-	record.material = options.material;
+	record.material = material;
 	record.instanceBuffer = instanceBuffer;
 	record.generation = generation;
 	if (record.values.length !== valueCount) {
@@ -102,10 +103,10 @@ function writeCasterRecord(record, item) {
 		index += 1;
 	};
 	write(matrixCount);
-	write(options.indexStart !== undefined ? options.indexStart : -1);
-	write(options.indexCount !== undefined ? options.indexCount : -1);
-	write(options.isCulled === false ? 0 : 1);
-	write(options.isMirrored === undefined ? -1 : (options.isMirrored === true ? 1 : 0));
+	write(state[DRAW_STATE_INDEX_START]);
+	write(state[DRAW_STATE_INDEX_COUNT]);
+	write(state[DRAW_STATE_IS_CULLED] ? 1 : 0);
+	write(state[DRAW_STATE_IS_MIRRORED]);
 	write(jointMatrices !== null ? jointMatrices.length : -1);
 	if (instanceBuffer !== null) {
 		write(item.instanceCount);
@@ -232,6 +233,12 @@ export class ToonDrawQueue {
 	/** @private @type { Array<object> } */ #passList; // { stage, callback }
 	/** @private @type { object | null } */ #screenOutline; // ToonScreenOutline. (없으면 null)
 	/** @private @type { Array<object> | null } */ #opaqueItemList; // 정렬한 불투명한 것. (담거나 비우면 null, 처음 그릴 때 만든다)
+	/** @private @type { Array<object> } */ #itemPool; // 담은 것 칸을 프레임마다 다시 쓴다. (clear 뒤에도 남는다)
+	/** @private @type { Int32Array } */ #sortKeys; // 앞의 정렬의 불투명한 것 열쇠. (하나에 재질, 모형, 텍스처 번호 셋, 담은 차례대로)
+	/** @private @type { Int32Array } */ #sortOrder; // 앞의 정렬 차례. (불투명한 것의 담은 차례 번호, 열쇠가 모두 같으면 다시 정렬하지 않고 쓴다)
+	/** @private @type { number } */ #sortCount; // 앞의 정렬의 불투명한 것 수. (-1 이면 없음)
+	/** @private @type { Array<object> } */ #opaqueScratch; // 담은 차례의 불투명한 것. (프레임마다 다시 쓴다)
+	/** @private @type { boolean } */ #isResolved; // 담은 것마다 꼴을 풀었는지. (그리기 앞에 렌더러로 한 번)
 
 	//==============================================================================
 	// 생성.
@@ -241,12 +248,82 @@ export class ToonDrawQueue {
 		this.#passList = [];
 		this.#screenOutline = null;
 		this.#opaqueItemList = null;
+		this.#itemPool = [];
+		this.#sortKeys = new System.Int32Array(0);
+		this.#sortOrder = new System.Int32Array(0);
+		this.#sortCount = -1;
+		this.#opaqueScratch = [];
+		this.#isResolved = false;
+	}
+
+	//==============================================================================
+	// 담은 것마다 꼴 풀기. (렌더러가 꼴 객체마다 기억한 푼 칸을 쓴다, 담은 뒤 처음 그릴 때 한 번)
+	// - 비치는지, 그림자를 드리우는지, 선 번호, 묶음 같은 것을 칸 이름으로 읽지 않고 번호로 읽는다. (렌더러의 readDrawEntry 머리말)
+	//==============================================================================
+	/**
+	 * @param { object } renderer - ToonRenderer.
+	 * @private
+	 */
+	resolveItems(renderer) {
+		if (this.#isResolved) {
+			return;
+		}
+		for (const item of this.#itemList) {
+			const state = renderer.readDrawEntry(item.options).state;
+			item.state = state;
+			item.isTransparent = state[DRAW_STATE_IS_TRANSPARENT];
+		}
+		this.#isResolved = true;
+		this.#opaqueItemList = null;
+	}
+
+	//==============================================================================
+	// 담을 칸 하나 꺼내기. (풀에서 다시 쓴다, 담은 것 목록에 넣는다)
+	//==============================================================================
+	/**
+	 * @param { object } mesh - 모형.
+	 * @param { Matrix4 | null } modelMatrix - 모형 행렬. (인스턴스면 null)
+	 * @param { Array<object> | null } instances - 인스턴스 배열.
+	 * @param { object | null } instanceBuffer - 인스턴스 버퍼.
+	 * @param { number } instanceCount - 인스턴스 버퍼의 그릴 수.
+	 * @param { object } options - 그리기 꼴.
+	 * @returns { object } 담은 칸. (depthPosition 을 채운다)
+	 * @private
+	 */
+	pushItem(mesh, modelMatrix, instances, instanceBuffer, instanceCount, options) {
+		const itemList = this.#itemList;
+		let item = this.#itemPool[itemList.length];
+		if (item === undefined) {
+			item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, state: null, isTransparent: false, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
+			this.#itemPool.push(item);
+		}
+		item.mesh = mesh;
+		item.modelMatrix = modelMatrix;
+		item.instances = instances;
+		item.instanceBuffer = instanceBuffer;
+		item.instanceCount = instanceCount;
+		item.options = options;
+		item.state = null;
+		item.isTransparent = false;
+		item.depth = 0;
+		this.#opaqueItemList = null;
+		this.#isResolved = false;
+		itemList.push(item);
+		return item;
 	}
 
 	//==============================================================================
 	// 비우기. (프레임마다 담기 전에, 단계 콜백도 비운다, 화면 공간 바깥선은 그대로)
 	//==============================================================================
 	clear() {
+		for (const item of this.#itemList) {
+			item.mesh = null;
+			item.modelMatrix = null;
+			item.instances = null;
+			item.instanceBuffer = null;
+			item.options = null;
+			item.state = null;
+		}
 		this.#itemList.length = 0;
 		this.#passList.length = 0;
 		this.#opaqueItemList = null;
@@ -308,14 +385,18 @@ export class ToonDrawQueue {
 	 * @param { Matrix4 } modelMatrix - 모형 행렬. (draw 때까지 고치지 않는다)
 	 * @param { object } [options] - ToonRenderer.drawMesh 의 꼴과 castsShadow (기본 true), group, isDepthPrepassed, lineId, hasScreenOutline (기본 true), hasCreaseLine (기본 true).
 	 */
-	addMesh(mesh, modelMatrix, options = {}) {
+	addMesh(mesh, modelMatrix, options = EMPTY_OPTIONS) {
 		if (mesh === null || mesh === undefined) {
 			return;
 		}
+		const item = this.pushItem(mesh, modelMatrix, null, null, 0, options);
+		// 가운데의 월드 자리. (Matrix4.transformPoint 와 같은 셈, 새 객체를 짓지 않는다)
 		const center = mesh.boundingCenter;
-		const depthPosition = modelMatrix.transformPoint(center[0], center[1], center[2]);
-		this.#opaqueItemList = null;
-		this.#itemList.push({ mesh: mesh, modelMatrix: modelMatrix, instances: null, instanceBuffer: null, instanceCount: 0, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
+		const elements = modelMatrix.getElements();
+		const depthPosition = item.depthPosition;
+		depthPosition.x = elements[0] * center[0] + elements[4] * center[1] + elements[8] * center[2] + elements[12];
+		depthPosition.y = elements[1] * center[0] + elements[5] * center[1] + elements[9] * center[2] + elements[13];
+		depthPosition.z = elements[2] * center[0] + elements[6] * center[1] + elements[10] * center[2] + elements[14];
 	}
 
 	//==============================================================================
@@ -326,11 +407,15 @@ export class ToonDrawQueue {
 	 * @param { Array<object> } instances - { modelMatrix, tintColor, lineId (선택) } 의 배열.
 	 * @param { object } [options] - addMesh 와 같다.
 	 */
-	addMeshInstanced(mesh, instances, options = {}) {
+	addMeshInstanced(mesh, instances, options = EMPTY_OPTIONS) {
 		if (mesh === null || mesh === undefined || instances.length === 0) {
 			return;
 		}
-		const depthPosition = { x: 0, y: 0, z: 0 };
+		const item = this.pushItem(mesh, null, instances, null, 0, options);
+		const depthPosition = item.depthPosition;
+		depthPosition.x = 0;
+		depthPosition.y = 0;
+		depthPosition.z = 0;
 		for (const instance of instances) {
 			const elements = instance.modelMatrix.getElements();
 			depthPosition.x += elements[12];
@@ -340,8 +425,6 @@ export class ToonDrawQueue {
 		depthPosition.x /= instances.length;
 		depthPosition.y /= instances.length;
 		depthPosition.z /= instances.length;
-		this.#opaqueItemList = null;
-		this.#itemList.push({ mesh: mesh, modelMatrix: null, instances: instances, instanceBuffer: null, instanceCount: 0, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
 	}
 
 	//==============================================================================
@@ -382,14 +465,15 @@ export class ToonDrawQueue {
 	 * renderer.updateInstanceBufferRange(instanceBuffer, 12, brokenRock);
 	 * queue.draw(renderer, camera);
 	 */
-	addMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, options = {}) {
+	addMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, options = EMPTY_OPTIONS) {
 		if (mesh === null || mesh === undefined || instanceBuffer === null || instanceBuffer === undefined || instanceCount <= 0) {
 			return;
 		}
 		const sphere = readInstanceBufferSphere(mesh, instanceBuffer);
-		const depthPosition = sphere !== null ? { x: sphere[0], y: sphere[1], z: sphere[2] } : { x: 0, y: 0, z: 0 };
-		this.#opaqueItemList = null;
-		this.#itemList.push({ mesh: mesh, modelMatrix: null, instances: null, instanceBuffer: instanceBuffer, instanceCount: instanceCount, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
+		const item = this.pushItem(mesh, null, null, instanceBuffer, instanceCount, options);
+		item.depthPosition.x = sphere !== null ? sphere[0] : 0;
+		item.depthPosition.y = sphere !== null ? sphere[1] : 0;
+		item.depthPosition.z = sphere !== null ? sphere[2] : 0;
 	}
 
 	//==============================================================================
@@ -417,13 +501,19 @@ export class ToonDrawQueue {
 		const lightKey = new System.Float32Array(17);
 		lightKey.set(shadowMap.getLightViewProjectionMatrix().getElements());
 		lightKey[16] = shadowMap.getResolution();
-		this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, () => {
-			renderer.beginShadowPass(shadowMap);
-		}, (casterList) => {
-			for (const item of casterList) {
-				this.drawItem(renderer, item, item.options);
-			}
-		});
+		renderer.beginTrustedOptions();
+		try {
+			this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, () => {
+				renderer.beginShadowPass(shadowMap);
+			}, (casterList) => {
+				for (const item of casterList) {
+					this.drawItem(renderer, item, item.options);
+				}
+			});
+		}
+		finally {
+			renderer.endTrustedOptions();
+		}
 	}
 
 	//==============================================================================
@@ -464,16 +554,22 @@ export class ToonDrawQueue {
 			lightKey[offset + 17] = tile.y;
 			lightKey[offset + 18] = tile.size;
 		}
-		this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, () => {
-			renderer.beginShadowAtlasPass(shadowAtlas);
-		}, (casterList) => {
-			for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
-				renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-				for (const item of casterList) {
-					this.drawItem(renderer, item, item.options);
+		renderer.beginTrustedOptions();
+		try {
+			this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, () => {
+				renderer.beginShadowAtlasPass(shadowAtlas);
+			}, (casterList) => {
+				for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+					renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
+					for (const item of casterList) {
+						this.drawItem(renderer, item, item.options);
+					}
 				}
-			}
-		});
+			});
+		}
+		finally {
+			renderer.endTrustedOptions();
+		}
 	}
 
 	//==============================================================================
@@ -495,9 +591,10 @@ export class ToonDrawQueue {
 	 * @private
 	 */
 	drawShadowCasters(renderer, shadowCache, lightKey, beginPass, drawCasters) {
+		this.resolveItems(renderer);
 		const casterList = [];
 		for (const item of this.readOpaqueItemList()) {
-			if (item.options.castsShadow !== false) {
+			if (item.state[DRAW_STATE_CASTS_SHADOW]) {
 				casterList.push(item);
 			}
 		}
@@ -546,7 +643,7 @@ export class ToonDrawQueue {
 				recordList.push({ mesh: null, material: undefined, instanceBuffer: null, generation: -1, values: new System.Float32Array(0), stableFrameCount: 0, isStatic: false });
 			}
 			const record = recordList[casterIndex];
-			const material = item.options.material;
+			const material = item.state[DRAW_STATE_MATERIAL];
 			const isVertexAnimated = material !== undefined && material !== null && material.getVertexChunk() !== "";
 			if (writeCasterRecord(record, item) || isVertexAnimated) {
 				isCacheStale = isCacheStale || record.isStatic;
@@ -598,12 +695,18 @@ export class ToonDrawQueue {
 	 * @param { object } camera - Camera3D.
 	 */
 	draw(renderer, camera) {
-		this.drawLineIds(renderer, camera.getViewMatrix(), camera.getProjectionMatrix());
-		renderer.beginFrameWithCamera(camera);
-		this.drawStages(renderer, (position) => {
-			return camera.readViewDepth(position.x, position.y, position.z);
-		});
-		renderer.endFrame();
+		renderer.beginTrustedOptions();
+		try {
+			this.drawLineIds(renderer, camera.getViewMatrix(), camera.getProjectionMatrix());
+			renderer.beginFrameWithCamera(camera);
+			this.drawStages(renderer, (position) => {
+				return camera.readViewDepth(position.x, position.y, position.z);
+			});
+			renderer.endFrame();
+		}
+		finally {
+			renderer.endTrustedOptions();
+		}
 	}
 
 	//==============================================================================
@@ -615,13 +718,19 @@ export class ToonDrawQueue {
 	 * @param { Matrix4 } projectionMatrix - 투영 행렬.
 	 */
 	drawWithMatrices(renderer, viewMatrix, projectionMatrix) {
-		this.drawLineIds(renderer, viewMatrix, projectionMatrix);
-		renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
-		const elements = viewMatrix.getElements();
-		this.drawStages(renderer, (position) => {
-			return -(elements[2] * position.x + elements[6] * position.y + elements[10] * position.z + elements[14]);
-		});
-		renderer.endFrame();
+		renderer.beginTrustedOptions();
+		try {
+			this.drawLineIds(renderer, viewMatrix, projectionMatrix);
+			renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
+			const elements = viewMatrix.getElements();
+			this.drawStages(renderer, (position) => {
+				return -(elements[2] * position.x + elements[6] * position.y + elements[10] * position.z + elements[14]);
+			});
+			renderer.endFrame();
+		}
+		finally {
+			renderer.endTrustedOptions();
+		}
 	}
 
 	//==============================================================================
@@ -633,6 +742,7 @@ export class ToonDrawQueue {
 	 * @param { Matrix4 } projectionMatrix - 투영 행렬.
 	 */
 	drawLineIds(renderer, viewMatrix, projectionMatrix) {
+		this.resolveItems(renderer);
 		const screenOutline = this.#screenOutline;
 		if (screenOutline === null) {
 			return;
@@ -652,7 +762,8 @@ export class ToonDrawQueue {
 				if (item.isTransparent) {
 					continue;
 				}
-				const lineId = typeof item.options.lineId === "number" ? item.options.lineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
+				const stateLineId = item.state[DRAW_STATE_LINE_ID];
+				const lineId = stateLineId !== null ? stateLineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
 				if (item.instanceBuffer !== null) {
 					screenOutline.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, lineId, item.options);
 				}
@@ -681,7 +792,14 @@ export class ToonDrawQueue {
 			if (pass.stage !== stage) {
 				continue;
 			}
-			pass.callback(renderer, renderer.getWebGL2RenderingContext());
+			// 콜백은 렌더러로 바로 그릴 수 있다. (그 꼴은 그리기마다 견준다)
+			renderer.pauseTrustedOptions(true);
+			try {
+				pass.callback(renderer, renderer.getWebGL2RenderingContext());
+			}
+			finally {
+				renderer.pauseTrustedOptions(false);
+			}
 			isRun = true;
 		}
 		if (isRun) {
@@ -697,6 +815,7 @@ export class ToonDrawQueue {
 	 * @param { Function } readDepth - ({ x, y, z }) 의 보기 깊이를 돌려준다.
 	 */
 	drawStages(renderer, readDepth) {
+		this.resolveItems(renderer);
 		const itemList = this.#itemList;
 		const webGL2RenderingContext = renderer.getWebGL2RenderingContext();
 		this.runPasses(renderer, ToonDrawStage.beforeOpaque);
@@ -709,13 +828,13 @@ export class ToonDrawQueue {
 				continue;
 			}
 			// 화면 밖이면 drawMesh 가 걸러 센다. 바깥선도 담지 않는다.
-			if (item.options.isCulled !== false && !renderer.isVisible(item.mesh, item.modelMatrix.getElements())) {
+			if (item.state[DRAW_STATE_IS_CULLED] && !renderer.isVisible(item.mesh, item.modelMatrix.getElements())) {
 				this.drawItem(renderer, item, item.options);
 				continue;
 			}
-			const bodyOptions = System.Object.assign({}, item.options, { hasOutline: false });
-			this.drawItem(renderer, item, bodyOptions);
-			if (item.options.hasOutline !== false && item.mesh.outlineVertexArray !== null) {
+			// 몸만. (바깥선 껍데기는 몸을 다 그린 뒤 몰아 그린다, 꼴 객체를 새로 짓지 않아 렌더러가 꼴마다 기억한 재질 블록을 그대로 쓴다)
+			renderer.drawMeshBody(item.mesh, item.modelMatrix, item.options);
+			if (item.state[DRAW_STATE_HAS_OUTLINE] && item.mesh.outlineVertexArray !== null) {
 				outlineItemList.push(item);
 			}
 		}
@@ -739,9 +858,9 @@ export class ToonDrawQueue {
 				continue;
 			}
 			item.depth = readDepth(item.depthPosition);
-			const group = item.options.group;
-			const isDepthPrepassed = item.options.isDepthPrepassed === true;
-			if (group === undefined || group === null) {
+			const group = item.state[DRAW_STATE_GROUP];
+			const isDepthPrepassed = item.state[DRAW_STATE_IS_DEPTH_PREPASSED];
+			if (group === null) {
 				entryList.push({ depthSum: item.depth, itemList: [item], isDepthPrepassed: isDepthPrepassed });
 				continue;
 			}
@@ -790,20 +909,54 @@ export class ToonDrawQueue {
 		if (this.#opaqueItemList !== null) {
 			return this.#opaqueItemList;
 		}
-		const keyList = [];
+		const scratch = this.#opaqueScratch;
+		scratch.length = 0;
 		for (const item of this.#itemList) {
-			if (item.isTransparent) {
-				continue;
+			if (!item.isTransparent) {
+				scratch.push(item);
 			}
-			keyList.push({ item: item, order: keyList.length, materialId: readSortId(item.options.material), meshId: readSortId(item.mesh), textureId: readSortId(item.options.baseColorTexture) });
 		}
-		keyList.sort((key, other) => {
-			return key.materialId - other.materialId || key.meshId - other.meshId || key.textureId - other.textureId || key.order - other.order;
-		});
-		this.#opaqueItemList = keyList.map((key) => {
-			return key.item;
-		});
-		return this.#opaqueItemList;
+		// 열쇠가 앞의 정렬과 모두 같으면 (게임이 프레임마다 같은 것을 같은 차례로 담으면) 앞의 차례를 그대로 쓴다.
+		const count = scratch.length;
+		let keys = this.#sortKeys;
+		let isSame = count === this.#sortCount;
+		if (keys.length < count * 3) {
+			keys = new System.Int32Array(count * 3);
+			this.#sortKeys = keys;
+			this.#sortOrder = new System.Int32Array(count);
+			isSame = false;
+		}
+		for (let index = 0; index < count; ++index) {
+			const item = scratch[index];
+			const materialId = readSortId(item.state[DRAW_STATE_MATERIAL]);
+			const meshId = readSortId(item.mesh);
+			const textureId = readSortId(item.state[DRAW_STATE_BASE_COLOR_TEXTURE]);
+			const offset = index * 3;
+			if (keys[offset] !== materialId || keys[offset + 1] !== meshId || keys[offset + 2] !== textureId) {
+				keys[offset] = materialId;
+				keys[offset + 1] = meshId;
+				keys[offset + 2] = textureId;
+				isSame = false;
+			}
+		}
+		const order = this.#sortOrder;
+		if (!isSame) {
+			const indexList = [];
+			for (let index = 0; index < count; ++index) {
+				indexList.push(index);
+			}
+			indexList.sort((index, other) => {
+				return keys[index * 3] - keys[other * 3] || keys[index * 3 + 1] - keys[other * 3 + 1] || keys[index * 3 + 2] - keys[other * 3 + 2] || index - other;
+			});
+			order.set(indexList);
+			this.#sortCount = count;
+		}
+		const opaqueItemList = [];
+		for (let index = 0; index < count; ++index) {
+			opaqueItemList.push(scratch[order[index]]);
+		}
+		this.#opaqueItemList = opaqueItemList;
+		return opaqueItemList;
 	}
 
 	//==============================================================================
