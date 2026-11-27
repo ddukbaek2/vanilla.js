@@ -1012,9 +1012,140 @@ function mixLocals(locals, otherLocals, ratio) {
 }
 
 //==============================================================================
+// 뼈 고치기의 꼴. (adjustBones 와 writeSkinPose 의 poseAdjust 표에서 고침 하나가 움직임 값에 어떻게 걸리는지)
+//   - add: 움직임 위에 덧붙인다. 자리는 부모 공간에서 더하고, 돌림은 그 뼈의 공간에서 뒤에 곱하고(q x 준 돌림), 크기는 곱한다.
+//   - replace: 준 값으로 바꾼다. (자리, 돌림, 크기 모두 부모 공간의 지역 값)
+//==============================================================================
+/**
+ * @example <caption>엉덩이는 내리고 머리는 움직임 값을 버리고 정면으로 두기</caption>
+ * import { readGlbArrays, writeSkinPose, BoneModifyMode } from "./vanilla.js";
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
+ * const skeleton = readGlbArrays(arrayBuffer).skeleton;
+ * if (skeleton !== null) {
+ * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
+ * 	writeSkinPose(skeleton, "Survey", 0.5, jointMatrices, null, null, [
+ * 		{ name: "b_Hip_01", translation: [0, -2, 0], mode: BoneModifyMode.add },
+ * 		{ name: "b_Head_05", rotation: [0, 0, 0, 1], mode: BoneModifyMode.replace },
+ * 	]);
+ * }
+ */
+export const BoneModifyMode = System.Object.freeze({
+	add: 0, // 움직임 위에 덧붙임. (자리는 더함, 돌림은 그 뼈의 공간에서 뒤에 곱함, 크기는 곱함)
+	replace: 1, // 준 값으로 바꿈. (부모 공간의 지역 값)
+});
+
+//==============================================================================
+// 두 사원수 곱. (rotation x otherRotation, 뒤의 돌림을 앞 돌림의 공간에서 건다, 정규화)
+//==============================================================================
+/**
+ * @param { Array<number> } rotation - [x, y, z, w] 앞 돌림.
+ * @param { Array<number> } otherRotation - [x, y, z, w] 뒤에 곱할 돌림.
+ * @returns { Array<number> } 곱한 단위 사원수.
+ */
+function multiplyRotation(rotation, otherRotation) {
+	const [x, y, z, w] = rotation;
+	const [otherX, otherY, otherZ, otherW] = otherRotation;
+	const result = [
+		w * otherX + x * otherW + y * otherZ - z * otherY,
+		w * otherY - x * otherZ + y * otherW + z * otherX,
+		w * otherZ + x * otherY - y * otherX + z * otherW,
+		w * otherW - x * otherX - y * otherY - z * otherZ,
+	];
+	const length = System.Math.hypot(result[0], result[1], result[2], result[3]);
+	if (length <= 0) {
+		return System.Array.from(rotation);
+	}
+	return result.map((value) => {
+		return value / length;
+	});
+}
+
+//==============================================================================
+// 섞은 자세의 뼈마다 지역 변환 고치기. (writeSkinPose 가 움직임을 읽어 섞은 뒤, 스킨 행렬을 짓기 전에 부르는 꼴, 행렬로 둔 노드는 건너뜀)
+//   - modifiers 의 고침 하나: { nodeIndex 또는 name, translation, rotation, scale, mode, weight } 준 칸만 건다.
+//   - 고침은 차례대로 걸린다. (같은 뼈에 둘을 주면 앞 고침 위에 뒤 고침)
+//   - weight 는 고치기 앞과 뒤 사이의 몫이다. (0 이면 그대로, 1 이면 다 고침, 돌림은 가까운 쪽으로 섞어 정규화)
+//==============================================================================
+/**
+ * @param { Array<object> } locals - 노드마다의 { translation, rotation, scale, matrix }. (writeSkinPose 의 poseAdjust 고리가 받는 것, 고친 값을 여기에 씀)
+ * @param { object } skeleton readGlbArrays 의 skeleton.
+ * @param { Array<object> } modifiers - [{ nodeIndex, name, translation, rotation, scale, mode, weight }] 뼈마다의 고침. (nodeIndex 가 없으면 name 으로 찾음, 못 찾으면 건너뜀, mode 는 BoneModifyMode 기본 add, weight 기본 1)
+ * @example <caption>고리 안에서 표 고침과 직접 고침을 같이 쓰기</caption>
+ * import { readGlbArrays, writeSkinPose, adjustBones } from "./vanilla.js";
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
+ * const skeleton = readGlbArrays(arrayBuffer).skeleton;
+ * if (skeleton !== null) {
+ * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
+ * 	const crouch = 0.6;
+ * 	const half = crouch / 2;
+ * 	writeSkinPose(skeleton, "Survey", 0, jointMatrices, null, null, (locals, poseSkeleton) => {
+ * 		adjustBones(locals, poseSkeleton, [{ name: "b_Spine01_02", rotation: [Math.sin(half), 0, 0, Math.cos(half)] }]);
+ * 		const tailIndex = poseSkeleton.nodes.findIndex((node) => node.name === "b_Tail01_012");
+ * 		locals[tailIndex].scale[1] *= 1.2;
+ * 	});
+ * }
+ */
+export function adjustBones(locals, skeleton, modifiers) {
+	let nameIndices = null;
+	for (const modifier of modifiers) {
+		let nodeIndex = modifier.nodeIndex !== undefined ? modifier.nodeIndex : -1;
+		if (nodeIndex < 0 && modifier.name !== undefined) {
+			if (nameIndices === null) {
+				nameIndices = new System.Map();
+				skeleton.nodes.forEach((node, index) => {
+					if (!nameIndices.has(node.name)) {
+						nameIndices.set(node.name, index);
+					}
+				});
+			}
+			const foundIndex = nameIndices.get(modifier.name);
+			nodeIndex = foundIndex !== undefined ? foundIndex : -1;
+		}
+		const local = locals[nodeIndex];
+		if (local === undefined || local.matrix !== null) {
+			continue;
+		}
+		const isReplace = modifier.mode === BoneModifyMode.replace;
+		const weight = modifier.weight !== undefined ? System.Math.max(0, System.Math.min(1, modifier.weight)) : 1;
+		if (weight <= 0) {
+			continue;
+		}
+		const mixVector = (before, after) => {
+			if (weight >= 1) {
+				return System.Array.from(after);
+			}
+			return before.map((value, componentIndex) => {
+				return value + (after[componentIndex] - value) * weight;
+			});
+		};
+		if (modifier.translation !== undefined && modifier.translation !== null) {
+			const before = local.translation;
+			const after = isReplace ? modifier.translation : before.map((value, componentIndex) => {
+				return value + modifier.translation[componentIndex];
+			});
+			local.translation = mixVector(before, after);
+		}
+		if (modifier.rotation !== undefined && modifier.rotation !== null) {
+			const before = local.rotation;
+			const after = isReplace ? multiplyRotation([0, 0, 0, 1], modifier.rotation) : multiplyRotation(before, modifier.rotation);
+			local.rotation = weight >= 1 ? after : mixRotation(before, after, weight);
+		}
+		if (modifier.scale !== undefined && modifier.scale !== null) {
+			const before = local.scale;
+			const after = isReplace ? modifier.scale : before.map((value, componentIndex) => {
+				return value * modifier.scale[componentIndex];
+			});
+			local.scale = mixVector(before, after);
+		}
+	}
+}
+
+//==============================================================================
 // 뼈대 자세 셈하기. (움직임을 그 시각에서 읽어 본마다 행렬을 target 에 16 씩 씀, 움직임이 없으면 쉬는 자세)
 //   - blend 를 주면 앞 움직임의 자세를 그 무게만큼 섞는다. (움직임이 바뀔 때 잠깐)
 //   - swingScales 를 주면 그 움직임의 그 노드는 돌림을 쉬는 자세 쪽으로 줄인다. (움직임을 다시 뽑지 않고 흔들림만 줄일 때, 섞는 앞 자세에도 같이)
+//   - poseAdjust 를 주면 섞은 뒤, 스킨 행렬을 짓기 전에 뼈마다의 지역 변환을 고친다. (움직임에 없는 자세, 머리 돌리기, 웅크림 같은 뼈 덮어쓰기)
+//     함수면 (locals, skeleton) 으로 불러 그 함수가 locals 를 고치고, 배열이면 adjustBones 의 뼈마다 고침 표로 건다. (없으면 움직임 그대로)
 //==============================================================================
 /**
  * @param { object } skeleton readGlbArrays 의 skeleton.
@@ -1023,6 +1154,7 @@ function mixLocals(locals, otherLocals, ratio) {
  * @param { Float32Array } target - 본마다 16 씩 쓸 곳. (skeleton.joints.length x 16 이상, ToonRenderer.drawMesh 의 jointMatrices)
  * @param { object | null } [blend] { animationName, time, weight } 섞을 앞 자세와 그 무게. (0 ~ 1)
  * @param { object | null } [swingScales] { 움직임 이름: [{ nodeIndex, scale }] } 흔들림 배율. (1 이면 그대로, 0 이면 쉬는 자세)
+ * @param { function | Array<object> | null } [poseAdjust] (locals, skeleton) 로 노드마다의 { translation, rotation, scale } 을 고치는 고리, 또는 adjustBones 의 고침 표. (locals 의 배열은 이 부름만의 것이라 제자리에서 고쳐도 된다)
  * @example <caption>움직임이 바뀔 때 앞 자세를 잠깐 섞기</caption>
  * import { readGlbArrays, writeSkinPose } from "./vanilla.js";
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
@@ -1035,11 +1167,25 @@ function mixLocals(locals, otherLocals, ratio) {
  * 	writeSkinPose(skeleton, "Run", timeSinceChange, jointMatrices, blend);
  * }
  */
-export function writeSkinPose(skeleton, animationName, time, target, blend = null, swingScales = null) {
+export function writeSkinPose(skeleton, animationName, time, target, blend = null, swingScales = null, poseAdjust = null) {
 	const locals = readAnimationLocals(skeleton, animationName, time, swingScales);
 	if (blend !== null && blend.weight > 0) {
 		const blendLocals = readAnimationLocals(skeleton, blend.animationName, blend.time, swingScales);
 		mixLocals(locals, blendLocals, System.Math.min(1, blend.weight));
+	}
+	if (typeof poseAdjust === "function") {
+		// 움직임이 없는 노드는 뼈대의 쉬는 자세 배열을 같이 쥐고 있어, 고리가 제자리에서 고쳐도 뼈대가 바뀌지 않게 따로 떼어 준다.
+		for (const local of locals) {
+			if (local.matrix === null) {
+				local.translation = System.Array.from(local.translation);
+				local.rotation = System.Array.from(local.rotation);
+				local.scale = System.Array.from(local.scale);
+			}
+		}
+		poseAdjust(locals, skeleton);
+	}
+	else if (poseAdjust !== null && poseAdjust !== undefined) {
+		adjustBones(locals, skeleton, poseAdjust);
 	}
 	const globals = [];
 	const readGlobal = (nodeIndex) => {

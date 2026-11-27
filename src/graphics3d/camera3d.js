@@ -4,6 +4,7 @@
 const System = globalThis;
 import { Matrix4 } from "../base/matrix4.js";
 import { Vector3 } from "../base/vector3.js";
+import { createOffsetViewMatrix } from "./camerashake.js";
 
 
 //==============================================================================
@@ -27,6 +28,8 @@ const MINIMUM_FRONT_DEPTH = 0.0001;
 // - 원 행렬: setMatrices(보기, 투영) 로 게임이 셈한 행렬을 그대로 쓴다. (기울인 직교, 화면 변환을 곱한 투영 같은 것) 위 함수들이 모두 그 행렬로 돈다.
 //   보기 행렬은 월드 → 카메라의 강체 변환(카메라는 -Z 를 봄)으로 준다. 눈, 보는 곳(눈 앞 1), 위쪽과 isOrthographic 은 그 행렬에서 뽑는다.
 //   시야각, 보이는 높이, 가까운 거리, 먼 거리, 가로 세로 비는 마지막으로 준 값 그대로다. setPerspective, setOrthographic, lookAt 을 부르면 원 행렬을 버리고 셈하는 길로 돌아간다.
+// - 보기 덧붙임: setViewOffset(자리, 돌림) 은 카메라 지역 축의 덧붙임을 마지막에 건다. (CameraShake 의 흔들림, 걸음 흔들림, 반동 같은 것, 셈하는 길과 원 행렬 모두)
+//   보기 행렬과 그 뒤의 행렬, projectToView, unprojectToPlane 은 덧붙인 카메라로 돈다. getEyePosition, getTargetPosition, getUpDirection 은 덧붙이기 앞 값이다.
 //==============================================================================
 /**
  * @example <caption>원근 카메라로 월드 점을 화면 자리로 옮기기</caption>
@@ -65,6 +68,8 @@ export class Camera3D {
 	/** @private @type { boolean } */ #isMatrixDirty; // 값을 바꾼 뒤 아직 다시 셈하지 않았는지.
 	/** @private @type { Matrix4 | null } */ #rawViewMatrix; // setMatrices 로 받은 보기 행렬. (null 이면 셈하는 길)
 	/** @private @type { Matrix4 | null } */ #rawProjectionMatrix;
+	/** @private @type { Vector3 } */ #viewOffsetPosition; // 카메라 지역 자리 덧붙임. (x 오른쪽, y 위, z 뒤)
+	/** @private @type { Vector3 } */ #viewOffsetRotation; // 카메라 지역 돌림 덧붙임. (라디안, x pitch, y yaw, z roll)
 
 	//==============================================================================
 	// 생성. (원근 시야각 0.8 라디안, 비 1, 거리 0.1 ~ 1000, 눈 (0, 0, 10) 에서 원점을 본다)
@@ -86,6 +91,8 @@ export class Camera3D {
 		this.#isMatrixDirty = true;
 		this.#rawViewMatrix = null;
 		this.#rawProjectionMatrix = null;
+		this.#viewOffsetPosition = Vector3.zero();
+		this.#viewOffsetRotation = Vector3.zero();
 	}
 
 	//==============================================================================
@@ -308,7 +315,32 @@ export class Camera3D {
 	}
 
 	//==============================================================================
-	// 바뀐 값이 있으면 행렬 넷을 다시 셈하기. (원 행렬이 있으면 그것으로)
+	// 보기 덧붙임 설정. (카메라 지역 축의 자리와 돌림을 보기 행렬 마지막에 건다, 값을 복사해 둔다, 둘 다 영 벡터면 덧붙임 없음)
+	//==============================================================================
+	/**
+	 * @param { Vector3 } position - 카메라 지역 자리 덧붙임. (장면 길이, x 오른쪽, y 위, z 뒤)
+	 * @param { Vector3 } [rotation] - 카메라 지역 돌림 덧붙임. (라디안, x pitch, y yaw, z roll, 기본 영 벡터)
+	 * @example <caption>카메라 흔들림을 걸고 다시 풀기</caption>
+	 * import { Camera3D, CameraShake, Vector3 } from "./vanilla.js";
+	 * const camera = new Camera3D();
+	 * camera.lookAt(Vector3.create(0, 4, 10), Vector3.create(0, 0, 0));
+	 * const cameraShake = new CameraShake();
+	 * cameraShake.add({ amplitude: 0.1, rotationAmplitude: 0.02, duration: 0.3 });
+	 * cameraShake.update(1 / 60);
+	 * const shake = cameraShake.read();
+	 * camera.setViewOffset(shake.position, shake.rotation);
+	 * const shakenViewMatrix = camera.getViewMatrix().clone();
+	 * camera.setViewOffset(Vector3.zero(), Vector3.zero());
+	 * console.log(shakenViewMatrix.getElements()[12], camera.getViewMatrix().getElements()[12]);
+	 */
+	setViewOffset(position, rotation = Vector3.zero()) {
+		this.#viewOffsetPosition = Vector3.create(position.x, position.y, position.z);
+		this.#viewOffsetRotation = Vector3.create(rotation.x, rotation.y, rotation.z);
+		this.#isMatrixDirty = true;
+	}
+
+	//==============================================================================
+	// 바뀐 값이 있으면 행렬 넷을 다시 셈하기. (원 행렬이 있으면 그것으로, 보기 덧붙임은 마지막에)
 	//==============================================================================
 	#refreshMatrices() {
 		if (!this.#isMatrixDirty) {
@@ -333,6 +365,12 @@ export class Camera3D {
 			else {
 				this.#projectionMatrix = Matrix4.createPerspective(this.#fieldOfViewRadian, aspectRatio, nearDistance, farDistance);
 			}
+		}
+		const offsetPosition = this.#viewOffsetPosition;
+		const offsetRotation = this.#viewOffsetRotation;
+		const hasViewOffset = offsetPosition.x !== 0 || offsetPosition.y !== 0 || offsetPosition.z !== 0 || offsetRotation.x !== 0 || offsetRotation.y !== 0 || offsetRotation.z !== 0;
+		if (hasViewOffset) {
+			this.#viewMatrix = createOffsetViewMatrix(this.#viewMatrix, offsetPosition, offsetRotation);
 		}
 		const viewProjectionMatrix = this.#projectionMatrix.clone();
 		viewProjectionMatrix.multiply(this.#viewMatrix);
