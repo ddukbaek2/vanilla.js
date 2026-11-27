@@ -14,6 +14,7 @@ import { Rect } from "../../base/rect.js";
 // 전역 상수 목록.
 //==============================================================================
 // 하위 트리 그리기 경계의 상태.
+const PARENT_SCALE = Vector2.create(0, 1); // readPosition 이 부모 크기를 읽는 칸. (값은 바로 지역 변수로 옮긴다, 다시 쓴다)
 const DRAW_BOUNDS_DIRTY = 0; // 다시 셈해야 한다.
 const DRAW_BOUNDS_KNOWN = 1; // 셈해 둔 경계가 맞다.
 const DRAW_BOUNDS_UNKNOWN = 2; // 하위 트리에 어디에 그리는지 모르는 것이 있다. (그리기를 건너뛰지 않는다)
@@ -36,6 +37,41 @@ const CHILD_RANGE_PREFIX_COUNT = 4;
 const visibleChildRect = new Rect();
 let visibleChildFirstIndex = 0;
 let visibleChildLastIndex = 0;
+
+
+//==============================================================================
+// 노드의 글로벌 위치를 벡터에 쓰기. (TransformNode 면 readPosition, 아니면 getPosition 의 값을 옮긴다)
+//==============================================================================
+/**
+ * @param { object } node 노드.
+ * @param { Vector2 } out 쓸 벡터.
+ */
+function readNodePosition(node, out) {
+	if (typeof node.readPosition === "function") {
+		node.readPosition(out);
+		return;
+	}
+	const position = node.getPosition();
+	out.x = position.x;
+	out.y = position.y;
+}
+
+//==============================================================================
+// 노드의 글로벌 크기를 벡터에 쓰기. (TransformNode 면 readScale, 아니면 getScale 의 값을 옮긴다)
+//==============================================================================
+/**
+ * @param { object } node 노드.
+ * @param { Vector2 } out 쓸 벡터.
+ */
+function readNodeScale(node, out) {
+	if (typeof node.readScale === "function") {
+		node.readScale(out);
+		return;
+	}
+	const scale = node.getScale();
+	out.x = scale.x;
+	out.y = scale.y;
+}
 
 
 //==============================================================================
@@ -429,6 +465,155 @@ export class TransformNode extends ComponentNode {
 		const rx = sx * cosRadian - sy * sinRadian;
 		const ry = sx * sinRadian + sy * cosRadian;
 		return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
+	}
+
+	//==============================================================================
+	// 글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 값, 새 벡터를 짓지 않는다)
+	// - getPosition 이나 부모의 위치, 회전, 크기 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다. (그때는 그 함수가 짓는 만큼 할당한다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } out 쓸 벡터.
+	 * @returns { Vector2 } out.
+	 * @example <caption>프레임마다 같은 벡터에 글로벌 위치 읽기</caption>
+	 * import { TransformNode, Vector2 } from "./vanilla.js";
+	 * const parentNode = new TransformNode();
+	 * parentNode.setLocalPosition(Vector2.create(10, 20));
+	 * const childNode = new TransformNode();
+	 * childNode.setParent(parentNode);
+	 * childNode.setLocalPosition(Vector2.create(5, 0));
+	 * const position = Vector2.create(0, 0);
+	 * childNode.readPosition(position);
+	 * if (position.x !== 15 || position.y !== 20) {
+	 * 	throw new Error("position failed");
+	 * }
+	 */
+	readPosition(out) {
+		if (this.getPosition !== TransformNode.prototype.getPosition) {
+			const position = this.getPosition();
+			out.x = position.x;
+			out.y = position.y;
+			return out;
+		}
+		const parent = this.getParent();
+		this.readLocalPosition(out);
+		if (!parent) {
+			return out;
+		}
+		const localX = out.x;
+		const localY = out.y;
+		readNodePosition(parent, out);
+		const parentPositionX = out.x;
+		const parentPositionY = out.y;
+		const parentRotation = parent.getRotation();
+		readNodeScale(parent, PARENT_SCALE);
+		const parentScaleX = PARENT_SCALE.x;
+		const parentScaleY = PARENT_SCALE.y;
+
+		// getPosition 과 같은 셈, 같은 차례.
+		const radian = Math.degreeToRadian(parentRotation);
+		const cosRadian = Math.cos(radian);
+		const sinRadian = Math.sin(radian);
+		const sx = localX * parentScaleX;
+		const sy = localY * parentScaleY;
+		const rx = sx * cosRadian - sy * sinRadian;
+		const ry = sx * sinRadian + sy * cosRadian;
+		out.x = parentPositionX + rx;
+		out.y = parentPositionY + ry;
+		return out;
+	}
+
+	//==============================================================================
+	// 글로벌 크기를 주어진 벡터에 쓰기. (getScale 과 같은 값, 새 벡터를 짓지 않는다)
+	// - getScale 이나 getLocalScale 을 덮어쓴 하위 클래스면 그 함수로 읽는다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } out 쓸 벡터.
+	 * @returns { Vector2 } out.
+	 * @example <caption>프레임마다 같은 벡터에 글로벌 크기 읽기</caption>
+	 * import { TransformNode, Vector2 } from "./vanilla.js";
+	 * const parentNode = new TransformNode();
+	 * parentNode.setLocalScale(Vector2.create(2, 2));
+	 * const childNode = new TransformNode();
+	 * childNode.setParent(parentNode);
+	 * childNode.setLocalScale(Vector2.create(0.5, 3));
+	 * const scale = Vector2.create(0, 0);
+	 * childNode.readScale(scale);
+	 * if (scale.x !== 1 || scale.y !== 6) {
+	 * 	throw new Error("scale failed");
+	 * }
+	 */
+	readScale(out) {
+		if (this.getScale !== TransformNode.prototype.getScale) {
+			const scale = this.getScale();
+			out.x = scale.x;
+			out.y = scale.y;
+			return out;
+		}
+		const parent = this.getParent();
+		this.readLocalScale(out);
+		if (!parent) {
+			return out;
+		}
+		const localX = out.x;
+		const localY = out.y;
+		readNodeScale(parent, out);
+		out.x = out.x * localX;
+		out.y = out.y * localY;
+		return out;
+	}
+
+	//==============================================================================
+	// 로컬 위치를 주어진 벡터에 쓰기. (getLocalPosition 과 같은 값, 복제하지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } out 쓸 벡터.
+	 * @returns { Vector2 } out.
+	 * @example <caption>로컬 위치 읽기</caption>
+	 * import { TransformNode, Vector2 } from "./vanilla.js";
+	 * const node = new TransformNode();
+	 * node.setLocalPositionXY(3, 4);
+	 * const position = node.readLocalPosition(Vector2.create(0, 0));
+	 * if (position.x !== 3 || position.y !== 4) {
+	 * 	throw new Error("local position failed");
+	 * }
+	 */
+	readLocalPosition(out) {
+		if (this.getLocalPosition !== TransformNode.prototype.getLocalPosition) {
+			const position = this.getLocalPosition();
+			out.x = position.x;
+			out.y = position.y;
+			return out;
+		}
+		out.x = this.#localPosition.x;
+		out.y = this.#localPosition.y;
+		return out;
+	}
+
+	//==============================================================================
+	// 로컬 크기를 주어진 벡터에 쓰기. (getLocalScale 과 같은 값, 복제하지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } out 쓸 벡터.
+	 * @returns { Vector2 } out.
+	 * @example <caption>로컬 크기 읽기</caption>
+	 * import { TransformNode, Vector2 } from "./vanilla.js";
+	 * const node = new TransformNode();
+	 * node.setLocalScaleXY(2, 0.5);
+	 * const scale = node.readLocalScale(Vector2.create(0, 0));
+	 * if (scale.x !== 2 || scale.y !== 0.5) {
+	 * 	throw new Error("local scale failed");
+	 * }
+	 */
+	readLocalScale(out) {
+		if (this.getLocalScale !== TransformNode.prototype.getLocalScale) {
+			const scale = this.getLocalScale();
+			out.x = scale.x;
+			out.y = scale.y;
+			return out;
+		}
+		out.x = this.#localScale.x;
+		out.y = this.#localScale.y;
+		return out;
 	}
 
 	//==============================================================================

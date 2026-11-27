@@ -167,6 +167,32 @@ function writeRecordValues(values, offset, source, count) {
 }
 
 //==============================================================================
+// 비치는 덩어리 차례. (가운데 깊이가 먼 것부터, 같으면 차례 그대로, Array.prototype.sort 는 안정 정렬)
+//==============================================================================
+/**
+ * @param { object } entry - 덩어리.
+ * @param { object } other - 견줄 덩어리.
+ * @returns { number } 정렬 값.
+ */
+function compareTransparentEntry(entry, other) {
+	return other.averageDepth - entry.averageDepth;
+}
+
+//==============================================================================
+// 목록 길이 맞추기. (다를 때만, 칸에 차례로 쓴 뒤 부른다)
+// - 프레임마다 length = 0 으로 비우고 push 하면 V8 이 칸(16 개 넘게 잡은 것)을 놓고 다시 잡는다. 칸에 쓰고 길이만 맞추면 수가 그대로인 프레임은 할당이 없다.
+//==============================================================================
+/**
+ * @param { Array<any> } list - 목록.
+ * @param { number } length - 길이.
+ */
+function setListLength(list, length) {
+	if (list.length !== length) {
+		list.length = length;
+	}
+}
+
+//==============================================================================
 // 자동 인스턴싱으로 묶을 수 있는지. (같은 모형, 같은 재질 블록, 같은 감기, 선 번호와 묶음 말고 푼 칸이 모두 같은 보통 모형 하나씩)
 //==============================================================================
 /**
@@ -491,12 +517,15 @@ export class ToonDrawQueue {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Array<object> } */ #itemList; // { mesh, modelMatrix, instances, instanceBuffer, instanceCount, options, isTransparent, depthPosition, depth }
+	/** @private @type { Array<object> } */ #itemList; // 담은 칸. ({ mesh, modelMatrix, instances, instanceBuffer, instanceCount, options, isTransparent, depthPosition, depth }, 앞의 #itemCount 칸, 칸은 프레임마다 다시 쓴다)
 	/** @private @type { Array<object> } */ #passList; // { stage, callback }
 	/** @private @type { object | null } */ #screenOutline; // ToonScreenOutline. (없으면 null)
 	/** @private @type { object | null } */ #postProcess; // ToonPostProcess. (모서리 어둠을 몸 앞에 셈한다, 없으면 null)
 	/** @private @type { Array<object> | null } */ #opaqueItemList; // 정렬한 불투명한 것. (담거나 비우면 null, 처음 그릴 때 만든다)
-	/** @private @type { Array<object> } */ #itemPool; // 담은 것 칸을 프레임마다 다시 쓴다. (clear 뒤에도 남는다)
+	/** @private @type { number } */ #itemCount; // 담은 수. (#itemList 의 앞 칸만 쓴다, 뒤 칸은 다시 쓸 칸이다)
+	/** @private @type { number } */ #batchMatrixCount; // #batchMatrices 의 쓴 수. (배열 길이를 줄이지 않아 프레임마다 다시 잡지 않는다)
+	/** @private @type { number } */ #outlineBatchCount; // #outlineBatches 의 쓴 수.
+	/** @private @type { number } */ #lineMatrixCount; // #lineMatrices, #lineIds 의 쓴 수.
 	/** @private @type { Int32Array } */ #sortKeys; // 앞의 정렬의 불투명한 것 열쇠. (하나에 재질, 모형, 텍스처 번호 셋, 담은 차례대로)
 	/** @private @type { Int32Array } */ #sortOrder; // 앞의 정렬 차례. (불투명한 것의 담은 차례 번호, 열쇠가 모두 같으면 다시 정렬하지 않고 쓴다)
 	/** @private @type { number } */ #sortCount; // 앞의 정렬의 불투명한 것 수. (-1 이면 없음)
@@ -525,11 +554,14 @@ export class ToonDrawQueue {
 	//==============================================================================
 	constructor() {
 		this.#itemList = [];
+		this.#itemCount = 0;
+		this.#batchMatrixCount = 0;
+		this.#outlineBatchCount = 0;
+		this.#lineMatrixCount = 0;
 		this.#passList = [];
 		this.#screenOutline = null;
 		this.#postProcess = null;
 		this.#opaqueItemList = null;
-		this.#itemPool = [];
 		this.#sortKeys = new System.Int32Array(0);
 		this.#sortOrder = new System.Int32Array(0);
 		this.#sortCount = -1;
@@ -566,7 +598,9 @@ export class ToonDrawQueue {
 		if (this.#isResolved) {
 			return;
 		}
-		for (const item of this.#itemList) {
+		const itemList = this.#itemList;
+		for (let index = 0; index < this.#itemCount; ++index) {
+			const item = itemList[index];
 			const entry = this.readItemEntry(renderer, item);
 			const state = entry.state;
 			item.entry = entry;
@@ -630,10 +664,11 @@ export class ToonDrawQueue {
 	 */
 	pushItem(mesh, modelMatrix, instances, instanceBuffer, instanceCount, options) {
 		const itemList = this.#itemList;
-		let item = this.#itemPool[itemList.length];
+		const itemCount = this.#itemCount;
+		let item = itemList[itemCount];
 		if (item === undefined) {
 			item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, drawItem: null, entry: null, heldEntry: null, heldRenderer: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
-			this.#itemPool.push(item);
+			itemList.push(item);
 		}
 		item.mesh = mesh;
 		item.modelMatrix = modelMatrix;
@@ -648,7 +683,7 @@ export class ToonDrawQueue {
 		item.depth = 0;
 		this.#opaqueItemList = null;
 		this.#isResolved = false;
-		itemList.push(item);
+		this.#itemCount = itemCount + 1;
 		return item;
 	}
 
@@ -656,7 +691,9 @@ export class ToonDrawQueue {
 	// 비우기. (프레임마다 담기 전에, 단계 콜백도 비운다, 화면 공간 바깥선은 그대로)
 	//==============================================================================
 	clear() {
-		for (const item of this.#itemList) {
+		const itemList = this.#itemList;
+		for (let index = 0; index < this.#itemCount; ++index) {
+			const item = itemList[index];
 			item.mesh = null;
 			item.modelMatrix = null;
 			item.instances = null;
@@ -667,7 +704,7 @@ export class ToonDrawQueue {
 			item.state = null;
 			item.materialBlock = null;
 		}
-		this.#itemList.length = 0;
+		this.#itemCount = 0;
 		this.#passList.length = 0;
 		this.#opaqueItemList = null;
 	}
@@ -679,7 +716,7 @@ export class ToonDrawQueue {
 	 * @returns { number } 담은 모형과 인스턴스 묶음 수.
 	 */
 	getItemCount() {
-		return this.#itemList.length;
+		return this.#itemCount;
 	}
 
 	//==============================================================================
@@ -830,11 +867,9 @@ export class ToonDrawQueue {
 	 * camera.lookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
 	 * const queue = new ToonDrawQueue();
 	 * const boxItem = queue.createItem(boxMesh, Matrix4.createTranslation(0, 0.5, 0), { tintColor: [1, 0.8, 0.8, 1], lineId: 1 });
-	 * // 프레임마다
 	 * queue.clear();
 	 * queue.addItem(boxItem);
 	 * queue.draw(renderer, camera);
-	 * // 꼴을 바꿀 때만
 	 * boxItem.setOption("tintColor", [0.8, 1, 0.8, 1]);
 	 */
 	createItem(mesh, modelMatrix, options = {}) {
@@ -861,7 +896,7 @@ export class ToonDrawQueue {
 			return;
 		}
 		this.addMesh(mesh, drawItem.getModelMatrix(), drawItem.getOptions());
-		this.#itemList[this.#itemList.length - 1].drawItem = drawItem;
+		this.#itemList[this.#itemCount - 1].drawItem = drawItem;
 	}
 
 	//==============================================================================
@@ -1047,12 +1082,16 @@ export class ToonDrawQueue {
 	drawShadowCasters(renderer, shadowCache, lightKey, shadowMap, shadowAtlas) {
 		this.resolveItems(renderer);
 		const casterList = this.#casterList;
-		casterList.length = 0;
-		for (const item of this.readOpaqueItemList()) {
+		const opaqueItemList = this.readOpaqueItemList();
+		let casterCount = 0;
+		for (let index = 0; index < opaqueItemList.length; ++index) {
+			const item = opaqueItemList[index];
 			if (item.state[DRAW_STATE_CASTS_SHADOW]) {
-				casterList.push(item);
+				casterList[casterCount] = item;
+				casterCount += 1;
 			}
 		}
+		setListLength(casterList, casterCount);
 		const updateMode = shadowCache.updateMode;
 		if (updateMode === ShadowUpdateMode.everyFrame) {
 			shadowCache.casterRecords.length = 0;
@@ -1091,8 +1130,8 @@ export class ToonDrawQueue {
 		}
 		const staticList = this.#staticCasterList;
 		const dynamicList = this.#dynamicCasterList;
-		staticList.length = 0;
-		dynamicList.length = 0;
+		let staticCount = 0;
+		let dynamicCount = 0;
 		for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
 			const item = casterList[casterIndex];
 			if (casterIndex >= recordList.length) {
@@ -1114,12 +1153,16 @@ export class ToonDrawQueue {
 				}
 			}
 			if (record.isStatic) {
-				staticList.push(item);
+				staticList[staticCount] = item;
+				staticCount += 1;
 			}
 			else {
-				dynamicList.push(item);
+				dynamicList[dynamicCount] = item;
+				dynamicCount += 1;
 			}
 		}
+		setListLength(staticList, staticCount);
+		setListLength(dynamicList, dynamicCount);
 		if (isLightChanged) {
 			// 빛이 바뀐 프레임은 전부를 판에 바로 그린다. (빛이 매 프레임 움직여도 굽고 옮기는 몫이 더 들지 않게, 구운 판은 빛이 멈춘 다음 프레임에 굽는다)
 			shadowCache.hasCache = false;
@@ -1276,42 +1319,29 @@ export class ToonDrawQueue {
 			// 묶지 않는 것(인스턴스 묶음, 인스턴스 버퍼, 뒤집은 감기, 뼈대)을 만나면 모은 것을 먼저 그려 그것과의 차례는 담은 차례 그대로 둔다. (선의 판은 LEQUAL)
 			const lineMatrices = this.#lineMatrices;
 			const lineIds = this.#lineIds;
-			const groupList = [];
-			const groupTable = new Map();
-			const flushGroups = () => {
-				for (const group of groupList) {
-					const start = lineMatrices.length;
-					for (const index of group.itemIndexList) {
-						lineMatrices.push(lineMatrices[index]);
-						lineIds.push(lineIds[index]);
-					}
-					screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, lineMatrices.length - start, group.item.options);
-				}
-				groupList.length = 0;
-				groupTable.clear();
-				lineMatrices.length = 0;
-				lineIds.length = 0;
-			};
-			let itemIndex = 0;
-			for (const item of this.#itemList) {
-				itemIndex += 1;
+			this.#lineMatrixCount = 0;
+			this.#lineGroupCount = 0;
+			this.#lineGroupSerial += 1;
+			const itemList = this.#itemList;
+			for (let itemIndex = 1; itemIndex <= this.#itemCount; ++itemIndex) {
+				const item = itemList[itemIndex - 1];
 				if (item.isTransparent) {
 					continue;
 				}
 				const stateLineId = item.state[DRAW_STATE_LINE_ID];
 				const lineId = stateLineId !== null ? stateLineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
 				if (item.instanceBuffer !== null) {
-					flushGroups();
+					this.flushLineGroups(screenOutline);
 					screenOutline.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, lineId, item.options);
 					continue;
 				}
 				if (item.instances !== null) {
-					flushGroups();
+					this.flushLineGroups(screenOutline);
 					screenOutline.drawMeshInstanced(item.mesh, item.instances, lineId, item.options);
 					continue;
 				}
 				if (item.mirrorSign === 1 || item.state[DRAW_STATE_JOINT_MATRICES] !== null) {
-					flushGroups();
+					this.flushLineGroups(screenOutline);
 					screenOutline.drawMesh(item.mesh, item.modelMatrix, lineId, item.options);
 					continue;
 				}
@@ -1322,32 +1352,98 @@ export class ToonDrawQueue {
 				const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
 				const indexStart = options.indexStart;
 				const indexCount = options.indexCount;
-				let groups = groupTable.get(item.mesh);
-				if (groups === undefined) {
-					groups = [];
-					groupTable.set(item.mesh, groups);
+				// 모형마다 그 모형의 묶음을 잇는다. (모형마다 기억한 첫 묶음 자리, 묶음 번호가 지금 것이 아니면 비었다)
+				let meshGroups = this.#lineGroupOfMesh.get(item.mesh);
+				if (meshGroups === undefined) {
+					meshGroups = { serial: -1, firstIndex: -1, lastIndex: -1 };
+					this.#lineGroupOfMesh.set(item.mesh, meshGroups);
 				}
+				if (meshGroups.serial !== this.#lineGroupSerial) {
+					meshGroups.serial = this.#lineGroupSerial;
+					meshGroups.firstIndex = -1;
+					meshGroups.lastIndex = -1;
+				}
+				const groupPool = this.#lineGroupPool;
 				let group = null;
-				for (const candidate of groups) {
+				for (let groupIndex = meshGroups.firstIndex; groupIndex >= 0; groupIndex = groupPool[groupIndex].nextIndex) {
+					const candidate = groupPool[groupIndex];
 					if (candidate.lineFlags === lineFlags && candidate.indexStart === indexStart && candidate.indexCount === indexCount) {
 						group = candidate;
 						break;
 					}
 				}
 				if (group === null) {
-					group = { item: item, lineFlags: lineFlags, indexStart: indexStart, indexCount: indexCount, itemIndexList: [] };
-					groups.push(group);
-					groupList.push(group);
+					const groupIndex = this.#lineGroupCount;
+					group = groupPool[groupIndex];
+					if (group === undefined) {
+						group = { item: null, lineFlags: 0, indexStart: undefined, indexCount: undefined, itemIndexList: [], itemIndexCount: 0, nextIndex: -1 };
+						groupPool.push(group);
+					}
+					group.item = item;
+					group.lineFlags = lineFlags;
+					group.indexStart = indexStart;
+					group.indexCount = indexCount;
+					group.itemIndexCount = 0;
+					group.nextIndex = -1;
+					this.#lineGroupCount = groupIndex + 1;
+					if (meshGroups.lastIndex >= 0) {
+						groupPool[meshGroups.lastIndex].nextIndex = groupIndex;
+					}
+					else {
+						meshGroups.firstIndex = groupIndex;
+					}
+					meshGroups.lastIndex = groupIndex;
 				}
-				group.itemIndexList.push(lineMatrices.length);
-				lineMatrices.push(item.modelMatrix);
-				lineIds.push(lineId);
+				group.itemIndexList[group.itemIndexCount] = this.#lineMatrixCount;
+				group.itemIndexCount += 1;
+				this.pushLineMatrix(item.modelMatrix, lineId);
 			}
 			// 묶음마다 이어 담아 그린다. (뒤쪽 자리에 차례로 옮겨 담는다)
-			flushGroups();
+			this.flushLineGroups(screenOutline);
 			screenOutline.endLineIds();
 		}
 		webGL2RenderingContext.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+	}
+
+	//==============================================================================
+	// 선의 판 묶음 그리기. (모은 묶음마다 행렬과 번호를 뒤쪽 자리에 이어 옮겨 담아 인스턴스 그리기 한 번, 묶음과 쓴 수를 비운다)
+	//==============================================================================
+	/**
+	 * @param { object } screenOutline - ToonScreenOutline.
+	 * @private
+	 */
+	flushLineGroups(screenOutline) {
+		const lineMatrices = this.#lineMatrices;
+		const lineIds = this.#lineIds;
+		const groupPool = this.#lineGroupPool;
+		for (let groupIndex = 0; groupIndex < this.#lineGroupCount; ++groupIndex) {
+			const group = groupPool[groupIndex];
+			const start = this.#lineMatrixCount;
+			for (let index = 0; index < group.itemIndexCount; ++index) {
+				const sourceIndex = group.itemIndexList[index];
+				this.pushLineMatrix(lineMatrices[sourceIndex], lineIds[sourceIndex]);
+			}
+			screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options);
+			group.item = null;
+		}
+		this.#lineGroupCount = 0;
+		this.#lineGroupSerial += 1;
+		this.#lineMatrixCount = 0;
+	}
+
+	//==============================================================================
+	// 선의 판 행렬과 번호 하나 더하기. (쓴 수 자리에, 배열 길이를 줄이지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Matrix4 } matrix - 모형 행렬.
+	 * @param { number } lineId - 선 번호.
+	 * @private
+	 */
+	pushLineMatrix(matrix, lineId) {
+		const index = this.#lineMatrixCount;
+		this.#lineMatrices[index] = matrix;
+		this.#lineIds[index] = lineId;
+		this.#lineMatrixCount = index + 1;
 	}
 
 	//==============================================================================
@@ -1395,8 +1491,8 @@ export class ToonDrawQueue {
 		// - 자동 인스턴싱: 정렬로 이어진 같은 모형, 같은 재질 블록의 보통 모형은 인스턴스 그리기 한 번으로. (거르기는 하나씩 먼저)
 		const outlineBatches = this.#outlineBatches;
 		const batchMatrices = this.#batchMatrices;
-		outlineBatches.length = 0;
-		batchMatrices.length = 0;
+		this.#outlineBatchCount = 0;
+		this.#batchMatrixCount = 0;
 		const opaqueItemList = this.readOpaqueItemList();
 		let itemIndex = 0;
 		let slotIndex = 0;
@@ -1412,10 +1508,10 @@ export class ToonDrawQueue {
 				this.drawItem(renderer, item, item.options);
 				continue;
 			}
-			const start = batchMatrices.length;
-			batchMatrices.push(item.modelMatrix);
-			itemIndex = this.collectBatch(renderer, opaqueItemList, itemIndex, item, batchMatrices);
-			const count = batchMatrices.length - start;
+			const start = this.#batchMatrixCount;
+			this.pushBatchMatrix(item.modelMatrix);
+			itemIndex = this.collectBatch(renderer, opaqueItemList, itemIndex, item);
+			const count = this.#batchMatrixCount - start;
 			// 몸만. (바깥선 껍데기는 몸을 다 그린 뒤 몰아 그린다, 꼴 객체를 새로 짓지 않아 렌더러가 꼴마다 기억한 재질 블록을 그대로 쓴다)
 			renderer.setDrawEntryHint(item.options, item.entry);
 			if (count === 1) {
@@ -1425,7 +1521,12 @@ export class ToonDrawQueue {
 				renderer.drawMeshBatch(item.mesh, batchMatrices, start, count, item.options, DRAW_PART_BODY, slotIndex);
 			}
 			if (item.state[DRAW_STATE_HAS_OUTLINE] && item.mesh.outlineVertexArray !== null) {
-				outlineBatches.push(item, start, count, slotIndex);
+				const offset = this.#outlineBatchCount;
+				outlineBatches[offset] = item;
+				outlineBatches[offset + 1] = start;
+				outlineBatches[offset + 2] = count;
+				outlineBatches[offset + 3] = slotIndex;
+				this.#outlineBatchCount = offset + 4;
 			}
 			if (count > 1) {
 				slotIndex += 1;
@@ -1434,7 +1535,7 @@ export class ToonDrawQueue {
 		this.runPasses(renderer, ToonDrawStage.afterOpaque);
 
 		// 2. 불투명한 것의 바깥선 껍데기와 화면 공간 바깥선. (몸과 같은 묶음)
-		for (let batchIndex = 0; batchIndex < outlineBatches.length; batchIndex += 4) {
+		for (let batchIndex = 0; batchIndex < this.#outlineBatchCount; batchIndex += 4) {
 			const item = outlineBatches[batchIndex];
 			const count = outlineBatches[batchIndex + 2];
 			renderer.setDrawEntryHint(item.options, item.entry);
@@ -1445,7 +1546,10 @@ export class ToonDrawQueue {
 				renderer.drawMeshBatch(item.mesh, batchMatrices, outlineBatches[batchIndex + 1], count, item.options, DRAW_PART_OUTLINE, outlineBatches[batchIndex + 3]);
 			}
 		}
-		outlineBatches.length = 0;
+		for (let batchIndex = 0; batchIndex < this.#outlineBatchCount; batchIndex += 4) {
+			outlineBatches[batchIndex] = null; // 담은 칸을 쥐지 않게. (수 칸은 그대로)
+		}
+		this.#outlineBatchCount = 0;
 		if (this.#screenOutline !== null) {
 			this.#screenOutline.drawOutline();
 			renderer.applyFrameState();
@@ -1453,47 +1557,69 @@ export class ToonDrawQueue {
 		this.runPasses(renderer, ToonDrawStage.afterOutline);
 
 		// 3. 비치는 것. (묶음은 한 덩어리로, 먼 것부터, 깊이는 쓰지 않음)
-		const entryList = [];
-		const groupTable = new Map();
-		for (const item of itemList) {
+		// 덩어리 칸은 다시 쓴다. (묶음은 몇 개라 덩어리 목록에서 찾는다, 덩어리의 itemList 는 앞의 itemCount 칸)
+		const entryList = this.#transparentList;
+		const entryPool = this.#transparentPool;
+		let entryCount = 0;
+		for (let index = 0; index < this.#itemCount; ++index) {
+			const item = itemList[index];
 			if (!item.isTransparent) {
 				continue;
 			}
 			item.depth = readDepth(item.depthPosition);
 			const group = item.state[DRAW_STATE_GROUP];
 			const isDepthPrepassed = item.state[DRAW_STATE_IS_DEPTH_PREPASSED];
-			if (group === null) {
-				entryList.push({ depthSum: item.depth, itemList: [item], isDepthPrepassed: isDepthPrepassed });
-				continue;
+			let entry = null;
+			if (group !== null) {
+				for (let entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
+					if (entryList[entryIndex].group === group) {
+						entry = entryList[entryIndex];
+						break;
+					}
+				}
 			}
-			let entry = groupTable.get(group);
-			if (entry === undefined) {
-				entry = { depthSum: 0, itemList: [], isDepthPrepassed: false };
-				groupTable.set(group, entry);
-				entryList.push(entry);
+			if (entry === null) {
+				entry = entryPool[entryCount];
+				if (entry === undefined) {
+					entry = { depthSum: 0, itemList: [], itemCount: 0, isDepthPrepassed: false, group: null, averageDepth: 0 };
+					entryPool.push(entry);
+				}
+				entry.depthSum = 0;
+				entry.itemCount = 0;
+				entry.isDepthPrepassed = false;
+				entry.group = group;
+				entryList[entryCount] = entry;
+				entryCount += 1;
 			}
 			entry.depthSum += item.depth;
-			entry.itemList.push(item);
+			entry.itemList[entry.itemCount] = item;
+			entry.itemCount += 1;
 			entry.isDepthPrepassed = entry.isDepthPrepassed || isDepthPrepassed;
 		}
+		setListLength(entryList, entryCount);
 		if (entryList.length > 0) {
-			entryList.sort((entry, other) => {
-				return other.depthSum / other.itemList.length - entry.depthSum / entry.itemList.length;
-			});
+			for (const entry of entryList) {
+				entry.averageDepth = entry.depthSum / entry.itemCount;
+			}
+			entryList.sort(compareTransparentEntry);
 			webGL2RenderingContext.depthMask(false);
 			for (const entry of entryList) {
 				if (entry.isDepthPrepassed) {
 					webGL2RenderingContext.colorMask(false, false, false, false);
 					webGL2RenderingContext.depthMask(true);
-					for (const item of entry.itemList) {
+					for (let index = 0; index < entry.itemCount; ++index) {
+						const item = entry.itemList[index];
 						this.drawItem(renderer, item, item.options);
 					}
 					webGL2RenderingContext.colorMask(true, true, true, true);
 					webGL2RenderingContext.depthMask(false);
 				}
-				for (const item of entry.itemList) {
+				for (let index = 0; index < entry.itemCount; ++index) {
+					const item = entry.itemList[index];
 					this.drawItem(renderer, item, item.options);
+					entry.itemList[index] = null; // 담은 칸을 쥐지 않게.
 				}
+				entry.group = null;
 			}
 			webGL2RenderingContext.depthMask(true);
 		}
@@ -1511,15 +1637,19 @@ export class ToonDrawQueue {
 		if (this.#opaqueItemList !== null) {
 			return this.#opaqueItemList;
 		}
+		// 담은 차례의 불투명한 것. (칸에 차례로 쓰고 길이는 다를 때만 맞춘다, 길이를 0 으로 줄이면 V8 이 칸을 놓아 프레임마다 다시 잡는다)
 		const scratch = this.#opaqueScratch;
-		scratch.length = 0;
-		for (const item of this.#itemList) {
+		const itemList = this.#itemList;
+		let count = 0;
+		for (let index = 0; index < this.#itemCount; ++index) {
+			const item = itemList[index];
 			if (!item.isTransparent) {
-				scratch.push(item);
+				scratch[count] = item;
+				count += 1;
 			}
 		}
+		setListLength(scratch, count);
 		// 열쇠가 앞의 정렬과 모두 같으면 (게임이 프레임마다 같은 것을 같은 차례로 담으면) 앞의 차례를 그대로 쓴다.
-		const count = scratch.length;
 		let keys = this.#sortKeys;
 		let isSame = count === this.#sortCount;
 		if (keys.length < count * 4) {
@@ -1546,10 +1676,10 @@ export class ToonDrawQueue {
 		const order = this.#sortOrder;
 		if (!isSame) {
 			const indexList = this.#sortIndexList;
-			indexList.length = 0;
 			for (let index = 0; index < count; ++index) {
-				indexList.push(index);
+				indexList[index] = index;
 			}
+			setListLength(indexList, count);
 			indexList.sort((index, other) => {
 				return keys[index * 4] - keys[other * 4] || keys[index * 4 + 1] - keys[other * 4 + 1] || keys[index * 4 + 2] - keys[other * 4 + 2] || keys[index * 4 + 3] - keys[other * 4 + 3] || index - other;
 			});
@@ -1557,27 +1687,26 @@ export class ToonDrawQueue {
 			this.#sortCount = count;
 		}
 		const opaqueItemList = this.#opaqueStorage;
-		opaqueItemList.length = 0;
 		for (let index = 0; index < count; ++index) {
-			opaqueItemList.push(scratch[order[index]]);
+			opaqueItemList[index] = scratch[order[index]];
 		}
+		setListLength(opaqueItemList, count);
 		this.#opaqueItemList = opaqueItemList;
 		return opaqueItemList;
 	}
 
 	//==============================================================================
-	// 자동 인스턴싱으로 묶을 것 모으기. (item 뒤에 이어진 같은 것의 행렬을 matrices 에 더한다, 화면 밖인 것은 drawItem 이 걸러 센다)
+	// 자동 인스턴싱으로 묶을 것 모으기. (item 뒤에 이어진 같은 것의 행렬을 #batchMatrices 에 더한다, 화면 밖인 것은 drawItem 이 걸러 센다)
 	//==============================================================================
 	/**
 	 * @param { object } renderer - ToonRenderer.
 	 * @param { Array<object> } itemList - 정렬한 담은 것 목록.
 	 * @param { number } itemIndex - item 다음 자리.
 	 * @param { object } item - 묶음의 첫 것. (보통 모형 하나, 걸러 그릴 것)
-	 * @param { Array<object> } matrices - 행렬을 더할 목록.
 	 * @returns { number } 묶지 않은 첫 자리.
 	 * @private
 	 */
-	collectBatch(renderer, itemList, itemIndex, item, matrices) {
+	collectBatch(renderer, itemList, itemIndex, item) {
 		if (item.materialBlock === null) {
 			return itemIndex;
 		}
@@ -1591,7 +1720,7 @@ export class ToonDrawQueue {
 				this.drawItem(renderer, other, other.options);
 				continue;
 			}
-			matrices.push(other.modelMatrix);
+			this.pushBatchMatrix(other.modelMatrix);
 		}
 		return itemIndex;
 	}
@@ -1615,19 +1744,31 @@ export class ToonDrawQueue {
 				this.drawItem(renderer, item, item.options);
 				continue;
 			}
-			batchMatrices.length = 0;
-			batchMatrices.push(item.modelMatrix);
-			itemIndex = this.collectBatch(renderer, casterList, itemIndex, item, batchMatrices);
-			if (batchMatrices.length === 1) {
+			this.#batchMatrixCount = 0;
+			this.pushBatchMatrix(item.modelMatrix);
+			itemIndex = this.collectBatch(renderer, casterList, itemIndex, item);
+			if (this.#batchMatrixCount === 1) {
 				this.drawItem(renderer, item, item.options);
 			}
 			else {
 				renderer.setDrawEntryHint(item.options, item.entry);
-				renderer.drawMeshBatch(item.mesh, batchMatrices, 0, batchMatrices.length, item.options, DRAW_PART_ALL, slotIndex);
+				renderer.drawMeshBatch(item.mesh, batchMatrices, 0, this.#batchMatrixCount, item.options, DRAW_PART_ALL, slotIndex);
 				slotIndex += 1;
 			}
 		}
-		batchMatrices.length = 0;
+		this.#batchMatrixCount = 0;
+	}
+
+	//==============================================================================
+	// 자동 인스턴싱 행렬 하나 더하기. (#batchMatrices 의 쓴 수 자리에, 배열 길이를 줄이지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Matrix4 } matrix - 모형 행렬.
+	 * @private
+	 */
+	pushBatchMatrix(matrix) {
+		this.#batchMatrices[this.#batchMatrixCount] = matrix;
+		this.#batchMatrixCount += 1;
 	}
 
 	//==============================================================================

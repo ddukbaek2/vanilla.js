@@ -10463,5 +10463,14 @@
 	"부품마다 항목을 한 번 짓고 프레임마다 담기": "Build an item per part once and add it every frame",
 	"createItem 이나 new ToonDrawItem 의 결과.": "Result of createItem or new ToonDrawItem.",
 	"남겨 두는 그리기 항목 담기. (addMesh 와 같은 자리, 바뀜 표시가 없으면 앞서 푼 꼴을 그대로 쓴다)\n- 꼴 객체를 프레임마다 견주거나 풀지 않는다. 꼴을 고쳤으면 그 항목의 markDirty 나 setOption, setOptions 를 부른다. (유니티 MeshRenderer, 언리얼 프리미티브 컴포넌트 꼴)\n- 바뀐 것이 없는 항목은 그림자 캐시(onChange)도 견주지 않는다. 행렬을 바꾸면 setModelMatrix 로 넘긴다.": "Adds a retained draw item. (Same place as addMesh, uses the options resolved before when not marked dirty)\n- Does not compare or resolve the options object every frame. After changing options call the item's markDirty, setOption or setOptions. (Unity MeshRenderer, Unreal primitive component shape)\n- Items with no change are not compared by the shadow cache (onChange) either. Pass a changed matrix with setModelMatrix.",
-	"남겨 두는 항목 담기": "Add a retained item"
+	"남겨 두는 항목 담기": "Add a retained item",
+	"쓸 벡터.": "Vector to write.",
+	"글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 값, 새 벡터를 짓지 않는다)\n- getPosition 이나 부모의 위치, 회전, 크기 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다. (그때는 그 함수가 짓는 만큼 할당한다)": "Writes the global position into a given vector. (Same value as getPosition, no new vector)\n- Subclasses that override getPosition or the parent's position, rotation or scale readers are read through those functions. (Then it allocates as much as they do)",
+	"프레임마다 같은 벡터에 글로벌 위치 읽기": "Read the global position into the same vector every frame",
+	"글로벌 크기를 주어진 벡터에 쓰기. (getScale 과 같은 값, 새 벡터를 짓지 않는다)\n- getScale 이나 getLocalScale 을 덮어쓴 하위 클래스면 그 함수로 읽는다.": "Writes the global scale into a given vector. (Same value as getScale, no new vector)\n- Subclasses that override getScale or getLocalScale are read through those functions.",
+	"프레임마다 같은 벡터에 글로벌 크기 읽기": "Read the global scale into the same vector every frame",
+	"로컬 위치를 주어진 벡터에 쓰기. (getLocalPosition 과 같은 값, 복제하지 않는다)": "Writes the local position into a given vector. (Same value as getLocalPosition, no clone)",
+	"로컬 위치 읽기": "Read the local position",
+	"로컬 크기를 주어진 벡터에 쓰기. (getLocalScale 과 같은 값, 복제하지 않는다)": "Writes the local scale into a given vector. (Same value as getLocalScale, no clone)",
+	"로컬 크기 읽기": "Read the local scale"
 }

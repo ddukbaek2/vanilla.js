@@ -471,6 +471,18 @@ export function readJumpFloodSteps(reach) {
 
 
 //==============================================================================
+// 0 ~ 1 색을 바이트로. (선 색 표의 칸, 반올림)
+//==============================================================================
+/**
+ * @param { number } value - 0 ~ 1 의 값.
+ * @returns { number } 0 ~ 255.
+ */
+function readColorByte(value) {
+	return System.Math.round(System.Math.max(0, System.Math.min(1, value)) * 255);
+}
+
+
+//==============================================================================
 // 툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)
 // - 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.
 // - 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)
@@ -532,6 +544,8 @@ export class ToonScreenOutline {
 	/** @private @type { number } */ #lineColorCount; // 표에 넣은 번호 수. (0 이면 섞을 때 표를 보지 않는다)
 	/** @private @type { WebGLTexture | null } */ #lineColorTexture; // 번호 색 표 텍스처. (처음 넣을 때 짓는다)
 	/** @private @type { boolean } */ #isLineColorTableDirty; // 표를 텍스처에 다시 올릴지.
+	/** @private @type { Uint32Array } */ #lineColorWords; // #lineColorTable 을 4 바이트씩 본 것. (올린 표와 견줄 때)
+	/** @private @type { Uint32Array | null } */ #uploadedLineColorTable; // 텍스처에 마지막으로 올린 표. (처음 올리기 전에는 null)
 
 	//==============================================================================
 	// 생성. (다섯 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
@@ -567,6 +581,8 @@ export class ToonScreenOutline {
 		this.#drawnDistanceCount = 0;
 		this.#lineWidths = [2, 1];
 		this.#lineColorTable = new System.Uint8Array((TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1) * 4);
+		this.#lineColorWords = new System.Uint32Array(this.#lineColorTable.buffer);
+		this.#uploadedLineColorTable = null;
 		this.#lineColorCount = 0;
 		this.#lineColorTexture = null;
 		this.#isLineColorTableDirty = false;
@@ -639,14 +655,21 @@ export class ToonScreenOutline {
 		}
 		const table = this.#lineColorTable;
 		const offset = lineId * 4;
+		const red = readColorByte(color[0]);
+		const green = readColorByte(color[1]);
+		const blue = readColorByte(color[2]);
+		const alpha = System.Math.max(1, readColorByte(color.length > 3 ? color[3] : 1));
+		// 같은 색이면 표를 다시 올리지 않는다. (게임이 프레임마다 같은 색을 다시 걸어도)
+		if (table[offset] === red && table[offset + 1] === green && table[offset + 2] === blue && table[offset + 3] === alpha) {
+			return;
+		}
 		if (table[offset + 3] === 0) {
 			this.#lineColorCount += 1;
 		}
-		const toByte = (value) => System.Math.round(System.Math.max(0, System.Math.min(1, value)) * 255);
-		table[offset] = toByte(color[0]);
-		table[offset + 1] = toByte(color[1]);
-		table[offset + 2] = toByte(color[2]);
-		table[offset + 3] = System.Math.max(1, toByte(color.length > 3 ? color[3] : 1));
+		table[offset] = red;
+		table[offset + 1] = green;
+		table[offset + 2] = blue;
+		table[offset + 3] = alpha;
 		this.#isLineColorTableDirty = true;
 	}
 
@@ -899,7 +922,7 @@ export class ToonScreenOutline {
 			instanceData[offset + 19] = 1;
 		}
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, count * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, count * TOON_INSTANCE_FLOAT_COUNT); // 앞의 칸만. (subarray 를 짓지 않는다)
 		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
 	}
 
@@ -996,7 +1019,7 @@ export class ToonScreenOutline {
 			return;
 		}
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, instanceCount * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, instanceCount * TOON_INSTANCE_FLOAT_COUNT); // 앞의 칸만. (subarray 를 짓지 않는다)
 		this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, 1, options.isMirrored === true, options, mesh.bodyVertexArray);
 	}
 
@@ -1291,9 +1314,30 @@ export class ToonScreenOutline {
 				return false;
 			}
 			this.#isLineColorTableDirty = true;
+			this.#uploadedLineColorTable = null; // 새 텍스처에는 아직 올린 것이 없다.
 		}
 		if (!this.#isLineColorTableDirty) {
 			return true;
+		}
+		this.#isLineColorTableDirty = false;
+		// 올린 표와 같으면 올리지 않는다. (clearLineColors 뒤 같은 색을 다시 걸어 표가 그대로인 프레임, 4 바이트씩 견준다)
+		const uploadedTable = this.#uploadedLineColorTable;
+		if (uploadedTable !== null) {
+			const words = this.#lineColorWords;
+			let isSame = true;
+			for (let index = 0; index < words.length; ++index) {
+				if (words[index] !== uploadedTable[index]) {
+					isSame = false;
+					break;
+				}
+			}
+			if (isSame) {
+				return true;
+			}
+			uploadedTable.set(words);
+		}
+		else {
+			this.#uploadedLineColorTable = this.#lineColorWords.slice();
 		}
 		const isFlipped = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL);
 		const isPremultiplied = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
@@ -1376,7 +1420,9 @@ export class ToonScreenOutline {
 		const scaleY = readHypot(modelElements[4], modelElements[5], modelElements[6]);
 		const scaleZ = readHypot(modelElements[8], modelElements[9], modelElements[10]);
 		const radius = mesh.boundingRadius * System.Math.max(scaleX, scaleY, scaleZ);
-		for (const plane of this.#frame.frustumPlanes) {
+		const frustumPlanes = this.#frame.frustumPlanes;
+		for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+			const plane = frustumPlanes[planeIndex];
 			if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
 				return false;
 			}

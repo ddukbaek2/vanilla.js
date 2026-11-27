@@ -7,7 +7,7 @@
 //   1. 센 값(부하와 상관없음): 프레임당 GL 호출 수(전부, 유니폼, 프로그램 바꿈, 텍스처 묶기, 버텍스 어레이 묶기, 버퍼 올림, 유니폼 버퍼 묶기, 드로 콜).
 //   2. 화면: 프레임 30, 90, 150 의 readPixels 해시가 a 와 b 에서 같은지.
 //   3. 스크립트 시간: drawFrame 의 CPU 시간(gl.finish 없음, 교차 출처 격리) 가운데 값, a 와 b 를 번갈아(ABAB) 새 페이지로, 반복의 가운데 값.
-//   4. 프로파일: CDP Profiler 로 프레임 60 ~ 239 의 자기 시간 위 함수(ms/프레임)와 가비지 컬렉터 시간.
+//   4. 프로파일: CDP Profiler 로 프레임 60 ~ 239 의 자기 시간 위 함수(ms/프레임), 엔진 JS(src) 자체 시간 합, 가비지 컬렉터 시간.
 //   5. 할당: CDP HeapProfiler 표본(1 KB 마다)으로 프레임 60 ~ 239 에 잡은 메모리(KB/프레임). 엔진 몫(장면 코드가 바로 부른 수학 함수는 장면 몫)과 함수마다 위.
 //      BENCH_ALLOCATION=0 이면 뺀다. BENCH_ONLY=allocation 이면 할당만 잰다. (센 값, 화면 해시, 시간, 프로파일을 건너뜀)
 // - 시작과 끝의 기계 부하를 찍는다. 시험이 아니다. (tests/run.mjs 가 돌리지 않는다)
@@ -196,16 +196,20 @@ function readSelfTimes(profileText) {
 	const profile = JSON.parse(profileText);
 	const nodeTable = new Map(profile.nodes.map((node) => [node.id, node]));
 	const selfTable = new Map();
+	let engineTime = 0;
 	for (let index = 0; index < profile.samples.length; ++index) {
 		const node = nodeTable.get(profile.samples[index]);
 		const delta = profile.timeDeltas[index + 1] ?? 0;
 		const frame = node.callFrame;
+		if (frame.url.includes("/src/")) {
+			engineTime += delta / 1000;
+		}
 		const key = (frame.functionName || "(anonymous)") + " " + path.basename(frame.url || "") + ":" + frame.lineNumber;
 		selfTable.set(key, (selfTable.get(key) ?? 0) + delta / 1000);
 	}
 	const garbageTime = [...selfTable.entries()].filter(([key]) => key.startsWith("(garbage")).reduce((sum, [, time]) => sum + time, 0);
 	const topList = [...selfTable.entries()].filter(([key]) => !key.startsWith("(idle)") && !key.startsWith("(program)") && !key.startsWith("(garbage") && !key.startsWith("(root)")).sort((first, second) => second[1] - first[1]).slice(0, 16).map(([key, time]) => key + " " + (time / 180).toFixed(4));
-	return ["가비지 컬렉터 " + (garbageTime / 180).toFixed(4), ...topList];
+	return ["엔진 JS 자체 합 " + (engineTime / 180).toFixed(4), "가비지 컬렉터 " + (garbageTime / 180).toFixed(4), ...topList];
 }
 
 // 할당 표본을 모은다. (KB/프레임, 180 프레임) 엔진 몫: 할당한 자리에서 위로 올라가며 src/base 밖의 첫 자리가 엔진(src)이면 엔진, 장면(tests)이면 장면.

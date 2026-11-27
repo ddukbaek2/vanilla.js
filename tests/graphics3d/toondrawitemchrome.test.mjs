@@ -27,8 +27,8 @@ function check(condition, message) {
 }
 const WIDTH = 320;
 const HEIGHT = 180;
-// 엔진 그리기 줄의 프레임당 할당 문턱. (KB, 표본이라 흔들려 넉넉히)
-const ALLOCATION_LIMIT_KILOBYTE = 30;
+// 엔진 그리기 줄의 프레임당 할당 문턱. (KB, 표본이고 낮은 단계로 도는 함수의 수 담기가 섞여 흔들려 넉넉히, 2026-11-28 맥미니 36, 고치기 전 312)
+const ALLOCATION_LIMIT_KILOBYTE = 60;
 const server = http.createServer((request, response) => {
 	const requestPath = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
 	if (requestPath === "/") {

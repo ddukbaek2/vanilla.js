@@ -1332,7 +1332,8 @@ export function writeInstanceBufferSphere(sphere, mesh, instanceBuffer) {
  * }
  */
 export function isSphereInFrustum(frustumPlanes, sphere) {
-	for (const plane of frustumPlanes) {
+	for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+		const plane = frustumPlanes[planeIndex];
 		if (plane[0] * sphere[0] + plane[1] * sphere[1] + plane[2] * sphere[2] + plane[3] < -sphere[3]) {
 			return false;
 		}
@@ -1862,6 +1863,7 @@ export class ToonRenderer {
 	/** @private @type { number } */ #drawEntryGeneration; // 블록 갈래를 지운 판 번호. (그리기 줄의 칸과 ToonDrawItem 이 쥔 기억 칸의 블록이 지운 것을 가리키지 않게, clearBlockCache 마다 오른다)
 	/** @private @type { object | null } */ #hintOptions; // 그리기 줄이 지금 그리는 담은 칸의 꼴 객체. (readDrawEntry 가 #hintEntry 를 바로 쓴다, 맡긴 판에서만)
 	/** @private @type { object | null } */ #hintEntry; // 그 칸이 푼 기억 칸.
+	/** @private @type { Float32Array } */ #batchModelElements; // drawMeshBatch 의 첫 인스턴스 행렬 칸. (다시 쓴다)
 	/** @private @type { object } */ #materialBlocks; // 몸의 재질 블록 갈래. (createBlockCache)
 	/** @private @type { object } */ #outlineBlocks; // 바깥선 껍데기의 블록 갈래.
 	/** @private @type { object | null } */ #lastProgramKey; // 마지막으로 찾은 프로그램 셋의 머티리얼과 인스턴스 꼴. ({ material, instanceLayout, programSet })
@@ -1884,6 +1886,7 @@ export class ToonRenderer {
 		this.#drawEntryGeneration = 1;
 		this.#hintOptions = null;
 		this.#hintEntry = null;
+		this.#batchModelElements = new System.Float32Array(16);
 		this.#trustSerial = 1;
 		this.#isTrusting = false;
 		this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
@@ -3151,7 +3154,9 @@ export class ToonRenderer {
 		const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
 		const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
 		const radius = mesh.boundingRadius * readMaximumScale(modelElements);
-		for (const plane of this.#frustumPlanes) {
+		const frustumPlanes = this.#frustumPlanes;
+		for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+			const plane = frustumPlanes[planeIndex];
 			if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
 				return false;
 			}
@@ -3436,10 +3441,14 @@ export class ToonRenderer {
 			if (slot.values.length < floatCount) {
 				slot.values = new System.Float32Array(floatCount);
 			}
-			slot.values.set(instanceData.subarray(0, floatCount));
+			const values = slot.values;
+			for (let index = 0; index < floatCount; ++index) {
+				values[index] = instanceData[index];
+			}
 			slot.count = count;
 			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
-			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+			// WebGL2 의 bufferData(대상, 자료, 쓰임, 시작, 수) 로 앞의 floatCount 만 올린다. (subarray 를 짓지 않는다)
+			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount);
 		}
 		let vertexArrays = slot.vertexArrays.get(mesh);
 		if (vertexArrays === undefined) {
@@ -3449,7 +3458,12 @@ export class ToonRenderer {
 			vertexArrays = this.createBatchVertexArrays(mesh, slot.buffer);
 			slot.vertexArrays.set(mesh, vertexArrays);
 		}
-		this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts, vertexArrays);
+		// 첫 인스턴스의 행렬. (감기와 스킨 없는 그리기의 모형 행렬 칸, 다시 쓰는 칸에 옮긴다)
+		const batchElements = this.#batchModelElements;
+		for (let index = 0; index < 16; ++index) {
+			batchElements[index] = instanceData[index];
+		}
+		this.drawWithCount(mesh, batchElements, count, options, null, parts, vertexArrays);
 	}
 
 	//==============================================================================

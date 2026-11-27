@@ -14,6 +14,7 @@ import { LayoutSolver } from "./autolayout/layoutsolver.js";
 import { LayoutStrength } from "./autolayout/layoutstrength.js";
 import { LayoutPriority } from "./autolayout/layoutpriority.js";
 import { LayoutConstraintAxis } from "./autolayout/layoutconstraintaxis.js";
+const LOCAL_SCALE = Vector2.create(1, 1); // pushTransform 이 지역 크기를 읽는 칸. (다시 쓴다, 그리기마다 복제하지 않게)
 
 
 //==============================================================================
@@ -169,7 +170,7 @@ export class UINode extends TransformNode {
 			}
 			const localRotation = this.getLocalRotation();
 			const radian = Math.degreeToRadian(localRotation);
-			const localScale = this.getLocalScale();
+			const localScale = this.readLocalScale(LOCAL_SCALE); // 복제하지 않는다. (getLocalScale 을 덮어쓴 노드는 그 함수로)
 			graphic.translate(translateX, translateY);
 			graphic.rotate(radian);
 			graphic.scale(localScale.x, localScale.y);
