@@ -1491,6 +1491,18 @@
 			"vanilla-engine": {
 				"module": "base/color",
 				"class": "Color",
+				"name": "create"
+			},
+			"vanilla.js": {
+				"module": "base/color",
+				"class": "Color",
+				"name": "create"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/color",
+				"class": "Color",
 				"name": "create_from_bytes"
 			},
 			"vanilla.js": {
@@ -6637,6 +6649,30 @@
 			"vanilla-engine": {
 				"module": "core/component/shadowimage",
 				"class": "ShadowImage",
+				"name": "set_image_path"
+			},
+			"vanilla.js": {
+				"module": "core/component/shadowimage",
+				"class": "ShadowImage",
+				"name": "setImagePath"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/shadowimage",
+				"class": "ShadowImage",
+				"name": "get_image_path"
+			},
+			"vanilla.js": {
+				"module": "core/component/shadowimage",
+				"class": "ShadowImage",
+				"name": "getImagePath"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/shadowimage",
+				"class": "ShadowImage",
 				"name": "set_shadow"
 			},
 			"vanilla.js": {
@@ -7161,6 +7197,30 @@
 				"module": "core/component/sprite",
 				"class": "Sprite",
 				"name": "getImage"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/sprite",
+				"class": "Sprite",
+				"name": "set_image_path"
+			},
+			"vanilla.js": {
+				"module": "core/component/sprite",
+				"class": "Sprite",
+				"name": "setImagePath"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/sprite",
+				"class": "Sprite",
+				"name": "get_image_path"
+			},
+			"vanilla.js": {
+				"module": "core/component/sprite",
+				"class": "Sprite",
+				"name": "getImagePath"
 			}
 		},
 		{
@@ -7903,6 +7963,18 @@
 				"module": "core/engine",
 				"class": "EngineConfiguration",
 				"name": "referenceResolutionSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
+				"name": "view_scale_mode"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
+				"name": "viewScaleMode"
 			}
 		},
 		{
@@ -10641,6 +10713,18 @@
 			"vanilla-engine": {
 				"module": "core/graphic",
 				"class": "Graphic",
+				"name": "resolve_shader_program"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "resolveShaderProgram"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
 				"name": "restore_render_state"
 			},
 			"vanilla.js": {
@@ -13285,6 +13369,30 @@
 			"vanilla-engine": {
 				"module": "core/node/nodetree",
 				"class": "NodeTree",
+				"name": "convert_node_position_to_view_position"
+			},
+			"vanilla.js": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "convertNodePositionToViewPosition"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/nodetree",
+				"class": "NodeTree",
+				"name": "convert_view_position_to_node_position"
+			},
+			"vanilla.js": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "convertViewPositionToNodePosition"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/nodetree",
+				"class": "NodeTree",
 				"name": "convert_view_to_local"
 			},
 			"vanilla.js": {
@@ -13811,6 +13919,18 @@
 			"vanilla-engine": {
 				"module": "core/node/worldnode",
 				"class": "WorldNode",
+				"name": "set_visible"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "setVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
 				"name": "is_visible"
 			},
 			"vanilla.js": {
@@ -14099,6 +14219,30 @@
 			"vanilla-engine": {
 				"module": "core/scene",
 				"class": "SceneBase",
+				"name": "set_scene_background_color"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "setSceneBackgroundColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/scene",
+				"class": "SceneBase",
+				"name": "get_scene_background_color"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "getSceneBackgroundColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/scene",
+				"class": "SceneBase",
 				"name": "tick"
 			},
 			"vanilla.js": {
@@ -14177,6 +14321,18 @@
 				"module": "core/scene",
 				"class": "Scene",
 				"name": "draw"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/scene",
+				"class": "SceneBase",
+				"name": "draw_scene_background"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "drawSceneBackground"
 			}
 		},
 		{
@@ -17357,6 +17513,808 @@
 				"module": "effect/trailrenderer",
 				"class": "TrailRenderer",
 				"name": "getPointCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_dev_tools"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getDevTools"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_dev_tools_mut"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getDevTools"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_view_scale_mode"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setViewScaleMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_view_scale_mode"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getViewScaleMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_loading_image_url"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setLoadingImageUrl"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_loading_min_duration_ms"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setLoadingMinDurationMs"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_loading_drawer"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setLoadingDrawer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "has_loading_drawer"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "hasLoadingDrawer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_loading_drawer"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getLoadingDrawer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_loading_colors"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setLoadingColors"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_loading_outside_color"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setLoadingOutsideColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_loading_progress"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setLoadingProgress"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "track_asset_loader"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "trackAssetLoader"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_scene_background_color"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "setSceneBackgroundColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_safe_area_rect"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getSafeAreaRect"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_safe_area_insets"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setSafeAreaInsets"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "create"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "create"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "load_assets"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "loadAssets"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_loading_progress"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getLoadingProgress"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "is_load_touched_to_skip"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "isLoadTouchedToSkip"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "draw_on_load"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "drawOnLoad"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "initialize"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "initialize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "resize"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "resize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "layout"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "layout"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "compute_safe_area_rect"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "computeSafeAreaRect"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "calculate_safe_area_rect"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "calculateSafeAreaRect"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "tick"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "tick"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "is_dev_tools_capturing_input"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "isDevToolsCapturingInput"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "pre_draw"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "preDraw"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "post_draw"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "postDraw"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "draw_screen_fade"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "drawScreenFade"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "fade_screen"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "fadeScreen"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "fade_screen_async"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "fadeScreen"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "is_screen_fading"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "isScreenFading"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_screen_fade_color"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setScreenFadeColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_screen_fade_seconds"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setScreenFadeSeconds"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_screen_fade_alpha"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getScreenFadeAlpha"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "is_user_interface_at"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "isUserInterfaceAt"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_play_input_enabled"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setPlayInputEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_play_input_handler"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setPlayInputHandler"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "take_play_inputs"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "takePlayInputs"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "convert_view_to_play_area"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "convertViewToPlayArea"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "set_play_area_reference"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "setPlayAreaReference"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "get_play_area_fixed_length"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "getPlayAreaFixedLength"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "apply_play_area_reference"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "applyPlayAreaReference"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "calculate_play_area_reference_length"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "calculatePlayAreaReferenceLength"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "load_assets"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "loadAssets"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "fade_screen_async"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "fadeScreen"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "draw_on_load"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "drawOnLoad"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "initialize"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "initialize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "destroy"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "destroy"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "layout"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "layout"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "tick"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "tick"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "pre_draw"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "preDraw"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "draw"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "draw"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "post_draw"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "postDraw"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "finalize"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "finalize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "unload"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "unload"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "on_page_process_restored"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "onPageProcessRestored"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "on_page_visibility_restored"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "onPageVisibilityRestored"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touch_press"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touchPress"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touch_move"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touchMove"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touch_release"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touchRelease"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touch_cancel"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touchCancel"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touch_wheel"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "touchWheel"
 			}
 		},
 		{
@@ -27189,6 +28147,18 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "misc/spriteanimator",
+				"class": "SpriteAnimator",
+				"name": "find_sprite"
+			},
+			"vanilla.js": {
+				"module": "misc/spriteanimator",
+				"class": "SpriteAnimator",
+				"name": "findSprite"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "misc/steering2d",
 				"class": "Steering2D"
 			},
@@ -31541,6 +32511,66 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "get_popup_motion"
+			},
+			"vanilla.js": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "getPopupMotion"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "get_overlay_node"
+			},
+			"vanilla.js": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "getOverlayNode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "get_panel_node"
+			},
+			"vanilla.js": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "getPanelNode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "get_confirm_node"
+			},
+			"vanilla.js": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "getConfirmNode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "get_cancel_node"
+			},
+			"vanilla.js": {
+				"module": "ui/uidialog",
+				"class": "UIDialog",
+				"name": "getCancelNode"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "ui/uidraggable",
 				"class": "UIDraggable"
 			},
@@ -31803,12 +32833,48 @@
 			"vanilla-engine": {
 				"module": "ui/uidropdown",
 				"class": "UIDropdown",
+				"name": "get_option_list"
+			},
+			"vanilla.js": {
+				"module": "ui/uidropdown",
+				"class": "UIDropdown",
+				"name": "getOptionList"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidropdown",
+				"class": "UIDropdown",
 				"name": "is_open"
 			},
 			"vanilla.js": {
 				"module": "ui/uidropdown",
 				"class": "UIDropdown",
 				"name": "isOpen"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidropdown",
+				"class": "UIDropdown",
+				"name": "get_popup_node"
+			},
+			"vanilla.js": {
+				"module": "ui/uidropdown",
+				"class": "UIDropdown",
+				"name": "getPopupNode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidropdown",
+				"class": "UIDropdown",
+				"name": "get_option_nodes"
+			},
+			"vanilla.js": {
+				"module": "ui/uidropdown",
+				"class": "UIDropdown",
+				"name": "getOptionNodes"
 			}
 		},
 		{
@@ -32117,6 +33183,30 @@
 				"module": "ui/uiimageview",
 				"class": "UIImageView",
 				"name": "setNineSlice"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiimageview",
+				"class": "UIImageView",
+				"name": "set_image_path"
+			},
+			"vanilla.js": {
+				"module": "ui/uiimageview",
+				"class": "UIImageView",
+				"name": "setImagePath"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiimageview",
+				"class": "UIImageView",
+				"name": "get_image_path"
+			},
+			"vanilla.js": {
+				"module": "ui/uiimageview",
+				"class": "UIImageView",
+				"name": "getImagePath"
 			}
 		},
 		{
@@ -35567,6 +36657,16 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "ui/uiview",
+				"name": "is_view_position_inside_node"
+			},
+			"vanilla.js": {
+				"module": "ui/uiview",
+				"name": "isViewPositionInsideNode"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "ui/uidocument",
 				"class": "UIDocument"
 			},
@@ -35675,18 +36775,6 @@
 			"vanilla-engine": {
 				"module": "ui/uidocument",
 				"class": "UIDocument",
-				"name": "serialize_node_mut"
-			},
-			"vanilla.js": {
-				"module": "ui/uidocument",
-				"class": "UIDocument",
-				"name": "serializeNode"
-			}
-		},
-		{
-			"vanilla-engine": {
-				"module": "ui/uidocument",
-				"class": "UIDocument",
 				"name": "get_reflected_properties"
 			},
 			"vanilla.js": {
@@ -35748,18 +36836,6 @@
 				"module": "ui/uidocument",
 				"class": "UIDocument",
 				"name": "to_json_text"
-			},
-			"vanilla.js": {
-				"module": "ui/uidocument",
-				"class": "UIDocument",
-				"name": "toJsonText"
-			}
-		},
-		{
-			"vanilla-engine": {
-				"module": "ui/uidocument",
-				"class": "UIDocument",
-				"name": "to_json_text_mut"
 			},
 			"vanilla.js": {
 				"module": "ui/uidocument",
@@ -37942,8 +39018,8 @@
 				"name": "set_scene_background_color"
 			},
 			"vanilla.js": {
-				"module": "ui/uiscene",
-				"class": "UIScene",
+				"module": "core/scene",
+				"class": "Scene",
 				"name": "setSceneBackgroundColor"
 			}
 		},
@@ -38065,6 +39141,30 @@
 				"module": "ui/uiscene",
 				"class": "UIScene",
 				"name": "rebuildSafeAreaLayoutGuideConstraints"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiscene",
+				"class": "UISceneBase",
+				"name": "get_dev_tools"
+			},
+			"vanilla.js": {
+				"module": "ui/uiscene",
+				"class": "UIScene",
+				"name": "getDevTools"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiscene",
+				"class": "UISceneBase",
+				"name": "get_dev_tools_mut"
+			},
+			"vanilla.js": {
+				"module": "ui/uiscene",
+				"class": "UIScene",
+				"name": "getDevTools"
 			}
 		},
 		{

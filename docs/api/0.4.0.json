@@ -2302,6 +2302,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/base/color.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/color",
+								"class": "Color",
+								"name": "create"
+							},
 							"examples": [
 								{
 									"title": {
@@ -9770,7 +9776,13 @@
 								"en": "View scale mode. (Default ViewScaleMode.stretchShort, put into the view manager when the engine is created. UIScene and GameScene switch to their own mode in initialize)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/engine.js"
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "EngineConfiguration",
+								"name": "view_scale_mode"
+							}
 						},
 						{
 							"kind": "field",
@@ -11362,8 +11374,8 @@
 								}
 							},
 							"description": {
-								"ko": "검증용 화면 저장 요청. (그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다)\n- 이미 지난 번호면 이번(프레임 사이에 부르면 다음) 프레임을 저장한다.\n- 주소 쿼리로도 건다. (?capture=120,240 은 그 프레임들을 내려받기로 저장, captureName 은 파일 이름(\"{frame}\" 은 번호), captureExit=1 은 마지막 저장 뒤 exitApplication)",
-								"en": "Requests a screen capture for verification. (After that frame is fully drawn, passes the canvas as a PNG data URL)\n- If that frame number has already passed, captures this frame (the next frame if called between frames).\n- Can also be set via the URL query. (?capture=120,240 saves those frames as downloads, captureName is the file name (\"{frame}\" is the number), captureExit=1 calls exitApplication after the last capture)"
+								"ko": "검증용 화면 저장 요청. (그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다)\n- 이미 지난 번호면 이번(프레임 사이에 부르면 다음) 프레임을 저장한다.\n- 주소 쿼리로도 건다. (?capture=120,240 은 그 프레임들을 내려받기로 저장, captureName 은 파일 이름(\"{frame}\" 은 번호), captureExit=1 은 마지막 저장 뒤 exitApplication)\n  주소 쿼리로 건 찍기 모드는 결정적으로 찍게 시간이 프레임마다 1/60 초씩 간다. (실제 시각과 최대 FPS 제한을 쓰지 않는다, 러스트 판 VANILLA_CAPTURE_* 와 같다)",
+								"en": "Requests a screen capture for verification. (After that frame is fully drawn, passes the canvas as a PNG data URL)\n- If that frame number has already passed, captures this frame (the next frame if called between frames).\n- Can also be set via the URL query. (?capture=120,240 saves those frames as downloads, captureName is the file name (\"{frame}\" is the number), captureExit=1 calls exitApplication after the last capture)\n  Capture mode set via the URL query advances time by 1/60 s per frame for deterministic captures. (real time and the maximum FPS limit are not used, same as the Rust edition VANILLA_CAPTURE_*)"
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
@@ -21975,6 +21987,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "resolve_shader_program"
+							},
 							"examples": [
 								{
 									"title": {
@@ -23024,7 +23042,13 @@
 								"en": "Sets the background color. (drawSceneBackground fills it, a Color or color text such as \"#202020\")"
 							},
 							"since": "0.4.0",
-							"source": "src/core/scene.js"
+							"source": "src/core/scene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/scene",
+								"class": "SceneBase",
+								"name": "set_scene_background_color"
+							}
 						},
 						{
 							"kind": "method",
@@ -23043,7 +23067,13 @@
 								"en": "Returns the background color."
 							},
 							"since": "0.4.0",
-							"source": "src/core/scene.js"
+							"source": "src/core/scene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/scene",
+								"class": "SceneBase",
+								"name": "get_scene_background_color"
+							}
 						},
 						{
 							"kind": "method",
@@ -23065,6 +23095,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/scene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/scene",
+								"class": "SceneBase",
+								"name": "draw_scene_background"
+							},
 							"examples": [
 								{
 									"title": {
@@ -23106,6 +23142,11 @@
 						}
 					],
 					"extends": "Scene",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "game/gamescene",
+						"class": "GameScene"
+					},
 					"members": [
 						{
 							"kind": "constructor",
@@ -23117,7 +23158,13 @@
 								"en": "Constructor."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "new"
+							}
 						},
 						{
 							"kind": "method",
@@ -23138,7 +23185,13 @@
 								"en": "Sets the ViewScaleMode. Can be set freely per project.\n- Default is ViewScaleMode.none. Can be called anywhere before / after engine startup.\n- If the engine is already attached at call time, it is applied to viewManager immediately,\n  otherwise it is applied all at once in initialize()."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_view_scale_mode"
+							}
 						},
 						{
 							"kind": "method",
@@ -23157,7 +23210,13 @@
 								"en": "Returns the current ViewScaleMode."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "get_view_scale_mode"
+							}
 						},
 						{
 							"kind": "method",
@@ -23178,7 +23237,13 @@
 								"en": "Sets the loading screen center image URL. (shows only the gauge without an image if empty string)"
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_loading_image_url"
+							}
 						},
 						{
 							"kind": "method",
@@ -23199,7 +23264,13 @@
 								"en": "Sets the loading screen minimum display time (ms)."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_loading_min_duration_ms"
+							}
 						},
 						{
 							"kind": "method",
@@ -23220,7 +23291,13 @@
 								"en": "Sets the loading screen drawing function. (null for the default drawing: loading image at the center + gauge below)\n- The engine fills the canvas with the outside color and the view with the background color, applies the view coordinate system, then calls drawer(graphic, viewSize, progress, elapsedSeconds).\n  progress is the displayed progress (0 ~ 1, the elapsed minimum display time if nothing was reported), and elapsedSeconds is the seconds since loading started.\n- It is drawn even before images and fonts are loaded, so draw with shapes and system fonts."
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_loading_drawer"
+							}
 						},
 						{
 							"kind": "method",
@@ -23239,7 +23316,13 @@
 								"en": "Returns the loading screen drawing function. (null if none)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "get_loading_drawer"
+							}
 						},
 						{
 							"kind": "method",
@@ -23284,7 +23367,13 @@
 								"en": "Sets the loading screen colors. (A Color or color text such as \"#rrggbb\", defaults are a black background, #333333 gauge background, #ffffff gauge)\n- outsideColor is the color outside the view (the rest of the canvas). If omitted, it is the same as the background color."
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_loading_colors"
+							}
 						},
 						{
 							"kind": "method",
@@ -23305,7 +23394,13 @@
 								"en": "Sets the loading screen color outside the view (the rest of the canvas). (Changes only the fourth value of setLoadingColors)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_loading_outside_color"
+							}
 						},
 						{
 							"kind": "method",
@@ -23324,7 +23419,13 @@
 								"en": "Whether a loading screen drawing function is set."
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "has_loading_drawer"
+							}
 						},
 						{
 							"kind": "method",
@@ -23343,7 +23444,13 @@
 								"en": "Whether the loading screen was tapped to skip."
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "is_load_touched_to_skip"
+							}
 						},
 						{
 							"kind": "method",
@@ -23362,7 +23469,13 @@
 								"en": "Returns the developer tools. (null before initialize or when EngineConfiguration.useDevTools is off)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "get_dev_tools"
+							}
 						},
 						{
 							"kind": "method",
@@ -23383,7 +23496,13 @@
 								"en": "Sets the safe area insets directly. (CSS pixels { top, right, bottom, left }, if null reads the view manager's getSafeAreaInsets)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_safe_area_insets"
+							}
 						},
 						{
 							"kind": "static",
@@ -23427,7 +23546,13 @@
 								"en": "Calculates the safe area. (static, divides CSS pixel insets by the view scale and subtracts them from the view area)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "calculate_safe_area_rect"
+							}
 						},
 						{
 							"kind": "method",
@@ -23448,7 +23573,13 @@
 								"en": "Reports loading progress. (0 ~ 1, never decreases. After reporting, the gauge follows this value instead of the elapsed time)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_loading_progress"
+							}
 						},
 						{
 							"kind": "method",
@@ -23467,7 +23598,13 @@
 								"en": "Returns the loading progress. (The reported amount and the displayed amount that smoothly follows it)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "get_loading_progress"
+							}
 						},
 						{
 							"kind": "method",
@@ -23488,7 +23625,13 @@
 								"en": "Hands over an asset loader. (Every frame the loading screen reports the finished count / total count of what was handed over as progress)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "track_asset_loader"
+							}
 						},
 						{
 							"kind": "method",
@@ -23538,7 +23681,13 @@
 								"en": "Returns the last calculated safe area rect."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "get_safe_area_rect"
+							}
 						},
 						{
 							"kind": "method",
@@ -23571,7 +23720,13 @@
 								"en": "Asset loading hook.\n- Subclasses override it to load their own assets asynchronously. Calling super is required."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "load_assets"
+							}
 						},
 						{
 							"kind": "method",
@@ -23592,7 +23747,13 @@
 								"en": "Draws the loading screen. (The engine calls it every frame while isLoaded() === false)\n- Outside-color canvas + background-color view + (the drawing function, or if none, the center loading image + bottom gauge)."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "draw_on_load"
+							}
 						},
 						{
 							"kind": "method",
@@ -23613,7 +23774,13 @@
 								"en": "Initialization."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "initialize"
+							}
 						},
 						{
 							"kind": "method",
@@ -23634,7 +23801,13 @@
 								"en": "Screen size changed."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "resize"
+							}
 						},
 						{
 							"kind": "method",
@@ -23646,7 +23819,13 @@
 								"en": "Layout.\n- Subclasses call super.layout() and then update their own content layout."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "layout"
+							}
 						},
 						{
 							"kind": "method",
@@ -23665,7 +23844,13 @@
 								"en": "Calculates the safe area. (in the view coordinate system)"
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "compute_safe_area_rect"
+							}
 						},
 						{
 							"kind": "method",
@@ -23686,7 +23871,13 @@
 								"en": "Update.\n- Detects viewSize changes → calls layout again automatically.\n  (Corrected every tick because the resize event alone can miss changes,\n   such as when 100vh changes dynamically as the mobile address bar shows or hides.)\n- Handles the DEVTools tick."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "tick"
+							}
 						},
 						{
 							"kind": "method",
@@ -23705,7 +23896,13 @@
 								"en": "Whether DevTools is taking the input."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "is_dev_tools_capturing_input"
+							}
 						},
 						{
 							"kind": "method",
@@ -23745,7 +23942,13 @@
 								"en": "touchPress."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameScene",
+								"name": "touch_press"
+							}
 						},
 						{
 							"kind": "method",
@@ -23766,7 +23969,13 @@
 								"en": "touchMove."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameScene",
+								"name": "touch_move"
+							}
 						},
 						{
 							"kind": "method",
@@ -23787,7 +23996,13 @@
 								"en": "touchRelease."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameScene",
+								"name": "touch_release"
+							}
 						},
 						{
 							"kind": "method",
@@ -23808,7 +24023,13 @@
 								"en": "touchCancel."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameScene",
+								"name": "touch_cancel"
+							}
 						},
 						{
 							"kind": "method",
@@ -23844,7 +24065,13 @@
 								"en": "touchWheel. (Passes it to the frontmost scroll view at that position, true if a view took it)\n- An overriding game scene that passes the wheel to the game (map zoom and so on) only when super.touchWheel is false does not overlap with window scrolling."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameScene",
+								"name": "touch_wheel"
+							}
 						},
 						{
 							"kind": "method",
@@ -23865,7 +24092,13 @@
 								"en": "preDraw. Fills the whole canvas with sceneBackgroundColor (including the area outside the safe area)."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "pre_draw"
+							}
 						},
 						{
 							"kind": "method",
@@ -23886,7 +24119,13 @@
 								"en": "postDraw. Draws the fade overlay and DEVTools on top of the screen."
 							},
 							"since": "0.2.1",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "post_draw"
+							}
 						},
 						{
 							"kind": "method",
@@ -23914,7 +24153,13 @@
 								"en": "Fades to dark and back.\n- Calls onDark once fully dark, and if it returns a Promise, stays dark until it settles (even if it fails), then brightens.\n- While the overlay is up (darkening, waiting, brightening), presses and the wheel are not received.\n- If already fading, ignores the call and returns false."
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "fade_screen"
+							}
 						},
 						{
 							"kind": "method",
@@ -23933,7 +24178,13 @@
 								"en": "Whether a fade is in progress. (darkening, waiting for onDark, or brightening)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "is_screen_fading"
+							}
 						},
 						{
 							"kind": "method",
@@ -23954,7 +24205,13 @@
 								"en": "Sets the color of the fade overlay. (default black)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_screen_fade_color"
+							}
 						},
 						{
 							"kind": "method",
@@ -23975,7 +24232,13 @@
 								"en": "Sets the time to darken and to brighten. (seconds, default 0.35, immediate if 0)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_screen_fade_seconds"
+							}
 						},
 						{
 							"kind": "method",
@@ -23994,7 +24257,13 @@
 								"en": "Opacity of the fade overlay. (0 ~ 1)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "get_screen_fade_alpha"
+							}
 						},
 						{
 							"kind": "method",
@@ -24027,7 +24296,13 @@
 								"en": "Draws the fade overlay. (Covers the whole canvas including the safe area insets)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "draw_screen_fade"
+							}
 						},
 						{
 							"kind": "method",
@@ -24055,7 +24330,13 @@
 								"en": "Whether there is UI (a pressable node: a button, a window's dimmer and panel, a scroll view) at that position. (view coordinates)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "is_user_interface_at"
+							}
 						},
 						{
 							"kind": "method",
@@ -24076,7 +24357,13 @@
 								"en": "Sets the play input handler. (Passes presses the UI did not take, their moves and releases (including cancel), and the wheel outside the UI in play area coordinates, null to pass nothing)\n- The play area is the safe area rect (getSafeAreaRect). Its top left is 0, 0.\n- Presses and the wheel are not passed during a fade. Nothing is passed while the developer tools capture input."
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_play_input_handler"
+							}
 						},
 						{
 							"kind": "method",
@@ -24097,7 +24384,13 @@
 								"en": "Turns on play input collection. (Collects input instead of a handler, to be taken out with takePlayInputs, turning it off discards what was collected)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_play_input_enabled"
+							}
 						},
 						{
 							"kind": "method",
@@ -24116,7 +24409,13 @@
 								"en": "Takes the collected play input. ({ kind, position, wheelDelta } in arrival order, taking empties it)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "take_play_inputs"
+							}
 						},
 						{
 							"kind": "method",
@@ -24144,7 +24443,13 @@
 								"en": "View coordinates → play area coordinates. (The safe area's top left is 0, 0)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "convert_view_to_play_area"
+							}
 						},
 						{
 							"kind": "method",
@@ -24231,7 +24536,13 @@
 								"en": "Sets the play area reference. (Enlarges the reference resolution so the fixed-side length of the play area excluding the safe area insets is always fixedLength)\n- The engine fits the whole canvas length to the reference resolution, but the canvas also covers the safe area insets. The reference resolution is enlarged by that much.\n  (canvas length : length excluding the safe area insets = reference resolution length : fixedLength)\n- If isLandscape the width is the fixed side, otherwise the height. The view scale mode is set to match. (width fixed stretchWidthExpandHeight, height fixed stretchHeightExpandWidth)\n- Pass the safe area sides to ignore with ViewManager.setIgnoredSafeAreaSides. A fixedLength of 0 turns it off. (The reference resolution is left as is)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "set_play_area_reference"
+							}
 						},
 						{
 							"kind": "method",
@@ -24250,7 +24561,13 @@
 								"en": "Fixed-side length of the play area. (0 if not used)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "get_play_area_fixed_length"
+							}
 						},
 						{
 							"kind": "method",
@@ -24262,7 +24579,13 @@
 								"en": "Applies the play area reference to the reference resolution. (Computed only from the canvas and inset sizes, so repeated calls give the same result, left untouched if unchanged)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "apply_play_area_reference"
+							}
 						},
 						{
 							"kind": "static",
@@ -24322,7 +24645,13 @@
 								"en": "Computes the reference resolution length for the play area reference. (0 if it cannot be computed)"
 							},
 							"since": "0.4.0",
-							"source": "src/game/gamescene.js"
+							"source": "src/game/gamescene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "game/gamescene",
+								"class": "GameSceneBase",
+								"name": "calculate_play_area_reference_length"
+							}
 						}
 					]
 				}
@@ -25160,6 +25489,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "set_visible"
+							},
 							"examples": [
 								{
 									"title": {
@@ -26155,6 +26490,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/worldnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/nodetree",
+								"class": "NodeTree",
+								"name": "convert_node_position_to_view_position"
+							},
 							"examples": [
 								{
 									"title": {
@@ -26193,6 +26534,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/worldnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/nodetree",
+								"class": "NodeTree",
+								"name": "convert_view_position_to_node_position"
+							},
 							"examples": [
 								{
 									"title": {
@@ -31585,7 +31932,13 @@
 								"en": "Sets the image path. (Only records it and does not load the image, UIDocument writes and reads this path instead of the image)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/shadowimage.js"
+							"source": "src/core/component/shadowimage.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/shadowimage",
+								"class": "ShadowImage",
+								"name": "set_image_path"
+							}
 						},
 						{
 							"kind": "method",
@@ -31604,7 +31957,13 @@
 								"en": "Returns the image path. (empty string if not set)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/shadowimage.js"
+							"source": "src/core/component/shadowimage.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/shadowimage",
+								"class": "ShadowImage",
+								"name": "get_image_path"
+							}
 						},
 						{
 							"kind": "method",
@@ -32134,7 +32493,13 @@
 								"en": "Sets the image path. (Only records it and does not load the image, UIDocument writes and reads this path instead of the image)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/sprite.js"
+							"source": "src/core/component/sprite.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/sprite",
+								"class": "Sprite",
+								"name": "set_image_path"
+							}
 						},
 						{
 							"kind": "method",
@@ -32154,6 +32519,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/component/sprite.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/sprite",
+								"class": "Sprite",
+								"name": "get_image_path"
+							},
 							"examples": [
 								{
 									"title": {
@@ -35721,6 +36092,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uiscene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiscene",
+								"class": "UISceneBase",
+								"name": "get_dev_tools"
+							},
 							"examples": [
 								{
 									"title": {
@@ -36434,6 +36811,11 @@
 					},
 					"since": "0.4.0",
 					"source": "src/ui/uiview.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "ui/uiview",
+						"name": "is_view_position_inside_node"
+					},
 					"examples": [
 						{
 							"title": {
@@ -36634,7 +37016,13 @@
 								"en": "Sets the image path. (Only records it and does not load the image, UIDocument writes and reads this path instead of the image)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiimageview.js"
+							"source": "src/ui/uiimageview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiimageview",
+								"class": "UIImageView",
+								"name": "set_image_path"
+							}
 						},
 						{
 							"kind": "method",
@@ -36653,7 +37041,13 @@
 								"en": "Returns the image path. (empty string if not set)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiimageview.js"
+							"source": "src/ui/uiimageview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiimageview",
+								"class": "UIImageView",
+								"name": "get_image_path"
+							}
 						},
 						{
 							"kind": "method",
@@ -81212,7 +81606,13 @@
 								"en": "Finds the sprite on the same node. (cached once found)"
 							},
 							"since": "0.3.0",
-							"source": "src/misc/spriteanimator.js"
+							"source": "src/misc/spriteanimator.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "misc/spriteanimator",
+								"class": "SpriteAnimator",
+								"name": "find_sprite"
+							}
 						},
 						{
 							"kind": "method",
@@ -93057,7 +93457,13 @@
 								"en": "Returns the option list."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uidropdown.js"
+							"source": "src/ui/uidropdown.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidropdown",
+								"class": "UIDropdown",
+								"name": "get_option_list"
+							}
 						},
 						{
 							"kind": "method",
@@ -93076,7 +93482,13 @@
 								"en": "Returns the popup list node. (A child of the tree root while open)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uidropdown.js"
+							"source": "src/ui/uidropdown.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidropdown",
+								"class": "UIDropdown",
+								"name": "get_popup_node"
+							}
 						},
 						{
 							"kind": "method",
@@ -93096,6 +93508,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uidropdown.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidropdown",
+								"class": "UIDropdown",
+								"name": "get_option_nodes"
+							},
 							"examples": [
 								{
 									"title": {
@@ -94821,7 +95239,13 @@
 								"en": "Returns the motion."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uidialog.js"
+							"source": "src/ui/uidialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidialog",
+								"class": "UIDialog",
+								"name": "get_popup_motion"
+							}
 						},
 						{
 							"kind": "method",
@@ -94840,7 +95264,13 @@
 								"en": "Returns the overlay node that covers what is behind."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uidialog.js"
+							"source": "src/ui/uidialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidialog",
+								"class": "UIDialog",
+								"name": "get_overlay_node"
+							}
 						},
 						{
 							"kind": "method",
@@ -94859,7 +95289,13 @@
 								"en": "Returns the panel node."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uidialog.js"
+							"source": "src/ui/uidialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidialog",
+								"class": "UIDialog",
+								"name": "get_panel_node"
+							}
 						},
 						{
 							"kind": "method",
@@ -94879,6 +95315,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uidialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidialog",
+								"class": "UIDialog",
+								"name": "get_confirm_node"
+							},
 							"examples": [
 								{
 									"title": {
@@ -94907,7 +95349,13 @@
 								"en": "Returns the cancel button node."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uidialog.js"
+							"source": "src/ui/uidialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidialog",
+								"class": "UIDialog",
+								"name": "get_cancel_node"
+							}
 						}
 					]
 				}

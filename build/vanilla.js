@@ -4973,10 +4973,10 @@ var DIALOG_PADDING_TOP = 20;
 var DIALOG_PADDING_SIDE = 20;
 var DIALOG_PADDING_BOTTOM = 20;
 var DIALOG_CORNER_RADIUS = 12;
-var TITLE_FONT_STRING = `500 16px ${SYSTEM_FONT_STRING}`;
+var TITLE_FONT_STRING = "500 16px system-ui";
 var TITLE_LINE_HEIGHT = 24;
-var MESSAGE_FONT_STRING = `13px ${SYSTEM_FONT_STRING}`;
-var FIELD_FONT_STRING = `13px ${SYSTEM_FONT_STRING}`;
+var MESSAGE_FONT_STRING = "13px system-ui";
+var FIELD_FONT_STRING = "13px system-ui";
 var MESSAGE_LINE_HEIGHT = 20;
 var TITLE_MESSAGE_GAP = 8;
 var MESSAGE_FIELD_GAP = 8;
@@ -4989,7 +4989,7 @@ var BUTTON_HEIGHT = 36;
 var BUTTON_MINIMUM_WIDTH = 64;
 var BUTTON_PADDING_X = 16;
 var BUTTON_GAP = 8;
-var BUTTON_FONT_STRING = `500 13px ${SYSTEM_FONT_STRING}`;
+var BUTTON_FONT_STRING = "500 13px system-ui";
 var COLOR_DIALOG_BACKGROUND = "#ffffff";
 var COLOR_DIALOG_BORDER = "#e1e3e1";
 var COLOR_TITLE = "#1f1f1f";
@@ -19529,6 +19529,7 @@ var FRAME_LIMIT_RESYNC_MILLISECONDS = 1;
 var COMPATIBILITY_MOUSE_MILLISECONDS = 800;
 var MOUSE_DEVICE_MOVE_THRESHOLD = 6;
 var DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
+var CAPTURE_FRAME_MILLISECONDS = 1e3 / 60;
 var PageEvent = System30.Object.freeze({
   hidden: "hidden",
   // 페이지가 가려짐. (다른 탭, 앱 전환)
@@ -19684,6 +19685,9 @@ var Engine = class extends Object2 {
   #frameCaptureRequests;
   // 프레임 번호 → 화면을 받을 함수 목록. (검증용 화면 저장)
   /** @private @type { boolean } */
+  #isCaptureTimeStepFixed;
+  // 찍기 모드라 시간을 프레임마다 1/60 초씩 보내는지. (주소 쿼리 capture)
+  /** @private @type { boolean } */
   #isExitRequested;
   // 종료를 요청했는지.
   /** @private @type { boolean } */
@@ -19731,6 +19735,7 @@ var Engine = class extends Object2 {
     this.#statisticsTextRect = Rect.zero();
     this.#version = Version.create(0, 3, 2);
     this.#frameCaptureRequests = new System30.Map();
+    this.#isCaptureTimeStepFixed = false;
     this.#isExitRequested = false;
     this.#isPageHidden = System30.document.visibilityState === "hidden";
     this.#pageEventListeners = [];
@@ -20274,7 +20279,7 @@ var Engine = class extends Object2 {
   updateEngine(timestamp) {
     const engineConfiguration = this.getEngineConfiguration();
     const maximumFramePerSecond = engineConfiguration.maximumFramePerSecond;
-    if (maximumFramePerSecond > 0) {
+    if (maximumFramePerSecond > 0 && !this.#isCaptureTimeStepFixed) {
       const frameInterval = 1e3 / maximumFramePerSecond;
       if (this.#frameLimitStartTimestamp < 0 || this.#frameLimitFramePerSecond !== maximumFramePerSecond) {
         this.#frameLimitStartTimestamp = timestamp;
@@ -20298,6 +20303,9 @@ var Engine = class extends Object2 {
     }
     const graphic = this.getGraphic();
     graphic.applySettings(this);
+    if (this.#isCaptureTimeStepFixed) {
+      timestamp = this.#frameNumber * CAPTURE_FRAME_MILLISECONDS;
+    }
     const timeManager = this.getTimeManager();
     timeManager.update(timestamp);
     const timeDelta = timeManager.getTimeDelta();
@@ -20852,6 +20860,7 @@ var Engine = class extends Object2 {
   // 검증용 화면 저장 요청. (그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다)
   // - 이미 지난 번호면 이번(프레임 사이에 부르면 다음) 프레임을 저장한다.
   // - 주소 쿼리로도 건다. (?capture=120,240 은 그 프레임들을 내려받기로 저장, captureName 은 파일 이름("{frame}" 은 번호), captureExit=1 은 마지막 저장 뒤 exitApplication)
+  //   주소 쿼리로 건 찍기 모드는 결정적으로 찍게 시간이 프레임마다 1/60 초씩 간다. (실제 시각과 최대 FPS 제한을 쓰지 않는다, 러스트 판 VANILLA_CAPTURE_* 와 같다)
   //==============================================================================
   /**
    * @param { number } frameNumber 저장할 프레임 번호. (소수는 버리고, 이미 지났으면 지금 프레임)
@@ -20922,6 +20931,7 @@ var Engine = class extends Object2 {
     if (frameNumbers.length === 0) {
       frameNumbers.push(120);
     }
+    this.#isCaptureTimeStepFixed = true;
     const captureNameText = searchParameters.get("captureName");
     const captureFileName = captureNameText !== null && captureNameText !== "" ? captureNameText : DEFAULT_CAPTURE_FILE_NAME;
     const isExitAfterLastCapture = searchParameters.get("captureExit") === "1";
