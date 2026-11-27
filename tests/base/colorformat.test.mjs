@@ -9,7 +9,7 @@
 //==============================================================================
 import { Color } from "../../src/base/color.js";
 import * as Format from "../../src/base/format.js";
-import { check, checkEqual, checkNear, finish, knownDifference } from "../testcheck.mjs";
+import { check, checkEqual, checkNear, finish } from "../testcheck.mjs";
 
 function getColorList(color) {
 	return [color.red, color.green, color.blue, color.alpha];
@@ -99,7 +99,7 @@ const formatNumberCaseList = [
 	["pt-PT", 1234.5, "1234,5"], ["pt-BR", 1234.5, "1.234,5"], ["zh-Hant-TW", 1234567.891, "1,234,567.891"], ["ja-JP", 1234567.891, "1,234,567.891"],
 	["ps", -1234567.891, "‎-‎۱٬۲۳۴٬۵۶۷٫۸۹۱"],
 	["it-CH", 1234567.891, "1'234'567.891"], ["et-EE", -1234.5, "−1234,5"], ["en-u-nu-latn", 1234567.891, "1,234,567.891"],
-	["EN_gb", 1234567.891, "1,234,567.891"],
+	["EN_gb", 1234567.891, "RangeError: Invalid language tag: EN_gb"],
 ];
 for (const [locale, value, expectedText] of formatNumberCaseList) {
 	let actualText = "";
@@ -109,12 +109,99 @@ for (const [locale, value, expectedText] of formatNumberCaseList) {
 	catch (error) {
 		actualText = error.name + ": " + error.message;
 	}
-	if (locale === "EN_gb" && actualText !== expectedText) {
-		// 원본은 toLocaleString 이 밑줄 태그를 받지 않아 던지고, 러스트 판은 밑줄을 줄표로 읽어 en-GB 로 쓴다.
-		knownDifference("src/base/format.rs::format_number_matches_original", "formatNumber(1234567.891, \"EN_gb\") 밑줄 로캘 태그", actualText, expectedText);
-		continue;
-	}
 	checkEqual(actualText, expectedText, "formatNumber(" + value + ", " + locale + ")");
+}
+
+// 언어 태그 검사. (받는 태그는 null, 던지는 태그는 오류 글에 찍히는 태그. 러스트 판 src/base/format.rs::language_tag_validation_matches_chrome 과 같은 목록)
+const languageTagCaseList = [
+	["EN--US", "EN--US"],
+	["EN-US-U", "en-us-u"],
+	["EN-US-X", "en-us-x"],
+	["EN-a-B", "en-a-b"],
+	["EN-US-1996-1996", "en-us-1996-1996"],
+	["EN-U-CA-U-NU", "en-u-ca-u-nu"],
+	["EN-T-A1", "en-t-a1"],
+	["EN-T-IT", null],
+	["EN-T-A1-XYZ", null],
+	["EN-U-CA", null],
+	["EN-U-C", "en-u-c"],
+	["EN-U-ABC", null],
+	["EN-U-ABC-CA-GREGORY", null],
+	["EN-U-CA-GREGORY-ABC", null],
+	["root", "root"],
+	["ROOT", "ROOT"],
+	["Latn", "Latn"],
+	["Latn-US", "Latn-US"],
+	["abcde", null],
+	["ABCDEFGHI", "ABCDEFGHI"],
+	["en-Latn-US-fonipa", null],
+	["EN-LATN", null],
+	["en-123", null],
+	["en-1234", null],
+	["en-12", "en-12"],
+	["en-1abc", null],
+	["en-abcd5", null],
+	["en-US-POSIX", null],
+	["en-x-abcdefghi", "en-x-abcdefghi"],
+	["en-x-", "en-x-"],
+	["EN-X-A-B", null],
+	["de-u-co-phonebk-ka-shifted", null],
+	["zh-Hans-CN-u-nu-hanidec", null],
+	["en-a-bc-a-de", "en-a-bc-a-de"],
+	["en-a-bc-b-de", null],
+	["en-Latn-Cyrl", "en-Latn-Cyrl"],
+	["en-US-GB", "en-US-GB"],
+	["und", null],
+	["UND-US", null],
+	["en-t-zh-latn-cn-variant1-m0-ungegn", null],
+	["en-t-zh-Latn-CN-variant1-variant1", "en-t-zh-latn-cn-variant1-variant1"],
+	["en-t-m0", "en-t-m0"],
+	["en-t-m0-ab", "en-t-m0-ab"],
+	["en-t-zh-zh", null],
+	["art-lojban", null],
+	["zh-min-nan", "zh-min-nan"],
+	["EN-U-NU-LATN-NU-ARAB", null],
+	["en-US-u-", "en-us-u-"],
+	["en-_US", "en-_US"],
+	["en US", "en US"],
+	["\u00e9\u00e9", "\u00c3\u00a9\u00c3\u00a9"],
+	["en-u-0a", null],
+	["en-u-a0", "en-u-a0"],
+	["en-u-ab-c", "en-u-ab-c"],
+	["en-u-ab-cde", null],
+	["en-u-ab-cdefghij", null],
+	["en-t-a1-ab", "en-t-a1-ab"],
+	["en-t-a1-abc-defghijkl", "en-t-a1-abc-defghijkl"],
+	["en-t-zh-u-nu-latn", null],
+	["en-u-nu-latn-t-zh", null],
+	["en-a-bcdefghij", "en-a-bcdefghij"],
+	["en-a-b1", null],
+	["en-x-a-u-ca", null],
+	["en-US-x-12345678", null],
+	["EN-001", null],
+	["en-419-u-nu-latn", null],
+	["EN-us-POSIX-posix", "en-us-posix-posix"],
+	["EN-LATN-US-1901-1902", null],
+	["fil", null],
+	["FIL", null],
+	["in", null],
+	["IN", null],
+	["iw-IL", null],
+	["ab", null],
+	["AB", null],
+	["abc", null],
+	["ABCD", "ABCD"],
+];
+for (const [locale, expectedErrorTag] of languageTagCaseList) {
+	let actualErrorText = null;
+	try {
+		Format.formatNumber(1, locale);
+	}
+	catch (error) {
+		actualErrorText = error.name + ": " + error.message;
+	}
+	const expectedErrorText = expectedErrorTag === null ? null : "RangeError: Invalid language tag: " + expectedErrorTag;
+	checkEqual(actualErrorText, expectedErrorText, "formatNumber 언어 태그 " + JSON.stringify(locale));
 }
 
 // formatNumberWithUnit.
