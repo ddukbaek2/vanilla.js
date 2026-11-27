@@ -52,6 +52,10 @@ export const ToonOutlineWidthUnit = System.Object.freeze({
 	pixel: "pixel", // 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)
 });
 
+// 판을 덮어쓰기 앞에 비울 값. (정수 판은 uiv, 곱한 색 판은 fv)
+const ZERO_CLEAR_VALUE = new System.Uint32Array(4);
+const ZERO_CLEAR_FLOAT_VALUE = new System.Float32Array(4);
+
 // 선 번호의 상한. (선의 판에 14 비트로 쓴다, 0 은 빈 곳)
 export const TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
 
@@ -1413,7 +1417,7 @@ export class ToonScreenOutline {
 	// 번호 그리기 끝. (가는 선은 씨앗 쪽 판 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
 	// - 가는 선(굵기가 THIN_LINE_MAXIMUM_WIDTH 이하, 약 3.24 픽셀까지): 화면 전체 패스가 씨앗 쪽 판 하나다. 섞기가 둘레 3 x 3 화소의 씨앗을 본다. (씨앗, 모으기, 넓히기 없음)
 	// - 굵은 선: 씨앗, 모으기, 넓히기 걸음마다 한 패스. (씨앗 판과 넓히기 판은 처음 굵은 선을 그을 때 짓는다)
-	// - 판을 통째로 덮어쓰는 패스는 앞에 invalidateFramebuffer 를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰)
+	// - 판을 통째로 덮어쓰는 패스는 앞에 판 비우기(clearBufferuiv, clearBufferfv)를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰, invalidateFramebuffer 는 아이패드와 아이폰 사파리에서 프레임마다 약 10 ~ 25 ms 가 붙어 쓰지 않는다)
 	//==============================================================================
 	endLineIds() {
 		if (this.#savedState === null) {
@@ -1445,12 +1449,11 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.depthMask(false);
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
-		const discardedAttachments = [webGL2RenderingContext.COLOR_ATTACHMENT0];
 
 		// 가는 선: 씨앗 쪽 판 고르기 한 패스.
 		if (isThinLine) {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.edgeMaskFramebuffer);
-			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+			webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
 			this.useEdgeProgram(this.#edgeMaskProgram, lineTarget, lineWidths);
 			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 			lineTarget.outlinePath = "thin";
@@ -1465,7 +1468,7 @@ export class ToonScreenOutline {
 
 		// 1. 씨앗 고르기.
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffer);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+		webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
 		this.useEdgeProgram(this.#seedProgram, lineTarget, lineWidths);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
@@ -1477,7 +1480,7 @@ export class ToonScreenOutline {
 		const seedGatherProgram = this.#seedGatherProgram;
 		webGL2RenderingContext.viewport(0, 0, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[0]);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+		webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
 		seedGatherProgram.useProgram();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTexture);
@@ -1494,7 +1497,7 @@ export class ToonScreenOutline {
 		let seedIndex = 0;
 		for (const stepSize of readJumpFloodSteps(reach)) {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[1 - seedIndex]);
-			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+			webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[seedIndex]);
 			webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("stepSize"), stepSize);
@@ -1554,7 +1557,7 @@ export class ToonScreenOutline {
 		const program = this.#thinCoverageProgram;
 		const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.coverageFramebuffer);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 		program.useProgram();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.edgeMaskTexture);
