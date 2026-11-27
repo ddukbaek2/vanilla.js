@@ -714,22 +714,6 @@ export class UIButton extends UIControl {
 	}
 
 	//==============================================================================
-	// 클릭 이벤트 설정.
-	//==============================================================================
-	/**
-	 * @param { ButtonState } buttonState 버튼 상태. (지금은 쓰지 않는다)
-	 * @param { function(UIButton): boolean } callback 그 상태에 걸 함수. (지금은 담지 않는다)
-	 */
-	setStateEvent(buttonState, callback) {
-		// this.#clickEvent = callback;
-		switch (buttonState) {
-			case ButtonState.normal: {
-					break;
-				}
-		}
-	}
-
-	//==============================================================================
 	// 클릭 이벤트 반환.
 	//==============================================================================
 	/**

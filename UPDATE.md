@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 원본에만 있던 공개 함수 정리(러스트 판과 같은 표면): 안쪽에서만 쓰던 WorldNode.isComponentDrawCulled, Camera3D.refreshMatrices, LocalStorage.readStorage 를 감췄다(러스트 판도 공개하지 않는다, 행렬은 게터가 알아서 다시 셈한다). 아무 일도 하지 않던 UIButton.setStateEvent 를 뺐다. 러스트 판에 같은 이름의 WorldNode::copy_content_size_to, ShadowAtlas::get_light_count 를 더했다.
+  - 옮기는 법: camera.refreshMatrices() 는 지운다(getViewMatrix, getProjectionMatrix 가 알아서 셈한다). setStateEvent 는 지운다(아무 일도 하지 않았다). 상태마다 할 일은 setPressedEvent, setReleasedEvent, setClickEvent 로 건다.
 - 기본 글꼴(러스트 판 default_font_url, 글꼴 이름 "default" 와 같게): EngineConfiguration.defaultFontUrl 의 처음 값이 jsDelivr 의 DOSGothic 주소에서 빈 글로 바뀌어, 엔진은 쓰지 않는 글꼴을 늘 받지 않는다. 주소를 주면 그 글꼴을 글꼴 이름 "default" 로 올린다(전에는 "DOSGothic"). 글꼴이 없는 글(Text, ShadowText, DynamicFont, buildFontString(null))은 시스템 글꼴 사슬 대신 엔진 기본 글꼴 사슬 DEFAULT_FONT_FAMILY_STRING('"default", ' 다음 SYSTEM_FONT_STRING)을 써서, 러스트 판 "32px default" 처럼 기본 글꼴이 있으면 그것을, 없으면 시스템 글꼴을 고른다. 통계 창도 "16px default" 로 그린다.
   - 옮기는 법: DOSGothic 을 쓰던 게임은 defaultFontUrl 에 글꼴 주소를 주거나(이름은 "default"), FontAsset 으로 "DOSGothic" 을 올린다. "16px DOSGothic" 처럼 이름으로 고르던 곳은 FontAsset 으로 올리거나 "16px default" 로 바꾼다.
 - 굽는 컴포넌트의 색을 Color 로(러스트 판 ShadowText, SoftShade, ShadowImage 와 같게): ShadowText, SoftShade, ShadowImage 가 색을 "#rrggbb" 글 대신 Color 로 담는다. 세터는 전처럼 Color 와 색 글을 다 받고 받은 Color 는 복사해 담는다. SoftShade.getColor() 는 Color, ShadowImage.getImageColor() 는 Color 나 null 을 돌려주고, UIDocument 는 ShadowImage 의 ImageColor 를 러스트 판처럼 수 넷 배열([r, g, b, a])로 적는다(색 글로 적힌 옛 문서도 그대로 읽는다). ShadowText 의 글 색 알파는 글자 불투명도다. 모듈 함수 readColorText 는 readColor(Color 를 돌려줌)로, buildRGBAString 은 Color 를 받는다.

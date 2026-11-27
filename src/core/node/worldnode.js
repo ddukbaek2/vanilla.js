@@ -133,7 +133,7 @@ export class WorldNode extends TransformNode {
         // 컴포넌트 출력. 동시에 Mask 컴포넌트가 있는지 확인.
         // 화면 밖이라 걸러진 노드는 컴포넌트만 건너뛴다. (마스크의 클립과 자식은 그대로)
         const components = this.getAllComponents();
-        const isComponentDrawCulled = this.isComponentDrawCulled(graphic, components);
+        const isComponentDrawCulled = this.#isComponentDrawCulled(graphic, components);
         if (isComponentDrawCulled) {
             graphic.addCulledNodeCount(1);
         }
@@ -184,7 +184,7 @@ export class WorldNode extends TransformNode {
      * @param { Component[] } components 이 노드의 컴포넌트 목록.
      * @returns { boolean } 컴포넌트 그리기를 건너뛰어도 되면 참.
      */
-    isComponentDrawCulled(graphic, components) {
+    #isComponentDrawCulled(graphic, components) {
         if (!graphic.isCullingEnabled()) {
             return false;
         }
