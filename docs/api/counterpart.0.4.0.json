@@ -5413,6 +5413,112 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "mark_user_gesture"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "markUserGesture"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "has_user_gesture"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "hasUserGesture"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "resume_context"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "resumeContext"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "create_audio_player"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "createAudioPlayer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "create_audio_bus"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "createAudioBus"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "get_context_time"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "getContextTime"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "get_audio_context"
+			},
+			"vanilla.js": {
+				"module": "core/audiomanager",
+				"class": "AudioManager",
+				"name": "getAudioContext"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "core/audioplayer",
 				"class": "AudioPlayer"
 			},
@@ -13883,6 +13989,18 @@
 			"vanilla-engine": {
 				"module": "core/node/worldnode",
 				"class": "WorldNode",
+				"name": "copy_content_size_to"
+			},
+			"vanilla.js": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "copyContentSizeTo"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
 				"name": "set_local_position_xy"
 			},
 			"vanilla.js": {
@@ -14653,6 +14771,18 @@
 				"module": "core/graphic/shaderprogram",
 				"class": "ShaderProgram",
 				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "use_program"
+			},
+			"vanilla.js": {
+				"module": "core/graphic/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "useProgram"
 			}
 		},
 		{
@@ -19525,6 +19655,18 @@
 				"module": "graphics3d/shadowmap",
 				"class": "ShadowAtlas",
 				"name": "getLights"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "get_light_count"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "getLightCount"
 			}
 		},
 		{
@@ -26003,6 +26145,196 @@
 				"module": "misc/collision2d",
 				"class": "Collision2D",
 				"name": "testPointInCircle"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "set_root_nodes"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "setRootNodes"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "is_visible"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "isVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "set_visible"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "setVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "get_active_tab"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "getActiveTab"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "set_active_tab"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "setActiveTab"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "get_selected_node"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "getSelectedNode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "set_selected_node"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "setSelectedNode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "is_node_expanded"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "isNodeExpanded"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "set_node_expanded"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "setNodeExpanded"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "get_panel_rect"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "getPanelRect"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "is_pointer_inside_panel"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "isPointerInsidePanel"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "tick"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "tick"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "draw"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "draw"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "is_frame_per_second_visible"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "isFramePerSecondVisible"
 			}
 		},
 		{
@@ -39749,6 +40081,690 @@
 				"module": "ui/uiscene",
 				"class": "UIScene",
 				"name": "touchWheel"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "connect"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "connect"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "disconnect"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "disconnect"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "send"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "send"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "tick"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "tick"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "receive_message"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "receiveMessage"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "take_received_messages"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "takeReceivedMessages"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "is_connected"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "isConnected"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "get_web_socket"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "getWebSocket"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "get_web_socket_mut"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "getWebSocket"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "set_receive_event"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "setReceiveEvent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "get_receive_event"
+			},
+			"vanilla.js": {
+				"module": "web/websocketclient",
+				"class": "WebSocketClient",
+				"name": "getReceiveEvent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane",
+				"class": "PaneTheme"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "PaneTheme"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "PaneStyle"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "PaneStyle"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "PaneStyle",
+				"name": "apply"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "PaneStyle",
+				"name": "apply"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "PaneStyle",
+				"name": "create"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "PaneStyle",
+				"name": "create"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "add_pane"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "addPane"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "update_layout"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "updateLayout"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "reset_layout"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "resetLayout"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "refresh"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "refresh"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "attach_to"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "attachTo"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "set_visible"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "setVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "is_visible"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "isVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "is_flex"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "isFlex"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "get_initial_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getInitialSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "get_fixed_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getFixedSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "set_fixed_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "setFixedSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "get_min_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getMinSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "get_max_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getMaxSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "get_container"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getContainer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "set_callback"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "setCallback"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "is_resizable"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "isResizable"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/dompane",
+				"class": "Pane",
+				"name": "get_resizable_edges"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getResizableEdges"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "add_pane"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "addPane"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "update_layout"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "updateLayout"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "reset_layout"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "resetLayout"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "refresh"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "refresh"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "attach_to"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "attachTo"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "set_visible"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "setVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "is_visible"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "isVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "is_flex"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "isFlex"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "get_initial_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getInitialSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "get_fixed_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getFixedSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "set_fixed_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "setFixedSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "get_min_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getMinSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "get_max_size"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getMaxSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "get_container"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getContainer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "set_callback"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "setCallback"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "is_resizable"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "isResizable"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "Pane",
+				"name": "get_resizable_edges"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "Pane",
+				"name": "getResizableEdges"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "PaneStyle"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "PaneStyle"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "PaneStyle",
+				"name": "apply"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "PaneStyle",
+				"name": "apply"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "web/pane/nodepane",
+				"class": "PaneStyle",
+				"name": "create"
+			},
+			"vanilla.js": {
+				"module": "web/pane",
+				"class": "PaneStyle",
+				"name": "create"
 			}
 		}
 	]

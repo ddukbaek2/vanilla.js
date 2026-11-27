@@ -7988,7 +7988,7 @@ void main() {
     #softDiscTexture;
     // 부드러운 원 스프라이트. (지연 생성)
     /** @private @type { boolean } */
-    #isSpriteBatchingEnabled;
+    #isBatchingEnabled;
     // 같은 텍스처의 연이은 드로우를 한 번에 그릴지.
     /** @private @type { ShaderProgram | null } */
     #batchShaderProgram;
@@ -8319,7 +8319,7 @@ void main() {
       this.#particleVertexBuffer = null;
       this.#particleVertexData = null;
       this.#softDiscTexture = null;
-      this.#isSpriteBatchingEnabled = false;
+      this.#isBatchingEnabled = false;
       this.#batchShaderProgram = null;
       this.#batchVertexArray = null;
       this.#batchVertexBuffer = null;
@@ -8344,7 +8344,7 @@ void main() {
       }, "textureBinder");
       this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
       const beforeTextureOverwrite = /* @__PURE__ */ __name(() => {
-        this.flushSpriteBatch();
+        this.flushBatch();
       }, "beforeTextureOverwrite");
       this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder, beforeTextureOverwrite);
       this.#transformMatrix = new TransformMatrix();
@@ -8445,7 +8445,7 @@ void main() {
       webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
       this.applyImageMipmapBias(shaderProgram);
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-      this.setSpriteBatchingEnabled(true);
+      this.setBatchingEnabled(true);
       this.setCullingEnabled(true);
     }
     //==============================================================================
@@ -8550,7 +8550,7 @@ void main() {
      * @param { number } value 밉맵 단계에 더할 값. (음수면 또렷해진다)
      */
     setImageMipmapBias(value) {
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#imageMipmapBias = value;
       const shaderPrograms = [this.#shaderProgram, this.#batchShaderProgram, this.#particleShaderProgram, this.#blendShaderProgram, this.#particleBlendShaderProgram, this.#shaderProgramOverride];
       for (const shaderProgram of shaderPrograms) {
@@ -8852,7 +8852,7 @@ void main() {
         blendFunction = this.#blendFunctionTable.get("source-over");
       }
       if (blendMode !== this.#blendMode) {
-        this.flushSpriteBatch();
+        this.flushBatch();
       }
       this.#blendMode = blendMode;
       this.#shaderBlendModeIndex = shaderBlendModeIndex;
@@ -9044,12 +9044,12 @@ void main() {
       }
       const shaderBlendModeIndex = this.#isStencilRecording ? 0 : this.getDrawShaderBlendModeIndex();
       const isShaderBlendDraw = shaderBlendModeIndex > 0;
-      if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
+      if (this.#isBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
         this.appendSpriteBatch(vertexCount, texture, color);
         return;
       }
       this.breakGeometryRecord();
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.applyClipScissor();
       if (isShaderBlendDraw) {
         this.applyShaderBlendCompositeFunction(true);
@@ -9620,32 +9620,32 @@ void main() {
       return this.#lastFrameCulledNodeCount;
     }
     //==============================================================================
-    // 스프라이트 묶어 그리기 설정.
+    // 묶어 그리기 켜고 끄기. (엔진이 처음에 켠다, 끄면 그리기 하나에 드로우 콜 하나)
     // - 켜면 연이은 드로우(이미지, 도형, 글자, 정점 색 쿼드)를 정점에 변환과 색을 실어 쌓아 두었다가 한 번의 드로우 콜로 그린다.
     // - 텍스처는 한 묶음에 여러 장(기기 텍스처 유닛 수와 16 가운데 작은 것)까지 묶어 텍스처가 바뀌어도 이어진다. (PixiJS 와 같은 꼴)
     // - 축에 맞고 화소 경계에 놓인 자르기(beginClipRect)는 정점의 자르기 사각형으로 셰이더가 잘라 묶음을 끊지 않는다. (돌아갔거나 둥근 자르기는 스텐실)
     // - 텍스처 칸이 차거나, 블렌드, 스텐실 자르기, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.
-    // - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.
+    // - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushBatch() 를 부른다.
     //==============================================================================
     /**
-     * @param { boolean } isSpriteBatchingEnabled 묶어 그리기를 켤지. (true 일 때만 켠다, 끄면 쌓인 것을 먼저 그린다)
+     * @param { boolean } isBatchingEnabled 묶어 그리기를 켤지. (true 일 때만 켠다, 끄면 쌓인 것을 먼저 그린다)
      */
-    setSpriteBatchingEnabled(isSpriteBatchingEnabled) {
-      if (!isSpriteBatchingEnabled) {
-        this.flushSpriteBatch();
+    setBatchingEnabled(isBatchingEnabled) {
+      if (!isBatchingEnabled) {
+        this.flushBatch();
       } else {
         this.ensureSpriteBatchResources();
       }
-      this.#isSpriteBatchingEnabled = isSpriteBatchingEnabled === true;
+      this.#isBatchingEnabled = isBatchingEnabled === true;
     }
     //==============================================================================
-    // 스프라이트 묶어 그리기 여부 반환.
+    // 묶어 그리기를 켰는지 반환.
     //==============================================================================
     /**
      * @returns { boolean } 묶어 그리기가 켜졌으면 참.
      */
-    isSpriteBatchingEnabled() {
-      return this.#isSpriteBatchingEnabled;
+    isBatchingEnabled() {
+      return this.#isBatchingEnabled;
     }
     //==============================================================================
     // 묶어 그리기 자원 준비. (셰이더 / 버텍스 어레이)
@@ -9831,7 +9831,7 @@ void main() {
       const isClipSlotMissing = this.#isShaderClipActive && this.#shaderClipSlotGeneration !== this.#batchGeneration && this.#batchClipRectCount >= BATCH_CLIP_SLOT_CAPACITY;
       const isVertexCapacityMissing = this.#batchVertexCount + vertexCount > BATCH_VERTEX_CAPACITY;
       if (isTextureSlotMissing || isClipSlotMissing || isVertexCapacityMissing) {
-        this.flushSpriteBatch();
+        this.flushBatch();
         textureSlot = -1;
       }
       if (textureSlot < 0) {
@@ -10001,10 +10001,21 @@ void main() {
       this.#batchVertexCount += vertexCount;
     }
     //==============================================================================
+    // 쌓인 묶음 그리기의 옛 이름. (폐기 예정, flushBatch 와 같다)
+    // - toonview3d.js 가 flushBatch 로 옮기면 뺀다. 공개 자료에는 싣지 않는다.
+    //==============================================================================
+    /**
+     * @private
+     * @deprecated flushBatch 를 쓴다.
+     */
+    flushSpriteBatch() {
+      this.flushBatch();
+    }
+    //==============================================================================
     // 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
     // - 묶음의 텍스처를 0 번부터의 유닛에 묶는다. 쓰지 않는 칸의 유닛에는 흰 텍스처를 묶어, 지난 그리기의 텍스처가 지금 그리는 칸(렌더 타겟)이어도 되먹임이 생기지 않게 한다.
     //==============================================================================
-    flushSpriteBatch() {
+    flushBatch() {
       const batchVertexCount = this.#batchVertexCount;
       if (batchVertexCount <= 0) {
         return;
@@ -10197,7 +10208,7 @@ void main() {
      * @param { Component } component 그릴 컴포넌트.
      */
     drawComponent(component) {
-      if (!this.#isGeometryCachingEnabled || this.#geometryActiveCache !== null || !this.#isSpriteBatchingEnabled || this.#shaderProgramOverride !== null || this.#isStencilRecording) {
+      if (!this.#isGeometryCachingEnabled || this.#geometryActiveCache !== null || !this.#isBatchingEnabled || this.#shaderProgramOverride !== null || this.#isStencilRecording) {
         component.draw(this);
         return;
       }
@@ -10751,11 +10762,11 @@ void main() {
       }
       const shaderBlendModeIndex = this.getDrawShaderBlendModeIndex();
       const isShaderBlendDraw = shaderBlendModeIndex > 0;
-      if (this.#isSpriteBatchingEnabled && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
+      if (this.#isBatchingEnabled && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
         this.appendColoredQuadsToSpriteBatch(vertexCount, texture);
         return;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.applyClipScissor();
       this.ensureParticleBatchResources();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -11493,7 +11504,7 @@ void main() {
       if (image === null || image === void 0) {
         return false;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       const imageTextureCache = this.getImageTextureCache();
       const texture = imageTextureCache.getTexture(image, this.isImageSmoothingEnabled(), this.isImageMipmapEnabled());
       return texture !== null;
@@ -11859,6 +11870,25 @@ void main() {
     measureText(text) {
       const textStringTextureCache = this.getTextStringTextureCache();
       const fontString = this.getFontString();
+      return textStringTextureCache.measureText(fontString, text);
+    }
+    //==============================================================================
+    // 문자열 측정. (주어진 폰트 문자열 기준, 현재 폰트 문자열은 바꾸지 않는다)
+    //==============================================================================
+    /**
+     * @param { string } fontString 잴 때 쓸 폰트 문자열. (Canvas2D font 꼴)
+     * @param { string } text 잴 글.
+     * @returns { TextMetrics } 그 글꼴로 잰 치수. (캐시가 나눠 쓰므로 고치지 않는다, 지금 변환은 보지 않는다)
+     * @example <caption>지금 글꼴을 바꾸지 않고 큰 글꼴로 재기</caption>
+     * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * const graphic = engine.getGraphic();
+     * const metrics = graphic.measureTextWithFontString("32px sans-serif", "Vanilla");
+     * console.log(metrics.width > 0, graphic.getFontString());
+     */
+    measureTextWithFontString(fontString, text) {
+      const textStringTextureCache = this.getTextStringTextureCache();
       return textStringTextureCache.measureText(fontString, text);
     }
     //==============================================================================
@@ -12333,7 +12363,7 @@ void main() {
       if (isShaderClip) {
         return;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       const previousStencilClipDepth = this.#stencilClipDepth;
       this.#stencilClipDepth += 1;
       if (previousStencilClipDepth === 0) {
@@ -12348,7 +12378,7 @@ void main() {
       } else {
         this.drawRect(rect);
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#isStencilRecording = false;
       webGL2RenderingContext.colorMask(true, true, true, true);
       webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -12443,7 +12473,7 @@ void main() {
       if (shaderClipCount === 0) {
         return 0;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const isShaderClipActive = this.#isShaderClipActive;
       this.#isShaderClipActive = false;
@@ -12461,7 +12491,7 @@ void main() {
           this.drawRect(clipEntry.rect);
         }
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#isStencilRecording = false;
       webGL2RenderingContext.colorMask(true, true, true, true);
       webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -12508,7 +12538,7 @@ void main() {
      */
     beginOpacityLayer() {
       this.breakGeometryRecord();
-      this.flushSpriteBatch();
+      this.flushBatch();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
       const globalAlpha = this.#globalAlpha;
@@ -12532,7 +12562,7 @@ void main() {
       if (opacityLayer === void 0) {
         return;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#globalAlpha = opacityLayer.globalAlpha;
       const target = opacityLayer.target;
       if (target === null) {
@@ -12552,7 +12582,7 @@ void main() {
       this.setBlendMode("source-over");
       const vertexCount = this.writeQuad(0, 0, 0, viewportWidth, viewportHeight, 0, 1, 1, 0) / FLOATS_PER_VERTEX;
       this.drawVertices(vertexCount, target.texture, this.getWhiteColor());
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.setBlendMode(blendMode);
       this.#transformMatrix = transformMatrix;
       this.#imageTintColor = imageTintColor;
@@ -12620,7 +12650,7 @@ void main() {
         return;
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#transformMatrix.copyFrom(clipEntry.transformMatrix);
       webGL2RenderingContext.colorMask(false, false, false, false);
       webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 255);
@@ -12631,7 +12661,7 @@ void main() {
       } else {
         this.drawRect(clipEntry.rect);
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#isStencilRecording = false;
       webGL2RenderingContext.colorMask(true, true, true, true);
       webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -12811,7 +12841,7 @@ void main() {
      */
     setShaderProgramOverride(shaderProgram) {
       this.breakGeometryRecord();
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#shaderProgramOverride = shaderProgram;
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const activeShaderProgram = this.getShaderProgram();
@@ -12892,7 +12922,7 @@ void main() {
     //   자르기 안에 3D 를 그릴 노드는 beginClipRect 앞에서 이것을 부르고, runExternalPass 에는 clearDepth: false 를 준다.
     //==============================================================================
     clearDepthBuffer() {
-      this.flushSpriteBatch();
+      this.flushBatch();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       webGL2RenderingContext.depthMask(true);
       webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
@@ -12934,7 +12964,7 @@ void main() {
     runExternalPass(callback, options = {}) {
       this.breakGeometryRecord();
       const isDepthCleared = options.clearDepth !== false;
-      this.flushSpriteBatch();
+      this.flushBatch();
       if (isDepthCleared) {
         this.clearDepthBuffer();
       }
@@ -13220,10 +13250,7 @@ void main() {
         return;
       }
       this.#isViewRectPending = false;
-      let devicePixelRatio = System14.window.devicePixelRatio || 1;
-      if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
-        devicePixelRatio = this.#maxRenderPixelRatio;
-      }
+      const devicePixelRatio = this.limitRenderPixelRatio(System14.window.devicePixelRatio || 1);
       const clientNativeSize = Vector2.create(System14.window.innerWidth, System14.window.innerHeight);
       const canvasNativeRect = canvas.getBoundingClientRect();
       const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
@@ -13626,6 +13653,27 @@ void main() {
      */
     getMaxRenderPixelRatio() {
       return this.#maxRenderPixelRatio;
+    }
+    //==============================================================================
+    // 상한을 건 배율.
+    // - 상한이 0 보다 크고 장치 배율이 상한을 넘으면 상한을, 아니면 장치 배율을 그대로 돌려준다. (calculateViewRect 가 쓰는 셈)
+    //==============================================================================
+    /**
+     * @param { number } devicePixelRatio 장치 화면 배율. (window.devicePixelRatio 꼴)
+     * @returns { number } 상한을 건 배율.
+     * @example <caption>상한 2 를 걸면 배율 3 은 2 로</caption>
+     * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * const viewManager = engine.getViewManager();
+     * viewManager.setMaxRenderPixelRatio(2);
+     * console.log(viewManager.limitRenderPixelRatio(3), viewManager.limitRenderPixelRatio(1.5));
+     */
+    limitRenderPixelRatio(devicePixelRatio) {
+      if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
+        return this.#maxRenderPixelRatio;
+      }
+      return devicePixelRatio;
     }
     //==============================================================================
     // 종횡비에 맞는 뷰 스케일 모드 자동 선택.
@@ -20298,7 +20346,7 @@ void main() {
         viewManager.applyCanvasNativeRect(graphic);
         this.#modalDialogList[0].draw(graphic, viewManager.getCanvasNativeSize());
       }
-      graphic.flushSpriteBatch();
+      graphic.flushBatch();
       const pointerCursor = PointerCursor.getInstance();
       pointerCursor.apply();
       inputManager.setTouchPressed(false);
@@ -20346,6 +20394,7 @@ void main() {
     // 씬 매니저 반환.
     //==============================================================================
     /**
+     * @private
      * @returns { SceneManager } 씬 매니저.
      */
     getSceneManager() {
@@ -20701,8 +20750,7 @@ void main() {
      * const isPauseSceneLoaded = pauseScene.isLoaded();
      * console.log(isPauseSceneLoaded);
      * await engine.unloadScene(pauseScene);
-     * const sceneManager = engine.getSceneManager();
-     * const loadedScenes = sceneManager.getAllLoadedScenes();
+     * const loadedScenes = engine.getAllLoadedScenes();
      * console.log(loadedScenes.length);
      */
     loadScene(scene) {
@@ -20729,6 +20777,22 @@ void main() {
     unloadAllScenes() {
       const sceneManager = this.getSceneManager();
       return sceneManager.unloadAllScenes();
+    }
+    //==============================================================================
+    // 불러온 씬 목록 반환. (불러온 차례, 러스트 판 get_all_loaded_scenes 와 같다)
+    //==============================================================================
+    /**
+     * @returns { Scene[] } 불러온 씬 목록. (엔진이 들고 있는 배열이라 고치지 않는다)
+     * @example <caption>run 한 씬이 목록에 든다</caption>
+     * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * engine.run(new Scene());
+     * console.log(engine.getAllLoadedScenes().length);
+     */
+    getAllLoadedScenes() {
+      const sceneManager = this.getSceneManager();
+      return sceneManager.getAllLoadedScenes();
     }
     //==============================================================================
     // 페이지가 가려져 있는지. (다른 탭, 앱 전환)

@@ -46,7 +46,6 @@
     ButtonMotion: () => ButtonMotion,
     ButtonMotionStyle: () => ButtonMotionStyle,
     ButtonState: () => ButtonState,
-    Camera: () => Camera,
     Camera2D: () => Camera2D,
     Camera3D: () => Camera3D,
     CameraGestures: () => CameraGestures,
@@ -59,7 +58,6 @@
     DevTools: () => DevTools,
     DialogueRunner: () => DialogueRunner,
     DialogueScriptParser: () => DialogueScriptParser,
-    Dictionary: () => Dictionary,
     DynamicFont: () => DynamicFont,
     Engine: () => Engine,
     EngineConfiguration: () => EngineConfiguration,
@@ -106,7 +104,6 @@
     LayoutStrength: () => LayoutStrength,
     LayoutTerm: () => LayoutTerm,
     LayoutVariable: () => LayoutVariable,
-    List: () => List,
     LoadingProgress: () => LoadingProgress,
     LocalStorage: () => LocalStorage,
     Localization: () => Localization,
@@ -116,6 +113,7 @@
     Material: () => Material,
     Math: () => math_exports,
     Matrix4: () => Matrix4,
+    MeshBuilder: () => MeshBuilder,
     ModalDialogHandle: () => ModalDialogHandle,
     ModalDialogKind: () => ModalDialogKind,
     ModalDialogResult: () => ModalDialogResult,
@@ -147,7 +145,6 @@
     PopupMotionState: () => PopupMotionState,
     ProgressDirection: () => ProgressDirection,
     Quaternion: () => Quaternion,
-    Queue: () => Queue,
     Rect: () => Rect,
     Reflection: () => reflection_exports,
     RenderTarget: () => RenderTarget,
@@ -169,7 +166,6 @@
     SKIN_TEXTURE_UNIT_MASKATLAS: () => SKIN_TEXTURE_UNIT_MASKATLAS,
     SKIN_TEXTURE_UNIT_MICRO: () => SKIN_TEXTURE_UNIT_MICRO,
     Scene: () => Scene,
-    SceneManager: () => SceneManager,
     ScreenEffect: () => ScreenEffect,
     ScreenEffectType: () => ScreenEffectType,
     ScreenFadeHold: () => ScreenFadeHold,
@@ -185,8 +181,8 @@
     ShadowImage: () => ShadowImage,
     ShadowMap: () => ShadowMap,
     ShadowText: () => ShadowText,
+    ShadowUpdateMode: () => ShadowUpdateMode,
     Shaker: () => Shaker,
-    Singleton: () => Singleton,
     SkinnedModel: () => SkinnedModel,
     SkinnedModelAsset: () => SkinnedModelAsset,
     SkinnedModelRenderer: () => SkinnedModelRenderer,
@@ -199,7 +195,6 @@
     SpriteAtlas: () => SpriteAtlas,
     SpriteBlendMode: () => SpriteBlendMode,
     SpriteDrawMode: () => SpriteDrawMode,
-    Stack: () => Stack,
     Steering2D: () => Steering2D,
     SubsurfaceScatteringEffect: () => SubsurfaceScatteringEffect,
     System: () => System147,
@@ -312,15 +307,32 @@
     composeToonProgramSources: () => composeToonProgramSources,
     countGraphemes: () => countGraphemes,
     createBezierEasing: () => createBezierEasing,
+    createBoxGeometry: () => createBoxGeometry,
+    createCapsuleGeometry: () => createCapsuleGeometry,
+    createCylinderGeometry: () => createCylinderGeometry,
+    createFacetedChunkGeometry: () => createFacetedChunkGeometry,
+    createLatheGeometry: () => createLatheGeometry,
+    createOctahedronGeometry: () => createOctahedronGeometry,
+    createPartMatrix: () => createPartMatrix,
     createReflectionMatrix: () => createReflectionMatrix,
+    createRoundedBoxGeometry: () => createRoundedBoxGeometry,
+    createSphereGeometry: () => createSphereGeometry,
+    createTorusGeometry: () => createTorusGeometry,
+    decodeGlbImage: () => decodeGlbImage,
     detectTextDirection: () => detectTextDirection,
     extractFrustumPlanes: () => extractFrustumPlanes,
     isViewPositionInsideNode: () => isViewPositionInsideNode,
     measureTextWithoutGraphic: () => measureTextWithoutGraphic,
     parseTimelineColor: () => parseTimelineColor,
+    readAnimationSwing: () => readAnimationSwing,
     readCameraRoll: () => readCameraRoll,
+    readColorValues: () => readColorValues,
     readFrameCamera: () => readFrameCamera,
     readGamepadKind: () => readGamepadKind,
+    readGlbArrays: () => readGlbArrays,
+    readGlbImages: () => readGlbImages,
+    readGlbNodeArrays: () => readGlbNodeArrays,
+    readGlbNodeInfos: () => readGlbNodeInfos,
     readJumpFloodSteps: () => readJumpFloodSteps,
     readMatrixDeterminant: () => readMatrixDeterminant,
     readOutlineVertexData: () => readOutlineVertexData,
@@ -334,7 +346,8 @@
     shakeButton: () => shakeButton,
     sliceGraphemes: () => sliceGraphemes,
     splitGraphemes: () => splitGraphemes,
-    splitWords: () => splitWords
+    splitWords: () => splitWords,
+    writeSkinPose: () => writeSkinPose
   });
 
   // src/base/wait.js
@@ -4025,46 +4038,6 @@
       const safeWidth = System8.Math.max(areaWidth - left - right, 0);
       const safeHeight = System8.Math.max(areaHeight - top - bottom, 0);
       return Rect.create(left, top, safeWidth, safeHeight);
-    }
-  };
-
-  // src/base/singleton.js
-  var Singleton = class _Singleton extends Object2 {
-    static {
-      __name(this, "Singleton");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @static @type { Map } */
-    static #instances = /* @__PURE__ */ new Map();
-    //==============================================================================
-    // 생성. (그 클래스의 인스턴스가 이미 있으면 던진다, getInstance 로 받는다)
-    //==============================================================================
-    /**
-     * @constructor
-     */
-    constructor() {
-      super();
-      const T = this.constructor;
-      if (_Singleton.#instances.has(T)) {
-        throw new Error(`Singleton: ${T.name} instance already exists. Use getInstance().`);
-      }
-      _Singleton.#instances.set(T, this);
-    }
-    //==============================================================================
-    // 공유 인스턴스 반환.
-    //==============================================================================
-    /**
-     * @static
-     * @returns { Singleton } 부른 클래스의 공유 인스턴스. (없으면 인자 없이 만들어 등록한다)
-     */
-    static getInstance() {
-      const T = this;
-      if (!_Singleton.#instances.has(T)) {
-        const obj = new T();
-      }
-      return _Singleton.#instances.get(T);
     }
   };
 
@@ -9961,7 +9934,7 @@ void main() {
     #softDiscTexture;
     // 부드러운 원 스프라이트. (지연 생성)
     /** @private @type { boolean } */
-    #isSpriteBatchingEnabled;
+    #isBatchingEnabled;
     // 같은 텍스처의 연이은 드로우를 한 번에 그릴지.
     /** @private @type { ShaderProgram | null } */
     #batchShaderProgram;
@@ -10292,7 +10265,7 @@ void main() {
       this.#particleVertexBuffer = null;
       this.#particleVertexData = null;
       this.#softDiscTexture = null;
-      this.#isSpriteBatchingEnabled = false;
+      this.#isBatchingEnabled = false;
       this.#batchShaderProgram = null;
       this.#batchVertexArray = null;
       this.#batchVertexBuffer = null;
@@ -10317,7 +10290,7 @@ void main() {
       }, "textureBinder");
       this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
       const beforeTextureOverwrite = /* @__PURE__ */ __name(() => {
-        this.flushSpriteBatch();
+        this.flushBatch();
       }, "beforeTextureOverwrite");
       this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder, beforeTextureOverwrite);
       this.#transformMatrix = new TransformMatrix();
@@ -10418,7 +10391,7 @@ void main() {
       webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
       this.applyImageMipmapBias(shaderProgram);
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-      this.setSpriteBatchingEnabled(true);
+      this.setBatchingEnabled(true);
       this.setCullingEnabled(true);
     }
     //==============================================================================
@@ -10523,7 +10496,7 @@ void main() {
      * @param { number } value 밉맵 단계에 더할 값. (음수면 또렷해진다)
      */
     setImageMipmapBias(value) {
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#imageMipmapBias = value;
       const shaderPrograms = [this.#shaderProgram, this.#batchShaderProgram, this.#particleShaderProgram, this.#blendShaderProgram, this.#particleBlendShaderProgram, this.#shaderProgramOverride];
       for (const shaderProgram of shaderPrograms) {
@@ -10825,7 +10798,7 @@ void main() {
         blendFunction = this.#blendFunctionTable.get("source-over");
       }
       if (blendMode !== this.#blendMode) {
-        this.flushSpriteBatch();
+        this.flushBatch();
       }
       this.#blendMode = blendMode;
       this.#shaderBlendModeIndex = shaderBlendModeIndex;
@@ -11017,12 +10990,12 @@ void main() {
       }
       const shaderBlendModeIndex = this.#isStencilRecording ? 0 : this.getDrawShaderBlendModeIndex();
       const isShaderBlendDraw = shaderBlendModeIndex > 0;
-      if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
+      if (this.#isBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
         this.appendSpriteBatch(vertexCount, texture, color);
         return;
       }
       this.breakGeometryRecord();
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.applyClipScissor();
       if (isShaderBlendDraw) {
         this.applyShaderBlendCompositeFunction(true);
@@ -11593,32 +11566,32 @@ void main() {
       return this.#lastFrameCulledNodeCount;
     }
     //==============================================================================
-    // 스프라이트 묶어 그리기 설정.
+    // 묶어 그리기 켜고 끄기. (엔진이 처음에 켠다, 끄면 그리기 하나에 드로우 콜 하나)
     // - 켜면 연이은 드로우(이미지, 도형, 글자, 정점 색 쿼드)를 정점에 변환과 색을 실어 쌓아 두었다가 한 번의 드로우 콜로 그린다.
     // - 텍스처는 한 묶음에 여러 장(기기 텍스처 유닛 수와 16 가운데 작은 것)까지 묶어 텍스처가 바뀌어도 이어진다. (PixiJS 와 같은 꼴)
     // - 축에 맞고 화소 경계에 놓인 자르기(beginClipRect)는 정점의 자르기 사각형으로 셰이더가 잘라 묶음을 끊지 않는다. (돌아갔거나 둥근 자르기는 스텐실)
     // - 텍스처 칸이 차거나, 블렌드, 스텐실 자르기, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.
-    // - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.
+    // - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushBatch() 를 부른다.
     //==============================================================================
     /**
-     * @param { boolean } isSpriteBatchingEnabled 묶어 그리기를 켤지. (true 일 때만 켠다, 끄면 쌓인 것을 먼저 그린다)
+     * @param { boolean } isBatchingEnabled 묶어 그리기를 켤지. (true 일 때만 켠다, 끄면 쌓인 것을 먼저 그린다)
      */
-    setSpriteBatchingEnabled(isSpriteBatchingEnabled) {
-      if (!isSpriteBatchingEnabled) {
-        this.flushSpriteBatch();
+    setBatchingEnabled(isBatchingEnabled) {
+      if (!isBatchingEnabled) {
+        this.flushBatch();
       } else {
         this.ensureSpriteBatchResources();
       }
-      this.#isSpriteBatchingEnabled = isSpriteBatchingEnabled === true;
+      this.#isBatchingEnabled = isBatchingEnabled === true;
     }
     //==============================================================================
-    // 스프라이트 묶어 그리기 여부 반환.
+    // 묶어 그리기를 켰는지 반환.
     //==============================================================================
     /**
      * @returns { boolean } 묶어 그리기가 켜졌으면 참.
      */
-    isSpriteBatchingEnabled() {
-      return this.#isSpriteBatchingEnabled;
+    isBatchingEnabled() {
+      return this.#isBatchingEnabled;
     }
     //==============================================================================
     // 묶어 그리기 자원 준비. (셰이더 / 버텍스 어레이)
@@ -11804,7 +11777,7 @@ void main() {
       const isClipSlotMissing = this.#isShaderClipActive && this.#shaderClipSlotGeneration !== this.#batchGeneration && this.#batchClipRectCount >= BATCH_CLIP_SLOT_CAPACITY;
       const isVertexCapacityMissing = this.#batchVertexCount + vertexCount > BATCH_VERTEX_CAPACITY;
       if (isTextureSlotMissing || isClipSlotMissing || isVertexCapacityMissing) {
-        this.flushSpriteBatch();
+        this.flushBatch();
         textureSlot = -1;
       }
       if (textureSlot < 0) {
@@ -11974,10 +11947,21 @@ void main() {
       this.#batchVertexCount += vertexCount;
     }
     //==============================================================================
+    // 쌓인 묶음 그리기의 옛 이름. (폐기 예정, flushBatch 와 같다)
+    // - toonview3d.js 가 flushBatch 로 옮기면 뺀다. 공개 자료에는 싣지 않는다.
+    //==============================================================================
+    /**
+     * @private
+     * @deprecated flushBatch 를 쓴다.
+     */
+    flushSpriteBatch() {
+      this.flushBatch();
+    }
+    //==============================================================================
     // 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
     // - 묶음의 텍스처를 0 번부터의 유닛에 묶는다. 쓰지 않는 칸의 유닛에는 흰 텍스처를 묶어, 지난 그리기의 텍스처가 지금 그리는 칸(렌더 타겟)이어도 되먹임이 생기지 않게 한다.
     //==============================================================================
-    flushSpriteBatch() {
+    flushBatch() {
       const batchVertexCount = this.#batchVertexCount;
       if (batchVertexCount <= 0) {
         return;
@@ -12170,7 +12154,7 @@ void main() {
      * @param { Component } component 그릴 컴포넌트.
      */
     drawComponent(component) {
-      if (!this.#isGeometryCachingEnabled || this.#geometryActiveCache !== null || !this.#isSpriteBatchingEnabled || this.#shaderProgramOverride !== null || this.#isStencilRecording) {
+      if (!this.#isGeometryCachingEnabled || this.#geometryActiveCache !== null || !this.#isBatchingEnabled || this.#shaderProgramOverride !== null || this.#isStencilRecording) {
         component.draw(this);
         return;
       }
@@ -12724,11 +12708,11 @@ void main() {
       }
       const shaderBlendModeIndex = this.getDrawShaderBlendModeIndex();
       const isShaderBlendDraw = shaderBlendModeIndex > 0;
-      if (this.#isSpriteBatchingEnabled && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
+      if (this.#isBatchingEnabled && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
         this.appendColoredQuadsToSpriteBatch(vertexCount, texture);
         return;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.applyClipScissor();
       this.ensureParticleBatchResources();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -13466,7 +13450,7 @@ void main() {
       if (image === null || image === void 0) {
         return false;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       const imageTextureCache = this.getImageTextureCache();
       const texture = imageTextureCache.getTexture(image, this.isImageSmoothingEnabled(), this.isImageMipmapEnabled());
       return texture !== null;
@@ -13832,6 +13816,25 @@ void main() {
     measureText(text) {
       const textStringTextureCache = this.getTextStringTextureCache();
       const fontString = this.getFontString();
+      return textStringTextureCache.measureText(fontString, text);
+    }
+    //==============================================================================
+    // 문자열 측정. (주어진 폰트 문자열 기준, 현재 폰트 문자열은 바꾸지 않는다)
+    //==============================================================================
+    /**
+     * @param { string } fontString 잴 때 쓸 폰트 문자열. (Canvas2D font 꼴)
+     * @param { string } text 잴 글.
+     * @returns { TextMetrics } 그 글꼴로 잰 치수. (캐시가 나눠 쓰므로 고치지 않는다, 지금 변환은 보지 않는다)
+     * @example <caption>지금 글꼴을 바꾸지 않고 큰 글꼴로 재기</caption>
+     * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * const graphic = engine.getGraphic();
+     * const metrics = graphic.measureTextWithFontString("32px sans-serif", "Vanilla");
+     * console.log(metrics.width > 0, graphic.getFontString());
+     */
+    measureTextWithFontString(fontString, text) {
+      const textStringTextureCache = this.getTextStringTextureCache();
       return textStringTextureCache.measureText(fontString, text);
     }
     //==============================================================================
@@ -14306,7 +14309,7 @@ void main() {
       if (isShaderClip) {
         return;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       const previousStencilClipDepth = this.#stencilClipDepth;
       this.#stencilClipDepth += 1;
       if (previousStencilClipDepth === 0) {
@@ -14321,7 +14324,7 @@ void main() {
       } else {
         this.drawRect(rect);
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#isStencilRecording = false;
       webGL2RenderingContext.colorMask(true, true, true, true);
       webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -14416,7 +14419,7 @@ void main() {
       if (shaderClipCount === 0) {
         return 0;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const isShaderClipActive = this.#isShaderClipActive;
       this.#isShaderClipActive = false;
@@ -14434,7 +14437,7 @@ void main() {
           this.drawRect(clipEntry.rect);
         }
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#isStencilRecording = false;
       webGL2RenderingContext.colorMask(true, true, true, true);
       webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -14481,7 +14484,7 @@ void main() {
      */
     beginOpacityLayer() {
       this.breakGeometryRecord();
-      this.flushSpriteBatch();
+      this.flushBatch();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
       const globalAlpha = this.#globalAlpha;
@@ -14505,7 +14508,7 @@ void main() {
       if (opacityLayer === void 0) {
         return;
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#globalAlpha = opacityLayer.globalAlpha;
       const target = opacityLayer.target;
       if (target === null) {
@@ -14525,7 +14528,7 @@ void main() {
       this.setBlendMode("source-over");
       const vertexCount = this.writeQuad(0, 0, 0, viewportWidth, viewportHeight, 0, 1, 1, 0) / FLOATS_PER_VERTEX;
       this.drawVertices(vertexCount, target.texture, this.getWhiteColor());
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.setBlendMode(blendMode);
       this.#transformMatrix = transformMatrix;
       this.#imageTintColor = imageTintColor;
@@ -14593,7 +14596,7 @@ void main() {
         return;
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#transformMatrix.copyFrom(clipEntry.transformMatrix);
       webGL2RenderingContext.colorMask(false, false, false, false);
       webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 255);
@@ -14604,7 +14607,7 @@ void main() {
       } else {
         this.drawRect(clipEntry.rect);
       }
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#isStencilRecording = false;
       webGL2RenderingContext.colorMask(true, true, true, true);
       webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -14784,7 +14787,7 @@ void main() {
      */
     setShaderProgramOverride(shaderProgram) {
       this.breakGeometryRecord();
-      this.flushSpriteBatch();
+      this.flushBatch();
       this.#shaderProgramOverride = shaderProgram;
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const activeShaderProgram = this.getShaderProgram();
@@ -14865,7 +14868,7 @@ void main() {
     //   자르기 안에 3D 를 그릴 노드는 beginClipRect 앞에서 이것을 부르고, runExternalPass 에는 clearDepth: false 를 준다.
     //==============================================================================
     clearDepthBuffer() {
-      this.flushSpriteBatch();
+      this.flushBatch();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       webGL2RenderingContext.depthMask(true);
       webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
@@ -14907,7 +14910,7 @@ void main() {
     runExternalPass(callback, options = {}) {
       this.breakGeometryRecord();
       const isDepthCleared = options.clearDepth !== false;
-      this.flushSpriteBatch();
+      this.flushBatch();
       if (isDepthCleared) {
         this.clearDepthBuffer();
       }
@@ -15193,10 +15196,7 @@ void main() {
         return;
       }
       this.#isViewRectPending = false;
-      let devicePixelRatio = System18.window.devicePixelRatio || 1;
-      if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
-        devicePixelRatio = this.#maxRenderPixelRatio;
-      }
+      const devicePixelRatio = this.limitRenderPixelRatio(System18.window.devicePixelRatio || 1);
       const clientNativeSize = Vector2.create(System18.window.innerWidth, System18.window.innerHeight);
       const canvasNativeRect = canvas.getBoundingClientRect();
       const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
@@ -15599,6 +15599,27 @@ void main() {
      */
     getMaxRenderPixelRatio() {
       return this.#maxRenderPixelRatio;
+    }
+    //==============================================================================
+    // 상한을 건 배율.
+    // - 상한이 0 보다 크고 장치 배율이 상한을 넘으면 상한을, 아니면 장치 배율을 그대로 돌려준다. (calculateViewRect 가 쓰는 셈)
+    //==============================================================================
+    /**
+     * @param { number } devicePixelRatio 장치 화면 배율. (window.devicePixelRatio 꼴)
+     * @returns { number } 상한을 건 배율.
+     * @example <caption>상한 2 를 걸면 배율 3 은 2 로</caption>
+     * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * const viewManager = engine.getViewManager();
+     * viewManager.setMaxRenderPixelRatio(2);
+     * console.log(viewManager.limitRenderPixelRatio(3), viewManager.limitRenderPixelRatio(1.5));
+     */
+    limitRenderPixelRatio(devicePixelRatio) {
+      if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
+        return this.#maxRenderPixelRatio;
+      }
+      return devicePixelRatio;
     }
     //==============================================================================
     // 종횡비에 맞는 뷰 스케일 모드 자동 선택.
@@ -21244,6 +21265,46 @@ void main() {
   }
   __name(copyToArrayBuffer2, "copyToArrayBuffer");
 
+  // src/base/singleton.js
+  var Singleton = class _Singleton extends Object2 {
+    static {
+      __name(this, "Singleton");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @static @type { Map } */
+    static #instances = /* @__PURE__ */ new Map();
+    //==============================================================================
+    // 생성. (그 클래스의 인스턴스가 이미 있으면 던진다, getInstance 로 받는다)
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      const T = this.constructor;
+      if (_Singleton.#instances.has(T)) {
+        throw new Error(`Singleton: ${T.name} instance already exists. Use getInstance().`);
+      }
+      _Singleton.#instances.set(T, this);
+    }
+    //==============================================================================
+    // 공유 인스턴스 반환.
+    //==============================================================================
+    /**
+     * @static
+     * @returns { Singleton } 부른 클래스의 공유 인스턴스. (없으면 인자 없이 만들어 등록한다)
+     */
+    static getInstance() {
+      const T = this;
+      if (!_Singleton.#instances.has(T)) {
+        const obj = new T();
+      }
+      return _Singleton.#instances.get(T);
+    }
+  };
+
   // src/core/pointercursor.js
   var System30 = globalThis;
   var SHOWN_CURSOR_NAMES = ["pointer", "crosshair", "not-allowed", "grab", "grabbing", "text", "move", "help", "wait", "progress", "none"];
@@ -22302,7 +22363,7 @@ void main() {
         viewManager.applyCanvasNativeRect(graphic);
         this.#modalDialogList[0].draw(graphic, viewManager.getCanvasNativeSize());
       }
-      graphic.flushSpriteBatch();
+      graphic.flushBatch();
       const pointerCursor = PointerCursor.getInstance();
       pointerCursor.apply();
       inputManager.setTouchPressed(false);
@@ -22350,6 +22411,7 @@ void main() {
     // 씬 매니저 반환.
     //==============================================================================
     /**
+     * @private
      * @returns { SceneManager } 씬 매니저.
      */
     getSceneManager() {
@@ -22705,8 +22767,7 @@ void main() {
      * const isPauseSceneLoaded = pauseScene.isLoaded();
      * console.log(isPauseSceneLoaded);
      * await engine.unloadScene(pauseScene);
-     * const sceneManager = engine.getSceneManager();
-     * const loadedScenes = sceneManager.getAllLoadedScenes();
+     * const loadedScenes = engine.getAllLoadedScenes();
      * console.log(loadedScenes.length);
      */
     loadScene(scene) {
@@ -22733,6 +22794,22 @@ void main() {
     unloadAllScenes() {
       const sceneManager = this.getSceneManager();
       return sceneManager.unloadAllScenes();
+    }
+    //==============================================================================
+    // 불러온 씬 목록 반환. (불러온 차례, 러스트 판 get_all_loaded_scenes 와 같다)
+    //==============================================================================
+    /**
+     * @returns { Scene[] } 불러온 씬 목록. (엔진이 들고 있는 배열이라 고치지 않는다)
+     * @example <caption>run 한 씬이 목록에 든다</caption>
+     * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * engine.run(new Scene());
+     * console.log(engine.getAllLoadedScenes().length);
+     */
+    getAllLoadedScenes() {
+      const sceneManager = this.getSceneManager();
+      return sceneManager.getAllLoadedScenes();
     }
     //==============================================================================
     // 페이지가 가려져 있는지. (다른 탭, 앱 전환)
@@ -30337,6 +30414,21 @@ void main() {
       return _LocalStorage.#backend;
     }
     //==============================================================================
+    // 저장 폴더 직접 설정. (러스트 판 데스크탑이 localstorage.json 을 둘 폴더, 원본은 브라우저가 페이지 주소마다 정해 아무것도 하지 않는다)
+    // - 같은 게임 코드가 두 엔진에서 돌게 두는 자리다. 러스트 판 웹도 아무것도 하지 않는다.
+    //==============================================================================
+    /**
+     * @param { string | null } storageDirectoryPath localstorage.json 을 둘 폴더. (null 이면 앱 이름으로 정한 기본 폴더)
+     * @example <caption>저장 폴더를 정해도 원본 저장은 그대로 브라우저 저장소에 간다</caption>
+     * import { LocalStorage } from "./build/vanilla.js";
+     *
+     * LocalStorage.setStorageDirectory("saves");
+     * LocalStorage.setString("profile.name", "Player");
+     * console.log(LocalStorage.getString("profile.name"));
+     */
+    static setStorageDirectory(storageDirectoryPath) {
+    }
+    //==============================================================================
     // 저장소를 못 써서 메모리로 대신한 적이 있는지.
     //==============================================================================
     /**
@@ -31060,6 +31152,33 @@ void main() {
       } else {
         this.#expandedNodes.delete(node);
       }
+    }
+    //==============================================================================
+    // 노드 검사. (보이고, Node Hierarchy 탭으로, 조상을 펼치고 그 노드를 고른다, 그 노드 자신은 펼치지 않는다)
+    //==============================================================================
+    /**
+     * @param { TransformNode } node 검사할 노드.
+     * @example <caption>자식 노드를 검사하면 부모가 펼쳐진다</caption>
+     * import { DevTools, WorldNode } from "./build/vanilla.js";
+     *
+     * const parentNode = new WorldNode();
+     * const childNode = new WorldNode();
+     * parentNode.addChild(childNode);
+     * const devTools = new DevTools();
+     * devTools.inspectNode(childNode);
+     * console.log(devTools.isVisible(), devTools.getActiveTab(), devTools.isNodeExpanded(parentNode), devTools.getSelectedNode() === childNode);
+     */
+    inspectNode(node) {
+      if (!this.#isVisible) {
+        this.setVisible(true);
+      }
+      this.setActiveTab(1);
+      let ancestorNode = node.getParent();
+      while (ancestorNode) {
+        this.#expandedNodes.add(ancestorNode);
+        ancestorNode = ancestorNode.getParent();
+      }
+      this.setSelectedNode(node);
     }
     //==============================================================================
     // 패널 영역 반환. (창 안쪽 논리 좌표)
@@ -44766,7 +44885,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
       if (contentSize.x <= 0 || contentSize.y <= 0) {
         return;
       }
-      graphic.flushSpriteBatch();
+      graphic.flushBatch();
       const transformMatrix = graphic.getTransformMatrix();
       const matrixA = transformMatrix.a;
       const matrixB = transformMatrix.b;
@@ -49181,11 +49300,11 @@ void main() {
     /**
      * @returns { number } 몸의 꼭짓점 번호 수. (indexData 의 길이)
      * @example <caption>바퀴 부위가 든 자리를 적어 두기</caption>
-     * import { ToonMesh, Matrix4 } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
-     * builder.addPart(ToonMesh.createBoxGeometry(1.2, 0.4, 0.6), Matrix4.createTranslation(0, 0.4, 0), "#c04040");
+     * import { MeshBuilder, createBoxGeometry, createCylinderGeometry, createPartMatrix, Matrix4 } from "./vanilla.js";
+     * const builder = new MeshBuilder();
+     * builder.addPart(createBoxGeometry(1.2, 0.4, 0.6), Matrix4.createTranslation(0, 0.4, 0), "#c04040");
      * const wheelStart = builder.getIndexCount();
-     * builder.addPart(ToonMesh.createCylinderGeometry(0.2, 0.2, 0.1, 16), ToonMesh.createPartMatrix(null, [0.4, 0.2, 0.35], [Math.PI / 2, 0, 0], null), "#303030");
+     * builder.addPart(createCylinderGeometry(0.2, 0.2, 0.1, 16), createPartMatrix(null, [0.4, 0.2, 0.35], [Math.PI / 2, 0, 0], null), "#303030");
      * const wheelRange = { indexStart: wheelStart, indexCount: builder.getIndexCount() - wheelStart };
      */
     getIndexCount() {
@@ -49197,11 +49316,11 @@ void main() {
     /**
      * @returns { number } 바깥선 껍데기의 꼭짓점 번호 수. (outlineIndexData 의 길이)
      * @example <caption>창의 바깥선 껍데기만 따로 그릴 자리</caption>
-     * import { ToonMesh, Matrix4 } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
-     * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#a0a0a0");
+     * import { MeshBuilder, createBoxGeometry, Matrix4 } from "./vanilla.js";
+     * const builder = new MeshBuilder();
+     * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#a0a0a0");
      * const windowOutlineStart = builder.getOutlineIndexCount();
-     * builder.addPart(ToonMesh.createBoxGeometry(0.4, 0.3, 0.05), Matrix4.createTranslation(0, 0.1, 0.5), "#80c0ff", { outlineWidth: 0.01 });
+     * builder.addPart(createBoxGeometry(0.4, 0.3, 0.05), Matrix4.createTranslation(0, 0.1, 0.5), "#80c0ff", { outlineWidth: 0.01 });
      * const windowOutlineRange = { outlineIndexStart: windowOutlineStart, outlineIndexCount: builder.getOutlineIndexCount() - windowOutlineStart };
      */
     getOutlineIndexCount() {
@@ -49216,11 +49335,11 @@ void main() {
      * @param { string } colorText "#rrggbb"
      * @param { object } [options] { glow 빛남(0 ~), isUnlit 빛을 받지 않음, hasOutline 바깥선(기본 있음), outlineWidth 바깥선 굵기 }
      * @example <caption>빛나는 눈과 바깥선 없는 그림자 판</caption>
-     * import { ToonMesh, Matrix4 } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
-     * builder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { outlineWidth: 0.03 });
-     * builder.addPart(ToonMesh.createSphereGeometry(0.06, 10, 8), Matrix4.createTranslation(0.15, 0.6, 0.45), "#40ffff", { glow: 2, isUnlit: true, hasOutline: false });
-     * builder.addPart(ToonMesh.createCylinderGeometry(0.5, 0.5, 0.01, 24), Matrix4.createTranslation(0, 0.005, 0), "#202020", { hasOutline: false });
+     * import { MeshBuilder, createSphereGeometry, createCylinderGeometry, Matrix4 } from "./vanilla.js";
+     * const builder = new MeshBuilder();
+     * builder.addPart(createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { outlineWidth: 0.03 });
+     * builder.addPart(createSphereGeometry(0.06, 10, 8), Matrix4.createTranslation(0.15, 0.6, 0.45), "#40ffff", { glow: 2, isUnlit: true, hasOutline: false });
+     * builder.addPart(createCylinderGeometry(0.5, 0.5, 0.01, 24), Matrix4.createTranslation(0, 0.005, 0), "#202020", { hasOutline: false });
      */
     addPart(geometry, matrix, colorText, options = {}) {
       const color = readColorValues(colorText);
@@ -49277,9 +49396,9 @@ void main() {
      * @param { Array<number> | null } patternColor [r, g, b] 무늬 색. (없으면 null)
      * @param { boolean } isUnlit 빛을 받지 않음.
      * @example <caption>무늬를 넣은 바닥 칸 두 개</caption>
-     * import { ToonMesh } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
-     * const grassColor = ToonMesh.readColorValues("#60a040");
+     * import { MeshBuilder, readColorValues } from "./vanilla.js";
+     * const builder = new MeshBuilder();
+     * const grassColor = readColorValues("#60a040");
      * builder.addQuad([[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [0, 1, 0], grassColor, 0, null, false);
      * builder.addQuad([[1, 0, 0], [2, 0, 0], [2, 0, 1], [1, 0, 1]], [0, 1, 0], grassColor, 1, [0.4, 0.7, 0.3], false);
      */
@@ -49315,8 +49434,8 @@ void main() {
      * @param { Array<object> } quads { corners 네 점 [x, y, z], normal [x, y, z] }
      * @param { number } outlineWidth - 껍데기 굵기. (꼭짓점 좌표 길이)
      * @example <caption>블록 하나의 윗면과 옆면에 바깥선 껍데기</caption>
-     * import { ToonMesh } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
+     * import { MeshBuilder } from "./vanilla.js";
+     * const builder = new MeshBuilder();
      * const quads = [
      * 	{ corners: [[0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1]], normal: [0, 1, 0] },
      * 	{ corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], normal: [0, 0, 1] },
@@ -49390,8 +49509,8 @@ void main() {
      * @param { ArrayLike<number> | null } [uvs] 꼭짓점마다 텍스처 좌표 둘. (없으면 null)
      * @param { ArrayLike<number> | null } [uvs1] 꼭짓점마다 2 번 텍스처 좌표 둘. (없으면 null)
      * @example <caption>코드로 만든 세모 하나를 UV 와 함께 담기</caption>
-     * import { ToonMesh, Matrix4 } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
+     * import { MeshBuilder, Matrix4 } from "./vanilla.js";
+     * const builder = new MeshBuilder();
      * const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
      * const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
      * const uvs = new Float32Array([0, 1, 1, 1, 0, 0]);
@@ -49431,10 +49550,10 @@ void main() {
      * @param { ArrayLike<number> | null } joints - 꼭짓점마다 뼈대 번호 넷. (없으면 null)
      * @param { ArrayLike<number> | null } weights - 꼭짓점마다 무게 넷. (없으면 null)
      * @example <caption>미리 부풀린 껍데기를 그대로 담기</caption>
-     * import { ToonMesh, Matrix4 } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
-     * const body = ToonMesh.createFacetedChunkGeometry(0.5, [1], [1, 1, 1]);
-     * const shell = ToonMesh.createFacetedChunkGeometry(0.53, [1], [1, 1, 1]);
+     * import { MeshBuilder, createFacetedChunkGeometry, Matrix4 } from "./vanilla.js";
+     * const builder = new MeshBuilder();
+     * const body = createFacetedChunkGeometry(0.5, [1], [1, 1, 1]);
+     * const shell = createFacetedChunkGeometry(0.53, [1], [1, 1, 1]);
      * builder.addTriangles(new Float32Array(body.positions), new Float32Array(body.normals), body.indices, Matrix4.createIdentity(), [0.6, 0.8, 1], 0, false, null, null);
      * builder.addOutlineTriangles(new Float32Array(shell.positions), shell.indices, Matrix4.createIdentity(), null, null);
      */
@@ -49463,9 +49582,9 @@ void main() {
      * @param { ArrayLike<number> | null } joints - 꼭짓점마다 뼈대 번호 넷. (없으면 null)
      * @param { ArrayLike<number> | null } weights - 꼭짓점마다 무게 넷. (없으면 null)
      * @example <caption>받은 몸으로 같은 굵기의 껍데기 짓기</caption>
-     * import { ToonMesh, Matrix4 } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
-     * const body = ToonMesh.createFacetedChunkGeometry(0.5, [1, 0.9, 1.1], [1, 0.8, 1]);
+     * import { MeshBuilder, createFacetedChunkGeometry, Matrix4 } from "./vanilla.js";
+     * const builder = new MeshBuilder();
+     * const body = createFacetedChunkGeometry(0.5, [1, 0.9, 1.1], [1, 0.8, 1]);
      * const matrix = Matrix4.createTranslation(0, 0.4, 0);
      * builder.addTriangles(new Float32Array(body.positions), new Float32Array(body.normals), body.indices, matrix, [0.6, 0.55, 0.5], 0, false, null, null);
      * builder.addTriangleShell(body.positions, body.normals, body.indices, matrix, 0.02, null, null);
@@ -49546,11 +49665,11 @@ void main() {
     /**
      * @param { object } materialRange - { name, indexStart, indexCount, ... } 몸의 꼭짓점 번호 자리. (readArrays 의 materialRanges 에 복사해 담긴다)
      * @example <caption>부위 하나를 이름 붙인 재질 범위로 담기</caption>
-     * import { ToonMesh, Matrix4 } from "./vanilla.js";
-     * const builder = new ToonMesh.MeshBuilder();
-     * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#909090");
+     * import { MeshBuilder, createBoxGeometry, Matrix4 } from "./vanilla.js";
+     * const builder = new MeshBuilder();
+     * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#909090");
      * const screenStart = builder.getIndexCount();
-     * builder.addPart(ToonMesh.createBoxGeometry(0.6, 0.4, 0.02), Matrix4.createTranslation(0, 0.1, 0.51), "#102030", { hasOutline: false });
+     * builder.addPart(createBoxGeometry(0.6, 0.4, 0.02), Matrix4.createTranslation(0, 0.1, 0.51), "#102030", { hasOutline: false });
      * builder.addMaterialRange({ name: "screen", indexStart: screenStart, indexCount: builder.getIndexCount() - screenStart, extras: {} });
      * const screenRange = builder.readArrays().materialRanges.find((materialRange) => materialRange.name === "screen");
      */
@@ -49581,10 +49700,10 @@ void main() {
     /**
      * @returns { object } { vertexData, indexData, outlineVertexData, outlineIndexData, outlineBaseData, skinData, outlineSkinData, skeleton, uvData, uv1Data, materialRanges }
      * @example <caption>지은 배열을 툰 렌더러에 올리기</caption>
-     * import { ToonRenderer, ToonMesh, Matrix4 } from "./vanilla.js";
+     * import { ToonRenderer, MeshBuilder, createTorusGeometry, Matrix4 } from "./vanilla.js";
      * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-     * const builder = new ToonMesh.MeshBuilder();
-     * builder.addPart(ToonMesh.createTorusGeometry(0.4, 0.1, 10, 24), Matrix4.createIdentity(), "#e08060");
+     * const builder = new MeshBuilder();
+     * builder.addPart(createTorusGeometry(0.4, 0.1, 10, 24), Matrix4.createIdentity(), "#e08060");
      * const arrays = builder.readArrays();
      * const mesh = builder.isEmpty() ? null : renderer.createMesh(arrays);
      */
@@ -49855,7 +49974,7 @@ void main() {
     }
     //==============================================================================
     // 지어 둔 배열 여럿을 옮겨 한 배열로 잇기. (움직이지 않는 조각을 한 메시로, 돌리거나 키우지 않음)
-    // - 조각마다 { arrays: readArrays 나 ToonGlb.readGlbArrays 의 결과, offset: [x, y, z] (없으면 옮기지 않음) }.
+    // - 조각마다 { arrays: readArrays 나 readGlbArrays 의 결과, offset: [x, y, z] (없으면 옮기지 않음) }.
     //   자리에 옮김을 더하고 번호에 앞 조각의 꼭짓점 수를 더한다. 바깥선 껍데기와 안쪽 범위(innerOutlineRanges, innerBodyRanges)도 같이 옮겨 잇는다.
     // - 뼈대는 잇지 않는다. 뼈대가 있는 조각도 쉬는 자세 그대로 움직이지 않는 몸이 된다.
     //==============================================================================
@@ -49864,13 +49983,13 @@ void main() {
      * @param { Array<object> } pieces { arrays, offset }
      * @returns { object } readArrays 의 꼴.
      * @example <caption>바위 조각 셋을 옮겨 한 메시로 잇기</caption>
-     * import { ToonRenderer, ToonMesh, Matrix4 } from "./vanilla.js";
+     * import { ToonRenderer, MeshBuilder, createFacetedChunkGeometry, Matrix4 } from "./vanilla.js";
      * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-     * const builder = new ToonMesh.MeshBuilder();
-     * builder.addPart(ToonMesh.createFacetedChunkGeometry(0.4, [1, 0.8, 1.1, 0.9], [1, 0.7, 1]), Matrix4.createIdentity(), "#8a8070");
+     * const builder = new MeshBuilder();
+     * builder.addPart(createFacetedChunkGeometry(0.4, [1, 0.8, 1.1, 0.9], [1, 0.7, 1]), Matrix4.createIdentity(), "#8a8070");
      * const rockArrays = builder.readArrays();
      * const pieces = [{ arrays: rockArrays, offset: [0, 0, 0] }, { arrays: rockArrays, offset: [1.2, 0, 0.3] }, { arrays: rockArrays, offset: [-0.8, 0, 1] }];
-     * const combinedArrays = ToonMesh.MeshBuilder.combine(pieces);
+     * const combinedArrays = MeshBuilder.combine(pieces);
      * const rocksMesh = renderer.createMesh(combinedArrays);
      */
     static combine(pieces) {
@@ -50571,6 +50690,14 @@ void main() {
   var SHADOW_ATLAS_MAXIMUM_LIGHTS = 4;
   var CUBE_FACE_FORWARDS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
   var CUBE_FACE_UPS = [[0, 1, 0], [0, 1, 0], [0, 0, 1], [0, 0, 1], [0, 1, 0], [0, 1, 0]];
+  var ShadowUpdateMode = System75.Object.freeze({
+    everyFrame: "everyFrame",
+    // 매 프레임 전부.
+    onChange: "onChange",
+    // 바뀔 때만. (기본)
+    interval: "interval"
+    // N 프레임마다.
+  });
   function createDepthTarget(webGL2RenderingContext, resolution) {
     const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
     const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
@@ -50593,6 +50720,49 @@ void main() {
     return { framebuffer, depthTexture };
   }
   __name(createDepthTarget, "createDepthTarget");
+  function createShadowCache(resolution) {
+    return { resolution, updateMode: ShadowUpdateMode.onChange, updateInterval: 1, isUpdateRequested: true, frameCount: 0, renderTarget: "live", cacheTarget: null, lightKey: null, casterRecords: [], hasCache: false, isDepthCurrent: false };
+  }
+  __name(createShadowCache, "createShadowCache");
+  function bindShadowTarget(webGL2RenderingContext, shadowCache, framebuffer) {
+    const renderTarget = shadowCache.renderTarget;
+    const resolution = shadowCache.resolution;
+    shadowCache.renderTarget = "live";
+    shadowCache.isDepthCurrent = false;
+    if (renderTarget === "cache" && shadowCache.cacheTarget === null) {
+      shadowCache.cacheTarget = createDepthTarget(webGL2RenderingContext, resolution);
+    }
+    if (renderTarget === "copy" && shadowCache.cacheTarget !== null) {
+      const isScissorEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.SCISSOR_TEST);
+      webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, shadowCache.cacheTarget.framebuffer);
+      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.DRAW_FRAMEBUFFER, framebuffer);
+      webGL2RenderingContext.blitFramebuffer(0, 0, resolution, resolution, 0, 0, resolution, resolution, webGL2RenderingContext.DEPTH_BUFFER_BIT, webGL2RenderingContext.NEAREST);
+      if (isScissorEnabled) {
+        webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+      }
+    }
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, renderTarget === "cache" ? shadowCache.cacheTarget.framebuffer : framebuffer);
+    webGL2RenderingContext.viewport(0, 0, resolution, resolution);
+    webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+    webGL2RenderingContext.depthMask(true);
+    if (renderTarget !== "copy" || shadowCache.cacheTarget === null) {
+      webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+    }
+  }
+  __name(bindShadowTarget, "bindShadowTarget");
+  function deleteShadowCache(webGL2RenderingContext, shadowCache) {
+    if (shadowCache.cacheTarget !== null) {
+      webGL2RenderingContext.deleteFramebuffer(shadowCache.cacheTarget.framebuffer);
+      webGL2RenderingContext.deleteTexture(shadowCache.cacheTarget.depthTexture);
+      shadowCache.cacheTarget = null;
+    }
+    shadowCache.casterRecords.length = 0;
+    shadowCache.lightKey = null;
+    shadowCache.hasCache = false;
+    shadowCache.isDepthCurrent = false;
+  }
+  __name(deleteShadowCache, "deleteShadowCache");
   function createBasisViewMatrix(position, forward, up) {
     const right = [forward[1] * up[2] - forward[2] * up[1], forward[2] * up[0] - forward[0] * up[2], forward[0] * up[1] - forward[1] * up[0]];
     const back = [-forward[0], -forward[1], -forward[2]];
@@ -50637,6 +50807,9 @@ void main() {
     #resolution;
     /** @private @type { Matrix4 } */
     #lightViewProjectionMatrix;
+    /** @private @type { object } */
+    #shadowCache;
+    // 갱신 방식과 구운 판. (createShadowCache)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -50653,6 +50826,7 @@ void main() {
       const depthTarget = createDepthTarget(webGL2RenderingContext, resolution);
       this.#framebuffer = depthTarget.framebuffer;
       this.#depthTexture = depthTarget.depthTexture;
+      this.#shadowCache = createShadowCache(resolution);
     }
     //==============================================================================
     // 광원 행렬 갱신. (초점 주변을 덮는 직교 투영, 텍셀 스냅, 빛이 거의 바로 위나 아래로 나아가면 위쪽을 z 축으로 잡아 행렬이 깨지지 않게)
@@ -50694,17 +50868,66 @@ void main() {
       this.#lightViewProjectionMatrix = lightViewProjectionMatrix;
     }
     //==============================================================================
-    // 깊이 패스 시작. (프레임버퍼 바인드 + 뷰포트 + 깊이 클리어)
+    // 깊이 패스 시작. (프레임버퍼 바인드 + 뷰포트 + 깊이 클리어, ToonDrawQueue 가 캐시를 쓸 때는 구운 판에 그리거나 구운 판을 옮겨 그 위에 덧그린다)
     //==============================================================================
     beginRender() {
-      const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const framebuffer = this.getFramebuffer();
-      const resolution = this.getResolution();
-      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
-      webGL2RenderingContext.viewport(0, 0, resolution, resolution);
-      webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
-      webGL2RenderingContext.depthMask(true);
-      webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+      bindShadowTarget(this.getWebGL2RenderingContext(), this.#shadowCache, this.getFramebuffer());
+    }
+    //==============================================================================
+    // 그림자를 다시 그리는 방식 정하기. (ToonDrawQueue 가 따른다, 기본 ShadowUpdateMode.onChange, 정하면 다음 그리기에서 전부 다시 그린다)
+    //==============================================================================
+    /**
+     * @param { string } updateMode - ShadowUpdateMode.
+     * @param { number } [updateInterval] - interval 일 때 몇 프레임마다 그릴지. (기본 1, 1 보다 작으면 1)
+     * @example <caption>해 그림자를 세 프레임마다 그리기</caption>
+     * import { ShadowMap, ShadowUpdateMode } from "./vanilla.js";
+     * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+     * const shadowTarget = new ShadowMap(webGL2RenderingContext, 1024);
+     * shadowTarget.setUpdateMode(ShadowUpdateMode.interval, 3);
+     * console.log(shadowTarget.getUpdateMode(), shadowTarget.getUpdateInterval());
+     * shadowTarget.setUpdateMode(ShadowUpdateMode.everyFrame);
+     * shadowTarget.destroy();
+     */
+    setUpdateMode(updateMode, updateInterval = 1) {
+      const shadowCache = this.#shadowCache;
+      shadowCache.updateMode = updateMode;
+      shadowCache.updateInterval = System75.Math.max(1, System75.Math.floor(updateInterval));
+      shadowCache.frameCount = 0;
+      shadowCache.isUpdateRequested = true;
+    }
+    //==============================================================================
+    // 그림자를 다시 그리는 방식 반환.
+    //==============================================================================
+    /**
+     * @returns { string } ShadowUpdateMode.
+     */
+    getUpdateMode() {
+      return this.#shadowCache.updateMode;
+    }
+    //==============================================================================
+    // interval 의 프레임 수 반환.
+    //==============================================================================
+    /**
+     * @returns { number } 몇 프레임마다 그리는지. (1 이상)
+     */
+    getUpdateInterval() {
+      return this.#shadowCache.updateInterval;
+    }
+    //==============================================================================
+    // 다음 그리기에서 전부 다시 그리게 하기. (드리우개 기록이 못 보는 바뀜, 예를 들어 모형의 꼭짓점을 고쳤을 때)
+    //==============================================================================
+    requestUpdate() {
+      this.#shadowCache.isUpdateRequested = true;
+    }
+    //==============================================================================
+    // 그림자 깊이 캐시 반환. (ToonDrawQueue 가 쓴다)
+    //==============================================================================
+    /**
+     * @returns { object } 캐시.
+     * @private
+     */
+    getShadowCache() {
+      return this.#shadowCache;
     }
     //==============================================================================
     // 렌더링 컨텍스트 반환.
@@ -50752,12 +50975,13 @@ void main() {
       return this.#lightViewProjectionMatrix;
     }
     //==============================================================================
-    // 파괴. (프레임버퍼와 깊이 텍스처를 지운다)
+    // 파괴. (프레임버퍼와 깊이 텍스처, 구운 판을 지운다)
     //==============================================================================
     destroy() {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       webGL2RenderingContext.deleteFramebuffer(this.#framebuffer);
       webGL2RenderingContext.deleteTexture(this.#depthTexture);
+      deleteShadowCache(webGL2RenderingContext, this.#shadowCache);
     }
   };
   var ShadowAtlas = class extends Object2 {
@@ -50790,6 +51014,9 @@ void main() {
     /** @private @type { Array<object> } */
     #tiles;
     // { viewProjectionMatrix, x, y, size }
+    /** @private @type { object } */
+    #shadowCache;
+    // 갱신 방식과 구운 판. (createShadowCache)
     //==============================================================================
     // 생성. (깊이 텍스처와 컬러 없는 프레임버퍼, 앞의 묶음은 돌린다)
     //==============================================================================
@@ -50811,6 +51038,7 @@ void main() {
       this.#tileSize = resolution;
       this.#lights = [];
       this.#tiles = [];
+      this.#shadowCache = createShadowCache(resolution);
     }
     //==============================================================================
     // 빛 목록으로 칸 나누기. (castsShadow 가 true 인 것을 SHADOW_ATLAS_MAXIMUM_LIGHTS 까지, 스포트라이트 한 칸, 점광 여섯 칸)
@@ -50879,16 +51107,68 @@ void main() {
       return { viewProjectionMatrix, x: tileIndex % this.#gridSize * this.#tileSize, y: System75.Math.floor(tileIndex / this.#gridSize) * this.#tileSize, size: this.#tileSize };
     }
     //==============================================================================
-    // 깊이 패스 시작. (프레임버퍼를 묶고 판 전체를 비운다, 칸마다 beginTile)
+    // 깊이 패스 시작. (프레임버퍼를 묶고 판 전체를 비운다, 칸마다 beginTile, ToonDrawQueue 가 캐시를 쓸 때는 구운 판에 그리거나 구운 판을 옮겨 그 위에 덧그린다)
     //==============================================================================
     beginRender() {
       const webGL2RenderingContext = this.#webGL2RenderingContext;
-      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.#framebuffer);
-      webGL2RenderingContext.viewport(0, 0, this.#resolution, this.#resolution);
       webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
-      webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
-      webGL2RenderingContext.depthMask(true);
-      webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+      bindShadowTarget(webGL2RenderingContext, this.#shadowCache, this.#framebuffer);
+    }
+    //==============================================================================
+    // 그림자를 다시 그리는 방식 정하기. (ToonDrawQueue 가 따른다, 기본 ShadowUpdateMode.onChange, 정하면 다음 그리기에서 전부 다시 그린다)
+    //==============================================================================
+    /**
+     * @param { string } updateMode - ShadowUpdateMode.
+     * @param { number } [updateInterval] - interval 일 때 몇 프레임마다 그릴지. (기본 1, 1 보다 작으면 1)
+     * @example <caption>점광 그림자를 세 프레임마다 그리기</caption>
+     * import { ShadowAtlas, ShadowUpdateMode } from "./vanilla.js";
+     * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+     * const shadowTarget = new ShadowAtlas(webGL2RenderingContext, 1024);
+     * shadowTarget.setUpdateMode(ShadowUpdateMode.interval, 3);
+     * console.log(shadowTarget.getUpdateMode(), shadowTarget.getUpdateInterval());
+     * shadowTarget.setUpdateMode(ShadowUpdateMode.everyFrame);
+     * shadowTarget.destroy();
+     */
+    setUpdateMode(updateMode, updateInterval = 1) {
+      const shadowCache = this.#shadowCache;
+      shadowCache.updateMode = updateMode;
+      shadowCache.updateInterval = System75.Math.max(1, System75.Math.floor(updateInterval));
+      shadowCache.frameCount = 0;
+      shadowCache.isUpdateRequested = true;
+    }
+    //==============================================================================
+    // 그림자를 다시 그리는 방식 반환.
+    //==============================================================================
+    /**
+     * @returns { string } ShadowUpdateMode.
+     */
+    getUpdateMode() {
+      return this.#shadowCache.updateMode;
+    }
+    //==============================================================================
+    // interval 의 프레임 수 반환.
+    //==============================================================================
+    /**
+     * @returns { number } 몇 프레임마다 그리는지. (1 이상)
+     */
+    getUpdateInterval() {
+      return this.#shadowCache.updateInterval;
+    }
+    //==============================================================================
+    // 다음 그리기에서 전부 다시 그리게 하기. (드리우개 기록이 못 보는 바뀜, 예를 들어 모형의 꼭짓점을 고쳤을 때)
+    //==============================================================================
+    requestUpdate() {
+      this.#shadowCache.isUpdateRequested = true;
+    }
+    //==============================================================================
+    // 그림자 깊이 캐시 반환. (ToonDrawQueue 가 쓴다)
+    //==============================================================================
+    /**
+     * @returns { object } 캐시.
+     * @private
+     */
+    getShadowCache() {
+      return this.#shadowCache;
     }
     //==============================================================================
     // 칸 하나에 뷰포트 걸기.
@@ -50992,12 +51272,13 @@ void main() {
       return this.#framebuffer;
     }
     //==============================================================================
-    // 파괴. (프레임버퍼와 깊이 텍스처를 지운다)
+    // 파괴. (프레임버퍼와 깊이 텍스처, 구운 판을 지운다)
     //==============================================================================
     destroy() {
       const webGL2RenderingContext = this.#webGL2RenderingContext;
       webGL2RenderingContext.deleteFramebuffer(this.#framebuffer);
       webGL2RenderingContext.deleteTexture(this.#depthTexture);
+      deleteShadowCache(webGL2RenderingContext, this.#shadowCache);
     }
   };
   function normalizeDirection2(direction) {
@@ -54934,18 +55215,21 @@ void main() {
     // (graphic, contentSize) => void
     /** @private @type { boolean } */
     #isDepthCleared;
-    /** @private @type { object } */
+    /** @private @type { Rect } */
     #screenRect;
-    // 이번 그리기의 화면 사각형. ({ x, y, width, height })
+    // 이번 그리기의 화면 사각형. (드로잉 버퍼 픽셀, 왼쪽 위 원점)
     /** @private @type { number } */
     #renderScale;
     // 3D 를 그리는 판의 배율. (1 이면 화면에 바로, 아니면 그 배율의 판에 그려 선형으로 늘여 얹는다)
     /** @private @type { RenderTarget | null } */
     #renderScaleTarget;
     // 배율 판. (처음 쓸 때 짓는다)
+    /** @private @type { Rect } */
+    #drawScreenRect;
+    // 그리기 함수에 넘기는 사각형. (배율 판에 그리면 판 전체)
     /** @private @type { object } */
-    #outputScreenRect;
-    // 그리기 함수에 넘기는 사각형. ({ x, y, width, height, outputFramebuffer, outputViewport })
+    #output;
+    // 그리기 함수에 넘기는 출력. ({ outputFramebuffer, outputViewport }, 러스트 판 ToonViewOutput)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -54958,17 +55242,18 @@ void main() {
       this.#drawCallback = null;
       this.#fallbackDrawCallback = null;
       this.#isDepthCleared = true;
-      this.#screenRect = { x: 0, y: 0, width: 0, height: 0 };
+      this.#screenRect = Rect.create(0, 0, 0, 0);
       this.#renderScale = 1;
       this.#renderScaleTarget = null;
-      this.#outputScreenRect = { x: 0, y: 0, width: 0, height: 0, outputFramebuffer: null, outputViewport: [0, 0, 0, 0] };
+      this.#drawScreenRect = Rect.create(0, 0, 0, 0);
+      this.#output = { outputFramebuffer: null, outputViewport: [0, 0, 0, 0] };
     }
     //==============================================================================
     // 렌더 스케일 설정. (3D 만 이 배율의 판에 그려 선형 거르기로 늘여 얹는다, UI 는 기기 화소 그대로. 유니티 URP renderScale, 언리얼 화면 비율과 같은 뜻)
     // - 1(기본)이면 지금처럼 화면에 바로 그린다. 1 이 아니면 판(내용 영역의 화면 크기 x 배율, 깊이 포함, 캔버스가 안티에일리어싱이면 멀티샘플 4)에
     //   투명하게 비운 뒤 그리고, 2D 그리기 길로 source-over 로 얹는다. (2D 자르기를 따르고, 3D 가 덮지 않은 곳은 아래 2D 가 비친다)
     // - 판은 제 깊이를 쓰므로 setDepthCleared(false) 로 앞의 3D 깊이를 이어 쓰던 것은 배율이 1 일 때만 된다.
-    // - 그리기 함수는 넘겨받은 사각형의 outputFramebuffer, outputViewport 로 내야 배율과 상관없이 맞는 자리에 낸다. (ToonPostProcess.end 같은 것)
+    // - 그리기 함수는 넘겨받은 출력(output)의 프레임 버퍼와 뷰포트로 내야 배율과 상관없이 맞는 자리에 낸다. (ToonPostProcess.end 같은 것)
     //==============================================================================
     /**
      * @param { number } renderScale - 배율. (0.05 ~ 4, 1 이면 화면에 바로, 수가 아니면 1)
@@ -54997,30 +55282,31 @@ void main() {
       return this.#renderScale;
     }
     //==============================================================================
-    // 그리기 함수 설정. ((renderer, camera, screenRect, webGL2RenderingContext) => void, null 이면 그리지 않음)
-    // - screenRect 는 { x, y, width, height, outputFramebuffer, outputViewport } 다. x, y, width, height 는 지금 프레임 버퍼에서 그릴 사각형(픽셀, 왼쪽 위 원점),
-    //   outputFramebuffer 는 지금 묶인 프레임 버퍼(null 이면 캔버스), outputViewport 는 그 안의 GL 뷰포트([x, y, 너비, 높이], 정수, 왼쪽 아래 원점)다.
+    // 그리기 함수 설정. ((renderer, camera, screenRect, webGL2RenderingContext, output) => void, null 이면 그리지 않음)
+    // - screenRect 는 지금 프레임 버퍼에서 그릴 사각형(Rect, 픽셀, 왼쪽 위 원점, 그리기마다 고쳐 쓰는 같은 객체)이다.
+    // - output 은 { outputFramebuffer, outputViewport } 다. outputFramebuffer 는 지금 묶인 프레임 버퍼(null 이면 캔버스),
+    //   outputViewport 는 그 안의 GL 뷰포트([x, y, 너비, 높이], 정수, 왼쪽 아래 원점)다. (러스트 판 ToonViewOutput 의 output_framebuffer, output_viewport)
     //   ToonPostProcess.end 처럼 따로 내는 것은 이 둘로 내야 렌더 스케일, 투명도 층과 상관없이 맞는 자리에 낸다.
     //==============================================================================
     /**
-     * @param { Function | null } drawCallback - (renderer, camera, screenRect, webGL2RenderingContext) => void. (null 이면 그리지 않음)
+     * @param { Function | null } drawCallback - (renderer, camera, screenRect, webGL2RenderingContext, output) => void. (null 이면 그리지 않음)
      * @example <caption>노드 사각형 안에 HDR 마무리를 걸어 그리기</caption>
      * import { WorldNode, ToonView3D, ToonPostProcess } from "./vanilla.js";
      * const node = new WorldNode();
      * node.setContentSizeXY(320, 240);
      * const view = node.addComponent(ToonView3D);
      * let postProcess = null;
-     * view.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext) => {
+     * view.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext, output) => {
      * 	if (postProcess === null) {
-     * 		postProcess = new ToonPostProcess(webGL2RenderingContext, screenRect.width, screenRect.height);
+     * 		postProcess = new ToonPostProcess(webGL2RenderingContext, screenRect.size.x, screenRect.size.y);
      * 		renderer.setHdrOutput(postProcess.getUseFloatColor());
      * 	}
      * 	renderer.clearScreenRect();
-     * 	postProcess.resize(screenRect.width, screenRect.height);
+     * 	postProcess.resize(screenRect.size.x, screenRect.size.y);
      * 	postProcess.begin([0.05, 0.05, 0.08]);
      * 	renderer.beginFrameWithCamera(camera);
      * 	renderer.endFrame();
-     * 	postProcess.end(screenRect.outputFramebuffer, screenRect.outputViewport);
+     * 	postProcess.end(output.outputFramebuffer, output.outputViewport);
      * });
      */
     setDrawCallback(drawCallback) {
@@ -55119,13 +55405,13 @@ void main() {
       return this.#camera;
     }
     //==============================================================================
-    // 지난 그리기의 화면 사각형 반환. ({ x, y, width, height } 드로잉 버퍼 픽셀)
+    // 지난 그리기의 화면 사각형 반환. (드로잉 버퍼 픽셀)
     //==============================================================================
     /**
-     * @returns { object } { x, y, width, height } 드로잉 버퍼 픽셀의 사각형. (왼쪽 위가 원점, 그리기마다 고쳐 쓰는 같은 객체)
+     * @returns { Rect } 드로잉 버퍼 픽셀의 사각형. (왼쪽 위가 원점, 아직 그리지 않았으면 빈 사각형, 복사본)
      */
     getScreenRect() {
-      return this.#screenRect;
+      return this.#screenRect.clone();
     }
     //==============================================================================
     // 렌더러 읽기. (처음이면 짓고, 짓지 못하면 null 이고 다시 짓지 않는다)
@@ -55176,10 +55462,10 @@ void main() {
         maximumY = System79.Math.max(maximumY, screenY);
       }
       const screenRect = this.#screenRect;
-      screenRect.x = minimumX;
-      screenRect.y = minimumY;
-      screenRect.width = maximumX - minimumX;
-      screenRect.height = maximumY - minimumY;
+      screenRect.position.x = minimumX;
+      screenRect.position.y = minimumY;
+      screenRect.size.x = maximumX - minimumX;
+      screenRect.size.y = maximumY - minimumY;
     }
     //==============================================================================
     // 출력.
@@ -55208,28 +55494,34 @@ void main() {
       }
       this.refreshScreenRect(graphic, contentSize);
       const screenRect = this.#screenRect;
-      if (screenRect.width <= 0 || screenRect.height <= 0) {
+      const screenX = screenRect.position.x;
+      const screenY = screenRect.position.y;
+      const screenWidth = screenRect.size.x;
+      const screenHeight = screenRect.size.y;
+      if (screenWidth <= 0 || screenHeight <= 0) {
         return;
       }
       const camera = this.#camera;
-      camera.setAspectRatio(screenRect.width / screenRect.height);
+      camera.setAspectRatio(screenWidth / screenHeight);
       if (this.#renderScale !== 1) {
         this.drawWithRenderScale(graphic, renderer, drawCallback);
         return;
       }
-      const outputScreenRect = this.#outputScreenRect;
+      const drawScreenRect = this.#drawScreenRect;
+      const output = this.#output;
       graphic.runExternalPass((webGL2RenderingContext) => {
-        this.writeOutputScreenRect(graphic, screenRect.x, screenRect.y, screenRect.width, screenRect.height);
-        renderer.setScreenRect(screenRect.x, screenRect.y, screenRect.width, screenRect.height);
+        this.#writeOutput(graphic, screenX, screenY, screenWidth, screenHeight);
+        renderer.setScreenRect(screenX, screenY, screenWidth, screenHeight);
         try {
-          drawCallback(renderer, camera, outputScreenRect, webGL2RenderingContext);
+          drawCallback(renderer, camera, drawScreenRect, webGL2RenderingContext, output);
         } finally {
           renderer.clearScreenRect();
         }
       }, { clearDepth: this.#isDepthCleared });
     }
     //==============================================================================
-    // 그리기 함수에 넘길 사각형 채우기. (지금 묶인 프레임 버퍼와 그 안의 GL 뷰포트, 왼쪽 아래 원점)
+    // 그리기 함수에 넘길 사각형과 출력 채우기. (출력은 지금 묶인 프레임 버퍼와 그 안의 GL 뷰포트, 왼쪽 아래 원점, 러스트 판 read_output)
+    // - 사각형은 지금 뷰포트 안의 픽셀(왼쪽 위 원점)이다. 뷰포트는 정수 픽셀로 반올림한다. (GL 뷰포트는 정수)
     //==============================================================================
     /**
      * @private
@@ -55239,17 +55531,18 @@ void main() {
      * @param { number } width - 너비.
      * @param { number } height - 높이.
      */
-    writeOutputScreenRect(graphic, x, y, width, height) {
-      const outputScreenRect = this.#outputScreenRect;
+    #writeOutput(graphic, x, y, width, height) {
+      const drawScreenRect = this.#drawScreenRect;
+      drawScreenRect.position.x = x;
+      drawScreenRect.position.y = y;
+      drawScreenRect.size.x = width;
+      drawScreenRect.size.y = height;
+      const output = this.#output;
       const viewport = graphic.getCurrentViewport();
-      outputScreenRect.x = x;
-      outputScreenRect.y = y;
-      outputScreenRect.width = width;
-      outputScreenRect.height = height;
-      outputScreenRect.outputFramebuffer = graphic.getCurrentFramebuffer();
+      output.outputFramebuffer = graphic.getCurrentFramebuffer();
       const outputWidth = System79.Math.max(1, System79.Math.round(width));
       const outputHeight = System79.Math.max(1, System79.Math.round(height));
-      const outputViewport = outputScreenRect.outputViewport;
+      const outputViewport = output.outputViewport;
       outputViewport[0] = viewport.position.x + System79.Math.round(x);
       outputViewport[1] = viewport.position.y + viewport.height - System79.Math.round(y) - outputHeight;
       outputViewport[2] = outputWidth;
@@ -55298,9 +55591,10 @@ void main() {
       const screenRect = this.#screenRect;
       const camera = this.#camera;
       const renderScale = this.#renderScale;
-      const targetWidth = System79.Math.max(1, System79.Math.round(screenRect.width * renderScale));
-      const targetHeight = System79.Math.max(1, System79.Math.round(screenRect.height * renderScale));
-      const outputScreenRect = this.#outputScreenRect;
+      const targetWidth = System79.Math.max(1, System79.Math.round(screenRect.size.x * renderScale));
+      const targetHeight = System79.Math.max(1, System79.Math.round(screenRect.size.y * renderScale));
+      const drawScreenRect = this.#drawScreenRect;
+      const output = this.#output;
       let colorTexture = null;
       graphic.runExternalPass((webGL2RenderingContext) => {
         const target = this.readRenderScaleTarget(webGL2RenderingContext, targetWidth, targetHeight);
@@ -55320,10 +55614,10 @@ void main() {
         webGL2RenderingContext.clearColor(0, 0, 0, 0);
         webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
         webGL2RenderingContext.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-        this.writeOutputScreenRect(graphic, 0, 0, targetWidth, targetHeight);
+        this.#writeOutput(graphic, 0, 0, targetWidth, targetHeight);
         renderer.setScreenRect(0, 0, targetWidth, targetHeight);
         try {
-          drawCallback(renderer, camera, outputScreenRect, webGL2RenderingContext);
+          drawCallback(renderer, camera, drawScreenRect, webGL2RenderingContext, output);
         } finally {
           renderer.clearScreenRect();
           target.resolve();
@@ -55346,7 +55640,7 @@ void main() {
       graphic.setGlobalAlpha(1);
       graphic.setImageTintColor(null);
       graphic.setBlendMode("source-over");
-      const floatCount = graphic.writeQuad(0, screenRect.x, screenRect.y, screenRect.x + screenRect.width, screenRect.y + screenRect.height, 0, 1, 1, 0);
+      const floatCount = graphic.writeQuad(0, screenRect.position.x, screenRect.position.y, screenRect.position.x + screenRect.size.x, screenRect.position.y + screenRect.size.y, 0, 1, 1, 0);
       graphic.drawVertices(floatCount / 4, colorTexture, graphic.getWhiteColor());
       graphic.popState();
     }
@@ -55446,32 +55740,34 @@ void main() {
       return this.#documentText;
     }
     //==============================================================================
-    // 문서로 노드 트리 짓기.
+    // 문서로 노드 트리 짓기. (넘겨받은 UIDocument 로 짓는다, 게임이 등록한 종류와 그림 해석기를 쓴다)
     //==============================================================================
     /**
+     * @param { UIDocument } uiDocument 노드와 컴포넌트를 지을 문서.
      * @returns { WorldNode | null } 새로 지은 뿌리 노드. (어느 부모에도 붙지 않았고 로컬 위치가 location 이다, 문서가 없으면 null, 문서 꼴이 틀리면 예외를 던진다)
      * @example <caption>같은 문서로 두 벌 짓기</caption>
-     * import { Visual, Vector2 } from "./build/vanilla.js";
+     * import { Visual, UIDocument, Vector2 } from "./build/vanilla.js";
      *
+     * const uiDocument = new UIDocument();
      * const documentData = {
      * 	version: 1,
      * 	root: { type: "WorldNode", name: "Coin", contentSize: [32, 32], components: [], children: [] },
      * };
      * const visual = new Visual();
-     * console.log(visual.createNode());
+     * console.log(visual.createNode(uiDocument));
      * visual.setDocumentText(JSON.stringify(documentData));
-     * const firstNode = visual.createNode();
+     * const firstNode = visual.createNode(uiDocument);
      * visual.setLocation(Vector2.create(48, 0));
-     * const secondNode = visual.createNode();
+     * const secondNode = visual.createNode(uiDocument);
      * const secondPosition = secondNode.getLocalPosition();
      * console.log(firstNode !== secondNode, secondNode.getName(), secondPosition.x);
      */
-    createNode() {
+    createNode(uiDocument) {
       const documentText = this.getDocumentText();
       if (documentText === null) {
         return null;
       }
-      const rootNode = UIDocument.fromJsonText(documentText);
+      const rootNode = uiDocument.fromJsonText(documentText);
       const location = this.getLocation();
       rootNode.setLocalPosition(location.clone());
       return rootNode;
@@ -56092,6 +56388,9 @@ void main() {
     /** @private @type { object | null } */
     #templateData;
     // 직렬화된 템플릿.
+    /** @private @type { UIDocument | null } */
+    #templateDocument;
+    // 템플릿을 쓰고 읽는 문서. (항목을 만들 때마다 이 문서로 읽는다)
     /** @private @type { Function | null } */
     #createItemEvent;
     // () => WorldNode, 템플릿 대신 항목 노드를 만든다.
@@ -56132,6 +56431,7 @@ void main() {
       super();
       this.setComponentType("UIListView");
       this.#templateData = null;
+      this.#templateDocument = null;
       this.#createItemEvent = null;
       this.#itemCount = 0;
       this.#itemSize = 0;
@@ -56159,13 +56459,41 @@ void main() {
     // 템플릿 설정.
     // - 노드를 직렬화해 두고 필요할 때 복제한다. 원본은 감춘다.
     //   항목 크기는 템플릿의 contentSize 진행 축 값에서 읽는다.
+    // - 엔진 기본 종류만 등록한 새 UIDocument 로 복제한다. 게임 컴포넌트가 든 템플릿은 setTemplateNodeWithDocument 를 쓴다.
     //==============================================================================
     /**
      * @param { import("../core/node/worldnode.js").WorldNode } templateNode 항목의 본이 될 노드. (UIDocument 로 직렬화해 쥐고 이 노드는 끈다, 항목 크기를 정하지 않았으면 이 노드의 contentSize 진행 축 값을 쓴다, 앞서 준 만들기 함수는 지운다)
      */
     setTemplateNode(templateNode) {
+      this.setTemplateNodeWithDocument(templateNode, new UIDocument());
+    }
+    //==============================================================================
+    // 템플릿 설정. (게임 컴포넌트를 등록한 UIDocument 로 직렬화하고 복제한다)
+    //==============================================================================
+    /**
+     * @param { import("../core/node/worldnode.js").WorldNode } templateNode 항목의 본이 될 노드. (setTemplateNode 와 같다)
+     * @param { UIDocument } uiDocument 템플릿을 쓰고 읽을 문서. (템플릿의 컴포넌트 종류를 등록해 둔 것, 항목을 만들 때마다 이 문서로 읽는다)
+     * @example <caption>게임 컴포넌트가 든 템플릿으로 목록 짓기</caption>
+     * import { UIDocument, UIListView, WorldNode, Component, Vector2 } from "./build/vanilla.js";
+     *
+     * class Badge extends Component {
+     * }
+     *
+     * const uiDocument = new UIDocument();
+     * uiDocument.registerComponentType("Badge", Badge);
+     * const listNode = new WorldNode();
+     * listNode.setContentSize(Vector2.create(200, 300));
+     * const listView = listNode.addComponent(UIListView);
+     * const templateNode = new WorldNode();
+     * templateNode.setContentSize(Vector2.create(200, 40));
+     * templateNode.addComponent(Badge);
+     * listView.setTemplateNodeWithDocument(templateNode, uiDocument);
+     * console.log(templateNode.isActive(), listView.getItemSize());
+     */
+    setTemplateNodeWithDocument(templateNode, uiDocument) {
       this.#createItemEvent = null;
-      this.#templateData = UIDocument.serializeNode(templateNode);
+      this.#templateDocument = uiDocument;
+      this.#templateData = uiDocument.serializeNode(templateNode);
       this.#templateData.active = true;
       templateNode.setActive(false);
       const templateSize = templateNode.getContentSize();
@@ -56302,7 +56630,7 @@ void main() {
       if (freeItemNode) {
         return freeItemNode;
       }
-      const itemNode = this.#createItemEvent !== null ? this.#createItemEvent() : UIDocument.deserializeNode(this.#templateData);
+      const itemNode = this.#createItemEvent !== null ? this.#createItemEvent() : this.#templateDocument.deserializeNode(this.#templateData);
       if (!itemNode) {
         return null;
       }
@@ -58415,7 +58743,7 @@ void main() {
   // src/ui/uidocument.js
   var System89 = globalThis;
   var UIDOCUMENT_VERSION = 1;
-  var NODE_TYPE_TABLE = {
+  var DEFAULT_NODE_TYPE_TABLE = {
     WorldNode
   };
   var NODE_REFERENCE_KEY = "$nodeRef";
@@ -58436,7 +58764,7 @@ void main() {
     "ImagePath"
     // 그림 경로는 전용 핸들러가 imagePath 로 적는다. (러스트 판 #[reflect(skip)])
   ]);
-  var COMPONENT_TYPE_TABLE = {
+  var DEFAULT_COMPONENT_TYPE_TABLE = {
     Paint,
     Sprite,
     Text,
@@ -58455,8 +58783,6 @@ void main() {
     UIScrollView,
     ShadowImage
   };
-  var deserializeRootNode = null;
-  var pendingNodeReferenceList = [];
   function collectReflectedProperties(targetObject) {
     const propertyList = [];
     const visitedNameSet = new System89.Set();
@@ -58498,6 +58824,28 @@ void main() {
     return targetType.name;
   }
   __name(findRegisteredTypeName, "findRegisteredTypeName");
+  function collectImagePaths(value, imagePathList) {
+    if (System89.Array.isArray(value)) {
+      for (const childValue of value) {
+        collectImagePaths(childValue, imagePathList);
+      }
+      return;
+    }
+    if (!value || typeof value !== "object") {
+      return;
+    }
+    for (const key of System89.Object.keys(value)) {
+      const childValue = value[key];
+      if (key === "imagePath") {
+        if (typeof childValue === "string" && childValue.length > 0 && !imagePathList.includes(childValue)) {
+          imagePathList.push(childValue);
+        }
+        continue;
+      }
+      collectImagePaths(childValue, imagePathList);
+    }
+  }
+  __name(collectImagePaths, "collectImagePaths");
   function colorToArray(color) {
     return [color.red, color.green, color.blue, color.alpha];
   }
@@ -58570,7 +58918,7 @@ void main() {
           spriteBlendMode: component.getSpriteBlendMode()
         };
       },
-      load(component, data) {
+      load(component, data, loadContext) {
         if (data.color) {
           component.setColor(arrayToColor(data.color));
         }
@@ -58579,10 +58927,7 @@ void main() {
         }
         if (data.imagePath) {
           component.setImagePath(data.imagePath);
-          const resolvedImage = UIDocument.resolveImage(data.imagePath);
-          if (resolvedImage) {
-            component.setImage(resolvedImage);
-          }
+          loadContext.bindImage(component, data.imagePath);
         }
         if (System89.Array.isArray(data.nineSlice) && data.nineSlice.length === 4) {
           const nineSliceLeft = data.nineSlice[0];
@@ -58658,13 +59003,10 @@ void main() {
       save(component) {
         return { imagePath: component.getImagePath() };
       },
-      load(component, data) {
+      load(component, data, loadContext) {
         if (data.imagePath) {
           component.setImagePath(data.imagePath);
-          const resolvedImage = UIDocument.resolveImage(data.imagePath);
-          if (resolvedImage) {
-            component.setImage(resolvedImage);
-          }
+          loadContext.bindImage(component, data.imagePath);
         }
       }
     },
@@ -58727,20 +59069,17 @@ void main() {
     },
     ShadowImage: {
       // 그림 경로 뒤에 반사 저장 꼴. (그림 원본은 문서에 담지 않고 Sprite 처럼 경로만 적는다)
-      save(component) {
+      save(component, document2) {
         const componentData = { imagePath: component.getImagePath() };
-        System89.Object.assign(componentData, UIDocument.saveByReflection(component));
+        System89.Object.assign(componentData, document2.saveByReflection(component));
         return componentData;
       },
-      load(component, data) {
+      load(component, data, loadContext) {
         if (data.imagePath) {
           component.setImagePath(data.imagePath);
-          const resolvedImage = UIDocument.resolveImage(data.imagePath);
-          if (resolvedImage) {
-            component.setImage(resolvedImage);
-          }
+          loadContext.bindImage(component, data.imagePath);
         }
-        UIDocument.loadByReflection(component, data);
+        loadContext.document.loadByReflection(component, data);
       }
     },
     UIScrollView: {
@@ -58777,16 +59116,74 @@ void main() {
       }
     }
   };
-  var imageResolver = null;
   var UIDocument = class _UIDocument extends Object2 {
     static {
       __name(this, "UIDocument");
     }
     //==============================================================================
-    // 이미지 경로 해석기 등록. (정적, 경로 → HTMLImageElement)
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { object } */
+    #componentTypeTable;
+    // 컴포넌트 종류 표. (문서 이름 → 생성자, 등록 차례)
+    /** @private @type { object } */
+    #nodeTypeTable;
+    // 노드 종류 표. (문서 이름 → 생성자)
+    /** @private @type { Function | null } */
+    #imageResolver;
+    // 그림 경로 해석기. (경로 → 그림, null 이면 loadImages 로 요청한 애셋에서 찾는다)
+    /** @private @type { Map<string, object> } */
+    #imageAssetMap;
+    // loadImages 로 요청한 그림. (경로 → { asset, isFinished })
+    /** @private @type { object[] } */
+    #pendingImageList;
+    // 맡아 둔 그림. ({ component, imagePath })
+    /** @private @type { object[] } */
+    #pendingNodeReferenceList;
+    // 트리를 다 지은 뒤 이을 노드 참조. ({ target, setterName, path })
+    /** @private @type { WorldNode | null } */
+    #serializeRootNode;
+    // 적고 있는 문서의 뿌리. (노드 참조 경로의 기준, 적는 동안만)
+    /** @private @type { object } */
+    #loadContext;
+    // 속성 표의 load 에 넘기는 것. ({ document, bindImage(component, imagePath) })
+    //==============================================================================
+    // 생성. (엔진 기본 종류를 등록해 둔다)
     //==============================================================================
     /**
-     * @param { function(string): HTMLImageElement | null } resolver 문서의 이미지 경로를 받아 그림을 돌려주는 함수. (복원할 때 부르므로 fromJsonText 앞에 건다, null 을 돌려주면 그림 없이 복원)
+     * @example <caption>문서 하나를 지어 트리를 글로 적고 되살리기</caption>
+     * import { UIDocument, WorldNode, Paint, Color, Vector2 } from "./build/vanilla.js";
+     *
+     * const panelNode = new WorldNode();
+     * panelNode.setName("Panel");
+     * panelNode.setContentSize(Vector2.create(320, 200));
+     * panelNode.addComponent(Paint).setColor(new Color(0.2, 0.4, 0.8, 1));
+     * const uiDocument = new UIDocument();
+     * const jsonText = uiDocument.toJsonText(panelNode, true);
+     * const loadedNode = uiDocument.fromJsonText(jsonText);
+     * console.log(loadedNode.getContentSize().x, uiDocument.toJsonText(loadedNode, true) === jsonText);
+     */
+    constructor() {
+      super();
+      this.#componentTypeTable = System89.Object.assign({}, DEFAULT_COMPONENT_TYPE_TABLE);
+      this.#nodeTypeTable = System89.Object.assign({}, DEFAULT_NODE_TYPE_TABLE);
+      this.#imageResolver = null;
+      this.#imageAssetMap = new System89.Map();
+      this.#pendingImageList = [];
+      this.#pendingNodeReferenceList = [];
+      this.#serializeRootNode = null;
+      this.#loadContext = {
+        document: this,
+        bindImage: /* @__PURE__ */ __name((component, imagePath) => {
+          this.#pendingImageList.push({ component, imagePath });
+        }, "bindImage")
+      };
+    }
+    //==============================================================================
+    // 이미지 경로 해석기 등록. (경로 → HTMLImageElement, 등록하면 loadImages 로 요청한 애셋 대신 이것으로 찾는다)
+    //==============================================================================
+    /**
+     * @param { function(string): HTMLImageElement | null } resolver 문서의 이미지 경로를 받아 그림을 돌려주는 함수. (null 을 돌려주면 그 그림은 찾지 못한 것이다)
      * @example <caption>미리 받은 그림으로 이미지 경로 잇기</caption>
      * import { UIDocument, Sprite } from "./build/vanilla.js";
      *
@@ -58795,7 +59192,8 @@ void main() {
      * image.src = imagePath;
      * await image.decode();
      * const imageTable = new Map([[imagePath, image]]);
-     * UIDocument.setImageResolver((path) => {
+     * const uiDocument = new UIDocument();
+     * uiDocument.setImageResolver((path) => {
      * 	const foundImage = imageTable.get(path);
      * 	return foundImage !== undefined ? foundImage : null;
      * });
@@ -58804,41 +59202,157 @@ void main() {
      * 	root: { type: "WorldNode", name: "Root", contentSize: [128, 128], components: [{ type: "Sprite", imagePath: imagePath }], children: [] },
      * };
      * const jsonText = JSON.stringify(documentData);
-     * const rootNode = UIDocument.fromJsonText(jsonText);
+     * const rootNode = uiDocument.fromJsonText(jsonText);
      * const sprite = rootNode.getComponent(Sprite);
-     * console.log(sprite.getImagePath());
+     * console.log(sprite.getImagePath(), sprite.getImage() === image, uiDocument.resolveImage("missing.png"));
      */
-    static setImageResolver(resolver) {
-      imageResolver = resolver;
+    setImageResolver(resolver) {
+      this.#imageResolver = resolver;
     }
     //==============================================================================
-    // 이미지 경로 해석. (정적)
+    // 이미지 경로 해석. (찾지 못했거나 아직 읽히는 중이면 null)
     //==============================================================================
     /**
      * @param { string } imagePath 문서에 적힌 이미지 경로.
-     * @returns { HTMLImageElement | null } 해석기가 돌려준 그림. (해석기가 없으면 null)
+     * @returns { HTMLImageElement | null } 찾은 그림. (해석기가 null 을 주었거나, 해석기가 없고 loadImages 로 요청하지 않았거나 아직 읽히는 중이거나 읽기에 실패했으면 null)
      */
-    static resolveImage(imagePath) {
-      if (!imageResolver) {
-        return null;
-      }
-      const resolvedImage = imageResolver(imagePath);
-      return resolvedImage;
+    resolveImage(imagePath) {
+      const imageLookup = this.#findImage(imagePath);
+      return imageLookup.image;
     }
     //==============================================================================
-    // 노드 트리 → 문서 데이터. (정적, 재귀)
+    // 그림 찾기. (해석기가 있으면 해석기, 없으면 loadImages 로 요청한 애셋)
+    //==============================================================================
+    /**
+     * @private
+     * @param { string } imagePath 그림 경로.
+     * @returns { object } { image, isWaiting }. (image 가 null 이고 isWaiting 이 참이면 아직 읽히는 중)
+     */
+    #findImage(imagePath) {
+      const imageResolver = this.#imageResolver;
+      if (imageResolver !== null) {
+        const resolvedImage = imageResolver(imagePath);
+        return { image: resolvedImage ? resolvedImage : null, isWaiting: false };
+      }
+      const imageEntry = this.#imageAssetMap.get(imagePath);
+      if (imageEntry === void 0) {
+        return { image: null, isWaiting: false };
+      }
+      if (imageEntry.asset.isLoaded()) {
+        return { image: imageEntry.asset.getImage(), isWaiting: false };
+      }
+      return { image: null, isWaiting: !imageEntry.isFinished };
+    }
+    //==============================================================================
+    // 문서의 그림 읽기 요청. (imagePath 마다 ImageAsset 을 요청해 문서에 든다. 이미 요청한 경로는 건너뛴다)
+    // - 새로 요청한 그림마다 다 읽히면(읽지 못해도) 풀리는 프로미스를 돌려준다. 씬의 loadAssets 에서 Promise.all 로 기다린 뒤 fromJsonText 하면 그림이 다 붙는다.
+    // - 기다리지 않고 지으면 아직 읽히는 그림은 맡아 두므로, 씬의 update 에서 bindPendingImages 를 남은 수가 0 이 될 때까지 부른다.
+    //==============================================================================
+    /**
+     * @param { string } jsonText 문서 글.
+     * @returns { Promise<void>[] } 새로 요청한 그림의 읽기 프로미스 목록. (읽지 못해도 풀린다, JSON 이 아니거나 새로 요청할 경로가 없으면 빈 목록)
+     * @example <caption>문서의 그림을 읽은 뒤 짓기</caption>
+     * import { UIDocument, Sprite } from "./build/vanilla.js";
+     *
+     * const jsonText = JSON.stringify({ version: 1, root: { name: "Icons", components: [{ type: "Sprite", imagePath: "examples/assets/spritesheet.png" }] } });
+     * const uiDocument = new UIDocument();
+     * const loadPromiseList = uiDocument.loadImages(jsonText);
+     * await Promise.all(loadPromiseList);
+     * const iconsNode = uiDocument.fromJsonText(jsonText);
+     * console.log(loadPromiseList.length, uiDocument.bindPendingImages(), iconsNode.getComponent(Sprite).getImage() !== null);
+     */
+    loadImages(jsonText) {
+      let documentData = null;
+      try {
+        documentData = System89.JSON.parse(jsonText);
+      } catch (exception) {
+        return [];
+      }
+      const imagePathList = [];
+      collectImagePaths(documentData, imagePathList);
+      const loadPromiseList = [];
+      for (const imagePath of imagePathList) {
+        if (this.#imageAssetMap.has(imagePath)) {
+          continue;
+        }
+        const imageEntry = { asset: new ImageAsset(), isFinished: false };
+        this.#imageAssetMap.set(imagePath, imageEntry);
+        const loadPromise = imageEntry.asset.load(imagePath).then(() => {
+          imageEntry.isFinished = true;
+        }, () => {
+          imageEntry.isFinished = true;
+        });
+        loadPromiseList.push(loadPromise);
+      }
+      return loadPromiseList;
+    }
+    //==============================================================================
+    // 맡아 둔 그림 붙이기. (찾은 그림은 넣고, 아직 읽히는 그림은 남긴다. 남은 수를 돌려준다)
+    // - fromJsonText, deserializeNode 가 끝에 한 번 부른다. 그림을 기다리지 않고 지었으면 씬의 update 에서 남은 수가 0 이 될 때까지 부른다.
+    // - 찾지 못한 그림(해석기가 null, 애셋이 없거나 실패)은 경고를 내고 버린다. 그 컴포넌트는 그림 없이 남는다.
+    //==============================================================================
+    /**
+     * @returns { number } 아직 읽히는 중이라 남은 그림 수. (0 이면 다 붙였거나 버렸다)
+     */
+    bindPendingImages() {
+      const pendingImageList = this.#pendingImageList;
+      this.#pendingImageList = [];
+      for (const pendingImage of pendingImageList) {
+        const imageLookup = this.#findImage(pendingImage.imagePath);
+        if (imageLookup.image !== null) {
+          pendingImage.component.setImage(imageLookup.image);
+        } else if (imageLookup.isWaiting) {
+          this.#pendingImageList.push(pendingImage);
+        } else {
+          System89.console.warn(`UIDocument: \uADF8\uB9BC\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 (${pendingImage.imagePath})`);
+        }
+      }
+      return this.#pendingImageList.length;
+    }
+    //==============================================================================
+    // 노드 트리 → 문서 데이터. (노드 참조는 이 노드 기준 경로로 적는다)
     //==============================================================================
     /**
      * @param { WorldNode } node 적을 노드. (자식까지)
      * @returns { object } 노드 데이터. ({ type, name, active, position, scale, rotation, opacity, pivot, anchor, contentSize, interactable, components, children, contentChildren? })
+     * @example <caption>노드를 문서 값으로 떠서 복제본 짓기</caption>
+     * import { UIDocument, WorldNode, Vector2 } from "./build/vanilla.js";
+     *
+     * const cardNode = new WorldNode();
+     * cardNode.setName("Card");
+     * cardNode.setContentSize(Vector2.create(120, 80));
+     * const iconNode = new WorldNode();
+     * iconNode.setName("Icon");
+     * cardNode.addChild(iconNode);
+     * const uiDocument = new UIDocument();
+     * const cardData = uiDocument.serializeNode(cardNode);
+     * const copyNode = uiDocument.deserializeNode(cardData);
+     * console.log(cardData.name, copyNode !== cardNode, copyNode.getContentSize().x, UIDocument.findNodeByPath(copyNode, "/Icon") !== null);
      */
-    static serializeNode(node) {
+    serializeNode(node) {
+      const previousRootNode = this.#serializeRootNode;
+      this.#serializeRootNode = node;
+      try {
+        return this.#serializeNodeFromRoot(node);
+      } finally {
+        this.#serializeRootNode = previousRootNode;
+      }
+    }
+    //==============================================================================
+    // 노드 하나 적기. (재귀, 노드 참조는 #serializeRootNode 기준 경로)
+    //==============================================================================
+    /**
+     * @private
+     * @param { WorldNode } node 적을 노드.
+     * @returns { object } 노드 데이터.
+     */
+    #serializeNodeFromRoot(node) {
       const pivot = node.getPivot();
       const anchor = node.getAnchor();
       const contentSize = node.getContentSize();
       const localPosition = node.getLocalPosition();
       const localScale = node.getLocalScale();
-      const nodeTypeName = findRegisteredTypeName(NODE_TYPE_TABLE, node.constructor);
+      const nodeTypeName = this.getNodeTypeName(node);
       const nodeData = {
         type: nodeTypeName,
         name: node.getName(),
@@ -58855,10 +59369,10 @@ void main() {
         children: []
       };
       const componentList = node.getAllComponents();
-      const generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(componentList);
+      const generatedTypeSet = this.collectGeneratedComponentTypes(componentList);
       const widgetContentNodeSet = new System89.Set();
       for (const component of componentList) {
-        const componentTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, component.constructor);
+        const componentTypeName = findRegisteredTypeName(this.#componentTypeTable, component.constructor);
         const propertyHandler = COMPONENT_PROPERTY_TABLE[componentTypeName];
         if (component instanceof UIView) {
           const contentNode = component.getContent();
@@ -58869,9 +59383,9 @@ void main() {
         if (generatedTypeSet.has(componentTypeName)) {
           continue;
         }
-        const componentData = propertyHandler ? propertyHandler.save(component) : _UIDocument.saveByReflection(component);
+        const componentData = propertyHandler ? propertyHandler.save(component, this) : this.saveByReflection(component);
         if (propertyHandler) {
-          _UIDocument.saveNodeReferences(component, componentData);
+          this.#saveNodeReferences(component, componentData);
         }
         componentData.type = componentTypeName;
         nodeData.components.push(componentData);
@@ -58881,22 +59395,22 @@ void main() {
         if (widgetContentNodeSet.has(childNode)) {
           const grandChildNodeList = childNode.getChildren();
           if (grandChildNodeList.length > 0) {
-            nodeData.contentChildren = grandChildNodeList.map((grandChildNode) => _UIDocument.serializeNode(grandChildNode));
+            nodeData.contentChildren = grandChildNodeList.map((grandChildNode) => this.#serializeNodeFromRoot(grandChildNode));
           }
           continue;
         }
-        nodeData.children.push(_UIDocument.serializeNode(childNode));
+        nodeData.children.push(this.#serializeNodeFromRoot(childNode));
       }
       return nodeData;
     }
     //==============================================================================
-    // 위젯이 생성한 컴포넌트 타입 수집. (정적, UIView 계열의 require 목록)
+    // 위젯이 생성한 컴포넌트 타입 수집. (UIView 계열의 require 목록)
     //==============================================================================
     /**
      * @param { object[] } componentList 한 노드의 컴포넌트 목록.
      * @returns { Set<string> } UIView 계열이 require 로 함께 붙이는 컴포넌트의 문서 이름 모음. (등록한 이름, 등록하지 않았으면 클래스 이름)
      */
-    static collectGeneratedComponentTypes(componentList) {
+    collectGeneratedComponentTypes(componentList) {
       const generatedTypeSet = new System89.Set();
       for (const component of componentList) {
         if (!(component instanceof UIView)) {
@@ -58907,34 +59421,61 @@ void main() {
           continue;
         }
         for (const requiredType of requiredTypes) {
-          const requiredTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, requiredType);
+          const requiredTypeName = findRegisteredTypeName(this.#componentTypeTable, requiredType);
           generatedTypeSet.add(requiredTypeName);
         }
       }
       return generatedTypeSet;
     }
     //==============================================================================
-    // 문서 데이터 → 노드 트리. (정적, 재귀)
+    // 문서 데이터 → 노드 트리. (어느 부모에도 붙지 않은 노드를 돌려준다)
+    // - 노드 참조는 이 노드 기준 경로로 잇고, 찾을 수 있는 그림을 넣는다. (bindPendingImages)
     //==============================================================================
     /**
      * @param { object } nodeData serializeNode 꼴의 노드 데이터. (모르는 노드 종류는 WorldNode 로 만들고, 모르는 컴포넌트는 건너뛴다, 둘 다 경고를 낸다)
-     * @returns { WorldNode } 만든 노드. (노드 참조는 아직 잇지 않는다, 노드 생성자가 만든 컴포넌트와 자식에는 문서 값을 넣고 겹쳐 만들지 않는다)
+     * @returns { WorldNode } 만든 노드. (노드 생성자가 만든 컴포넌트와 자식에는 문서 값을 넣고 겹쳐 만들지 않는다)
      */
-    static deserializeNode(nodeData) {
-      let nodeType = NODE_TYPE_TABLE[nodeData.type];
+    deserializeNode(nodeData) {
+      const previousReferenceList = this.#pendingNodeReferenceList;
+      this.#pendingNodeReferenceList = [];
+      let rootNode = null;
+      try {
+        rootNode = this.#buildNode(nodeData);
+        for (const pendingReference of this.#pendingNodeReferenceList) {
+          const referencedNode = _UIDocument.findNodeByPath(rootNode, pendingReference.path);
+          if (referencedNode) {
+            pendingReference.target[pendingReference.setterName](referencedNode);
+          }
+        }
+      } finally {
+        this.#pendingNodeReferenceList = previousReferenceList;
+      }
+      this.bindPendingImages();
+      return rootNode;
+    }
+    //==============================================================================
+    // 노드 하나 짓기. (재귀, 노드 참조는 맡아 두기만 한다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { object } nodeData 노드 데이터.
+     * @returns { WorldNode } 만든 노드.
+     */
+    #buildNode(nodeData) {
+      let nodeType = this.#nodeTypeTable[nodeData.type];
       if (!nodeType) {
         if (nodeData.type !== void 0) {
-          System89.console.warn(`UIDocument: unregistered node type "${nodeData.type}" is read as WorldNode. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
+          System89.console.warn(`UIDocument: unregistered node type "${nodeData.type}" is read as WorldNode. (call registerEditorTypes() on the document for documents saved by the editor)`);
         }
         nodeType = WorldNode;
       }
       const node = new nodeType();
       node.setName(nodeData.name || "");
-      _UIDocument.fillNode(node, nodeData);
+      this.#fillNode(node, nodeData);
       return node;
     }
     //==============================================================================
-    // 문서 값을 노드 하나에 넣기. (정적, 재귀)
+    // 문서 값을 노드 하나에 넣기. (재귀)
     // - 노드에 이미 있는 컴포넌트와 자식(노드 생성자나 위젯이 만든 것, 붙을 때 함께 붙은 것)은 문서의 앞에서부터
     //   차례와 종류(자식은 이름)가 맞으면 그것에 문서 값을 넣고 다시 만들지 않는다. 맞지 않으면 새로 만들어 붙인다.
     //   (새로 만들면 다시 읽을 때마다 생성자가 만든 것과 문서의 것이 겹친다)
@@ -58944,7 +59485,7 @@ void main() {
      * @param { WorldNode } node 값을 넣을 노드.
      * @param { object } nodeData serializeNode 꼴의 노드 데이터.
      */
-    static fillNode(node, nodeData) {
+    #fillNode(node, nodeData) {
       if (nodeData.active !== void 0) {
         node.setActive(nodeData.active);
       }
@@ -58973,12 +59514,12 @@ void main() {
         node.setInteractable(nodeData.interactable);
       }
       const currentComponentList = node.getAllComponents().slice();
-      let generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(currentComponentList);
+      let generatedTypeSet = this.collectGeneratedComponentTypes(currentComponentList);
       const existingComponentList = [];
       const widgetContentNodeSet = new System89.Set();
       let widgetComponent = null;
       for (const component of currentComponentList) {
-        const componentTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, component.constructor);
+        const componentTypeName = findRegisteredTypeName(this.#componentTypeTable, component.constructor);
         if (!generatedTypeSet.has(componentTypeName)) {
           existingComponentList.push(component);
         }
@@ -58994,22 +59535,22 @@ void main() {
       const componentDataList = nodeData.components || [];
       for (const componentData of componentDataList) {
         const frontComponent = existingComponentList.length > 0 ? existingComponentList[0] : null;
-        const frontTypeName = frontComponent ? findRegisteredTypeName(COMPONENT_TYPE_TABLE, frontComponent.constructor) : "";
+        const frontTypeName = frontComponent ? findRegisteredTypeName(this.#componentTypeTable, frontComponent.constructor) : "";
         let component = null;
         if (frontComponent && frontTypeName === componentData.type) {
           component = existingComponentList.shift();
         } else {
-          const componentType = COMPONENT_TYPE_TABLE[componentData.type];
+          const componentType = this.#componentTypeTable[componentData.type];
           if (!componentType) {
-            System89.console.warn(`UIDocument: unregistered component type "${componentData.type}" is skipped. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
+            System89.console.warn(`UIDocument: unregistered component type "${componentData.type}" is skipped. (call registerEditorTypes() on the document for documents saved by the editor)`);
             continue;
           }
           const previousComponentCount = node.getAllComponents().length;
           component = node.addComponent(componentType);
           const addedComponentList = node.getAllComponents().slice(previousComponentCount);
-          generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(node.getAllComponents());
+          generatedTypeSet = this.collectGeneratedComponentTypes(node.getAllComponents());
           for (const addedComponent of addedComponentList) {
-            const addedTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, addedComponent.constructor);
+            const addedTypeName = findRegisteredTypeName(this.#componentTypeTable, addedComponent.constructor);
             if (addedComponent !== component && !generatedTypeSet.has(addedTypeName)) {
               existingComponentList.push(addedComponent);
             }
@@ -59017,28 +59558,28 @@ void main() {
         }
         const propertyHandler = COMPONENT_PROPERTY_TABLE[componentData.type];
         if (propertyHandler) {
-          propertyHandler.load(component, componentData);
-          _UIDocument.loadNodeReferences(component, componentData);
+          propertyHandler.load(component, componentData, this.#loadContext);
+          this.#loadNodeReferences(component, componentData);
         } else {
-          _UIDocument.loadByReflection(component, componentData);
+          this.loadByReflection(component, componentData);
         }
         if (component instanceof UIView) {
           widgetComponent = component;
         }
       }
       const childDataList = nodeData.children || [];
-      _UIDocument.fillChildren(node, childDataList, existingChildList);
+      this.#fillChildren(node, childDataList, existingChildList);
       const contentChildDataList = nodeData.contentChildren || [];
       if (widgetComponent && contentChildDataList.length > 0) {
         const contentNode = widgetComponent.getContent();
         if (contentNode) {
           const existingContentChildList = contentNode.getChildren().slice();
-          _UIDocument.fillChildren(contentNode, contentChildDataList, existingContentChildList);
+          this.#fillChildren(contentNode, contentChildDataList, existingContentChildList);
         }
       }
     }
     //==============================================================================
-    // 자식 문서 값 넣기. (정적, 이미 있는 자식은 차례와 이름이 맞으면 그것에 넣고, 아니면 만들어 붙인다)
+    // 자식 문서 값 넣기. (이미 있는 자식은 차례와 이름이 맞으면 그것에 넣고, 아니면 만들어 붙인다)
     //==============================================================================
     /**
      * @private
@@ -59046,22 +59587,22 @@ void main() {
      * @param { object[] } childDataList 자식 노드 데이터 목록.
      * @param { WorldNode[] } existingChildList 이미 있던 자식 목록. (문서 값을 받을 자리)
      */
-    static fillChildren(parentNode, childDataList, existingChildList) {
+    #fillChildren(parentNode, childDataList, existingChildList) {
       let existingChildIndex = 0;
       for (const childData of childDataList) {
         const childName = childData.name || "";
         const existingChild = existingChildIndex < existingChildList.length ? existingChildList[existingChildIndex] : null;
         if (existingChild && existingChild.getName() === childName) {
           ++existingChildIndex;
-          _UIDocument.fillNode(existingChild, childData);
+          this.#fillNode(existingChild, childData);
         } else {
-          const childNode = _UIDocument.deserializeNode(childData);
+          const childNode = this.#buildNode(childData);
           parentNode.addChild(childNode);
         }
       }
     }
     //==============================================================================
-    // 노드 트리 → JSON 문자열. (정적)
+    // 노드 트리 → JSON 문자열.
     //==============================================================================
     /**
      * @param { WorldNode } rootNode 문서의 뿌리 노드. (노드 참조 경로의 기준)
@@ -59084,59 +59625,89 @@ void main() {
      * titleLabel.setText("Hello");
      * panelNode.addChild(titleNode);
      *
-     * const jsonText = UIDocument.toJsonText(rootNode, false);
-     * const restoredRootNode = UIDocument.fromJsonText(jsonText);
+     * const uiDocument = new UIDocument();
+     * const jsonText = uiDocument.toJsonText(rootNode, false);
+     * const restoredRootNode = uiDocument.fromJsonText(jsonText);
      * const restoredTitleNode = UIDocument.findNodeByPath(restoredRootNode, "/Panel/Title");
      * const restoredTitleLabel = restoredTitleNode.getComponent(UILabel);
      * const restoredText = restoredTitleLabel.getText();
      * const restoredPath = UIDocument.findNodePath(restoredRootNode, restoredTitleNode);
      * console.log(restoredText, restoredPath);
      */
-    static toJsonText(rootNode, isPretty = true) {
-      deserializeRootNode = rootNode;
+    toJsonText(rootNode, isPretty = true) {
       const documentData = {
         version: UIDOCUMENT_VERSION,
-        root: _UIDocument.serializeNode(rootNode)
+        root: this.serializeNode(rootNode)
       };
-      deserializeRootNode = null;
       const jsonText = isPretty ? System89.JSON.stringify(documentData, null, "	") : System89.JSON.stringify(documentData);
       return jsonText;
     }
     //==============================================================================
-    // JSON 문자열 → 노드 트리. (정적)
+    // JSON 문자열 → 노드 트리. (어느 부모에도 붙지 않은 뿌리를 돌려준다, 씬에 보이려면 addChild 로 붙인다)
     //==============================================================================
     /**
-     * @param { string } jsonText { version, root } 꼴의 JSON 글. (root 가 없으면 예외를 던진다)
-     * @returns { WorldNode } 되살린 뿌리 노드. (노드 참조까지 이은 것)
+     * @param { string } jsonText { version, root } 꼴의 JSON 글. (JSON 이 아니거나 root 가 없으면 예외를 던진다)
+     * @returns { WorldNode } 되살린 뿌리 노드. (노드 참조까지 잇고, 찾을 수 있는 그림을 넣은 것)
      */
-    static fromJsonText(jsonText) {
+    fromJsonText(jsonText) {
       const documentData = System89.JSON.parse(jsonText);
       if (!documentData || !documentData.root) {
         throw new Error("UIDocument: invalid document.");
       }
-      pendingNodeReferenceList.length = 0;
-      const rootNode = _UIDocument.deserializeNode(documentData.root);
-      for (const pendingReference of pendingNodeReferenceList) {
-        const referencedNode = _UIDocument.findNodeByPath(rootNode, pendingReference.path);
-        if (referencedNode) {
-          pendingReference.target[pendingReference.setterName](referencedNode);
-        }
-      }
-      pendingNodeReferenceList.length = 0;
+      const rootNode = this.deserializeNode(documentData.root);
       return rootNode;
     }
     //==============================================================================
-    // 지원 컴포넌트 타입 이름 목록 반환. (정적, 편집 도구의 컴포넌트 추가 메뉴용)
+    // 지원 컴포넌트 타입 이름 목록 반환. (등록 차례, 편집 도구의 컴포넌트 추가 메뉴용)
     //==============================================================================
     /**
-     * @returns { string[] } 문서가 다루는 컴포넌트 이름 목록. (registerComponentType 으로 더한 것 포함)
+     * @returns { string[] } 이 문서가 다루는 컴포넌트 이름 목록. (registerComponentType 으로 더한 것 포함, 노드 종류 이름은 들지 않는다)
      */
-    static getComponentTypeNames() {
-      const typeNames = System89.Object.keys(COMPONENT_TYPE_TABLE);
+    getComponentTypeNames() {
+      const typeNames = System89.Object.keys(this.#componentTypeTable);
       return typeNames;
     }
     //==============================================================================
-    // 컴포넌트의 편집할 수 있는 속성 목록. (짝이 맞는 get 또는 is 와 set, 에디터의 인스펙터가 쓴다)
+    // 이름으로 컴포넌트를 지어 노드에 붙인다. (등록하지 않은 이름이면 null)
+    //==============================================================================
+    /**
+     * @param { WorldNode } node 컴포넌트를 붙일 노드.
+     * @param { string } typeName 등록한 컴포넌트 종류 이름.
+     * @returns { * } 붙인 컴포넌트. (등록하지 않은 이름이면 null)
+     * @example <caption>이름으로 Paint 붙이기</caption>
+     * import { UIDocument, WorldNode, Paint } from "./build/vanilla.js";
+     *
+     * const uiDocument = new UIDocument();
+     * const node = new WorldNode();
+     * const paint = uiDocument.createComponent(node, "Paint");
+     * console.log(paint === node.getComponent(Paint), uiDocument.createComponent(node, "Unknown"));
+     */
+    createComponent(node, typeName) {
+      if (!System89.Object.hasOwn(this.#componentTypeTable, typeName)) {
+        return null;
+      }
+      const componentType = this.#componentTypeTable[typeName];
+      const component = node.addComponent(componentType);
+      return component;
+    }
+    //==============================================================================
+    // 노드의 문서 종류 이름 반환. (등록한 노드 종류 이름, 등록하지 않은 클래스면 클래스 이름)
+    //==============================================================================
+    /**
+     * @param { WorldNode } node 볼 노드.
+     * @returns { string } 문서에 적힐 노드 종류 이름.
+     * @example <caption>에디터 종류를 등록한 문서에서 노드 종류 보기</caption>
+     * import { UIDocument, WorldNode, FloatingText } from "./build/vanilla.js";
+     *
+     * const uiDocument = new UIDocument();
+     * uiDocument.registerEditorTypes();
+     * console.log(uiDocument.getNodeTypeName(new WorldNode()), uiDocument.getNodeTypeName(new FloatingText()));
+     */
+    getNodeTypeName(node) {
+      return findRegisteredTypeName(this.#nodeTypeTable, node.constructor);
+    }
+    //==============================================================================
+    // 컴포넌트의 편집할 수 있는 속성 목록. (정적, 짝이 맞는 get 또는 is 와 set, 에디터의 인스펙터가 쓴다)
     //==============================================================================
     /**
      * @param { * } component 볼 컴포넌트.
@@ -59146,24 +59717,14 @@ void main() {
       return collectReflectedProperties(component);
     }
     //==============================================================================
-    // 컴포넌트 타입 이름으로 생성자 반환. (정적)
+    // 노드를 가리키는 속성만 따로 적는다. (전용 핸들러가 있는 컴포넌트)
     //==============================================================================
     /**
-     * @param { string } typeName 문서에 적힌 컴포넌트 이름.
-     * @returns { * } 컴포넌트 클래스. (없으면 undefined)
-     */
-    static getComponentType(typeName) {
-      const componentType = COMPONENT_TYPE_TABLE[typeName];
-      return componentType;
-    }
-    //==============================================================================
-    // 노드를 가리키는 속성만 따로 적는다.
-    //==============================================================================
-    /**
+     * @private
      * @param { Component } component 적을 컴포넌트.
      * @param { object } componentData 덧붙일 컴포넌트 데이터. (노드를 돌려주는 속성을 { $nodeRef: 경로 } 로 적는다)
      */
-    static saveNodeReferences(component, componentData) {
+    #saveNodeReferences(component, componentData) {
       for (const property of collectReflectedProperties(component)) {
         let currentValue = null;
         try {
@@ -59174,20 +59735,21 @@ void main() {
         if (!(currentValue instanceof WorldNode)) {
           continue;
         }
-        const referencePath = _UIDocument.findNodePath(_UIDocument.getSerializeRootNode(), currentValue);
+        const referencePath = _UIDocument.findNodePath(this.#serializeRootNode, currentValue);
         if (referencePath !== null) {
           componentData[property.name] = { [NODE_REFERENCE_KEY]: referencePath };
         }
       }
     }
     //==============================================================================
-    // 노드를 가리키는 속성만 따로 잇는다.
+    // 노드를 가리키는 속성만 따로 잇는다. (전용 핸들러가 있는 컴포넌트)
     //==============================================================================
     /**
+     * @private
      * @param { Component } component 되살릴 컴포넌트.
      * @param { object } componentData 컴포넌트 데이터. ({ $nodeRef } 값을 찾아 트리를 다 만든 뒤 이을 목록에 넣는다)
      */
-    static loadNodeReferences(component, componentData) {
+    #loadNodeReferences(component, componentData) {
       for (const propertyName of System89.Object.keys(componentData)) {
         const storedValue = componentData[propertyName];
         if (!storedValue || typeof storedValue !== "object" || storedValue[NODE_REFERENCE_KEY] === void 0) {
@@ -59197,7 +59759,7 @@ void main() {
         if (typeof component[setterName] !== "function") {
           continue;
         }
-        pendingNodeReferenceList.push({
+        this.#pendingNodeReferenceList.push({
           target: component,
           setterName,
           path: storedValue[NODE_REFERENCE_KEY]
@@ -59205,7 +59767,7 @@ void main() {
       }
     }
     //==============================================================================
-    // UI 뿌리 기준 절대 경로 계산. (노드 참조를 문서에 적을 때 쓴다)
+    // UI 뿌리 기준 절대 경로 계산. (정적, 노드 참조를 문서에 적을 때 쓴다)
     //==============================================================================
     /**
      * @param { WorldNode } rootNode 기준 뿌리 노드. (경로에 넣지 않는다)
@@ -59228,7 +59790,7 @@ void main() {
       return "/" + nameList.join("/");
     }
     //==============================================================================
-    // UI 뿌리 기준 절대 경로로 노드 찾기.
+    // UI 뿌리 기준 절대 경로로 노드 찾기. (정적)
     //==============================================================================
     /**
      * @param { WorldNode } rootNode 기준 뿌리 노드.
@@ -59260,15 +59822,6 @@ void main() {
       return currentNode;
     }
     //==============================================================================
-    // 경로 계산 기준이 되는 뿌리 반환.
-    //==============================================================================
-    /**
-     * @returns { WorldNode } toJsonText 가 적고 있는 뿌리. (그 밖에는 null)
-     */
-    static getSerializeRootNode() {
-      return deserializeRootNode;
-    }
-    //==============================================================================
     // 노드 종류 등록.
     // - 엔진에 노드가 늘어나면 등록만으로 문서가 그 종류를 다룬다.
     //==============================================================================
@@ -59276,8 +59829,8 @@ void main() {
      * @param { string } typeName 문서에 적힐 이름. (읽을 때 이 이름으로 찾고, 적을 때도 이 이름을 쓴다)
      * @param { * } nodeType 노드 클래스. (인자 없이 new 한다)
      */
-    static registerNodeType(typeName, nodeType) {
-      NODE_TYPE_TABLE[typeName] = nodeType;
+    registerNodeType(typeName, nodeType) {
+      this.#nodeTypeTable[typeName] = nodeType;
     }
     //==============================================================================
     // 컴포넌트 종류 등록.
@@ -59300,25 +59853,26 @@ void main() {
      * 	}
      * }
      *
-     * UIDocument.registerComponentType("Blinker", Blinker);
+     * const uiDocument = new UIDocument();
+     * uiDocument.registerComponentType("Blinker", Blinker);
      * const rootNode = new WorldNode();
      * const lampNode = new WorldNode();
      * lampNode.setName("Lamp");
      * const blinker = lampNode.addComponent(Blinker);
      * blinker.setSpeed(3);
      * rootNode.addChild(lampNode);
-     * const jsonText = UIDocument.toJsonText(rootNode);
-     * const restoredRootNode = UIDocument.fromJsonText(jsonText);
+     * const jsonText = uiDocument.toJsonText(rootNode);
+     * const restoredRootNode = uiDocument.fromJsonText(jsonText);
      * const restoredLampNode = UIDocument.findNodeByPath(restoredRootNode, "/Lamp");
      * const restoredBlinker = restoredLampNode.getComponent(Blinker);
      * const speed = restoredBlinker.getSpeed();
      * console.log(speed);
      */
-    static registerComponentType(typeName, componentType) {
-      COMPONENT_TYPE_TABLE[typeName] = componentType;
+    registerComponentType(typeName, componentType) {
+      this.#componentTypeTable[typeName] = componentType;
     }
     //==============================================================================
-    // 에디터가 다루는 종류 모두 등록. (정적)
+    // 에디터가 다루는 종류 모두 이 문서에 등록.
     // - UI 에디터(tools/uieditor)는 엔진이 내보내는 모든 Component 와 WorldNode 하위 클래스를 등록해 문서에 적는다.
     //   기본 표에는 런타임이 늘 쓰는 종류만 있으므로, 에디터가 저장한 문서를 읽는 게임은 이것을 한 번 부른다.
     // - 이름 차례(abc)로 등록하고, 이미 등록한 이름은 그대로 둔다. (기본 표의 전용 입출력과 게임이 등록한 종류를 지킨다)
@@ -59327,7 +59881,8 @@ void main() {
      * @example <caption>에디터가 저장한 입력 필드와 스냅 스크롤을 읽기</caption>
      * import { UIDocument, UIInputField, UISnapScrollView, WorldNode } from "./build/vanilla.js";
      *
-     * UIDocument.registerEditorTypes();
+     * const uiDocument = new UIDocument();
+     * uiDocument.registerEditorTypes();
      * const rootNode = new WorldNode();
      * const inputFieldNode = new UIInputField();
      * inputFieldNode.setName("Name");
@@ -59336,14 +59891,14 @@ void main() {
      * pageNode.setName("Pages");
      * pageNode.addComponent(UISnapScrollView);
      * rootNode.addChild(pageNode);
-     * const jsonText = UIDocument.toJsonText(rootNode);
-     * const restoredRootNode = UIDocument.fromJsonText(jsonText);
+     * const jsonText = uiDocument.toJsonText(rootNode);
+     * const restoredRootNode = uiDocument.fromJsonText(jsonText);
      * const restoredInputFieldNode = UIDocument.findNodeByPath(restoredRootNode, "/Name");
      * const restoredPageNode = UIDocument.findNodeByPath(restoredRootNode, "/Pages");
      * const restoredSnapScrollView = restoredPageNode.getComponent(UISnapScrollView);
      * console.log(restoredInputFieldNode instanceof UIInputField, restoredSnapScrollView !== null);
      */
-    static registerEditorTypes() {
+    registerEditorTypes() {
       const editorComponentTypeList = [
         ["ButtonMotion", ButtonMotion],
         ["HeatHazeEffect", HeatHazeEffect],
@@ -59396,25 +59951,26 @@ void main() {
         ["UIWindowLayer", UIWindowLayer]
       ];
       for (const [typeName, componentType] of editorComponentTypeList) {
-        if (!System89.Object.hasOwn(COMPONENT_TYPE_TABLE, typeName)) {
-          COMPONENT_TYPE_TABLE[typeName] = componentType;
+        if (!System89.Object.hasOwn(this.#componentTypeTable, typeName)) {
+          this.#componentTypeTable[typeName] = componentType;
         }
       }
       for (const [typeName, nodeType] of editorNodeTypeList) {
-        if (!System89.Object.hasOwn(NODE_TYPE_TABLE, typeName)) {
-          NODE_TYPE_TABLE[typeName] = nodeType;
+        if (!System89.Object.hasOwn(this.#nodeTypeTable, typeName)) {
+          this.#nodeTypeTable[typeName] = nodeType;
         }
       }
     }
     //==============================================================================
     // 짝이 맞는 get/set 속성으로 컴포넌트 저장.
     // - 전용 핸들러가 없는 컴포넌트에 쓴다. 옮길 수 있는 값만 담는다.
+    // - 노드 참조는 serializeNode, toJsonText 가 적고 있는 뿌리 기준 경로로 적는다. (그 밖에서 부르면 노드 참조는 빠진다)
     //==============================================================================
     /**
      * @param { Component } component 적을 컴포넌트.
      * @returns { object } 속성 이름과 값. (수, 글, 참거짓은 그대로, Color 와 Vector2 는 배열, 노드는 { $nodeRef })
      */
-    static saveByReflection(component) {
+    saveByReflection(component) {
       const componentData = {};
       for (const property of collectReflectedProperties(component)) {
         let currentValue = null;
@@ -59430,7 +59986,7 @@ void main() {
         } else if (currentValue instanceof Vector2) {
           componentData[property.name] = [currentValue.x, currentValue.y];
         } else if (currentValue instanceof WorldNode) {
-          const referencePath = _UIDocument.findNodePath(_UIDocument.getSerializeRootNode(), currentValue);
+          const referencePath = _UIDocument.findNodePath(this.#serializeRootNode, currentValue);
           if (referencePath !== null) {
             componentData[property.name] = { [NODE_REFERENCE_KEY]: referencePath };
           }
@@ -59442,12 +59998,13 @@ void main() {
     // 짝이 맞는 get/set 속성으로 컴포넌트 복원.
     // - 지금 값의 꼴로 받을지 가린다. 지금 값이 없으면(null) 저장할 때의 꼴로 받는다.
     //   (saveByReflection 은 Color 만 수 넷 배열로, Vector2 만 수 둘 배열로, 그 밖은 수, 글, 불 그대로 적는다)
+    // - 노드 참조는 맡아 두었다가 deserializeNode, fromJsonText 가 트리를 다 지은 뒤 잇는다. (그 밖에서 부르면 잇지 않는다)
     //==============================================================================
     /**
      * @param { Component } component 되살릴 컴포넌트.
      * @param { object } componentData saveByReflection 꼴의 데이터. (지금 값과 꼴이 같은 것만 넣는다)
      */
-    static loadByReflection(component, componentData) {
+    loadByReflection(component, componentData) {
       for (const property of collectReflectedProperties(component)) {
         const storedValue = componentData[property.name];
         if (storedValue === void 0) {
@@ -59460,7 +60017,7 @@ void main() {
           continue;
         }
         if (storedValue && typeof storedValue === "object" && storedValue[NODE_REFERENCE_KEY] !== void 0) {
-          pendingNodeReferenceList.push({
+          this.#pendingNodeReferenceList.push({
             target: component,
             setterName: property.setterName,
             path: storedValue[NODE_REFERENCE_KEY]
@@ -59917,11 +60474,11 @@ void main() {
      * @param { string } documentText 비주얼 에디터가 저장한 UIDocument JSON 글.
      * @returns { Visual } 그 글을 든 Visual. (JSON 객체가 아니거나 root 객체가 없으면 예외를 던진다)
      * @example <caption>문서 글에서 바로 만들기</caption>
-     * import { VisualAsset } from "./build/vanilla.js";
+     * import { VisualAsset, UIDocument } from "./build/vanilla.js";
      *
      * const documentText = JSON.stringify({ version: 1, root: { type: "WorldNode", name: "Icon", components: [], children: [] } });
      * const visual = VisualAsset.createVisualFromText(documentText);
-     * const iconNode = visual.createNode();
+     * const iconNode = visual.createNode(new UIDocument());
      * console.log(iconNode.getName());
      */
     static createVisualFromText(documentText) {
@@ -60759,6 +61316,152 @@ void main() {
     }
   };
 
+  // src/base/collection/set.js
+  var System96 = globalThis;
+  var Set2 = class _Set extends Object2 {
+    static {
+      __name(this, "Set");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { Set<T> } */
+    #items;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      this.#items = new System96.Set();
+    }
+    //==============================================================================
+    // 데이터 추가.
+    //==============================================================================
+    /**
+     * @param { T } item 더할 요소. (이미 있으면 그대로)
+     */
+    add(item) {
+      this.#items.add(item);
+    }
+    //==============================================================================
+    // 데이터 제거.
+    //==============================================================================
+    /**
+     * @param { T } item 지울 요소.
+     * @returns { boolean } 있어서 지웠으면 참.
+     */
+    remove(item) {
+      return this.#items.delete(item);
+    }
+    //==============================================================================
+    // 요소 포함 여부 반환.
+    //==============================================================================
+    /**
+     * @param { T } item 찾을 요소.
+     * @returns { boolean } 있으면 참.
+     */
+    contains(item) {
+      return this.#items.has(item);
+    }
+    //==============================================================================
+    // 합집합. (Union)
+    //==============================================================================
+    /**
+     * @param { Set<T> } otherSet 합칠 다른 셋.
+     * @returns { Set<T> } 두 셋의 요소를 모두 담은 새 셋.
+     */
+    union(otherSet) {
+      const resultSet = new _Set();
+      for (const item of this.#items) {
+        resultSet.add(item);
+      }
+      for (const item of otherSet.toArray()) {
+        resultSet.add(item);
+      }
+      return resultSet;
+    }
+    //==============================================================================
+    // 교집합. (Intersection)
+    //==============================================================================
+    /**
+     * @param { Set<T> } otherSet 견줄 다른 셋.
+     * @returns { Set<T> } 두 셋에 모두 있는 요소만 담은 새 셋.
+     */
+    intersection(otherSet) {
+      const resultSet = new _Set();
+      for (const item of this.#items) {
+        if (otherSet.contains(item)) {
+          resultSet.add(item);
+        }
+      }
+      return resultSet;
+    }
+    //==============================================================================
+    // 차집합. (Difference)
+    //==============================================================================
+    /**
+     * @param { Set<T> } otherSet 뺄 다른 셋.
+     * @returns { Set<T> } 이 셋에만 있고 다른 셋에는 없는 요소를 담은 새 셋.
+     */
+    difference(otherSet) {
+      const resultSet = new _Set();
+      for (const item of this.#items) {
+        if (!otherSet.contains(item)) {
+          resultSet.add(item);
+        }
+      }
+      return resultSet;
+    }
+    //==============================================================================
+    // 대칭 차집합 (여집합). (Symmetric Difference)
+    //==============================================================================
+    /**
+     * @param { Set<T> } otherSet 견줄 다른 셋.
+     * @returns { Set<T> } 두 셋 가운데 한쪽에만 있는 요소를 담은 새 셋.
+     */
+    symmetricDifference(otherSet) {
+      const resultSet = new _Set();
+      for (const item of this.#items) {
+        if (!otherSet.contains(item)) {
+          resultSet.add(item);
+        }
+      }
+      for (const item of otherSet.toArray()) {
+        if (!this.contains(item)) {
+          resultSet.add(item);
+        }
+      }
+      return resultSet;
+    }
+    //==============================================================================
+    // 전체 제거.
+    //==============================================================================
+    clear() {
+      this.#items.clear();
+    }
+    //==============================================================================
+    // 요소 수 반환.
+    //==============================================================================
+    /**
+     * @returns { number } 요소 수.
+     */
+    getCount() {
+      return this.#items.size;
+    }
+    //==============================================================================
+    // 전체 요소 배열 반환.
+    //==============================================================================
+    /**
+     * @returns { T[] } 넣은 차례의 요소를 담은 새 배열.
+     */
+    toArray() {
+      return Array.from(this.#items);
+    }
+  };
+
   // src/base/collection/list.js
   var List = class extends Object2 {
     static {
@@ -61087,316 +61790,6 @@ void main() {
     getValues() {
       const items = this.getItems();
       return Array.from(items.values());
-    }
-  };
-
-  // src/base/collection/queue.js
-  var Queue = class extends Object2 {
-    static {
-      __name(this, "Queue");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @private @type { T[] } */
-    #items;
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    /**
-     * @constructor
-     */
-    constructor() {
-      super();
-      this.#items = [];
-    }
-    //==============================================================================
-    // 데이터 추가.
-    //==============================================================================
-    /**
-     * @param { T } item 맨 뒤에 넣을 요소.
-     */
-    enqueue(item) {
-      this.#items.push(item);
-    }
-    //==============================================================================
-    // 데이터 추출 및 제거.
-    //==============================================================================
-    /**
-     * @returns { T | undefined } 맨 앞에서 뺀 요소. 비었으면 undefined.
-     */
-    dequeue() {
-      return this.#items.shift();
-    }
-    //==============================================================================
-    // 데이터 확인 (제거하지 않음).
-    //==============================================================================
-    /**
-     * @returns { T | undefined } 맨 앞의 요소. 비었으면 undefined.
-     */
-    peek() {
-      return this.#items[0];
-    }
-    //==============================================================================
-    // 전체 제거.
-    //==============================================================================
-    clear() {
-      this.#items.length = 0;
-    }
-    //==============================================================================
-    // 비어있는지 여부 반환.
-    //==============================================================================
-    /**
-     * @returns { boolean } 비었으면 참.
-     */
-    isEmpty() {
-      return this.#items.length === 0;
-    }
-    //==============================================================================
-    // 요소 수 반환.
-    //==============================================================================
-    /**
-     * @returns { number } 요소 수.
-     */
-    getCount() {
-      return this.#items.length;
-    }
-    //==============================================================================
-    // 전체 요소 배열 반환.
-    //==============================================================================
-    /**
-     * @returns { T[] } 맨 앞부터 담은 새 배열.
-     */
-    toArray() {
-      return [...this.#items];
-    }
-  };
-
-  // src/base/collection/stack.js
-  var Stack = class extends Object2 {
-    static {
-      __name(this, "Stack");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @private @type { T[] } */
-    #items;
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    /**
-     * @constructor
-     */
-    constructor() {
-      super();
-      this.#items = [];
-    }
-    //==============================================================================
-    // 데이터 추가.
-    //==============================================================================
-    /**
-     * @param { T } item 맨 위에 쌓을 요소.
-     */
-    push(item) {
-      this.#items.push(item);
-    }
-    //==============================================================================
-    // 데이터 추출 및 제거.
-    //==============================================================================
-    /**
-     * @returns { T | undefined } 맨 위에서 뺀 요소. 비었으면 undefined.
-     */
-    pop() {
-      return this.#items.pop();
-    }
-    //==============================================================================
-    // 데이터 확인 (제거하지 않음).
-    //==============================================================================
-    /**
-     * @returns { T | undefined } 맨 위의 요소. 비었으면 undefined.
-     */
-    peek() {
-      return this.#items[this.#items.length - 1];
-    }
-    //==============================================================================
-    // 전체 제거.
-    //==============================================================================
-    clear() {
-      this.#items.length = 0;
-    }
-    //==============================================================================
-    // 비어있는지 여부 반환.
-    //==============================================================================
-    /**
-     * @returns { boolean } 비었으면 참.
-     */
-    isEmpty() {
-      return this.#items.length === 0;
-    }
-    //==============================================================================
-    // 요소 수 반환.
-    //==============================================================================
-    /**
-     * @returns { number } 요소 수.
-     */
-    getCount() {
-      return this.#items.length;
-    }
-    //==============================================================================
-    // 전체 요소 배열 반환.
-    //==============================================================================
-    /**
-     * @returns { T[] } 맨 아래부터 담은 새 배열.
-     */
-    toArray() {
-      return [...this.#items];
-    }
-  };
-
-  // src/base/collection/set.js
-  var System96 = globalThis;
-  var Set2 = class _Set extends Object2 {
-    static {
-      __name(this, "Set");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @private @type { Set<T> } */
-    #items;
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    /**
-     * @constructor
-     */
-    constructor() {
-      super();
-      this.#items = new System96.Set();
-    }
-    //==============================================================================
-    // 데이터 추가.
-    //==============================================================================
-    /**
-     * @param { T } item 더할 요소. (이미 있으면 그대로)
-     */
-    add(item) {
-      this.#items.add(item);
-    }
-    //==============================================================================
-    // 데이터 제거.
-    //==============================================================================
-    /**
-     * @param { T } item 지울 요소.
-     * @returns { boolean } 있어서 지웠으면 참.
-     */
-    remove(item) {
-      return this.#items.delete(item);
-    }
-    //==============================================================================
-    // 요소 포함 여부 반환.
-    //==============================================================================
-    /**
-     * @param { T } item 찾을 요소.
-     * @returns { boolean } 있으면 참.
-     */
-    contains(item) {
-      return this.#items.has(item);
-    }
-    //==============================================================================
-    // 합집합. (Union)
-    //==============================================================================
-    /**
-     * @param { Set<T> } otherSet 합칠 다른 셋.
-     * @returns { Set<T> } 두 셋의 요소를 모두 담은 새 셋.
-     */
-    union(otherSet) {
-      const resultSet = new _Set();
-      for (const item of this.#items) {
-        resultSet.add(item);
-      }
-      for (const item of otherSet.toArray()) {
-        resultSet.add(item);
-      }
-      return resultSet;
-    }
-    //==============================================================================
-    // 교집합. (Intersection)
-    //==============================================================================
-    /**
-     * @param { Set<T> } otherSet 견줄 다른 셋.
-     * @returns { Set<T> } 두 셋에 모두 있는 요소만 담은 새 셋.
-     */
-    intersection(otherSet) {
-      const resultSet = new _Set();
-      for (const item of this.#items) {
-        if (otherSet.contains(item)) {
-          resultSet.add(item);
-        }
-      }
-      return resultSet;
-    }
-    //==============================================================================
-    // 차집합. (Difference)
-    //==============================================================================
-    /**
-     * @param { Set<T> } otherSet 뺄 다른 셋.
-     * @returns { Set<T> } 이 셋에만 있고 다른 셋에는 없는 요소를 담은 새 셋.
-     */
-    difference(otherSet) {
-      const resultSet = new _Set();
-      for (const item of this.#items) {
-        if (!otherSet.contains(item)) {
-          resultSet.add(item);
-        }
-      }
-      return resultSet;
-    }
-    //==============================================================================
-    // 대칭 차집합 (여집합). (Symmetric Difference)
-    //==============================================================================
-    /**
-     * @param { Set<T> } otherSet 견줄 다른 셋.
-     * @returns { Set<T> } 두 셋 가운데 한쪽에만 있는 요소를 담은 새 셋.
-     */
-    symmetricDifference(otherSet) {
-      const resultSet = new _Set();
-      for (const item of this.#items) {
-        if (!otherSet.contains(item)) {
-          resultSet.add(item);
-        }
-      }
-      for (const item of otherSet.toArray()) {
-        if (!this.contains(item)) {
-          resultSet.add(item);
-        }
-      }
-      return resultSet;
-    }
-    //==============================================================================
-    // 전체 제거.
-    //==============================================================================
-    clear() {
-      this.#items.clear();
-    }
-    //==============================================================================
-    // 요소 수 반환.
-    //==============================================================================
-    /**
-     * @returns { number } 요소 수.
-     */
-    getCount() {
-      return this.#items.size;
-    }
-    //==============================================================================
-    // 전체 요소 배열 반환.
-    //==============================================================================
-    /**
-     * @returns { T[] } 넣은 차례의 요소를 담은 새 배열.
-     */
-    toArray() {
-      return Array.from(this.#items);
     }
   };
 
@@ -71227,117 +71620,6 @@ void main() {
     }
   };
 
-  // src/deprecated/camera.js
-  var Camera = class extends Object2 {
-    static {
-      __name(this, "Camera");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @private @type { Vector2 } */
-    #position;
-    // 카메라가 바라보는 중심 위치.
-    /** @private @type { number } */
-    #zoom;
-    // 확대/축소 비율.
-    /** @private @type { number } */
-    #rotation;
-    // 회전 각도.
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    constructor() {
-      super();
-      this.#position = Vector2.zero();
-      this.#zoom = 1;
-      this.#rotation = 0;
-    }
-    //==============================================================================
-    // 시작.
-    //==============================================================================
-    /**
-     * @param { CanvasRenderingContext2D } canvasRenderingContext 변환을 걸 2D 컨텍스트. (save 한 뒤 줌, 회전, 위치 차례로 건다. 없으면 아무것도 하지 않는다)
-     */
-    begin(canvasRenderingContext) {
-      if (canvasRenderingContext) {
-        const position = this.getPosition();
-        const zoom = this.getZoom();
-        const rotation = this.getRotation();
-        const radian = degreeToRadian(rotation);
-        canvasRenderingContext.save();
-        canvasRenderingContext.scale(zoom, zoom);
-        canvasRenderingContext.rotate(radian);
-        canvasRenderingContext.translate(-position.x, -position.y);
-      }
-    }
-    //==============================================================================
-    // 종료.
-    //==============================================================================
-    /**
-     * @param { CanvasRenderingContext2D } canvasRenderingContext begin 에 넘긴 2D 컨텍스트. (restore 한다. 없으면 아무것도 하지 않는다)
-     */
-    end(canvasRenderingContext) {
-      if (canvasRenderingContext) {
-        canvasRenderingContext.restore();
-      }
-    }
-    //==============================================================================
-    // 이동 설정.
-    //==============================================================================
-    /**
-     * @param { Vector2 } position 화면 왼쪽 위에 올 월드 위치. (픽셀, 복사하지 않고 그대로 쥔다)
-     */
-    setPosition(position) {
-      this.#position = position;
-    }
-    //==============================================================================
-    // 이동 반환.
-    //==============================================================================
-    /**
-     * @returns { Vector2 } 카메라 위치. (복사본이 아니다)
-     */
-    getPosition() {
-      return this.#position;
-    }
-    //==============================================================================
-    // 줌 설정.
-    //==============================================================================
-    /**
-     * @param { number } zoom 확대 배율. (1 이 원래 크기, 0.001 보다 작으면 0.001)
-     */
-    setZoom(zoom) {
-      this.#zoom = max(1e-3, zoom);
-    }
-    //==============================================================================
-    // 줌 반환.
-    //==============================================================================
-    /**
-     * @returns { number } 확대 배율.
-     */
-    getZoom() {
-      return this.#zoom;
-    }
-    //==============================================================================
-    // 회전 설정.
-    //==============================================================================
-    /**
-     * @param { number } rotation 회전 각도. (도)
-     */
-    setRotation(rotation) {
-      this.#rotation = rotation;
-    }
-    //==============================================================================
-    // 회전 반환.
-    //==============================================================================
-    /**
-     * @returns { number } 회전 각도. (도)
-     */
-    getRotation() {
-      return this.#rotation;
-    }
-  };
-
   // src/base/timer.js
   var System110 = globalThis;
   var Cooldown = class extends Object2 {
@@ -77966,7 +78248,7 @@ void main() {
       }
       this.#isBound = false;
       this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
-      graphic.flushSpriteBatch();
+      graphic.flushBatch();
       const webGL2RenderingContext = this.#webGL2RenderingContext;
       const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
       const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
@@ -79028,12 +79310,12 @@ void main() {
      * @param { Function | null } imageResolver - (이미지 이름) → HTMLImageElement | HTMLCanvasElement | null
      * @returns { System.Map } 이름 → 노드
      */
-    buildStage(parentNode, imageResolver2 = null) {
+    buildStage(parentNode, imageResolver = null) {
       const nodeTable = new System134.Map();
       const nodeDescriptions = this.#description.stage.nodes;
       const createdList = [];
       for (const nodeDescription of nodeDescriptions) {
-        const node = _Timeline.createStageNode(nodeDescription, imageResolver2);
+        const node = _Timeline.createStageNode(nodeDescription, imageResolver);
         nodeTable.set(nodeDescription.name, node);
         this.#targetTable.set(nodeDescription.name, node);
         createdList.push({ node, parentName: nodeDescription.parent });
@@ -79077,11 +79359,11 @@ void main() {
      * @param { Function | null } imageResolver 이미지 이름을 받아 그림을 돌려주는 함수. (없거나 null 을 돌려주면 data: 주소만 스스로 읽는다)
      * @returns { WorldNode } 서술의 이름을 단 새 노드.
      */
-    static createStageNode(nodeDescription, imageResolver2 = null) {
+    static createStageNode(nodeDescription, imageResolver = null) {
       const description = System134.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
       const node = new WorldNode();
       node.setName(description.name);
-      _Timeline.applyStageNodeDescription(node, description, imageResolver2);
+      _Timeline.applyStageNodeDescription(node, description, imageResolver);
       return node;
     }
     //==============================================================================
@@ -79092,7 +79374,7 @@ void main() {
      * @param { object } nodeDescription 무대 노드 서술. (빠진 값은 TIMELINE_NODE_DEFAULTS 로 채운다)
      * @param { Function | null } imageResolver 이미지 이름을 받아 그림을 돌려주는 함수. (없거나 null 을 돌려주면 data: 주소만 스스로 읽는다)
      */
-    static applyStageNodeDescription(node, nodeDescription, imageResolver2 = null) {
+    static applyStageNodeDescription(node, nodeDescription, imageResolver = null) {
       const description = System134.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
       node.setPivot(Vector2.create(description.pivotX, description.pivotY));
       node.setAnchor(Pivot.topLeft.clone());
@@ -79110,8 +79392,8 @@ void main() {
         const sprite = node.getOrAddComponent(ShaderSprite);
         spriteFrameGridTable.set(sprite, { columns: System134.Math.max(1, description.frameColumns), rows: System134.Math.max(1, description.frameRows) });
         let image = null;
-        if (description.image && imageResolver2) {
-          image = imageResolver2(description.image);
+        if (description.image && imageResolver) {
+          image = imageResolver(description.image);
         }
         if (!image && description.image && description.image.startsWith("data:")) {
           image = new System134.Image();
@@ -80662,6 +80944,68 @@ void main() {
     return sortId;
   }
   __name(readSortId, "readSortId");
+  var SHADOW_STATIC_FRAME_COUNT = 30;
+  function writeCasterRecord(record, item) {
+    const options = item.options;
+    const jointMatrices = options.jointMatrices !== void 0 && options.jointMatrices !== null ? options.jointMatrices : null;
+    const matrixCount = item.instances !== null ? item.instances.length : 1;
+    const valueCount = 6 + matrixCount * 16 + (jointMatrices !== null ? jointMatrices.length : 0);
+    let isChanged = record.mesh !== item.mesh || record.material !== options.material;
+    record.mesh = item.mesh;
+    record.material = options.material;
+    if (record.values.length !== valueCount) {
+      record.values = new System136.Float32Array(valueCount);
+      isChanged = true;
+    }
+    const values = record.values;
+    let index = 0;
+    const write = /* @__PURE__ */ __name((value) => {
+      const rounded = System136.Math.fround(value);
+      if (values[index] !== rounded) {
+        values[index] = rounded;
+        isChanged = true;
+      }
+      index += 1;
+    }, "write");
+    write(matrixCount);
+    write(options.indexStart !== void 0 ? options.indexStart : -1);
+    write(options.indexCount !== void 0 ? options.indexCount : -1);
+    write(options.isCulled === false ? 0 : 1);
+    write(options.isMirrored === void 0 ? -1 : options.isMirrored === true ? 1 : 0);
+    write(jointMatrices !== null ? jointMatrices.length : -1);
+    if (item.instances !== null) {
+      for (const instance of item.instances) {
+        const elements = instance.modelMatrix.getElements();
+        for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
+          write(elements[elementIndex]);
+        }
+      }
+    } else {
+      const elements = item.modelMatrix.getElements();
+      for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
+        write(elements[elementIndex]);
+      }
+    }
+    if (jointMatrices !== null) {
+      for (let jointIndex = 0; jointIndex < jointMatrices.length; ++jointIndex) {
+        write(jointMatrices[jointIndex]);
+      }
+    }
+    return isChanged;
+  }
+  __name(writeCasterRecord, "writeCasterRecord");
+  function isSameValues(values, other) {
+    if (values === null || values.length !== other.length) {
+      return false;
+    }
+    for (let index = 0; index < values.length; ++index) {
+      if (values[index] !== other[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  __name(isSameValues, "isSameValues");
   var ToonDrawStage = System136.Object.freeze({
     beforeOpaque: "beforeOpaque",
     // 불투명한 몸 앞.
@@ -80815,14 +81159,16 @@ void main() {
      * @param { object } shadowMap - ShadowMap.
      */
     drawShadows(renderer, shadowMap) {
-      renderer.beginShadowPass(shadowMap);
-      for (const item of this.readOpaqueItemList()) {
-        if (item.options.castsShadow === false) {
-          continue;
+      const lightKey = new System136.Float32Array(17);
+      lightKey.set(shadowMap.getLightViewProjectionMatrix().getElements());
+      lightKey[16] = shadowMap.getResolution();
+      this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, () => {
+        renderer.beginShadowPass(shadowMap);
+      }, (casterList) => {
+        for (const item of casterList) {
+          this.drawItem(renderer, item, item.options);
         }
-        this.drawItem(renderer, item, item.options);
-      }
-      renderer.endShadowPass();
+      });
     }
     //==============================================================================
     // 점광과 스포트라이트 그림자 깊이 그리기. (불투명하고 castsShadow 가 false 가 아닌 것을 아틀라스의 칸마다, 앞의 프레임버퍼와 뷰포트는 되돌린다)
@@ -80851,17 +81197,135 @@ void main() {
      * queue.draw(renderer, camera);
      */
     drawLocalShadows(renderer, shadowAtlas) {
-      renderer.beginShadowAtlasPass(shadowAtlas);
-      for (let tileIndex = 0; tileIndex < shadowAtlas.getTileCount(); ++tileIndex) {
-        renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-        for (const item of this.readOpaqueItemList()) {
-          if (item.options.castsShadow === false) {
-            continue;
+      const tileCount = shadowAtlas.getTileCount();
+      const lightKey = new System136.Float32Array(1 + tileCount * 19);
+      lightKey[0] = shadowAtlas.getResolution();
+      for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+        const tile = shadowAtlas.getTile(tileIndex);
+        const offset = 1 + tileIndex * 19;
+        lightKey.set(tile.viewProjectionMatrix.getElements(), offset);
+        lightKey[offset + 16] = tile.x;
+        lightKey[offset + 17] = tile.y;
+        lightKey[offset + 18] = tile.size;
+      }
+      this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, () => {
+        renderer.beginShadowAtlasPass(shadowAtlas);
+      }, (casterList) => {
+        for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+          renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
+          for (const item of casterList) {
+            this.drawItem(renderer, item, item.options);
           }
-          this.drawItem(renderer, item, item.options);
+        }
+      });
+    }
+    //==============================================================================
+    // 그림자 드리우개 그리기. (그림자 판의 갱신 방식대로 다시 그리거나 건너뛴다, 불투명하고 castsShadow 가 false 가 아닌 것만)
+    // - everyFrame: 판을 비우고 전부 그린다.
+    // - interval: N 프레임마다(처음과 requestUpdate 뒤에는 바로) 판을 비우고 전부 그린다. 사이의 프레임은 그리지 않는다.
+    // - onChange: 드리우개를 담은 차례로 앞의 프레임과 견준다. SHADOW_STATIC_FRAME_COUNT 프레임 그대로인 것은 구운 판에 굽고,
+    //   나머지(움직이는 것, 정점 조각이 있는 재질)는 매 프레임 구운 판을 판에 옮긴 뒤 그 위에 덧그린다.
+    //   구운 것이 바뀌거나 빠지거나 새로 구울 것이 생기거나 requestUpdate 를 부르면 다시 굽는다. 움직이는 것이 없고 판이 구운 판과 같으면 아무것도 그리지 않는다.
+    //   빛 행렬이나 칸이 바뀐 프레임은 전부를 판에 바로 그리고, 빛이 멈춘 다음 프레임에 굽는다.
+    //   깊이는 LEQUAL 로 가장 가까운 것이 남으므로 굽고 덧그린 판은 전부를 한 번에 그린 판과 같다.
+    //==============================================================================
+    /**
+     * @param { object } renderer - ToonRenderer.
+     * @param { object } shadowCache - ShadowMap 이나 ShadowAtlas 의 getShadowCache().
+     * @param { Float32Array } lightKey - 빛 행렬과 판의 꼴. (다르면 다시 굽는다)
+     * @param { Function } beginPass - 깊이 패스를 시작한다. (endShadowPass 로 끝낸다)
+     * @param { Function } drawCasters - (드리우개 목록) 을 그린다.
+     * @private
+     */
+    drawShadowCasters(renderer, shadowCache, lightKey, beginPass, drawCasters) {
+      const casterList = [];
+      for (const item of this.readOpaqueItemList()) {
+        if (item.options.castsShadow !== false) {
+          casterList.push(item);
         }
       }
-      renderer.endShadowPass();
+      const drawPass = /* @__PURE__ */ __name((renderTarget, itemList) => {
+        shadowCache.renderTarget = renderTarget;
+        beginPass();
+        drawCasters(itemList);
+        renderer.endShadowPass();
+      }, "drawPass");
+      const updateMode = shadowCache.updateMode;
+      if (updateMode === ShadowUpdateMode.everyFrame) {
+        shadowCache.casterRecords.length = 0;
+        shadowCache.lightKey = null;
+        shadowCache.hasCache = false;
+        drawPass("live", casterList);
+        return;
+      }
+      if (updateMode === ShadowUpdateMode.interval) {
+        const isDue = shadowCache.isUpdateRequested || shadowCache.frameCount % shadowCache.updateInterval === 0;
+        shadowCache.frameCount += 1;
+        if (isDue) {
+          shadowCache.isUpdateRequested = false;
+          shadowCache.hasCache = false;
+          drawPass("live", casterList);
+        }
+        return;
+      }
+      const isLightChanged = !isSameValues(shadowCache.lightKey, lightKey);
+      let isCacheStale = shadowCache.isUpdateRequested;
+      shadowCache.isUpdateRequested = false;
+      shadowCache.lightKey = lightKey;
+      const recordList = shadowCache.casterRecords;
+      for (let recordIndex = casterList.length; recordIndex < recordList.length; ++recordIndex) {
+        isCacheStale = isCacheStale || recordList[recordIndex].isStatic;
+      }
+      if (recordList.length > casterList.length) {
+        recordList.length = casterList.length;
+      }
+      const staticList = [];
+      const dynamicList = [];
+      for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
+        const item = casterList[casterIndex];
+        if (casterIndex >= recordList.length) {
+          recordList.push({ mesh: null, material: void 0, values: new System136.Float32Array(0), stableFrameCount: 0, isStatic: false });
+        }
+        const record = recordList[casterIndex];
+        const material = item.options.material;
+        const isVertexAnimated = material !== void 0 && material !== null && material.getVertexChunk() !== "";
+        if (writeCasterRecord(record, item) || isVertexAnimated) {
+          isCacheStale = isCacheStale || record.isStatic;
+          record.isStatic = false;
+          record.stableFrameCount = 0;
+        } else {
+          record.stableFrameCount += 1;
+          if (!record.isStatic && record.stableFrameCount >= SHADOW_STATIC_FRAME_COUNT) {
+            record.isStatic = true;
+            isCacheStale = true;
+          }
+        }
+        if (record.isStatic) {
+          staticList.push(item);
+        } else {
+          dynamicList.push(item);
+        }
+      }
+      if (isLightChanged) {
+        shadowCache.hasCache = false;
+        drawPass("live", casterList);
+        return;
+      }
+      if (isCacheStale || !shadowCache.hasCache && staticList.length > 0) {
+        shadowCache.hasCache = staticList.length > 0;
+        if (shadowCache.hasCache) {
+          drawPass("cache", staticList);
+        }
+        shadowCache.isDepthCurrent = false;
+      }
+      if (dynamicList.length > 0) {
+        drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+        return;
+      }
+      if (!shadowCache.isDepthCurrent) {
+        drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+        shadowCache.isDepthCurrent = true;
+      }
     }
     //==============================================================================
     // 담은 것 그리기. (화면 공간 바깥선이 있으면 선의 판부터, beginFrameWithCamera 와 endFrame 을 스스로 부른다)
@@ -81187,6 +81651,26 @@ void main() {
       }
       const value = searchParameters.get(liteKey);
       this.#liteOverride = value !== "0" && value !== "false";
+    }
+    //==============================================================================
+    // 페이지 주소의 쿼리로 덮어쓰기. (지금 페이지의 location.search 를 applySearchText 로 넘긴다, 주소가 없는 곳이면 그대로)
+    // - 러스트 판은 웹에서 주소의 쿼리, 데스크탑에서 환경 변수 VANILLA_<이름> 을 읽는다. 원본은 크롬 위에서만 돌아 주소만 본다.
+    //==============================================================================
+    /**
+     * @param { string } [liteKey] 볼 쿼리 이름. (처음은 "light")
+     * @example <caption>페이지 주소의 쿼리로 가벼운 길 덮어쓰기</caption>
+     * import { GraphicsQualityGovernor } from "./build/vanilla.js";
+     *
+     * const governor = new GraphicsQualityGovernor();
+     * governor.applyPageQuery("light");
+     * console.log(governor.getLiteOverride());
+     */
+    applyPageQuery(liteKey = "light") {
+      const location = System137.location;
+      if (!location || typeof location.search !== "string") {
+        return;
+      }
+      this.applySearchText(location.search, liteKey);
     }
     //==============================================================================
     // 자동일 때 처음부터 가벼운 길인지 설정. (손가락 기기처럼 재기 전부터 가볍게 갈 때)
@@ -87230,6 +87714,9 @@ void main() {
     //==============================================================================
     // 멤버 변수 목록.
     //==============================================================================
+    /** @private @type { UIDocument } */
+    #uiDocument;
+    // 문서를 쓰고 읽는 UIDocument. (엔진이 내보내는 노드와 컴포넌트를 모두 등록한 것)
     /** @private @type { WorldNode } */
     #documentRootNode;
     /** @private @type { WorldNode | null } */
@@ -87312,6 +87799,8 @@ void main() {
     // 생성.
     //==============================================================================
     constructor() {
+      this.#uiDocument = new UIDocument();
+      registerEngineTypes(this.#uiDocument);
       this.#documentRootNode = null;
       this.#selectedNode = null;
       this.#editorCanvas = null;
@@ -87796,7 +88285,7 @@ void main() {
       graphic.popState();
       this.drawSnapGuides(graphic, editorTransform);
       this.drawSelectionOverlay(graphic, editorTransform);
-      graphic.flushSpriteBatch();
+      graphic.flushBatch();
     }
     //==============================================================================
     // 결과 화면 그리기. (편집 표시 없이 문서만)
@@ -87834,7 +88323,7 @@ void main() {
       graphic.scale(scaleX, scaleY);
       graphic.drawNode(this.#documentRootNode);
       graphic.popState();
-      graphic.flushSpriteBatch();
+      graphic.flushBatch();
     }
     //==============================================================================
     // 편집 화면 크기 반환. (CSS 픽셀 기준)
@@ -89426,7 +89915,7 @@ void main() {
       });
       this.appendReflectedProperties(bodyElement, selectedNode);
       const componentList = selectedNode.getAllComponents();
-      const generatedTypeSet = UIDocument.collectGeneratedComponentTypes(componentList);
+      const generatedTypeSet = this.#uiDocument.collectGeneratedComponentTypes(componentList);
       for (const component of componentList) {
         const componentTypeName = component.constructor.name;
         if (generatedTypeSet.has(componentTypeName)) {
@@ -89947,7 +90436,7 @@ void main() {
     // 되돌리기 스냅샷 저장.
     //==============================================================================
     pushUndoSnapshot() {
-      const jsonText = UIDocument.toJsonText(this.#documentRootNode, false);
+      const jsonText = this.#uiDocument.toJsonText(this.#documentRootNode, false);
       this.#undoStack.push(jsonText);
       if (this.#undoStack.length > UNDO_LIMIT) {
         this.#undoStack.shift();
@@ -89961,7 +90450,7 @@ void main() {
       if (this.#undoStack.length === 0) {
         return;
       }
-      this.#redoStack.push(UIDocument.toJsonText(this.#documentRootNode, false));
+      this.#redoStack.push(this.#uiDocument.toJsonText(this.#documentRootNode, false));
       this.replaceDocument(this.#undoStack.pop());
     }
     //==============================================================================
@@ -89971,7 +90460,7 @@ void main() {
       if (this.#redoStack.length === 0) {
         return;
       }
-      this.#undoStack.push(UIDocument.toJsonText(this.#documentRootNode, false));
+      this.#undoStack.push(this.#uiDocument.toJsonText(this.#documentRootNode, false));
       this.replaceDocument(this.#redoStack.pop());
     }
     //==============================================================================
@@ -89981,7 +90470,7 @@ void main() {
      * @param { string } jsonText
      */
     replaceDocument(jsonText) {
-      this.#documentRootNode = UIDocument.fromJsonText(jsonText);
+      this.#documentRootNode = this.#uiDocument.fromJsonText(jsonText);
       this.#documentRootNode.setPivot(Pivot.topLeft.clone());
       this.#documentRootNode.setAnchor(Pivot.topLeft.clone());
       this.#selectedNode = null;
@@ -90002,7 +90491,7 @@ void main() {
         return;
       }
       this.pushUndoSnapshot();
-      const copiedNode = UIDocument.deserializeNode(UIDocument.serializeNode(selectedNode));
+      const copiedNode = this.#uiDocument.deserializeNode(this.#uiDocument.serializeNode(selectedNode));
       this.#nodeSerialNumber += 1;
       copiedNode.setName(selectedNode.getName() + "_copy" + this.#nodeSerialNumber);
       const localPosition = selectedNode.getLocalPosition();
@@ -90064,7 +90553,7 @@ void main() {
      * @returns { string }
      */
     saveDocument(fileName) {
-      const jsonText = UIDocument.toJsonText(this.#documentRootNode);
+      const jsonText = this.#uiDocument.toJsonText(this.#documentRootNode);
       const blob = new System149.Blob([jsonText], { type: "application/json" });
       const objectUrl = System149.URL.createObjectURL(blob);
       const anchorElement = System149.document.createElement("a");
@@ -90157,17 +90646,20 @@ void main() {
     }
   };
   applyEditorTheme();
-  for (const exportName of System149.Object.keys(import_exports)) {
-    const candidateType = import_exports[exportName];
-    if (typeof candidateType !== "function" || !candidateType.prototype) {
-      continue;
-    }
-    if (candidateType.prototype instanceof Component) {
-      UIDocument.registerComponentType(exportName, candidateType);
-    } else if (candidateType === WorldNode || candidateType.prototype instanceof WorldNode) {
-      UIDocument.registerNodeType(exportName, candidateType);
+  function registerEngineTypes(uiDocument) {
+    for (const exportName of System149.Object.keys(import_exports)) {
+      const candidateType = import_exports[exportName];
+      if (typeof candidateType !== "function" || !candidateType.prototype) {
+        continue;
+      }
+      if (candidateType.prototype instanceof Component) {
+        uiDocument.registerComponentType(exportName, candidateType);
+      } else if (candidateType === WorldNode || candidateType.prototype instanceof WorldNode) {
+        uiDocument.registerNodeType(exportName, candidateType);
+      }
     }
   }
+  __name(registerEngineTypes, "registerEngineTypes");
   var uiEditor = new UIEditor();
   setEditorCommandHandler((commandId) => {
     uiEditor.executeCommand(commandId);
