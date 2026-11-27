@@ -2412,7 +2412,7 @@
 	// 머리카락 마스크 / 깊이 패스. (카메라 시점 — 앞머리 그림자 / 앞머리 너머 비침의 근거)
 	function drawHairDepth(viewProjectionElements, modelElements) {
 		const depthProgram = hairMaskProgram;
-		depthProgram.use();
+		depthProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(depthProgram.getUniformLocation("viewProjectionMatrix"), false, viewProjectionElements);
 		webGL2RenderingContext.uniformMatrix4fv(depthProgram.getUniformLocation("modelMatrix"), false, modelElements);
 		const jointMatricesLocation = depthProgram.getUniformLocation("jointMatrices[0]");
@@ -2433,7 +2433,7 @@
 	// 셀 셰이딩 패스. (모든 드로어블 — 비침 패스면 눈 부위만, 가려진 곳만)
 	function drawToonPass(frame, isSeeThroughPass) {
 		const shaderProgram = toonRenderer.getShaderProgram();
-		shaderProgram.use();
+		shaderProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
 		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("modelMatrix"), false, frame.modelElements);
 		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewMatrix"), false, frame.viewElements);
@@ -2503,7 +2503,7 @@
 
 	// 아웃라인 패스. (뒤집힌 껍질 — 앞면 컬링)
 	function drawOutlinePass(frame) {
-		outlineProgram.use();
+		outlineProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(outlineProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
 		webGL2RenderingContext.uniformMatrix4fv(outlineProgram.getUniformLocation("modelMatrix"), false, frame.modelElements);
 		webGL2RenderingContext.uniformMatrix4fv(outlineProgram.getUniformLocation("viewMatrix"), false, frame.viewElements);
@@ -2536,7 +2536,7 @@
 
 	// 바닥.
 	function drawFloor(frame) {
-		floorProgram.use();
+		floorProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(floorProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
 		bindShadowMap(floorProgram, frame.lightViewProjectionElements);
 		webGL2RenderingContext.uniform3f(floorProgram.getUniformLocation("backgroundColor"), 0.014, 0.013, 0.016);

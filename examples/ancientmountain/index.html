@@ -2839,7 +2839,7 @@
 			const lightViewProjectionMatrix = shadowMap.getLightViewProjectionMatrix();
 			lightViewProjectionElements = lightViewProjectionMatrix.getElements();
 			shadowMap.beginRender();
-			depthShaderProgram.use();
+			depthShaderProgram.useProgram();
 			webGL2RenderingContext.uniformMatrix4fv(depthLightViewProjectionLocation, false, lightViewProjectionElements);
 			const identityElements = identityModelMatrix.getElements();
 
@@ -2910,7 +2910,7 @@
 
 		// === 3. 지형 ===
 		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
-		terrainShaderProgram.use();
+		terrainShaderProgram.useProgram();
 		webGL2RenderingContext.bindVertexArray(terrainVertexArray);
 		webGL2RenderingContext.uniformMatrix4fv(terrainViewProjectionLocation, false, viewProjectionElements);
 		webGL2RenderingContext.uniform1i(terrainGrassTextureLocation, 0);
@@ -2933,7 +2933,7 @@
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 
 		// === 4. 바위 (트라이플래너 볼더 텍스처) ===
-		rockShaderProgram.use();
+		rockShaderProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(rockViewProjectionLocation, false, viewProjectionElements);
 		webGL2RenderingContext.uniform3f(rockSunDirectionLocation, sunDirectionVector.x, sunDirectionVector.y, sunDirectionVector.z);
 		webGL2RenderingContext.uniform3f(rockCameraPositionLocation, cameraPositionX, cameraPositionY, cameraPositionZ);
@@ -2953,7 +2953,7 @@
 		}
 
 		// === 5. 오브젝트 (캐릭터 / 깃발) ===
-		objectShaderProgram.use();
+		objectShaderProgram.useProgram();
 		webGL2RenderingContext.bindVertexArray(cubeVertexArray);
 		webGL2RenderingContext.uniformMatrix4fv(objectViewProjectionLocation, false, viewProjectionElements);
 		webGL2RenderingContext.uniform3f(objectSunDirectionLocation, sunDirectionVector.x, sunDirectionVector.y, sunDirectionVector.z);
@@ -2992,7 +2992,7 @@
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 		webGL2RenderingContext.depthMask(false);
-		shadowShaderProgram.use();
+		shadowShaderProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(shadowViewProjectionLocation, false, viewProjectionElements);
 		webGL2RenderingContext.uniform1f(shadowStrengthLocation, 1);
 		webGL2RenderingContext.bindVertexArray(staticShadowVertexArray);

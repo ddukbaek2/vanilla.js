@@ -866,7 +866,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, passMode) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
-		shaderProgram.use();
+		shaderProgram.useProgram();
 		const viewProjectionLocation = shaderProgram.getUniformLocation("viewProjectionMatrix");
 		webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
 		const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
@@ -930,7 +930,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		const cutoutDepthShaderProgram = this.getCutoutDepthShaderProgram();
 		for (const shaderProgram of [depthShaderProgram, cutoutDepthShaderProgram]) {
 			const useCutout = shaderProgram === cutoutDepthShaderProgram;
-			shaderProgram.use();
+			shaderProgram.useProgram();
 			const lightViewProjectionLocation = shaderProgram.getUniformLocation("lightViewProjectionMatrix");
 			webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
 			const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");

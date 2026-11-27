@@ -409,7 +409,7 @@ engine.run(new ScoreScene());
 
 ## 엔진의 기본 글꼴
 
-`engine.run()` 은 `EngineConfiguration.defaultFontUrl` 의 글꼴을 뒤에서 받아 `"DOSGothic"` 이라는 이름으로 브라우저 글꼴 목록에 올립니다. 처음 값은 jsDelivr 의 DOSGothic 주소(`https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff`)입니다. 받기가 실패하거나 늦어도 엔진은 멈추지 않고 경고만 남깁니다. 인터넷 없이 도는 데스크탑 앱이나 바깥 요청을 막은 페이지는 빈 글(`""`)로 두어 받지 않거나, 자기 경로를 줍니다.
+`engine.run()` 은 `EngineConfiguration.defaultFontUrl` 에 주소가 있으면 그 글꼴을 뒤에서 받아 `"default"` 라는 이름으로 브라우저 글꼴 목록에 올립니다. 글꼴 이름 `default`(엔진 기본 글꼴 사슬)는 이 글꼴 다음 시스템 글꼴 사슬이라, 글꼴을 고르지 않은 Text, ShadowText, DynamicFont 가 이 글꼴을 먼저 씁니다(러스트 판 `default_font_url` 과 같다). 처음 값은 빈 글(`""`)이라 엔진은 글꼴을 받지 않습니다. 받기가 실패하거나 늦어도 엔진은 멈추지 않고 경고만 남깁니다.
 
 이 글꼴을 쓰는 곳은 `useStatistics` 의 정보창 같은 엔진 내부 표시입니다. `Text` 와 `UILabel` 은 `setFont` 로 글꼴을 주지 않으면 시스템 글꼴 목록(`-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`)으로 그립니다. 다른 글꼴을 쓰려면 `FontAsset` 으로 받아 `setFont` 에 줍니다. ("애셋 불러오기" 장)
 

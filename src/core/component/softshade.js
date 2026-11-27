@@ -2,10 +2,11 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Color } from "../../base/color.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
-import { readColorText } from "./shadowtext.js";
+import { readColor } from "./shadowtext.js";
 
 
 //==============================================================================
@@ -77,7 +78,7 @@ export class SoftShade extends Component {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { string } */ #shape; // 모양. (SoftShadeShape)
-	/** @private @type { string } */ #color; // 색. ("#rrggbb")
+	/** @private @type { Color } */ #color; // 색. (알파는 읽지 않는다, 짙기는 #opacity)
 	/** @private @type { number } */ #opacity; // 가장 짙은 곳의 불투명도.
 	/** @private @type { number } */ #fadeWidth; // 띠의 양옆이 엷어지는 너비. (내용 크기 단위)
 	/** @private @type { number } */ #bakeUnit; // 구운 캔버스 한 픽셀이 덮는 내용 크기 단위.
@@ -95,7 +96,7 @@ export class SoftShade extends Component {
 		super();
 		this.setComponentType("SoftShade");
 		this.#shape = SoftShadeShape.band;
-		this.#color = "#000000";
+		this.#color = Color.black();
 		this.#opacity = 0.5;
 		this.#fadeWidth = 0;
 		this.#bakeUnit = 4;
@@ -128,7 +129,7 @@ export class SoftShade extends Component {
 		const shape = this.getShape();
 		const color = this.getColor();
 		const fadeRatioText = fadeRatio.toFixed(3);
-		const bakeKey = `SoftShade|${shape}|${color}|${opacity}|${fadeRatioText}|${bakeWidth}|${bakeHeight}`;
+		const bakeKey = `SoftShade|${shape}|${color.withAlpha(1).toHEXString()}|${opacity}|${fadeRatioText}|${bakeWidth}|${bakeHeight}`;
 		if (bakeKey !== this.#bakeKey) {
 			// 같은 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
 			releaseSharedBake(this.#bakeKey, this);
@@ -190,11 +191,9 @@ export class SoftShade extends Component {
 		bakeCanvas.width = bakeWidth;
 		bakeCanvas.height = bakeHeight;
 		const color = this.getColor();
-		const colorText = color.slice(1);
-		const colorValue = System.parseInt(colorText, 16);
-		const red = (colorValue >> 16) & 255;
-		const green = (colorValue >> 8) & 255;
-		const blue = colorValue & 255;
+		const red = System.Math.min(255, System.Math.max(0, System.Math.round(color.red * 255)));
+		const green = System.Math.min(255, System.Math.max(0, System.Math.round(color.green * 255)));
+		const blue = System.Math.min(255, System.Math.max(0, System.Math.round(color.blue * 255)));
 		const opacity = this.getOpacity();
 		const shape = this.getShape();
 		const isBand = shape === SoftShadeShape.band;
@@ -222,12 +221,12 @@ export class SoftShade extends Component {
 	//==============================================================================
 	/**
 	 * @param { string } shape - SoftShadeShape
-	 * @param { Color | string } color - "#rrggbb"
+	 * @param { Color | string } color 그늘 색. (Color 나 "#rrggbb" 같은 색 글, 알파는 읽지 않는다)
 	 * @param { number } opacity 가장 짙은 곳의 불투명도. (0 ~ 1, 0 이하면 그리지 않는다)
 	 * @param { number } fadeWidth 띠의 양옆이 엷어지는 너비. (내용 크기 단위, 내용 너비의 반까지, 0 이면 엷어지지 않는다)
 	 */
 	setShade(shape, color, opacity, fadeWidth = 0) {
-		color = readColorText(color);
+		color = readColor(color);
 		this.#shape = shape;
 		this.#color = color;
 		this.#opacity = opacity;
@@ -260,7 +259,7 @@ export class SoftShade extends Component {
 	// 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { string } 색. ("#rrggbb")
+	 * @returns { Color } 색. (setShade 에 준 색, 알파는 굽기에 쓰지 않는다)
 	 */
 	getColor() {
 		return this.#color;

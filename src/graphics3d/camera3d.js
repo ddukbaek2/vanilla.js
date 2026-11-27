@@ -310,7 +310,7 @@ export class Camera3D {
 	//==============================================================================
 	// 바뀐 값이 있으면 행렬 넷을 다시 셈하기. (원 행렬이 있으면 그것으로)
 	//==============================================================================
-	refreshMatrices() {
+	#refreshMatrices() {
 		if (!this.#isMatrixDirty) {
 			return;
 		}
@@ -348,7 +348,7 @@ export class Camera3D {
 	 * @returns { Matrix4 } 보기 행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getViewMatrix() {
-		this.refreshMatrices();
+		this.#refreshMatrices();
 		return this.#viewMatrix;
 	}
 
@@ -359,7 +359,7 @@ export class Camera3D {
 	 * @returns { Matrix4 } 투영 행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getProjectionMatrix() {
-		this.refreshMatrices();
+		this.#refreshMatrices();
 		return this.#projectionMatrix;
 	}
 
@@ -370,7 +370,7 @@ export class Camera3D {
 	 * @returns { Matrix4 } 투영 x 보기 행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getViewProjectionMatrix() {
-		this.refreshMatrices();
+		this.#refreshMatrices();
 		return this.#viewProjectionMatrix;
 	}
 
@@ -381,7 +381,7 @@ export class Camera3D {
 	 * @returns { Matrix4 } 보기와 투영의 역행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getInverseViewProjectionMatrix() {
-		this.refreshMatrices();
+		this.#refreshMatrices();
 		return this.#inverseViewProjectionMatrix;
 	}
 

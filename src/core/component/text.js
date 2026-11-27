@@ -5,7 +5,7 @@ const System = globalThis;
 import { Color } from "../../base/color.js";
 import { Rect } from "../../base/rect.js";
 import { Vector2 } from "../../base/vector2.js";
-import { SYSTEM_FONT_STRING } from "../../base/platform.js";
+import { DEFAULT_FONT_FAMILY_STRING } from "../../base/platform.js";
 import { Component } from "../component.js";
 import { Graphic } from "../graphic.js";
 import { FontAsset } from "../../resource/fontasset.js";
@@ -180,17 +180,19 @@ export function sliceGraphemes(text, count) {
 
 
 //==============================================================================
-// 폰트 문자열 합성 (canvas font property 형식).
+// 폰트 문자열 합성. (canvas font 꼴, 러스트 판 build_font_string 과 같다)
+// - 글꼴이 없으면 엔진 기본 글꼴 사슬(글꼴 이름 "default" 다음 시스템 글꼴 사슬)이다. 러스트 판 "32px default" 와 같은 글꼴을 고른다.
+//   (캔버스에 바로 넣어도 되게 "default" 는 따옴표로 감싸고 시스템 글꼴 사슬을 잇는다)
 //==============================================================================
 /**
- * @param { FontFace | null } fontFace
- * @param { number } fontSize
- * @param { boolean } bold
- * @param { boolean } italic
- * @returns { string }
+ * @param { FontFace | null } fontFace 글꼴. (null 이면 엔진 기본 글꼴 사슬)
+ * @param { number } fontSize 글자 크기. (픽셀)
+ * @param { boolean } bold 굵게.
+ * @param { boolean } italic 기울임.
+ * @returns { string } canvas font 글. (예: "bold 32px DOSGothic", 글꼴이 없으면 '32px "default", -apple-system, ...')
  */
 export function buildFontString(fontFace, fontSize, bold, italic) {
-	const fontFamily = fontFace ? fontFace.family : SYSTEM_FONT_STRING;
+	const fontFamily = fontFace ? fontFace.family : DEFAULT_FONT_FAMILY_STRING;
 	const styleParts = [];
 	if (italic) {
 		styleParts.push("italic");

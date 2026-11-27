@@ -676,7 +676,7 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
 		webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
 		const lineProgram = this.#lineProgram;
-		lineProgram.use();
+		lineProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("viewProjectionMatrix"), false, this.#frame.viewProjectionElements);
 		return true;
 	}
@@ -851,7 +851,7 @@ export class ToonScreenOutline {
 		const projectionElements = frame.projectionElements;
 		const viewElements = frame.viewElements;
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffer);
-		seedProgram.use();
+		seedProgram.useProgram();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
@@ -874,7 +874,7 @@ export class ToonScreenOutline {
 		const seedGatherProgram = this.#seedGatherProgram;
 		webGL2RenderingContext.viewport(0, 0, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[0]);
-		seedGatherProgram.use();
+		seedGatherProgram.useProgram();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTexture);
 		webGL2RenderingContext.uniform1i(seedGatherProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
@@ -883,7 +883,7 @@ export class ToonScreenOutline {
 
 		// 3. 점프 플러딩. (그리는 영역 굵기의 반과 덮는 몫의 반 픽셀을 넓히기 판 칸으로, 섞을 때 보는 2x2 칸만큼 더)
 		const jumpFloodProgram = this.#jumpFloodProgram;
-		jumpFloodProgram.use();
+		jumpFloodProgram.useProgram();
 		webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform2f(jumpFloodProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
 		const reach = (System.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System.Math.min(pointScaleX, pointScaleY) + 1.5;
@@ -923,7 +923,7 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 		const compositeProgram = this.#compositeProgram;
-		compositeProgram.use();
+		compositeProgram.useProgram();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);

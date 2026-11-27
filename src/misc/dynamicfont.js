@@ -8,7 +8,7 @@ import { Rect } from "../base/rect.js";
 import { Graphic } from "../core/graphic.js";
 import { FontAsset } from "../resource/fontasset.js";
 import { splitGraphemes } from "../core/component/text.js";
-import { SYSTEM_FONT_STRING } from "../base/platform.js";
+import { DEFAULT_FONT_FAMILY_STRING } from "../base/platform.js";
 
 
 //==============================================================================
@@ -220,7 +220,7 @@ export class DynamicFont extends Object {
 	//==============================================================================
 	rebuildAtlas() {
 		const document = System.document;
-		const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : SYSTEM_FONT_STRING; // 애셋이 없으면 엔진 기본 글꼴 사슬. (러스트 판 글꼴 이름 "default", Text 와 같다)
+		const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : DEFAULT_FONT_FAMILY_STRING; // 애셋이 없으면 엔진 기본 글꼴 사슬. (러스트 판 글꼴 이름 "default", Text 와 같다)
 		const fontSize = this.getFontSize();
 		const fontString = `${fontSize}px ${fontFamily}`;
 

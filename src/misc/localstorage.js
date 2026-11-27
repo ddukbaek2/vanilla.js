@@ -107,7 +107,7 @@ export class LocalStorage extends Object {
 	/**
 	 * @returns { object | null } 지금 쓰는 저장소. 못 쓰면 null.
 	 */
-	static readStorage() {
+	static #readStorage() {
 		const backend = LocalStorage.getBackend();
 		if (backend !== null) {
 			return backend;
@@ -133,7 +133,7 @@ export class LocalStorage extends Object {
 		if (memoryItemMap.has(key)) {
 			return memoryItemMap.get(key);
 		}
-		const storage = LocalStorage.readStorage();
+		const storage = LocalStorage.#readStorage();
 		if (storage === null) {
 			return null;
 		}
@@ -159,7 +159,7 @@ export class LocalStorage extends Object {
 	 */
 	static setItem(key, value) {
 		const memoryItemMap = LocalStorage.#memoryItemMap;
-		const storage = LocalStorage.readStorage();
+		const storage = LocalStorage.#readStorage();
 		if (storage !== null) {
 			try {
 				storage.setItem(key, value);
@@ -183,7 +183,7 @@ export class LocalStorage extends Object {
 	 */
 	static removeItem(key) {
 		LocalStorage.#memoryItemMap.delete(key);
-		const storage = LocalStorage.readStorage();
+		const storage = LocalStorage.#readStorage();
 		if (storage === null) {
 			return;
 		}
@@ -200,7 +200,7 @@ export class LocalStorage extends Object {
 	//==============================================================================
 	static clear() {
 		LocalStorage.#memoryItemMap.clear();
-		const storage = LocalStorage.readStorage();
+		const storage = LocalStorage.#readStorage();
 		if (storage === null) {
 			return;
 		}
@@ -360,7 +360,7 @@ export class LocalStorage extends Object {
 	 */
 	static getKeys() {
 		const keySet = new System.Set();
-		const storage = LocalStorage.readStorage();
+		const storage = LocalStorage.#readStorage();
 		if (storage !== null) {
 			try {
 				if (typeof storage.getKeys === "function") {

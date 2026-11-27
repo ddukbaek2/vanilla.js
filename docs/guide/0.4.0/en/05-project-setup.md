@@ -45,7 +45,7 @@ The smallest page is one canvas and one module script.
 
 - Calling `applyViewRect` in `preDraw` switches the following drawing to view coordinates. Without it, coordinates are the canvas's real pixels (CSS pixels times the device pixel ratio). The "Engine and Scenes" chapter explains this in detail.
 - Browsers block module scripts on pages opened from `file://`. Open the page through a local web server (such as VSCode Live Server, listed under the development environment in the README).
-- The default value of `EngineConfiguration.defaultFontUrl` is the address of the DOSGothic font on jsdelivr, and `engine.run` fetches it in the background. Where there is no internet access, give it your own path such as the repository's `examples/assets/DOSGothic.woff`, or set it to an empty string so nothing is fetched. If the fetch fails, the engine only logs a warning and continues with the system font.
+- The default value of `EngineConfiguration.defaultFontUrl` is an empty string, so the engine fetches no font and draws with the system font (same as Rust `default_font_url`). Give it an address (such as the repository's `examples/assets/DOSGothic.woff`) and `engine.run` fetches it in the background and adds it under the font name `"default"`, so text that picks no font (the engine default font chain) uses it first. If the fetch fails, the engine only logs a warning and continues with the system font.
 
 ## Building the engine bundle
 

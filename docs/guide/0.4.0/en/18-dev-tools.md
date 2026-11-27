@@ -73,7 +73,7 @@ Where the panel must not be visible to users, such as release builds, turn it of
 
 ## The engine statistics overlay
 
-When `EngineConfiguration.useStatistics` is on (the default is `false`), the engine draws a statistics overlay at the top left after drawing every scene each frame. It works with any kind of scene and uses the engine's default font (`16px DOSGothic`) scaled by 1.4.
+When `EngineConfiguration.useStatistics` is on (the default is `false`), the engine draws a statistics overlay at the top left after drawing every scene each frame. It works with any kind of scene and uses the engine's default font chain (`16px default`) scaled by 1.4.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Vector2, Color } from "./build/vanilla.js";

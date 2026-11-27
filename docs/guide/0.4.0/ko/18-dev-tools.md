@@ -73,7 +73,7 @@ engine.run(new DebugScene());
 
 ## 엔진 정보창
 
-`EngineConfiguration.useStatistics` 를 켜면(처음 값 `false`) 엔진이 매 프레임 모든 씬을 그린 뒤 화면 왼쪽 위에 정보창을 그립니다. 씬 종류와 상관없이 동작하고, 엔진 기본 글꼴(`16px DOSGothic`)을 1.4 배로 키워 씁니다.
+`EngineConfiguration.useStatistics` 를 켜면(처음 값 `false`) 엔진이 매 프레임 모든 씬을 그린 뒤 화면 왼쪽 위에 정보창을 그립니다. 씬 종류와 상관없이 동작하고, 엔진 기본 글꼴 사슬(`16px default`)을 1.4 배로 키워 씁니다.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Vector2, Color } from "./build/vanilla.js";
