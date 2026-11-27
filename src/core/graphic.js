@@ -852,7 +852,9 @@ export class Graphic extends Object {
 		this.#boundShaderProgram = null;
 		this.#boundTexture = null;
 
-		// 컨텍스트를 잃거나 되살리면 GL 의 묶음이 처음으로 돌아가므로 기억을 잊는다. (기하 캐시가 든 텍스처도 다시 적게 한다)
+		// 컨텍스트를 잃으면 GL 묶음 기억과 기하 캐시, 남긴 묶음을 잊는다. (잃은 뒤의 호출이 옛 기억을 믿지 않게 하는 것뿐이다)
+		// 엔진은 컨텍스트를 되살리지 않는다. webglcontextlost 에서 preventDefault 를 하지 않아 브라우저가 webglcontextrestored 를 보내지 않는다.
+		// 게임이 preventDefault 로 되살려도 셰이더 프로그램, 버텍스 어레이, 흰 텍스처, 글자 아틀라스, 그림 텍스처는 잃은 컨텍스트의 객체라 그려지지 않는다. (되살림은 아직 없다)
 		const contextChangeCallback = () => {
 			this.invalidateRenderStateCache();
 			this.#geometryCacheGeneration += 1;
