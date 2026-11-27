@@ -32430,6 +32430,8 @@ var FRAME_BLOCK_NAME = "ToonFrame";
 var FRAME_BLOCK_BINDING = 2;
 var FRAME_BLOCK_FLOAT_COUNT = 172;
 var MATERIAL_BLOCK_LIMIT = 1024;
+var FRAME_RING_SLOT_COUNT = 1;
+var FRAME_RING_LATENCY = 8;
 var BATCH_SLOT_MESH_LIMIT = 8;
 var DRAW_PART_OUTLINE = 1;
 var DRAW_PART_BODY = 2;
@@ -32516,9 +32518,24 @@ function isSameBits(bits, other) {
 __name(isSameBits, "isSameBits");
 function createBlockCache(binding, floatCount) {
   const values = new System80.Float32Array(floatCount);
-  return { binding, values, bits: new System80.Uint32Array(values.buffer), table: new System80.Map(), count: 0, boundBlock: null };
+  return { binding, values, bits: new System80.Uint32Array(values.buffer), table: new System80.Map(), count: 0, boundBlock: null, blocks: [], hand: 0 };
 }
 __name(createBlockCache, "createBlockCache");
+function createFrameRing(alignment) {
+  const values = new System80.Float32Array(FRAME_BLOCK_FLOAT_COUNT);
+  const stride = System80.Math.ceil(FRAME_BLOCK_FLOAT_COUNT * 4 / alignment) * alignment;
+  return { values, bits: new System80.Uint32Array(values.buffer), stride, pages: [], writePage: null, boundBuffer: null, boundOffset: -1 };
+}
+__name(createFrameRing, "createFrameRing");
+function isSameBitsAt(pageBits, start, bits) {
+  for (let index = 0; index < bits.length; ++index) {
+    if (pageBits[start + index] !== bits[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+__name(isSameBitsAt, "isSameBitsAt");
 var DRAW_STATE_MATERIAL = 0;
 var DRAW_STATE_JOINT_MATRICES = 1;
 var DRAW_STATE_INDEX_START = 2;
@@ -32712,7 +32729,9 @@ var ToonRenderer = class {
   #shadowBatchSlots;
   #frameBlocks;
   #frameBlock;
+  #frameBlockOffset;
   #frameBlockSerial;
+  #frameNumber;
   #stateCache;
   #uniformSlotTable;
   #uniformSerial;
@@ -32785,9 +32804,12 @@ var ToonRenderer = class {
     this.#localShadowInput = null;
     this.#batchSlots = [];
     this.#shadowBatchSlots = [];
-    this.#frameBlocks = createBlockCache(FRAME_BLOCK_BINDING, FRAME_BLOCK_FLOAT_COUNT);
+    const offsetAlignment = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+    this.#frameBlocks = createFrameRing(typeof offsetAlignment === "number" && offsetAlignment > 0 ? offsetAlignment : 256);
     this.#frameBlock = null;
+    this.#frameBlockOffset = 0;
     this.#frameBlockSerial = 0;
+    this.#frameNumber = 0;
   }
   static readProgramSources(material = null, instanceLayout = null, isAmbientOcclusion = false, colorSpace = readEngineColorSpace()) {
     const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, colorSpace);
@@ -33207,7 +33229,12 @@ var ToonRenderer = class {
     this.clearBlockCache(this.#outlineBlocks);
     webGL2RenderingContext.deleteTexture(this.#emptyShadowTexture);
     webGL2RenderingContext.deleteTexture(this.#whiteTexture);
-    this.clearBlockCache(this.#frameBlocks);
+    for (const page of this.#frameBlocks.pages) {
+      webGL2RenderingContext.deleteBuffer(page.buffer);
+    }
+    this.#frameBlocks.pages.length = 0;
+    this.#frameBlocks.writePage = null;
+    this.#frameBlocks.boundBuffer = null;
     this.#frameBlock = null;
     for (const slot of this.#batchSlots.concat(this.#shadowBatchSlots)) {
       this.deleteBatchVertexArrays(slot, null);
@@ -33304,6 +33331,7 @@ var ToonRenderer = class {
     this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
     this.#isShadowPass = false;
     this.#frameSerial += 1;
+    this.#frameNumber += 1;
     this.saveState();
     this.applyScreenRect();
     this.applyFrameState();
@@ -33517,7 +33545,7 @@ var ToonRenderer = class {
     return this.readEntryMaterialBlock(this.readDrawEntry(options), options);
   }
   readEntryMaterialBlock(drawEntry, options) {
-    if (drawEntry.materialBlock === null) {
+    if (drawEntry.materialBlock === null || drawEntry.materialBlock.buffer === null) {
       writeMaterialBlockValues(this.#materialBlocks.values, options);
       drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
     }
@@ -33624,9 +33652,68 @@ var ToonRenderer = class {
     if (this.#frameBlockSerial !== this.#frameSerial || this.#frameBlock === null) {
       this.#frameBlockSerial = this.#frameSerial;
       this.writeFrameBlockValues(frameBlocks.values);
-      this.#frameBlock = this.readUniformBlock(frameBlocks);
+      this.selectFrameSlot(frameBlocks);
     }
-    this.bindBlock(frameBlocks, this.#frameBlock);
+    const page = this.#frameBlock;
+    if (frameBlocks.boundBuffer !== page.buffer || frameBlocks.boundOffset !== this.#frameBlockOffset) {
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      if (FRAME_RING_SLOT_COUNT === 1) {
+        webGL2RenderingContext.bindBufferBase(webGL2RenderingContext.UNIFORM_BUFFER, FRAME_BLOCK_BINDING, page.buffer);
+      } else {
+        webGL2RenderingContext.bindBufferRange(webGL2RenderingContext.UNIFORM_BUFFER, FRAME_BLOCK_BINDING, page.buffer, this.#frameBlockOffset, FRAME_BLOCK_FLOAT_COUNT * 4);
+      }
+      frameBlocks.boundBuffer = page.buffer;
+      frameBlocks.boundOffset = this.#frameBlockOffset;
+    }
+  }
+  selectFrameSlot(frameRing) {
+    const bits = frameRing.bits;
+    const hash = readMaterialBlockHash(bits);
+    const frameNumber = this.#frameNumber;
+    const pages = frameRing.pages;
+    for (let pageIndex = 0; pageIndex < pages.length; ++pageIndex) {
+      const page2 = pages[pageIndex];
+      for (let slot2 = 0; slot2 < page2.count; ++slot2) {
+        if (page2.hashes[slot2] === hash && isSameBitsAt(page2.bits, slot2 * FRAME_BLOCK_FLOAT_COUNT, bits)) {
+          page2.useFrame = frameNumber;
+          this.#frameBlock = page2;
+          this.#frameBlockOffset = slot2 * frameRing.stride;
+          return;
+        }
+      }
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    let page = frameRing.writePage;
+    if (page === null || page.writeFrame !== frameNumber || page.count >= FRAME_RING_SLOT_COUNT) {
+      page = null;
+      for (let pageIndex = 0; pageIndex < pages.length; ++pageIndex) {
+        const candidate = pages[pageIndex];
+        if (frameNumber - candidate.useFrame >= FRAME_RING_LATENCY && (page === null || candidate.useFrame < page.useFrame)) {
+          page = candidate;
+        }
+      }
+      if (page === null) {
+        const buffer = webGL2RenderingContext.createBuffer();
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
+        webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, frameRing.stride * (FRAME_RING_SLOT_COUNT - 1) + FRAME_BLOCK_FLOAT_COUNT * 4, webGL2RenderingContext.STATIC_DRAW);
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+        page = { buffer, bits: new System80.Uint32Array(FRAME_RING_SLOT_COUNT * FRAME_BLOCK_FLOAT_COUNT), hashes: new System80.Array(FRAME_RING_SLOT_COUNT).fill(0), count: 0, useFrame: frameNumber, writeFrame: frameNumber };
+        pages.push(page);
+      }
+      page.count = 0;
+      page.writeFrame = frameNumber;
+      frameRing.writePage = page;
+    }
+    const slot = page.count;
+    page.bits.set(bits, slot * FRAME_BLOCK_FLOAT_COUNT);
+    page.hashes[slot] = hash;
+    page.count = slot + 1;
+    page.useFrame = frameNumber;
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, page.buffer);
+    webGL2RenderingContext.bufferSubData(webGL2RenderingContext.UNIFORM_BUFFER, slot * frameRing.stride, bits);
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+    this.#frameBlock = page;
+    this.#frameBlockOffset = slot * frameRing.stride;
   }
   writeFrameBlockValues(values) {
     values.set(this.#viewProjectionElements, 0);
@@ -33849,7 +33936,7 @@ var ToonRenderer = class {
     this.#uniformSerial += 1;
     this.#materialBlocks.boundBlock = null;
     this.#outlineBlocks.boundBlock = null;
-    this.#frameBlocks.boundBlock = null;
+    this.#frameBlocks.boundBuffer = null;
   }
   readDrawEntry(options) {
     if (options === this.#hintOptions) {
@@ -33923,6 +34010,7 @@ var ToonRenderer = class {
     this.#hintEntry = null;
   }
   bindBlock(blockCache, block) {
+    block.isUsed = true;
     if (block !== blockCache.boundBlock) {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       webGL2RenderingContext.bindBufferBase(webGL2RenderingContext.UNIFORM_BUFFER, blockCache.binding, block.buffer);
@@ -33940,32 +34028,68 @@ var ToonRenderer = class {
         }
       }
     }
-    if (blockCache.count >= MATERIAL_BLOCK_LIMIT) {
-      this.clearBlockCache(blockCache);
-      blockList = void 0;
-    }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const buffer = webGL2RenderingContext.createBuffer();
-    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
-    webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, bits, webGL2RenderingContext.STATIC_DRAW);
-    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
-    const block = { buffer, bits: bits.slice() };
+    const blocks = blockCache.blocks;
+    let block = null;
+    if (blocks.length >= MATERIAL_BLOCK_LIMIT) {
+      const victim = this.evictUniformBlock(blockCache);
+      block = { buffer: victim.buffer, bits: bits.slice(), hash, isUsed: true };
+      victim.buffer = null;
+      blocks[blockCache.hand] = block;
+      blockCache.hand = (blockCache.hand + 1) % blocks.length;
+      blockList = blockCache.table.get(hash);
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, block.buffer);
+      webGL2RenderingContext.bufferSubData(webGL2RenderingContext.UNIFORM_BUFFER, 0, bits);
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+    } else {
+      const buffer = webGL2RenderingContext.createBuffer();
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
+      webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, bits, webGL2RenderingContext.STATIC_DRAW);
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+      block = { buffer, bits: bits.slice(), hash, isUsed: true };
+      blocks.push(block);
+      blockCache.count += 1;
+    }
     if (blockList === void 0) {
       blockList = [];
       blockCache.table.set(hash, blockList);
     }
     blockList.push(block);
-    blockCache.count += 1;
     return block;
+  }
+  evictUniformBlock(blockCache) {
+    const blocks = blockCache.blocks;
+    for (; ; ) {
+      const block = blocks[blockCache.hand];
+      if (block.isUsed) {
+        block.isUsed = false;
+        blockCache.hand = (blockCache.hand + 1) % blocks.length;
+        continue;
+      }
+      const blockList = blockCache.table.get(block.hash);
+      const index = blockList.indexOf(block);
+      blockList[index] = blockList[blockList.length - 1];
+      blockList.pop();
+      if (blockList.length === 0) {
+        blockCache.table.delete(block.hash);
+      }
+      if (blockCache.boundBlock === block) {
+        blockCache.boundBlock = null;
+      }
+      return block;
+    }
   }
   clearBlockCache(blockCache) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     for (const blockList of blockCache.table.values()) {
       for (const block of blockList) {
         webGL2RenderingContext.deleteBuffer(block.buffer);
+        block.buffer = null;
       }
     }
     blockCache.table.clear();
+    blockCache.blocks.length = 0;
+    blockCache.hand = 0;
     blockCache.count = 0;
     blockCache.boundBlock = null;
     this.#drawEntryOfOptions = new System80.WeakMap();
@@ -34147,7 +34271,7 @@ var ToonRenderer = class {
       const outlineBlocks = this.#outlineBlocks;
       const outlineLightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
       const outlineLightVersion = outlineLightSet.getVersion();
-      if (drawEntry.outlineBlock === null || drawEntry.outlineColor !== this.#outlineColor || drawEntry.outlineLightSet !== outlineLightSet || drawEntry.outlineLightVersion !== outlineLightVersion) {
+      if (drawEntry.outlineBlock === null || drawEntry.outlineBlock.buffer === null || drawEntry.outlineColor !== this.#outlineColor || drawEntry.outlineLightSet !== outlineLightSet || drawEntry.outlineLightVersion !== outlineLightVersion) {
         const outlineColor = state[DRAW_STATE_OUTLINE_COLOR] !== null ? state[DRAW_STATE_OUTLINE_COLOR] : this.#outlineColor;
         const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? readOutlineLightColor(outlineLightSet.getSunColor()) : WHITE_COLOR;
         const outlineValues = outlineBlocks.values;
@@ -34193,7 +34317,7 @@ var ToonRenderer = class {
     this.uploadLightUniforms(solidEntry, lightSet);
     this.uploadDrawUniforms(solidProgram, modelElements, isSkinned, instancedMode, jointMatrices);
     const materialBlocks = this.#materialBlocks;
-    if (drawEntry.materialBlock === null) {
+    if (drawEntry.materialBlock === null || drawEntry.materialBlock.buffer === null) {
       writeMaterialBlockValues(materialBlocks.values, options);
       drawEntry.materialBlock = this.readUniformBlock(materialBlocks);
     }

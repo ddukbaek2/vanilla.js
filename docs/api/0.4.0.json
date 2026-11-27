@@ -19403,6 +19403,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "is_inside_visible_bounds"
+							},
 							"examples": [
 								{
 									"title": {

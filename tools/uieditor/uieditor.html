@@ -55408,6 +55408,8 @@ void main() {
   var FRAME_BLOCK_BINDING = 2;
   var FRAME_BLOCK_FLOAT_COUNT = 172;
   var MATERIAL_BLOCK_LIMIT = 1024;
+  var FRAME_RING_SLOT_COUNT = 1;
+  var FRAME_RING_LATENCY = 8;
   var BATCH_SLOT_MESH_LIMIT = 8;
   var DRAW_PART_OUTLINE = 1;
   var DRAW_PART_BODY = 2;
@@ -55494,9 +55496,24 @@ void main() {
   __name(isSameBits, "isSameBits");
   function createBlockCache(binding, floatCount) {
     const values = new System80.Float32Array(floatCount);
-    return { binding, values, bits: new System80.Uint32Array(values.buffer), table: new System80.Map(), count: 0, boundBlock: null };
+    return { binding, values, bits: new System80.Uint32Array(values.buffer), table: new System80.Map(), count: 0, boundBlock: null, blocks: [], hand: 0 };
   }
   __name(createBlockCache, "createBlockCache");
+  function createFrameRing(alignment) {
+    const values = new System80.Float32Array(FRAME_BLOCK_FLOAT_COUNT);
+    const stride = System80.Math.ceil(FRAME_BLOCK_FLOAT_COUNT * 4 / alignment) * alignment;
+    return { values, bits: new System80.Uint32Array(values.buffer), stride, pages: [], writePage: null, boundBuffer: null, boundOffset: -1 };
+  }
+  __name(createFrameRing, "createFrameRing");
+  function isSameBitsAt(pageBits, start, bits) {
+    for (let index = 0; index < bits.length; ++index) {
+      if (pageBits[start + index] !== bits[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  __name(isSameBitsAt, "isSameBitsAt");
   var DRAW_STATE_MATERIAL = 0;
   var DRAW_STATE_JOINT_MATRICES = 1;
   var DRAW_STATE_INDEX_START = 2;
@@ -55759,13 +55776,19 @@ void main() {
     // 그림자 패스의 묶음 자리.
     /** @private @type { object } */
     #frameBlocks;
-    // 프레임 블록(ToonFrame) 갈래. (재질 블록과 같은 꼴, 값이 같은 블록은 하나, 지은 버퍼는 고치지 않는다)
+    // 프레임 블록(ToonFrame) 고리. (createFrameRing, 장의 칸마다 한 패스의 값, GPU 가 읽는 장은 고치지 않는다)
     /** @private @type { object | null } */
     #frameBlock;
-    // 지금 frameSerial 의 프레임 블록.
+    // 지금 frameSerial 의 프레임 블록이 든 장.
+    /** @private @type { number } */
+    #frameBlockOffset;
+    // 그 장 안의 칸 자리. (바이트)
     /** @private @type { number } */
     #frameBlockSerial;
     // #frameBlock 을 고른 frameSerial. (같으면 다시 고르지 않는다)
+    /** @private @type { number } */
+    #frameNumber;
+    // beginFrame 마다 오르는 번호. (프레임 블록 장을 다시 쓸 수 있는지 가른다)
     /** @private @type { WebGLStateCache } */
     #stateCache;
     // 컨텍스트의 GL 상태 기억. (같은 프로그램, 텍스처, 버텍스 어레이, 감김을 다시 걸지 않을 때 묻는다)
@@ -55877,9 +55900,12 @@ void main() {
       this.#localShadowInput = null;
       this.#batchSlots = [];
       this.#shadowBatchSlots = [];
-      this.#frameBlocks = createBlockCache(FRAME_BLOCK_BINDING, FRAME_BLOCK_FLOAT_COUNT);
+      const offsetAlignment = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+      this.#frameBlocks = createFrameRing(typeof offsetAlignment === "number" && offsetAlignment > 0 ? offsetAlignment : 256);
       this.#frameBlock = null;
+      this.#frameBlockOffset = 0;
       this.#frameBlockSerial = 0;
+      this.#frameNumber = 0;
     }
     //==============================================================================
     // 셰이더 소스 반환. (ShaderWarmer 로 미리 링크할 때, 머티리얼과 인스턴스 꼴이 없으면 기본 프로그램)
@@ -56638,7 +56664,12 @@ void main() {
       this.clearBlockCache(this.#outlineBlocks);
       webGL2RenderingContext.deleteTexture(this.#emptyShadowTexture);
       webGL2RenderingContext.deleteTexture(this.#whiteTexture);
-      this.clearBlockCache(this.#frameBlocks);
+      for (const page of this.#frameBlocks.pages) {
+        webGL2RenderingContext.deleteBuffer(page.buffer);
+      }
+      this.#frameBlocks.pages.length = 0;
+      this.#frameBlocks.writePage = null;
+      this.#frameBlocks.boundBuffer = null;
       this.#frameBlock = null;
       for (const slot of this.#batchSlots.concat(this.#shadowBatchSlots)) {
         this.deleteBatchVertexArrays(slot, null);
@@ -56789,6 +56820,7 @@ void main() {
       this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
       this.#isShadowPass = false;
       this.#frameSerial += 1;
+      this.#frameNumber += 1;
       this.saveState();
       this.applyScreenRect();
       this.applyFrameState();
@@ -57256,7 +57288,7 @@ void main() {
      * @private
      */
     readEntryMaterialBlock(drawEntry, options) {
-      if (drawEntry.materialBlock === null) {
+      if (drawEntry.materialBlock === null || drawEntry.materialBlock.buffer === null) {
         writeMaterialBlockValues(this.#materialBlocks.values, options);
         drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
       }
@@ -57404,9 +57436,75 @@ void main() {
       if (this.#frameBlockSerial !== this.#frameSerial || this.#frameBlock === null) {
         this.#frameBlockSerial = this.#frameSerial;
         this.writeFrameBlockValues(frameBlocks.values);
-        this.#frameBlock = this.readUniformBlock(frameBlocks);
+        this.selectFrameSlot(frameBlocks);
       }
-      this.bindBlock(frameBlocks, this.#frameBlock);
+      const page = this.#frameBlock;
+      if (frameBlocks.boundBuffer !== page.buffer || frameBlocks.boundOffset !== this.#frameBlockOffset) {
+        const webGL2RenderingContext = this.getWebGL2RenderingContext();
+        if (FRAME_RING_SLOT_COUNT === 1) {
+          webGL2RenderingContext.bindBufferBase(webGL2RenderingContext.UNIFORM_BUFFER, FRAME_BLOCK_BINDING, page.buffer);
+        } else {
+          webGL2RenderingContext.bindBufferRange(webGL2RenderingContext.UNIFORM_BUFFER, FRAME_BLOCK_BINDING, page.buffer, this.#frameBlockOffset, FRAME_BLOCK_FLOAT_COUNT * 4);
+        }
+        frameBlocks.boundBuffer = page.buffer;
+        frameBlocks.boundOffset = this.#frameBlockOffset;
+      }
+    }
+    //==============================================================================
+    // 프레임 블록 칸 고르기. (값이 같은 칸이 있으면 그것, 없으면 이 프레임의 장 다음 칸에 bufferSubData, #frameBlock 과 #frameBlockOffset 에 둔다)
+    //==============================================================================
+    /**
+     * @param { object } frameRing - createFrameRing 의 결과. (values 에 이번 값을 써 둔 것)
+     * @private
+     */
+    selectFrameSlot(frameRing) {
+      const bits = frameRing.bits;
+      const hash = readMaterialBlockHash(bits);
+      const frameNumber = this.#frameNumber;
+      const pages = frameRing.pages;
+      for (let pageIndex = 0; pageIndex < pages.length; ++pageIndex) {
+        const page2 = pages[pageIndex];
+        for (let slot2 = 0; slot2 < page2.count; ++slot2) {
+          if (page2.hashes[slot2] === hash && isSameBitsAt(page2.bits, slot2 * FRAME_BLOCK_FLOAT_COUNT, bits)) {
+            page2.useFrame = frameNumber;
+            this.#frameBlock = page2;
+            this.#frameBlockOffset = slot2 * frameRing.stride;
+            return;
+          }
+        }
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      let page = frameRing.writePage;
+      if (page === null || page.writeFrame !== frameNumber || page.count >= FRAME_RING_SLOT_COUNT) {
+        page = null;
+        for (let pageIndex = 0; pageIndex < pages.length; ++pageIndex) {
+          const candidate = pages[pageIndex];
+          if (frameNumber - candidate.useFrame >= FRAME_RING_LATENCY && (page === null || candidate.useFrame < page.useFrame)) {
+            page = candidate;
+          }
+        }
+        if (page === null) {
+          const buffer = webGL2RenderingContext.createBuffer();
+          webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
+          webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, frameRing.stride * (FRAME_RING_SLOT_COUNT - 1) + FRAME_BLOCK_FLOAT_COUNT * 4, webGL2RenderingContext.STATIC_DRAW);
+          webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+          page = { buffer, bits: new System80.Uint32Array(FRAME_RING_SLOT_COUNT * FRAME_BLOCK_FLOAT_COUNT), hashes: new System80.Array(FRAME_RING_SLOT_COUNT).fill(0), count: 0, useFrame: frameNumber, writeFrame: frameNumber };
+          pages.push(page);
+        }
+        page.count = 0;
+        page.writeFrame = frameNumber;
+        frameRing.writePage = page;
+      }
+      const slot = page.count;
+      page.bits.set(bits, slot * FRAME_BLOCK_FLOAT_COUNT);
+      page.hashes[slot] = hash;
+      page.count = slot + 1;
+      page.useFrame = frameNumber;
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, page.buffer);
+      webGL2RenderingContext.bufferSubData(webGL2RenderingContext.UNIFORM_BUFFER, slot * frameRing.stride, bits);
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+      this.#frameBlock = page;
+      this.#frameBlockOffset = slot * frameRing.stride;
     }
     //==============================================================================
     // 프레임 블록의 값 쓰기. (FRAME_BLOCK_CHUNK 의 std140 자리, 그림자나 점광 그림자가 없으면 그 행렬, 치우침과 아틀라스 칸은 앞의 값 그대로)
@@ -57717,7 +57815,7 @@ void main() {
       this.#uniformSerial += 1;
       this.#materialBlocks.boundBlock = null;
       this.#outlineBlocks.boundBlock = null;
-      this.#frameBlocks.boundBlock = null;
+      this.#frameBlocks.boundBuffer = null;
     }
     //==============================================================================
     // 그리기 꼴 객체의 푼 칸 읽기. (앞의 그리기와 꼴 객체의 얕은 사본이 같으면 앞서 푼 것을 쓰고, 다르면 다시 푼다)
@@ -57874,6 +57972,7 @@ void main() {
      * @private
      */
     bindBlock(blockCache, block) {
+      block.isUsed = true;
       if (block !== blockCache.boundBlock) {
         const webGL2RenderingContext = this.getWebGL2RenderingContext();
         webGL2RenderingContext.bindBufferBase(webGL2RenderingContext.UNIFORM_BUFFER, blockCache.binding, block.buffer);
@@ -57881,11 +57980,13 @@ void main() {
       }
     }
     //==============================================================================
-    // 값이 같은 블록 찾기. (없으면 지어 올린다, MATERIAL_BLOCK_LIMIT 을 넘으면 갈래를 모두 지우고 다시 짓는다)
+    // 값이 같은 블록 찾기. (없으면 지어 올린다, MATERIAL_BLOCK_LIMIT 에 닿으면 오래 안 쓴 블록 하나를 내보내고 그 버퍼에 새 값을 쓴다)
+    // - 내보낼 블록은 시계 꼴(second chance)로 고른다: 지은 차례의 고리를 돌며 쓴 표시(bindBlock)가 있으면 지우고 넘어가고, 없으면 그것을 내보낸다.
+    // - 내보낸 블록은 buffer 가 null 이 된다. 그것을 쥔 기억 칸은 다음 그리기에 값을 다시 푼다. (갈래를 통째 지우거나 꼴 기억을 비우지 않는다)
     //==============================================================================
     /**
      * @param { object } blockCache - createBlockCache 의 결과.
-     * @returns { object } { buffer, bits }
+     * @returns { object } { buffer, bits, hash, isUsed }
      * @private
      */
     readUniformBlock(blockCache) {
@@ -57899,23 +58000,64 @@ void main() {
           }
         }
       }
-      if (blockCache.count >= MATERIAL_BLOCK_LIMIT) {
-        this.clearBlockCache(blockCache);
-        blockList = void 0;
-      }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const buffer = webGL2RenderingContext.createBuffer();
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
-      webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, bits, webGL2RenderingContext.STATIC_DRAW);
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
-      const block = { buffer, bits: bits.slice() };
+      const blocks = blockCache.blocks;
+      let block = null;
+      if (blocks.length >= MATERIAL_BLOCK_LIMIT) {
+        const victim = this.evictUniformBlock(blockCache);
+        block = { buffer: victim.buffer, bits: bits.slice(), hash, isUsed: true };
+        victim.buffer = null;
+        blocks[blockCache.hand] = block;
+        blockCache.hand = (blockCache.hand + 1) % blocks.length;
+        blockList = blockCache.table.get(hash);
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, block.buffer);
+        webGL2RenderingContext.bufferSubData(webGL2RenderingContext.UNIFORM_BUFFER, 0, bits);
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+      } else {
+        const buffer = webGL2RenderingContext.createBuffer();
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
+        webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, bits, webGL2RenderingContext.STATIC_DRAW);
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+        block = { buffer, bits: bits.slice(), hash, isUsed: true };
+        blocks.push(block);
+        blockCache.count += 1;
+      }
       if (blockList === void 0) {
         blockList = [];
         blockCache.table.set(hash, blockList);
       }
       blockList.push(block);
-      blockCache.count += 1;
       return block;
+    }
+    //==============================================================================
+    // 내보낼 블록 고르기. (시계 꼴, 고른 블록은 해시 칸에서 빼고 돌려준다, 버퍼는 지우지 않는다)
+    //==============================================================================
+    /**
+     * @param { object } blockCache - createBlockCache 의 결과. (blocks 가 MATERIAL_BLOCK_LIMIT 개)
+     * @returns { object } 내보낼 블록. (blocks[blockCache.hand] 자리)
+     * @private
+     */
+    evictUniformBlock(blockCache) {
+      const blocks = blockCache.blocks;
+      for (; ; ) {
+        const block = blocks[blockCache.hand];
+        if (block.isUsed) {
+          block.isUsed = false;
+          blockCache.hand = (blockCache.hand + 1) % blocks.length;
+          continue;
+        }
+        const blockList = blockCache.table.get(block.hash);
+        const index = blockList.indexOf(block);
+        blockList[index] = blockList[blockList.length - 1];
+        blockList.pop();
+        if (blockList.length === 0) {
+          blockCache.table.delete(block.hash);
+        }
+        if (blockCache.boundBlock === block) {
+          blockCache.boundBlock = null;
+        }
+        return block;
+      }
     }
     //==============================================================================
     // 블록 갈래 모두 지우기.
@@ -57929,9 +58071,12 @@ void main() {
       for (const blockList of blockCache.table.values()) {
         for (const block of blockList) {
           webGL2RenderingContext.deleteBuffer(block.buffer);
+          block.buffer = null;
         }
       }
       blockCache.table.clear();
+      blockCache.blocks.length = 0;
+      blockCache.hand = 0;
       blockCache.count = 0;
       blockCache.boundBlock = null;
       this.#drawEntryOfOptions = new System80.WeakMap();
@@ -58172,7 +58317,7 @@ void main() {
         const outlineBlocks = this.#outlineBlocks;
         const outlineLightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
         const outlineLightVersion = outlineLightSet.getVersion();
-        if (drawEntry.outlineBlock === null || drawEntry.outlineColor !== this.#outlineColor || drawEntry.outlineLightSet !== outlineLightSet || drawEntry.outlineLightVersion !== outlineLightVersion) {
+        if (drawEntry.outlineBlock === null || drawEntry.outlineBlock.buffer === null || drawEntry.outlineColor !== this.#outlineColor || drawEntry.outlineLightSet !== outlineLightSet || drawEntry.outlineLightVersion !== outlineLightVersion) {
           const outlineColor = state[DRAW_STATE_OUTLINE_COLOR] !== null ? state[DRAW_STATE_OUTLINE_COLOR] : this.#outlineColor;
           const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? readOutlineLightColor(outlineLightSet.getSunColor()) : WHITE_COLOR;
           const outlineValues = outlineBlocks.values;
@@ -58218,7 +58363,7 @@ void main() {
       this.uploadLightUniforms(solidEntry, lightSet);
       this.uploadDrawUniforms(solidProgram, modelElements, isSkinned, instancedMode, jointMatrices);
       const materialBlocks = this.#materialBlocks;
-      if (drawEntry.materialBlock === null) {
+      if (drawEntry.materialBlock === null || drawEntry.materialBlock.buffer === null) {
         writeMaterialBlockValues(materialBlocks.values, options);
         drawEntry.materialBlock = this.readUniformBlock(materialBlocks);
       }
