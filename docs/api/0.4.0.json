@@ -1604,13 +1604,7 @@
 								"en": "Constructor."
 							},
 							"since": "0.0.8",
-							"source": "src/base/object.js",
-							"counterpart": {
-								"engine": "vanilla-engine",
-								"module": "ui/uidocument",
-								"class": "UIDocument",
-								"name": "new"
-							}
+							"source": "src/base/object.js"
 						},
 						{
 							"kind": "method",
@@ -11179,6 +11173,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "get_all_loaded_scenes"
+							},
 							"examples": [
 								{
 									"title": {
@@ -11391,7 +11391,13 @@
 								"en": "Returns the global instance."
 							},
 							"since": "0.2.0",
-							"source": "src/core/engine.js"
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "get_engine"
+							}
 						}
 					]
 				}
@@ -13187,6 +13193,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/viewmanager.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/viewmanager",
+								"class": "ViewManager",
+								"name": "limit_render_pixel_ratio"
+							},
 							"examples": [
 								{
 									"title": {
@@ -19347,7 +19359,13 @@
 								"en": "Turns batched drawing on and off. (the engine turns it on at the start, off means one draw call per draw)\n- When on, consecutive draws (images, shapes, text, vertex-color quads) are accumulated with transform and color carried in the vertices and drawn in one draw call.\n- One batch binds several textures (the smaller of the device texture unit count and 16), so the batch continues when the texture changes. (the same scheme as PixiJS)\n- Axis-aligned clips (beginClipRect) whose edges lie on pixel boundaries are clipped by the shader with a clip rectangle carried in the vertices, so they do not break the batch. (rotated or rounded clips use the stencil)\n- When the texture slots fill up, when the blend, a stencil clip or a swapped-in shader changes, or when the buffer is full, what has accumulated is drawn, and the engine draws the rest at the end of the frame.\n- When inserting a pass that touches WebGL directly (an external renderer and the like) while it is on, call flushBatch() first."
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "set_batching_enabled"
+							}
 						},
 						{
 							"kind": "method",
@@ -19366,7 +19384,13 @@
 								"en": "Returns whether batched drawing is on."
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "is_batching_enabled"
+							}
 						},
 						{
 							"kind": "method",
@@ -19378,7 +19402,13 @@
 								"en": "Draws the accumulated batch. (does nothing if nothing has accumulated)\n- Binds the batch textures to units from 0 up. Units of unused slots get the white texture, so a texture from an earlier draw never forms a feedback loop even if it is the current target (render target)."
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "flush_batch"
+							}
 						},
 						{
 							"kind": "method",
@@ -21003,6 +21033,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "measure_text_with_font_string"
+							},
 							"examples": [
 								{
 									"title": {
@@ -21686,6 +21722,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "get_current_framebuffer"
+							},
 							"examples": [
 								{
 									"title": {
@@ -21715,6 +21757,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "get_current_viewport"
+							},
 							"examples": [
 								{
 									"title": {
@@ -21737,6 +21785,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "reset_gl_state_cache"
+							},
 							"examples": [
 								{
 									"title": {
@@ -23086,7 +23140,13 @@
 								"en": "Returns the engine."
 							},
 							"since": "0.0.8",
-							"source": "src/core/scene.js"
+							"source": "src/core/scene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/scene",
+								"class": "SceneBase",
+								"name": "get_engine"
+							}
 						},
 						{
 							"kind": "method",
@@ -36983,7 +37043,13 @@
 								"en": "Returns the engine. (moved from the former UIComponent)"
 							},
 							"since": "0.2.1",
-							"source": "src/ui/uiview.js"
+							"source": "src/ui/uiview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiview",
+								"class": "UIView",
+								"name": "get_engine"
+							}
 						},
 						{
 							"kind": "method",
@@ -49069,6 +49135,12 @@
 							},
 							"since": "0.3.0",
 							"source": "src/ui/uidocument.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidocument",
+								"class": "UIDocument",
+								"name": "new"
+							},
 							"examples": [
 								{
 									"title": {
@@ -49178,6 +49250,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uidocument.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidocument",
+								"class": "UIDocument",
+								"name": "load_images"
+							},
 							"examples": [
 								{
 									"title": {
@@ -49206,7 +49284,13 @@
 								"en": "Sets the pending images. (sets the images found, keeps the images still loading, and returns how many remain)\n- fromJsonText and deserializeNode call it once at the end. If the tree was built without waiting for the images, call it in the scene's update until the remaining count is 0.\n- An image that is not found (the resolver gave null, the asset is missing or failed) gives a warning and is dropped. That component stays without an image."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uidocument.js"
+							"source": "src/ui/uidocument.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidocument",
+								"class": "UIDocument",
+								"name": "bind_pending_images"
+							}
 						},
 						{
 							"kind": "method",
@@ -49466,6 +49550,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uidocument.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidocument",
+								"class": "UIDocument",
+								"name": "create_component"
+							},
 							"examples": [
 								{
 									"title": {
@@ -49504,6 +49594,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uidocument.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uidocument",
+								"class": "UIDocument",
+								"name": "get_node_type_name"
+							},
 							"examples": [
 								{
 									"title": {
@@ -50617,6 +50713,94 @@
 						},
 						{
 							"kind": "method",
+							"name": "setLoadType",
+							"signature": "setLoadType(loadType)",
+							"params": [
+								{
+									"name": "loadType",
+									"type": "string",
+									"description": {
+										"ko": "읽기 방식. (AudioLoadType 의 값, 모르는 값이면 decompressOnLoad)",
+										"en": "Load type. (a value of AudioLoadType, decompressOnLoad if unknown)"
+									}
+								}
+							],
+							"description": {
+								"ko": "읽기 방식 설정. (다음 load, loadFromBytes 부터, 이미 읽혔으면 unload 뒤에 다시 읽어야 바뀐다)",
+								"en": "Sets the load type. (from the next load or loadFromBytes, if already loaded it changes only after unload and loading again)"
+							},
+							"since": "0.4.0",
+							"source": "src/resource/audioasset.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "긴 배경음을 스트리밍으로 읽기",
+										"en": "Load long background music as streaming"
+									},
+									"code": "import { AudioAsset, AudioLoadType } from \"./build/vanilla.js\";\n\nconst audioAsset = new AudioAsset();\naudioAsset.setLoadType(AudioLoadType.streaming);\nawait audioAsset.load(\"examples/assets/beep.wav\");\nconsole.log(audioAsset.getLoadType(), audioAsset.isStreaming(), audioAsset.getDuration());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getLoadType",
+							"signature": "getLoadType()",
+							"params": [],
+							"returns": {
+								"type": "string",
+								"description": {
+									"ko": "읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)",
+									"en": "Load type. (a value of AudioLoadType, decompressOnLoad by default, the background music default is planned to change to streaming after it is checked on real devices (iPhone and iPad Safari))"
+								}
+							},
+							"description": {
+								"ko": "읽기 방식 반환.",
+								"en": "Returns the load type."
+							},
+							"since": "0.4.0",
+							"source": "src/resource/audioasset.js"
+						},
+						{
+							"kind": "method",
+							"name": "isStreaming",
+							"signature": "isStreaming()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "스트리밍으로 읽혔으면 참. (통째로 풀었거나 읽기 전이면 거짓)",
+									"en": "True if loaded as streaming. (false if fully decompressed or not loaded yet)"
+								}
+							},
+							"description": {
+								"ko": "스트리밍으로 읽혔는지. (읽기 방식이 automatic 이면 읽은 뒤에 정해진다)",
+								"en": "Whether it was loaded as streaming. (with the automatic load type this is decided after loading)"
+							},
+							"since": "0.4.0",
+							"source": "src/resource/audioasset.js"
+						},
+						{
+							"kind": "method",
+							"name": "getStreamUrl",
+							"signature": "getStreamUrl()",
+							"params": [],
+							"returns": {
+								"type": "string | null",
+								"description": {
+									"ko": "파일 경로나 blob: 주소. (스트리밍이 아니면 null)",
+									"en": "A file path or blob: URL. (null if not streaming)"
+								}
+							},
+							"description": {
+								"ko": "스트리밍 소리의 주소. (미디어 요소의 src 로 쓴다)",
+								"en": "URL of the streaming sound. (used as the media element's src)"
+							},
+							"since": "0.4.0",
+							"source": "src/resource/audioasset.js"
+						},
+						{
+							"kind": "method",
 							"name": "load",
 							"signature": "async load(assetPath)",
 							"params": [
@@ -50709,6 +50893,18 @@
 						},
 						{
 							"kind": "method",
+							"name": "unload",
+							"signature": "unload()",
+							"params": [],
+							"description": {
+								"ko": "애셋 언로드. (오디오 버퍼를 놓고, 이 애셋이 만든 blob: 주소를 놓는다, 읽기 방식은 그대로)",
+								"en": "Unloads the asset. (releases the audio buffer and any blob: URL this asset created, the load type stays)"
+							},
+							"since": "0.4.0",
+							"source": "src/resource/audioasset.js"
+						},
+						{
+							"kind": "method",
 							"name": "getLoadError",
 							"signature": "getLoadError()",
 							"params": [],
@@ -50740,8 +50936,8 @@
 							"returns": {
 								"type": "AudioBuffer | null",
 								"description": {
-									"ko": "디코딩한 오디오 버퍼. (읽기 전이면 null)",
-									"en": "Decoded audio buffer. (null before loading)"
+									"ko": "디코딩한 오디오 버퍼. (읽기 전이거나 스트리밍이면 null)",
+									"en": "The decoded audio buffer. (null if not loaded yet or streaming)"
 								}
 							},
 							"description": {
@@ -50765,8 +50961,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "재생 시간. (초, 읽기 전이면 0)",
-									"en": "Duration. (seconds, 0 before loading)"
+									"ko": "재생 시간. (초, 읽기 전이면 0, 스트리밍이면 메타데이터의 길이)",
+									"en": "Playback duration. (seconds, 0 if not loaded yet, the metadata duration if streaming)"
 								}
 							},
 							"description": {
@@ -50785,8 +50981,65 @@
 					]
 				}
 			],
-			"functions": [],
-			"enums": []
+			"functions": [
+				{
+					"kind": "field",
+					"name": "AUTOMATIC_STREAMING_BYTE_THRESHOLD",
+					"signature": "AUTOMATIC_STREAMING_BYTE_THRESHOLD",
+					"params": [],
+					"description": {
+						"ko": "자동(AudioLoadType.automatic)일 때 스트리밍으로 고르는 파일 크기. (바이트, 이보다 크면 스트리밍)\n- 통째로 풀면 1 초에 채널마다 44100 개의 float32 를 든다. (스테레오 1 초 약 345 KiB, 3 분이면 약 61 MiB)\n  128 kbps MP3 1 MiB 는 약 65 초라 풀면 약 22 MiB 다. 효과음은 거의 이보다 작고, 이보다 큰 WAV 도 6 초 안팎이라 흘려 틀어도 된다.",
+						"en": "File size above which automatic (AudioLoadType.automatic) picks streaming. (bytes, larger files stream)\n- Full decoding holds 44100 float32 values per channel per second. (about 345 KiB per stereo second, about 61 MiB for 3 minutes)\n  1 MiB of 128 kbps MP3 is about 65 seconds, about 22 MiB when decoded. Sound effects are almost always smaller, and a WAV larger than this is still only around 6 seconds, so streaming it is fine."
+					},
+					"since": "0.4.0",
+					"source": "src/resource/audioasset.js"
+				}
+			],
+			"enums": [
+				{
+					"name": "AudioLoadType",
+					"summary": {
+						"ko": "소리 읽기 방식. (유니티 AudioClip 의 Load Type, 언리얼 사운드 웨이브의 스트리밍과 같은 갈래)",
+						"en": "Sound load type. (the same kind of choice as Unity AudioClip's Load Type and Unreal sound wave streaming)"
+					},
+					"values": [
+						{
+							"name": "automatic",
+							"value": "automatic",
+							"description": {
+								"ko": "크기를 보고 고른다. (AUTOMATIC_STREAMING_BYTE_THRESHOLD 보다 큰 파일은 스트리밍, 아니면 통째로 풀기, 고른 애셋만)",
+								"en": "Chooses by size. (files larger than AUTOMATIC_STREAMING_BYTE_THRESHOLD stream, others are fully decompressed, only for assets that choose it)"
+							}
+						},
+						{
+							"name": "decompressOnLoad",
+							"value": "decompressOnLoad",
+							"description": {
+								"ko": "읽을 때 PCM 으로 통째로 푼다. (효과음처럼 짧고 자주 겹쳐 트는 소리, 시작이 바로이고 겹쳐 틀어도 싸다, 기본)",
+								"en": "Fully decompresses to PCM on load. (short sounds played often and overlapping, like sound effects, start immediately and are cheap to overlap, the default)"
+							}
+						},
+						{
+							"name": "streaming",
+							"value": "streaming",
+							"description": {
+								"ko": "풀지 않고 미디어 요소(HTMLAudioElement)가 조금씩 풀어 흘린다. (배경음처럼 긴 소리, 메모리는 압축된 파일 크기 이하)",
+								"en": "Does not decompress, a media element (HTMLAudioElement) decodes and streams it bit by bit. (long sounds like background music, memory is at most the compressed file size)"
+							}
+						}
+					],
+					"examples": [
+						{
+							"title": {
+								"ko": "배경음은 스트리밍, 효과음은 통째로 풀기",
+								"en": "Stream background music, fully decompress sound effects"
+							},
+							"code": "import { AudioAsset, AudioLoadType } from \"./build/vanilla.js\";\n\nconst musicAsset = new AudioAsset();\nmusicAsset.setLoadType(AudioLoadType.streaming);\nawait musicAsset.load(\"examples/assets/beep.wav\");\nconst effectAsset = new AudioAsset();\neffectAsset.setLoadType(AudioLoadType.decompressOnLoad);\nawait effectAsset.load(\"examples/assets/beep.wav\");\nconsole.log(musicAsset.isStreaming(), musicAsset.getAudioBuffer(), effectAsset.isStreaming(), effectAsset.getDuration());",
+							"language": "javascript"
+						}
+					]
+				}
+			]
 		},
 		{
 			"name": "resource/blobasset",
@@ -63783,8 +64036,8 @@
 		{
 			"name": "graphics3d/toon/toonrenderer",
 			"summary": {
-				"ko": "툰 렌더러. (ToonMesh 와 ToonGlb 의 배열을 한 색 재질과 바깥선으로 그린다)",
-				"en": "Toon renderer. (draws ToonMesh and ToonGlb arrays with single-color material and outline)"
+				"ko": "툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)",
+				"en": "Toon renderer. (draws MeshBuilder and readGlbArrays arrays with single-color material and outline)"
 			},
 			"examples": [
 				{
@@ -63792,7 +64045,7 @@
 						"ko": "그늘, 림, 하이라이트, 점광과 스포트라이트를 걸고 한 프레임 그리기",
 						"en": "Draw one frame with shade, rim, highlight, point light and spotlight set"
 					},
-					"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createTranslation(0, 0.5, 0), \"#f0c8a0\", { hasOutline: true });\nbuilder.addPart(ToonMesh.createBoxGeometry(3, 0.1, 3), Matrix4.createTranslation(0, -0.05, 0), \"#708090\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setShade({ step: 0.5, feather: 0.02, color: [0.6, 0.55, 0.75], secondStep: 0.2, secondFeather: 0.02, secondColor: [0.4, 0.36, 0.55], isHalfLambert: true });\nrenderer.setRimLight([0.5, 0.55, 0.7], 3, 0.2, 1);\nrenderer.setSpecular(0.6, 64, 0, [1, 1, 1]);\nrenderer.setPointLights([\n\t{ position: [1.5, 1.5, 1], color: [1, 0.7, 0.4], intensity: 2, range: 5 },\n\t{ position: [0, 3, 0], color: [0.6, 0.8, 1], intensity: 3, range: 6, direction: [0, -1, 0], innerConeAngle: 0.3, outerConeAngle: 0.6 },\n]);\nconst matcapTexture = renderer.createTexture({ width: 2, height: 2, data: new Uint8Array([60, 60, 70, 255, 255, 255, 255, 255, 60, 60, 70, 255, 160, 160, 180, 255]) }, { isMipmapped: false, isRepeated: false });\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0.4, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nrenderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);\nrenderer.drawMesh(mesh, Matrix4.createIdentity(), { receivesShadow: false, specularScale: 1.5, matcapTexture: matcapTexture, matcapStrength: 0.5 });\nrenderer.endFrame();",
+					"code": "import { ToonRenderer, MeshBuilder, createSphereGeometry, createBoxGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createTranslation(0, 0.5, 0), \"#f0c8a0\", { hasOutline: true });\nbuilder.addPart(createBoxGeometry(3, 0.1, 3), Matrix4.createTranslation(0, -0.05, 0), \"#708090\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setShade({ step: 0.5, feather: 0.02, color: [0.6, 0.55, 0.75], secondStep: 0.2, secondFeather: 0.02, secondColor: [0.4, 0.36, 0.55], isHalfLambert: true });\nrenderer.setRimLight([0.5, 0.55, 0.7], 3, 0.2, 1);\nrenderer.setSpecular(0.6, 64, 0, [1, 1, 1]);\nrenderer.setPointLights([\n\t{ position: [1.5, 1.5, 1], color: [1, 0.7, 0.4], intensity: 2, range: 5 },\n\t{ position: [0, 3, 0], color: [0.6, 0.8, 1], intensity: 3, range: 6, direction: [0, -1, 0], innerConeAngle: 0.3, outerConeAngle: 0.6 },\n]);\nconst matcapTexture = renderer.createTexture({ width: 2, height: 2, data: new Uint8Array([60, 60, 70, 255, 255, 255, 255, 255, 60, 60, 70, 255, 160, 160, 180, 255]) }, { isMipmapped: false, isRepeated: false });\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0.4, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nrenderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);\nrenderer.drawMesh(mesh, Matrix4.createIdentity(), { receivesShadow: false, specularScale: 1.5, matcapTexture: matcapTexture, matcapStrength: 0.5 });\nrenderer.endFrame();",
 					"language": "javascript"
 				}
 			],
@@ -63800,8 +64053,8 @@
 				{
 					"name": "ToonRenderer",
 					"summary": {
-						"ko": "툰 렌더러. (ToonMesh 와 ToonGlb 의 배열을 한 색 재질과 바깥선으로 그린다)\n- 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).\n  셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)\n  해는 램프 색을 통째로, 채움 빛과 점광과 스포트라이트는 램프의 밝기 단계를 받는다. 하이라이트와 림은 단단한 툰 꼴에서 부드러운 꼴까지. 셈은 ToonLightSet 머리말에 있다.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel 은 기본 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음(createLightSet)을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 노멀: 모형 행렬과 본 행렬의 왼쪽 위 3x3 의 역행렬의 전치로 옮긴다. (늘이고 줄인 모형도 빛이 맞다, 정점 조각이 고친 행렬도 같다)\n- 재질: 꼭짓점의 색(sRGB), 빛남(바탕색에 곱해 더함), 빛을 받지 않음. 꼭짓점 UV(arrays.uvData, 2 씩)가 있으면 텍스처를 읽는다.\n- 그리기 꼴(options, 기본값이면 지금까지와 같은 화면):\n  tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강)\n  glowScale 꼭짓점 빛남의 배(기본 1), colorScale 마지막 선형 색의 배(기본 1, 거울에 비친 모습을 어둡게), emissiveColor [r, g, b] sRGB 와 emissiveIntensity(선형 배, 기본 1, 색 기본 검정).\n  baseColorTexture(바탕색에 곱함, 알파는 불투명도에), emissiveTexture(빛남 색에 곱함), uvTransform [u 옮김, v 옮김, u 배, v 배] (KHR_texture_transform 의 offset, scale).\n  decalTexture 는 바탕색 위에 알파로 덮는다(색 = 텍스처 x decalColor). decalEmission 만큼 그 색으로 빛난다. decalUvTransform 은 묶음 그림의 한 칸을 고를 때.\n  alphaCutoff 는 불투명도가 그보다 작은 화소를 버린다. (0 이면 끔, glTF MASK)\n  blendMode: ToonBlendMode.alpha(기본, 곧은 알파), premultiplied(미리 곱한 알파), additive(더하기). alpha 가 아니면 비치는 것으로 그린다.\n  softEdge 는 pow(|dot(N, V)|, softEdge) 를 불투명도에 곱해 가장자리를 엷게 한다. (0 이면 끔, 프레넬 꼴)\n  isMirrored 는 감기를 뒤집어 그린다. 주지 않으면 모형 행렬의 행렬식이 음수일 때 스스로 뒤집는다. 보기 행렬이 거울에 비쳤으면 그것도 더해 뒤집는다.\n  indexStart, indexCount 는 몸의 꼭짓점 번호 가운데 그 자리만 그린다. (GLB 재질 범위, 숨긴 부분) outlineIndexStart, outlineIndexCount 는 바깥선 껍데기.\n  material(ToonMaterial), textures({ 유니폼 이름: 텍스처 }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) 는 확장 자리다. (toonmaterial.js 머리말)\n  lightSet(ToonLightSet) 은 그 그리기의 빛 묶음이다.\n  receivesShadow (기본 true) 가 false 면 해의 그림자를 보지 않는다. shadeOffset 은 빛을 받는 몫에 더해 그늘 경계를 옮긴다. (길티기어 Xrd 의 꼭짓점 색 문턱, 유니티 툰 셰이더의 Shading Grade Map 꼴)\n  specularScale, rimScale (기본 1) 은 그 그리기의 하이라이트와 림 배다. (0 이면 없음, 재질마다의 세기)\n  matcapTexture 는 보기 공간 노멀로 읽는 매트캡이다. matcapStrength (기본 1), matcapBlend (ToonMatcapBlend.multiply 기본, add)\n  outlineColor [r, g, b, a] sRGB 는 그 그리기의 껍데기 바깥선 색 (주지 않으면 setOutlineColor), outlineWidthScale (기본 1) 은 지은 굵기의 배다.\n  outlineOffsetZ (기본 0) 는 껍데기를 카메라에서 먼 쪽으로 미는 월드 길이다. (몸 앞으로 비치지 않게, 유니티 툰 셰이더의 Offset Z)\n  angelRingTexture 는 천사 고리 텍스처다. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 angelRingOffsetV (기본 0.3) 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring)\n  angelRingColor [r, g, b] (선형 배, 기본 흰색), angelRingOffsetU (0 ~ 0.5, 기본 0), isAngelRingAlpha (기본 false 면 더하고 true 면 텍스처 알파로 덮는다)\n  천사 고리 UV 는 카메라 기울임만큼 되돌려 돌린다. (readCameraRoll, 유니티 툰 셰이더의 Camera Rolling Stabilizer, 카메라를 기울여도 고리는 머리에 붙어 있다)\n  lineId, hasScreenOutline, hasCreaseLine 은 ToonDrawQueue 가 화면 공간 바깥선에 넘기는 값이다. (렌더러는 읽지 않는다)\n- 바깥선 껍데기(inverted hull): MeshBuilder 가 지은 껍데기의 바탕 자리와 미는 쪽(지은 굵기, 같은 자리의 노멀을 평균한 쪽)을 올리고, 셰이더가 outlineWidthScale 만큼 밀어 뒷면만 그린다.\n  setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 를 주면 카메라까지의 거리 / 기준 거리 를 굵기에 곱해 화면 굵기를 맞춘다. (원근만)\n  setOutlineFadeDistance(가까운 거리, 먼 거리) 를 주면 모형의 자리에서 카메라까지가 먼 거리에 다가갈수록 굵기가 0 이 된다. (smoothstep, 유니티 툰 셰이더의 Nearest, Farthest Distance)\n  껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)\n- 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)\n- GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)\n  오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (거르지 않음, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)\n- 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)\n- 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF)\n  점광과 스포트라이트 그림자는 ShadowAtlas 에 beginShadowAtlasPass, 칸마다 setShadowAtlasTile 과 drawMesh 로 드리우고, setLocalShadows 로 받는다. (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)\n  그 빛의 받는 몫에 그림자를 곱해 그늘 램프에 넣는다. (해와 같은 꼴) castsShadow 가 true 인 점광만 칸을 받는다. (SHADOW_ATLAS_MAXIMUM_LIGHTS 까지)\n  그림자를 받지 않을 때도 두 그림자 유닛에 1x1 비교 깊이 텍스처를 묶는다. (sampler2DShadow 유닛에 깊이 텍스처가 없으면 맥 드라이버가 알리고, 색 텍스처가 묶여 있으면 WebGL 이 그리기를 거부한다)\n- HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.\n- 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.\n  beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.\n  (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)\n  beginFrameWithMatrices(보기, 투영) 는 두 행렬로 시작한다. (직교 원 행렬 카메라) 카메라의 자리와 보기 돌림(하이라이트, 림, 소프트 엣지, 매트캡)은 보기와 투영에서 읽는다.\n- 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR)과 빛 묶음은 바뀔 때만 올린다. 그리기마다 바뀌는 값(모형 행렬, 틴트, 텍스처)만 매번 올린다.\n- readProgramSources(material, instanceLayout) 로 ShaderWarmer 에 넘길 소스를 준다.\n- 노드 사각형 안에 그리기: setScreenRect(x, y, 너비, 높이) 를 주면 beginFrame 이 보기와 투영의 클립 공간을 그 사각형으로 옮기고 가위로 밖을 자른다.\n  사각형은 beginFrame 때의 뷰포트(보통 드로잉 버퍼 전체) 안의 픽셀이고 왼쪽 위가 원점이다. (2D 노드의 draw 에서 graphic.getTransformMatrix 로 셈한 자리)\n  화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.\n- drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)\n- 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)\n- 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.\n- 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))\n- 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.",
-						"en": "Toon renderer. (Draws ToonMesh and ToonGlb arrays with single-color material and outlines)\n- Light: holds one ToonLightSet as the default. Sun (direction and color, shadow), ambient light of sky color and ground color, fill light, point lights and spotlights (up to TOON_MAXIMUM_POINT_LIGHTS), rim light, highlight, light model (÷π).\n  Cel shading is a shade ramp. (Base, 1st shade, 2nd shade with Step and Feather of the Unity Toon Shader, shadows enter as the shade color, boundaries without stairs by fwidth, a ramp texture also works)\n  The sun receives the whole ramp color, while the fill light, point lights and spotlights receive the ramp's brightness level. Highlight and rim range from the hard toon form to the soft form. The math is in the ToonLightSet header.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel change the default set. Another set (createLightSet) can be given per draw with options.lightSet. (When the shade color differs per material)\n- Normals: transformed by the transpose of the inverse of the upper left 3x3 of the model matrix and the joint matrix. (Light stays correct on stretched and squashed models, the same goes for matrices changed by the vertex chunk)\n- Material: vertex color (sRGB), glow (multiplied by the base color and added), unlit. If there are vertex UVs (arrays.uvData, 2 each), textures are read.\n- Draw options (options, the defaults give the same picture as before):\n  tintColor [r, g, b, a] sRGB and alpha. If tintAmount (0 ~ 1) is given, the tint is mixed in sRGB instead of multiplied. (Hit flash, broken red)\n  glowScale multiplier of vertex glow (default 1), colorScale multiplier of the final linear color (default 1, darkens a mirrored image), emissiveColor [r, g, b] sRGB and emissiveIntensity (linear multiplier, default 1, color default black).\n  baseColorTexture (multiplied by the base color, alpha into opacity), emissiveTexture (multiplied by the glow color), uvTransform [u offset, v offset, u scale, v scale] (offset and scale of KHR_texture_transform).\n  decalTexture covers the base color with alpha (color = texture x decalColor). It glows in that color by decalEmission. decalUvTransform picks one cell of an atlas.\n  alphaCutoff discards pixels whose opacity is below it. (0 turns it off, glTF MASK)\n  blendMode: ToonBlendMode.alpha (default, straight alpha), premultiplied (premultiplied alpha), additive (add). Anything other than alpha is drawn as transparent.\n  softEdge multiplies pow(|dot(N, V)|, softEdge) into the opacity to thin the edges. (0 turns it off, Fresnel form)\n  isMirrored draws with the winding flipped. If not given, it flips by itself when the determinant of the model matrix is negative. If the view matrix is mirrored, that flip is added too.\n  indexStart, indexCount draw only that span of the body vertex indices. (GLB material ranges, hidden parts) outlineIndexStart, outlineIndexCount are for the outline shell.\n  material (ToonMaterial), textures ({ uniform name: texture }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) are extension points. (toonmaterial.js header)\n  lightSet (ToonLightSet) is the light set of that draw.\n  If receivesShadow (default true) is false, the sun's shadow is not looked up. shadeOffset is added to the received light amount to move the shade boundary. (Vertex color threshold of Guilty Gear Xrd, Shading Grade Map form of the Unity Toon Shader)\n  specularScale, rimScale (default 1) are the highlight and rim multipliers of that draw. (0 means none, strength per material)\n  matcapTexture is a matcap read with the view-space normal. matcapStrength (default 1), matcapBlend (ToonMatcapBlend.multiply default, add)\n  outlineColor [r, g, b, a] sRGB is the shell outline color of that draw (setOutlineColor if not given), outlineWidthScale (default 1) is the multiplier of the built thickness.\n  outlineOffsetZ (default 0) is the world length the shell is pushed away from the camera. (So it does not show in front of the body, Offset Z of the Unity Toon Shader)\n  angelRingTexture is the angel ring texture. u is the x of the view-space normal, v is the y of the second UV mixed with the y of the view normal by angelRingOffsetV (default 0.3). (Angel Ring of the Unity Toon Shader)\n  angelRingColor [r, g, b] (linear multiplier, default white), angelRingOffsetU (0 ~ 0.5, default 0), isAngelRingAlpha (default false adds, true covers with the texture alpha)\n  The angel ring UV is rotated back by the camera roll. (readCameraRoll, Camera Rolling Stabilizer of the Unity Toon Shader, the ring stays on the head even when the camera is tilted)\n  lineId, hasScreenOutline, hasCreaseLine are values ToonDrawQueue passes to the screen-space outline. (The renderer does not read them)\n- Outline shell (inverted hull): uploads the base position and push direction (built thickness, the averaged normal of the same position) of the shell MeshBuilder built, and the shader pushes it by outlineWidthScale and draws only back faces.\n  If setOutlineDistanceScale(reference distance, minimum scale, maximum scale) is given, distance to the camera / reference distance is multiplied into the thickness to keep the screen thickness. (Perspective only)\n  If setOutlineFadeDistance(near distance, far distance) is given, the thickness goes to 0 as the distance from the model position to the camera approaches the far distance. (smoothstep, Nearest and Farthest Distance of the Unity Toon Shader)\n  The shell color is multiplied by the sun color when the outline light color usage of the light set is on (default). (Divided by its intensity when the intensity is 1 or more, same as the Unity Toon Shader outline)\n- Skeleton: the joint matrices computed by writeSkinPose are passed to drawMesh. (Up to TOON_MAXIMUM_JOINTS)\n- GPU instancing: drawMeshInstanced draws many copies of the same model at once with a matrix and tint per instance. (Both body and outline, culled and uploaded on every draw)\n  Long-lived instances build a persistent buffer with createInstanceLayout and createInstanceBuffer and are drawn with drawMeshInstanceBuffer. (Not culled, the material vertex chunk reads user attributes)\n- Off-screen culling: the model's bounding sphere is tested against the frustum of view and projection and is not drawn if outside. (Instances are culled one by one and only the remaining ones are uploaded)\n- Shadows: cast into a ShadowMap with beginShadowPass and drawMesh, received with setShadow. (3x3 PCF)\n  Point light and spotlight shadows are cast into a ShadowAtlas with beginShadowAtlasPass and, per tile, setShadowAtlasTile and drawMesh, and received with setLocalShadows. (A point light uses six cube tiles, a spotlight one perspective tile)\n  The shadow is multiplied into that light's received amount and goes into the shade ramp. (Same form as the sun) Only point lights with castsShadow true get tiles. (Up to SHADOW_ATLAS_MAXIMUM_LIGHTS)\n  Even when shadows are not received, a 1x1 comparison depth texture is bound to both shadow units. (Without a depth texture on a sampler2DShadow unit the Mac driver reports it, and if a color texture is bound WebGL refuses to draw)\n- HDR: setHdrOutput(true) outputs linear color without gamma. Draw into a float render target (ToonPostProcess) and finish with bloom and tone mapping.\n- Use: createMesh(arrays) → every frame beginFrame(view and projection) → drawMesh / drawMeshInstanced → endFrame() → deleteMesh when done.\n  beginFrame notes the previous draw state (blend, depth, face culling, program, vertex array) and turns on depth test and face culling, and endFrame restores the noted state.\n  (When inserted between engine 2D drawing, call Graphic.flushSpriteBatch before it)\n  beginFrameWithMatrices(view, projection) starts with two matrices. (Orthographic or raw matrix camera) The camera position and view rotation (highlight, rim, soft edge, matcap) are read from the view and projection.\n- Per program, frame values (view and projection, camera, shadow, HDR) and the light set are uploaded only when changed. Only values that change per draw (model matrix, tint, textures) are uploaded every time.\n- readProgramSources(material, instanceLayout) gives the sources to pass to ShaderWarmer.\n- Drawing inside a node rectangle: if setScreenRect(x, y, width, height) is given, beginFrame moves the clip space of view and projection into that rectangle and cuts the outside with the scissor.\n  The rectangle is in pixels inside the viewport at beginFrame (usually the whole drawing buffer) with the top left as the origin. (The position computed with graphic.getTransformMatrix in a 2D node's draw)\n  Off-screen culling uses the frustum before the move. endFrame releases the scissor. Match the camera aspect ratio to the rectangle's ratio. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) calls beginFrame with the camera's view and projection. It uses the same camera as the 2D display (Camera3D.projectToView).\n- drawMeshOutline draws only the outline shell. (When ToonDrawQueue draws all outlines together after all opaque bodies, drawn counts are not counted)\n- Textures: createTexture(image or { width, height, data }, { isMipmapped, isRepeated, isFiltered }) builds an RGBA texture. UV (0, 0) is the top left of the image. (Same as glTF)\n- Texture units: point light shadow atlas 0, ramp 1, matcap 2, sun shadow 3, base color 4, glow 5, decal 6, angel ring 7, material 8 ~ 15. beginFrame notes the binding of unit 0 and endFrame restores it.\n- Second UV: if the arrays have uv1Data, vertexUv is four values (UV, second UV). Shader chunks read it as ToonSurface.uv1. ((0, 1) if none)\n- Light color usage (setLightColorUsage), shade-side rim (setShadeRimLight) and light intensity limit (setLightIntensityLimited) live in the light set (ToonLightSet)."
+						"ko": "툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)\n- 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).\n  셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)\n  해는 램프 색을 통째로, 채움 빛과 점광과 스포트라이트는 램프의 밝기 단계를 받는다. 하이라이트와 림은 단단한 툰 꼴에서 부드러운 꼴까지. 셈은 ToonLightSet 머리말에 있다.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel 은 기본 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음(createLightSet)을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 노멀: 모형 행렬과 본 행렬의 왼쪽 위 3x3 의 역행렬의 전치로 옮긴다. (늘이고 줄인 모형도 빛이 맞다, 정점 조각이 고친 행렬도 같다)\n- 재질: 꼭짓점의 색(sRGB), 빛남(바탕색에 곱해 더함), 빛을 받지 않음. 꼭짓점 UV(arrays.uvData, 2 씩)가 있으면 텍스처를 읽는다.\n- 그리기 꼴(options, 기본값이면 지금까지와 같은 화면):\n  tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강)\n  glowScale 꼭짓점 빛남의 배(기본 1), colorScale 마지막 선형 색의 배(기본 1, 거울에 비친 모습을 어둡게), emissiveColor [r, g, b] sRGB 와 emissiveIntensity(선형 배, 기본 1, 색 기본 검정).\n  baseColorTexture(바탕색에 곱함, 알파는 불투명도에), emissiveTexture(빛남 색에 곱함), uvTransform [u 옮김, v 옮김, u 배, v 배] (KHR_texture_transform 의 offset, scale).\n  decalTexture 는 바탕색 위에 알파로 덮는다(색 = 텍스처 x decalColor). decalEmission 만큼 그 색으로 빛난다. decalUvTransform 은 묶음 그림의 한 칸을 고를 때.\n  alphaCutoff 는 불투명도가 그보다 작은 화소를 버린다. (0 이면 끔, glTF MASK)\n  blendMode: ToonBlendMode.alpha(기본, 곧은 알파), premultiplied(미리 곱한 알파), additive(더하기). alpha 가 아니면 비치는 것으로 그린다.\n  softEdge 는 pow(|dot(N, V)|, softEdge) 를 불투명도에 곱해 가장자리를 엷게 한다. (0 이면 끔, 프레넬 꼴)\n  isMirrored 는 감기를 뒤집어 그린다. 주지 않으면 모형 행렬의 행렬식이 음수일 때 스스로 뒤집는다. 보기 행렬이 거울에 비쳤으면 그것도 더해 뒤집는다.\n  indexStart, indexCount 는 몸의 꼭짓점 번호 가운데 그 자리만 그린다. (GLB 재질 범위, 숨긴 부분) outlineIndexStart, outlineIndexCount 는 바깥선 껍데기.\n  material(ToonMaterial), textures({ 유니폼 이름: 텍스처 }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) 는 확장 자리다. (toonmaterial.js 머리말)\n  lightSet(ToonLightSet) 은 그 그리기의 빛 묶음이다.\n  receivesShadow (기본 true) 가 false 면 해의 그림자를 보지 않는다. shadeOffset 은 빛을 받는 몫에 더해 그늘 경계를 옮긴다. (길티기어 Xrd 의 꼭짓점 색 문턱, 유니티 툰 셰이더의 Shading Grade Map 꼴)\n  specularScale, rimScale (기본 1) 은 그 그리기의 하이라이트와 림 배다. (0 이면 없음, 재질마다의 세기)\n  matcapTexture 는 보기 공간 노멀로 읽는 매트캡이다. matcapStrength (기본 1), matcapBlend (ToonMatcapBlend.multiply 기본, add)\n  outlineColor [r, g, b, a] sRGB 는 그 그리기의 껍데기 바깥선 색 (주지 않으면 setOutlineColor), outlineWidthScale (기본 1) 은 지은 굵기의 배다.\n  outlineOffsetZ (기본 0) 는 껍데기를 카메라에서 먼 쪽으로 미는 월드 길이다. (몸 앞으로 비치지 않게, 유니티 툰 셰이더의 Offset Z)\n  angelRingTexture 는 천사 고리 텍스처다. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 angelRingOffsetV (기본 0.3) 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring)\n  angelRingColor [r, g, b] (선형 배, 기본 흰색), angelRingOffsetU (0 ~ 0.5, 기본 0), isAngelRingAlpha (기본 false 면 더하고 true 면 텍스처 알파로 덮는다)\n  천사 고리 UV 는 카메라 기울임만큼 되돌려 돌린다. (readCameraRoll, 유니티 툰 셰이더의 Camera Rolling Stabilizer, 카메라를 기울여도 고리는 머리에 붙어 있다)\n  lineId, hasScreenOutline, hasCreaseLine 은 ToonDrawQueue 가 화면 공간 바깥선에 넘기는 값이다. (렌더러는 읽지 않는다)\n- 바깥선 껍데기(inverted hull): MeshBuilder 가 지은 껍데기의 바탕 자리와 미는 쪽(지은 굵기, 같은 자리의 노멀을 평균한 쪽)을 올리고, 셰이더가 outlineWidthScale 만큼 밀어 뒷면만 그린다.\n  setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 를 주면 카메라까지의 거리 / 기준 거리 를 굵기에 곱해 화면 굵기를 맞춘다. (원근만)\n  setOutlineFadeDistance(가까운 거리, 먼 거리) 를 주면 모형의 자리에서 카메라까지가 먼 거리에 다가갈수록 굵기가 0 이 된다. (smoothstep, 유니티 툰 셰이더의 Nearest, Farthest Distance)\n  껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)\n- 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)\n- GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)\n  오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (거르지 않음, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)\n- 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)\n- 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF)\n  점광과 스포트라이트 그림자는 ShadowAtlas 에 beginShadowAtlasPass, 칸마다 setShadowAtlasTile 과 drawMesh 로 드리우고, setLocalShadows 로 받는다. (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)\n  그 빛의 받는 몫에 그림자를 곱해 그늘 램프에 넣는다. (해와 같은 꼴) castsShadow 가 true 인 점광만 칸을 받는다. (SHADOW_ATLAS_MAXIMUM_LIGHTS 까지)\n  그림자를 받지 않을 때도 두 그림자 유닛에 1x1 비교 깊이 텍스처를 묶는다. (sampler2DShadow 유닛에 깊이 텍스처가 없으면 맥 드라이버가 알리고, 색 텍스처가 묶여 있으면 WebGL 이 그리기를 거부한다)\n- HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.\n- 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.\n  beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.\n  (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)\n  beginFrameWithMatrices(보기, 투영) 는 두 행렬로 시작한다. (직교 원 행렬 카메라) 카메라의 자리와 보기 돌림(하이라이트, 림, 소프트 엣지, 매트캡)은 보기와 투영에서 읽는다.\n- 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR)과 빛 묶음은 바뀔 때만 올린다. 그리기마다 바뀌는 값(모형 행렬, 틴트, 텍스처)만 매번 올린다.\n- readProgramSources(material, instanceLayout) 로 ShaderWarmer 에 넘길 소스를 준다.\n- 노드 사각형 안에 그리기: setScreenRect(x, y, 너비, 높이) 를 주면 beginFrame 이 보기와 투영의 클립 공간을 그 사각형으로 옮기고 가위로 밖을 자른다.\n  사각형은 beginFrame 때의 뷰포트(보통 드로잉 버퍼 전체) 안의 픽셀이고 왼쪽 위가 원점이다. (2D 노드의 draw 에서 graphic.getTransformMatrix 로 셈한 자리)\n  화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.\n- drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)\n- 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)\n- 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.\n- 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))\n- 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.",
+						"en": "Toon renderer. (Draws MeshBuilder and readGlbArrays arrays with single-color material and outlines)\n- Light: holds one ToonLightSet as the default. Sun (direction and color, shadow), ambient light of sky color and ground color, fill light, point lights and spotlights (up to TOON_MAXIMUM_POINT_LIGHTS), rim light, highlight, light model (÷π).\n  Cel shading is a shade ramp. (Base, 1st shade, 2nd shade with Step and Feather of the Unity Toon Shader, shadows enter as the shade color, boundaries without stairs by fwidth, a ramp texture also works)\n  The sun receives the whole ramp color, while the fill light, point lights and spotlights receive the ramp's brightness level. Highlight and rim range from the hard toon form to the soft form. The math is in the ToonLightSet header.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel change the default set. Another set (createLightSet) can be given per draw with options.lightSet. (When the shade color differs per material)\n- Normals: transformed by the transpose of the inverse of the upper left 3x3 of the model matrix and the joint matrix. (Light stays correct on stretched and squashed models, the same goes for matrices changed by the vertex chunk)\n- Material: vertex color (sRGB), glow (multiplied by the base color and added), unlit. If there are vertex UVs (arrays.uvData, 2 each), textures are read.\n- Draw options (options, the defaults give the same picture as before):\n  tintColor [r, g, b, a] sRGB and alpha. If tintAmount (0 ~ 1) is given, the tint is mixed in sRGB instead of multiplied. (Hit flash, broken red)\n  glowScale multiplier of vertex glow (default 1), colorScale multiplier of the final linear color (default 1, darkens a mirrored image), emissiveColor [r, g, b] sRGB and emissiveIntensity (linear multiplier, default 1, color default black).\n  baseColorTexture (multiplied by the base color, alpha into opacity), emissiveTexture (multiplied by the glow color), uvTransform [u offset, v offset, u scale, v scale] (offset and scale of KHR_texture_transform).\n  decalTexture covers the base color with alpha (color = texture x decalColor). It glows in that color by decalEmission. decalUvTransform picks one cell of an atlas.\n  alphaCutoff discards pixels whose opacity is below it. (0 turns it off, glTF MASK)\n  blendMode: ToonBlendMode.alpha (default, straight alpha), premultiplied (premultiplied alpha), additive (add). Anything other than alpha is drawn as transparent.\n  softEdge multiplies pow(|dot(N, V)|, softEdge) into the opacity to thin the edges. (0 turns it off, Fresnel form)\n  isMirrored draws with the winding flipped. If not given, it flips by itself when the determinant of the model matrix is negative. If the view matrix is mirrored, that flip is added too.\n  indexStart, indexCount draw only that span of the body vertex indices. (GLB material ranges, hidden parts) outlineIndexStart, outlineIndexCount are for the outline shell.\n  material (ToonMaterial), textures ({ uniform name: texture }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) are extension points. (toonmaterial.js header)\n  lightSet (ToonLightSet) is the light set of that draw.\n  If receivesShadow (default true) is false, the sun's shadow is not looked up. shadeOffset is added to the received light amount to move the shade boundary. (Vertex color threshold of Guilty Gear Xrd, Shading Grade Map form of the Unity Toon Shader)\n  specularScale, rimScale (default 1) are the highlight and rim multipliers of that draw. (0 means none, strength per material)\n  matcapTexture is a matcap read with the view-space normal. matcapStrength (default 1), matcapBlend (ToonMatcapBlend.multiply default, add)\n  outlineColor [r, g, b, a] sRGB is the shell outline color of that draw (setOutlineColor if not given), outlineWidthScale (default 1) is the multiplier of the built thickness.\n  outlineOffsetZ (default 0) is the world length the shell is pushed away from the camera. (So it does not show in front of the body, Offset Z of the Unity Toon Shader)\n  angelRingTexture is the angel ring texture. u is the x of the view-space normal, v is the y of the second UV mixed with the y of the view normal by angelRingOffsetV (default 0.3). (Angel Ring of the Unity Toon Shader)\n  angelRingColor [r, g, b] (linear multiplier, default white), angelRingOffsetU (0 ~ 0.5, default 0), isAngelRingAlpha (default false adds, true covers with the texture alpha)\n  The angel ring UV is rotated back by the camera roll. (readCameraRoll, Camera Rolling Stabilizer of the Unity Toon Shader, the ring stays on the head even when the camera is tilted)\n  lineId, hasScreenOutline, hasCreaseLine are values ToonDrawQueue passes to the screen-space outline. (The renderer does not read them)\n- Outline shell (inverted hull): uploads the base position and push direction (built thickness, the averaged normal of the same position) of the shell MeshBuilder built, and the shader pushes it by outlineWidthScale and draws only back faces.\n  If setOutlineDistanceScale(reference distance, minimum scale, maximum scale) is given, distance to the camera / reference distance is multiplied into the thickness to keep the screen thickness. (Perspective only)\n  If setOutlineFadeDistance(near distance, far distance) is given, the thickness goes to 0 as the distance from the model position to the camera approaches the far distance. (smoothstep, Nearest and Farthest Distance of the Unity Toon Shader)\n  The shell color is multiplied by the sun color when the outline light color usage of the light set is on (default). (Divided by its intensity when the intensity is 1 or more, same as the Unity Toon Shader outline)\n- Skeleton: the joint matrices computed by writeSkinPose are passed to drawMesh. (Up to TOON_MAXIMUM_JOINTS)\n- GPU instancing: drawMeshInstanced draws many copies of the same model at once with a matrix and tint per instance. (Both body and outline, culled and uploaded on every draw)\n  Long-lived instances build a persistent buffer with createInstanceLayout and createInstanceBuffer and are drawn with drawMeshInstanceBuffer. (Not culled, the material vertex chunk reads user attributes)\n- Off-screen culling: the model's bounding sphere is tested against the frustum of view and projection and is not drawn if outside. (Instances are culled one by one and only the remaining ones are uploaded)\n- Shadows: cast into a ShadowMap with beginShadowPass and drawMesh, received with setShadow. (3x3 PCF)\n  Point light and spotlight shadows are cast into a ShadowAtlas with beginShadowAtlasPass and, per tile, setShadowAtlasTile and drawMesh, and received with setLocalShadows. (A point light uses six cube tiles, a spotlight one perspective tile)\n  The shadow is multiplied into that light's received amount and goes into the shade ramp. (Same form as the sun) Only point lights with castsShadow true get tiles. (Up to SHADOW_ATLAS_MAXIMUM_LIGHTS)\n  Even when shadows are not received, a 1x1 comparison depth texture is bound to both shadow units. (Without a depth texture on a sampler2DShadow unit the Mac driver reports it, and if a color texture is bound WebGL refuses to draw)\n- HDR: setHdrOutput(true) outputs linear color without gamma. Draw into a float render target (ToonPostProcess) and finish with bloom and tone mapping.\n- Use: createMesh(arrays) → every frame beginFrame(view and projection) → drawMesh / drawMeshInstanced → endFrame() → deleteMesh when done.\n  beginFrame notes the previous draw state (blend, depth, face culling, program, vertex array) and turns on depth test and face culling, and endFrame restores the noted state.\n  (When inserted between engine 2D drawing, call Graphic.flushBatch before it)\n  beginFrameWithMatrices(view, projection) starts with two matrices. (Orthographic or raw matrix camera) The camera position and view rotation (highlight, rim, soft edge, matcap) are read from the view and projection.\n- Per program, frame values (view and projection, camera, shadow, HDR) and the light set are uploaded only when changed. Only values that change per draw (model matrix, tint, textures) are uploaded every time.\n- readProgramSources(material, instanceLayout) gives the sources to pass to ShaderWarmer.\n- Drawing inside a node rectangle: if setScreenRect(x, y, width, height) is given, beginFrame moves the clip space of view and projection into that rectangle and cuts the outside with the scissor.\n  The rectangle is in pixels inside the viewport at beginFrame (usually the whole drawing buffer) with the top left as the origin. (The position computed with graphic.getTransformMatrix in a 2D node's draw)\n  Off-screen culling uses the frustum before the move. endFrame releases the scissor. Match the camera aspect ratio to the rectangle's ratio. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) calls beginFrame with the camera's view and projection. It uses the same camera as the 2D display (Camera3D.projectToView).\n- drawMeshOutline draws only the outline shell. (When ToonDrawQueue draws all outlines together after all opaque bodies, drawn counts are not counted)\n- Textures: createTexture(image or { width, height, data }, { isMipmapped, isRepeated, isFiltered }) builds an RGBA texture. UV (0, 0) is the top left of the image. (Same as glTF)\n- Texture units: point light shadow atlas 0, ramp 1, matcap 2, sun shadow 3, base color 4, glow 5, decal 6, angel ring 7, material 8 ~ 15. beginFrame notes the binding of unit 0 and endFrame restores it.\n- Second UV: if the arrays have uv1Data, vertexUv is four values (UV, second UV). Shader chunks read it as ToonSurface.uv1. ((0, 1) if none)\n- Light color usage (setLightColorUsage), shade-side rim (setShadeRimLight) and light intensity limit (setLightIntensityLimited) live in the light set (ToonLightSet)."
 					},
 					"examples": [
 						{
@@ -63809,7 +64062,7 @@
 								"ko": "해와 바깥선 색을 정해 그린 뒤 통계를 읽고 치우기",
 								"en": "Draw after setting the sun and outline color, then read statistics and clean up"
 							},
-							"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nrenderer.setLight([-0.4, -1, -0.3], [1, 0.96, 0.9], [0.45, 0.5, 0.6], [0.25, 0.22, 0.2]);\nrenderer.setOutlineColor([0.1, 0.06, 0.08, 1]);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createCapsuleGeometry(0.3, 0.6, 8, 16), Matrix4.createIdentity(), \"#a0d0a0\", { outlineWidth: 0.02 });\nconst mesh = renderer.createMesh(builder.readArrays());\nwebGL2RenderingContext.clearColor(0.9, 0.9, 0.95, 1);\nwebGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.drawMesh(mesh, Matrix4.createTranslation(0, 0, 50));\nrenderer.endFrame();\nconst statistics = renderer.getFrameStatistics();\nif (statistics.drawnObjectCount !== 1 || statistics.culledObjectCount !== 1) {\n\tthrow new Error(\"unexpected statistics\");\n}\nrenderer.deleteMesh(mesh);\nrenderer.destroy();",
+							"code": "import { ToonRenderer, MeshBuilder, createCapsuleGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nrenderer.setLight([-0.4, -1, -0.3], [1, 0.96, 0.9], [0.45, 0.5, 0.6], [0.25, 0.22, 0.2]);\nrenderer.setOutlineColor([0.1, 0.06, 0.08, 1]);\nconst builder = new MeshBuilder();\nbuilder.addPart(createCapsuleGeometry(0.3, 0.6, 8, 16), Matrix4.createIdentity(), \"#a0d0a0\", { outlineWidth: 0.02 });\nconst mesh = renderer.createMesh(builder.readArrays());\nwebGL2RenderingContext.clearColor(0.9, 0.9, 0.95, 1);\nwebGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.drawMesh(mesh, Matrix4.createTranslation(0, 0, 50));\nrenderer.endFrame();\nconst statistics = renderer.getFrameStatistics();\nif (statistics.drawnObjectCount !== 1 || statistics.culledObjectCount !== 1) {\n\tthrow new Error(\"unexpected statistics\");\n}\nrenderer.deleteMesh(mesh);\nrenderer.destroy();",
 							"language": "javascript"
 						}
 					],
@@ -64274,7 +64527,7 @@
 										"ko": "캔버스에 그린 무늬를 바탕색 텍스처로 쓰기",
 										"en": "Use a pattern drawn on a canvas as the base color texture"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = 64;\ncanvas.height = 64;\nconst context = canvas.getContext(\"2d\");\ncontext.fillStyle = \"#f0e0c0\";\ncontext.fillRect(0, 0, 64, 64);\ncontext.fillStyle = \"#c04040\";\ncontext.fillRect(0, 0, 32, 32);\nconst baseColorTexture = renderer.createTexture(canvas, { isRepeated: true });\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#ffffff\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity(), { baseColorTexture: baseColorTexture, uvTransform: [0, 0, 2, 2] });\nrenderer.endFrame();\nrenderer.deleteTexture(baseColorTexture);",
+									"code": "import { ToonRenderer, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = 64;\ncanvas.height = 64;\nconst context = canvas.getContext(\"2d\");\ncontext.fillStyle = \"#f0e0c0\";\ncontext.fillRect(0, 0, 64, 64);\ncontext.fillStyle = \"#c04040\";\ncontext.fillRect(0, 0, 32, 32);\nconst baseColorTexture = renderer.createTexture(canvas, { isRepeated: true });\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#ffffff\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity(), { baseColorTexture: baseColorTexture, uvTransform: [0, 0, 2, 2] });\nrenderer.endFrame();\nrenderer.deleteTexture(baseColorTexture);",
 									"language": "javascript"
 								}
 							]
@@ -64315,8 +64568,8 @@
 									"name": "arrays",
 									"type": "object",
 									"description": {
-										"ko": "MeshBuilder.readArrays 나 ToonGlb.readGlbArrays 의 결과.",
-										"en": "Result of MeshBuilder.readArrays or ToonGlb.readGlbArrays."
+										"ko": "MeshBuilder.readArrays 나 readGlbArrays 의 결과.",
+										"en": "Result of MeshBuilder.readArrays or readGlbArrays."
 									}
 								}
 							],
@@ -64328,8 +64581,8 @@
 								}
 							},
 							"description": {
-								"ko": "모형 올리기. (MeshBuilder.readArrays 나 ToonGlb.readGlbArrays 의 결과, 몸이 비면 null)",
-								"en": "Uploads a model. (result of MeshBuilder.readArrays or ToonGlb.readGlbArrays, null if the body is empty)"
+								"ko": "모형 올리기. (MeshBuilder.readArrays 나 readGlbArrays 의 결과, 몸이 비면 null)",
+								"en": "Uploads a model. (result of MeshBuilder.readArrays or readGlbArrays, null if the body is empty)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js",
@@ -64345,7 +64598,7 @@
 										"ko": "부품 둘을 한 모형으로 올리고 다 쓰면 지우기",
 										"en": "Upload two parts as one model and delete it when done"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(0.8, 1, 0.5), Matrix4.createTranslation(0, 0.5, 0), \"#6080c0\", { hasOutline: true });\nbuilder.addPart(ToonMesh.createSphereGeometry(0.3, 20, 14), Matrix4.createTranslation(0, 1.3, 0), \"#f0d0b0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nif (mesh === null) {\n\tthrow new Error(\"empty mesh\");\n}\nrenderer.deleteMesh(mesh);",
+									"code": "import { ToonRenderer, MeshBuilder, createBoxGeometry, createSphereGeometry, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(0.8, 1, 0.5), Matrix4.createTranslation(0, 0.5, 0), \"#6080c0\", { hasOutline: true });\nbuilder.addPart(createSphereGeometry(0.3, 20, 14), Matrix4.createTranslation(0, 1.3, 0), \"#f0d0b0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nif (mesh === null) {\n\tthrow new Error(\"empty mesh\");\n}\nrenderer.deleteMesh(mesh);",
 									"language": "javascript"
 								}
 							]
@@ -64542,7 +64795,7 @@
 										"ko": "Camera3D 로 프레임 시작하기",
 										"en": "Start a frame with a Camera3D"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createCylinderGeometry(0.4, 0.4, 1, 24), Matrix4.createIdentity(), \"#c0a0e0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 100);\ncamera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nrenderer.beginFrameWithCamera(camera);\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();",
+									"code": "import { ToonRenderer, MeshBuilder, createCylinderGeometry, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createCylinderGeometry(0.4, 0.4, 1, 24), Matrix4.createIdentity(), \"#c0a0e0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 100);\ncamera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nrenderer.beginFrameWithCamera(camera);\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();",
 									"language": "javascript"
 								}
 							]
@@ -64663,7 +64916,7 @@
 										"ko": "드로잉 버퍼 오른쪽 위 사각형에만 미리보기 그리기",
 										"en": "Draw a preview only in the top right rectangle of the drawing buffer"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = 320;\ncanvas.height = 240;\nconst renderer = new ToonRenderer(canvas.getContext(\"webgl2\"));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createOctahedronGeometry(0.6), Matrix4.createIdentity(), \"#60c0a0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setScreenRect(200, 16, 104, 78);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 104 / 78, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();\nrenderer.clearScreenRect();",
+									"code": "import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = 320;\ncanvas.height = 240;\nconst renderer = new ToonRenderer(canvas.getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createOctahedronGeometry(0.6), Matrix4.createIdentity(), \"#60c0a0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setScreenRect(200, 16, 104, 78);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 104 / 78, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();\nrenderer.clearScreenRect();",
 									"language": "javascript"
 								}
 							]
@@ -64743,7 +64996,7 @@
 										"ko": "해의 그림자를 ShadowMap 에 드리우고 받기",
 										"en": "Cast the sun's shadow into a ShadowMap and receive it"
 									},
-									"code": "import { ToonRenderer, ToonMesh, ShadowMap, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(0.6, 0.6, 0.6), Matrix4.createTranslation(0, 0.6, 0), \"#e0b080\", { hasOutline: true });\nbuilder.addPart(ToonMesh.createBoxGeometry(4, 0.1, 4), Matrix4.createTranslation(0, -0.05, 0), \"#a0b0a0\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 1024);\nconst sunDirection = renderer.getSunDirection();\nshadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(sunDirection[0], sunDirection[1], sunDirection[2]), 3, 0.5, 20);\nrenderer.beginShadowPass(shadowMap);\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endShadowPass();\nrenderer.setShadow(shadowMap, 0.7);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 3, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();",
+									"code": "import { ToonRenderer, MeshBuilder, createBoxGeometry, ShadowMap, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(0.6, 0.6, 0.6), Matrix4.createTranslation(0, 0.6, 0), \"#e0b080\", { hasOutline: true });\nbuilder.addPart(createBoxGeometry(4, 0.1, 4), Matrix4.createTranslation(0, -0.05, 0), \"#a0b0a0\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 1024);\nconst sunDirection = renderer.getSunDirection();\nshadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(sunDirection[0], sunDirection[1], sunDirection[2]), 3, 0.5, 20);\nrenderer.beginShadowPass(shadowMap);\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endShadowPass();\nrenderer.setShadow(shadowMap, 0.7);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 3, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();",
 									"language": "javascript"
 								}
 							]
@@ -64780,7 +65033,7 @@
 										"ko": "점광 그림자 아틀라스의 칸마다 깊이 그리기",
 										"en": "Draw depth for each tile of the point light shadow atlas"
 									},
-									"code": "import { ToonRenderer, ToonMesh, ShadowAtlas, Matrix4 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createTranslation(0, 0.5, 0), \"#c0a080\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setPointLights([{ position: [0, 2.5, 1], color: [1, 0.8, 0.6], intensity: 3, range: 8, castsShadow: true }]);\nconst shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);\nshadowAtlas.updateLights(renderer.getLightSet().getPointLights());\nrenderer.beginShadowAtlasPass(shadowAtlas);\nfor (let tileIndex = 0; tileIndex < shadowAtlas.getTileCount(); ++tileIndex) {\n\trenderer.setShadowAtlasTile(shadowAtlas, tileIndex);\n\trenderer.drawMesh(mesh, Matrix4.createIdentity());\n}\nrenderer.endShadowPass();\nrenderer.setLocalShadows(shadowAtlas, 1);",
+									"code": "import { ToonRenderer, MeshBuilder, createBoxGeometry, ShadowAtlas, Matrix4 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createTranslation(0, 0.5, 0), \"#c0a080\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setPointLights([{ position: [0, 2.5, 1], color: [1, 0.8, 0.6], intensity: 3, range: 8, castsShadow: true }]);\nconst shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);\nshadowAtlas.updateLights(renderer.getLightSet().getPointLights());\nrenderer.beginShadowAtlasPass(shadowAtlas);\nfor (let tileIndex = 0; tileIndex < shadowAtlas.getTileCount(); ++tileIndex) {\n\trenderer.setShadowAtlasTile(shadowAtlas, tileIndex);\n\trenderer.drawMesh(mesh, Matrix4.createIdentity());\n}\nrenderer.endShadowPass();\nrenderer.setLocalShadows(shadowAtlas, 1);",
 									"language": "javascript"
 								}
 							]
@@ -64928,7 +65181,7 @@
 										"ko": "틴트, 바깥선 색과 굵기, 반투명을 그리기마다 바꾸기",
 										"en": "Change tint, outline color and thickness, and translucency per draw"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createRoundedBoxGeometry(0.8, 0.8, 0.8, 4, 0.1), Matrix4.createIdentity(), \"#e0e0e0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createTranslation(-1, 0, 0), { tintColor: [1, 0.6, 0.6, 1], outlineColor: [0.4, 0.05, 0.05, 1], outlineWidthScale: 1.5 });\nrenderer.drawMesh(mesh, Matrix4.createTranslation(0, 0, 0), { tintColor: [1, 0.2, 0.2, 1], tintAmount: 0.7, shadeOffset: 0.2 });\nrenderer.drawMesh(mesh, Matrix4.createTranslation(1, 0, 0), { alpha: 0.5, softEdge: 1.5, hasOutline: false });\nrenderer.endFrame();",
+									"code": "import { ToonRenderer, MeshBuilder, createRoundedBoxGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createRoundedBoxGeometry(0.8, 0.8, 0.8, 4, 0.1), Matrix4.createIdentity(), \"#e0e0e0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createTranslation(-1, 0, 0), { tintColor: [1, 0.6, 0.6, 1], outlineColor: [0.4, 0.05, 0.05, 1], outlineWidthScale: 1.5 });\nrenderer.drawMesh(mesh, Matrix4.createTranslation(0, 0, 0), { tintColor: [1, 0.2, 0.2, 1], tintAmount: 0.7, shadeOffset: 0.2 });\nrenderer.drawMesh(mesh, Matrix4.createTranslation(1, 0, 0), { alpha: 0.5, softEdge: 1.5, hasOutline: false });\nrenderer.endFrame();",
 									"language": "javascript"
 								}
 							]
@@ -64981,7 +65234,7 @@
 										"ko": "같은 바위 스무 개를 인스턴스마다 다른 틴트로",
 										"en": "Twenty identical rocks with a different tint per instance"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createOctahedronGeometry(0.3), Matrix4.createIdentity(), \"#909098\", { hasOutline: true });\nconst rockMesh = renderer.createMesh(builder.readArrays());\nconst instances = [];\nfor (let index = 0; index < 20; ++index) {\n\tconst shade = 0.7 + (index % 4) * 0.1;\n\tinstances.push({ modelMatrix: Matrix4.createTranslation(index % 5 - 2, 0, Math.floor(index / 5) - 2), tintColor: [shade, shade, shade, 1] });\n}\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 4, 6), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));\nrenderer.drawMeshInstanced(rockMesh, instances, { specularScale: 0 });\nrenderer.endFrame();",
+									"code": "import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), \"#909098\", { hasOutline: true });\nconst rockMesh = renderer.createMesh(builder.readArrays());\nconst instances = [];\nfor (let index = 0; index < 20; ++index) {\n\tconst shade = 0.7 + (index % 4) * 0.1;\n\tinstances.push({ modelMatrix: Matrix4.createTranslation(index % 5 - 2, 0, Math.floor(index / 5) - 2), tintColor: [shade, shade, shade, 1] });\n}\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 4, 6), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));\nrenderer.drawMeshInstanced(rockMesh, instances, { specularScale: 0 });\nrenderer.endFrame();",
 									"language": "javascript"
 								}
 							]
@@ -65042,7 +65295,7 @@
 										"ko": "자리만 담은 영구 버퍼로 풀숲 그리기",
 										"en": "Draw a bush with a persistent buffer holding only positions"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createCylinderGeometry(0.02, 0.15, 0.6, 6), Matrix4.createTranslation(0, 0.3, 0), \"#60a050\", { hasOutline: true });\nconst grassMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceOffset\", size: 3 }]);\nconst material = renderer.createMaterial({ name: \"grass\", vertexChunk: \"void applyVertex(inout ToonVertex vertex) { vertex.modelMatrix[3].xyz += instanceOffset; }\" });\nconst data = new Float32Array(3 * 50);\nfor (let index = 0; index < 50; ++index) {\n\tdata.set([(index % 10) * 0.4 - 2, 0, Math.floor(index / 10) * 0.4 - 1], index * 3);\n}\nconst instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 3, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));\nrenderer.drawMeshInstanceBuffer(grassMesh, instanceBuffer, 50, { material: material });\nrenderer.endFrame();\nrenderer.deleteInstanceBuffer(instanceBuffer);",
+									"code": "import { ToonRenderer, MeshBuilder, createCylinderGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createCylinderGeometry(0.02, 0.15, 0.6, 6), Matrix4.createTranslation(0, 0.3, 0), \"#60a050\", { hasOutline: true });\nconst grassMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceOffset\", size: 3 }]);\nconst material = renderer.createMaterial({ name: \"grass\", vertexChunk: \"void applyVertex(inout ToonVertex vertex) { vertex.modelMatrix[3].xyz += instanceOffset; }\" });\nconst data = new Float32Array(3 * 50);\nfor (let index = 0; index < 50; ++index) {\n\tdata.set([(index % 10) * 0.4 - 2, 0, Math.floor(index / 10) * 0.4 - 1], index * 3);\n}\nconst instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 3, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));\nrenderer.drawMeshInstanceBuffer(grassMesh, instanceBuffer, 50, { material: material });\nrenderer.endFrame();\nrenderer.deleteInstanceBuffer(instanceBuffer);",
 									"language": "javascript"
 								}
 							]
@@ -65522,7 +65775,7 @@
 										"ko": "밝은 피부와 그늘 두 단계를 단단하게 가르기",
 										"en": "Split bright skin and two shade levels hard"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nrenderer.setShade({ step: 0.55, feather: 0.01, color: [0.85, 0.62, 0.6], secondStep: 0.25, secondFeather: 0.01, secondColor: [0.6, 0.42, 0.45], isHalfLambert: true });\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), \"#f8e0d0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 0, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();",
+									"code": "import { ToonRenderer, MeshBuilder, createSphereGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nrenderer.setShade({ step: 0.55, feather: 0.01, color: [0.85, 0.62, 0.6], secondStep: 0.25, secondFeather: 0.01, secondColor: [0.6, 0.42, 0.45], isHalfLambert: true });\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), \"#f8e0d0\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 0, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();",
 									"language": "javascript"
 								}
 							]
@@ -65726,7 +65979,7 @@
 										"ko": "네 칸 램프 텍스처로 그늘 색을 주고 다시 칸으로 돌리기",
 										"en": "Give the shade color with a four-cell ramp texture and then return to cells"
 									},
-									"code": "import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst rampData = new Uint8Array([60, 50, 110, 255, 110, 100, 160, 255, 200, 185, 215, 255, 255, 255, 255, 255]);\nconst rampTexture = renderer.createTexture({ width: 4, height: 1, data: rampData }, { isMipmapped: false, isRepeated: false, isFiltered: false });\nrenderer.setRampTexture(rampTexture, true);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createTorusGeometry(0.4, 0.15, 16, 32), Matrix4.createIdentity(), \"#ffffff\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();\nrenderer.setRampTexture(null);\nrenderer.deleteTexture(rampTexture);",
+									"code": "import { ToonRenderer, MeshBuilder, createTorusGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst rampData = new Uint8Array([60, 50, 110, 255, 110, 100, 160, 255, 200, 185, 215, 255, 255, 255, 255, 255]);\nconst rampTexture = renderer.createTexture({ width: 4, height: 1, data: rampData }, { isMipmapped: false, isRepeated: false, isFiltered: false });\nrenderer.setRampTexture(rampTexture, true);\nconst builder = new MeshBuilder();\nbuilder.addPart(createTorusGeometry(0.4, 0.15, 16, 32), Matrix4.createIdentity(), \"#ffffff\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity());\nrenderer.endFrame();\nrenderer.setRampTexture(null);\nrenderer.deleteTexture(rampTexture);",
 									"language": "javascript"
 								}
 							]
@@ -66174,7 +66427,7 @@
 										"ko": "그림자를 받되 공중의 빛 구슬은 받지 않게 하기",
 										"en": "Receive shadows but keep the floating light orb from receiving them"
 									},
-									"code": "import { ToonRenderer, ToonMesh, ShadowMap, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createSphereGeometry(0.3, 20, 14), Matrix4.createIdentity(), \"#ffe080\", { glow: 1, hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 512);\nshadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.3, -1, -0.2), 4, 0.5, 20);\nrenderer.setShadow(shadowMap, 0.8);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createTranslation(0, 1, 0), { receivesShadow: false });\nrenderer.endFrame();\nrenderer.setShadow(null);",
+									"code": "import { ToonRenderer, MeshBuilder, createSphereGeometry, ShadowMap, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.3, 20, 14), Matrix4.createIdentity(), \"#ffe080\", { glow: 1, hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 512);\nshadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.3, -1, -0.2), 4, 0.5, 20);\nrenderer.setShadow(shadowMap, 0.8);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createTranslation(0, 1, 0), { receivesShadow: false });\nrenderer.endFrame();\nrenderer.setShadow(null);",
 									"language": "javascript"
 								}
 							]
@@ -66805,7 +67058,7 @@
 								"ko": "MeshBuilder 의 껍데기를 바탕 자리와 미는 쪽으로 풀기",
 								"en": "Unpack MeshBuilder's shell into base positions and push directions"
 							},
-							"code": "import { readOutlineVertexData, ToonMesh, Matrix4 } from \"./vanilla.js\";\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#a0a0a0\", { outlineWidth: 0.02 });\nconst arrays = builder.readArrays();\nconst outlineData = readOutlineVertexData(arrays.outlineVertexData, arrays.outlineBaseData);\nconst firstPush = Math.hypot(outlineData[3], outlineData[4], outlineData[5]);\nif (outlineData.length !== arrays.outlineVertexData.length * 2 || firstPush <= 0) {\n\tthrow new Error(\"unexpected outline data\");\n}",
+							"code": "import { readOutlineVertexData, MeshBuilder, createBoxGeometry, Matrix4 } from \"./vanilla.js\";\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#a0a0a0\", { outlineWidth: 0.02 });\nconst arrays = builder.readArrays();\nconst outlineData = readOutlineVertexData(arrays.outlineVertexData, arrays.outlineBaseData);\nconst firstPush = Math.hypot(outlineData[3], outlineData[4], outlineData[5]);\nif (outlineData.length !== arrays.outlineVertexData.length * 2 || firstPush <= 0) {\n\tthrow new Error(\"unexpected outline data\");\n}",
 							"language": "javascript"
 						}
 					]
@@ -66856,7 +67109,7 @@
 								"ko": "바닥 거울에 비친 모습을 어둡게 그리기",
 								"en": "Draw the reflection in the floor mirror darker"
 							},
-							"code": "import { ToonRenderer, ToonMesh, createReflectionMatrix, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createSphereGeometry(0.4, 24, 16), Matrix4.createIdentity(), \"#e0a060\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst modelMatrix = Matrix4.createTranslation(0, 0.6, 0);\nconst mirroredMatrix = createReflectionMatrix([0, 0, 0], [0, 1, 0]);\nmirroredMatrix.multiply(modelMatrix);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1.5, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, mirroredMatrix, { colorScale: 0.4, hasOutline: false });\nrenderer.drawMesh(mesh, modelMatrix);\nrenderer.endFrame();",
+							"code": "import { ToonRenderer, MeshBuilder, createSphereGeometry, createReflectionMatrix, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.4, 24, 16), Matrix4.createIdentity(), \"#e0a060\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst modelMatrix = Matrix4.createTranslation(0, 0.6, 0);\nconst mirroredMatrix = createReflectionMatrix([0, 0, 0], [0, 1, 0]);\nmirroredMatrix.multiply(modelMatrix);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1.5, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, mirroredMatrix, { colorScale: 0.4, hasOutline: false });\nrenderer.drawMesh(mesh, modelMatrix);\nrenderer.endFrame();",
 							"language": "javascript"
 						}
 					]
@@ -66906,7 +67159,7 @@
 								"ko": "몸 프로그램에만 머티리얼 유니폼 쓰기",
 								"en": "Write material uniforms only for the body program"
 							},
-							"code": "import { ToonRenderer, ToonMaterial, ToonProgramKind, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst material = new ToonMaterial({ name: \"pulse\", uniformChunk: \"uniform float pulse;\", surfaceChunk: \"void applySurface(inout ToonSurface surface) { surface.emission += vec3(pulse); }\" });\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#d06060\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity(), {\n\tmaterial: material,\n\tonBeforeDraw: (program, context, kind) => {\n\t\tif (kind === ToonProgramKind.solid) {\n\t\t\tcontext.uniform1f(program.getUniformLocation(\"pulse\"), 0.3);\n\t\t}\n\t},\n});\nrenderer.endFrame();",
+							"code": "import { ToonRenderer, ToonMaterial, ToonProgramKind, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst material = new ToonMaterial({ name: \"pulse\", uniformChunk: \"uniform float pulse;\", surfaceChunk: \"void applySurface(inout ToonSurface surface) { surface.emission += vec3(pulse); }\" });\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#d06060\", { hasOutline: true });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));\nrenderer.drawMesh(mesh, Matrix4.createIdentity(), {\n\tmaterial: material,\n\tonBeforeDraw: (program, context, kind) => {\n\t\tif (kind === ToonProgramKind.solid) {\n\t\t\tcontext.uniform1f(program.getUniformLocation(\"pulse\"), 0.3);\n\t\t}\n\t},\n});\nrenderer.endFrame();",
 							"language": "javascript"
 						}
 					]
@@ -74102,6 +74355,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/misc/localstorage.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "misc/localstorage",
+								"class": "LocalStorage",
+								"name": "set_storage_directory"
+							},
 							"examples": [
 								{
 									"title": {
@@ -82768,15 +83027,15 @@
 		{
 			"name": "core/soundsystem",
 			"summary": {
-				"ko": "소리. (배경음악과 효과음)\n\n엔진의 AudioManager(공유 AudioContext)와 AudioAsset(MP3)을 쓴다. 받은 소리 버퍼를 Web Audio 로 튼다. (소리를 합성하지 않고 파일만 튼다)\n소리 표를 넘긴다. 줄마다 { id, path 나 paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds } 이다.\n  volume: 소리마다의 크기. (0 ~ 1, 없으면 1)  minimumInterval: 같은 소리를 다시 낼 수 있는 간격. (초, 한꺼번에 몰려 시끄럽지 않게)\n  paths: 같은 소리를 여러 번 녹음한 무리. 낼 때마다 하나를 고르고 바로 앞과 같은 것은 고르지 않는다. (하나면 path)\n  maximumVoices: 같은 소리가 한꺼번에 날 수 있는 수. (넘으면 가장 오래된 것을 끊음, 없으면 효과음 전체의 수까지)\n  pitchVariation: 낼 때마다 음 높이를 흔드는 비. (0.05 면 ±5%, 없으면 0)\n  playSeconds, fadeOutSeconds: 효과음을 앞의 playSeconds 초만 틀고 fadeOutSeconds 초 동안 줄여 끈다. (긴 파일, 없거나 0 이면 끝까지)\n\n크기: 배경음악 = 설정의 음악 크기 × 음악의 비(멈춤 창의 반 크기 등) × 소리의 크기, 효과음 = 설정의 효과음 크기 × 소리의 크기 × 부를 때의 크기(거리에 따른 줄임 등).\n배경음악은 겹쳐 바꿀 수 있고(fadeSeconds), 멈췄던 자리를 소리마다 기억해 이어 틀 수 있다. (isResumed)\n음소거는 설정한 크기보다 먼저이다. 아래 가운데 하나라도 맞으면 설정과 상관없이 소리가 나지 않는다.\n  - 플랫폼의 음소거. (setExternalMuteProvider 로 준 함수, 플랫폼 SDK 의 음소거 설정, 보상형 광고를 보이는 동안 등)\n  - 사용자의 음소거 단추. (setUserMuted)\n  - 페이지가 가려짐. (다른 탭, 앱 전환)\n  - 터치가 주된 기기에서 창이 포커스를 잃음. (blur, 앱을 내리기 시작할 때)\n    아이폰은 페이지가 가려졌다는 알림이 앱이 내려간 뒤에 와서, 그때는 오디오가 멈추지 못한 채 얼어 마지막 소리 조각이 되풀이된다.\n    창이 포커스를 잃는 알림은 그보다 먼저 온다. 데스크탑은 캔버스 바깥(바깥 페이지)을 누를 때도 포커스를 잃으므로 따르지 않는다.\n플랫폼의 음소거는 매 프레임(update) 읽고, 페이지가 가려지는 것은 그 순간에 적용한다. (가려지면 프레임이 멈춘다)\n음소거인 동안은 AudioContext 도 멈춘다. (suspend, 풀리면 resume) 아이폰은 돌던 AudioContext 를 앱 전환이나 전면 광고가 가로채면\n돌아와서 깨워도 소리가 나지 않는다. 그 전에 스스로 멈춰 두면 돌아올 때 다시 난다.\n풀린 뒤에도 AudioContext 가 돌지 않으면 돌 때까지 잠깐마다 다시 깨워 본다. (아이폰은 앱으로 돌아온 순간의 깨우기를 듣지 않는 일이 있음)\n\n허락하면(setAutoplayAllowedProvider, 주지 않으면 허락) 누르기 전에도 한 번 깨워 본다. 막히면 아래처럼 첫 누름에 켜진다.\n브라우저는 사람이 처음 누르기 전에는 소리를 내지 못하게 한다. 엔진이 첫 누름에 AudioContext 를 만들고 깨우므로,\n그 뒤에 소리의 길(음악과 효과음의 버스, AudioBus)을 만들고, AudioContext 가 돌고 있을 때만 소리를 낸다. (멈춘 동안 부른 소리가 깨어날 때 한꺼번에 나지 않게)\n버스는 getMusicBus, getEffectBus 로 꺼낸다. 버스로 만든 플레이어(AudioBus.createAudioPlayer)도 설정 크기와 음소거를 따른다.\n설정 크기는 버스의 GainNode 에 직접 건다. 그래서 버스의 setVolume, mute 로 건 값은 SoundSystem 이 크기를 다시 걸 때까지 간다.\n소리 파일은 놀이를 막지 않게 뒤에서 받는다. 아직 못 받았거나 못 받은 소리는 나지 않을 뿐이다.",
-				"en": "Sound. (background music and sound effects)\n\nUses the engine's AudioManager (shared AudioContext) and AudioAsset (MP3). Plays downloaded sound buffers with Web Audio. (does not synthesize sound, only plays files)\nTakes a sound table. Each row is { id, path or paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds }.\n  volume: per-sound volume. (0 ~ 1, 1 if absent)  minimumInterval: interval before the same sound can play again. (seconds, so they do not pile up and get noisy)\n  paths: a group of multiple recordings of the same sound. Picks one each time it plays, never the same as the one just before. (path if only one)\n  maximumVoices: number of instances of the same sound that can play at once. (beyond that the oldest is cut off, if absent up to the total number of sound effects)\n  pitchVariation: ratio by which the pitch varies on each play. (0.05 means ±5%, 0 if absent)\n  playSeconds, fadeOutSeconds: plays only the first playSeconds seconds of a sound effect and fades it out over fadeOutSeconds seconds. (long files, to the end if absent or 0)\n\nVolume: background music = music volume setting × music ratio (half volume for the pause window, etc.) × sound volume, sound effect = sound effect volume setting × sound volume × volume at call time (attenuation by distance, etc.).\nBackground music can be crossfaded (fadeSeconds), and the stopped position is remembered per sound so it can resume from there. (isResumed)\nMute takes precedence over the volume setting. If any one of the following applies, no sound plays regardless of the settings.\n  - Platform mute. (the function given with setExternalMuteProvider, the platform SDK's mute setting, while a rewarded ad is shown, etc.)\n  - The user's mute button. (setUserMuted)\n  - Page hidden. (another tab, app switch)\n  - The window loses focus on a touch-primary device. (blur, when the app starts going to the background)\n    On iPhone the page-hidden notification arrives after the app has gone to the background, by which time audio freezes without stopping and the last sound chunk repeats.\n    The window focus-loss notification arrives before that. On desktop, clicking outside the canvas (the outer page) also loses focus, so it is not followed there.\nPlatform mute is read every frame (update), and page hiding is applied at that moment. (frames stop when hidden)\nWhile muted, the AudioContext is also stopped. (suspend, resume when unmuted) On iPhone, if an app switch or interstitial ad takes over a running AudioContext,\nno sound plays even when it is woken on return. If it is stopped on its own beforehand, sound plays again on return.\nIf the AudioContext is still not running after unmuting, it tries to wake it at short intervals until it runs. (iPhone sometimes ignores the wake at the moment of returning to the app)\n\nIf allowed (setAutoplayAllowedProvider, allowed if not given), it tries to wake once even before a press. If blocked, it turns on at the first press as below.\nBrowsers do not allow sound before the person first presses. Since the engine creates and wakes the AudioContext on the first press,\nthe sound paths (music and sound effect buses, AudioBus) are created after that, and sound plays only while the AudioContext is running. (so sounds requested while stopped do not all play at once on wake)\nBuses are retrieved with getMusicBus and getEffectBus. Players made from a bus (AudioBus.createAudioPlayer) also follow the volume setting and mute.\nThe volume setting is applied directly to the bus's GainNode. So values set with the bus's setVolume and mute last only until SoundSystem applies the volume again.\nSound files are downloaded in the background so they do not block play. Sounds not yet downloaded or that failed to download simply do not play."
+				"ko": "소리. (배경음악과 효과음)\n\n엔진의 AudioManager(공유 AudioContext)와 AudioAsset(MP3)을 쓴다. 받은 소리 버퍼를 Web Audio 로 튼다. (소리를 합성하지 않고 파일만 튼다)\n소리 표를 넘긴다. 줄마다 { id, path 나 paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds } 이다.\n  volume: 소리마다의 크기. (0 ~ 1, 없으면 1)  minimumInterval: 같은 소리를 다시 낼 수 있는 간격. (초, 한꺼번에 몰려 시끄럽지 않게)\n  paths: 같은 소리를 여러 번 녹음한 무리. 낼 때마다 하나를 고르고 바로 앞과 같은 것은 고르지 않는다. (하나면 path)\n  maximumVoices: 같은 소리가 한꺼번에 날 수 있는 수. (넘으면 가장 오래된 것을 끊음, 없으면 효과음 전체의 수까지)\n  pitchVariation: 낼 때마다 음 높이를 흔드는 비. (0.05 면 ±5%, 없으면 0)\n  playSeconds, fadeOutSeconds: 효과음을 앞의 playSeconds 초만 틀고 fadeOutSeconds 초 동안 줄여 끈다. (긴 파일, 없거나 0 이면 끝까지)\n  loadType: 읽기 방식. (AudioLoadType, 없으면 decompressOnLoad, 효과음은 겹쳐 트므로 통째로 풀어야 난다, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)\n\n크기: 배경음악 = 설정의 음악 크기 × 음악의 비(멈춤 창의 반 크기 등) × 소리의 크기, 효과음 = 설정의 효과음 크기 × 소리의 크기 × 부를 때의 크기(거리에 따른 줄임 등).\n배경음악은 겹쳐 바꿀 수 있고(fadeSeconds), 멈췄던 자리를 소리마다 기억해 이어 틀 수 있다. (isResumed)\n음소거는 설정한 크기보다 먼저이다. 아래 가운데 하나라도 맞으면 설정과 상관없이 소리가 나지 않는다.\n  - 플랫폼의 음소거. (setExternalMuteProvider 로 준 함수, 플랫폼 SDK 의 음소거 설정, 보상형 광고를 보이는 동안 등)\n  - 사용자의 음소거 단추. (setUserMuted)\n  - 페이지가 가려짐. (다른 탭, 앱 전환)\n  - 터치가 주된 기기에서 창이 포커스를 잃음. (blur, 앱을 내리기 시작할 때)\n    아이폰은 페이지가 가려졌다는 알림이 앱이 내려간 뒤에 와서, 그때는 오디오가 멈추지 못한 채 얼어 마지막 소리 조각이 되풀이된다.\n    창이 포커스를 잃는 알림은 그보다 먼저 온다. 데스크탑은 캔버스 바깥(바깥 페이지)을 누를 때도 포커스를 잃으므로 따르지 않는다.\n플랫폼의 음소거는 매 프레임(update) 읽고, 페이지가 가려지는 것은 그 순간에 적용한다. (가려지면 프레임이 멈춘다)\n음소거인 동안은 AudioContext 도 멈춘다. (suspend, 풀리면 resume) 아이폰은 돌던 AudioContext 를 앱 전환이나 전면 광고가 가로채면\n돌아와서 깨워도 소리가 나지 않는다. 그 전에 스스로 멈춰 두면 돌아올 때 다시 난다.\n풀린 뒤에도 AudioContext 가 돌지 않으면 돌 때까지 잠깐마다 다시 깨워 본다. (아이폰은 앱으로 돌아온 순간의 깨우기를 듣지 않는 일이 있음)\n\n허락하면(setAutoplayAllowedProvider, 주지 않으면 허락) 누르기 전에도 한 번 깨워 본다. 막히면 아래처럼 첫 누름에 켜진다.\n브라우저는 사람이 처음 누르기 전에는 소리를 내지 못하게 한다. 엔진이 첫 누름에 AudioContext 를 만들고 깨우므로,\n그 뒤에 소리의 길(음악과 효과음의 버스, AudioBus)을 만들고, AudioContext 가 돌고 있을 때만 소리를 낸다. (멈춘 동안 부른 소리가 깨어날 때 한꺼번에 나지 않게)\n버스는 getMusicBus, getEffectBus 로 꺼낸다. 버스로 만든 플레이어(AudioBus.createAudioPlayer)도 설정 크기와 음소거를 따른다.\n설정 크기는 버스의 GainNode 에 직접 건다. 그래서 버스의 setVolume, mute 로 건 값은 SoundSystem 이 크기를 다시 걸 때까지 간다.\n소리 파일은 놀이를 막지 않게 뒤에서 받는다. 아직 못 받았거나 못 받은 소리는 나지 않을 뿐이다.",
+				"en": "Sound. (background music and sound effects)\n\nUses the engine's AudioManager (shared AudioContext) and AudioAsset (MP3). Plays downloaded sound buffers with Web Audio. (does not synthesize sound, only plays files)\nTakes a sound table. Each row is { id, path or paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds }.\n  volume: per-sound volume. (0 ~ 1, 1 if absent)  minimumInterval: interval before the same sound can play again. (seconds, so they do not pile up and get noisy)\n  paths: a group of multiple recordings of the same sound. Picks one each time it plays, never the same as the one just before. (path if only one)\n  maximumVoices: number of instances of the same sound that can play at once. (beyond that the oldest is cut off, if absent up to the total number of sound effects)\n  pitchVariation: ratio by which the pitch varies on each play. (0.05 means ±5%, 0 if absent)\n  playSeconds, fadeOutSeconds: plays only the first playSeconds seconds of a sound effect and fades it out over fadeOutSeconds seconds. (long files, to the end if absent or 0)\n  loadType: load type. (AudioLoadType, decompressOnLoad if absent, sound effects overlap so they must be fully decompressed to play, the background music default is planned to change to streaming after it is checked on real devices (iPhone and iPad Safari))\n\nVolume: background music = music volume setting × music ratio (half volume for the pause window, etc.) × sound volume, sound effect = sound effect volume setting × sound volume × volume at call time (attenuation by distance, etc.).\nBackground music can be crossfaded (fadeSeconds), and the stopped position is remembered per sound so it can resume from there. (isResumed)\nMute takes precedence over the volume setting. If any one of the following applies, no sound plays regardless of the settings.\n  - Platform mute. (the function given with setExternalMuteProvider, the platform SDK's mute setting, while a rewarded ad is shown, etc.)\n  - The user's mute button. (setUserMuted)\n  - Page hidden. (another tab, app switch)\n  - The window loses focus on a touch-primary device. (blur, when the app starts going to the background)\n    On iPhone the page-hidden notification arrives after the app has gone to the background, by which time audio freezes without stopping and the last sound chunk repeats.\n    The window focus-loss notification arrives before that. On desktop, clicking outside the canvas (the outer page) also loses focus, so it is not followed there.\nPlatform mute is read every frame (update), and page hiding is applied at that moment. (frames stop when hidden)\nWhile muted, the AudioContext is also stopped. (suspend, resume when unmuted) On iPhone, if an app switch or interstitial ad takes over a running AudioContext,\nno sound plays even when it is woken on return. If it is stopped on its own beforehand, sound plays again on return.\nIf the AudioContext is still not running after unmuting, it tries to wake it at short intervals until it runs. (iPhone sometimes ignores the wake at the moment of returning to the app)\n\nIf allowed (setAutoplayAllowedProvider, allowed if not given), it tries to wake once even before a press. If blocked, it turns on at the first press as below.\nBrowsers do not allow sound before the person first presses. Since the engine creates and wakes the AudioContext on the first press,\nthe sound paths (music and sound effect buses, AudioBus) are created after that, and sound plays only while the AudioContext is running. (so sounds requested while stopped do not all play at once on wake)\nBuses are retrieved with getMusicBus and getEffectBus. Players made from a bus (AudioBus.createAudioPlayer) also follow the volume setting and mute.\nThe volume setting is applied directly to the bus's GainNode. So values set with the bus's setVolume and mute last only until SoundSystem applies the volume again.\nSound files are downloaded in the background so they do not block play. Sounds not yet downloaded or that failed to download simply do not play."
 			},
 			"classes": [
 				{
 					"name": "SoundSystem",
 					"summary": {
-						"ko": "소리. (배경음악과 효과음)\n\n엔진의 AudioManager(공유 AudioContext)와 AudioAsset(MP3)을 쓴다. 받은 소리 버퍼를 Web Audio 로 튼다. (소리를 합성하지 않고 파일만 튼다)\n소리 표를 넘긴다. 줄마다 { id, path 나 paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds } 이다.\n  volume: 소리마다의 크기. (0 ~ 1, 없으면 1)  minimumInterval: 같은 소리를 다시 낼 수 있는 간격. (초, 한꺼번에 몰려 시끄럽지 않게)\n  paths: 같은 소리를 여러 번 녹음한 무리. 낼 때마다 하나를 고르고 바로 앞과 같은 것은 고르지 않는다. (하나면 path)\n  maximumVoices: 같은 소리가 한꺼번에 날 수 있는 수. (넘으면 가장 오래된 것을 끊음, 없으면 효과음 전체의 수까지)\n  pitchVariation: 낼 때마다 음 높이를 흔드는 비. (0.05 면 ±5%, 없으면 0)\n  playSeconds, fadeOutSeconds: 효과음을 앞의 playSeconds 초만 틀고 fadeOutSeconds 초 동안 줄여 끈다. (긴 파일, 없거나 0 이면 끝까지)\n\n크기: 배경음악 = 설정의 음악 크기 × 음악의 비(멈춤 창의 반 크기 등) × 소리의 크기, 효과음 = 설정의 효과음 크기 × 소리의 크기 × 부를 때의 크기(거리에 따른 줄임 등).\n배경음악은 겹쳐 바꿀 수 있고(fadeSeconds), 멈췄던 자리를 소리마다 기억해 이어 틀 수 있다. (isResumed)\n음소거는 설정한 크기보다 먼저이다. 아래 가운데 하나라도 맞으면 설정과 상관없이 소리가 나지 않는다.\n  - 플랫폼의 음소거. (setExternalMuteProvider 로 준 함수, 플랫폼 SDK 의 음소거 설정, 보상형 광고를 보이는 동안 등)\n  - 사용자의 음소거 단추. (setUserMuted)\n  - 페이지가 가려짐. (다른 탭, 앱 전환)\n  - 터치가 주된 기기에서 창이 포커스를 잃음. (blur, 앱을 내리기 시작할 때)\n    아이폰은 페이지가 가려졌다는 알림이 앱이 내려간 뒤에 와서, 그때는 오디오가 멈추지 못한 채 얼어 마지막 소리 조각이 되풀이된다.\n    창이 포커스를 잃는 알림은 그보다 먼저 온다. 데스크탑은 캔버스 바깥(바깥 페이지)을 누를 때도 포커스를 잃으므로 따르지 않는다.\n플랫폼의 음소거는 매 프레임(update) 읽고, 페이지가 가려지는 것은 그 순간에 적용한다. (가려지면 프레임이 멈춘다)\n음소거인 동안은 AudioContext 도 멈춘다. (suspend, 풀리면 resume) 아이폰은 돌던 AudioContext 를 앱 전환이나 전면 광고가 가로채면\n돌아와서 깨워도 소리가 나지 않는다. 그 전에 스스로 멈춰 두면 돌아올 때 다시 난다.\n풀린 뒤에도 AudioContext 가 돌지 않으면 돌 때까지 잠깐마다 다시 깨워 본다. (아이폰은 앱으로 돌아온 순간의 깨우기를 듣지 않는 일이 있음)\n\n허락하면(setAutoplayAllowedProvider, 주지 않으면 허락) 누르기 전에도 한 번 깨워 본다. 막히면 아래처럼 첫 누름에 켜진다.\n브라우저는 사람이 처음 누르기 전에는 소리를 내지 못하게 한다. 엔진이 첫 누름에 AudioContext 를 만들고 깨우므로,\n그 뒤에 소리의 길(음악과 효과음의 버스, AudioBus)을 만들고, AudioContext 가 돌고 있을 때만 소리를 낸다. (멈춘 동안 부른 소리가 깨어날 때 한꺼번에 나지 않게)\n버스는 getMusicBus, getEffectBus 로 꺼낸다. 버스로 만든 플레이어(AudioBus.createAudioPlayer)도 설정 크기와 음소거를 따른다.\n설정 크기는 버스의 GainNode 에 직접 건다. 그래서 버스의 setVolume, mute 로 건 값은 SoundSystem 이 크기를 다시 걸 때까지 간다.\n소리 파일은 놀이를 막지 않게 뒤에서 받는다. 아직 못 받았거나 못 받은 소리는 나지 않을 뿐이다.",
-						"en": "Sound. (background music and sound effects)\n\nUses the engine's AudioManager (shared AudioContext) and AudioAsset (MP3). Plays downloaded sound buffers with Web Audio. (does not synthesize sound, only plays files)\nTakes a sound table. Each row is { id, path or paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds }.\n  volume: per-sound volume. (0 ~ 1, 1 if absent)  minimumInterval: interval before the same sound can play again. (seconds, so they do not pile up and get noisy)\n  paths: a group of multiple recordings of the same sound. Picks one each time it plays, never the same as the one just before. (path if only one)\n  maximumVoices: number of instances of the same sound that can play at once. (beyond that the oldest is cut off, if absent up to the total number of sound effects)\n  pitchVariation: ratio by which the pitch varies on each play. (0.05 means ±5%, 0 if absent)\n  playSeconds, fadeOutSeconds: plays only the first playSeconds seconds of a sound effect and fades it out over fadeOutSeconds seconds. (long files, to the end if absent or 0)\n\nVolume: background music = music volume setting × music ratio (half volume for the pause window, etc.) × sound volume, sound effect = sound effect volume setting × sound volume × volume at call time (attenuation by distance, etc.).\nBackground music can be crossfaded (fadeSeconds), and the stopped position is remembered per sound so it can resume from there. (isResumed)\nMute takes precedence over the volume setting. If any one of the following applies, no sound plays regardless of the settings.\n  - Platform mute. (the function given with setExternalMuteProvider, the platform SDK's mute setting, while a rewarded ad is shown, etc.)\n  - The user's mute button. (setUserMuted)\n  - Page hidden. (another tab, app switch)\n  - The window loses focus on a touch-primary device. (blur, when the app starts going to the background)\n    On iPhone the page-hidden notification arrives after the app has gone to the background, by which time audio freezes without stopping and the last sound chunk repeats.\n    The window focus-loss notification arrives before that. On desktop, clicking outside the canvas (the outer page) also loses focus, so it is not followed there.\nPlatform mute is read every frame (update), and page hiding is applied at that moment. (frames stop when hidden)\nWhile muted, the AudioContext is also stopped. (suspend, resume when unmuted) On iPhone, if an app switch or interstitial ad takes over a running AudioContext,\nno sound plays even when it is woken on return. If it is stopped on its own beforehand, sound plays again on return.\nIf the AudioContext is still not running after unmuting, it tries to wake it at short intervals until it runs. (iPhone sometimes ignores the wake at the moment of returning to the app)\n\nIf allowed (setAutoplayAllowedProvider, allowed if not given), it tries to wake once even before a press. If blocked, it turns on at the first press as below.\nBrowsers do not allow sound before the person first presses. Since the engine creates and wakes the AudioContext on the first press,\nthe sound paths (music and sound effect buses, AudioBus) are created after that, and sound plays only while the AudioContext is running. (so sounds requested while stopped do not all play at once on wake)\nBuses are retrieved with getMusicBus and getEffectBus. Players made from a bus (AudioBus.createAudioPlayer) also follow the volume setting and mute.\nThe volume setting is applied directly to the bus's GainNode. So values set with the bus's setVolume and mute last only until SoundSystem applies the volume again.\nSound files are downloaded in the background so they do not block play. Sounds not yet downloaded or that failed to download simply do not play."
+						"ko": "소리. (배경음악과 효과음)\n\n엔진의 AudioManager(공유 AudioContext)와 AudioAsset(MP3)을 쓴다. 받은 소리 버퍼를 Web Audio 로 튼다. (소리를 합성하지 않고 파일만 튼다)\n소리 표를 넘긴다. 줄마다 { id, path 나 paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds } 이다.\n  volume: 소리마다의 크기. (0 ~ 1, 없으면 1)  minimumInterval: 같은 소리를 다시 낼 수 있는 간격. (초, 한꺼번에 몰려 시끄럽지 않게)\n  paths: 같은 소리를 여러 번 녹음한 무리. 낼 때마다 하나를 고르고 바로 앞과 같은 것은 고르지 않는다. (하나면 path)\n  maximumVoices: 같은 소리가 한꺼번에 날 수 있는 수. (넘으면 가장 오래된 것을 끊음, 없으면 효과음 전체의 수까지)\n  pitchVariation: 낼 때마다 음 높이를 흔드는 비. (0.05 면 ±5%, 없으면 0)\n  playSeconds, fadeOutSeconds: 효과음을 앞의 playSeconds 초만 틀고 fadeOutSeconds 초 동안 줄여 끈다. (긴 파일, 없거나 0 이면 끝까지)\n  loadType: 읽기 방식. (AudioLoadType, 없으면 decompressOnLoad, 효과음은 겹쳐 트므로 통째로 풀어야 난다, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)\n\n크기: 배경음악 = 설정의 음악 크기 × 음악의 비(멈춤 창의 반 크기 등) × 소리의 크기, 효과음 = 설정의 효과음 크기 × 소리의 크기 × 부를 때의 크기(거리에 따른 줄임 등).\n배경음악은 겹쳐 바꿀 수 있고(fadeSeconds), 멈췄던 자리를 소리마다 기억해 이어 틀 수 있다. (isResumed)\n음소거는 설정한 크기보다 먼저이다. 아래 가운데 하나라도 맞으면 설정과 상관없이 소리가 나지 않는다.\n  - 플랫폼의 음소거. (setExternalMuteProvider 로 준 함수, 플랫폼 SDK 의 음소거 설정, 보상형 광고를 보이는 동안 등)\n  - 사용자의 음소거 단추. (setUserMuted)\n  - 페이지가 가려짐. (다른 탭, 앱 전환)\n  - 터치가 주된 기기에서 창이 포커스를 잃음. (blur, 앱을 내리기 시작할 때)\n    아이폰은 페이지가 가려졌다는 알림이 앱이 내려간 뒤에 와서, 그때는 오디오가 멈추지 못한 채 얼어 마지막 소리 조각이 되풀이된다.\n    창이 포커스를 잃는 알림은 그보다 먼저 온다. 데스크탑은 캔버스 바깥(바깥 페이지)을 누를 때도 포커스를 잃으므로 따르지 않는다.\n플랫폼의 음소거는 매 프레임(update) 읽고, 페이지가 가려지는 것은 그 순간에 적용한다. (가려지면 프레임이 멈춘다)\n음소거인 동안은 AudioContext 도 멈춘다. (suspend, 풀리면 resume) 아이폰은 돌던 AudioContext 를 앱 전환이나 전면 광고가 가로채면\n돌아와서 깨워도 소리가 나지 않는다. 그 전에 스스로 멈춰 두면 돌아올 때 다시 난다.\n풀린 뒤에도 AudioContext 가 돌지 않으면 돌 때까지 잠깐마다 다시 깨워 본다. (아이폰은 앱으로 돌아온 순간의 깨우기를 듣지 않는 일이 있음)\n\n허락하면(setAutoplayAllowedProvider, 주지 않으면 허락) 누르기 전에도 한 번 깨워 본다. 막히면 아래처럼 첫 누름에 켜진다.\n브라우저는 사람이 처음 누르기 전에는 소리를 내지 못하게 한다. 엔진이 첫 누름에 AudioContext 를 만들고 깨우므로,\n그 뒤에 소리의 길(음악과 효과음의 버스, AudioBus)을 만들고, AudioContext 가 돌고 있을 때만 소리를 낸다. (멈춘 동안 부른 소리가 깨어날 때 한꺼번에 나지 않게)\n버스는 getMusicBus, getEffectBus 로 꺼낸다. 버스로 만든 플레이어(AudioBus.createAudioPlayer)도 설정 크기와 음소거를 따른다.\n설정 크기는 버스의 GainNode 에 직접 건다. 그래서 버스의 setVolume, mute 로 건 값은 SoundSystem 이 크기를 다시 걸 때까지 간다.\n소리 파일은 놀이를 막지 않게 뒤에서 받는다. 아직 못 받았거나 못 받은 소리는 나지 않을 뿐이다.",
+						"en": "Sound. (background music and sound effects)\n\nUses the engine's AudioManager (shared AudioContext) and AudioAsset (MP3). Plays downloaded sound buffers with Web Audio. (does not synthesize sound, only plays files)\nTakes a sound table. Each row is { id, path or paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds }.\n  volume: per-sound volume. (0 ~ 1, 1 if absent)  minimumInterval: interval before the same sound can play again. (seconds, so they do not pile up and get noisy)\n  paths: a group of multiple recordings of the same sound. Picks one each time it plays, never the same as the one just before. (path if only one)\n  maximumVoices: number of instances of the same sound that can play at once. (beyond that the oldest is cut off, if absent up to the total number of sound effects)\n  pitchVariation: ratio by which the pitch varies on each play. (0.05 means ±5%, 0 if absent)\n  playSeconds, fadeOutSeconds: plays only the first playSeconds seconds of a sound effect and fades it out over fadeOutSeconds seconds. (long files, to the end if absent or 0)\n  loadType: load type. (AudioLoadType, decompressOnLoad if absent, sound effects overlap so they must be fully decompressed to play, the background music default is planned to change to streaming after it is checked on real devices (iPhone and iPad Safari))\n\nVolume: background music = music volume setting × music ratio (half volume for the pause window, etc.) × sound volume, sound effect = sound effect volume setting × sound volume × volume at call time (attenuation by distance, etc.).\nBackground music can be crossfaded (fadeSeconds), and the stopped position is remembered per sound so it can resume from there. (isResumed)\nMute takes precedence over the volume setting. If any one of the following applies, no sound plays regardless of the settings.\n  - Platform mute. (the function given with setExternalMuteProvider, the platform SDK's mute setting, while a rewarded ad is shown, etc.)\n  - The user's mute button. (setUserMuted)\n  - Page hidden. (another tab, app switch)\n  - The window loses focus on a touch-primary device. (blur, when the app starts going to the background)\n    On iPhone the page-hidden notification arrives after the app has gone to the background, by which time audio freezes without stopping and the last sound chunk repeats.\n    The window focus-loss notification arrives before that. On desktop, clicking outside the canvas (the outer page) also loses focus, so it is not followed there.\nPlatform mute is read every frame (update), and page hiding is applied at that moment. (frames stop when hidden)\nWhile muted, the AudioContext is also stopped. (suspend, resume when unmuted) On iPhone, if an app switch or interstitial ad takes over a running AudioContext,\nno sound plays even when it is woken on return. If it is stopped on its own beforehand, sound plays again on return.\nIf the AudioContext is still not running after unmuting, it tries to wake it at short intervals until it runs. (iPhone sometimes ignores the wake at the moment of returning to the app)\n\nIf allowed (setAutoplayAllowedProvider, allowed if not given), it tries to wake once even before a press. If blocked, it turns on at the first press as below.\nBrowsers do not allow sound before the person first presses. Since the engine creates and wakes the AudioContext on the first press,\nthe sound paths (music and sound effect buses, AudioBus) are created after that, and sound plays only while the AudioContext is running. (so sounds requested while stopped do not all play at once on wake)\nBuses are retrieved with getMusicBus and getEffectBus. Players made from a bus (AudioBus.createAudioPlayer) also follow the volume setting and mute.\nThe volume setting is applied directly to the bus's GainNode. So values set with the bus's setVolume and mute last only until SoundSystem applies the volume again.\nSound files are downloaded in the background so they do not block play. Sounds not yet downloaded or that failed to download simply do not play."
 					},
 					"examples": [
 						{
@@ -83904,8 +84163,8 @@
 									"name": "playingMusic",
 									"type": "object",
 									"description": {
-										"ko": "틀던 배경음악. ({ soundId, source, gain, startTime, offset, duration })",
-										"en": "The background music that was playing. ({ soundId, source, gain, startTime, offset, duration })"
+										"ko": "틀던 배경음악. ({ soundId, source, player, gain, startTime, offset, duration })",
+										"en": "The background music that was playing. ({ soundId, source, player, gain, startTime, offset, duration })"
 									}
 								},
 								{
@@ -85063,8 +85322,8 @@
 				{
 					"name": "AudioPlayer",
 					"summary": {
-						"ko": "오디오 플레이어.\nAudioAsset 에 로드된 오디오 버퍼를 재생한다.\n내보낼 노드를 주면(AudioBus.createAudioPlayer) 출력 대신 그 노드로 소리를 낸다.",
-						"en": "Audio player.\nPlays the audio buffer loaded into an AudioAsset.\nIf an output node is given (AudioBus.createAudioPlayer), sound goes to that node instead of the output."
+						"ko": "오디오 플레이어.\nAudioAsset 에 로드된 오디오 버퍼를 재생한다.\n내보낼 노드를 주면(AudioBus.createAudioPlayer) 출력 대신 그 노드로 소리를 낸다.\n스트리밍 애셋(AudioLoadType.streaming)은 플레이어마다 미디어 요소 하나를 MediaElementAudioSourceNode 로 같은 GainNode 에 이어 튼다.\n- 재생, 멈춤, 반복, 음량, 음소거, 빠르기, 위치, 끝(isPlaying 이 거짓이 됨)이 통째로 푼 애셋과 같다.\n- 오디오 컨텍스트가 멈추면(suspend, 탭이 숨음, 음소거) 미디어 요소도 멈추고, 다시 돌면 이어 튼다. (버퍼 소리가 컨텍스트 시계와 같이 멈추는 것과 같게)",
+						"en": "Audio player.\nPlays the audio buffer loaded into an AudioAsset.\nIf an output node is given (AudioBus.createAudioPlayer), sound goes to that node instead of the output.\nA streaming asset (AudioLoadType.streaming) is played by one media element per player, connected to the same GainNode with a MediaElementAudioSourceNode.\n- Play, stop, loop, volume, mute, rate, position and end (isPlaying turns false) behave the same as a fully decompressed asset.\n- When the audio context stops (suspend, hidden tab, mute) the media element also pauses, and resumes when it runs again. (the same as buffer sounds stopping with the context clock)"
 					},
 					"examples": [
 						{
@@ -85340,10 +85599,10 @@
 							"params": [
 								{
 									"name": "audioAsset",
-									"type": "AudioAsset",
+									"type": "AudioAsset | null",
 									"description": {
-										"ko": "재생할 오디오 애셋. (다음 play 부터)",
-										"en": "Audio asset to play. (from the next play)"
+										"ko": "재생할 오디오 애셋. (다음 play 부터, 스트리밍으로 틀던 것이 멈춰 있으면 그 미디어 요소가 받아 둔 것을 놓는다)",
+										"en": "The audio asset to play. (from the next play, if a streaming sound was playing and is stopped, its media element releases what it had loaded)"
 									}
 								}
 							],
@@ -91932,6 +92191,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uilistview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uilistview",
+								"class": "UIListView",
+								"name": "set_template_node_with_document"
+							},
 							"examples": [
 								{
 									"title": {
@@ -96988,7 +97253,7 @@
 						"ko": "그리기 줄로 그림자, 화면 공간 바깥선, 비치는 것까지 한 프레임",
 						"en": "One frame with shadows, screen-space outline and transparent things through the draw queue"
 					},
-					"code": "import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, ToonMesh, ShadowMap, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), \"#f0e8e0\", { hasOutline: false });\nconst ballMesh = renderer.createMesh(builder.readArrays());\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 1024);\nshadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.4, -1, -0.3), 5, 0.5, 30);\nrenderer.setShadow(shadowMap, 1);\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 100);\ncamera.lookAt(Vector3.create(0, 2, 5), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nqueue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));\nqueue.addMesh(ballMesh, Matrix4.createTranslation(0, 0.5, 0), { lineId: 1 });\nqueue.addMesh(ballMesh, Matrix4.createTranslation(1.2, 0.5, 0), { lineId: 2, alpha: 0.5 });\nqueue.drawShadows(renderer, shadowMap);\nqueue.draw(renderer, camera);",
+					"code": "import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createSphereGeometry, ShadowMap, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), \"#f0e8e0\", { hasOutline: false });\nconst ballMesh = renderer.createMesh(builder.readArrays());\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 1024);\nshadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.4, -1, -0.3), 5, 0.5, 30);\nrenderer.setShadow(shadowMap, 1);\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 100);\ncamera.lookAt(Vector3.create(0, 2, 5), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nqueue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));\nqueue.addMesh(ballMesh, Matrix4.createTranslation(0, 0.5, 0), { lineId: 1 });\nqueue.addMesh(ballMesh, Matrix4.createTranslation(1.2, 0.5, 0), { lineId: 2, alpha: 0.5 });\nqueue.drawShadows(renderer, shadowMap);\nqueue.draw(renderer, camera);",
 					"language": "javascript"
 				}
 			],
@@ -97005,7 +97270,7 @@
 								"ko": "모형마다 바깥선 꼴 정하기",
 								"en": "Decide the outline form per model"
 							},
-							"code": "import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, ToonMesh, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst floorBuilder = new ToonMesh.MeshBuilder();\nfloorBuilder.addPart(ToonMesh.createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), \"#708090\", { hasOutline: false });\nconst floorMesh = renderer.createMesh(floorBuilder.readArrays());\nconst gemBuilder = new ToonMesh.MeshBuilder();\ngemBuilder.addPart(ToonMesh.createFacetedChunkGeometry(0.5, [1, 0.9, 1.1], [1, 1, 1]), Matrix4.createTranslation(0, 0.5, 0), \"#a0c0ff\", { hasOutline: false });\nconst gemMesh = renderer.createMesh(gemBuilder.readArrays());\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 100);\ncamera.lookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0.4, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nqueue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));\nqueue.addMesh(floorMesh, Matrix4.createIdentity(), { lineId: 1, hasScreenOutline: false });\nqueue.addMesh(gemMesh, Matrix4.createIdentity(), { lineId: 2, hasCreaseLine: false });\nqueue.draw(renderer, camera);",
+							"code": "import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createBoxGeometry, createFacetedChunkGeometry, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst floorBuilder = new MeshBuilder();\nfloorBuilder.addPart(createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), \"#708090\", { hasOutline: false });\nconst floorMesh = renderer.createMesh(floorBuilder.readArrays());\nconst gemBuilder = new MeshBuilder();\ngemBuilder.addPart(createFacetedChunkGeometry(0.5, [1, 0.9, 1.1], [1, 1, 1]), Matrix4.createTranslation(0, 0.5, 0), \"#a0c0ff\", { hasOutline: false });\nconst gemMesh = renderer.createMesh(gemBuilder.readArrays());\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 100);\ncamera.lookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0.4, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nqueue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));\nqueue.addMesh(floorMesh, Matrix4.createIdentity(), { lineId: 1, hasScreenOutline: false });\nqueue.addMesh(gemMesh, Matrix4.createIdentity(), { lineId: 2, hasCreaseLine: false });\nqueue.draw(renderer, camera);",
 							"language": "javascript"
 						}
 					],
@@ -97356,7 +97621,7 @@
 										"ko": "점광 그림자를 굽고 받기",
 										"en": "Bake and receive point light shadows"
 									},
-									"code": "import { ToonRenderer, ToonDrawQueue, ToonMesh, ShadowAtlas, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), \"#8090a0\", { hasOutline: false });\nbuilder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), \"#f0e0d0\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setPointLights([{ position: [1, 2, 1], color: [1, 0.85, 0.6], intensity: 4, range: 8, castsShadow: true }]);\nconst shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);\nshadowAtlas.updateLights(renderer.getLightSet().getPointLights());\nrenderer.setLocalShadows(shadowAtlas, 1);\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 50);\ncamera.lookAt(Vector3.create(0, 3, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nqueue.addMesh(mesh, Matrix4.createIdentity());\nqueue.drawLocalShadows(renderer, shadowAtlas);\nqueue.draw(renderer, camera);",
+									"code": "import { ToonRenderer, ToonDrawQueue, MeshBuilder, createBoxGeometry, createSphereGeometry, ShadowAtlas, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), \"#8090a0\", { hasOutline: false });\nbuilder.addPart(createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), \"#f0e0d0\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nrenderer.setPointLights([{ position: [1, 2, 1], color: [1, 0.85, 0.6], intensity: 4, range: 8, castsShadow: true }]);\nconst shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);\nshadowAtlas.updateLights(renderer.getLightSet().getPointLights());\nrenderer.setLocalShadows(shadowAtlas, 1);\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 50);\ncamera.lookAt(Vector3.create(0, 3, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nqueue.addMesh(mesh, Matrix4.createIdentity());\nqueue.drawLocalShadows(renderer, shadowAtlas);\nqueue.draw(renderer, camera);",
 									"language": "javascript"
 								}
 							]
@@ -97646,7 +97911,7 @@
 						"ko": "노드 사각형 안에 툰 3D 장면 그리기",
 						"en": "Draw a toon 3D scene inside a node rectangle"
 					},
-					"code": "import { WorldNode, ToonView3D, ToonDrawQueue, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst node = new WorldNode();\nnode.setContentSizeXY(320, 240);\nconst view = node.addComponent(ToonView3D);\nview.getCamera().setPerspective(0.8, 0.1, 100);\nview.getCamera().lookAt(Vector3.create(0, 1.5, 3), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), \"#f0b080\");\nconst arrays = builder.readArrays();\nconst queue = new ToonDrawQueue();\nlet mesh = null;\nview.setDrawCallback((renderer, camera) => {\n\tif (mesh === null) {\n\t\tmesh = renderer.createMesh(arrays);\n\t}\n\tqueue.clear();\n\tqueue.addMesh(mesh, Matrix4.createIdentity());\n\tqueue.draw(renderer, camera);\n});",
+					"code": "import { WorldNode, ToonView3D, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst node = new WorldNode();\nnode.setContentSizeXY(320, 240);\nconst view = node.addComponent(ToonView3D);\nview.getCamera().setPerspective(0.8, 0.1, 100);\nview.getCamera().lookAt(Vector3.create(0, 1.5, 3), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), \"#f0b080\");\nconst arrays = builder.readArrays();\nconst queue = new ToonDrawQueue();\nlet mesh = null;\nview.setDrawCallback((renderer, camera) => {\n\tif (mesh === null) {\n\t\tmesh = renderer.createMesh(arrays);\n\t}\n\tqueue.clear();\n\tqueue.addMesh(mesh, Matrix4.createIdentity());\n\tqueue.draw(renderer, camera);\n});",
 					"language": "javascript"
 				}
 			],
@@ -98379,6 +98644,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/misc/graphicsqualitygovernor.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "misc/graphicsqualitygovernor",
+								"class": "GraphicsQualityGovernor",
+								"name": "apply_page_query"
+							},
 							"examples": [
 								{
 									"title": {
@@ -100334,7 +100605,7 @@
 						"ko": "툰 화면 공간 바깥선을 한 프레임에 긋기",
 						"en": "Draw the toon screen-space outline in one frame"
 					},
-					"code": "import { ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst outline = new ToonScreenOutline(webGL2RenderingContext);\noutline.setWidth(2, ToonOutlineWidthUnit.pixel);\noutline.setCrease(50, 1, 0.8);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#e0c8a8\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nconst modelMatrix = Matrix4.createIdentity();\nif (outline.beginLineIds(viewMatrix, projectionMatrix)) {\n\toutline.drawMesh(mesh, modelMatrix, 1);\n\toutline.endLineIds();\n}\nrenderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);\nrenderer.drawMesh(mesh, modelMatrix);\nrenderer.endFrame();\noutline.drawOutline();",
+					"code": "import { ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst outline = new ToonScreenOutline(webGL2RenderingContext);\noutline.setWidth(2, ToonOutlineWidthUnit.pixel);\noutline.setCrease(50, 1, 0.8);\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#e0c8a8\", { hasOutline: false });\nconst mesh = renderer.createMesh(builder.readArrays());\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nconst modelMatrix = Matrix4.createIdentity();\nif (outline.beginLineIds(viewMatrix, projectionMatrix)) {\n\toutline.drawMesh(mesh, modelMatrix, 1);\n\toutline.endLineIds();\n}\nrenderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);\nrenderer.drawMesh(mesh, modelMatrix);\nrenderer.endFrame();\noutline.drawOutline();",
 					"language": "javascript",
 					"image": "toon-style.webp"
 				}
@@ -100343,8 +100614,8 @@
 				{
 					"name": "ToonScreenOutline",
 					"summary": {
-						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)",
-						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the two are farther apart than the depth threshold from each other's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. Twice the pixel size at that depth is added to the threshold so distant things mean the same.\n- Widening: the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines even when the widening target is reduced)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Cost: setResolutionScale reduces the widening (jump flooding) target. (The light path for phones) The line target and seeds stay at drawing area resolution, so line positions do not change when reduced.\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushSpriteBatch before it)"
+						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)",
+						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the two are farther apart than the depth threshold from each other's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. Twice the pixel size at that depth is added to the threshold so distant things mean the same.\n- Widening: the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines even when the widening target is reduced)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Cost: setResolutionScale reduces the widening (jump flooding) target. (The light path for phones) The line target and seeds stay at drawing area resolution, so line positions do not change when reduced.\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushBatch before it)"
 					},
 					"examples": [
 						{
@@ -100795,7 +101066,7 @@
 										"ko": "바닥은 선 없이 가리기만, 결정은 꺾임 선 없이",
 										"en": "The floor only hides without lines, the crystals without crease lines"
 									},
-									"code": "import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst outline = new ToonScreenOutline(webGL2RenderingContext);\nconst floorBuilder = new ToonMesh.MeshBuilder();\nfloorBuilder.addPart(ToonMesh.createBoxGeometry(6, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), \"#506070\", { hasOutline: false });\nconst floorMesh = renderer.createMesh(floorBuilder.readArrays());\nconst crystalBuilder = new ToonMesh.MeshBuilder();\ncrystalBuilder.addPart(ToonMesh.createOctahedronGeometry(0.5), Matrix4.createTranslation(0, 0.5, 0), \"#90d0ff\", { hasOutline: false });\nconst crystalMesh = renderer.createMesh(crystalBuilder.readArrays());\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(3, 3, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nif (outline.beginLineIds(viewMatrix, projectionMatrix)) {\n\toutline.drawMesh(floorMesh, Matrix4.createIdentity(), 1, { hasScreenOutline: false });\n\toutline.drawMesh(crystalMesh, Matrix4.createIdentity(), 2, { hasCreaseLine: false });\n\toutline.endLineIds();\n}",
+									"code": "import { ToonRenderer, ToonScreenOutline, MeshBuilder, createBoxGeometry, createOctahedronGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst outline = new ToonScreenOutline(webGL2RenderingContext);\nconst floorBuilder = new MeshBuilder();\nfloorBuilder.addPart(createBoxGeometry(6, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), \"#506070\", { hasOutline: false });\nconst floorMesh = renderer.createMesh(floorBuilder.readArrays());\nconst crystalBuilder = new MeshBuilder();\ncrystalBuilder.addPart(createOctahedronGeometry(0.5), Matrix4.createTranslation(0, 0.5, 0), \"#90d0ff\", { hasOutline: false });\nconst crystalMesh = renderer.createMesh(crystalBuilder.readArrays());\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(3, 3, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nif (outline.beginLineIds(viewMatrix, projectionMatrix)) {\n\toutline.drawMesh(floorMesh, Matrix4.createIdentity(), 1, { hasScreenOutline: false });\n\toutline.drawMesh(crystalMesh, Matrix4.createIdentity(), 2, { hasCreaseLine: false });\n\toutline.endLineIds();\n}",
 									"language": "javascript"
 								}
 							]
@@ -100856,7 +101127,7 @@
 										"ko": "돌마다 다른 번호로 맞닿은 곳에도 선",
 										"en": "A different ID per stone so lines appear where they touch too"
 									},
-									"code": "import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst outline = new ToonScreenOutline(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createOctahedronGeometry(0.3), Matrix4.createIdentity(), \"#a89880\", { hasOutline: false });\nconst rockMesh = renderer.createMesh(builder.readArrays());\nconst instances = [0, 1, 2].map((index) => ({ modelMatrix: Matrix4.createTranslation(index * 0.5, 0, 0), lineId: 10 + index }));\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nif (outline.beginLineIds(viewMatrix, projectionMatrix)) {\n\toutline.drawMeshInstanced(rockMesh, instances, 10);\n\toutline.endLineIds();\n}",
+									"code": "import { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst outline = new ToonScreenOutline(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), \"#a89880\", { hasOutline: false });\nconst rockMesh = renderer.createMesh(builder.readArrays());\nconst instances = [0, 1, 2].map((index) => ({ modelMatrix: Matrix4.createTranslation(index * 0.5, 0, 0), lineId: 10 + index }));\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nif (outline.beginLineIds(viewMatrix, projectionMatrix)) {\n\toutline.drawMeshInstanced(rockMesh, instances, 10);\n\toutline.endLineIds();\n}",
 									"language": "javascript"
 								}
 							]
@@ -110220,6 +110491,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/misc/devtools.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "misc/devtools",
+								"class": "DevTools",
+								"name": "inspect_node"
+							},
 							"examples": [
 								{
 									"title": {

@@ -6508,6 +6508,13 @@
     return fontString.slice(0, familyListStart).trimEnd() + " " + resolvedFamilyNameList.join(", ");
   }
   __name(resolveFontString, "resolveFontString");
+  function getTextInkPadding(mode, scaledLineWidth) {
+    if (mode !== "stroke") {
+      return 2;
+    }
+    return ceil(max(System12.Math.fround(scaledLineWidth) * 0.5, 0.5)) + 2;
+  }
+  __name(getTextInkPadding, "getTextInkPadding");
   function measureTextMetrics(fontString, text) {
     const document2 = System12.document;
     if (document2 === void 0 || document2 === null) {
@@ -6805,12 +6812,10 @@
       if (scaledFontDescent === void 0) {
         scaledFontDescent = scaledTextMetrics.actualBoundingBoxDescent || 0;
       }
-      const scaledPadding = ceil(lineWidth * scale / 2) + 2;
+      const scaledPadding = getTextInkPadding(mode, lineWidth * scale);
       const scaledPenX = scaledPadding + actualLeft;
-      const scaledBaselineY = scaledPadding + ceil(scaledFontAscent);
       const bakeWidth = scaledPenX + actualRight + scaledPadding;
-      const bakeHeight = scaledBaselineY + ceil(scaledFontDescent) + scaledPadding;
-      if (bakeWidth <= 0 || bakeHeight <= 0) {
+      if (bakeWidth <= 0) {
         return null;
       }
       const chunks = this.splitTextChunks(text, scaledFontString, textDirection);
@@ -6848,6 +6853,8 @@
           const chunkLeft = ceil(max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
           const chunkRight = ceil(max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
           const originX = cellPadding + chunkLeft;
+          const cellTopExtent = scaledPadding + ceil(max(scaledFontAscent, chunkMetrics.actualBoundingBoxAscent || 0));
+          const cellBottomExtent = ceil(max(scaledFontDescent, chunkMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
           glyph = {
             glyphKey,
             text: chunk.text,
@@ -6855,8 +6862,8 @@
             fractionX,
             originX,
             width: originX + 1 + chunkRight + cellPadding,
-            height: bakeHeight + 2,
-            baselineY: scaledBaselineY + 1,
+            height: cellTopExtent + cellBottomExtent + 2,
+            baselineY: cellTopExtent + 1,
             atlasPage: null,
             atlasX: 0,
             atlasY: 0
@@ -6870,6 +6877,15 @@
       if (missingGlyphList.length > 0) {
         this.bakeGlyphs(missingGlyphList, mode, colorString, lineWidth * scale, textDirection);
       }
+      let topExtent = scaledPadding + ceil(max(scaledFontAscent, scaledTextMetrics.actualBoundingBoxAscent || 0));
+      let bottomExtent = ceil(max(scaledFontDescent, scaledTextMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
+      for (let glyphIndex = 0; glyphIndex < glyphList.length; glyphIndex += 2) {
+        const glyph = glyphList[glyphIndex];
+        topExtent = max(topExtent, glyph.baselineY - 1);
+        bottomExtent = max(bottomExtent, glyph.height - glyph.baselineY - 1);
+      }
+      const scaledBaselineY = topExtent;
+      const bakeHeight = topExtent + bottomExtent;
       const glyphTextures = [];
       const glyphRects = [];
       const atlasPages = [];
@@ -9999,17 +10015,6 @@ void main() {
         targetOffset += BATCH_FLOATS_PER_VERTEX;
       }
       this.#batchVertexCount += vertexCount;
-    }
-    //==============================================================================
-    // 쌓인 묶음 그리기의 옛 이름. (폐기 예정, flushBatch 와 같다)
-    // - toonview3d.js 가 flushBatch 로 옮기면 뺀다. 공개 자료에는 싣지 않는다.
-    //==============================================================================
-    /**
-     * @private
-     * @deprecated flushBatch 를 쓴다.
-     */
-    flushSpriteBatch() {
-      this.flushBatch();
     }
     //==============================================================================
     // 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
@@ -18243,8 +18248,39 @@ void main() {
     // 비주얼 애셋.
   });
 
-  // src/core/audioplayer.js
+  // src/resource/audioasset.js
   var System23 = globalThis;
+  var AUTOMATIC_STREAMING_BYTE_THRESHOLD = 1024 * 1024;
+  var AudioLoadType = System23.Object.freeze({
+    automatic: "automatic",
+    // 크기를 보고 고른다. (AUTOMATIC_STREAMING_BYTE_THRESHOLD 보다 큰 파일은 스트리밍, 아니면 통째로 풀기, 고른 애셋만)
+    decompressOnLoad: "decompressOnLoad",
+    // 읽을 때 PCM 으로 통째로 푼다. (효과음처럼 짧고 자주 겹쳐 트는 소리, 시작이 바로이고 겹쳐 틀어도 싸다, 기본)
+    streaming: "streaming"
+    // 풀지 않고 미디어 요소(HTMLAudioElement)가 조금씩 풀어 흘린다. (배경음처럼 긴 소리, 메모리는 압축된 파일 크기 이하)
+  });
+  function createStreamMediaElement() {
+    const mediaElement = System23.document.createElement("audio");
+    mediaElement.preservesPitch = false;
+    mediaElement.webkitPreservesPitch = false;
+    return mediaElement;
+  }
+  __name(createStreamMediaElement, "createStreamMediaElement");
+  function setStreamMediaElementUrl(mediaElement, streamUrl) {
+    const isLocalUrl = streamUrl.startsWith("blob:") || streamUrl.startsWith("data:");
+    mediaElement.crossOrigin = isLocalUrl ? null : "anonymous";
+    mediaElement.src = streamUrl;
+  }
+  __name(setStreamMediaElementUrl, "setStreamMediaElementUrl");
+  function releaseMediaElement(mediaElement) {
+    mediaElement.pause();
+    mediaElement.removeAttribute("src");
+    mediaElement.load();
+  }
+  __name(releaseMediaElement, "releaseMediaElement");
+
+  // src/core/audioplayer.js
+  var System24 = globalThis;
   function readPlaybackPosition(startTime, elapsedSeconds, duration, isLoop) {
     const position = startTime + elapsedSeconds;
     if (!(duration > 0)) {
@@ -18253,7 +18289,7 @@ void main() {
     if (isLoop) {
       return position % duration;
     }
-    return System23.Math.min(position, duration);
+    return System24.Math.min(position, duration);
   }
   __name(readPlaybackPosition, "readPlaybackPosition");
   var AudioPlayer = class {
@@ -18299,6 +18335,21 @@ void main() {
     /** @private @type { number } */
     #startDuration;
     // 지금 소리의 버퍼 길이. (초)
+    /** @private @type { HTMLAudioElement | null } */
+    #mediaElement;
+    // 스트리밍 애셋을 트는 미디어 요소. (처음 틀 때 만들고 플레이어가 끝까지 쓴다)
+    /** @private @type { MediaElementAudioSourceNode | null } */
+    #mediaSource;
+    // 그 미디어 요소를 GainNode 에 잇는 노드. (요소 하나에 하나만 만들 수 있다)
+    /** @private @type { string | null } */
+    #mediaUrl;
+    // 미디어 요소에 건 주소.
+    /** @private @type { boolean } */
+    #isMediaPlaying;
+    // 미디어 요소로 틀고 있는지.
+    /** @private @type { function(): void } */
+    #contextStateHandler;
+    // 컨텍스트가 멈추고 돌 때 미디어 요소를 따라 멈추고 트는 함수.
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -18322,6 +18373,13 @@ void main() {
       this.#startContextTime = 0;
       this.#startPlaybackRate = 1;
       this.#startDuration = 0;
+      this.#mediaElement = null;
+      this.#mediaSource = null;
+      this.#mediaUrl = null;
+      this.#isMediaPlaying = false;
+      this.#contextStateHandler = () => {
+        this.followContextState();
+      };
       if (audioContext) {
         this.#gainNode = audioContext.createGain();
         this.#gainNode.connect(outputNode !== null ? outputNode : audioContext.destination);
@@ -18342,15 +18400,12 @@ void main() {
       if (!audioAsset) {
         return;
       }
+      const isStreaming = audioAsset.isStreaming();
       const audioBuffer = audioAsset.getAudioBuffer();
-      if (!audioBuffer) {
+      if (!isStreaming && !audioBuffer) {
         return;
       }
-      if (this.#audioSource) {
-        this.#audioSource.onended = null;
-        this.#audioSource.stop();
-        this.#audioSource = null;
-      }
+      this.stopSource();
       this.#playRequestId += 1;
       const playRequestId = this.#playRequestId;
       if (audioContext.state === "suspended") {
@@ -18358,13 +18413,156 @@ void main() {
           if (playRequestId !== this.#playRequestId) {
             return;
           }
-          this.startPlayback(audioBuffer, loop);
+          if (isStreaming) {
+            this.startStreamPlayback(audioAsset, loop);
+          } else {
+            this.startPlayback(audioBuffer, loop);
+          }
         }, () => {
           return;
         });
         return;
       }
-      this.startPlayback(audioBuffer, loop);
+      if (isStreaming) {
+        this.startStreamPlayback(audioAsset, loop);
+      } else {
+        this.startPlayback(audioBuffer, loop);
+      }
+    }
+    //==============================================================================
+    // 틀던 소리 끊기. (버퍼 소리는 멈추고 놓고, 미디어 요소는 멈춰 두고 다음에 다시 쓴다, 재생 상태는 쓰는 쪽이 정한다)
+    //==============================================================================
+    /**
+     * @private
+     */
+    stopSource() {
+      if (this.#audioSource) {
+        this.#audioSource.onended = null;
+        this.#audioSource.stop();
+        this.#audioSource = null;
+      }
+      if (this.#isMediaPlaying) {
+        this.#isMediaPlaying = false;
+        this.#mediaElement.onended = null;
+        this.#mediaElement.pause();
+        this.unwatchContextState();
+      }
+    }
+    //==============================================================================
+    // 내부 스트리밍 재생 시작. (미디어 요소를 GainNode 에 잇고 setTime 의 자리부터 튼다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { AudioAsset } audioAsset 스트리밍으로 읽힌 오디오 애셋.
+     * @param { boolean } loop 반복 재생하면 참.
+     */
+    startStreamPlayback(audioAsset, loop) {
+      const audioContext = this.getAudioContext();
+      const streamUrl = audioAsset.getStreamUrl();
+      if (!audioContext || !this.#gainNode || streamUrl === null || typeof audioContext.createMediaElementSource !== "function") {
+        return;
+      }
+      this.stopSource();
+      if (this.#mediaElement === null) {
+        this.#mediaElement = createStreamMediaElement();
+        this.#mediaElement.preload = "auto";
+        this.#mediaSource = audioContext.createMediaElementSource(this.#mediaElement);
+        this.#mediaSource.connect(this.#gainNode);
+      }
+      const mediaElement = this.#mediaElement;
+      if (this.#mediaUrl !== streamUrl) {
+        setStreamMediaElementUrl(mediaElement, streamUrl);
+        this.#mediaUrl = streamUrl;
+      }
+      this.#isLoop = loop;
+      mediaElement.loop = loop;
+      mediaElement.playbackRate = this.#playbackRate;
+      mediaElement.currentTime = this.#time;
+      const playRequestId = this.#playRequestId;
+      mediaElement.onended = () => {
+        this.#isPlaying = false;
+        this.#isMediaPlaying = false;
+        mediaElement.onended = null;
+        this.unwatchContextState();
+      };
+      this.#isMediaPlaying = true;
+      this.#isPlaying = true;
+      this.#startContextTime = audioContext.currentTime;
+      this.#startPlaybackRate = this.#playbackRate;
+      this.#startDuration = audioAsset.getDuration();
+      this.watchContextState();
+      this.playMediaElement(playRequestId);
+    }
+    //==============================================================================
+    // 미디어 요소 틀기. (브라우저가 거부하면 재생을 끝낸 것으로 둔다, 그 사이 다른 요청이 왔으면 건드리지 않는다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { number } playRequestId 이 재생 요청의 번호.
+     */
+    playMediaElement(playRequestId) {
+      const mediaElement = this.#mediaElement;
+      const playPromise = mediaElement.play();
+      if (!playPromise) {
+        return;
+      }
+      playPromise.catch((error) => {
+        if (playRequestId !== this.#playRequestId || !this.#isMediaPlaying) {
+          return;
+        }
+        if (error && error.name === "AbortError") {
+          return;
+        }
+        console.warn("[audio] \uC2A4\uD2B8\uB9AC\uBC0D \uC18C\uB9AC\uB97C \uD2C0\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
+        this.#isPlaying = false;
+        this.#isMediaPlaying = false;
+        mediaElement.onended = null;
+        this.unwatchContextState();
+      });
+    }
+    //==============================================================================
+    // 컨텍스트가 멈추고 도는 것 따라가기. (스트리밍으로 트는 동안만 듣는다, 버퍼 소리처럼 컨텍스트가 멈추면 같이 멈춘다)
+    //==============================================================================
+    /**
+     * @private
+     */
+    watchContextState() {
+      const audioContext = this.getAudioContext();
+      if (audioContext && typeof audioContext.addEventListener === "function") {
+        audioContext.addEventListener("statechange", this.#contextStateHandler);
+      }
+    }
+    //==============================================================================
+    // 컨텍스트가 멈추고 도는 것 그만 듣기. (스트리밍 재생이 멈추거나 끝나면, 플레이어가 컨텍스트에 붙잡혀 남지 않게)
+    //==============================================================================
+    /**
+     * @private
+     */
+    unwatchContextState() {
+      const audioContext = this.getAudioContext();
+      if (audioContext && typeof audioContext.removeEventListener === "function") {
+        audioContext.removeEventListener("statechange", this.#contextStateHandler);
+      }
+    }
+    //==============================================================================
+    // 컨텍스트 상태 따르기. (돌면 멈춰 둔 미디어 요소를 이어 틀고, 멈추면 미디어 요소도 멈춘다)
+    //==============================================================================
+    /**
+     * @private
+     */
+    followContextState() {
+      const audioContext = this.getAudioContext();
+      if (!this.#isMediaPlaying || !audioContext) {
+        return;
+      }
+      const mediaElement = this.#mediaElement;
+      if (audioContext.state === "running") {
+        if (mediaElement.paused) {
+          this.playMediaElement(this.#playRequestId);
+        }
+      } else if (!mediaElement.paused) {
+        mediaElement.pause();
+      }
     }
     //==============================================================================
     // 내부 재생 시작.
@@ -18378,11 +18576,7 @@ void main() {
       if (!audioContext || !this.#gainNode) {
         return;
       }
-      if (this.#audioSource) {
-        this.#audioSource.onended = null;
-        this.#audioSource.stop();
-        this.#audioSource = null;
-      }
+      this.stopSource();
       this.#isLoop = loop;
       this.#audioSource = audioContext.createBufferSource();
       this.#audioSource.buffer = audioBuffer;
@@ -18406,7 +18600,7 @@ void main() {
      * @param { number } playbackRate 재생 빠르기. (1 이면 그대로)
      */
     setPlaybackRate(playbackRate) {
-      const isValid = typeof playbackRate === "number" && System23.Number.isFinite(playbackRate) && playbackRate > 0;
+      const isValid = typeof playbackRate === "number" && System24.Number.isFinite(playbackRate) && playbackRate > 0;
       this.#playbackRate = isValid ? playbackRate : 1;
     }
     //==============================================================================
@@ -18414,11 +18608,7 @@ void main() {
     //==============================================================================
     stop() {
       this.#playRequestId += 1;
-      if (this.#audioSource) {
-        this.#audioSource.onended = null;
-        this.#audioSource.stop();
-        this.#audioSource = null;
-      }
+      this.stopSource();
       this.#isPlaying = false;
     }
     //==============================================================================
@@ -18446,7 +18636,7 @@ void main() {
      * @param { number } volume 음량. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
      */
     setVolume(volume) {
-      const clampedVolume = System23.Number.isFinite(volume) ? System23.Math.max(0, System23.Math.min(1, volume)) : 1;
+      const clampedVolume = System24.Number.isFinite(volume) ? System24.Math.max(0, System24.Math.min(1, volume)) : 1;
       this.#volume = clampedVolume;
       if (this.#gainNode && !this.#isMuted) {
         this.#gainNode.gain.value = clampedVolume;
@@ -18478,10 +18668,15 @@ void main() {
     // 오디오 애셋 설정.
     //==============================================================================
     /**
-     * @param { AudioAsset } audioAsset 재생할 오디오 애셋. (다음 play 부터)
+     * @param { AudioAsset | null } audioAsset 재생할 오디오 애셋. (다음 play 부터, 스트리밍으로 틀던 것이 멈춰 있으면 그 미디어 요소가 받아 둔 것을 놓는다)
      */
     setAudioAsset(audioAsset) {
       this.#audioAsset = audioAsset;
+      const streamUrl = audioAsset ? audioAsset.getStreamUrl() : null;
+      if (this.#mediaElement !== null && !this.#isMediaPlaying && this.#mediaUrl !== null && this.#mediaUrl !== streamUrl) {
+        releaseMediaElement(this.#mediaElement);
+        this.#mediaUrl = null;
+      }
     }
     //==============================================================================
     // 오디오 애셋 반환.
@@ -18523,7 +18718,10 @@ void main() {
       if (!this.#isPlaying || !audioContext) {
         return this.#time;
       }
-      const elapsedSeconds = System23.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
+      if (this.#isMediaPlaying) {
+        return this.#mediaElement.currentTime;
+      }
+      const elapsedSeconds = System24.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
       return readPlaybackPosition(this.#time, elapsedSeconds, this.#startDuration, this.#isLoop);
     }
     //==============================================================================
@@ -18551,7 +18749,7 @@ void main() {
   };
 
   // src/core/audiobus.js
-  var System24 = globalThis;
+  var System25 = globalThis;
   var AudioBus = class {
     static {
       __name(this, "AudioBus");
@@ -18620,7 +18818,7 @@ void main() {
      * @param { number } volume 크기. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
      */
     setVolume(volume) {
-      const clampedVolume = System24.Number.isFinite(volume) ? System24.Math.max(0, System24.Math.min(1, volume)) : 1;
+      const clampedVolume = System25.Number.isFinite(volume) ? System25.Math.max(0, System25.Math.min(1, volume)) : 1;
       this.#volume = clampedVolume;
       if (this.#gainNode && !this.#isMuted) {
         this.#gainNode.gain.value = clampedVolume;
@@ -18666,7 +18864,7 @@ void main() {
   };
 
   // src/core/audiomanager.js
-  var System25 = globalThis;
+  var System26 = globalThis;
   var CONTEXT_CLOCK_CHECK_INTERVAL = 0.5;
   var CONTEXT_CLOCK_MINIMUM_RATIO = 0.25;
   var AudioManager = class extends Object2 {
@@ -18700,7 +18898,7 @@ void main() {
       const platform = engine.getPlatform();
       const platformInfo = platform.getPlatformInfo();
       const platformName = platformInfo.platformName;
-      const isDesktopModeIPad = platformName === PlatformType.macOS && System25.navigator.maxTouchPoints > 1;
+      const isDesktopModeIPad = platformName === PlatformType.macOS && System26.navigator.maxTouchPoints > 1;
       this.#isIOS = platformName === PlatformType.iOS || platformName === PlatformType.iPadOS || isDesktopModeIPad;
       this.#isVerifyingContextClock = false;
     }
@@ -18730,7 +18928,7 @@ void main() {
       if (this.#audioContext) {
         return this.#audioContext;
       }
-      const audioContextType = System25.window.AudioContext || System25.window.webkitAudioContext;
+      const audioContextType = System26.window.AudioContext || System26.window.webkitAudioContext;
       if (audioContextType) {
         this.#audioContext = new audioContextType();
       }
@@ -18787,14 +18985,14 @@ void main() {
         return;
       }
       this.#isVerifyingContextClock = true;
-      const startTime = System25.performance.now() / 1e3;
+      const startTime = System26.performance.now() / 1e3;
       const startContextTime = audioContext.currentTime;
-      System25.setTimeout(() => {
+      System26.setTimeout(() => {
         this.#isVerifyingContextClock = false;
-        if (audioContext !== this.#audioContext || audioContext.state !== "running" || System25.document.visibilityState !== "visible") {
+        if (audioContext !== this.#audioContext || audioContext.state !== "running" || System26.document.visibilityState !== "visible") {
           return;
         }
-        const elapsedTime = System25.performance.now() / 1e3 - startTime;
+        const elapsedTime = System26.performance.now() / 1e3 - startTime;
         const contextElapsedTime = audioContext.currentTime - startContextTime;
         if (contextElapsedTime >= elapsedTime * CONTEXT_CLOCK_MINIMUM_RATIO) {
           return;
@@ -18807,7 +19005,7 @@ void main() {
             this.verifyContextClock(audioContext);
           }
         }).catch(() => {
-          System25.setTimeout(() => {
+          System26.setTimeout(() => {
             this.resumeContext();
           }, CONTEXT_CLOCK_CHECK_INTERVAL * 1e3);
         });
@@ -18898,7 +19096,7 @@ void main() {
   };
 
   // src/core/pointercursor.js
-  var System26 = globalThis;
+  var System27 = globalThis;
   var SHOWN_CURSOR_NAMES = ["pointer", "crosshair", "not-allowed", "grab", "grabbing", "text", "move", "help", "wait", "progress", "none"];
   var PointerCursor = class _PointerCursor extends Singleton {
     static {
@@ -18937,7 +19135,7 @@ void main() {
     constructor() {
       super();
       this.#isEnabled = false;
-      this.#imageCursorValues = new System26.Map();
+      this.#imageCursorValues = new System27.Map();
       this.#buttonCursorName = "pointer";
       this.#defaultCursorName = "default";
       this.#screenCursorName = "default";
@@ -19036,11 +19234,11 @@ void main() {
      * @param { string } fallbackCursorName - 그림을 못 쓸 때의 CSS cursor 이름.
      */
     registerImageCursor(name, url, url2x, hotspotX, hotspotY, fallbackCursorName) {
-      const roundedHotspotX = System26.Math.round(hotspotX);
-      const roundedHotspotY = System26.Math.round(hotspotY);
+      const roundedHotspotX = System27.Math.round(hotspotX);
+      const roundedHotspotY = System27.Math.round(hotspotY);
       const hotspotText = ` ${roundedHotspotX} ${roundedHotspotY}, ${fallbackCursorName}`;
       let cursorValue = `url("${url}")${hotspotText}`;
-      const css = System26.CSS;
+      const css = System27.CSS;
       if (url2x !== "" && css !== void 0 && typeof css.supports === "function") {
         const imageSetValue = `-webkit-image-set(url("${url}") 1x, url("${url2x}") 2x)${hotspotText}`;
         if (css.supports("cursor", imageSetValue)) {
@@ -19049,9 +19247,9 @@ void main() {
       }
       this.#imageCursorValues.set(name, cursorValue);
       if (!_PointerCursor.isCoarsePointer()) {
-        const devicePixelRatio = System26.devicePixelRatio || 1;
+        const devicePixelRatio = System27.devicePixelRatio || 1;
         const preloadUrl = url2x !== "" && devicePixelRatio > 1 ? url2x : url;
-        const image = new System26.Image();
+        const image = new System27.Image();
         image.src = preloadUrl;
       }
     }
@@ -19102,10 +19300,10 @@ void main() {
      * @returns { boolean } 주된 손이 손가락이면 참.
      */
     static isCoarsePointer() {
-      if (typeof System26.matchMedia !== "function") {
+      if (typeof System27.matchMedia !== "function") {
         return false;
       }
-      const mediaQueryList = System26.matchMedia("(pointer: coarse)");
+      const mediaQueryList = System27.matchMedia("(pointer: coarse)");
       return mediaQueryList.matches;
     }
     //==============================================================================
@@ -19116,7 +19314,7 @@ void main() {
      * @returns { HTMLCanvasElement | null } 엔진의 캔버스. (엔진이 없으면 null)
      */
     static readEngineCanvas() {
-      const engine = System26.vanillaEngine;
+      const engine = System27.vanillaEngine;
       if (!engine) {
         return null;
       }
@@ -19126,14 +19324,14 @@ void main() {
   };
 
   // src/core/engine.js
-  var System27 = globalThis;
+  var System28 = globalThis;
   var FRAME_LIMIT_TOLERANCE_MILLISECONDS = 4;
   var FRAME_LIMIT_RESYNC_MILLISECONDS = 1;
   var COMPATIBILITY_MOUSE_MILLISECONDS = 800;
   var MOUSE_DEVICE_MOVE_THRESHOLD = 6;
   var DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
   var CAPTURE_FRAME_MILLISECONDS = 1e3 / 60;
-  var PageEvent = System27.Object.freeze({
+  var PageEvent = System28.Object.freeze({
     hidden: "hidden",
     // 페이지가 가려짐. (다른 탭, 앱 전환)
     visible: "visible",
@@ -19310,13 +19508,13 @@ void main() {
     constructor(engineConfiguration) {
       super();
       if (engineConfiguration === null || engineConfiguration === void 0 || engineConfiguration instanceof EngineConfiguration === false) {
-        throw new System27.Error(`engineConfiguration is invalid.`);
+        throw new System28.Error(`engineConfiguration is invalid.`);
       }
       this.#engineConfiguration = engineConfiguration;
       this.#platform = new Platform();
       this.#modalDialogList = [];
       if (engineConfiguration.title !== "") {
-        System27.document.title = engineConfiguration.title;
+        System28.document.title = engineConfiguration.title;
       }
       const canvasId = this.#engineConfiguration.canvasId;
       const canvas = this.#platform.getOrAddCanvas(canvasId);
@@ -19338,12 +19536,12 @@ void main() {
       this.#frameLimitFramePerSecond = 0;
       this.#statisticsTextRect = Rect.zero();
       this.#version = Version.create(0, 3, 2);
-      this.#frameCaptureRequests = new System27.Map();
+      this.#frameCaptureRequests = new System28.Map();
       this.#isCaptureTimeStepFixed = false;
       this.#isExitRequested = false;
-      this.#isPageHidden = System27.document.visibilityState === "hidden";
+      this.#isPageHidden = System28.document.visibilityState === "hidden";
       this.#pageEventListeners = [];
-      System27.vanillaEngine = this;
+      System28.vanillaEngine = this;
       this.setupAllDocumentEvents();
       this.resize();
       this.requestFrameCapturesFromUrl();
@@ -19356,25 +19554,25 @@ void main() {
      */
     run(scene) {
       if (scene === null || scene === void 0 || scene instanceof Scene === false) {
-        throw new System27.Error(`scene is invalid.`);
+        throw new System28.Error(`scene is invalid.`);
       }
       const startEngine = /* @__PURE__ */ __name(() => {
         const sceneManager = this.getSceneManager();
         sceneManager.loadScene(scene).catch((error) => {
           console.error(error);
         });
-        System27.window.addEventListener("resize", this.#resizeCallback);
-        if (System27.window.visualViewport) {
-          System27.window.visualViewport.addEventListener("resize", this.#resizeCallback);
-          System27.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+        System28.window.addEventListener("resize", this.#resizeCallback);
+        if (System28.window.visualViewport) {
+          System28.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+          System28.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
         }
         ++this.#frameNumber;
-        System27.window.requestAnimationFrame(this.#updateEngineCallback);
+        System28.window.requestAnimationFrame(this.#updateEngineCallback);
       }, "startEngine");
       startEngine();
       const engineConfiguration = this.getEngineConfiguration();
-      if (engineConfiguration.rebakeTextOnFontLoad && System27.document.fonts) {
-        System27.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
+      if (engineConfiguration.rebakeTextOnFontLoad && System28.document.fonts) {
+        System28.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
           const graphic = this.getGraphic();
           const textStringTextureCache = graphic.getTextStringTextureCache();
           textStringTextureCache.invalidateFontFaces(fontFaceSetLoadEvent.fontfaces);
@@ -19416,13 +19614,13 @@ void main() {
       const engineConfiguration = this.getEngineConfiguration();
       const viewManager = this.getViewManager();
       if (engineConfiguration.autoResizeOnWindowResize) {
-        const visualViewport = System27.window.visualViewport;
-        const clientWidth = visualViewport ? visualViewport.width : System27.window.innerWidth;
-        let clientHeight = visualViewport ? visualViewport.height : System27.window.innerHeight;
+        const visualViewport = System28.window.visualViewport;
+        const clientWidth = visualViewport ? visualViewport.width : System28.window.innerWidth;
+        let clientHeight = visualViewport ? visualViewport.height : System28.window.innerHeight;
         const appliedClientNativeSize = this.#appliedClientNativeSize;
         const isTextInputFocused = this.isTextInputFocused();
         if (engineConfiguration.ignoreVirtualKeyboardResize && isTextInputFocused && appliedClientNativeSize !== null) {
-          const isSameWidth = System27.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
+          const isSameWidth = System28.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
           if (isSameWidth && clientHeight < appliedClientNativeSize.y) {
             clientHeight = appliedClientNativeSize.y;
           }
@@ -19432,10 +19630,10 @@ void main() {
         const canvas = viewManager.getCanvas();
         const maxCanvasAspectRatio = engineConfiguration.maxCanvasAspectRatio;
         if (maxCanvasAspectRatio > 0) {
-          const canvasWidth = System27.Math.floor(System27.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
-          const canvasHeight = System27.Math.floor(System27.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
-          const canvasLeft = System27.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
-          const canvasTop = System27.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
+          const canvasWidth = System28.Math.floor(System28.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
+          const canvasHeight = System28.Math.floor(System28.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
+          const canvasLeft = System28.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
+          const canvasTop = System28.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
           canvas.style.width = `${canvasWidth}px`;
           canvas.style.height = `${canvasHeight}px`;
           canvas.style.marginLeft = `${canvasLeft}px`;
@@ -19469,7 +19667,7 @@ void main() {
      * @returns { boolean } 글자 입력칸이 포커스되어 있으면 참.
      */
     isTextInputFocused() {
-      const activeElement = System27.document.activeElement;
+      const activeElement = System28.document.activeElement;
       if (!activeElement) {
         return false;
       }
@@ -19504,7 +19702,7 @@ void main() {
           inputManager2.clear();
         }
       }, "recoverEngineState");
-      System27.document.addEventListener("resume", () => {
+      System28.document.addEventListener("resume", () => {
         console.log(`[Engine] resume: persisted`);
         recoverEngineState();
         const sceneManager = this.getSceneManager();
@@ -19513,7 +19711,7 @@ void main() {
           loadedScene.onPageProcessRestored();
         }
       });
-      System27.window.addEventListener("pageshow", (pageTransitionEvent) => {
+      System28.window.addEventListener("pageshow", (pageTransitionEvent) => {
         if (pageTransitionEvent.persisted) {
           console.log(`[Engine] pageshow: persisted`);
           recoverEngineState();
@@ -19524,8 +19722,8 @@ void main() {
           }
         }
       });
-      System27.document.addEventListener("visibilitychange", () => {
-        if (System27.document.visibilityState === "visible") {
+      System28.document.addEventListener("visibilitychange", () => {
+        if (System28.document.visibilityState === "visible") {
           console.log(`[Engine] visibilitychange: visible`);
           recoverEngineState();
           const sceneManager = this.getSceneManager();
@@ -19537,12 +19735,12 @@ void main() {
       });
       let lastTouchTimestamp = -COMPATIBILITY_MOUSE_MILLISECONDS;
       const noteMouseDevice = /* @__PURE__ */ __name(() => {
-        if (System27.performance.now() - lastTouchTimestamp < COMPATIBILITY_MOUSE_MILLISECONDS) {
+        if (System28.performance.now() - lastTouchTimestamp < COMPATIBILITY_MOUSE_MILLISECONDS) {
           return;
         }
         inputManager.setLastInputDevice(InputDevice.mouse);
       }, "noteMouseDevice");
-      System27.document.addEventListener("keydown", (keyboardEvent) => {
+      System28.document.addEventListener("keydown", (keyboardEvent) => {
         const key = keyboardEvent.code;
         inputManager.pushKey(key);
         inputManager.setLastInputDevice(InputDevice.keyboard);
@@ -19551,7 +19749,7 @@ void main() {
           keyboardEvent.preventDefault();
         }
       });
-      System27.document.addEventListener("keyup", (keyboardEvent) => {
+      System28.document.addEventListener("keyup", (keyboardEvent) => {
         const key = keyboardEvent.code;
         inputManager.popKey(key);
       });
@@ -19574,7 +19772,7 @@ void main() {
         this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
       });
       canvas.addEventListener("mousemove", (touchEvent) => {
-        const movement = System27.Math.abs(touchEvent.movementX) + System27.Math.abs(touchEvent.movementY);
+        const movement = System28.Math.abs(touchEvent.movementX) + System28.Math.abs(touchEvent.movementY);
         if (movement >= MOUSE_DEVICE_MOVE_THRESHOLD) {
           noteMouseDevice();
         }
@@ -19599,7 +19797,7 @@ void main() {
         this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
         wheelEvent.preventDefault();
       }, { passive: false });
-      System27.window.addEventListener("mouseup", (touchEvent) => {
+      System28.window.addEventListener("mouseup", (touchEvent) => {
         const inputManager2 = this.getInputManager();
         inputManager2.setMouseButtonDown(touchEvent.button, false);
         if (!inputManager2.isTouchMoved()) {
@@ -19615,7 +19813,7 @@ void main() {
         this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
       });
       canvas.addEventListener("touchstart", (touchEvent) => {
-        lastTouchTimestamp = System27.performance.now();
+        lastTouchTimestamp = System28.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (!touch) {
@@ -19629,7 +19827,7 @@ void main() {
         touchEvent.preventDefault();
       }, { passive: false });
       canvas.addEventListener("touchmove", (touchEvent) => {
-        lastTouchTimestamp = System27.performance.now();
+        lastTouchTimestamp = System28.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (!touch) {
@@ -19639,7 +19837,7 @@ void main() {
         touchEvent.preventDefault();
       }, { passive: false });
       canvas.addEventListener("touchend", (touchEvent) => {
-        lastTouchTimestamp = System27.performance.now();
+        lastTouchTimestamp = System28.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (touch) {
@@ -19651,7 +19849,7 @@ void main() {
         inputManager2.setTouchReleased(true);
         touchEvent.preventDefault();
       }, { passive: false });
-      System27.window.addEventListener("touchmove", (touchEvent) => {
+      System28.window.addEventListener("touchmove", (touchEvent) => {
         const touch = touchEvent.changedTouches[0];
         if (!touch) {
           return;
@@ -19665,7 +19863,7 @@ void main() {
         }
       });
       canvas.addEventListener("touchcancel", (touchEvent) => {
-        lastTouchTimestamp = System27.performance.now();
+        lastTouchTimestamp = System28.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (touch) {
@@ -19676,52 +19874,52 @@ void main() {
         inputManager2.setTouchDown(false);
         inputManager2.setTouchCancelled(true);
       });
-      System27.window.addEventListener("blur", (focusEvent) => {
+      System28.window.addEventListener("blur", (focusEvent) => {
         const inputManager2 = this.getInputManager();
         inputManager2.clear();
         inputManager2.setTouchReleased(true);
         focusEvent.preventDefault();
       }, { passive: false });
       const userGestureHandler = this.resumeOnUserGesture.bind(this);
-      System27.window.addEventListener("click", userGestureHandler);
-      System27.window.addEventListener("touchstart", userGestureHandler);
-      System27.window.addEventListener("keydown", userGestureHandler);
+      System28.window.addEventListener("click", userGestureHandler);
+      System28.window.addEventListener("touchstart", userGestureHandler);
+      System28.window.addEventListener("keydown", userGestureHandler);
       if (this.#engineConfiguration.resumeAudioOnTouchEnd) {
-        System27.window.addEventListener("touchend", userGestureHandler);
-        System27.window.addEventListener("pointerup", userGestureHandler);
+        System28.window.addEventListener("touchend", userGestureHandler);
+        System28.window.addEventListener("pointerup", userGestureHandler);
       }
-      System27.window.addEventListener("focus", this.#resumeCallback);
-      System27.document.addEventListener("visibilitychange", () => {
-        if (System27.document.visibilityState === "visible") {
+      System28.window.addEventListener("focus", this.#resumeCallback);
+      System28.document.addEventListener("visibilitychange", () => {
+        if (System28.document.visibilityState === "visible") {
           this.resume();
         }
       });
-      System27.document.addEventListener("pointerlockchange", () => {
+      System28.document.addEventListener("pointerlockchange", () => {
         if (document.pointerLockElement === canvas) {
         } else {
         }
       });
-      System27.document.addEventListener("visibilitychange", () => {
-        const isHidden = System27.document.visibilityState === "hidden";
+      System28.document.addEventListener("visibilitychange", () => {
+        const isHidden = System28.document.visibilityState === "hidden";
         const pageEvent = isHidden ? PageEvent.hidden : PageEvent.visible;
         this.dispatchPageEvent(pageEvent);
       });
-      System27.window.addEventListener("blur", () => {
+      System28.window.addEventListener("blur", () => {
         this.dispatchPageEvent(PageEvent.blurred);
       });
-      System27.window.addEventListener("focus", () => {
+      System28.window.addEventListener("focus", () => {
         this.dispatchPageEvent(PageEvent.focused);
       });
-      System27.window.addEventListener("pointerdown", () => {
+      System28.window.addEventListener("pointerdown", () => {
         this.dispatchPageEvent(PageEvent.pointerDown);
       });
-      System27.window.addEventListener("gamepadconnected", (gamepadEvent) => {
+      System28.window.addEventListener("gamepadconnected", (gamepadEvent) => {
         const gamepad = gamepadEvent.gamepad;
         const inputManager2 = this.getInputManager();
         inputManager2.connectGamepad(gamepad);
         console.log(`gamepadconnected: ${gamepad.id}`);
       });
-      System27.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
+      System28.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
         const gamepad = gamepadEvent.gamepad;
         const inputManager2 = this.getInputManager();
         inputManager2.disconnectGamepad(gamepad);
@@ -19765,7 +19963,7 @@ void main() {
           }
         }
       }
-      const touchingIdentifiers = new System27.Set();
+      const touchingIdentifiers = new System28.Set();
       const touches = touchEvent.touches;
       for (let touchIndex = 0; touchIndex < touches.length; ++touchIndex) {
         touchingIdentifiers.add(touches[touchIndex].identifier);
@@ -19893,7 +20091,7 @@ void main() {
         const dueTimestamp = this.#frameLimitStartTimestamp + this.#frameLimitFrameCount * frameInterval;
         const earlyMilliseconds = dueTimestamp - timestamp;
         if (earlyMilliseconds > FRAME_LIMIT_TOLERANCE_MILLISECONDS) {
-          System27.window.requestAnimationFrame(this.#updateEngineCallback);
+          System28.window.requestAnimationFrame(this.#updateEngineCallback);
           return;
         }
         if (earlyMilliseconds < -frameInterval || earlyMilliseconds > 0 && earlyMilliseconds <= FRAME_LIMIT_RESYNC_MILLISECONDS) {
@@ -19965,7 +20163,7 @@ void main() {
       inputManager.updateFrameSnapshot();
       this.captureFrameIfRequested();
       ++this.#frameNumber;
-      System27.window.requestAnimationFrame(this.#updateEngineCallback);
+      System28.window.requestAnimationFrame(this.#updateEngineCallback);
     }
     //==============================================================================
     // 커서 보이기 설정.
@@ -20073,7 +20271,7 @@ void main() {
      */
     setMaximumFramePerSecond(maximumFramePerSecond) {
       const engineConfiguration = this.getEngineConfiguration();
-      if (typeof maximumFramePerSecond !== "number" || !System27.Number.isFinite(maximumFramePerSecond) || maximumFramePerSecond < 0) {
+      if (typeof maximumFramePerSecond !== "number" || !System28.Number.isFinite(maximumFramePerSecond) || maximumFramePerSecond < 0) {
         engineConfiguration.maximumFramePerSecond = 0;
         return;
       }
@@ -20106,7 +20304,7 @@ void main() {
     exitApplication() {
       this.#isExitRequested = true;
       try {
-        const capacitor = System27.Capacitor;
+        const capacitor = System28.Capacitor;
         if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
           capacitor.Plugins.App.exitApp();
           return;
@@ -20114,7 +20312,7 @@ void main() {
       } catch (nativeError) {
       }
       try {
-        System27.window.close();
+        System28.window.close();
       } catch (closeError) {
       }
     }
@@ -20143,7 +20341,7 @@ void main() {
      * @param { string } title 창 제목.
      */
     setTitle(title) {
-      System27.document.title = title;
+      System28.document.title = title;
     }
     //==============================================================================
     // 알림 창. (window.alert 자리, 엔진이 그린 창, 러스트 판 Engine::alert 와 같다)
@@ -20185,7 +20383,7 @@ void main() {
      * @returns { Promise<void> } 닫히면 풀린다.
      */
     alertAsync(message) {
-      return new System27.Promise((resolve) => {
+      return new System28.Promise((resolve) => {
         this.alert(message).setCallback(() => {
           resolve();
         });
@@ -20199,7 +20397,7 @@ void main() {
      * @returns { Promise<boolean> } 확인하면 참.
      */
     confirmAsync(message) {
-      return new System27.Promise((resolve) => {
+      return new System28.Promise((resolve) => {
         this.confirm(message).setCallback((result) => {
           resolve(result.isConfirmed());
         });
@@ -20214,7 +20412,7 @@ void main() {
      * @returns { Promise<string | null> } 입력한 글. (취소하면 null)
      */
     promptAsync(message, defaultValue = "") {
-      return new System27.Promise((resolve) => {
+      return new System28.Promise((resolve) => {
         this.prompt(message, defaultValue).setCallback((result) => {
           resolve(result.isConfirmed() ? result.getText() : null);
         });
@@ -20241,11 +20439,11 @@ void main() {
     #showModalDialog(kind, message, defaultValue) {
       const handle = new ModalDialogHandle();
       const viewManager = this.getViewManager();
-      if (!System27.document || !viewManager || !viewManager.getCanvas()) {
+      if (!System28.document || !viewManager || !viewManager.getCanvas()) {
         handle.finish(kind === ModalDialogKind.alert ? ModalDialogResult.confirmed("") : ModalDialogResult.cancelled());
         return handle;
       }
-      this.#modalDialogList.push(new ModalDialog(kind, System27.String(message), System27.String(defaultValue), handle, this.getPlatform().platformName));
+      this.#modalDialogList.push(new ModalDialog(kind, System28.String(message), System28.String(defaultValue), handle, this.getPlatform().platformName));
       return handle;
     }
     //==============================================================================
@@ -20280,7 +20478,7 @@ void main() {
      * @param { string } text 클립보드에 쓸 글.
      */
     writeClipboardText(text) {
-      const clipboard = System27.navigator ? System27.navigator.clipboard : void 0;
+      const clipboard = System28.navigator ? System28.navigator.clipboard : void 0;
       if (!clipboard || typeof clipboard.writeText !== "function") {
         return;
       }
@@ -20311,7 +20509,7 @@ void main() {
      * });
      */
     async readClipboardText() {
-      const clipboard = System27.navigator ? System27.navigator.clipboard : void 0;
+      const clipboard = System28.navigator ? System28.navigator.clipboard : void 0;
       if (!clipboard || typeof clipboard.readText !== "function") {
         return null;
       }
@@ -20498,8 +20696,8 @@ void main() {
      */
     requestFrameCapture(frameNumber) {
       const currentFrameNumber = this.getFrameNumber();
-      const targetFrameNumber = System27.Math.max(System27.Math.floor(frameNumber), currentFrameNumber);
-      const promise = new System27.Promise((resolve) => {
+      const targetFrameNumber = System28.Math.max(System28.Math.floor(frameNumber), currentFrameNumber);
+      const promise = new System28.Promise((resolve) => {
         let captureHandlers = this.#frameCaptureRequests.get(targetFrameNumber);
         if (captureHandlers === void 0) {
           captureHandlers = [];
@@ -20533,18 +20731,18 @@ void main() {
     // 주소 쿼리의 화면 저장 요청 걸기. (capture, captureName, captureExit)
     //==============================================================================
     requestFrameCapturesFromUrl() {
-      if (!System27.location || typeof System27.URLSearchParams !== "function") {
+      if (!System28.location || typeof System28.URLSearchParams !== "function") {
         return;
       }
-      const searchParameters = new System27.URLSearchParams(System27.location.search);
+      const searchParameters = new System28.URLSearchParams(System28.location.search);
       const captureText = searchParameters.get("capture");
       if (captureText === null) {
         return;
       }
       const frameNumbers = [];
       for (const frameText of captureText.split(",")) {
-        const frameNumber = System27.Number.parseInt(frameText.trim(), 10);
-        if (System27.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
+        const frameNumber = System28.Number.parseInt(frameText.trim(), 10);
+        if (System28.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
           frameNumbers.push(frameNumber);
         }
       }
@@ -20559,11 +20757,11 @@ void main() {
       for (const frameNumber of frameNumbers) {
         const capturePromise = this.requestFrameCapture(frameNumber);
         capturePromise.then((dataUrl) => {
-          const fileName = captureFileName.split("{frame}").join(System27.String(frameNumber));
-          const anchorElement = System27.document.createElement("a");
+          const fileName = captureFileName.split("{frame}").join(System28.String(frameNumber));
+          const anchorElement = System28.document.createElement("a");
           anchorElement.href = dataUrl;
           anchorElement.download = fileName;
-          System27.document.body.appendChild(anchorElement);
+          System28.document.body.appendChild(anchorElement);
           anchorElement.click();
           anchorElement.remove();
           const canvas = this.getCanvas();
@@ -20582,12 +20780,12 @@ void main() {
      * @returns { Engine } 마지막으로 만든 엔진. (만든 적이 없으면 undefined)
      */
     static getEngine() {
-      return System27.vanillaEngine;
+      return System28.vanillaEngine;
     }
   };
 
   // src/base/seededrandom.js
-  var System28 = globalThis;
+  var System29 = globalThis;
   var SeededRandom = class _SeededRandom extends Object2 {
     static {
       __name(this, "SeededRandom");
@@ -20653,8 +20851,8 @@ void main() {
     nextValue() {
       this.#state = this.#state + 1831565813 >>> 0;
       let mixed = this.#state;
-      mixed = System28.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
-      mixed ^= mixed + System28.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+      mixed = System29.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+      mixed ^= mixed + System29.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
       const value = ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
       return value;
     }
@@ -20679,7 +20877,7 @@ void main() {
      * @returns { number } minValue 이상 maxValue 이하의 정수.
      */
     nextInt(minValue, maxValue) {
-      const value = minValue + System28.Math.floor(this.nextValue() * (maxValue - minValue + 1));
+      const value = minValue + System29.Math.floor(this.nextValue() * (maxValue - minValue + 1));
       return value;
     }
     //==============================================================================
@@ -20725,7 +20923,7 @@ void main() {
      * @returns { number } 시드. (32 비트 부호 없는 정수, 0 이면 1)
      */
     static createDailySeed(dateNumber, baseSeed = 2654435761) {
-      const mixed = (baseSeed ^ System28.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
+      const mixed = (baseSeed ^ System29.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
       return mixed || 1;
     }
     //==============================================================================
@@ -20745,14 +20943,14 @@ void main() {
       * const sameDayValue = sameDayRandom.nextInt(1, 100);
       * console.log(boardValue === sameDayValue);
      */
-    static fromDate(date = new System28.Date(), baseSeed = 2654435761) {
+    static fromDate(date = new System29.Date(), baseSeed = 2654435761) {
       const dateNumber = date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate();
       return new _SeededRandom(_SeededRandom.createDailySeed(dateNumber, baseSeed));
     }
   };
 
   // src/effect/particlesystem.js
-  var System29 = globalThis;
+  var System30 = globalThis;
   var ParticleEmitterShape = {
     point: "point",
     // 노드 원점 한 점에서 무작위 방향.
@@ -20782,10 +20980,10 @@ void main() {
     }
     let firstCycle = 0;
     if (!isStartIncluded) {
-      firstCycle = System29.Math.max(0, System29.Math.floor((previousTime - burstTime) / loopDuration) + 1);
+      firstCycle = System30.Math.max(0, System30.Math.floor((previousTime - burstTime) / loopDuration) + 1);
     }
-    const lastCycle = System29.Math.floor((currentTime - burstTime) / loopDuration);
-    return System29.Math.max(0, lastCycle - firstCycle + 1);
+    const lastCycle = System30.Math.floor((currentTime - burstTime) / loopDuration);
+    return System30.Math.max(0, lastCycle - firstCycle + 1);
   }
   __name(countBurstFires, "countBurstFires");
   var ParticleSystem = class extends Component {
@@ -21066,7 +21264,7 @@ void main() {
         if (this.#attractorPosition) {
           const toCenterX = this.#attractorPosition.x - particle.x;
           const toCenterY = this.#attractorPosition.y - particle.y;
-          const centerDistance = System29.Math.max(System29.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
+          const centerDistance = System30.Math.max(System30.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
           const directionX = toCenterX / centerDistance;
           const directionY = toCenterY / centerDistance;
           particle.velocityX += directionX * this.#attractorStrength * timeDelta;
@@ -21075,7 +21273,7 @@ void main() {
           particle.velocityY += directionX * this.#attractorSwirl * timeDelta;
         }
         if (this.#damping > 0) {
-          const dampingBlend = System29.Math.max(0, 1 - this.#damping * timeDelta);
+          const dampingBlend = System30.Math.max(0, 1 - this.#damping * timeDelta);
           particle.velocityX *= dampingBlend;
           particle.velocityY *= dampingBlend;
         }
@@ -21102,19 +21300,19 @@ void main() {
       let directionY = -1;
       const shape = this.#emitterShape;
       if (shape === ParticleEmitterShape.circle) {
-        const angle = this.randomRange(0, System29.Math.PI * 2);
-        const radius = this.#shapeRadius * System29.Math.sqrt(this.randomRange(0, 1));
-        spawnX = System29.Math.cos(angle) * radius;
-        spawnY = System29.Math.sin(angle) * radius;
-        directionX = System29.Math.cos(angle);
-        directionY = System29.Math.sin(angle);
+        const angle = this.randomRange(0, System30.Math.PI * 2);
+        const radius = this.#shapeRadius * System30.Math.sqrt(this.randomRange(0, 1));
+        spawnX = System30.Math.cos(angle) * radius;
+        spawnY = System30.Math.sin(angle) * radius;
+        directionX = System30.Math.cos(angle);
+        directionY = System30.Math.sin(angle);
       } else if (shape === ParticleEmitterShape.cone) {
-        const angle = -System29.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+        const angle = -System30.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
         const radius = this.randomRange(0, this.#shapeRadius);
-        spawnX = System29.Math.cos(angle) * radius;
-        spawnY = System29.Math.sin(angle) * radius;
-        directionX = System29.Math.cos(angle);
-        directionY = System29.Math.sin(angle);
+        spawnX = System30.Math.cos(angle) * radius;
+        spawnY = System30.Math.sin(angle) * radius;
+        directionX = System30.Math.cos(angle);
+        directionY = System30.Math.sin(angle);
       } else if (shape === ParticleEmitterShape.box) {
         spawnX = this.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
         spawnY = this.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
@@ -21122,9 +21320,9 @@ void main() {
         spawnX = this.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
         directionY = 1;
       } else {
-        const angle = this.randomRange(0, System29.Math.PI * 2);
-        directionX = System29.Math.cos(angle);
-        directionY = System29.Math.sin(angle);
+        const angle = this.randomRange(0, System30.Math.PI * 2);
+        directionX = System30.Math.cos(angle);
+        directionY = System30.Math.sin(angle);
       }
       if (originOffset) {
         spawnX += originOffset.x;
@@ -21148,7 +21346,7 @@ void main() {
       particle.size = this.randomRange(this.#startSizeMin, this.#startSizeMax);
       particle.rotation = this.randomRange(this.#startRotationMin, this.#startRotationMax);
       particle.angularVelocity = this.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-      particle.wobblePhase = this.randomRange(0, System29.Math.PI * 2);
+      particle.wobblePhase = this.randomRange(0, System30.Math.PI * 2);
       particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
       particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
       particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -21181,8 +21379,8 @@ void main() {
             break;
           }
         }
-        const keySpan = System29.Math.max(nextKey.time - previousKey.time, 1e-4);
-        const keyBlend = System29.Math.max(0, System29.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
+        const keySpan = System30.Math.max(nextKey.time - previousKey.time, 1e-4);
+        const keyBlend = System30.Math.max(0, System30.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
         red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
         green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
         blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
@@ -21191,7 +21389,7 @@ void main() {
       outChannels[0] = red;
       outChannels[1] = green;
       outChannels[2] = blue;
-      outChannels[3] = System29.Math.max(0, System29.Math.min(1, alpha));
+      outChannels[3] = System30.Math.max(0, System30.Math.min(1, alpha));
     }
     //==============================================================================
     // 출력. (정점 색 배치, 파티클 수와 무관하게 시스템당 드로우 한 번)
@@ -21256,16 +21454,16 @@ void main() {
       for (const particle of this.#particleList) {
         const lifeRatio = particle.age / particle.lifetime;
         const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-        const drawSize = System29.Math.max(0.1, particle.size * sizeScale);
+        const drawSize = System30.Math.max(0.1, particle.size * sizeScale);
         this.evaluateColorChannels(particle, lifeRatio, colorChannels);
         let drawX = particle.x + baseOffsetX;
         const drawY = particle.y + baseOffsetY;
         if (this.#wobbleAmplitude > 0) {
-          drawX += System29.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+          drawX += System30.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
         }
         if (isStreak) {
-          const speed = System29.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
-          const safeSpeed = System29.Math.max(speed, 1e-3);
+          const speed = System30.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
+          const safeSpeed = System30.Math.max(speed, 1e-3);
           const directionX = particle.velocityX / safeSpeed;
           const directionY = particle.velocityY / safeSpeed;
           const tailX = drawX - particle.velocityX * this.#streakScale;
@@ -21281,8 +21479,8 @@ void main() {
           writeVertex(tailX + sideX, tailY + sideY, 0, 1);
         } else if (isRect && particle.rotation !== 0) {
           const halfSize = drawSize * 0.5;
-          const cosValue = System29.Math.cos(particle.rotation);
-          const sinValue = System29.Math.sin(particle.rotation);
+          const cosValue = System30.Math.cos(particle.rotation);
+          const sinValue = System30.Math.sin(particle.rotation);
           const axisX1 = cosValue * halfSize;
           const axisY1 = sinValue * halfSize;
           const axisX2 = -sinValue * halfSize;
@@ -21319,16 +21517,16 @@ void main() {
       for (const particle of this.#particleList) {
         const lifeRatio = particle.age / particle.lifetime;
         const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-        const drawSize = System29.Math.max(0.1, particle.size * sizeScale);
+        const drawSize = System30.Math.max(0.1, particle.size * sizeScale);
         let drawX = particle.x + baseOffsetX;
         const drawY = particle.y + baseOffsetY;
         if (this.#wobbleAmplitude > 0) {
-          drawX += System29.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+          drawX += System30.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
         }
         graphic.pushState();
         graphic.translate(drawX, drawY);
         graphic.rotate(particle.rotation);
-        graphic.multiplyGlobalAlpha(System29.Math.max(0, System29.Math.min(1, particle.alpha * (1 - lifeRatio))));
+        graphic.multiplyGlobalAlpha(System30.Math.max(0, System30.Math.min(1, particle.alpha * (1 - lifeRatio))));
         const image = this.#image;
         graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
         graphic.popState();
@@ -21768,8 +21966,8 @@ void main() {
         this.setWorldSpace(description.worldSpace);
       }
       if (description.imageDataUrl !== void 0) {
-        if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System29.Image === "function") {
-          const imageElement = new System29.Image();
+        if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System30.Image === "function") {
+          const imageElement = new System30.Image();
           imageElement.src = description.imageDataUrl;
           this.setImage(imageElement);
         } else {
@@ -21891,7 +22089,7 @@ void main() {
   };
 
   // src/web/pane.js
-  var System30 = globalThis;
+  var System31 = globalThis;
   var PaneTheme = {
     color: {
       background: "#1e1e1e",
@@ -21945,7 +22143,7 @@ void main() {
      * @returns { HTMLElement } 만든 엘리먼트.
      */
     static create(tagName, preset = "", options = {}) {
-      const el = System30.document.createElement(tagName);
+      const el = System31.document.createElement(tagName);
       if (options.id) el.id = options.id;
       if (options.text) el.innerText = options.text;
       if (options.type) el.type = options.type;
@@ -22112,7 +22310,7 @@ void main() {
     //==============================================================================
     /** @private */
     #createContainer() {
-      this.#container = System30.document.createElement("div");
+      this.#container = System31.document.createElement("div");
       this.#container.style.position = "absolute";
       this.#container.style.overflow = "hidden";
       this.#container.style.boxSizing = "border-box";
@@ -22141,7 +22339,7 @@ void main() {
     //==============================================================================
     /** @private */
     #createResizer(prev, next) {
-      const resizer = System30.document.createElement("div");
+      const resizer = System31.document.createElement("div");
       resizer.style.position = "absolute";
       resizer.style.backgroundColor = PaneTheme.color.resizer;
       resizer.style.zIndex = "1000";
@@ -22172,10 +22370,10 @@ void main() {
           const grabRect = resizer.getBoundingClientRect();
           this.#resizeGrabOffset = this.#direction === "horizontal" ? e.clientX - grabRect.left : e.clientY - grabRect.top;
           resizer.style.backgroundColor = PaneTheme.color.resizerHover;
-          System30.document.body.style.cursor = resizer.style.cursor;
-          System30.document.body.style.userSelect = "none";
-          System30.document.addEventListener("mousemove", this.#onMouseMoveBind);
-          System30.document.addEventListener("mouseup", this.#onMouseUpBind);
+          System31.document.body.style.cursor = resizer.style.cursor;
+          System31.document.body.style.userSelect = "none";
+          System31.document.addEventListener("mousemove", this.#onMouseMoveBind);
+          System31.document.addEventListener("mouseup", this.#onMouseUpBind);
         });
       }
       resizer.dataset.thickness = thickness;
@@ -22209,10 +22407,10 @@ void main() {
     /** @private */
     #onMouseUp() {
       this.#isResizing = false;
-      System30.document.body.style.cursor = "default";
-      System30.document.body.style.userSelect = "auto";
-      System30.document.removeEventListener("mousemove", this.#onMouseMoveBind);
-      System30.document.removeEventListener("mouseup", this.#onMouseUpBind);
+      System31.document.body.style.cursor = "default";
+      System31.document.body.style.userSelect = "auto";
+      System31.document.removeEventListener("mousemove", this.#onMouseMoveBind);
+      System31.document.removeEventListener("mouseup", this.#onMouseUpBind);
       for (const r of this.#resizers) r.style.backgroundColor = PaneTheme.color.resizer;
     }
     //==============================================================================
@@ -22305,7 +22503,7 @@ void main() {
     refresh() {
       const p = this.#container.parentElement;
       if (!p) return;
-      this.updateLayout(0, 0, p.clientWidth || System30.window.innerWidth, p.clientHeight || System30.window.innerHeight);
+      this.updateLayout(0, 0, p.clientWidth || System31.window.innerWidth, p.clientHeight || System31.window.innerHeight);
     }
     //==============================================================================
     // 부모 요소에 붙이기. (창 크기가 바뀔 때마다 다시 배치한다)
@@ -22316,9 +22514,9 @@ void main() {
     attachTo(p) {
       p.appendChild(this.#container);
       const run = /* @__PURE__ */ __name(() => this.refresh(), "run");
-      System30.window.addEventListener("resize", run);
+      System31.window.addEventListener("resize", run);
       run();
-      System30.requestAnimationFrame(run);
+      System31.requestAnimationFrame(run);
     }
     //==============================================================================
     // 보이기 / 숨기기. (숨긴 패널은 자리를 차지하지 않고, 맞닿은 리사이저도 숨는다)
@@ -22435,7 +22633,7 @@ void main() {
   };
 
   // tools/common/editorkit.js
-  var System31 = globalThis;
+  var System32 = globalThis;
   var EditorTheme = {
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", Roboto, sans-serif',
     accentColor: "#d4b06a",
@@ -22481,15 +22679,15 @@ void main() {
   }
   __name(setEditorCommandHandler, "setEditorCommandHandler");
   function applyEditorTheme() {
-    for (const colorName of System31.Object.keys(EDITOR_PANE_COLORS)) {
+    for (const colorName of System32.Object.keys(EDITOR_PANE_COLORS)) {
       PaneTheme.color[colorName] = EDITOR_PANE_COLORS[colorName];
     }
     PaneTheme.size.resizer = 3;
     PaneTheme.font.family = EditorTheme.fontFamily;
     PaneTheme.font.size = "13px";
-    const editorStyleElement = System31.document.createElement("style");
+    const editorStyleElement = System32.document.createElement("style");
     editorStyleElement.innerText = "* { scrollbar-width: thin; scrollbar-color: rgba(121, 121, 121, 0.4) transparent; }::-webkit-scrollbar { width: 10px; height: 10px; }::-webkit-scrollbar-track { background: transparent; }::-webkit-scrollbar-thumb { background: rgba(121, 121, 121, 0.4); }::-webkit-scrollbar-thumb:hover { background: rgba(121, 121, 121, 0.7); }::-webkit-scrollbar-corner { background: transparent; }input[type=checkbox] { accent-color: " + EditorTheme.accentColor + "; }body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }";
-    System31.document.head.appendChild(editorStyleElement);
+    System32.document.head.appendChild(editorStyleElement);
   }
   __name(applyEditorTheme, "applyEditorTheme");
   function wrapEditorIconMarkup(shapeMarkup) {
@@ -22537,7 +22735,7 @@ void main() {
   }
   __name(setEditorHeaderIconActive, "setEditorHeaderIconActive");
   function createEditorMenuPanelElement(menuItems) {
-    const panelElement = System31.document.createElement("div");
+    const panelElement = System32.document.createElement("div");
     panelElement.id = "editorMenuPanel";
     panelElement.style.cssText = "position:fixed;z-index:9999;min-width:196px;padding:4px 0;background:" + PaneTheme.color.toolbar + ";border:1px solid " + PaneTheme.color.border + ";border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,0.5);font-size:13px;color:" + PaneTheme.color.text + ";font-family:" + PaneTheme.font.family + ";";
     panelElement.addEventListener("mousedown", (mouseEvent) => {
@@ -22545,24 +22743,24 @@ void main() {
     });
     for (const menuItem of menuItems) {
       if (menuItem.separator) {
-        const separatorElement = System31.document.createElement("div");
+        const separatorElement = System32.document.createElement("div");
         separatorElement.style.cssText = "height:1px;margin:4px 8px;background:" + PaneTheme.color.border + ";";
         panelElement.appendChild(separatorElement);
         continue;
       }
-      const itemElement = System31.document.createElement("div");
+      const itemElement = System32.document.createElement("div");
       itemElement.style.cssText = "display:flex;align-items:center;padding:5px 12px 5px 8px;cursor:pointer;white-space:nowrap;";
-      const checkElement = System31.document.createElement("span");
+      const checkElement = System32.document.createElement("span");
       checkElement.style.cssText = "width:16px;flex:0 0 16px;color:" + EditorTheme.accentColor + ";";
       const isChecked = editorIsCommandChecked ? editorIsCommandChecked(menuItem.id) : false;
       checkElement.innerText = isChecked ? "\u2713" : "";
       itemElement.appendChild(checkElement);
-      const labelElement = System31.document.createElement("span");
+      const labelElement = System32.document.createElement("span");
       labelElement.style.cssText = "flex:1;";
       labelElement.innerText = menuItem.label;
       itemElement.appendChild(labelElement);
       if (menuItem.shortcut) {
-        const shortcutElement = System31.document.createElement("span");
+        const shortcutElement = System32.document.createElement("span");
         shortcutElement.style.cssText = "margin-left:24px;color:" + PaneTheme.color.textDim + ";font-size:12px;";
         shortcutElement.innerText = menuItem.shortcut;
         itemElement.appendChild(shortcutElement);
@@ -22591,22 +22789,22 @@ void main() {
   function openEditorMenuPanelAt(clientX, clientY, menuItems) {
     closeEditorMenuPanel();
     const panelElement = createEditorMenuPanelElement(menuItems);
-    panelElement.style.left = System31.Math.round(clientX) + "px";
-    panelElement.style.top = System31.Math.round(clientY) + "px";
-    System31.document.body.appendChild(panelElement);
+    panelElement.style.left = System32.Math.round(clientX) + "px";
+    panelElement.style.top = System32.Math.round(clientY) + "px";
+    System32.document.body.appendChild(panelElement);
     const panelRect = panelElement.getBoundingClientRect();
-    const viewportWidth = System31.document.documentElement.clientWidth;
-    const viewportHeight = System31.document.documentElement.clientHeight;
+    const viewportWidth = System32.document.documentElement.clientWidth;
+    const viewportHeight = System32.document.documentElement.clientHeight;
     if (panelRect.right > viewportWidth) {
-      panelElement.style.left = System31.Math.max(0, System31.Math.floor(viewportWidth - panelRect.width)) + "px";
+      panelElement.style.left = System32.Math.max(0, System32.Math.floor(viewportWidth - panelRect.width)) + "px";
     }
     if (panelRect.bottom > viewportHeight) {
-      panelElement.style.top = System31.Math.max(0, System31.Math.floor(viewportHeight - panelRect.height)) + "px";
+      panelElement.style.top = System32.Math.max(0, System32.Math.floor(viewportHeight - panelRect.height)) + "px";
     }
   }
   __name(openEditorMenuPanelAt, "openEditorMenuPanelAt");
   function closeEditorMenuPanel() {
-    const existingPanel = System31.document.getElementById("editorMenuPanel");
+    const existingPanel = System32.document.getElementById("editorMenuPanel");
     if (existingPanel) {
       existingPanel.remove();
     }
@@ -22616,8 +22814,8 @@ void main() {
   }
   __name(closeEditorMenuPanel, "closeEditorMenuPanel");
   var openMenuCloseHandler = null;
-  System31.window.addEventListener("mousedown", () => {
-    const openedPanel = System31.document.getElementById("editorMenuPanel");
+  System32.window.addEventListener("mousedown", () => {
+    const openedPanel = System32.document.getElementById("editorMenuPanel");
     if (openedPanel || openMenuCloseHandler) {
       closeEditorMenuPanel();
     }
@@ -22646,9 +22844,9 @@ void main() {
       const titleElement = menuTitleElementList[menuIndex];
       const titleRect = titleElement.getBoundingClientRect();
       const panelElement = createEditorMenuPanelElement(menuDefinitions[menuIndex].items);
-      panelElement.style.left = System31.Math.round(titleRect.left) + "px";
-      panelElement.style.top = System31.Math.round(titleRect.bottom) + "px";
-      System31.document.body.appendChild(panelElement);
+      panelElement.style.left = System32.Math.round(titleRect.left) + "px";
+      panelElement.style.top = System32.Math.round(titleRect.bottom) + "px";
+      System32.document.body.appendChild(panelElement);
       titleElement.style.backgroundColor = EditorTheme.menuHoverColor;
       openMenuIndex = menuIndex;
       openMenuCloseHandler = closeDropdown;
@@ -22901,7 +23099,7 @@ void main() {
   }
   __name(decorateEditorInputElement, "decorateEditorInputElement");
   function createEditorButtonElement(labelText, isPrimary) {
-    const buttonElement = System31.document.createElement("div");
+    const buttonElement = System32.document.createElement("div");
     buttonElement.innerText = labelText;
     buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;border:1px solid " + PaneTheme.color.border + ";" + (isPrimary ? "background:" + EditorTheme.accentColor + ";color:" + EditorTheme.onAccentTextColor + ";border-color:" + EditorTheme.accentColor + ";" : "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";");
     buttonElement.addEventListener("mouseenter", () => {
@@ -23029,8 +23227,8 @@ void main() {
   }
   __name(createEditorPropertyRowElement, "createEditorPropertyRowElement");
   function composeEditorNumberText(value) {
-    const isInteger = System31.Math.abs(value - System31.Math.round(value)) < 1e-4;
-    return isInteger ? String(System31.Math.round(value)) : value.toFixed(2);
+    const isInteger = System32.Math.abs(value - System32.Math.round(value)) < 1e-4;
+    return isInteger ? String(System32.Math.round(value)) : value.toFixed(2);
   }
   __name(composeEditorNumberText, "composeEditorNumberText");
   function appendEditorNumberRow(parentElement, labelText, currentValue, stepAmount, applyCallback, beginEditCallback) {
@@ -23040,8 +23238,8 @@ void main() {
     inputElement.style.width = "100%";
     inputElement.value = composeEditorNumberText(currentValue);
     const commitValue = /* @__PURE__ */ __name(() => {
-      const parsedValue = System31.Number(inputElement.value);
-      if (System31.Number.isFinite(parsedValue)) {
+      const parsedValue = System32.Number(inputElement.value);
+      if (System32.Number.isFinite(parsedValue)) {
         if (beginEditCallback) {
           beginEditCallback();
         }
@@ -23062,24 +23260,24 @@ void main() {
     labelElement.addEventListener("mousedown", (mouseEvent) => {
       mouseEvent.preventDefault();
       const startX = mouseEvent.clientX;
-      const startValue = System31.Number(inputElement.value) || 0;
+      const startValue = System32.Number(inputElement.value) || 0;
       if (beginEditCallback) {
         beginEditCallback();
       }
       const onMouseMove = /* @__PURE__ */ __name((moveEvent) => {
         let nextValue = startValue + (moveEvent.clientX - startX) * stepAmount;
         if (stepAmount >= 1) {
-          nextValue = System31.Math.round(nextValue);
+          nextValue = System32.Math.round(nextValue);
         }
         inputElement.value = composeEditorNumberText(nextValue);
         applyCallback(nextValue);
       }, "onMouseMove");
       const onMouseUp = /* @__PURE__ */ __name(() => {
-        System31.window.removeEventListener("mousemove", onMouseMove);
-        System31.window.removeEventListener("mouseup", onMouseUp);
+        System32.window.removeEventListener("mousemove", onMouseMove);
+        System32.window.removeEventListener("mouseup", onMouseUp);
       }, "onMouseUp");
-      System31.window.addEventListener("mousemove", onMouseMove);
-      System31.window.addEventListener("mouseup", onMouseUp);
+      System32.window.addEventListener("mousemove", onMouseMove);
+      System32.window.addEventListener("mouseup", onMouseUp);
     });
     rowElement.appendChild(inputElement);
     return rowElement;
@@ -23117,8 +23315,8 @@ void main() {
     alphaInputElement.style.width = "100%";
     alphaInputElement.value = alphaValue.toFixed(2);
     const commitColor = /* @__PURE__ */ __name(() => {
-      const parsedAlpha = System31.Number(alphaInputElement.value);
-      const clampedAlpha = System31.Number.isFinite(parsedAlpha) ? System31.Math.max(0, System31.Math.min(1, parsedAlpha)) : alphaValue;
+      const parsedAlpha = System32.Number(alphaInputElement.value);
+      const clampedAlpha = System32.Number.isFinite(parsedAlpha) ? System32.Math.max(0, System32.Math.min(1, parsedAlpha)) : alphaValue;
       if (beginEditCallback) {
         beginEditCallback();
       }
@@ -23136,7 +23334,7 @@ void main() {
   __name(appendEditorColorRow, "appendEditorColorRow");
   function appendEditorBooleanRow(parentElement, labelText, currentValue, changeHandler, beginEditCallback) {
     const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const checkElement = System31.document.createElement("input");
+    const checkElement = System32.document.createElement("input");
     checkElement.type = "checkbox";
     checkElement.checked = currentValue;
     checkElement.style.cssText = "width:14px;height:14px;accent-color:" + EditorTheme.accentColor + ";cursor:pointer;";
@@ -23152,10 +23350,10 @@ void main() {
   __name(appendEditorBooleanRow, "appendEditorBooleanRow");
   function appendEditorSelectRow(parentElement, labelText, optionList, currentValue, changeHandler) {
     const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const selectElement = System31.document.createElement("select");
+    const selectElement = System32.document.createElement("select");
     selectElement.style.cssText = "flex:1;min-width:0;height:24px;box-sizing:border-box;padding:0 4px;font-family:" + EditorTheme.fontFamily + ";font-size:13px;border-radius:3px;outline:none;background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";border:1px solid " + EditorTheme.borderColor + ";cursor:pointer;";
     for (const optionValue of optionList) {
-      const optionElement = System31.document.createElement("option");
+      const optionElement = System32.document.createElement("option");
       optionElement.value = optionValue;
       optionElement.textContent = optionValue;
       selectElement.appendChild(optionElement);
@@ -23169,29 +23367,29 @@ void main() {
   }
   __name(appendEditorSelectRow, "appendEditorSelectRow");
   function openEditorInputDialog(titleText, labelText, currentText, acceptHandler, acceptLabelText = "Save") {
-    const existingDialog = System31.document.getElementById("editorDialog");
+    const existingDialog = System32.document.getElementById("editorDialog");
     if (existingDialog) {
       existingDialog.remove();
     }
-    const backdropElement = System31.document.createElement("div");
+    const backdropElement = System32.document.createElement("div");
     backdropElement.id = "editorDialog";
     backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-family:" + PaneTheme.font.family + ";";
-    const panelElement = System31.document.createElement("div");
+    const panelElement = System32.document.createElement("div");
     panelElement.style.cssText = "min-width:340px;padding:16px 18px 14px 18px;border-radius:6px;background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
-    const titleElement = System31.document.createElement("div");
+    const titleElement = System32.document.createElement("div");
     titleElement.innerText = titleText;
     titleElement.style.cssText = "font-size:14px;font-weight:bold;color:" + EditorTheme.accentColor + ";margin-bottom:12px;";
     panelElement.appendChild(titleElement);
-    const fieldLabelElement = System31.document.createElement("div");
+    const fieldLabelElement = System32.document.createElement("div");
     fieldLabelElement.innerText = labelText;
     fieldLabelElement.style.cssText = "font-size:12px;color:" + PaneTheme.color.textDim + ";margin-bottom:4px;";
     panelElement.appendChild(fieldLabelElement);
-    const inputElement = System31.document.createElement("input");
+    const inputElement = System32.document.createElement("input");
     inputElement.type = "text";
     inputElement.value = currentText;
     inputElement.style.cssText = "width:100%;box-sizing:border-box;padding:6px 8px;font-size:14px;border-radius:3px;background:" + PaneTheme.color.inputBg + ";border:1px solid " + PaneTheme.color.border + ";color:" + PaneTheme.color.text + ";outline:none;";
     panelElement.appendChild(inputElement);
-    const buttonRowElement = System31.document.createElement("div");
+    const buttonRowElement = System32.document.createElement("div");
     buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
     const cancelElement = createEditorButtonElement("Cancel", false);
     const acceptElement = createEditorButtonElement(acceptLabelText, true);
@@ -23199,7 +23397,7 @@ void main() {
     buttonRowElement.appendChild(acceptElement);
     panelElement.appendChild(buttonRowElement);
     backdropElement.appendChild(panelElement);
-    System31.document.body.appendChild(backdropElement);
+    System32.document.body.appendChild(backdropElement);
     inputElement.focus();
     inputElement.select();
     const closeDialog = /* @__PURE__ */ __name(() => {
@@ -23244,7 +23442,7 @@ void main() {
   __name(buildEditorWindowLayout, "buildEditorWindowLayout");
 
   // tools/particleeditor/particleeditor.js
-  var System32 = globalThis;
+  var System33 = globalThis;
   var ICON_SHAPES = {
     preset: "<circle cx='7' cy='7' r='2.2' fill='currentColor'/><circle cx='3' cy='3.6' r='1.2' fill='currentColor' opacity='0.7'/><circle cx='11.2' cy='4.4' r='1' fill='currentColor' opacity='0.55'/><circle cx='10.4' cy='10.8' r='1.3' fill='currentColor' opacity='0.7'/><circle cx='3.4' cy='10.4' r='0.9' fill='currentColor' opacity='0.5'/>",
     system: "<path d='M7 1.8l5.2 5.2-5.2 5.2-5.2-5.2z' fill='none' stroke='currentColor' stroke-width='1.5'/><circle cx='7' cy='7' r='1.6' fill='currentColor'/>"
@@ -23487,15 +23685,15 @@ void main() {
     }
   ];
   function composeHexText(channels) {
-    const toByte = /* @__PURE__ */ __name((value) => System32.Math.round(value * 255).toString(16).padStart(2, "0"), "toByte");
+    const toByte = /* @__PURE__ */ __name((value) => System33.Math.round(value * 255).toString(16).padStart(2, "0"), "toByte");
     return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]);
   }
   __name(composeHexText, "composeHexText");
   function parseHexChannels(hexText, alphaValue) {
     return [
-      System32.parseInt(hexText.substring(1, 3), 16) / 255,
-      System32.parseInt(hexText.substring(3, 5), 16) / 255,
-      System32.parseInt(hexText.substring(5, 7), 16) / 255,
+      System33.parseInt(hexText.substring(1, 3), 16) / 255,
+      System33.parseInt(hexText.substring(3, 5), 16) / 255,
+      System33.parseInt(hexText.substring(5, 7), 16) / 255,
       alphaValue
     ];
   }
@@ -23632,7 +23830,7 @@ void main() {
       const presetPane = new Pane({ size: 320, minSize: 120 });
       const presetElement = createEditorSectionElement("PRESETS", () => {
         const menuItems = [];
-        for (const presetName of System32.Object.keys(PRESET_TABLE)) {
+        for (const presetName of System33.Object.keys(PRESET_TABLE)) {
           menuItems.push({
             id: "addPreset." + presetName,
             label: "Add " + presetName,
@@ -23645,7 +23843,7 @@ void main() {
       });
       const presetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
       const presetIconMarkup = wrapEditorIconMarkup(ICON_SHAPES.preset);
-      for (const presetName of System32.Object.keys(PRESET_TABLE)) {
+      for (const presetName of System33.Object.keys(PRESET_TABLE)) {
         const rowElement = createEditorListRowElement(presetIconMarkup, presetName);
         rowElement.addEventListener("click", () => {
           this.addSystemFromPreset(presetName);
@@ -23746,8 +23944,8 @@ void main() {
       const windowLayout = buildEditorWindowLayout(MENU_DEFINITIONS, mainPane);
       const rootPane = windowLayout.rootPane;
       this.#statusTextElement = windowLayout.statusTextElement;
-      rootPane.attachTo(System32.document.body);
-      this.#fileInputElement = System32.document.createElement("input");
+      rootPane.attachTo(System33.document.body);
+      this.#fileInputElement = System33.document.createElement("input");
       this.#fileInputElement.type = "file";
       this.#fileInputElement.accept = ".json";
       this.#fileInputElement.style.display = "none";
@@ -23760,8 +23958,8 @@ void main() {
         this.loadAssetText(jsonText, selectedFile.name);
         this.#fileInputElement.value = "";
       });
-      System32.document.body.appendChild(this.#fileInputElement);
-      this.#imageInputElement = System32.document.createElement("input");
+      System33.document.body.appendChild(this.#fileInputElement);
+      this.#imageInputElement = System33.document.createElement("input");
       this.#imageInputElement.type = "file";
       this.#imageInputElement.accept = "image/*";
       this.#imageInputElement.multiple = true;
@@ -23773,8 +23971,8 @@ void main() {
         this.#imageInputElement.value = "";
         this.rebuildAssetList();
       });
-      System32.document.body.appendChild(this.#imageInputElement);
-      System32.window.addEventListener("keydown", (keyboardEvent) => {
+      System33.document.body.appendChild(this.#imageInputElement);
+      System33.window.addEventListener("keydown", (keyboardEvent) => {
         const targetTag = keyboardEvent.target.tagName;
         const isTypingTarget = targetTag === "INPUT" || targetTag === "TEXTAREA" || targetTag === "SELECT";
         if (keyboardEvent.ctrlKey && keyboardEvent.altKey && keyboardEvent.key.toLowerCase() === "n") {
@@ -23881,8 +24079,8 @@ void main() {
     composeAsset() {
       const systemList = [];
       for (const systemEntry of this.#systems) {
-        const clonedDescription = System32.JSON.parse(System32.JSON.stringify(systemEntry.description));
-        systemList.push(System32.Object.assign({ name: systemEntry.name }, clonedDescription));
+        const clonedDescription = System33.JSON.parse(System33.JSON.stringify(systemEntry.description));
+        systemList.push(System33.Object.assign({ name: systemEntry.name }, clonedDescription));
       }
       return { systems: systemList };
     }
@@ -23894,13 +24092,13 @@ void main() {
      */
     saveAsset(fileName) {
       const asset = this.composeAsset();
-      const jsonText = System32.JSON.stringify(asset, null, "	");
-      const blob = new System32.Blob([jsonText], { type: "application/json" });
-      const anchorElement = System32.document.createElement("a");
-      anchorElement.href = System32.URL.createObjectURL(blob);
+      const jsonText = System33.JSON.stringify(asset, null, "	");
+      const blob = new System33.Blob([jsonText], { type: "application/json" });
+      const anchorElement = System33.document.createElement("a");
+      anchorElement.href = System33.URL.createObjectURL(blob);
       anchorElement.download = fileName;
       anchorElement.click();
-      System32.URL.revokeObjectURL(anchorElement.href);
+      System33.URL.revokeObjectURL(anchorElement.href);
       this.refreshStatus();
     }
     //==============================================================================
@@ -23911,10 +24109,10 @@ void main() {
      * @param { string } fileName
      */
     loadAssetText(jsonText, fileName) {
-      const parsedAsset = System32.JSON.parse(jsonText);
+      const parsedAsset = System33.JSON.parse(jsonText);
       this.clearSystems();
       this.#assetFileName = fileName;
-      if (System32.Array.isArray(parsedAsset.systems)) {
+      if (System33.Array.isArray(parsedAsset.systems)) {
         for (const systemDescription of parsedAsset.systems) {
           const systemName = systemDescription.name ? systemDescription.name : this.composeSystemName("System");
           this.addSystem(systemName, systemDescription);
@@ -23950,11 +24148,11 @@ void main() {
      * @param { object } overrideDescription
      */
     addSystem(systemName, overrideDescription) {
-      const description = System32.JSON.parse(System32.JSON.stringify(DEFAULT_DESCRIPTION));
+      const description = System33.JSON.parse(System33.JSON.stringify(DEFAULT_DESCRIPTION));
       if (overrideDescription) {
-        const clonedOverride = System32.JSON.parse(System32.JSON.stringify(overrideDescription));
+        const clonedOverride = System33.JSON.parse(System33.JSON.stringify(overrideDescription));
         delete clonedOverride.name;
-        System32.Object.assign(description, clonedOverride);
+        System33.Object.assign(description, clonedOverride);
       }
       const systemEntry = { name: systemName, description, node: null, particleSystem: null };
       this.#systems.push(systemEntry);
@@ -24052,7 +24250,7 @@ void main() {
         this.#emitterNode.removeChild(selectedEntry.node);
       }
       this.#systems.splice(this.#selectedIndex, 1);
-      const nextIndex = System32.Math.min(this.#selectedIndex, this.#systems.length - 1);
+      const nextIndex = System33.Math.min(this.#selectedIndex, this.#systems.length - 1);
       this.rebuildHierarchy();
       this.selectSystem(nextIndex);
     }
@@ -24111,10 +24309,10 @@ void main() {
      * @param { File } imageFile
      */
     importImageAsset(imageFile) {
-      return new System32.Promise((resolve) => {
-        const fileReader = new System32.FileReader();
+      return new System33.Promise((resolve) => {
+        const fileReader = new System33.FileReader();
         fileReader.onload = () => {
-          const imageElement = new System32.Image();
+          const imageElement = new System33.Image();
           imageElement.onload = () => {
             this.#assets.push({ name: imageFile.name, dataUrl: fileReader.result, imageElement });
             resolve();
@@ -24197,7 +24395,7 @@ void main() {
       if (!systemEntry.description.imageDataUrl || !systemEntry.particleSystem) {
         return;
       }
-      const imageElement = new System32.Image();
+      const imageElement = new System33.Image();
       imageElement.onload = () => {
         systemEntry.particleSystem.setImage(imageElement);
       };
@@ -24475,16 +24673,16 @@ void main() {
               borderBottom: "1px solid " + EditorTheme.borderSoftColor
             }
           });
-          const timeInputElement = System32.document.createElement("input");
+          const timeInputElement = System33.document.createElement("input");
           timeInputElement.type = "text";
           timeInputElement.value = String(gradientKey.time);
           decorateEditorInputElement(timeInputElement);
           timeInputElement.style.flex = "0 0 52px";
-          const colorInputElement = System32.document.createElement("input");
+          const colorInputElement = System33.document.createElement("input");
           colorInputElement.type = "color";
           colorInputElement.value = composeHexText(gradientKey.color);
           colorInputElement.style.cssText = "position:relative;width:34px;height:22px;padding:0;border:1px solid " + PaneTheme.color.border + ";background:transparent;cursor:pointer;flex-shrink:0;";
-          const alphaInputElement = System32.document.createElement("input");
+          const alphaInputElement = System33.document.createElement("input");
           alphaInputElement.type = "text";
           alphaInputElement.value = String(gradientKey.color[3]);
           decorateEditorInputElement(alphaInputElement);
@@ -24493,10 +24691,10 @@ void main() {
           removeButtonElement.style.padding = "2px 10px";
           removeButtonElement.style.fontSize = "12px";
           const commitKey = /* @__PURE__ */ __name(() => {
-            const timeValue = System32.Number.parseFloat(timeInputElement.value);
-            const alphaValue = System32.Number.parseFloat(alphaInputElement.value);
-            gradientKey.time = System32.Number.isFinite(timeValue) ? timeValue : gradientKey.time;
-            const safeAlpha = System32.Number.isFinite(alphaValue) ? alphaValue : 1;
+            const timeValue = System33.Number.parseFloat(timeInputElement.value);
+            const alphaValue = System33.Number.parseFloat(alphaInputElement.value);
+            gradientKey.time = System33.Number.isFinite(timeValue) ? timeValue : gradientKey.time;
+            const safeAlpha = System33.Number.isFinite(alphaValue) ? alphaValue : 1;
             gradientKey.color = parseHexChannels(colorInputElement.value, safeAlpha);
             description.colorOverLifetime.sort((left, right) => left.time - right.time);
             applyChange();
@@ -24638,8 +24836,8 @@ void main() {
   }, (commandId) => {
     return false;
   });
-  System32.particleEditor = particleEditor;
-  System32.document.title = "vanilla.js - Particle Editor";
+  System33.particleEditor = particleEditor;
+  System33.document.title = "vanilla.js - Particle Editor";
   particleEditor.run();
 })();
 

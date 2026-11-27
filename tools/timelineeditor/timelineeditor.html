@@ -6508,6 +6508,13 @@
     return fontString.slice(0, familyListStart).trimEnd() + " " + resolvedFamilyNameList.join(", ");
   }
   __name(resolveFontString, "resolveFontString");
+  function getTextInkPadding(mode, scaledLineWidth) {
+    if (mode !== "stroke") {
+      return 2;
+    }
+    return ceil(max(System12.Math.fround(scaledLineWidth) * 0.5, 0.5)) + 2;
+  }
+  __name(getTextInkPadding, "getTextInkPadding");
   function measureTextMetrics(fontString, text) {
     const document2 = System12.document;
     if (document2 === void 0 || document2 === null) {
@@ -6805,12 +6812,10 @@
       if (scaledFontDescent === void 0) {
         scaledFontDescent = scaledTextMetrics.actualBoundingBoxDescent || 0;
       }
-      const scaledPadding = ceil(lineWidth * scale / 2) + 2;
+      const scaledPadding = getTextInkPadding(mode, lineWidth * scale);
       const scaledPenX = scaledPadding + actualLeft;
-      const scaledBaselineY = scaledPadding + ceil(scaledFontAscent);
       const bakeWidth = scaledPenX + actualRight + scaledPadding;
-      const bakeHeight = scaledBaselineY + ceil(scaledFontDescent) + scaledPadding;
-      if (bakeWidth <= 0 || bakeHeight <= 0) {
+      if (bakeWidth <= 0) {
         return null;
       }
       const chunks = this.splitTextChunks(text, scaledFontString, textDirection);
@@ -6848,6 +6853,8 @@
           const chunkLeft = ceil(max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
           const chunkRight = ceil(max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
           const originX = cellPadding + chunkLeft;
+          const cellTopExtent = scaledPadding + ceil(max(scaledFontAscent, chunkMetrics.actualBoundingBoxAscent || 0));
+          const cellBottomExtent = ceil(max(scaledFontDescent, chunkMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
           glyph = {
             glyphKey,
             text: chunk.text,
@@ -6855,8 +6862,8 @@
             fractionX,
             originX,
             width: originX + 1 + chunkRight + cellPadding,
-            height: bakeHeight + 2,
-            baselineY: scaledBaselineY + 1,
+            height: cellTopExtent + cellBottomExtent + 2,
+            baselineY: cellTopExtent + 1,
             atlasPage: null,
             atlasX: 0,
             atlasY: 0
@@ -6870,6 +6877,15 @@
       if (missingGlyphList.length > 0) {
         this.bakeGlyphs(missingGlyphList, mode, colorString, lineWidth * scale, textDirection);
       }
+      let topExtent = scaledPadding + ceil(max(scaledFontAscent, scaledTextMetrics.actualBoundingBoxAscent || 0));
+      let bottomExtent = ceil(max(scaledFontDescent, scaledTextMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
+      for (let glyphIndex = 0; glyphIndex < glyphList.length; glyphIndex += 2) {
+        const glyph = glyphList[glyphIndex];
+        topExtent = max(topExtent, glyph.baselineY - 1);
+        bottomExtent = max(bottomExtent, glyph.height - glyph.baselineY - 1);
+      }
+      const scaledBaselineY = topExtent;
+      const bakeHeight = topExtent + bottomExtent;
       const glyphTextures = [];
       const glyphRects = [];
       const atlasPages = [];
@@ -9999,17 +10015,6 @@ void main() {
         targetOffset += BATCH_FLOATS_PER_VERTEX;
       }
       this.#batchVertexCount += vertexCount;
-    }
-    //==============================================================================
-    // 쌓인 묶음 그리기의 옛 이름. (폐기 예정, flushBatch 와 같다)
-    // - toonview3d.js 가 flushBatch 로 옮기면 뺀다. 공개 자료에는 싣지 않는다.
-    //==============================================================================
-    /**
-     * @private
-     * @deprecated flushBatch 를 쓴다.
-     */
-    flushSpriteBatch() {
-      this.flushBatch();
     }
     //==============================================================================
     // 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
@@ -18354,6 +18359,15 @@ void main() {
   // src/resource/audioasset.js
   var System23 = globalThis;
   var DECODE_SAMPLE_RATE = 44100;
+  var AUTOMATIC_STREAMING_BYTE_THRESHOLD = 1024 * 1024;
+  var AudioLoadType = System23.Object.freeze({
+    automatic: "automatic",
+    // 크기를 보고 고른다. (AUTOMATIC_STREAMING_BYTE_THRESHOLD 보다 큰 파일은 스트리밍, 아니면 통째로 풀기, 고른 애셋만)
+    decompressOnLoad: "decompressOnLoad",
+    // 읽을 때 PCM 으로 통째로 푼다. (효과음처럼 짧고 자주 겹쳐 트는 소리, 시작이 바로이고 겹쳐 틀어도 싸다, 기본)
+    streaming: "streaming"
+    // 풀지 않고 미디어 요소(HTMLAudioElement)가 조금씩 풀어 흘린다. (배경음처럼 긴 소리, 메모리는 압축된 파일 크기 이하)
+  });
   var AudioAsset = class extends Asset {
     static {
       __name(this, "AudioAsset");
@@ -18366,6 +18380,18 @@ void main() {
     /** @private @type { string | null } */
     #loadError;
     // 마지막 읽기 실패의 까닭. (없으면 null)
+    /** @private @type { string } */
+    #loadType;
+    // 읽기 방식. (AudioLoadType, 다음 읽기부터)
+    /** @private @type { string | null } */
+    #streamUrl;
+    // 스트리밍으로 읽었으면 미디어 요소가 틀 주소. (파일 경로나 blob: 주소, 아니면 null)
+    /** @private @type { boolean } */
+    #isStreamUrlOwned;
+    // 그 주소가 이 애셋이 만든 blob: 주소인지. (내릴 때 놓는다)
+    /** @private @type { number } */
+    #streamDuration;
+    // 스트리밍 소리의 길이. (초, 메타데이터에서)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -18374,6 +18400,54 @@ void main() {
       this.setAssetType(AssetType.audio);
       this.#audioBuffer = null;
       this.#loadError = null;
+      this.#loadType = AudioLoadType.decompressOnLoad;
+      this.#streamUrl = null;
+      this.#isStreamUrlOwned = false;
+      this.#streamDuration = 0;
+    }
+    //==============================================================================
+    // 읽기 방식 설정. (다음 load, loadFromBytes 부터, 이미 읽혔으면 unload 뒤에 다시 읽어야 바뀐다)
+    //==============================================================================
+    /**
+     * @param { string } loadType 읽기 방식. (AudioLoadType 의 값, 모르는 값이면 decompressOnLoad)
+     * @example <caption>긴 배경음을 스트리밍으로 읽기</caption>
+     * import { AudioAsset, AudioLoadType } from "./build/vanilla.js";
+     *
+     * const audioAsset = new AudioAsset();
+     * audioAsset.setLoadType(AudioLoadType.streaming);
+     * await audioAsset.load("examples/assets/beep.wav");
+     * console.log(audioAsset.getLoadType(), audioAsset.isStreaming(), audioAsset.getDuration());
+     */
+    setLoadType(loadType) {
+      const isKnown = System23.Object.values(AudioLoadType).includes(loadType);
+      this.#loadType = isKnown ? loadType : AudioLoadType.decompressOnLoad;
+    }
+    //==============================================================================
+    // 읽기 방식 반환.
+    //==============================================================================
+    /**
+     * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
+     */
+    getLoadType() {
+      return this.#loadType;
+    }
+    //==============================================================================
+    // 스트리밍으로 읽혔는지. (읽기 방식이 automatic 이면 읽은 뒤에 정해진다)
+    //==============================================================================
+    /**
+     * @returns { boolean } 스트리밍으로 읽혔으면 참. (통째로 풀었거나 읽기 전이면 거짓)
+     */
+    isStreaming() {
+      return this.#streamUrl !== null;
+    }
+    //==============================================================================
+    // 스트리밍 소리의 주소. (미디어 요소의 src 로 쓴다)
+    //==============================================================================
+    /**
+     * @returns { string | null } 파일 경로나 blob: 주소. (스트리밍이 아니면 null)
+     */
+    getStreamUrl() {
+      return this.#streamUrl;
     }
     //==============================================================================
     // 비동기 애셋 로드.
@@ -18395,12 +18469,29 @@ void main() {
         return;
       }
       try {
+        const loadType = this.getLoadType();
+        if (loadType === AudioLoadType.streaming) {
+          await this.openStream(assetPath, false);
+          return;
+        }
         const response = await System23.fetch(assetPath);
         if (!response.ok) {
           throw new System23.Error(`HTTP ${response.status}`);
         }
+        if (loadType === AudioLoadType.automatic) {
+          const contentLength = System23.Number(response.headers.get("Content-Length"));
+          if (contentLength > AUTOMATIC_STREAMING_BYTE_THRESHOLD) {
+            if (response.body) {
+              response.body.cancel().catch(() => {
+                return;
+              });
+            }
+            await this.openStream(assetPath, false);
+            return;
+          }
+        }
         const arrayBuffer = await response.arrayBuffer();
-        await this.decodeArrayBuffer(arrayBuffer);
+        await this.openBytes(arrayBuffer);
       } catch (error) {
         this.#loadError = `Error loading sound: ${assetPath} (${error})`;
         console.error(`Error loading sound: ${assetPath}`, error);
@@ -18434,12 +18525,68 @@ void main() {
       }
       try {
         const arrayBuffer = copyToArrayBuffer(bytes);
-        await this.decodeArrayBuffer(arrayBuffer);
+        await this.openBytes(arrayBuffer);
       } catch (error) {
         this.#loadError = `Error loading sound from memory (${error})`;
         console.error(`Error loading sound from bytes`, error);
         throw error;
       }
+    }
+    //==============================================================================
+    // 받은 바이트를 읽기 방식대로 열기. (스트리밍이거나 자동인데 문턱보다 크면 blob: 주소로 흘려 틀고, 아니면 통째로 푼다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { ArrayBuffer } arrayBuffer 소리 파일의 바이트. (풀면 떼어 간다)
+     */
+    async openBytes(arrayBuffer) {
+      const loadType = this.getLoadType();
+      const isStreamed = loadType === AudioLoadType.streaming || loadType === AudioLoadType.automatic && arrayBuffer.byteLength > AUTOMATIC_STREAMING_BYTE_THRESHOLD;
+      if (!isStreamed) {
+        await this.decodeArrayBuffer(arrayBuffer);
+        return;
+      }
+      const blob = new System23.Blob([arrayBuffer]);
+      const blobUrl = System23.URL.createObjectURL(blob);
+      try {
+        await this.openStream(blobUrl, true);
+      } catch (error) {
+        System23.URL.revokeObjectURL(blobUrl);
+        throw error;
+      }
+    }
+    //==============================================================================
+    // 스트리밍으로 열기. (미디어 요소로 메타데이터만 읽어 길이를 알고, 주소를 든다, 소리는 AudioPlayer 가 틀 때 미디어 요소가 조금씩 푼다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { string } streamUrl 파일 경로나 blob: 주소.
+     * @param { boolean } isStreamUrlOwned 이 애셋이 만든 blob: 주소면 참. (내릴 때 놓는다)
+     */
+    async openStream(streamUrl, isStreamUrlOwned) {
+      if (!isMediaStreamingSupported()) {
+        throw new System23.Error("HTMLAudioElement is not supported.");
+      }
+      const mediaElement = createStreamMediaElement();
+      mediaElement.preload = "metadata";
+      try {
+        await new System23.Promise((resolve, reject) => {
+          mediaElement.addEventListener("loadedmetadata", resolve, { once: true });
+          mediaElement.addEventListener("error", () => {
+            const mediaError = mediaElement.error;
+            reject(new System23.Error(`MediaError ${mediaError ? mediaError.code : 0}`));
+          }, { once: true });
+          setStreamMediaElementUrl(mediaElement, streamUrl);
+        });
+        const duration = mediaElement.duration;
+        this.#streamDuration = System23.Number.isFinite(duration) ? duration : 0;
+      } finally {
+        releaseMediaElement(mediaElement);
+      }
+      this.#audioBuffer = null;
+      this.#streamUrl = streamUrl;
+      this.#isStreamUrlOwned = isStreamUrlOwned;
+      this.setLoaded(true);
     }
     //==============================================================================
     // 소리 바이트 디코딩. (다 되면 오디오 버퍼를 들고 읽힌 것으로 둔다)
@@ -18460,7 +18607,26 @@ void main() {
         this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
         await tempAudioContext.close();
       }
+      this.#streamUrl = null;
+      this.#isStreamUrlOwned = false;
+      this.#streamDuration = 0;
       this.setLoaded(true);
+    }
+    //==============================================================================
+    // 애셋 언로드. (오디오 버퍼를 놓고, 이 애셋이 만든 blob: 주소를 놓는다, 읽기 방식은 그대로)
+    //==============================================================================
+    /**
+     * @override
+     */
+    unload() {
+      if (this.#isStreamUrlOwned && this.#streamUrl !== null) {
+        System23.URL.revokeObjectURL(this.#streamUrl);
+      }
+      this.#audioBuffer = null;
+      this.#streamUrl = null;
+      this.#isStreamUrlOwned = false;
+      this.#streamDuration = 0;
+      super.unload();
     }
     //==============================================================================
     // 마지막 읽기 실패의 까닭. (받기나 디코딩이 실패했으면 글, 아니면 null, 다시 읽기 시작하면 지운다)
@@ -18475,7 +18641,7 @@ void main() {
     // 오디오 버퍼 반환.
     //==============================================================================
     /**
-     * @returns { AudioBuffer | null } 디코딩한 오디오 버퍼. (읽기 전이면 null)
+     * @returns { AudioBuffer | null } 디코딩한 오디오 버퍼. (읽기 전이거나 스트리밍이면 null)
      */
     getAudioBuffer() {
       return this.#audioBuffer;
@@ -18484,11 +18650,14 @@ void main() {
     // 재생 시간 반환.
     //==============================================================================
     /**
-     * @returns { number } 재생 시간. (초, 읽기 전이면 0)
+     * @returns { number } 재생 시간. (초, 읽기 전이면 0, 스트리밍이면 메타데이터의 길이)
      */
     getDuration() {
       if (this.#audioBuffer !== null && this.#audioBuffer !== void 0) {
         return this.#audioBuffer.duration;
+      }
+      if (this.#streamUrl !== null) {
+        return this.#streamDuration;
       }
       return 0;
     }
@@ -18508,6 +18677,29 @@ void main() {
     return offlineAudioContextType !== void 0 || audioContextType !== void 0;
   }
   __name(isAudioDecodingSupported, "isAudioDecodingSupported");
+  function isMediaStreamingSupported() {
+    return System23.document !== void 0 && typeof System23.window.HTMLAudioElement === "function";
+  }
+  __name(isMediaStreamingSupported, "isMediaStreamingSupported");
+  function createStreamMediaElement() {
+    const mediaElement = System23.document.createElement("audio");
+    mediaElement.preservesPitch = false;
+    mediaElement.webkitPreservesPitch = false;
+    return mediaElement;
+  }
+  __name(createStreamMediaElement, "createStreamMediaElement");
+  function setStreamMediaElementUrl(mediaElement, streamUrl) {
+    const isLocalUrl = streamUrl.startsWith("blob:") || streamUrl.startsWith("data:");
+    mediaElement.crossOrigin = isLocalUrl ? null : "anonymous";
+    mediaElement.src = streamUrl;
+  }
+  __name(setStreamMediaElementUrl, "setStreamMediaElementUrl");
+  function releaseMediaElement(mediaElement) {
+    mediaElement.pause();
+    mediaElement.removeAttribute("src");
+    mediaElement.load();
+  }
+  __name(releaseMediaElement, "releaseMediaElement");
 
   // src/core/audioplayer.js
   var System24 = globalThis;
@@ -18565,6 +18757,21 @@ void main() {
     /** @private @type { number } */
     #startDuration;
     // 지금 소리의 버퍼 길이. (초)
+    /** @private @type { HTMLAudioElement | null } */
+    #mediaElement;
+    // 스트리밍 애셋을 트는 미디어 요소. (처음 틀 때 만들고 플레이어가 끝까지 쓴다)
+    /** @private @type { MediaElementAudioSourceNode | null } */
+    #mediaSource;
+    // 그 미디어 요소를 GainNode 에 잇는 노드. (요소 하나에 하나만 만들 수 있다)
+    /** @private @type { string | null } */
+    #mediaUrl;
+    // 미디어 요소에 건 주소.
+    /** @private @type { boolean } */
+    #isMediaPlaying;
+    // 미디어 요소로 틀고 있는지.
+    /** @private @type { function(): void } */
+    #contextStateHandler;
+    // 컨텍스트가 멈추고 돌 때 미디어 요소를 따라 멈추고 트는 함수.
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -18588,6 +18795,13 @@ void main() {
       this.#startContextTime = 0;
       this.#startPlaybackRate = 1;
       this.#startDuration = 0;
+      this.#mediaElement = null;
+      this.#mediaSource = null;
+      this.#mediaUrl = null;
+      this.#isMediaPlaying = false;
+      this.#contextStateHandler = () => {
+        this.followContextState();
+      };
       if (audioContext) {
         this.#gainNode = audioContext.createGain();
         this.#gainNode.connect(outputNode !== null ? outputNode : audioContext.destination);
@@ -18608,15 +18822,12 @@ void main() {
       if (!audioAsset) {
         return;
       }
+      const isStreaming = audioAsset.isStreaming();
       const audioBuffer = audioAsset.getAudioBuffer();
-      if (!audioBuffer) {
+      if (!isStreaming && !audioBuffer) {
         return;
       }
-      if (this.#audioSource) {
-        this.#audioSource.onended = null;
-        this.#audioSource.stop();
-        this.#audioSource = null;
-      }
+      this.stopSource();
       this.#playRequestId += 1;
       const playRequestId = this.#playRequestId;
       if (audioContext.state === "suspended") {
@@ -18624,13 +18835,156 @@ void main() {
           if (playRequestId !== this.#playRequestId) {
             return;
           }
-          this.startPlayback(audioBuffer, loop);
+          if (isStreaming) {
+            this.startStreamPlayback(audioAsset, loop);
+          } else {
+            this.startPlayback(audioBuffer, loop);
+          }
         }, () => {
           return;
         });
         return;
       }
-      this.startPlayback(audioBuffer, loop);
+      if (isStreaming) {
+        this.startStreamPlayback(audioAsset, loop);
+      } else {
+        this.startPlayback(audioBuffer, loop);
+      }
+    }
+    //==============================================================================
+    // 틀던 소리 끊기. (버퍼 소리는 멈추고 놓고, 미디어 요소는 멈춰 두고 다음에 다시 쓴다, 재생 상태는 쓰는 쪽이 정한다)
+    //==============================================================================
+    /**
+     * @private
+     */
+    stopSource() {
+      if (this.#audioSource) {
+        this.#audioSource.onended = null;
+        this.#audioSource.stop();
+        this.#audioSource = null;
+      }
+      if (this.#isMediaPlaying) {
+        this.#isMediaPlaying = false;
+        this.#mediaElement.onended = null;
+        this.#mediaElement.pause();
+        this.unwatchContextState();
+      }
+    }
+    //==============================================================================
+    // 내부 스트리밍 재생 시작. (미디어 요소를 GainNode 에 잇고 setTime 의 자리부터 튼다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { AudioAsset } audioAsset 스트리밍으로 읽힌 오디오 애셋.
+     * @param { boolean } loop 반복 재생하면 참.
+     */
+    startStreamPlayback(audioAsset, loop) {
+      const audioContext = this.getAudioContext();
+      const streamUrl = audioAsset.getStreamUrl();
+      if (!audioContext || !this.#gainNode || streamUrl === null || typeof audioContext.createMediaElementSource !== "function") {
+        return;
+      }
+      this.stopSource();
+      if (this.#mediaElement === null) {
+        this.#mediaElement = createStreamMediaElement();
+        this.#mediaElement.preload = "auto";
+        this.#mediaSource = audioContext.createMediaElementSource(this.#mediaElement);
+        this.#mediaSource.connect(this.#gainNode);
+      }
+      const mediaElement = this.#mediaElement;
+      if (this.#mediaUrl !== streamUrl) {
+        setStreamMediaElementUrl(mediaElement, streamUrl);
+        this.#mediaUrl = streamUrl;
+      }
+      this.#isLoop = loop;
+      mediaElement.loop = loop;
+      mediaElement.playbackRate = this.#playbackRate;
+      mediaElement.currentTime = this.#time;
+      const playRequestId = this.#playRequestId;
+      mediaElement.onended = () => {
+        this.#isPlaying = false;
+        this.#isMediaPlaying = false;
+        mediaElement.onended = null;
+        this.unwatchContextState();
+      };
+      this.#isMediaPlaying = true;
+      this.#isPlaying = true;
+      this.#startContextTime = audioContext.currentTime;
+      this.#startPlaybackRate = this.#playbackRate;
+      this.#startDuration = audioAsset.getDuration();
+      this.watchContextState();
+      this.playMediaElement(playRequestId);
+    }
+    //==============================================================================
+    // 미디어 요소 틀기. (브라우저가 거부하면 재생을 끝낸 것으로 둔다, 그 사이 다른 요청이 왔으면 건드리지 않는다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { number } playRequestId 이 재생 요청의 번호.
+     */
+    playMediaElement(playRequestId) {
+      const mediaElement = this.#mediaElement;
+      const playPromise = mediaElement.play();
+      if (!playPromise) {
+        return;
+      }
+      playPromise.catch((error) => {
+        if (playRequestId !== this.#playRequestId || !this.#isMediaPlaying) {
+          return;
+        }
+        if (error && error.name === "AbortError") {
+          return;
+        }
+        console.warn("[audio] \uC2A4\uD2B8\uB9AC\uBC0D \uC18C\uB9AC\uB97C \uD2C0\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
+        this.#isPlaying = false;
+        this.#isMediaPlaying = false;
+        mediaElement.onended = null;
+        this.unwatchContextState();
+      });
+    }
+    //==============================================================================
+    // 컨텍스트가 멈추고 도는 것 따라가기. (스트리밍으로 트는 동안만 듣는다, 버퍼 소리처럼 컨텍스트가 멈추면 같이 멈춘다)
+    //==============================================================================
+    /**
+     * @private
+     */
+    watchContextState() {
+      const audioContext = this.getAudioContext();
+      if (audioContext && typeof audioContext.addEventListener === "function") {
+        audioContext.addEventListener("statechange", this.#contextStateHandler);
+      }
+    }
+    //==============================================================================
+    // 컨텍스트가 멈추고 도는 것 그만 듣기. (스트리밍 재생이 멈추거나 끝나면, 플레이어가 컨텍스트에 붙잡혀 남지 않게)
+    //==============================================================================
+    /**
+     * @private
+     */
+    unwatchContextState() {
+      const audioContext = this.getAudioContext();
+      if (audioContext && typeof audioContext.removeEventListener === "function") {
+        audioContext.removeEventListener("statechange", this.#contextStateHandler);
+      }
+    }
+    //==============================================================================
+    // 컨텍스트 상태 따르기. (돌면 멈춰 둔 미디어 요소를 이어 틀고, 멈추면 미디어 요소도 멈춘다)
+    //==============================================================================
+    /**
+     * @private
+     */
+    followContextState() {
+      const audioContext = this.getAudioContext();
+      if (!this.#isMediaPlaying || !audioContext) {
+        return;
+      }
+      const mediaElement = this.#mediaElement;
+      if (audioContext.state === "running") {
+        if (mediaElement.paused) {
+          this.playMediaElement(this.#playRequestId);
+        }
+      } else if (!mediaElement.paused) {
+        mediaElement.pause();
+      }
     }
     //==============================================================================
     // 내부 재생 시작.
@@ -18644,11 +18998,7 @@ void main() {
       if (!audioContext || !this.#gainNode) {
         return;
       }
-      if (this.#audioSource) {
-        this.#audioSource.onended = null;
-        this.#audioSource.stop();
-        this.#audioSource = null;
-      }
+      this.stopSource();
       this.#isLoop = loop;
       this.#audioSource = audioContext.createBufferSource();
       this.#audioSource.buffer = audioBuffer;
@@ -18680,11 +19030,7 @@ void main() {
     //==============================================================================
     stop() {
       this.#playRequestId += 1;
-      if (this.#audioSource) {
-        this.#audioSource.onended = null;
-        this.#audioSource.stop();
-        this.#audioSource = null;
-      }
+      this.stopSource();
       this.#isPlaying = false;
     }
     //==============================================================================
@@ -18744,10 +19090,15 @@ void main() {
     // 오디오 애셋 설정.
     //==============================================================================
     /**
-     * @param { AudioAsset } audioAsset 재생할 오디오 애셋. (다음 play 부터)
+     * @param { AudioAsset | null } audioAsset 재생할 오디오 애셋. (다음 play 부터, 스트리밍으로 틀던 것이 멈춰 있으면 그 미디어 요소가 받아 둔 것을 놓는다)
      */
     setAudioAsset(audioAsset) {
       this.#audioAsset = audioAsset;
+      const streamUrl = audioAsset ? audioAsset.getStreamUrl() : null;
+      if (this.#mediaElement !== null && !this.#isMediaPlaying && this.#mediaUrl !== null && this.#mediaUrl !== streamUrl) {
+        releaseMediaElement(this.#mediaElement);
+        this.#mediaUrl = null;
+      }
     }
     //==============================================================================
     // 오디오 애셋 반환.
@@ -18788,6 +19139,9 @@ void main() {
       const audioContext = this.getAudioContext();
       if (!this.#isPlaying || !audioContext) {
         return this.#time;
+      }
+      if (this.#isMediaPlaying) {
+        return this.#mediaElement.currentTime;
       }
       const elapsedSeconds = System24.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
       return readPlaybackPosition(this.#time, elapsedSeconds, this.#startDuration, this.#isLoop);

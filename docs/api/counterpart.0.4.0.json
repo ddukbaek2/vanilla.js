@@ -8289,6 +8289,18 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "Engine",
+				"name": "get_engine"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "getEngine"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
 				"name": "alert"
 			},
 			"vanilla.js": {
@@ -8460,8 +8472,8 @@
 				"name": "get_all_loaded_scenes"
 			},
 			"vanilla.js": {
-				"module": "core/scenemanager",
-				"class": "SceneManager",
+				"module": "core/engine",
+				"class": "Engine",
 				"name": "getAllLoadedScenes"
 			}
 		},
@@ -10135,6 +10147,42 @@
 			"vanilla-engine": {
 				"module": "core/graphic",
 				"class": "Graphic",
+				"name": "flush_batch"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "flushBatch"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "set_batching_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "setBatchingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "is_batching_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "isBatchingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
 				"name": "set_culling_enabled"
 			},
 			"vanilla.js": {
@@ -10639,6 +10687,18 @@
 			"vanilla-engine": {
 				"module": "core/graphic",
 				"class": "Graphic",
+				"name": "measure_text_with_font_string"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "measureTextWithFontString"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
 				"name": "set_text_bake_scale_step"
 			},
 			"vanilla.js": {
@@ -10933,6 +10993,42 @@
 				"module": "core/graphic",
 				"class": "Graphic",
 				"name": "readFramebufferPixels"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "get_current_framebuffer"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "getCurrentFramebuffer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "get_current_viewport"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "getCurrentViewport"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "reset_gl_state_cache"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "resetGLStateCache"
 			}
 		},
 		{
@@ -14325,6 +14421,18 @@
 			"vanilla-engine": {
 				"module": "core/scene",
 				"class": "SceneBase",
+				"name": "get_engine"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "getEngine"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/scene",
+				"class": "SceneBase",
 				"name": "get_root"
 			},
 			"vanilla.js": {
@@ -15999,6 +16107,18 @@
 				"module": "core/viewmanager",
 				"class": "ViewManager",
 				"name": "getMaxRenderPixelRatio"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/viewmanager",
+				"class": "ViewManager",
+				"name": "limit_render_pixel_ratio"
+			},
+			"vanilla.js": {
+				"module": "core/viewmanager",
+				"class": "ViewManager",
+				"name": "limitRenderPixelRatio"
 			}
 		},
 		{
@@ -26317,6 +26437,18 @@
 			"vanilla-engine": {
 				"module": "misc/devtools",
 				"class": "DevTools",
+				"name": "inspect_node"
+			},
+			"vanilla.js": {
+				"module": "misc/devtools",
+				"class": "DevTools",
+				"name": "inspectNode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/devtools",
+				"class": "DevTools",
 				"name": "draw"
 			},
 			"vanilla.js": {
@@ -27407,6 +27539,18 @@
 			"vanilla.js": {
 				"module": "misc/localstorage",
 				"class": "LocalStorage"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/localstorage",
+				"class": "LocalStorage",
+				"name": "set_storage_directory"
+			},
+			"vanilla.js": {
+				"module": "misc/localstorage",
+				"class": "LocalStorage",
+				"name": "setStorageDirectory"
 			}
 		},
 		{
@@ -29359,6 +29503,18 @@
 				"module": "misc/graphicsqualitygovernor",
 				"class": "GraphicsQualityGovernor",
 				"name": "applySearchText"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/graphicsqualitygovernor",
+				"class": "GraphicsQualityGovernor",
+				"name": "apply_page_query"
+			},
+			"vanilla.js": {
+				"module": "misc/graphicsqualitygovernor",
+				"class": "GraphicsQualityGovernor",
+				"name": "applyPageQuery"
 			}
 		},
 		{
@@ -35035,6 +35191,18 @@
 			"vanilla-engine": {
 				"module": "ui/uilistview",
 				"class": "UIListView",
+				"name": "set_template_node_with_document"
+			},
+			"vanilla.js": {
+				"module": "ui/uilistview",
+				"class": "UIListView",
+				"name": "setTemplateNodeWithDocument"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uilistview",
+				"class": "UIListView",
 				"name": "set_item_count"
 			},
 			"vanilla.js": {
@@ -37276,6 +37444,18 @@
 		{
 			"vanilla-engine": {
 				"module": "ui/uiview",
+				"class": "UIView",
+				"name": "get_engine"
+			},
+			"vanilla.js": {
+				"module": "ui/uiview",
+				"class": "UIView",
+				"name": "getEngine"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiview",
 				"name": "is_view_position_inside_node"
 			},
 			"vanilla.js": {
@@ -37300,8 +37480,8 @@
 				"name": "new"
 			},
 			"vanilla.js": {
-				"module": "base/object",
-				"class": "Object",
+				"module": "ui/uidocument",
+				"class": "UIDocument",
 				"name": "constructor"
 			}
 		},
@@ -37345,12 +37525,36 @@
 			"vanilla-engine": {
 				"module": "ui/uidocument",
 				"class": "UIDocument",
+				"name": "get_node_type_name"
+			},
+			"vanilla.js": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
+				"name": "getNodeTypeName"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
 				"name": "get_component_type_names"
 			},
 			"vanilla.js": {
 				"module": "ui/uidocument",
 				"class": "UIDocument",
 				"name": "getComponentTypeNames"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
+				"name": "create_component"
+			},
+			"vanilla.js": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
+				"name": "createComponent"
 			}
 		},
 		{
@@ -37375,6 +37579,30 @@
 				"module": "ui/uidocument",
 				"class": "UIDocument",
 				"name": "resolveImage"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
+				"name": "load_images"
+			},
+			"vanilla.js": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
+				"name": "loadImages"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
+				"name": "bind_pending_images"
+			},
+			"vanilla.js": {
+				"module": "ui/uidocument",
+				"class": "UIDocument",
+				"name": "bindPendingImages"
 			}
 		},
 		{

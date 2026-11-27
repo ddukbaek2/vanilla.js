@@ -8106,6 +8106,13 @@ function resolveFontString(fontString) {
   return fontString.slice(0, familyListStart).trimEnd() + " " + resolvedFamilyNameList.join(", ");
 }
 __name(resolveFontString, "resolveFontString");
+function getTextInkPadding(mode, scaledLineWidth) {
+  if (mode !== "stroke") {
+    return 2;
+  }
+  return ceil(max(System16.Math.fround(scaledLineWidth) * 0.5, 0.5)) + 2;
+}
+__name(getTextInkPadding, "getTextInkPadding");
 function measureTextMetrics(fontString, text) {
   const document2 = System16.document;
   if (document2 === void 0 || document2 === null) {
@@ -8407,12 +8414,10 @@ var TextStringTextureCache = class extends Object2 {
     if (scaledFontDescent === void 0) {
       scaledFontDescent = scaledTextMetrics.actualBoundingBoxDescent || 0;
     }
-    const scaledPadding = ceil(lineWidth * scale / 2) + 2;
+    const scaledPadding = getTextInkPadding(mode, lineWidth * scale);
     const scaledPenX = scaledPadding + actualLeft;
-    const scaledBaselineY = scaledPadding + ceil(scaledFontAscent);
     const bakeWidth = scaledPenX + actualRight + scaledPadding;
-    const bakeHeight = scaledBaselineY + ceil(scaledFontDescent) + scaledPadding;
-    if (bakeWidth <= 0 || bakeHeight <= 0) {
+    if (bakeWidth <= 0) {
       return null;
     }
     const chunks = this.splitTextChunks(text, scaledFontString, textDirection);
@@ -8450,6 +8455,8 @@ var TextStringTextureCache = class extends Object2 {
         const chunkLeft = ceil(max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
         const chunkRight = ceil(max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
         const originX = cellPadding + chunkLeft;
+        const cellTopExtent = scaledPadding + ceil(max(scaledFontAscent, chunkMetrics.actualBoundingBoxAscent || 0));
+        const cellBottomExtent = ceil(max(scaledFontDescent, chunkMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
         glyph = {
           glyphKey,
           text: chunk.text,
@@ -8457,8 +8464,8 @@ var TextStringTextureCache = class extends Object2 {
           fractionX,
           originX,
           width: originX + 1 + chunkRight + cellPadding,
-          height: bakeHeight + 2,
-          baselineY: scaledBaselineY + 1,
+          height: cellTopExtent + cellBottomExtent + 2,
+          baselineY: cellTopExtent + 1,
           atlasPage: null,
           atlasX: 0,
           atlasY: 0
@@ -8472,6 +8479,15 @@ var TextStringTextureCache = class extends Object2 {
     if (missingGlyphList.length > 0) {
       this.bakeGlyphs(missingGlyphList, mode, colorString, lineWidth * scale, textDirection);
     }
+    let topExtent = scaledPadding + ceil(max(scaledFontAscent, scaledTextMetrics.actualBoundingBoxAscent || 0));
+    let bottomExtent = ceil(max(scaledFontDescent, scaledTextMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
+    for (let glyphIndex = 0; glyphIndex < glyphList.length; glyphIndex += 2) {
+      const glyph = glyphList[glyphIndex];
+      topExtent = max(topExtent, glyph.baselineY - 1);
+      bottomExtent = max(bottomExtent, glyph.height - glyph.baselineY - 1);
+    }
+    const scaledBaselineY = topExtent;
+    const bakeHeight = topExtent + bottomExtent;
     const glyphTextures = [];
     const glyphRects = [];
     const atlasPages = [];
@@ -11601,17 +11617,6 @@ var Graphic = class extends Object2 {
       targetOffset += BATCH_FLOATS_PER_VERTEX;
     }
     this.#batchVertexCount += vertexCount;
-  }
-  //==============================================================================
-  // 쌓인 묶음 그리기의 옛 이름. (폐기 예정, flushBatch 와 같다)
-  // - toonview3d.js 가 flushBatch 로 옮기면 뺀다. 공개 자료에는 싣지 않는다.
-  //==============================================================================
-  /**
-   * @private
-   * @deprecated flushBatch 를 쓴다.
-   */
-  flushSpriteBatch() {
-    this.flushBatch();
   }
   //==============================================================================
   // 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
@@ -20027,6 +20032,15 @@ var Asset = class extends Object2 {
 // src/resource/audioasset.js
 var System26 = globalThis;
 var DECODE_SAMPLE_RATE = 44100;
+var AUTOMATIC_STREAMING_BYTE_THRESHOLD = 1024 * 1024;
+var AudioLoadType = System26.Object.freeze({
+  automatic: "automatic",
+  // 크기를 보고 고른다. (AUTOMATIC_STREAMING_BYTE_THRESHOLD 보다 큰 파일은 스트리밍, 아니면 통째로 풀기, 고른 애셋만)
+  decompressOnLoad: "decompressOnLoad",
+  // 읽을 때 PCM 으로 통째로 푼다. (효과음처럼 짧고 자주 겹쳐 트는 소리, 시작이 바로이고 겹쳐 틀어도 싸다, 기본)
+  streaming: "streaming"
+  // 풀지 않고 미디어 요소(HTMLAudioElement)가 조금씩 풀어 흘린다. (배경음처럼 긴 소리, 메모리는 압축된 파일 크기 이하)
+});
 var AudioAsset = class extends Asset {
   static {
     __name(this, "AudioAsset");
@@ -20039,6 +20053,18 @@ var AudioAsset = class extends Asset {
   /** @private @type { string | null } */
   #loadError;
   // 마지막 읽기 실패의 까닭. (없으면 null)
+  /** @private @type { string } */
+  #loadType;
+  // 읽기 방식. (AudioLoadType, 다음 읽기부터)
+  /** @private @type { string | null } */
+  #streamUrl;
+  // 스트리밍으로 읽었으면 미디어 요소가 틀 주소. (파일 경로나 blob: 주소, 아니면 null)
+  /** @private @type { boolean } */
+  #isStreamUrlOwned;
+  // 그 주소가 이 애셋이 만든 blob: 주소인지. (내릴 때 놓는다)
+  /** @private @type { number } */
+  #streamDuration;
+  // 스트리밍 소리의 길이. (초, 메타데이터에서)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -20047,6 +20073,54 @@ var AudioAsset = class extends Asset {
     this.setAssetType(AssetType.audio);
     this.#audioBuffer = null;
     this.#loadError = null;
+    this.#loadType = AudioLoadType.decompressOnLoad;
+    this.#streamUrl = null;
+    this.#isStreamUrlOwned = false;
+    this.#streamDuration = 0;
+  }
+  //==============================================================================
+  // 읽기 방식 설정. (다음 load, loadFromBytes 부터, 이미 읽혔으면 unload 뒤에 다시 읽어야 바뀐다)
+  //==============================================================================
+  /**
+   * @param { string } loadType 읽기 방식. (AudioLoadType 의 값, 모르는 값이면 decompressOnLoad)
+   * @example <caption>긴 배경음을 스트리밍으로 읽기</caption>
+   * import { AudioAsset, AudioLoadType } from "./build/vanilla.js";
+   *
+   * const audioAsset = new AudioAsset();
+   * audioAsset.setLoadType(AudioLoadType.streaming);
+   * await audioAsset.load("examples/assets/beep.wav");
+   * console.log(audioAsset.getLoadType(), audioAsset.isStreaming(), audioAsset.getDuration());
+   */
+  setLoadType(loadType) {
+    const isKnown = System26.Object.values(AudioLoadType).includes(loadType);
+    this.#loadType = isKnown ? loadType : AudioLoadType.decompressOnLoad;
+  }
+  //==============================================================================
+  // 읽기 방식 반환.
+  //==============================================================================
+  /**
+   * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
+   */
+  getLoadType() {
+    return this.#loadType;
+  }
+  //==============================================================================
+  // 스트리밍으로 읽혔는지. (읽기 방식이 automatic 이면 읽은 뒤에 정해진다)
+  //==============================================================================
+  /**
+   * @returns { boolean } 스트리밍으로 읽혔으면 참. (통째로 풀었거나 읽기 전이면 거짓)
+   */
+  isStreaming() {
+    return this.#streamUrl !== null;
+  }
+  //==============================================================================
+  // 스트리밍 소리의 주소. (미디어 요소의 src 로 쓴다)
+  //==============================================================================
+  /**
+   * @returns { string | null } 파일 경로나 blob: 주소. (스트리밍이 아니면 null)
+   */
+  getStreamUrl() {
+    return this.#streamUrl;
   }
   //==============================================================================
   // 비동기 애셋 로드.
@@ -20068,12 +20142,29 @@ var AudioAsset = class extends Asset {
       return;
     }
     try {
+      const loadType = this.getLoadType();
+      if (loadType === AudioLoadType.streaming) {
+        await this.openStream(assetPath, false);
+        return;
+      }
       const response = await System26.fetch(assetPath);
       if (!response.ok) {
         throw new System26.Error(`HTTP ${response.status}`);
       }
+      if (loadType === AudioLoadType.automatic) {
+        const contentLength = System26.Number(response.headers.get("Content-Length"));
+        if (contentLength > AUTOMATIC_STREAMING_BYTE_THRESHOLD) {
+          if (response.body) {
+            response.body.cancel().catch(() => {
+              return;
+            });
+          }
+          await this.openStream(assetPath, false);
+          return;
+        }
+      }
       const arrayBuffer = await response.arrayBuffer();
-      await this.decodeArrayBuffer(arrayBuffer);
+      await this.openBytes(arrayBuffer);
     } catch (error) {
       this.#loadError = `Error loading sound: ${assetPath} (${error})`;
       console.error(`Error loading sound: ${assetPath}`, error);
@@ -20107,12 +20198,68 @@ var AudioAsset = class extends Asset {
     }
     try {
       const arrayBuffer = copyToArrayBuffer(bytes);
-      await this.decodeArrayBuffer(arrayBuffer);
+      await this.openBytes(arrayBuffer);
     } catch (error) {
       this.#loadError = `Error loading sound from memory (${error})`;
       console.error(`Error loading sound from bytes`, error);
       throw error;
     }
+  }
+  //==============================================================================
+  // 받은 바이트를 읽기 방식대로 열기. (스트리밍이거나 자동인데 문턱보다 크면 blob: 주소로 흘려 틀고, 아니면 통째로 푼다)
+  //==============================================================================
+  /**
+   * @private
+   * @param { ArrayBuffer } arrayBuffer 소리 파일의 바이트. (풀면 떼어 간다)
+   */
+  async openBytes(arrayBuffer) {
+    const loadType = this.getLoadType();
+    const isStreamed = loadType === AudioLoadType.streaming || loadType === AudioLoadType.automatic && arrayBuffer.byteLength > AUTOMATIC_STREAMING_BYTE_THRESHOLD;
+    if (!isStreamed) {
+      await this.decodeArrayBuffer(arrayBuffer);
+      return;
+    }
+    const blob = new System26.Blob([arrayBuffer]);
+    const blobUrl = System26.URL.createObjectURL(blob);
+    try {
+      await this.openStream(blobUrl, true);
+    } catch (error) {
+      System26.URL.revokeObjectURL(blobUrl);
+      throw error;
+    }
+  }
+  //==============================================================================
+  // 스트리밍으로 열기. (미디어 요소로 메타데이터만 읽어 길이를 알고, 주소를 든다, 소리는 AudioPlayer 가 틀 때 미디어 요소가 조금씩 푼다)
+  //==============================================================================
+  /**
+   * @private
+   * @param { string } streamUrl 파일 경로나 blob: 주소.
+   * @param { boolean } isStreamUrlOwned 이 애셋이 만든 blob: 주소면 참. (내릴 때 놓는다)
+   */
+  async openStream(streamUrl, isStreamUrlOwned) {
+    if (!isMediaStreamingSupported()) {
+      throw new System26.Error("HTMLAudioElement is not supported.");
+    }
+    const mediaElement = createStreamMediaElement();
+    mediaElement.preload = "metadata";
+    try {
+      await new System26.Promise((resolve, reject) => {
+        mediaElement.addEventListener("loadedmetadata", resolve, { once: true });
+        mediaElement.addEventListener("error", () => {
+          const mediaError = mediaElement.error;
+          reject(new System26.Error(`MediaError ${mediaError ? mediaError.code : 0}`));
+        }, { once: true });
+        setStreamMediaElementUrl(mediaElement, streamUrl);
+      });
+      const duration = mediaElement.duration;
+      this.#streamDuration = System26.Number.isFinite(duration) ? duration : 0;
+    } finally {
+      releaseMediaElement(mediaElement);
+    }
+    this.#audioBuffer = null;
+    this.#streamUrl = streamUrl;
+    this.#isStreamUrlOwned = isStreamUrlOwned;
+    this.setLoaded(true);
   }
   //==============================================================================
   // 소리 바이트 디코딩. (다 되면 오디오 버퍼를 들고 읽힌 것으로 둔다)
@@ -20133,7 +20280,26 @@ var AudioAsset = class extends Asset {
       this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
       await tempAudioContext.close();
     }
+    this.#streamUrl = null;
+    this.#isStreamUrlOwned = false;
+    this.#streamDuration = 0;
     this.setLoaded(true);
+  }
+  //==============================================================================
+  // 애셋 언로드. (오디오 버퍼를 놓고, 이 애셋이 만든 blob: 주소를 놓는다, 읽기 방식은 그대로)
+  //==============================================================================
+  /**
+   * @override
+   */
+  unload() {
+    if (this.#isStreamUrlOwned && this.#streamUrl !== null) {
+      System26.URL.revokeObjectURL(this.#streamUrl);
+    }
+    this.#audioBuffer = null;
+    this.#streamUrl = null;
+    this.#isStreamUrlOwned = false;
+    this.#streamDuration = 0;
+    super.unload();
   }
   //==============================================================================
   // 마지막 읽기 실패의 까닭. (받기나 디코딩이 실패했으면 글, 아니면 null, 다시 읽기 시작하면 지운다)
@@ -20148,7 +20314,7 @@ var AudioAsset = class extends Asset {
   // 오디오 버퍼 반환.
   //==============================================================================
   /**
-   * @returns { AudioBuffer | null } 디코딩한 오디오 버퍼. (읽기 전이면 null)
+   * @returns { AudioBuffer | null } 디코딩한 오디오 버퍼. (읽기 전이거나 스트리밍이면 null)
    */
   getAudioBuffer() {
     return this.#audioBuffer;
@@ -20157,11 +20323,14 @@ var AudioAsset = class extends Asset {
   // 재생 시간 반환.
   //==============================================================================
   /**
-   * @returns { number } 재생 시간. (초, 읽기 전이면 0)
+   * @returns { number } 재생 시간. (초, 읽기 전이면 0, 스트리밍이면 메타데이터의 길이)
    */
   getDuration() {
     if (this.#audioBuffer !== null && this.#audioBuffer !== void 0) {
       return this.#audioBuffer.duration;
+    }
+    if (this.#streamUrl !== null) {
+      return this.#streamDuration;
     }
     return 0;
   }
@@ -20181,6 +20350,29 @@ function isAudioDecodingSupported() {
   return offlineAudioContextType !== void 0 || audioContextType !== void 0;
 }
 __name(isAudioDecodingSupported, "isAudioDecodingSupported");
+function isMediaStreamingSupported() {
+  return System26.document !== void 0 && typeof System26.window.HTMLAudioElement === "function";
+}
+__name(isMediaStreamingSupported, "isMediaStreamingSupported");
+function createStreamMediaElement() {
+  const mediaElement = System26.document.createElement("audio");
+  mediaElement.preservesPitch = false;
+  mediaElement.webkitPreservesPitch = false;
+  return mediaElement;
+}
+__name(createStreamMediaElement, "createStreamMediaElement");
+function setStreamMediaElementUrl(mediaElement, streamUrl) {
+  const isLocalUrl = streamUrl.startsWith("blob:") || streamUrl.startsWith("data:");
+  mediaElement.crossOrigin = isLocalUrl ? null : "anonymous";
+  mediaElement.src = streamUrl;
+}
+__name(setStreamMediaElementUrl, "setStreamMediaElementUrl");
+function releaseMediaElement(mediaElement) {
+  mediaElement.pause();
+  mediaElement.removeAttribute("src");
+  mediaElement.load();
+}
+__name(releaseMediaElement, "releaseMediaElement");
 
 // src/core/audioplayer.js
 var System27 = globalThis;
@@ -20238,6 +20430,21 @@ var AudioPlayer = class {
   /** @private @type { number } */
   #startDuration;
   // 지금 소리의 버퍼 길이. (초)
+  /** @private @type { HTMLAudioElement | null } */
+  #mediaElement;
+  // 스트리밍 애셋을 트는 미디어 요소. (처음 틀 때 만들고 플레이어가 끝까지 쓴다)
+  /** @private @type { MediaElementAudioSourceNode | null } */
+  #mediaSource;
+  // 그 미디어 요소를 GainNode 에 잇는 노드. (요소 하나에 하나만 만들 수 있다)
+  /** @private @type { string | null } */
+  #mediaUrl;
+  // 미디어 요소에 건 주소.
+  /** @private @type { boolean } */
+  #isMediaPlaying;
+  // 미디어 요소로 틀고 있는지.
+  /** @private @type { function(): void } */
+  #contextStateHandler;
+  // 컨텍스트가 멈추고 돌 때 미디어 요소를 따라 멈추고 트는 함수.
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -20261,6 +20468,13 @@ var AudioPlayer = class {
     this.#startContextTime = 0;
     this.#startPlaybackRate = 1;
     this.#startDuration = 0;
+    this.#mediaElement = null;
+    this.#mediaSource = null;
+    this.#mediaUrl = null;
+    this.#isMediaPlaying = false;
+    this.#contextStateHandler = () => {
+      this.followContextState();
+    };
     if (audioContext) {
       this.#gainNode = audioContext.createGain();
       this.#gainNode.connect(outputNode !== null ? outputNode : audioContext.destination);
@@ -20281,15 +20495,12 @@ var AudioPlayer = class {
     if (!audioAsset) {
       return;
     }
+    const isStreaming = audioAsset.isStreaming();
     const audioBuffer = audioAsset.getAudioBuffer();
-    if (!audioBuffer) {
+    if (!isStreaming && !audioBuffer) {
       return;
     }
-    if (this.#audioSource) {
-      this.#audioSource.onended = null;
-      this.#audioSource.stop();
-      this.#audioSource = null;
-    }
+    this.stopSource();
     this.#playRequestId += 1;
     const playRequestId = this.#playRequestId;
     if (audioContext.state === "suspended") {
@@ -20297,13 +20508,156 @@ var AudioPlayer = class {
         if (playRequestId !== this.#playRequestId) {
           return;
         }
-        this.startPlayback(audioBuffer, loop);
+        if (isStreaming) {
+          this.startStreamPlayback(audioAsset, loop);
+        } else {
+          this.startPlayback(audioBuffer, loop);
+        }
       }, () => {
         return;
       });
       return;
     }
-    this.startPlayback(audioBuffer, loop);
+    if (isStreaming) {
+      this.startStreamPlayback(audioAsset, loop);
+    } else {
+      this.startPlayback(audioBuffer, loop);
+    }
+  }
+  //==============================================================================
+  // 틀던 소리 끊기. (버퍼 소리는 멈추고 놓고, 미디어 요소는 멈춰 두고 다음에 다시 쓴다, 재생 상태는 쓰는 쪽이 정한다)
+  //==============================================================================
+  /**
+   * @private
+   */
+  stopSource() {
+    if (this.#audioSource) {
+      this.#audioSource.onended = null;
+      this.#audioSource.stop();
+      this.#audioSource = null;
+    }
+    if (this.#isMediaPlaying) {
+      this.#isMediaPlaying = false;
+      this.#mediaElement.onended = null;
+      this.#mediaElement.pause();
+      this.unwatchContextState();
+    }
+  }
+  //==============================================================================
+  // 내부 스트리밍 재생 시작. (미디어 요소를 GainNode 에 잇고 setTime 의 자리부터 튼다)
+  //==============================================================================
+  /**
+   * @private
+   * @param { AudioAsset } audioAsset 스트리밍으로 읽힌 오디오 애셋.
+   * @param { boolean } loop 반복 재생하면 참.
+   */
+  startStreamPlayback(audioAsset, loop) {
+    const audioContext = this.getAudioContext();
+    const streamUrl = audioAsset.getStreamUrl();
+    if (!audioContext || !this.#gainNode || streamUrl === null || typeof audioContext.createMediaElementSource !== "function") {
+      return;
+    }
+    this.stopSource();
+    if (this.#mediaElement === null) {
+      this.#mediaElement = createStreamMediaElement();
+      this.#mediaElement.preload = "auto";
+      this.#mediaSource = audioContext.createMediaElementSource(this.#mediaElement);
+      this.#mediaSource.connect(this.#gainNode);
+    }
+    const mediaElement = this.#mediaElement;
+    if (this.#mediaUrl !== streamUrl) {
+      setStreamMediaElementUrl(mediaElement, streamUrl);
+      this.#mediaUrl = streamUrl;
+    }
+    this.#isLoop = loop;
+    mediaElement.loop = loop;
+    mediaElement.playbackRate = this.#playbackRate;
+    mediaElement.currentTime = this.#time;
+    const playRequestId = this.#playRequestId;
+    mediaElement.onended = () => {
+      this.#isPlaying = false;
+      this.#isMediaPlaying = false;
+      mediaElement.onended = null;
+      this.unwatchContextState();
+    };
+    this.#isMediaPlaying = true;
+    this.#isPlaying = true;
+    this.#startContextTime = audioContext.currentTime;
+    this.#startPlaybackRate = this.#playbackRate;
+    this.#startDuration = audioAsset.getDuration();
+    this.watchContextState();
+    this.playMediaElement(playRequestId);
+  }
+  //==============================================================================
+  // 미디어 요소 틀기. (브라우저가 거부하면 재생을 끝낸 것으로 둔다, 그 사이 다른 요청이 왔으면 건드리지 않는다)
+  //==============================================================================
+  /**
+   * @private
+   * @param { number } playRequestId 이 재생 요청의 번호.
+   */
+  playMediaElement(playRequestId) {
+    const mediaElement = this.#mediaElement;
+    const playPromise = mediaElement.play();
+    if (!playPromise) {
+      return;
+    }
+    playPromise.catch((error) => {
+      if (playRequestId !== this.#playRequestId || !this.#isMediaPlaying) {
+        return;
+      }
+      if (error && error.name === "AbortError") {
+        return;
+      }
+      console.warn("[audio] \uC2A4\uD2B8\uB9AC\uBC0D \uC18C\uB9AC\uB97C \uD2C0\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
+      this.#isPlaying = false;
+      this.#isMediaPlaying = false;
+      mediaElement.onended = null;
+      this.unwatchContextState();
+    });
+  }
+  //==============================================================================
+  // 컨텍스트가 멈추고 도는 것 따라가기. (스트리밍으로 트는 동안만 듣는다, 버퍼 소리처럼 컨텍스트가 멈추면 같이 멈춘다)
+  //==============================================================================
+  /**
+   * @private
+   */
+  watchContextState() {
+    const audioContext = this.getAudioContext();
+    if (audioContext && typeof audioContext.addEventListener === "function") {
+      audioContext.addEventListener("statechange", this.#contextStateHandler);
+    }
+  }
+  //==============================================================================
+  // 컨텍스트가 멈추고 도는 것 그만 듣기. (스트리밍 재생이 멈추거나 끝나면, 플레이어가 컨텍스트에 붙잡혀 남지 않게)
+  //==============================================================================
+  /**
+   * @private
+   */
+  unwatchContextState() {
+    const audioContext = this.getAudioContext();
+    if (audioContext && typeof audioContext.removeEventListener === "function") {
+      audioContext.removeEventListener("statechange", this.#contextStateHandler);
+    }
+  }
+  //==============================================================================
+  // 컨텍스트 상태 따르기. (돌면 멈춰 둔 미디어 요소를 이어 틀고, 멈추면 미디어 요소도 멈춘다)
+  //==============================================================================
+  /**
+   * @private
+   */
+  followContextState() {
+    const audioContext = this.getAudioContext();
+    if (!this.#isMediaPlaying || !audioContext) {
+      return;
+    }
+    const mediaElement = this.#mediaElement;
+    if (audioContext.state === "running") {
+      if (mediaElement.paused) {
+        this.playMediaElement(this.#playRequestId);
+      }
+    } else if (!mediaElement.paused) {
+      mediaElement.pause();
+    }
   }
   //==============================================================================
   // 내부 재생 시작.
@@ -20317,11 +20671,7 @@ var AudioPlayer = class {
     if (!audioContext || !this.#gainNode) {
       return;
     }
-    if (this.#audioSource) {
-      this.#audioSource.onended = null;
-      this.#audioSource.stop();
-      this.#audioSource = null;
-    }
+    this.stopSource();
     this.#isLoop = loop;
     this.#audioSource = audioContext.createBufferSource();
     this.#audioSource.buffer = audioBuffer;
@@ -20353,11 +20703,7 @@ var AudioPlayer = class {
   //==============================================================================
   stop() {
     this.#playRequestId += 1;
-    if (this.#audioSource) {
-      this.#audioSource.onended = null;
-      this.#audioSource.stop();
-      this.#audioSource = null;
-    }
+    this.stopSource();
     this.#isPlaying = false;
   }
   //==============================================================================
@@ -20417,10 +20763,15 @@ var AudioPlayer = class {
   // 오디오 애셋 설정.
   //==============================================================================
   /**
-   * @param { AudioAsset } audioAsset 재생할 오디오 애셋. (다음 play 부터)
+   * @param { AudioAsset | null } audioAsset 재생할 오디오 애셋. (다음 play 부터, 스트리밍으로 틀던 것이 멈춰 있으면 그 미디어 요소가 받아 둔 것을 놓는다)
    */
   setAudioAsset(audioAsset) {
     this.#audioAsset = audioAsset;
+    const streamUrl = audioAsset ? audioAsset.getStreamUrl() : null;
+    if (this.#mediaElement !== null && !this.#isMediaPlaying && this.#mediaUrl !== null && this.#mediaUrl !== streamUrl) {
+      releaseMediaElement(this.#mediaElement);
+      this.#mediaUrl = null;
+    }
   }
   //==============================================================================
   // 오디오 애셋 반환.
@@ -20461,6 +20812,9 @@ var AudioPlayer = class {
     const audioContext = this.getAudioContext();
     if (!this.#isPlaying || !audioContext) {
       return this.#time;
+    }
+    if (this.#isMediaPlaying) {
+      return this.#mediaElement.currentTime;
     }
     const elapsedSeconds = System27.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
     return readPlaybackPosition(this.#time, elapsedSeconds, this.#startDuration, this.#isLoop);
@@ -36996,14 +37350,16 @@ var ShadowText = class extends Component {
     }
     const scaledShadowOffset = this.#shadowOffset * bakeScale;
     const scaledShadowBlur = this.#shadowBlur * bakeScale;
-    const bakePadding = BAKE_PADDING + System55.Math.ceil(scaledShadowBlur);
+    const bakePadding = BAKE_PADDING + System55.Math.ceil(scaledShadowBlur) * 2;
     const scaledPenX = bakePadding + actualLeft;
-    const scaledBaselineY = bakePadding + System55.Math.ceil(scaledFontAscent);
+    const scaledInkAscent = System55.Math.max(scaledFontAscent, textMetrics.actualBoundingBoxAscent || 0);
+    const scaledInkDescent = System55.Math.max(scaledFontDescent, textMetrics.actualBoundingBoxDescent || 0);
+    const scaledBaselineY = bakePadding + System55.Math.ceil(scaledInkAscent);
     const bakeWidth = scaledPenX + actualRight + bakePadding;
     const scaledDecorationLineWidth = System55.Math.max(1, fontSize / 16) * bakeScale;
     const scaledMiddleY = scaledBaselineY - (scaledFontAscent - scaledFontDescent) * 0.5;
     const scaledUnderlineY = scaledMiddleY + (fontSize * 0.5 + 2) * bakeScale;
-    let bakeHeight = scaledBaselineY + System55.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
+    let bakeHeight = scaledBaselineY + System55.Math.ceil(scaledInkDescent + scaledShadowOffset) + bakePadding;
     if (this.#isUnderline) {
       bakeHeight = System55.Math.max(bakeHeight, System55.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
     }
@@ -48577,23 +48933,6 @@ var Camera3D = class {
 };
 
 // src/graphics3d/toon/meshbuilder.js
-var meshbuilder_exports = {};
-__export(meshbuilder_exports, {
-  MeshBuilder: () => MeshBuilder,
-  SKIN_FLOAT_COUNT: () => SKIN_FLOAT_COUNT,
-  VERTEX_FLOAT_COUNT: () => VERTEX_FLOAT_COUNT,
-  createBoxGeometry: () => createBoxGeometry,
-  createCapsuleGeometry: () => createCapsuleGeometry,
-  createCylinderGeometry: () => createCylinderGeometry,
-  createFacetedChunkGeometry: () => createFacetedChunkGeometry,
-  createLatheGeometry: () => createLatheGeometry,
-  createOctahedronGeometry: () => createOctahedronGeometry,
-  createPartMatrix: () => createPartMatrix,
-  createRoundedBoxGeometry: () => createRoundedBoxGeometry,
-  createSphereGeometry: () => createSphereGeometry,
-  createTorusGeometry: () => createTorusGeometry,
-  readColorValues: () => readColorValues
-});
 var System73 = globalThis;
 var VERTEX_FLOAT_COUNT = 15;
 var SKIN_FLOAT_COUNT = 8;
@@ -52438,7 +52777,7 @@ var ToonRenderer = class {
    * @param { object } [options] - { isMipmapped (기본 true), isRepeated (기본 true, false 면 가장자리 붙임), isFiltered (기본 true, false 면 가까운 화소) }
    * @returns { WebGLTexture } 지은 RGBA 텍스처.
    * @example <caption>캔버스에 그린 무늬를 바탕색 텍스처로 쓰기</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
    * const canvas = document.createElement("canvas");
    * canvas.width = 64;
@@ -52449,8 +52788,8 @@ var ToonRenderer = class {
    * context.fillStyle = "#c04040";
    * context.fillRect(0, 0, 32, 32);
    * const baseColorTexture = renderer.createTexture(canvas, { isRepeated: true });
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
    * const mesh = renderer.createMesh(builder.readArrays());
    * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
    * renderer.drawMesh(mesh, Matrix4.createIdentity(), { baseColorTexture: baseColorTexture, uvTransform: [0, 0, 2, 2] });
@@ -52504,17 +52843,17 @@ var ToonRenderer = class {
     this.getWebGL2RenderingContext().deleteTexture(texture);
   }
   //==============================================================================
-  // 모형 올리기. (MeshBuilder.readArrays 나 ToonGlb.readGlbArrays 의 결과, 몸이 비면 null)
+  // 모형 올리기. (MeshBuilder.readArrays 나 readGlbArrays 의 결과, 몸이 비면 null)
   //==============================================================================
   /**
-   * @param { object } arrays - MeshBuilder.readArrays 나 ToonGlb.readGlbArrays 의 결과.
+   * @param { object } arrays - MeshBuilder.readArrays 나 readGlbArrays 의 결과.
    * @returns { object | null } GPU 에 올린 모형. (몸의 꼭짓점 번호가 비면 null)
    * @example <caption>부품 둘을 한 모형으로 올리고 다 쓰면 지우기</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createBoxGeometry, createSphereGeometry, Matrix4 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createBoxGeometry(0.8, 1, 0.5), Matrix4.createTranslation(0, 0.5, 0), "#6080c0", { hasOutline: true });
-   * builder.addPart(ToonMesh.createSphereGeometry(0.3, 20, 14), Matrix4.createTranslation(0, 1.3, 0), "#f0d0b0", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createBoxGeometry(0.8, 1, 0.5), Matrix4.createTranslation(0, 0.5, 0), "#6080c0", { hasOutline: true });
+   * builder.addPart(createSphereGeometry(0.3, 20, 14), Matrix4.createTranslation(0, 1.3, 0), "#f0d0b0", { hasOutline: true });
    * const mesh = renderer.createMesh(builder.readArrays());
    * if (mesh === null) {
    * 	throw new Error("empty mesh");
@@ -52960,10 +53299,10 @@ var ToonRenderer = class {
   /**
    * @param { object } camera - Camera3D. (보기와 투영을 읽는다)
    * @example <caption>Camera3D 로 프레임 시작하기</caption>
-   * import { ToonRenderer, ToonMesh, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createCylinderGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createCylinderGeometry(0.4, 0.4, 1, 24), Matrix4.createIdentity(), "#c0a0e0", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createCylinderGeometry(0.4, 0.4, 1, 24), Matrix4.createIdentity(), "#c0a0e0", { hasOutline: true });
    * const mesh = renderer.createMesh(builder.readArrays());
    * const camera = new Camera3D();
    * camera.setPerspective(0.8, 0.1, 100);
@@ -53006,13 +53345,13 @@ var ToonRenderer = class {
    * @param { number } width - 너비. (픽셀)
    * @param { number } height - 높이. (픽셀)
    * @example <caption>드로잉 버퍼 오른쪽 위 사각형에만 미리보기 그리기</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const canvas = document.createElement("canvas");
    * canvas.width = 320;
    * canvas.height = 240;
    * const renderer = new ToonRenderer(canvas.getContext("webgl2"));
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createOctahedronGeometry(0.6), Matrix4.createIdentity(), "#60c0a0", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createOctahedronGeometry(0.6), Matrix4.createIdentity(), "#60c0a0", { hasOutline: true });
    * const mesh = renderer.createMesh(builder.readArrays());
    * renderer.setScreenRect(200, 16, 104, 78);
    * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 104 / 78, 0.1, 20));
@@ -53088,12 +53427,12 @@ var ToonRenderer = class {
   /**
    * @param { object } shadowMap - ShadowMap. (깊이를 그릴 곳, updateLightMatrix 로 빛 행렬을 정해 둔다)
    * @example <caption>해의 그림자를 ShadowMap 에 드리우고 받기</caption>
-   * import { ToonRenderer, ToonMesh, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createBoxGeometry, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
    * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
    * const renderer = new ToonRenderer(webGL2RenderingContext);
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createBoxGeometry(0.6, 0.6, 0.6), Matrix4.createTranslation(0, 0.6, 0), "#e0b080", { hasOutline: true });
-   * builder.addPart(ToonMesh.createBoxGeometry(4, 0.1, 4), Matrix4.createTranslation(0, -0.05, 0), "#a0b0a0", { hasOutline: false });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createBoxGeometry(0.6, 0.6, 0.6), Matrix4.createTranslation(0, 0.6, 0), "#e0b080", { hasOutline: true });
+   * builder.addPart(createBoxGeometry(4, 0.1, 4), Matrix4.createTranslation(0, -0.05, 0), "#a0b0a0", { hasOutline: false });
    * const mesh = renderer.createMesh(builder.readArrays());
    * const shadowMap = new ShadowMap(webGL2RenderingContext, 1024);
    * const sunDirection = renderer.getSunDirection();
@@ -53128,11 +53467,11 @@ var ToonRenderer = class {
   /**
    * @param { object } shadowAtlas - ShadowAtlas.
    * @example <caption>점광 그림자 아틀라스의 칸마다 깊이 그리기</caption>
-   * import { ToonRenderer, ToonMesh, ShadowAtlas, Matrix4 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createBoxGeometry, ShadowAtlas, Matrix4 } from "./vanilla.js";
    * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
    * const renderer = new ToonRenderer(webGL2RenderingContext);
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createTranslation(0, 0.5, 0), "#c0a080", { hasOutline: false });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createTranslation(0, 0.5, 0), "#c0a080", { hasOutline: false });
    * const mesh = renderer.createMesh(builder.readArrays());
    * renderer.setPointLights([{ position: [0, 2.5, 1], color: [1, 0.8, 0.6], intensity: 3, range: 8, castsShadow: true }]);
    * const shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);
@@ -53209,10 +53548,10 @@ var ToonRenderer = class {
    * @param { Matrix4 } modelMatrix - 모형 행렬.
    * @param { object } [options] - 클래스 머리말의 그리기 꼴과 jointMatrices Float32Array, hasOutline (기본 true), isCulled (기본 true)
    * @example <caption>틴트, 바깥선 색과 굵기, 반투명을 그리기마다 바꾸기</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createRoundedBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createRoundedBoxGeometry(0.8, 0.8, 0.8, 4, 0.1), Matrix4.createIdentity(), "#e0e0e0", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createRoundedBoxGeometry(0.8, 0.8, 0.8, 4, 0.1), Matrix4.createIdentity(), "#e0e0e0", { hasOutline: true });
    * const mesh = renderer.createMesh(builder.readArrays());
    * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
    * renderer.drawMesh(mesh, Matrix4.createTranslation(-1, 0, 0), { tintColor: [1, 0.6, 0.6, 1], outlineColor: [0.4, 0.05, 0.05, 1], outlineWidthScale: 1.5 });
@@ -53241,10 +53580,10 @@ var ToonRenderer = class {
    * @param { Array<object> } instances - { modelMatrix: Matrix4, tintColor: [r, g, b, a] } 의 배열.
    * @param { object } [options] - drawMesh 와 같다. (모든 인스턴스에 같게 건다)
    * @example <caption>같은 바위 스무 개를 인스턴스마다 다른 틴트로</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#909098", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#909098", { hasOutline: true });
    * const rockMesh = renderer.createMesh(builder.readArrays());
    * const instances = [];
    * for (let index = 0; index < 20; ++index) {
@@ -53299,10 +53638,10 @@ var ToonRenderer = class {
    * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다)
    * @param { object } [options] - drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다)
    * @example <caption>자리만 담은 영구 버퍼로 풀숲 그리기</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createCylinderGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createCylinderGeometry(0.02, 0.15, 0.6, 6), Matrix4.createTranslation(0, 0.3, 0), "#60a050", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createCylinderGeometry(0.02, 0.15, 0.6, 6), Matrix4.createTranslation(0, 0.3, 0), "#60a050", { hasOutline: true });
    * const grassMesh = renderer.createMesh(builder.readArrays());
    * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceOffset", size: 3 }]);
    * const material = renderer.createMaterial({ name: "grass", vertexChunk: "void applyVertex(inout ToonVertex vertex) { vertex.modelMatrix[3].xyz += instanceOffset; }" });
@@ -54051,11 +54390,11 @@ var ToonRenderer = class {
   /**
    * @param { object } shade - 바탕에서 1 차, 2 차 그늘로 넘어가는 문턱, 부드러움, 색. ({ step, feather, color, secondStep, secondFeather, secondColor, isHalfLambert })
    * @example <caption>밝은 피부와 그늘 두 단계를 단단하게 가르기</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createSphereGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
    * renderer.setShade({ step: 0.55, feather: 0.01, color: [0.85, 0.62, 0.6], secondStep: 0.25, secondFeather: 0.01, secondColor: [0.6, 0.42, 0.45], isHalfLambert: true });
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f8e0d0", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f8e0d0", { hasOutline: true });
    * const mesh = renderer.createMesh(builder.readArrays());
    * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 0, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
    * renderer.drawMesh(mesh, Matrix4.createIdentity());
@@ -54123,13 +54462,13 @@ var ToonRenderer = class {
    * @param { WebGLTexture | null } rampTexture - createTexture 로 지은 램프 텍스처나 null.
    * @param { boolean } [isHalfLambert] - 반 램버트로 셀지. (기본 true)
    * @example <caption>네 칸 램프 텍스처로 그늘 색을 주고 다시 칸으로 돌리기</caption>
-   * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createTorusGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
    * const rampData = new Uint8Array([60, 50, 110, 255, 110, 100, 160, 255, 200, 185, 215, 255, 255, 255, 255, 255]);
    * const rampTexture = renderer.createTexture({ width: 4, height: 1, data: rampData }, { isMipmapped: false, isRepeated: false, isFiltered: false });
    * renderer.setRampTexture(rampTexture, true);
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createTorusGeometry(0.4, 0.15, 16, 32), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createTorusGeometry(0.4, 0.15, 16, 32), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
    * const mesh = renderer.createMesh(builder.readArrays());
    * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
    * renderer.drawMesh(mesh, Matrix4.createIdentity());
@@ -54299,11 +54638,11 @@ var ToonRenderer = class {
    * @param { object | null } shadowMap - 받을 ShadowMap. (null 이면 그림자를 받지 않는다)
    * @param { number } [strength] - 그림자 세기 0 ~ 1. (기본 0.6)
    * @example <caption>그림자를 받되 공중의 빛 구슬은 받지 않게 하기</caption>
-   * import { ToonRenderer, ToonMesh, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, MeshBuilder, createSphereGeometry, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
    * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
    * const renderer = new ToonRenderer(webGL2RenderingContext);
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createSphereGeometry(0.3, 20, 14), Matrix4.createIdentity(), "#ffe080", { glow: 1, hasOutline: false });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createSphereGeometry(0.3, 20, 14), Matrix4.createIdentity(), "#ffe080", { glow: 1, hasOutline: false });
    * const mesh = renderer.createMesh(builder.readArrays());
    * const shadowMap = new ShadowMap(webGL2RenderingContext, 512);
    * shadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.3, -1, -0.2), 4, 0.5, 20);
@@ -55080,7 +55419,7 @@ var ToonView3D = class extends Component {
     if (this.#renderer !== null || this.#isRendererFailed) {
       return this.#renderer;
     }
-    graphic.flushSpriteBatch();
+    graphic.flushBatch();
     try {
       const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
       this.#renderer = new ToonRenderer(webGL2RenderingContext);
@@ -67588,16 +67927,6 @@ var SkinnedModelRenderer = class extends Object2 {
 };
 
 // src/graphics3d/toon/glbmeshreader.js
-var glbmeshreader_exports = {};
-__export(glbmeshreader_exports, {
-  decodeGlbImage: () => decodeGlbImage,
-  readAnimationSwing: () => readAnimationSwing,
-  readGlbArrays: () => readGlbArrays,
-  readGlbImages: () => readGlbImages,
-  readGlbNodeArrays: () => readGlbNodeArrays,
-  readGlbNodeInfos: () => readGlbNodeInfos,
-  writeSkinPose: () => writeSkinPose
-});
 var System104 = globalThis;
 var GLB_MAGIC = 1179937895;
 var CHUNK_TYPE_JSON = 1313821514;
@@ -76024,7 +76353,7 @@ var SoundSystem = class {
   // 그 음악을 멈췄던 자리에서 이어 트는지.
   /** @private @type { object | null } */
   #playingMusic;
-  // 틀고 있는 배경음악. ({ soundId, source, gain, startTime, offset, duration })
+  // 틀고 있는 배경음악. ({ soundId, source, player, gain, startTime, offset, duration }, 스트리밍이면 source 대신 player)
   /** @private @type { Map<string, number> } */
   #musicPositions;
   // 음악마다 멈췄던 자리. (초)
@@ -76395,8 +76724,10 @@ var SoundSystem = class {
       return null;
     });
     this.#assetsById.set(soundRow.id, assets);
+    const loadType = readSoundRowLoadType(soundRow);
     const loads = paths.map(async (path, pathIndex) => {
       const audioAsset = new AudioAsset();
+      audioAsset.setLoadType(loadType);
       try {
         await audioAsset.load(path);
         assets[pathIndex] = audioAsset;
@@ -76816,19 +77147,18 @@ var SoundSystem = class {
     if (soundRow === void 0 || assets === void 0 || assets[0] === null) {
       return;
     }
-    const audioBuffer = assets[0].getAudioBuffer();
-    if (!audioBuffer) {
+    const musicAsset = assets[0];
+    const isStreaming = musicAsset.isStreaming();
+    const audioBuffer = musicAsset.getAudioBuffer();
+    if (!isStreaming && !audioBuffer) {
       return;
     }
     const musicGainNode = musicBus.getGainNode();
     const audioContext = musicGainNode.context;
     const now = audioContext.currentTime;
-    const duration = audioBuffer.duration;
+    const duration = musicAsset.getDuration();
     const storedPosition = this.#musicPositions.has(musicId) ? this.#musicPositions.get(musicId) : 0;
     const offset = this.#isMusicResumed && duration > 0 ? storedPosition % duration : 0;
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.loop = true;
     const gainNode = audioContext.createGain();
     const rowVolume = clampVolume(readSoundRowVolume(soundRow));
     if (fadeSeconds > 0) {
@@ -76837,16 +77167,27 @@ var SoundSystem = class {
     } else {
       gainNode.gain.value = rowVolume;
     }
-    source.connect(gainNode);
     gainNode.connect(musicGainNode);
+    if (isStreaming) {
+      const player = new AudioPlayer(audioContext, gainNode);
+      player.setAudioAsset(musicAsset);
+      player.setTime(offset);
+      player.play(true);
+      this.#playingMusic = { soundId: musicId, source: null, player, gain: gainNode, startTime: now, offset, duration };
+      return;
+    }
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.loop = true;
+    source.connect(gainNode);
     source.start(0, offset);
-    this.#playingMusic = { soundId: musicId, source, gain: gainNode, startTime: now, offset, duration };
+    this.#playingMusic = { soundId: musicId, source, player: null, gain: gainNode, startTime: now, offset, duration };
   }
   //==============================================================================
   // 틀던 배경음악을 줄여 끄기. (fadeSeconds 동안, 다 줄어든 때의 자리를 기억)
   //==============================================================================
   /**
-   * @param { object } playingMusic 틀던 배경음악. ({ soundId, source, gain, startTime, offset, duration })
+   * @param { object } playingMusic 틀던 배경음악. ({ soundId, source, player, gain, startTime, offset, duration })
    * @param { number } fadeSeconds 줄이는 시간. (초, 0 이면 바로 끈다)
    */
   fadeOutMusic(playingMusic, fadeSeconds) {
@@ -76854,7 +77195,8 @@ var SoundSystem = class {
     const now = audioContext.currentTime;
     const stopTime = now + fadeSeconds;
     if (playingMusic.duration > 0) {
-      this.#musicPositions.set(playingMusic.soundId, (playingMusic.offset + stopTime - playingMusic.startTime) % playingMusic.duration);
+      const position = playingMusic.player !== null ? playingMusic.player.getTime() + fadeSeconds : playingMusic.offset + stopTime - playingMusic.startTime;
+      this.#musicPositions.set(playingMusic.soundId, position % playingMusic.duration);
     }
     const gainParameter = playingMusic.gain.gain;
     gainParameter.cancelScheduledValues(now);
@@ -76863,6 +77205,16 @@ var SoundSystem = class {
       gainParameter.linearRampToValueAtTime(0, stopTime);
     } else {
       gainParameter.setValueAtTime(0, now);
+    }
+    if (playingMusic.player !== null) {
+      const player = playingMusic.player;
+      const gainNode = playingMusic.gain;
+      System132.setTimeout(() => {
+        player.stop();
+        player.setAudioAsset(null);
+        gainNode.disconnect();
+      }, (fadeSeconds + VOLUME_SMOOTHING_SECONDS) * 1e3);
+      return;
     }
     try {
       playingMusic.source.stop(stopTime + VOLUME_SMOOTHING_SECONDS);
@@ -76880,6 +77232,13 @@ function readSoundPaths(soundRow) {
   return [];
 }
 __name(readSoundPaths, "readSoundPaths");
+function readSoundRowLoadType(soundRow) {
+  if (System132.Object.values(AudioLoadType).includes(soundRow.loadType)) {
+    return soundRow.loadType;
+  }
+  return AudioLoadType.decompressOnLoad;
+}
+__name(readSoundRowLoadType, "readSoundRowLoadType");
 function clampVolume(volume) {
   if (typeof volume !== "number" || !System132.Number.isFinite(volume)) {
     return 0;
@@ -80112,15 +80471,15 @@ var ToonScreenOutline = class {
    * @param { number } lineId - 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID. (0 은 빈 곳이라 쓰지 않는다, 같은 번호끼리 맞닿은 곳은 긋지 않는다)
    * @param { object } [options] - { jointMatrices Float32Array, isCulled (기본 true), indexStart, indexCount (몸 번호 버퍼의 일부만), isMirrored (주지 않으면 행렬식으로), hasScreenOutline (기본 true, false 면 선은 내지 않고 가리기만), hasCreaseLine (기본 true) }
    * @example <caption>바닥은 선 없이 가리기만, 결정은 꺾임 선 없이</caption>
-   * import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, ToonScreenOutline, MeshBuilder, createBoxGeometry, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
    * const renderer = new ToonRenderer(webGL2RenderingContext);
    * const outline = new ToonScreenOutline(webGL2RenderingContext);
-   * const floorBuilder = new ToonMesh.MeshBuilder();
-   * floorBuilder.addPart(ToonMesh.createBoxGeometry(6, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), "#506070", { hasOutline: false });
+   * const floorBuilder = new MeshBuilder();
+   * floorBuilder.addPart(createBoxGeometry(6, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), "#506070", { hasOutline: false });
    * const floorMesh = renderer.createMesh(floorBuilder.readArrays());
-   * const crystalBuilder = new ToonMesh.MeshBuilder();
-   * crystalBuilder.addPart(ToonMesh.createOctahedronGeometry(0.5), Matrix4.createTranslation(0, 0.5, 0), "#90d0ff", { hasOutline: false });
+   * const crystalBuilder = new MeshBuilder();
+   * crystalBuilder.addPart(createOctahedronGeometry(0.5), Matrix4.createTranslation(0, 0.5, 0), "#90d0ff", { hasOutline: false });
    * const crystalMesh = renderer.createMesh(crystalBuilder.readArrays());
    * const viewMatrix = Matrix4.createLookAt(Vector3.create(3, 3, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
    * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
@@ -80151,12 +80510,12 @@ var ToonScreenOutline = class {
    * @param { number } lineId - 공통 번호.
    * @param { object } [options] - drawMesh 와 같다. (꼴은 모든 인스턴스에 같다)
    * @example <caption>돌마다 다른 번호로 맞닿은 곳에도 선</caption>
-   * import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
    * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
    * const renderer = new ToonRenderer(webGL2RenderingContext);
    * const outline = new ToonScreenOutline(webGL2RenderingContext);
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
    * const rockMesh = renderer.createMesh(builder.readArrays());
    * const instances = [0, 1, 2].map((index) => ({ modelMatrix: Matrix4.createTranslation(index * 0.5, 0, 0), lineId: 10 + index }));
    * const viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));
@@ -80833,12 +81192,12 @@ var ToonDrawQueue = class {
    * @param { object } renderer - ToonRenderer.
    * @param { object } shadowAtlas - ShadowAtlas. (updateLights 를 부른 것)
    * @example <caption>점광 그림자를 굽고 받기</caption>
-   * import { ToonRenderer, ToonDrawQueue, ToonMesh, ShadowAtlas, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+   * import { ToonRenderer, ToonDrawQueue, MeshBuilder, createBoxGeometry, createSphereGeometry, ShadowAtlas, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
    * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
    * const renderer = new ToonRenderer(webGL2RenderingContext);
-   * const builder = new ToonMesh.MeshBuilder();
-   * builder.addPart(ToonMesh.createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), "#8090a0", { hasOutline: false });
-   * builder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { hasOutline: false });
+   * const builder = new MeshBuilder();
+   * builder.addPart(createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), "#8090a0", { hasOutline: false });
+   * builder.addPart(createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { hasOutline: false });
    * const mesh = renderer.createMesh(builder.readArrays());
    * renderer.setPointLights([{ position: [1, 2, 1], color: [1, 0.85, 0.6], intensity: 4, range: 8, castsShadow: true }]);
    * const shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);
@@ -86416,6 +86775,7 @@ var WebSocketClient = class extends Object2 {
 // import.js
 var System147 = globalThis;
 export {
+  AUTOMATIC_STREAMING_BYTE_THRESHOLD,
   Action,
   AmbientOcclusionEffect,
   Animation,
@@ -86429,6 +86789,7 @@ export {
   AssetType,
   AudioAsset,
   AudioBus,
+  AudioLoadType,
   AudioManager,
   AudioPlayer,
   BeepPlayer,
@@ -86620,12 +86981,10 @@ export {
   ToonBufferUsage,
   ToonDrawQueue,
   ToonDrawStage,
-  glbmeshreader_exports as ToonGlb,
   ToonInstanceLayout,
   ToonLightSet,
   ToonMatcapBlend,
   ToonMaterial,
-  meshbuilder_exports as ToonMesh,
   ToonOutlineWidthUnit,
   ToonPostProcess,
   ToonProgramKind,
