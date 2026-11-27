@@ -263,8 +263,11 @@ try {
 	check(frameTable.get(81).retainedCount < frameTable.get(81).drawCallCount, `바꾼 프레임은 묶음을 다시 올림 (${frameTable.get(81).retainedCount} / ${frameTable.get(81).drawCallCount})`);
 	for (const frame of uncachedResult.frameList) {
 		check(frame.hitCount <= 0, `캐시 끈 길은 캐시로 그리지 않음 (${frame.frameNumber})`);
-		check(frame.retainedCount <= 0, `캐시 끈 길은 남긴 묶음을 쓰지 않음 (${frame.frameNumber})`);
 	}
+	// 캐시를 꺼도 바로 쓴 정점이 지난 프레임과 같으면 다시 올리지 않고, 바꾼 프레임은 다시 올린다.
+	const uncachedFrameTable = new Map(uncachedResult.frameList.map((frame) => [frame.frameNumber, frame]));
+	check(uncachedFrameTable.get(30).retainedCount === uncachedFrameTable.get(30).drawCallCount, `캐시 끈 길의 멈춘 프레임은 남긴 묶음으로 그림 (${uncachedFrameTable.get(30).retainedCount} / ${uncachedFrameTable.get(30).drawCallCount})`);
+	check(uncachedFrameTable.get(81).retainedCount < uncachedFrameTable.get(81).drawCallCount, `캐시 끈 길의 바꾼 프레임은 묶음을 다시 올림 (${uncachedFrameTable.get(81).retainedCount} / ${uncachedFrameTable.get(81).drawCallCount})`);
 	const uncachedStaticTime = readMedianDrawTime(uncachedResult.frameList, 10, 40);
 	const cachedStaticTime = readMedianDrawTime(cachedResult.frameList, 10, 40);
 	const uncachedScrollTime = readMedianDrawTime(uncachedResult.frameList, 45, 80);

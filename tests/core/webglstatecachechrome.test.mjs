@@ -323,6 +323,13 @@ try {
 			realQueryCount++;
 			return originalPrototypeIsEnabled.call(this, capability);
 		};
+		// 잃음은 이벤트 깃발로 알므로 읽을 때마다 isContextLost 도 부르지 않아야 한다.
+		let contextLostQueryCount = 0;
+		const originalPrototypeIsContextLost = WebGL2RenderingContext.prototype.isContextLost;
+		WebGL2RenderingContext.prototype.isContextLost = function () {
+			contextLostQueryCount++;
+			return originalPrototypeIsContextLost.call(this);
+		};
 		const queryParameterList = [gl.FRAMEBUFFER_BINDING, gl.VIEWPORT, gl.BLEND_SRC_RGB, gl.DEPTH_WRITEMASK, gl.DEPTH_FUNC, gl.FRONT_FACE, gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ACTIVE_TEXTURE, gl.TEXTURE_BINDING_2D, gl.COLOR_CLEAR_VALUE, gl.UNPACK_FLIP_Y_WEBGL, gl.MAX_SAMPLES];
 		for (let frameIndex = 0; frameIndex < 10; frameIndex++) {
 			for (const parameterName of queryParameterList) {
@@ -335,6 +342,7 @@ try {
 		}
 		WebGL2RenderingContext.prototype.getParameter = originalPrototypeGetParameter;
 		WebGL2RenderingContext.prototype.isEnabled = originalPrototypeIsEnabled;
+		WebGL2RenderingContext.prototype.isContextLost = originalPrototypeIsContextLost;
 
 		// 컨텍스트 잃기와 되살리기.
 		const loseContextExtension = gl.getExtension("WEBGL_lose_context");
@@ -369,6 +377,7 @@ try {
 			isStaleBeforeReset,
 			resetViewport: [resetViewport.position.x, resetViewport.position.y, resetViewport.width, resetViewport.height],
 			realQueryCount,
+			contextLostQueryCount,
 			lostMismatchCount,
 			isContextLostEventSeen,
 			isContextRestoredEventSeen,
@@ -391,6 +400,7 @@ console.log("  견주기 함수가 참이라고 답한 수 " + result.knownAnswe
 check(result.isStaleBeforeReset, "프로토타입으로 바꾼 뷰포트는 reset 전에 모르는 것이 맞음");
 check(result.resetViewport.join(",") === "3,4,50,60", "resetGLStateCache 뒤 뷰포트 " + result.resetViewport.join(","));
 check(result.realQueryCount === 0, "그리는 중 GL 에 물은 횟수 " + result.realQueryCount + " (0 이어야)");
+check(result.contextLostQueryCount === 0, "그리는 중 isContextLost 를 부른 횟수 " + result.contextLostQueryCount + " (0 이어야)");
 console.log("  컨텍스트 잃음 사건 " + result.isContextLostEventSeen + ", 되살림 사건 " + result.isContextRestoredEventSeen);
 check(result.lostMismatchCount === 0, "컨텍스트를 되살린 뒤 다름 " + result.lostMismatchCount);
 check(result.antialiasDefault === true, "antialias 기본 켬");

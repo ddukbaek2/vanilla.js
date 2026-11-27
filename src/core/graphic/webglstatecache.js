@@ -184,6 +184,7 @@ export class WebGLStateCache extends Object {
 	/** @private @type { WeakMap<WebGLTexture, number> } */ #textureTargetTable; // 텍스처마다 처음 묶은 대상 칸. (다른 대상으로 묶으면 GL 이 무시한다)
 	/** @private @type { WeakMap<WebGLProgram, boolean> } */ #programLinkStatusTable; // 프로그램마다 알아낸 링크 결과. (링크에 실패한 프로그램은 쓰게 해도 GL 이 무시한다)
 	/** @private @type { WeakSet<object> } */ #deletedObjectSet; // 지운 프레임 버퍼, 텍스처, 버텍스 어레이, 프로그램. (묶으면 GL 이 무시한다)
+	/** @private @type { boolean } */ #isContextLost; // 컨텍스트를 잃었는지. (webglcontextlost, webglcontextrestored 이벤트로 바꾼다, 읽을 때마다 isContextLost 를 부르지 않는다)
 
 	//==============================================================================
 	// 생성.
@@ -203,20 +204,27 @@ export class WebGLStateCache extends Object {
 		this.#bufferElementTable = new System.WeakMap();
 		this.#programLinkStatusTable = new System.WeakMap();
 		this.#deletedObjectSet = new System.WeakSet();
+		// 이미 잃은 컨텍스트로 만들 수도 있으니 처음에 한 번만 묻는다.
+		this.#isContextLost = typeof webGL2RenderingContext.isContextLost === "function" && webGL2RenderingContext.isContextLost();
 		this.#originalGetParameter = webGL2RenderingContext.getParameter;
 		this.#originalIsEnabled = webGL2RenderingContext.isEnabled;
 		this.reset();
 		this.installTrackers();
 
-		// 컨텍스트를 잃으면 기억한 GL 상태를 잊는다. (되살리면 GL 상태가 처음으로 돌아가므로 그때도 잊는다)
+		// 컨텍스트를 잃으면 기억한 GL 상태를 잊고 잃었다고 적는다. (되살리면 GL 상태가 처음으로 돌아가므로 그때도 잊는다)
+		// - 잃음은 이 두 이벤트로만 안다. (WebGL 명세: 잃는 순간 잃음 깃발을 세우고 webglcontextlost 는 작업으로 미뤄 쏜다)
+		//   깃발이 선 뒤 이벤트가 오기 전에 채운 값(GL 이 null 을 준다)은 이벤트가 올 때 reset 으로 잊으므로, 그동안 isContextLost 를 묻지 않아도 이벤트 뒤에 남지 않는다.
 		// 엔진은 컨텍스트를 되살리지 않는다. (preventDefault 를 하지 않아 webglcontextrestored 가 오지 않는다, 게임이 되살려도 엔진 자원은 다시 짓지 않는다, Graphic 생성자 참고)
 		const canvas = webGL2RenderingContext.canvas;
 		if (canvas && typeof canvas.addEventListener === "function") {
-			const contextChangeCallback = () => {
+			canvas.addEventListener("webglcontextlost", () => {
+				this.#isContextLost = true;
 				this.reset();
-			};
-			canvas.addEventListener("webglcontextlost", contextChangeCallback);
-			canvas.addEventListener("webglcontextrestored", contextChangeCallback);
+			});
+			canvas.addEventListener("webglcontextrestored", () => {
+				this.#isContextLost = false;
+				this.reset();
+			});
 		}
 	}
 
@@ -276,14 +284,14 @@ export class WebGLStateCache extends Object {
 
 	//==============================================================================
 	// 모르는 값을 GL 에서 채워도 되는지. (컨텍스트를 잃은 동안 읽은 null 은 기억하지 않는다)
+	// - 잃음 이벤트로 세운 깃발만 본다. getParameter, isEnabled 를 가로챌 때마다 불리므로 GL 의 isContextLost 를 부르지 않는다.
 	//==============================================================================
 	/**
 	 * @private
 	 * @returns { boolean }
 	 */
 	canRemember() {
-		const webGL2RenderingContext = this.#webGL2RenderingContext;
-		return typeof webGL2RenderingContext.isContextLost !== "function" || !webGL2RenderingContext.isContextLost();
+		return !this.#isContextLost;
 	}
 
 	//==============================================================================
