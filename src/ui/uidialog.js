@@ -366,7 +366,7 @@ export class UIDialog extends WorldNode {
 	 * @example <caption>확인 단추 노드를 찾아 이름과 크기 읽기</caption>
 	 * import { UIDialog } from "./build/vanilla.js";
 	 *
-	 * const dialog = new UIDialog({ confirmText: "좋아요", cancelText: "아니요" });
+	 * const dialog = new UIDialog({ confirmText: "OK", cancelText: "Cancel" });
 	 * const confirmNode = dialog.getConfirmNode();
 	 * const cancelNode = dialog.getCancelNode();
 	 * console.log(confirmNode.getName(), cancelNode.getName(), dialog.getPanelNode().getName());

@@ -396,7 +396,7 @@ export class UIDropdown extends WorldNode {
 	 * import { UIDropdown } from "./build/vanilla.js";
 	 *
 	 * const dropdown = new UIDropdown({ width: 160 });
-	 * dropdown.setOptionList(["낮음", "보통", "높음"]);
+	 * dropdown.setOptionList(["Low", "Medium", "High"]);
 	 * const optionNodes = dropdown.getOptionNodes();
 	 * console.log(optionNodes.length, optionNodes[1].getName(), dropdown.getOptionList()[1]);
 	 * dropdown.selectIndex(1);

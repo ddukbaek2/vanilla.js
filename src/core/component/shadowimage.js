@@ -2,11 +2,10 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Color } from "../../base/color.js";
 import { Rect } from "../../base/rect.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
-import { buildRGBAString } from "./shadowtext.js";
+import { buildRGBAString, readColorText } from "./shadowtext.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
 
@@ -335,13 +334,13 @@ export class ShadowImage extends Component {
 	// 그림자 설정. (색, 불투명도, 그림 아래로 내려가는 만큼, 번지는 만큼)
 	//==============================================================================
 	/**
-	 * @param { string } shadowColor - "#rrggbb"
+	 * @param { Color | string } shadowColor - "#rrggbb"
 	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
 	 * @param { number } shadowOffset 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
-		shadowColor = Color.from(shadowColor);
+		shadowColor = readColorText(shadowColor);
 		this.#shadowColor = shadowColor;
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;

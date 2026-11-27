@@ -9,7 +9,8 @@
 import * as Vanilla from "../../import.js";
 import { check, checkEqual, checkJson, checkNear, finish } from "../testcheck.mjs";
 
-const { Color, Paint, Outline, UIView, UISlider, WorldNode, Vector2, Sprite, ShadowImage, UIImageView, UIDropdown, UIDialog, UIDocument, isViewPositionInsideNode, GameScene, Scene, UIScene } = Vanilla;
+const { Color, Paint, Outline, SoftShade, ShadowText, UIView, UISlider, WorldNode, Vector2, Sprite, ShadowImage, UIImageView, UIDropdown, UIDialog, UIDocument, isViewPositionInsideNode, GameScene, Scene, UIScene } = Vanilla;
+const { readColorText } = await import("../../src/core/component/shadowtext.js");
 
 // GameScene 도 맨 위에서 나간다. (러스트 판 vanilla::GameScene)
 {
@@ -50,6 +51,20 @@ const { Color, Paint, Outline, UIView, UISlider, WorldNode, Vector2, Sprite, Sha
 	uiScene.setSceneBackgroundColor(new Color(0, 1, 0, 1));
 	checkEqual(uiScene.getSceneBackgroundColor().toHEXString(), "#00ff00", "UIScene 은 Scene 의 배경색을 쓴다");
 	checkEqual(typeof uiScene.drawSceneBackground, "function", "drawSceneBackground");
+
+	// 색을 글로 담아 굽는 컴포넌트도 Color 를 받는다. (글은 그대로, Color 는 알파를 뺀 "#rrggbb", 불투명도는 따로 받는다)
+	const softShade = new SoftShade();
+	softShade.setShade("band", new Color(1, 0, 0, 0.5), 0.4);
+	checkEqual(softShade.getColor(), "#ff0000", "SoftShade.setShade 의 Color");
+	softShade.setShade("band", "#123456", 0.4);
+	checkEqual(softShade.getColor(), "#123456", "SoftShade.setShade 의 색 글은 그대로");
+	checkEqual(readColorText(new Color(0, 0, 1, 0.25)), "#0000ff", "ShadowText, ShadowImage 가 담는 Color 의 글 (알파는 뺀다)");
+	checkEqual(readColorText("rgb(1, 2, 3)"), "rgb(1, 2, 3)", "ShadowText 의 CSS 색 글은 그대로");
+	const shadowText = new ShadowText();
+	shadowText.setTextStyle(20, false, new Color(0, 0, 1, 1));
+	shadowText.setShadow(new Color(0, 0, 0, 1), 0.5, 2);
+	const shadowImage = new ShadowImage();
+	shadowImage.setShadow(new Color(0, 1, 0, 1), 0.5, 2);
 }
 
 // 보이기 플래그: 켜짐, 투명도와 따로. (러스트 판 active_and_visible_in_hierarchy 의 set_visible 대목)
