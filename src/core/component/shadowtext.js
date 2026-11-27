@@ -277,15 +277,19 @@ export class ShadowText extends Component {
 		const scaledShadowBlur = this.#shadowBlur * bakeScale;
 
 		// 번지는 그림자가 잘리지 않게 사방을 번지는 만큼 넓힌다.
-		const bakePadding = BAKE_PADDING + System.Math.ceil(scaledShadowBlur);
+		// (캔버스 shadowBlur 는 표준 편차 blur / 2 의 가우스라 꼬리가 3 표준 편차인 1.5 배까지 간다, 넉넉히 2 배, 러스트 bake 의 padding 과 같은 셈)
+		const bakePadding = BAKE_PADDING + System.Math.ceil(scaledShadowBlur) * 2;
 		const scaledPenX = bakePadding + actualLeft;
-		const scaledBaselineY = bakePadding + System.Math.ceil(scaledFontAscent);
+		// 세로는 글꼴 상자와 잉크 가운데 큰 쪽. (크롬 fillText 처럼 줄 높이를 넘는 부호도 자르지 않는다, 그리는 자리는 baselineOffsetY 로 되돌아간다)
+		const scaledInkAscent = System.Math.max(scaledFontAscent, textMetrics.actualBoundingBoxAscent || 0);
+		const scaledInkDescent = System.Math.max(scaledFontDescent, textMetrics.actualBoundingBoxDescent || 0);
+		const scaledBaselineY = bakePadding + System.Math.ceil(scaledInkAscent);
 		const bakeWidth = scaledPenX + actualRight + bakePadding;
 		// 밑줄은 기준선 아래로 내려가므로 그만큼 여유를 더 둔다.
 		const scaledDecorationLineWidth = System.Math.max(1, fontSize / 16) * bakeScale;
 		const scaledMiddleY = scaledBaselineY - (scaledFontAscent - scaledFontDescent) * 0.5;
 		const scaledUnderlineY = scaledMiddleY + (fontSize * 0.5 + 2) * bakeScale;
-		let bakeHeight = scaledBaselineY + System.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
+		let bakeHeight = scaledBaselineY + System.Math.ceil(scaledInkDescent + scaledShadowOffset) + bakePadding;
 		if (this.#isUnderline) {
 			bakeHeight = System.Math.max(bakeHeight, System.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
 		}

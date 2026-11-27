@@ -169,6 +169,24 @@ function resolveFontString(fontString) {
 }
 
 //==============================================================================
+// 글 굽기의 잉크 둘레 여백. (굽는 배율 텍셀, 문자열 사각형과 글리프 칸의 위아래에 둔다)
+// - 채우기는 2. 크롬(맥)은 안티앨리어싱 잉크가 actualBoundingBox 를 올림한 경계 밖 한 줄까지 번진다. 그 한 줄과,
+//   사각형 가장자리에서 선형 거르기가 투명을 뽑게 비우는 한 줄.
+// - 바깥선은 선 굵기의 반(0.5 아래는 0.5)을 올림하고 2 를 더한다. (러스트 build_entry 의 padding 도 같은 셈으로 맞춘다)
+//==============================================================================
+/**
+ * @param { string } mode "fill" 또는 "stroke".
+ * @param { number } scaledLineWidth 굽는 배율을 곱한 선 굵기.
+ * @returns { number }
+ */
+function getTextInkPadding(mode, scaledLineWidth) {
+	if (mode !== "stroke") {
+		return 2;
+	}
+	return Math.ceil(Math.max(System.Math.fround(scaledLineWidth) * 0.5, 0.5)) + 2;
+}
+
+//==============================================================================
 // 글 재기. (캐시를 거친다, 문서가 없으면 null)
 // - 돌려준 TextMetrics 는 캐시가 나눠 쓰므로 고치지 않는다.
 // - 기본 글꼴 이름 default 는 엔진 기본 글꼴 사슬로 잰다. (resolveFontString)
@@ -525,7 +543,7 @@ export class TextStringTextureCache extends Object {
 		const actualLeft = Math.ceil(Math.max(scaledTextMetrics.actualBoundingBoxLeft || 0, 0));
 		const actualRight = Math.ceil(Math.max(scaledTextMetrics.actualBoundingBoxRight || scaledTextMetrics.width, 0));
 
-		// 폰트 상하 경계. (미지원 시 실측 경계로 폴백)
+		// 폰트 상하 경계. (줄 배치와 기준선 정렬에 쓴다, 미지원 시 실측 경계로 폴백)
 		let scaledFontAscent = scaledTextMetrics.fontBoundingBoxAscent;
 		if (scaledFontAscent === undefined) {
 			scaledFontAscent = scaledTextMetrics.actualBoundingBoxAscent || 0;
@@ -535,15 +553,13 @@ export class TextStringTextureCache extends Object {
 			scaledFontDescent = scaledTextMetrics.actualBoundingBoxDescent || 0;
 		}
 
-		// 아웃라인 두께와 안티앨리어싱 여유 패딩.
-		const scaledPadding = Math.ceil((lineWidth * scale) / 2) + 2;
+		// 잉크 경계 둘레의 여백. (바깥선은 선 굵기의 반을 더한다, 번지는 안티앨리어싱 한 줄과 선형 거르기가 투명을 뽑을 한 줄, getTextInkPadding)
+		const scaledPadding = getTextInkPadding(mode, lineWidth * scale);
 
-		// 문자열째 그릴 때의 펜 자리와 크기. (글리프 칸은 이 사각형 안으로 잘라 예전과 같은 화소만 남긴다)
+		// 문자열 사각형의 펜 자리와 너비. (세로는 글리프를 다 찾은 뒤 글꼴 상자와 잉크 가운데 큰 쪽으로 잡는다)
 		const scaledPenX = scaledPadding + actualLeft;
-		const scaledBaselineY = scaledPadding + Math.ceil(scaledFontAscent);
 		const bakeWidth = scaledPenX + actualRight + scaledPadding;
-		const bakeHeight = scaledBaselineY + Math.ceil(scaledFontDescent) + scaledPadding;
-		if (bakeWidth <= 0 || bakeHeight <= 0) {
+		if (bakeWidth <= 0) {
 			return null;
 		}
 
@@ -588,6 +604,9 @@ export class TextStringTextureCache extends Object {
 				const chunkLeft = Math.ceil(Math.max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
 				const chunkRight = Math.ceil(Math.max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
 				const originX = cellPadding + chunkLeft;
+				// 칸 세로는 글꼴 상자와 이 덩어리 잉크 가운데 큰 쪽에 여백. (줄 높이를 넘는 부호도 자르지 않는다, 위아래 한 줄씩은 가장자리 되풀이 자리)
+				const cellTopExtent = scaledPadding + Math.ceil(Math.max(scaledFontAscent, chunkMetrics.actualBoundingBoxAscent || 0));
+				const cellBottomExtent = Math.ceil(Math.max(scaledFontDescent, chunkMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
 				glyph = {
 					glyphKey: glyphKey,
 					text: chunk.text,
@@ -595,8 +614,8 @@ export class TextStringTextureCache extends Object {
 					fractionX: fractionX,
 					originX: originX,
 					width: originX + 1 + chunkRight + cellPadding,
-					height: bakeHeight + 2,
-					baselineY: scaledBaselineY + 1,
+					height: cellTopExtent + cellBottomExtent + 2,
+					baselineY: cellTopExtent + 1,
 					atlasPage: null,
 					atlasX: 0,
 					atlasY: 0,
@@ -611,6 +630,18 @@ export class TextStringTextureCache extends Object {
 		if (missingGlyphList.length > 0) {
 			this.bakeGlyphs(missingGlyphList, mode, colorString, lineWidth * scale, textDirection);
 		}
+
+		// 문자열 사각형 세로. (글꼴 상자와 문자열 잉크, 글리프 칸 가운데 가장 큰 쪽, 크롬 fillText 처럼 줄 높이를 넘는 잉크도 자르지 않는다)
+		// 기준선 자리만 아래로 내려가고 그리는 자리는 baselineOffsetY 로 되돌아가므로 줄 배치와 정렬은 그대로다.
+		let topExtent = scaledPadding + Math.ceil(Math.max(scaledFontAscent, scaledTextMetrics.actualBoundingBoxAscent || 0));
+		let bottomExtent = Math.ceil(Math.max(scaledFontDescent, scaledTextMetrics.actualBoundingBoxDescent || 0)) + scaledPadding;
+		for (let glyphIndex = 0; glyphIndex < glyphList.length; glyphIndex += 2) {
+			const glyph = glyphList[glyphIndex];
+			topExtent = Math.max(topExtent, glyph.baselineY - 1);
+			bottomExtent = Math.max(bottomExtent, glyph.height - glyph.baselineY - 1);
+		}
+		const scaledBaselineY = topExtent;
+		const bakeHeight = topExtent + bottomExtent;
 
 		// 글리프 사각형. (문자열 사각형 왼쪽 위 기준 논리 좌표, 문자열 사각형 밖은 잘라 낸다)
 		const glyphTextures = [];
@@ -823,9 +854,8 @@ export class TextStringTextureCache extends Object {
 			}
 			bakeCanvasRenderingContext.restore();
 
-			// 칸의 맨 위와 맨 아래 한 줄은 문자열 사각형의 가장자리 줄을 되풀이한다.
-			// (줄 높이를 넘는 잉크는 문자열 사각형에서 잘리고, 세로 소수 자리에서 선형 거르기가 사각형 밖 한 줄을 뽑을 때
-			//  아틀라스의 이웃 줄이 아니라 예전 문자열 텍스처의 CLAMP_TO_EDGE 와 같은 가장자리 줄을 뽑는다)
+			// 칸의 맨 위와 맨 아래 한 줄은 칸 가장자리 줄(잉크 밖 여백이라 투명)을 되풀이한다.
+			// (세로 소수 자리에서 선형 거르기가 칸 밖 한 줄을 뽑을 때 아틀라스의 이웃 줄이 아니라 CLAMP_TO_EDGE 와 같은 가장자리 줄을 뽑는다)
 			bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, 1, span.width, 1, 0, 0, span.width, 1);
 			bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, span.height - 2, span.width, 1, 0, span.height - 1, span.width, 1);
 
