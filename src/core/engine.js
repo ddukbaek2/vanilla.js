@@ -62,6 +62,7 @@ export const PageEvent = System.Object.freeze({
  * engineConfiguration.referenceResolutionSize = Vector2.create(1920, 1080);
  * engineConfiguration.autoResizeOnWindowResize = true;
  * engineConfiguration.maximumFramePerSecond = 60;
+ * engineConfiguration.antialias = true;
  * engineConfiguration.useStatistics = true;
  * engineConfiguration.useDevTools = false;
  * const engine = new Engine(engineConfiguration);
@@ -82,6 +83,10 @@ export class EngineConfiguration extends Object {
 	// 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. 캔버스 위에 후처리를 얹는 프로젝트가 켠다.
 	// (다른 캔버스가 texImage2D 나 drawImage 로 읽으려면 필요하다) 한 번 더 복사하는 만큼 비용이 있다.
 	/** @type { boolean } */ preserveDrawingBuffer;
+	// 캔버스(기본 프레임 버퍼)의 멀티샘플 안티에일리어싱(MSAA)을 켤지. 생성 때 정한다. 켜면(기본) 지금까지와 같다.
+	// 끄면 도형과 3D 의 가장자리가 계단져 보이는 대신 고해상도 모바일에서 프레임마다 드는 리졸브 비용이 빠진다.
+	// (웹은 WebGL 컨텍스트 속성 antialias 로 켬과 끔만 고르고 표본 수는 브라우저가 정한다. 데스크탑은 켜면 표본 4)
+	/** @type { boolean } */ antialias;
 	// 최대 FPS. 0 이면 제한하지 않는다. (화면 주사율을 따른다) 정하면 그보다 빨리 온 프레임은 건너뛰어
 	// 주사율이 높거나 프레임이 들쭉날쭉한 기기에서도 고른 간격으로 돈다.
 	/** @type { number } */ maximumFramePerSecond;
@@ -121,6 +126,7 @@ export class EngineConfiguration extends Object {
 		this.autoResizeOnWindowResize = false;
 		this.title = "";
 		this.preserveDrawingBuffer = false;
+		this.antialias = true;
 		this.maximumFramePerSecond = 0;
 		this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
 		this.ignoreVirtualKeyboardResize = false;
@@ -207,7 +213,7 @@ export class Engine extends Object {
 		const canvas = this.#platform.getOrAddCanvas(canvasId);
 		
 
-		this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true);
+		this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true, engineConfiguration.antialias !== false);
 		this.#sceneManager = new SceneManager(this);
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this);

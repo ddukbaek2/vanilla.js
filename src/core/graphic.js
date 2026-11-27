@@ -13,6 +13,7 @@ import { TransformMatrix } from "../base/transformmatrix.js";
 import { ShaderProgram } from "./graphic/shaderprogram.js";
 import { ImageTextureCache } from "./graphic/imagetexturecache.js";
 import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
+import { WebGLStateCache } from "./graphic/webglstatecache.js";
 import * as Math from "../base/math.js";
 
 
@@ -548,6 +549,7 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #lastFrameCulledNodeCount; // 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
 	/** @private @type { ShaderProgram | null } */ #boundShaderProgram; // 마지막으로 쓰게 한 셰이더 프로그램. (null 이면 모른다)
 	/** @private @type { WebGLTexture | null } */ #boundTexture; // 0 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
+	/** @private @type { WebGLStateCache } */ #webGLStateCache; // 컨텍스트의 GL 상태 기억. (getParameter, isEnabled 를 GL 에 묻지 않고 답한다)
 
 	//==============================================================================
 	// 생성.
@@ -556,15 +558,18 @@ export class Graphic extends Object {
 	 * @constructor
 	 * @param { HTMLCanvasElement } canvas 그릴 캔버스. (WebGL2 컨텍스트를 얻지 못하면 오류를 던진다)
 	 * @param { boolean } preserveDrawingBuffer 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. (true 일 때만 남긴다)
+	 * @param { boolean } [antialias] 캔버스의 멀티샘플 안티에일리어싱을 켤지. (기본 true, false 일 때만 끈다)
 	 */
-	constructor(canvas, preserveDrawingBuffer) {
+	constructor(canvas, preserveDrawingBuffer, antialias = true) {
 		super();
 
 		// preserveDrawingBuffer 를 켜면 프레임이 끝난 뒤에도 그린 것이 캔버스에 남는다.
 		// 캔버스 위에 후처리를 얹는 프로젝트가 그 그림을 읽어 쓴다. (엔진 설정에서 켠다)
+		// antialias 를 끄면 캔버스의 멀티샘플을 쓰지 않는다. (엔진 설정에서 끈다, 고해상도 모바일에서 리졸브 비용을 아낀다)
 		const webGL2RenderingContext = canvas.getContext("webgl2", {
 			alpha: false,
 			stencil: true,
+			antialias: antialias !== false,
 			premultipliedAlpha: true,
 			preserveDrawingBuffer: preserveDrawingBuffer === true,
 		}); // WebGL2RenderingContext
@@ -574,6 +579,8 @@ export class Graphic extends Object {
 
 		this.#canvas = canvas;
 		this.#webGL2RenderingContext = webGL2RenderingContext;
+		// 그리는 중에 GL 상태를 읽지 않게 컨텍스트의 상태 함수를 가로채 기억한다. (다른 GL 호출보다 먼저 건다)
+		this.#webGLStateCache = WebGLStateCache.attach(webGL2RenderingContext);
 		this.#boundShaderProgram = null;
 		this.#boundTexture = null;
 
@@ -3888,6 +3895,93 @@ export class Graphic extends Object {
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
+	}
+
+	//==============================================================================
+	// 지금 그리는 프레임 버퍼 반환. (null 이면 캔버스, GL 에 묻지 않고 기억한 값)
+	//==============================================================================
+	/**
+	 * @returns { WebGLFramebuffer | null } 지금 묶인 그리기 프레임 버퍼. (null 이면 캔버스의 기본 프레임 버퍼)
+	 * @example <caption>바깥 패스에서 렌더 타깃을 바꿨다가 되돌리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.runExternalPass((webGL2RenderingContext) => {
+	 * 			const previousFramebuffer = graphic.getCurrentFramebuffer();
+	 * 			const framebuffer = webGL2RenderingContext.createFramebuffer();
+	 * 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+	 * 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
+	 * 			webGL2RenderingContext.deleteFramebuffer(framebuffer);
+	 * 		}, { clearDepth: false });
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	getCurrentFramebuffer() {
+		return this.#webGLStateCache.getDrawFramebuffer();
+	}
+
+	//==============================================================================
+	// 지금 뷰포트 반환. (디바이스 픽셀, GL 처럼 왼쪽 아래가 원점, GL 에 묻지 않고 기억한 값)
+	//==============================================================================
+	/**
+	 * @returns { Rect } 지금 뷰포트. (위치 x, y 와 크기 너비, 높이, 새 Rect)
+	 * @example <caption>지금 뷰포트 크기 읽기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		const viewport = graphic.getCurrentViewport();
+	 * 		console.log(viewport.position.x, viewport.position.y, viewport.width, viewport.height);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	getCurrentViewport() {
+		const viewport = this.#webGLStateCache.getViewport();
+		return Rect.create(viewport[0], viewport[1], viewport[2], viewport[3]);
+	}
+
+	//==============================================================================
+	// GL 상태 기억 다시 맞추기. (three.js 의 resetState 처럼 바깥 GL 코드가 상태를 바꾼 뒤 부른다)
+	// - 엔진은 컨텍스트의 상태 함수(bindFramebuffer, viewport, enable 같은 것)를 가로채 기억하므로, 같은 컨텍스트 객체로 부른 것은 따로 알리지 않아도 된다.
+	// - 프로토타입 함수를 직접 부르는 것처럼 가로채지 못한 길로 바꿨을 때 부른다. 기억을 모두 잊고 다음에 읽을 때 GL 에 한 번씩 묻는다.
+	//   마지막으로 쓰게 한 프로그램과 묶은 텍스처의 기억도 잊는다. (invalidateRenderStateCache)
+	//==============================================================================
+	/**
+	 * @example <caption>가로채지 못한 길로 상태를 바꾼 뒤 기억 맞추기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.runExternalPass((webGL2RenderingContext) => {
+	 * 			WebGL2RenderingContext.prototype.viewport.call(webGL2RenderingContext, 0, 0, 64, 64);
+	 * 			graphic.resetGLStateCache();
+	 * 			console.log(graphic.getCurrentViewport().width);
+	 * 		}, { clearDepth: false });
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	resetGLStateCache() {
+		this.#webGLStateCache.reset();
+		this.invalidateRenderStateCache();
 	}
 
 	//==============================================================================
