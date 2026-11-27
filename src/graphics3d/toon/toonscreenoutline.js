@@ -135,7 +135,10 @@ void main() {
 // 씨앗을 고르는 셰이더. (화소와 바로 이웃 넷 사이의 경계마다 선인지 보고, 선이면 그 경계의 가운데를 씨앗으로 쓴다)
 // - 씨앗은 반 화소 단위 자리다. (x 가 홀수면 가로 이웃 사이의 세로 경계, y 가 홀수면 세로 이웃 사이의 가로 경계) rg 는 바깥 선, ba 는 꺾임 선.
 // - 같은 경계를 양쪽 화소가 함께 씨앗으로 들어도 선은 경계 한가운데 하나다. (선을 화소가 아니라 화소 사이에 둔다)
-// - 바깥 선: 한쪽이 빈 곳, 번호가 다름, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어짐. (가린 쪽의 꼴을 따르고, 맞닿은 두 번호는 한쪽만 켜져 있어도 긋는다)
+// - 바깥 선: 한쪽이 빈 곳, 번호가 다름, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유를 더한 것보다 떨어짐. (가린 쪽의 꼴을 따르고, 맞닿은 두 번호는 한쪽만 켜져 있어도 긋는다)
+//   가려진 쪽의 접평면만 쓴다. 가린 쪽이 둥근 면의 실루엣이면 그 접평면이 시선을 품어, 뒤의 면이 얼마나 떨어져 있든 거리가 화소 한 칸 밑으로 줄기 때문이다.
+//   오차 여유는 이어진 면에서도 생기는 거리의 오차를 잰 것이다: 노멀 8 비트 팔면체의 각 오차 x 두 자리 사이 거리(면이 비스듬할수록 길다), 꺾인 줄을 사이에 둔 두 화소의 화소 한 칸 x 두 노멀이 벌어진 사인, 깊이 24 비트 한 칸.
+//   거기에 여유 배율(setDepthMargin)을 곱한다. 두 면이 나란한 턱은 꺾임 몫이 0 이라 화소 한 칸보다 낮아도 잡힌다.
 // - 꺾임 선: 같은 번호이고 떨어지지 않았는데 두 노멀이 꺾임 각보다 더 벌어짐. (비스듬한 면과 둥근 면은 접평면 안이라 바깥 선으로 잡히지 않는다)
 const SEED_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
@@ -147,9 +150,12 @@ uniform vec4 projectionScale;
 uniform vec4 projectionDepth;
 uniform float isPerspective;
 uniform float depthThreshold;
+uniform float depthMargin;
 uniform float creaseCosine;
 out uvec4 fragmentSeed;
 const uint NO_SEED = 65535u;
+const float NORMAL_ERROR = 0.0165;
+const float DEPTH_STEP = 1.0 / 16777215.0;
 const ivec2 SIDES[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
 struct LinePixel {
 	float id;
@@ -157,6 +163,7 @@ struct LinePixel {
 	vec3 normal;
 	vec3 position;
 	float footprint;
+	float depthError;
 };
 vec3 readNormal(vec2 encoded) {
 	vec2 folded = encoded * 2.0 - 1.0;
@@ -179,11 +186,13 @@ LinePixel readPixel(ivec2 pixel, vec2 size) {
 		float viewZ = -projectionDepth.y / (clipDepth + projectionDepth.x);
 		result.position = vec3(-viewZ * (clipPoint.x + projectionScale.z) / projectionScale.x, -viewZ * (clipPoint.y + projectionScale.w) / projectionScale.y, viewZ);
 		result.footprint = -viewZ * 2.0 / (projectionScale.y * size.y);
+		result.depthError = DEPTH_STEP * viewZ * viewZ / abs(projectionDepth.y) * length(result.position) / max(-viewZ, 1e-6);
 	}
 	else {
 		float viewZ = (clipDepth - projectionDepth.y) / projectionDepth.x;
 		result.position = vec3((clipPoint.x - projectionDepth.z) / projectionScale.x, (clipPoint.y - projectionDepth.w) / projectionScale.y, viewZ);
 		result.footprint = 2.0 / (projectionScale.y * size.y);
+		result.depthError = DEPTH_STEP / abs(projectionDepth.x);
 	}
 	return result;
 }
@@ -203,9 +212,16 @@ int readEdge(LinePixel first, LinePixel second) {
 	if (farId < 0.5) {
 		return hasContour(nearFlags) ? 2 : 0;
 	}
-	vec3 offset = second.position - first.position;
-	float planeDistance = min(abs(dot(offset, first.normal)), abs(dot(offset, second.normal)));
-	bool isSeparated = planeDistance > depthThreshold + 2.0 * max(first.footprint, second.footprint);
+	LinePixel nearPixel = first;
+	LinePixel farPixel = second;
+	if (!isFirstNearer) {
+		nearPixel = second;
+		farPixel = first;
+	}
+	vec3 offset = nearPixel.position - farPixel.position;
+	float planeDistance = abs(dot(offset, farPixel.normal));
+	float pixelError = length(offset) * NORMAL_ERROR + nearPixel.footprint * length(cross(nearPixel.normal, farPixel.normal)) + nearPixel.depthError + farPixel.depthError;
+	bool isSeparated = planeDistance > depthThreshold + depthMargin * pixelError;
 	if (isSeparated) {
 		return hasContour(nearFlags) ? 2 : 0;
 	}
@@ -473,9 +489,9 @@ export function readJumpFloodSteps(reach) {
 // 툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)
 // - 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.
 // - 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)
-//   바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.
+//   바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유보다 떨어진 곳(가려진 실루엣)이다.
 //   꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.
-//   깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.
+//   깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 잰 오차(노멀 8 비트 각 오차 x 두 자리 사이 거리, 꺾임의 화소 한 칸 x 사인, 깊이 24 비트 한 칸) x 배율을 더해 먼 것도 같은 뜻이 되고, 나란한 낮은 턱은 화소 한 칸보다 낮아도 잡힌다.
 // - 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.
 // - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)
 // - 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.
@@ -514,7 +530,8 @@ export class ToonScreenOutline {
 	/** @private @type { number } */ #width; // 바깥 선 굵기.
 	/** @private @type { string } */ #widthUnit;
 	/** @private @type { number } */ #focusDistance; // 원근에서 월드 굵기를 픽셀로 셀 거리. (0 이면 그린 모형의 평균 거리)
-	/** @private @type { number } */ #depthThreshold; // 같은 번호를 떨어진 것으로 칠 접평면 거리. (월드 길이)
+	/** @private @type { number } */ #depthThreshold; // 같은 번호를 떨어진 것으로 칠 접평면 거리. (월드 길이, 면에 수직)
+	/** @private @type { number } */ #depthMargin; // 깊이 문턱에 더하는 오차 여유의 배율. (잰 오차의 몇 배)
 	/** @private @type { number } */ #creaseCosine;
 	/** @private @type { number } */ #creaseWidth; // 꺾임 선 굵기. (바깥 선과 같은 단위)
 	/** @private @type { number } */ #creaseOpacity;
@@ -553,6 +570,7 @@ export class ToonScreenOutline {
 		this.#widthUnit = ToonOutlineWidthUnit.pixel;
 		this.#focusDistance = 0;
 		this.#depthThreshold = 0.05;
+		this.#depthMargin = 2;
 		this.#creaseCosine = System.Math.cos(System.Math.PI / 3);
 		this.#creaseWidth = 1;
 		this.#creaseOpacity = 1;
@@ -742,14 +760,67 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 깊이 문턱 설정. (같은 번호의 이웃 화소가 서로의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)
-	// - 그 깊이의 화소 크기 두 배를 더해 쓴다. 장면의 크기에 맞춘다. (사람 크기 장면이면 0.02 ~ 0.1)
+	// 깊이 문턱 설정. (같은 번호의 이웃 화소 가운데 가린 쪽이 가려진 쪽의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)
+	// - depthThreshold 는 면에 수직인 거리이고, 화소 여유가 더해진다. (setDepthMargin 의 배율 x 잰 오차, 오차는 화소 크기와 면의 기울기를 따른다)
+	// - 장면의 크기에 맞춘다. (사람 크기 장면이면 0.02 ~ 0.1, 0 이면 오차 여유만으로 가른다)
 	//==============================================================================
 	/**
-	 * @param { number } depthThreshold - 접평면 거리 문턱. (월드 길이)
+	 * @example <caption>낮은 턱까지 실루엣으로 긋기</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+	 * outline.setDepthThreshold(0.01);
+	 * console.log(outline.getDepthThreshold());
+	 * @param { number } depthThreshold - 접평면 거리 문턱. (월드 길이, 면에 수직, 0 이상)
 	 */
 	setDepthThreshold(depthThreshold) {
 		this.#depthThreshold = System.Math.max(0, depthThreshold);
+	}
+
+	//==============================================================================
+	// 깊이 문턱 반환. (월드 길이, 면에 수직)
+	//==============================================================================
+	/**
+	 * @example <caption>기본 깊이 문턱 읽기</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+	 * console.log(outline.getDepthThreshold()); // 0.05
+	 * @returns { number } 접평면 거리 문턱. (월드 길이)
+	 */
+	getDepthThreshold() {
+		return this.#depthThreshold;
+	}
+
+	//==============================================================================
+	// 깊이 여유 배율 설정. (깊이 문턱에 더하는 화소 여유가 잰 오차의 몇 배인지, 기본 2)
+	// - 이어진 면에서도 생기는 접평면 거리의 오차를 화소마다 잰다. 노멀 8 비트 팔면체의 각 오차(0.0165 rad) x 두 화소 자리 사이 거리(면이 비스듬할수록 길다), 꺾인 줄을 사이에 둔 두 화소의 화소 한 칸 x 두 노멀이 벌어진 사인, 깊이 24 비트 한 칸.
+	// - 두 면이 나란한 낮은 턱은 꺾임 몫이 0 이라 화소 한 칸보다 낮아도 잡힌다. 둥근 면을 굵은 다각형으로 지어 보간 노멀이 면에서 크게 벗어나는 모형에서 깊이 문턱을 아주 낮추면 잔선이 생기니, 그때 배율을 올린다.
+	// - 0 이면 깊이 문턱만으로 가른다.
+	//==============================================================================
+	/**
+	 * @example <caption>여유를 줄여 낮은 턱을 더 잡기</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+	 * outline.setDepthThreshold(0.02);
+	 * outline.setDepthMargin(1);
+	 * console.log(outline.getDepthMargin()); // 1
+	 * @param { number } depthMargin - 잰 오차에 곱할 배율. (0 이상)
+	 */
+	setDepthMargin(depthMargin) {
+		this.#depthMargin = System.Math.max(0, depthMargin);
+	}
+
+	//==============================================================================
+	// 깊이 여유 배율 반환.
+	//==============================================================================
+	/**
+	 * @example <caption>기본 깊이 여유 배율 읽기</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+	 * console.log(outline.getDepthMargin()); // 2
+	 * @returns { number } 잰 오차에 곱할 배율.
+	 */
+	getDepthMargin() {
+		return this.#depthMargin;
 	}
 
 	//==============================================================================
@@ -1180,6 +1251,7 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionDepth"), projectionElements[10], projectionElements[14], projectionElements[12], projectionElements[13]);
 		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
 		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthThreshold"), this.#depthThreshold);
+		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthMargin"), this.#depthMargin);
 		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("creaseCosine"), lineWidths[1] > 0 ? this.#creaseCosine : -2);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
