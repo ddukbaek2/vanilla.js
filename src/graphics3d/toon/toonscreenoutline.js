@@ -69,7 +69,7 @@ const LINE_COLOR_TEXTURE_UNIT = 4;
 const COMPOSITE_LINE_TEXTURE_UNIT = 6;
 const COMPOSITE_DEPTH_TEXTURE_UNIT = 7;
 
-// 가는 선 길의 가장 큰 찾기 반지름. (섞기가 보는 화소가 (2 x 2 + 1) 제곱 = 25 개, 4 x 4 묶음 가면 칸으로 2 x 2 칸, 굵기 4 픽셀까지)
+// 가는 선 길의 가장 큰 찾기 반지름. (섞기가 보는 가면 칸이 (2 x 2 + 1) 제곱 = 25 개, 굵기 4 픽셀까지, 섞기 셰이더의 상수 5 x 5 와 맞춘다)
 // - 굵기 w 의 선은 둘레 ceil(w / 2 + 1) - 1 칸을 보면 빠짐이 없다. 이보다 굵으면 점프 플러딩 길로 간다. (넓히기 걸음이 셋 이상이 되는 굵기부터)
 const THIN_LINE_MAXIMUM_SEARCH_RADIUS = 2;
 
@@ -287,29 +287,6 @@ void main() {
 	fragmentMask = mask;
 }
 `;
-// 가는 선의 가면을 4 x 4 화소 묶음으로 담는 셰이더. (묶음마다 RGBA16UI 한 칸, 줄 j 가 채널 j, 그 줄의 화소 i 가 비트 4i ~ 4i + 3)
-// - 섞기가 둘레 5 x 5 화소를 볼 때 읽는 칸이 25 에서 2 x 2 로 준다. (선이 없는 칸은 한 번 견주고 건너뜀)
-const EDGE_BLOCK_FRAGMENT_SHADER = `#version 300 es
-precision highp float;
-precision highp int;
-uniform highp usampler2D edgeMaskTexture;
-out uvec4 fragmentBlock;
-uint readRowBits(ivec2 origin, int row, ivec2 size) {
-	uint bits = 0u;
-	for (int column = 0; column < 4; ++column) {
-		ivec2 pixel = origin + ivec2(column, row);
-		if (pixel.x < size.x && pixel.y < size.y) {
-			bits |= (texelFetch(edgeMaskTexture, pixel, 0).r & 15u) << uint(column * 4);
-		}
-	}
-	return bits;
-}
-void main() {
-	ivec2 size = textureSize(edgeMaskTexture, 0);
-	ivec2 origin = ivec2(gl_FragCoord.xy) * 4;
-	fragmentBlock = uvec4(readRowBits(origin, 0, size), readRowBits(origin, 1, size), readRowBits(origin, 2, size), readRowBits(origin, 3, size));
-}
-`;
 // 온 해상도 씨앗을 넓히기 판으로 모으는 셰이더. (넓히기 판 한 칸이 덮는 씨앗 판 칸들 가운데 칸 가운데에 가장 가까운 씨앗을 고른다, 줄이지 않으면 그대로 옮김)
 const SEED_GATHER_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
@@ -522,68 +499,50 @@ void main() {
 }
 `;
 // 가는 선을 한 패스로 섞는 셰이더. (점프 플러딩 없이 가면 판에서 searchRadius 화소 안의 경계 토막을 모두 보고 가장 가까운 것까지의 거리로 덮는 몫을 셈한다)
-// - 화소 q 의 오른쪽 경계는 (2q.x + 1, 2q.y), 위 경계는 (2q.x, 2q.y + 1) 의 씨앗과 같다. 거리, 색 찾기, 덮는 몫은 점프 플러딩 길과 같은 함수다.
+// - 화소 q 의 오른쪽 경계는 (2q.x + 1, 2q.y), 위 경계는 (2q.x, 2q.y + 1) 의 씨앗과 같다. 색 찾기와 덮는 몫은 점프 플러딩 길과 같은 함수다.
 // - 덮는 몫이 0 보다 크려면 거리가 굵기 / 2 + 0.5 보다 작아야 하므로, 그 거리 안의 토막을 가진 화소는 모두 ceil(굵기 / 2 + 1) - 1 화소 안에 있다. (빠짐 없이 가장 가까운 토막)
-// - 그 화소들을 덮는 4 x 4 묶음 칸(반지름 2 까지 2 x 2 칸)만 읽고, 빈 칸과 빈 줄, 빈 화소는 건너뛴다.
+// - 고리는 상수 5 x 5 로 펼치고, 반지름 밖과 판 밖의 칸은 가면을 0 으로 고르며, 토막 고르기도 갈래 없이 고른다. (SIMD 무리가 갈리지 않게, 실기기에서 갈래 있는 고리보다 빨랐다)
+// - 거리는 제곱으로 견주고 끝에 한 번 sqrt 한다.
 const THIN_COMPOSITE_FRAGMENT_SHADER = `#version 300 es
-${COMPOSITE_SHADER_PART}uniform highp usampler2D edgeBlockTexture;
+${COMPOSITE_SHADER_PART}uniform highp usampler2D edgeMaskTexture;
 uniform int searchRadius;
 void main() {
 	ivec2 size = textureSize(lineTexture, 0);
-	ivec2 blockLimit = textureSize(edgeBlockTexture, 0) - 1;
-	vec2 toOutput = vec2(1.0);
 	vec2 point = gl_FragCoord.xy - viewportRect.xy - 0.5;
 	ivec2 pixel = ivec2(floor(point + 0.5));
-	ivec2 firstBlock = max(pixel - searchRadius, ivec2(0)) / 4;
-	ivec2 lastBlock = min(max(pixel + searchRadius, ivec2(0)) / 4, blockLimit);
-	float contourDistance = 1.0e9;
-	float creaseDistance = 1.0e9;
+	float contourDistance = 1.0e18;
+	float creaseDistance = 1.0e18;
 	uvec2 contourSeed = uvec2(NO_SEED);
 	uvec2 creaseSeed = uvec2(NO_SEED);
-	for (int blockY = firstBlock.y; blockY <= lastBlock.y; ++blockY) {
-		for (int blockX = firstBlock.x; blockX <= lastBlock.x; ++blockX) {
-			uvec4 block = texelFetch(edgeBlockTexture, ivec2(blockX, blockY), 0);
-			if (block == uvec4(0u)) {
-				continue;
-			}
-			for (int row = 0; row < 4; ++row) {
-				uint bits = block[row];
-				int sampleY = blockY * 4 + row;
-				if (bits == 0u || abs(sampleY - pixel.y) > searchRadius) {
-					continue;
-				}
-				for (int column = 0; column < 4; ++column) {
-					uint mask = (bits >> uint(column * 4)) & 15u;
-					int sampleX = blockX * 4 + column;
-					if (mask == 0u || abs(sampleX - pixel.x) > searchRadius || sampleX >= size.x || sampleY >= size.y) {
-						continue;
-					}
-					ivec2 samplePixel = ivec2(sampleX, sampleY);
-					uvec2 sideX = uvec2(samplePixel * 2 + ivec2(1, 0));
-					uvec2 sideY = uvec2(samplePixel * 2 + ivec2(0, 1));
-					float distanceX = readSeedDistance(point, sideX, toOutput);
-					float distanceY = readSeedDistance(point, sideY, toOutput);
-					if ((mask & 1u) != 0u && distanceX < contourDistance) {
-						contourDistance = distanceX;
-						contourSeed = sideX;
-					}
-					if ((mask & 2u) != 0u && distanceY < contourDistance) {
-						contourDistance = distanceY;
-						contourSeed = sideY;
-					}
-					if ((mask & 4u) != 0u && distanceX < creaseDistance) {
-						creaseDistance = distanceX;
-						creaseSeed = sideX;
-					}
-					if ((mask & 8u) != 0u && distanceY < creaseDistance) {
-						creaseDistance = distanceY;
-						creaseSeed = sideY;
-					}
-				}
-			}
+	for (int offsetY = -2; offsetY <= 2; ++offsetY) {
+		for (int offsetX = -2; offsetX <= 2; ++offsetX) {
+			ivec2 wantedPixel = pixel + ivec2(offsetX, offsetY);
+			ivec2 samplePixel = clamp(wantedPixel, ivec2(0), size - 1);
+			uint mask = texelFetch(edgeMaskTexture, samplePixel, 0).r;
+			bool isInside = samplePixel == wantedPixel && max(abs(offsetX), abs(offsetY)) <= searchRadius;
+			mask = isInside ? mask : 0u;
+			vec2 base = vec2(samplePixel) - point;
+			vec2 offsetSideX = vec2(abs(base.x + 0.5), max(abs(base.y) - 0.5, 0.0));
+			vec2 offsetSideY = vec2(max(abs(base.x) - 0.5, 0.0), abs(base.y + 0.5));
+			float distanceX = dot(offsetSideX, offsetSideX);
+			float distanceY = dot(offsetSideY, offsetSideY);
+			uvec2 sideX = uvec2(samplePixel * 2 + ivec2(1, 0));
+			uvec2 sideY = uvec2(samplePixel * 2 + ivec2(0, 1));
+			bool isTaken = (mask & 1u) != 0u && distanceX < contourDistance;
+			contourDistance = isTaken ? distanceX : contourDistance;
+			contourSeed = isTaken ? sideX : contourSeed;
+			isTaken = (mask & 2u) != 0u && distanceY < contourDistance;
+			contourDistance = isTaken ? distanceY : contourDistance;
+			contourSeed = isTaken ? sideY : contourSeed;
+			isTaken = (mask & 4u) != 0u && distanceX < creaseDistance;
+			creaseDistance = isTaken ? distanceX : creaseDistance;
+			creaseSeed = isTaken ? sideX : creaseSeed;
+			isTaken = (mask & 8u) != 0u && distanceY < creaseDistance;
+			creaseDistance = isTaken ? distanceY : creaseDistance;
+			creaseSeed = isTaken ? sideY : creaseSeed;
 		}
 	}
-	writeLineColor(contourDistance, creaseDistance, contourSeed, creaseSeed);
+	writeLineColor(sqrt(contourDistance), sqrt(creaseDistance), contourSeed, creaseSeed);
 }
 `;
 
@@ -633,8 +592,8 @@ function readColorByte(value) {
 //   바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유보다 떨어진 곳(가려진 실루엣)이다.
 //   꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.
 //   깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 잰 오차(노멀 8 비트 각 오차 x 두 자리 사이 거리, 꺾임의 화소 한 칸 x 사인, 깊이 24 비트 한 칸) x 배율을 더해 먼 것도 같은 뜻이 되고, 나란한 낮은 턱은 화소 한 칸보다 낮아도 잡힌다.
-// - 가는 선(굵기 4 픽셀까지): 경계마다 한 번 가린 가면(화소마다 4 비트, R8UI)을 고르고, 4 x 4 화소 묶음(RGBA16UI 한 칸)으로 담은 뒤, 섞기가 둘레 ceil(굵기 / 2 + 1) - 1 화소(5 x 5 까지)의 경계 토막을 모두 보아 가장 가까운 것까지의 거리를 잰다.
-//   화면 전체 패스가 가면, 묶기(16 분의 1 크기), 섞기다. 섞기는 묶음 칸 2 x 2 만 읽고 빈 칸은 건너뛴다. (모바일 타일 GPU 에서 패스 수와 판 대역폭이 굵은 선 길의 몇 분의 1)
+// - 가는 선(굵기 4 픽셀까지): 경계마다 한 번 가린 가면(화소마다 4 비트, R8UI 한 바이트)을 고르고, 섞기가 둘레 ceil(굵기 / 2 + 1) - 1 화소(5 x 5 까지)의 경계 토막을 모두 보아 가장 가까운 것까지의 거리를 잰다.
+//   화면 전체 패스가 가면 하나와 섞기 하나다. (모바일 타일 GPU 에서 패스 수와 판 대역폭이 굵은 선 길의 몇 분의 1)
 // - 넓히기(굵은 선): 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.
 // - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)
 // - 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.
@@ -668,7 +627,6 @@ export class ToonScreenOutline {
 	/** @private @type { ShaderProgram } */ #jumpFloodProgram;
 	/** @private @type { ShaderProgram } */ #compositeProgram;
 	/** @private @type { ShaderProgram } */ #edgeMaskProgram; // 가는 선의 가면 고르기.
-	/** @private @type { ShaderProgram } */ #edgeBlockProgram; // 가는 선의 가면을 4 x 4 묶음으로 담기.
 	/** @private @type { ShaderProgram } */ #thinCompositeProgram; // 가는 선을 한 패스로 섞기.
 	/** @private @type { string } */ #colorSpace; // 색 공간. (ColorSpace, 생성 때 정함, HDR 출력에서 선 색을 선형으로 바꾸는 곡선)
 	/** @private @type { WebGLVertexArrayObject } */ #emptyVertexArray; // 화면 세모용 빈 버텍스 어레이.
@@ -699,7 +657,7 @@ export class ToonScreenOutline {
 	/** @private @type { Uint32Array | null } */ #uploadedLineColorTable; // 텍스처에 마지막으로 올린 표. (처음 올리기 전에는 null)
 
 	//==============================================================================
-	// 생성. (여덟 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
+	// 생성. (일곱 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
 	//==============================================================================
 	/**
 	 * @constructor
@@ -715,7 +673,6 @@ export class ToonScreenOutline {
 		this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
 		this.#compositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, this.#colorSpace), {});
 		this.#edgeMaskProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, EDGE_MASK_FRAGMENT_SHADER, {});
-		this.#edgeBlockProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, EDGE_BLOCK_FRAGMENT_SHADER, {});
 		this.#thinCompositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, this.#colorSpace), {});
 		this.#emptyVertexArray = webGL2RenderingContext.createVertexArray();
 		this.#lineTarget = null;
@@ -751,7 +708,7 @@ export class ToonScreenOutline {
 	/**
 	 * @static
 	 * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, 지을 ToonScreenOutline 과 같은 값을 준다)
-	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 여덟. (번호, 씨앗, 모으기, 넓히기, 섞기, 가는 선의 가면, 가면 묶기, 가는 선 섞기)
+	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 일곱. (번호, 씨앗, 모으기, 넓히기, 섞기, 가는 선의 가면, 가는 선 섞기)
 	 * @example <caption>셰이더를 미리 링크할 목록에 넣기</caption>
 	 * import { ToonScreenOutline } from "./vanilla.js";
 	 * const sources = ToonScreenOutline.readProgramSources();
@@ -765,7 +722,6 @@ export class ToonScreenOutline {
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: JUMP_FLOOD_FRAGMENT_SHADER, attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: EDGE_MASK_FRAGMENT_SHADER, attributeLocationTable: {} },
-			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: EDGE_BLOCK_FRAGMENT_SHADER, attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} },
 		];
 	}
@@ -1044,7 +1000,7 @@ export class ToonScreenOutline {
 	// 선의 판 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null } { lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), edgeMaskTexture (가는 선의 가면 R8UI), edgeBlockTexture (가면의 4 x 4 화소 묶음 RGBA16UI), seedTexture (온 해상도 씨앗 RGBA16UI, 굵은 선을 긋기 전에는 null), jumpFloodTextures (넓히기 판 RGBA16UI 둘, 굵은 선을 긋기 전에는 빔), jumpFloodIndex (넓히기를 마친 쪽, 점프 플러딩을 안 했으면 -1), outlinePath (이번 프레임의 길 "none", "thin", "jumpFlood"), width, height, jumpFloodWidth, jumpFloodHeight }
+	 * @returns { object | null } { lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), edgeMaskTexture (가는 선의 가면 R8UI), seedTexture (온 해상도 씨앗 RGBA16UI, 굵은 선을 긋기 전에는 null), jumpFloodTextures (넓히기 판 RGBA16UI 둘, 굵은 선을 긋기 전에는 빔), jumpFloodIndex (넓히기를 마친 쪽, 점프 플러딩을 안 했으면 -1), outlinePath (이번 프레임의 길 "none", "thin", "jumpFlood"), width, height, jumpFloodWidth, jumpFloodHeight }
 	 */
 	getLineTarget() {
 		return this.#lineTarget;
@@ -1395,8 +1351,8 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 번호 그리기 끝. (가는 선은 가면을 고르고 묶음으로 담고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
-	// - 가는 선(찾기 반지름이 THIN_LINE_MAXIMUM_SEARCH_RADIUS 이하, 굵기 4 픽셀까지): 가면 하나와 그것을 4 x 4 묶음으로 담는 작은 패스 하나다. 섞기가 둘레 화소의 경계 토막을 모두 본다. (씨앗, 모으기, 넓히기 없음)
+	// 번호 그리기 끝. (가는 선은 가면 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
+	// - 가는 선(찾기 반지름이 THIN_LINE_MAXIMUM_SEARCH_RADIUS 이하, 굵기 4 픽셀까지): 화면 전체 패스가 가면 하나다. 섞기가 둘레 화소의 경계 토막을 모두 본다. (씨앗, 모으기, 넓히기 없음)
 	// - 굵은 선: 씨앗, 모으기, 넓히기 걸음마다 한 패스. (씨앗 판과 넓히기 판은 처음 굵은 선을 그을 때 짓는다)
 	// - 판을 통째로 덮어쓰는 패스는 앞에 invalidateFramebuffer 를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰)
 	//==============================================================================
@@ -1434,17 +1390,6 @@ export class ToonScreenOutline {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.edgeMaskFramebuffer);
 			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
 			this.useEdgeProgram(this.#edgeMaskProgram, lineTarget, lineWidths);
-			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
-			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
-			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
-			const edgeBlockProgram = this.#edgeBlockProgram;
-			webGL2RenderingContext.viewport(0, 0, lineTarget.edgeBlockWidth, lineTarget.edgeBlockHeight);
-			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.edgeBlockFramebuffer);
-			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
-			edgeBlockProgram.useProgram();
-			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.edgeMaskTexture);
-			webGL2RenderingContext.uniform1i(edgeBlockProgram.getUniformLocation("edgeMaskTexture"), LINE_TEXTURE_UNIT);
 			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 			lineTarget.outlinePath = "thin";
 			lineTarget.searchRadius = searchRadius;
@@ -1566,7 +1511,7 @@ export class ToonScreenOutline {
 		compositeProgram.useProgram();
 		const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isThinLine ? lineTarget.edgeBlockTexture : lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isThinLine ? lineTarget.edgeMaskTexture : lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
@@ -1577,7 +1522,7 @@ export class ToonScreenOutline {
 		const color = this.#color;
 		const lineWidths = this.#lineWidths;
 		if (isThinLine) {
-			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("edgeBlockTexture"), LINE_TEXTURE_UNIT);
+			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("edgeMaskTexture"), LINE_TEXTURE_UNIT);
 			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("searchRadius"), lineTarget.searchRadius);
 		}
 		else {
@@ -1757,18 +1702,13 @@ export class ToonScreenOutline {
 		const lineTexture = this.createTargetTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
 		const depthTexture = this.createTargetTexture(webGL2RenderingContext.DEPTH_COMPONENT24, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, width, height);
 		const edgeMaskTexture = this.createTargetTexture(webGL2RenderingContext.R8UI, webGL2RenderingContext.RED_INTEGER, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
-		const edgeBlockWidth = System.Math.ceil(width / 4);
-		const edgeBlockHeight = System.Math.ceil(height / 4);
-		const edgeBlockTexture = this.createTargetTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, edgeBlockWidth, edgeBlockHeight);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
 		const framebuffer = this.createTargetFramebuffer(lineTexture, depthTexture);
 		let isComplete = this.isFramebufferComplete();
 		const edgeMaskFramebuffer = this.createTargetFramebuffer(edgeMaskTexture, null);
 		isComplete = isComplete && this.isFramebufferComplete();
-		const edgeBlockFramebuffer = this.createTargetFramebuffer(edgeBlockTexture, null);
-		isComplete = isComplete && this.isFramebufferComplete();
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
-		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, edgeMaskFramebuffer: edgeMaskFramebuffer, edgeMaskTexture: edgeMaskTexture, edgeBlockFramebuffer: edgeBlockFramebuffer, edgeBlockTexture: edgeBlockTexture, edgeBlockWidth: edgeBlockWidth, edgeBlockHeight: edgeBlockHeight, seedFramebuffer: null, seedTexture: null, jumpFloodFramebuffers: [], jumpFloodTextures: [], jumpFloodIndex: -1, outlinePath: "none", searchRadius: 0, width: width, height: height, jumpFloodWidth: jumpFloodWidth, jumpFloodHeight: jumpFloodHeight };
+		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, edgeMaskFramebuffer: edgeMaskFramebuffer, edgeMaskTexture: edgeMaskTexture, seedFramebuffer: null, seedTexture: null, jumpFloodFramebuffers: [], jumpFloodTextures: [], jumpFloodIndex: -1, outlinePath: "none", searchRadius: 0, width: width, height: height, jumpFloodWidth: jumpFloodWidth, jumpFloodHeight: jumpFloodHeight };
 		if (!isComplete) {
 			this.deleteLineTarget();
 			return null;
@@ -1903,11 +1843,9 @@ export class ToonScreenOutline {
 		this.deleteJumpFloodTarget(lineTarget);
 		webGL2RenderingContext.deleteFramebuffer(lineTarget.framebuffer);
 		webGL2RenderingContext.deleteFramebuffer(lineTarget.edgeMaskFramebuffer);
-		webGL2RenderingContext.deleteFramebuffer(lineTarget.edgeBlockFramebuffer);
 		webGL2RenderingContext.deleteTexture(lineTarget.lineTexture);
 		webGL2RenderingContext.deleteTexture(lineTarget.depthTexture);
 		webGL2RenderingContext.deleteTexture(lineTarget.edgeMaskTexture);
-		webGL2RenderingContext.deleteTexture(lineTarget.edgeBlockTexture);
 		this.#lineTarget = null;
 	}
 
@@ -1975,7 +1913,7 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 여덟)
+	// 다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 일곱)
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1991,7 +1929,6 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.deleteProgram(this.#jumpFloodProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#compositeProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#edgeMaskProgram.getProgram());
-		webGL2RenderingContext.deleteProgram(this.#edgeBlockProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#thinCompositeProgram.getProgram());
 	}
 }
