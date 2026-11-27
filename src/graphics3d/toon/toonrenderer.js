@@ -43,6 +43,8 @@ import { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonB
 export const TOON_MAXIMUM_JOINTS = 96;
 
 // 인스턴스 하나의 수 개수. (행렬 16, 틴트 4)
+// - 행렬은 아핀 3x4 로 읽는다. 아래 줄 네 칸(원소 3, 7, 11, 15)은 인스턴스 빛남(sRGB r, g, b 와 선형 세기)이다. (Godot MultiMesh, 유니티 BatchRendererGroup 의 3x4 행렬 꼴)
+//   Matrix4 원소를 그대로 담으면 아래 줄이 0, 0, 0, 1 이라 빛남이 없다.
 export const TOON_INSTANCE_FLOAT_COUNT = 20;
 
 // 텍스처 유닛. (점광 그림자 아틀라스 0, 램프, 매트캡, 해 그림자, 바탕색, 빛남, 데칼, 천사 고리, 머티리얼 텍스처는 8 부터 15 까지)
@@ -115,6 +117,7 @@ in vec4 vertexUv;
 
 // 꼭짓점을 본으로 움직이고 인스턴스 행렬을 고르는 셰이더 조각.
 // - instanced: 0 이면 인스턴스 아님, 1 이면 인스턴스 행렬과 틴트, 2 면 인스턴스 틴트만(모형 행렬은 유니폼).
+// - 인스턴스 행렬은 아핀 3x4 로 짓고, 네 열의 w(행렬의 아래 줄)는 인스턴스 빛남으로 읽는다. (TOON_INSTANCE_FLOAT_COUNT 머리말)
 const VERTEX_COMMON_CHUNK = `in vec4 vertexJoints;
 in vec4 vertexWeights;
 in vec4 instanceMatrix0;
@@ -137,13 +140,19 @@ mat4 readModelMatrix() {
 	if (instanced < 0.5 || instanced > 1.5) {
 		return modelMatrix;
 	}
-	return mat4(instanceMatrix0, instanceMatrix1, instanceMatrix2, instanceMatrix3);
+	return mat4(vec4(instanceMatrix0.xyz, 0.0), vec4(instanceMatrix1.xyz, 0.0), vec4(instanceMatrix2.xyz, 0.0), vec4(instanceMatrix3.xyz, 1.0));
 }
 vec4 readInstanceTint() {
 	if (instanced < 0.5) {
 		return vec4(1.0);
 	}
 	return instanceTint;
+}
+vec4 readInstanceEmissive() {
+	if (instanced < 0.5 || instanced > 1.5) {
+		return vec4(0.0);
+	}
+	return vec4(instanceMatrix0.w, instanceMatrix1.w, instanceMatrix2.w, instanceMatrix3.w);
 }
 `;
 
@@ -157,6 +166,7 @@ const VERTEX_STRUCT_CHUNK = `struct ToonVertex {
 	vec2 uv;
 	vec2 uv1;
 	vec4 tint;
+	vec4 emissive;
 	mat4 modelMatrix;
 };
 ToonVertex readVertex() {
@@ -169,6 +179,7 @@ ToonVertex readVertex() {
 	vertex.uv = vertexUv.xy;
 	vertex.uv1 = vertexUv.zw;
 	vertex.tint = readInstanceTint();
+	vertex.emissive = readInstanceEmissive();
 	vertex.modelMatrix = readModelMatrix();
 	return vertex;
 }
@@ -196,6 +207,7 @@ out vec4 surfaceDetail;
 out vec2 surfaceUv;
 out vec2 surfaceUv1;
 out vec4 surfaceTint;
+out vec4 surfaceEmissive;
 out vec4 lightSpacePosition;
 void main() {
 	ToonVertex vertex = readVertex();
@@ -212,6 +224,7 @@ void main() {
 	surfaceUv = vertex.uv;
 	surfaceUv1 = vertex.uv1;
 	surfaceTint = vertex.tint;
+	surfaceEmissive = vertex.emissive;
 	lightSpacePosition = lightViewProjectionMatrix * vec4(position.xyz + worldNormal * 0.02, 1.0);
 	gl_Position = viewProjectionMatrix * position;
 }
@@ -230,6 +243,7 @@ in vec4 surfaceDetail;
 in vec2 surfaceUv;
 in vec2 surfaceUv1;
 in vec4 surfaceTint;
+in vec4 surfaceEmissive;
 in vec4 lightSpacePosition;
 uniform vec3 sunDirection;
 uniform vec3 sunColor;
@@ -499,7 +513,7 @@ const SOLID_FRAGMENT_BODY = `ToonSurface readSurface() {
 	}
 	surface.baseColor = color;
 	surface.alpha = opacity;
-	surface.emission = emission;
+	surface.emission = emission + toLinear(surfaceEmissive.rgb) * surfaceEmissive.a;
 	surface.normal = normalize(worldNormal);
 	surface.glow = surfaceMaterial.x;
 	surface.isUnlit = surfaceMaterial.y > 0.5;
@@ -2412,7 +2426,9 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { object } mesh - createMesh 의 결과.
-	 * @param { Array<object> } instances - { modelMatrix: Matrix4, tintColor: [r, g, b, a] } 의 배열.
+	 * @param { Array<object> } instances - { modelMatrix: Matrix4, tintColor: [r, g, b, a], emissiveColor: [r, g, b], emissiveIntensity: number } 의 배열.
+	 * 틴트는 곱하는 sRGB 와 알파(기본 1), emissiveColor 는 그 인스턴스에 더하는 빛남 sRGB(기본 없음, 명암과 무늬 위에 더해 그 인스턴스만 밝힘), emissiveIntensity 는 빛남의 선형 배(기본 1).
+	 * 모형 행렬은 아핀으로 읽는다. (TOON_INSTANCE_FLOAT_COUNT 머리말)
 	 * @param { object } [options] - drawMesh 와 같다. (모든 인스턴스에 같게 건다)
 	 * @example <caption>같은 바위 스무 개를 인스턴스마다 다른 틴트로</caption>
 	 * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
@@ -2427,6 +2443,18 @@ export class ToonRenderer {
 	 * }
 	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 4, 6), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));
 	 * renderer.drawMeshInstanced(rockMesh, instances, { specularScale: 0 });
+	 * renderer.endFrame();
+	 * @example <caption>인스턴스 하나만 빛남을 더해 밝히기</caption>
+	 * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#909098", { hasOutline: true });
+	 * const rockMesh = renderer.createMesh(builder.readArrays());
+	 * const instances = [0, 1, 2].map((index) => ({ modelMatrix: Matrix4.createTranslation(index - 1, 0, 0) }));
+	 * instances[1].emissiveColor = [1, 0.85, 0.3];
+	 * instances[1].emissiveIntensity = 0.35;
+	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));
+	 * renderer.drawMeshInstanced(rockMesh, instances);
 	 * renderer.endFrame();
 	 */
 	drawMeshInstanced(mesh, instances, options = {}) {
@@ -2448,6 +2476,11 @@ export class ToonRenderer {
 			}
 			const offset = instanceCount * TOON_INSTANCE_FLOAT_COUNT;
 			instanceData.set(modelElements, offset);
+			const emissiveColor = instance.emissiveColor !== undefined ? instance.emissiveColor : null;
+			instanceData[offset + 3] = emissiveColor !== null ? emissiveColor[0] : 0;
+			instanceData[offset + 7] = emissiveColor !== null ? emissiveColor[1] : 0;
+			instanceData[offset + 11] = emissiveColor !== null ? emissiveColor[2] : 0;
+			instanceData[offset + 15] = emissiveColor !== null && instance.emissiveIntensity !== undefined ? instance.emissiveIntensity : 1;
 			const tintColor = instance.tintColor !== undefined ? instance.tintColor : [1, 1, 1, 1];
 			instanceData[offset + 16] = tintColor[0];
 			instanceData[offset + 17] = tintColor[1];

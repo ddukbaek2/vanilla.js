@@ -59,9 +59,15 @@ const NO_SEED = 65535;
 // 인스턴스 그리기의 modelMatrix 자리. (단위 행렬)
 const IDENTITY_ELEMENTS = new System.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
-// 선의 판과 씨앗 판을 묶는 텍스처 유닛. (툰 렌더러의 그림자 유닛 3 과 겹치지 않게)
+// 선의 판과 씨앗 판을 묶는 텍스처 유닛. (툰 렌더러의 그림자 유닛 3 과 겹치지 않게, 섞기는 번호 색 표를 4, 선의 판을 6, 깊이를 7 에)
 const LINE_TEXTURE_UNIT = 5;
 const DEPTH_TEXTURE_UNIT = 6;
+const LINE_COLOR_TEXTURE_UNIT = 4;
+const COMPOSITE_LINE_TEXTURE_UNIT = 6;
+const COMPOSITE_DEPTH_TEXTURE_UNIT = 7;
+
+// 번호 색 표 텍스처의 너비. (선 번호 0 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID 를 128 x 128 칸에 하나씩, 번호 % 128 이 x, 번호 / 128 이 y)
+const LINE_COLOR_TABLE_WIDTH = 128;
 
 // 선의 판에 노멀과 선 번호를 그리는 셰이더. (툰 렌더러의 몸 버텍스 어레이를 그대로 쓴다, 인스턴스는 틴트 칸의 x 를 번호로 읽을 수 있다)
 const LINE_VERTEX_SHADER = `#version 300 es
@@ -91,7 +97,7 @@ mat4 readSkinMatrix() {
 }
 void main() {
 	mat4 skinMatrix = readSkinMatrix();
-	mat4 objectMatrix = instanced > 0.5 ? mat4(instanceMatrix0, instanceMatrix1, instanceMatrix2, instanceMatrix3) : modelMatrix;
+	mat4 objectMatrix = instanced > 0.5 ? mat4(vec4(instanceMatrix0.xyz, 0.0), vec4(instanceMatrix1.xyz, 0.0), vec4(instanceMatrix2.xyz, 0.0), vec4(instanceMatrix3.xyz, 1.0)) : modelMatrix;
 	worldNormal = transpose(inverse(mat3(objectMatrix) * mat3(skinMatrix))) * vertexNormal;
 	surfaceLineId = instanced > 0.5 && instanceLineIds > 0.5 ? instanceTint.x : lineId;
 	gl_Position = viewProjectionMatrix * objectMatrix * skinMatrix * vec4(vertexPosition, 1.0);
@@ -339,10 +345,16 @@ void main() {
 // 그리는 영역의 화소마다 가까운 씨앗까지의 거리(그리는 영역 픽셀)로 선이 덮는 몫을 셈해 섞는 셰이더. (미리 곱한 알파)
 // - 넓히기 판에서 둘레 2x2 칸의 씨앗을 보고 경계 토막까지의 거리를 그리는 영역 화소로 잰다. 씨앗이 그리는 영역 화소의 경계라 넓히기 판을 줄여도 계단과 점선이 없다.
 // - 덮는 몫은 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 이다. (픽셀 상자로 거른 선, 가장자리가 부드럽다)
+// - 번호 색 표를 켜면(lineColorEnabled) 가장 가까운 씨앗의 경계 양쪽 화소에서 앞쪽(깊이가 작은 쪽, 한쪽이 빈 곳이면 다른 쪽) 번호를 읽어 표에서 색을 찾는다.
+//   표의 알파가 0 이면 표에 없는 번호라 선 색 그대로다. 바깥 선과 꺾임 선이 따로 찾고, 더 진한 쪽의 색을 쓴다.
 const COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 precision highp int;
 uniform highp usampler2D seedTexture;
+uniform highp sampler2D lineTexture;
+uniform highp sampler2D depthTexture;
+uniform highp sampler2D lineColorTexture;
+uniform float lineColorEnabled;
 uniform vec4 viewportRect;
 uniform vec2 pointScale;
 uniform vec2 lineWidths;
@@ -351,6 +363,24 @@ uniform vec4 outlineColor;
 uniform float hdrOutput;
 out vec4 fragmentColor;
 const uint NO_SEED = 65535u;
+float readLineId(ivec2 pixel) {
+	vec4 value = texelFetch(lineTexture, pixel, 0);
+	return floor(value.b * 255.0 + 0.5) + mod(floor(value.a * 255.0 + 0.5), 64.0) * 256.0;
+}
+vec4 readSeedColor(uvec2 seed) {
+	if (seed.x == NO_SEED) {
+		return outlineColor;
+	}
+	ivec2 size = textureSize(lineTexture, 0);
+	ivec2 firstPixel = clamp(ivec2(seed >> 1u), ivec2(0), size - 1);
+	ivec2 secondPixel = clamp(ivec2((seed + 1u) >> 1u), ivec2(0), size - 1);
+	float firstId = readLineId(firstPixel);
+	float secondId = readLineId(secondPixel);
+	bool isFirstNearer = secondId < 0.5 || (firstId > 0.5 && texelFetch(depthTexture, firstPixel, 0).r <= texelFetch(depthTexture, secondPixel, 0).r);
+	int id = int(isFirstNearer ? firstId : secondId);
+	vec4 tableColor = texelFetch(lineColorTexture, ivec2(id % ${LINE_COLOR_TABLE_WIDTH}, id / ${LINE_COLOR_TABLE_WIDTH}), 0);
+	return tableColor.a > 0.0 ? tableColor : outlineColor;
+}
 float readSeedDistance(vec2 point, uvec2 seed, vec2 toOutput) {
 	if (seed.x == NO_SEED) {
 		return 1.0e9;
@@ -371,21 +401,40 @@ void main() {
 	ivec2 basePixel = ivec2(floor((point + 0.5) / pointScale - 0.5));
 	float contourDistance = 1.0e9;
 	float creaseDistance = 1.0e9;
+	uvec2 contourSeed = uvec2(NO_SEED);
+	uvec2 creaseSeed = uvec2(NO_SEED);
 	for (int offsetY = 0; offsetY <= 1; ++offsetY) {
 		for (int offsetX = 0; offsetX <= 1; ++offsetX) {
 			ivec2 samplePixel = clamp(basePixel + ivec2(offsetX, offsetY), ivec2(0), size - 1);
 			uvec4 seed = texelFetch(seedTexture, samplePixel, 0);
-			contourDistance = min(contourDistance, readSeedDistance(point, seed.xy, toOutput));
-			creaseDistance = min(creaseDistance, readSeedDistance(point, seed.zw, toOutput));
+			float sampleContourDistance = readSeedDistance(point, seed.xy, toOutput);
+			if (sampleContourDistance < contourDistance) {
+				contourDistance = sampleContourDistance;
+				contourSeed = seed.xy;
+			}
+			float sampleCreaseDistance = readSeedDistance(point, seed.zw, toOutput);
+			if (sampleCreaseDistance < creaseDistance) {
+				creaseDistance = sampleCreaseDistance;
+				creaseSeed = seed.zw;
+			}
 		}
 	}
 	float contour = lineWidths.x > 0.0 ? clamp(lineWidths.x * 0.5 - contourDistance + 0.5, 0.0, 1.0) : 0.0;
 	float crease = lineWidths.y > 0.0 ? clamp(lineWidths.y * 0.5 - creaseDistance + 0.5, 0.0, 1.0) * creaseOpacity : 0.0;
+	vec4 lineColor = outlineColor;
 	float strength = max(contour, crease) * outlineColor.a;
+	if (lineColorEnabled > 0.5 && max(contour, crease) > 0.0) {
+		vec4 contourColor = contour > 0.0 ? readSeedColor(contourSeed) : outlineColor;
+		vec4 creaseColor = crease > 0.0 ? readSeedColor(creaseSeed) : outlineColor;
+		float contourStrength = contour * contourColor.a;
+		float creaseStrength = crease * creaseColor.a;
+		lineColor = contourStrength >= creaseStrength ? contourColor : creaseColor;
+		strength = max(contourStrength, creaseStrength);
+	}
 	if (strength < 0.004) {
 		discard;
 	}
-	vec3 color = hdrOutput > 0.5 ? pow(outlineColor.rgb, vec3(2.2)) : outlineColor.rgb;
+	vec3 color = hdrOutput > 0.5 ? pow(lineColor.rgb, vec3(2.2)) : lineColor.rgb;
 	fragmentColor = vec4(color * strength, strength);
 }
 `;
@@ -427,6 +476,7 @@ export function readJumpFloodSteps(reach) {
 // - 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.
 // - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)
 // - 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.
+// - 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)
 // - 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.
 // - 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)
 // - 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.
@@ -471,6 +521,10 @@ export class ToonScreenOutline {
 	/** @private @type { number } */ #drawnDistanceSum; // 이번 프레임에 그린 모형의 거리 합과 수. (초점 거리를 주지 않았을 때)
 	/** @private @type { number } */ #drawnDistanceCount;
 	/** @private @type { Array<number> } */ #lineWidths; // 이번 프레임의 바깥 선과 꺾임 선 굵기. (그리는 영역 픽셀)
+	/** @private @type { Uint8Array } */ #lineColorTable; // 번호마다의 선 색. (번호 x 4 자리의 sRGB 와 알파 바이트, 알파 0 은 표에 없음)
+	/** @private @type { number } */ #lineColorCount; // 표에 넣은 번호 수. (0 이면 섞을 때 표를 보지 않는다)
+	/** @private @type { WebGLTexture | null } */ #lineColorTexture; // 번호 색 표 텍스처. (처음 넣을 때 짓는다)
+	/** @private @type { boolean } */ #isLineColorTableDirty; // 표를 텍스처에 다시 올릴지.
 
 	//==============================================================================
 	// 생성. (다섯 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
@@ -504,6 +558,10 @@ export class ToonScreenOutline {
 		this.#drawnDistanceSum = 0;
 		this.#drawnDistanceCount = 0;
 		this.#lineWidths = [2, 1];
+		this.#lineColorTable = new System.Uint8Array((TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1) * 4);
+		this.#lineColorCount = 0;
+		this.#lineColorTexture = null;
+		this.#isLineColorTableDirty = false;
 	}
 
 	//==============================================================================
@@ -535,6 +593,104 @@ export class ToonScreenOutline {
 	 */
 	setColor(color) {
 		this.#color = [color[0], color[1], color[2], color.length > 3 ? color[3] : 1];
+	}
+
+	//==============================================================================
+	// 번호마다 선 색 설정. (그 번호의 모형이 앞에 선 바깥 선과 꺾임 선을 이 색으로, 표에 없는 번호는 setColor 의 색 그대로)
+	// - 언리얼 Custom Stencil 의 후처리 바깥선처럼 선의 판에 이미 있는 번호로 색을 고른다. 고른 모형을 강조하거나 편마다 색을 달리할 때.
+	// - 표는 선 번호 전부(1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID)를 덮는 128 x 128 찾기 텍스처다. 넣는 번호 수에 상한이 없고, 화소마다 한 번 읽는다.
+	// - 두 번호가 맞닿은 선은 앞(카메라에 가까운) 쪽 번호의 색이다. 색은 sRGB 8 비트로 담고, 알파 0 은 1/255 로 담는다. (표에 없음과 가르려고, 보이지 않는 것은 같다)
+	//==============================================================================
+	/**
+	 * @param { number } lineId - 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID. (drawMesh 와 drawMeshInstanced 에 준 번호, 범위 밖이면 하지 않는다)
+	 * @param { Array<number> } color - [r, g, b, a] 의 sRGB 0 ~ 1. (a 를 빼면 1)
+	 * @example <caption>가리킨 바위 하나의 선만 노랗게</caption>
+	 * import { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const outline = new ToonScreenOutline(webGL2RenderingContext);
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
+	 * const rockMesh = renderer.createMesh(builder.readArrays());
+	 * const instances = [0, 1, 2].map((index) => ({ modelMatrix: Matrix4.createTranslation(index * 0.7, 0, 0), lineId: 10 + index }));
+	 * outline.setLineColor(11, [1, 0.85, 0.2, 1]);
+	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(0.7, 2, 3), Vector3.create(0.7, 0, 0), Vector3.create(0, 1, 0));
+	 * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
+	 * if (outline.beginLineIds(viewMatrix, projectionMatrix)) {
+	 * 	outline.drawMeshInstanced(rockMesh, instances, 10);
+	 * 	outline.endLineIds();
+	 * }
+	 * renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
+	 * renderer.drawMeshInstanced(rockMesh, instances);
+	 * renderer.endFrame();
+	 * outline.drawOutline();
+	 */
+	setLineColor(lineId, color) {
+		if (!System.Number.isInteger(lineId) || lineId < 1 || lineId > TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID) {
+			return;
+		}
+		const table = this.#lineColorTable;
+		const offset = lineId * 4;
+		if (table[offset + 3] === 0) {
+			this.#lineColorCount += 1;
+		}
+		const toByte = (value) => System.Math.round(System.Math.max(0, System.Math.min(1, value)) * 255);
+		table[offset] = toByte(color[0]);
+		table[offset + 1] = toByte(color[1]);
+		table[offset + 2] = toByte(color[2]);
+		table[offset + 3] = System.Math.max(1, toByte(color.length > 3 ? color[3] : 1));
+		this.#isLineColorTableDirty = true;
+	}
+
+	//==============================================================================
+	// 번호 하나를 색 표에서 빼기. (그 번호의 선은 setColor 의 색으로 돌아간다)
+	//==============================================================================
+	/**
+	 * @param { number } lineId - setLineColor 에 준 번호.
+	 */
+	removeLineColor(lineId) {
+		if (!System.Number.isInteger(lineId) || lineId < 1 || lineId > TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID) {
+			return;
+		}
+		const table = this.#lineColorTable;
+		const offset = lineId * 4;
+		if (table[offset + 3] === 0) {
+			return;
+		}
+		table.fill(0, offset, offset + 4);
+		this.#lineColorCount -= 1;
+		this.#isLineColorTableDirty = true;
+	}
+
+	//==============================================================================
+	// 색 표 비우기. (모든 선이 setColor 의 색으로 돌아간다)
+	//==============================================================================
+	/**
+	 * @example <caption>프레임마다 강조할 번호를 다시 넣기</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+	 * outline.clearLineColors();
+	 * outline.setLineColor(3, [1, 1, 1, 1]);
+	 * outline.setLineColor(7, [1, 0.3, 0.2, 1]);
+	 * const count = outline.getLineColorCount();
+	 */
+	clearLineColors() {
+		if (this.#lineColorCount === 0) {
+			return;
+		}
+		this.#lineColorTable.fill(0);
+		this.#lineColorCount = 0;
+		this.#isLineColorTableDirty = true;
+	}
+
+	//==============================================================================
+	// 색 표에 든 번호 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } setLineColor 로 넣고 빼지 않은 번호 수.
+	 */
+	getLineColorCount() {
+		return this.#lineColorCount;
 	}
 
 	//==============================================================================
@@ -924,12 +1080,23 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 		const compositeProgram = this.#compositeProgram;
 		compositeProgram.useProgram();
+		const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_COLOR_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isLineColorEnabled ? this.#lineColorTexture : null);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		const color = this.#color;
 		const lineWidths = this.#lineWidths;
 		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineTexture"), COMPOSITE_LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("depthTexture"), COMPOSITE_DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineColorTexture"), LINE_COLOR_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("lineColorEnabled"), isLineColorEnabled ? 1 : 0);
 		webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System.Math.max(1, viewport[2]), System.Math.max(1, viewport[3]));
 		webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
 		webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
@@ -939,10 +1106,52 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 		webGL2RenderingContext.bindVertexArray(null);
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		for (const textureUnit of [LINE_TEXTURE_UNIT, COMPOSITE_LINE_TEXTURE_UNIT, COMPOSITE_DEPTH_TEXTURE_UNIT, LINE_COLOR_TEXTURE_UNIT]) {
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + textureUnit);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		}
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		this.restoreState();
+	}
+
+	//==============================================================================
+	// 번호 색 표를 텍스처에 올리기. (처음이면 짓고, 바뀐 때만 통째로 64 KB 를 올린다)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 텍스처가 있으면 true.
+	 * @private
+	 */
+	uploadLineColorTable() {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		if (this.#lineColorTexture === null) {
+			this.#lineColorTexture = webGL2RenderingContext.createTexture();
+			if (this.#lineColorTexture === null) {
+				return false;
+			}
+			this.#isLineColorTableDirty = true;
+		}
+		if (!this.#isLineColorTableDirty) {
+			return true;
+		}
+		const isFlipped = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL);
+		const isPremultiplied = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+		const unpackAlignment = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_ALIGNMENT);
+		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL, false);
+		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_ALIGNMENT, 4);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_COLOR_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#lineColorTexture);
+		const height = (TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1) / LINE_COLOR_TABLE_WIDTH;
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, LINE_COLOR_TABLE_WIDTH, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, this.#lineColorTable);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL, isFlipped);
+		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, isPremultiplied);
+		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_ALIGNMENT, unpackAlignment);
+		this.#isLineColorTableDirty = false;
+		return true;
 	}
 
 	//==============================================================================
@@ -1172,6 +1381,10 @@ export class ToonScreenOutline {
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		this.deleteLineTarget();
+		if (this.#lineColorTexture !== null) {
+			webGL2RenderingContext.deleteTexture(this.#lineColorTexture);
+			this.#lineColorTexture = null;
+		}
 		webGL2RenderingContext.deleteVertexArray(this.#emptyVertexArray);
 		webGL2RenderingContext.deleteProgram(this.#lineProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#seedProgram.getProgram());
