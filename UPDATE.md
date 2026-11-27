@@ -538,6 +538,10 @@
     - getLineTarget() 의 maskTexture 는 없어졌다. 대신 seedTextures (RGBA16UI 둘), seedIndex (넓히기를 마친 쪽)
     - drawOutline 이 뷰포트를 beginLineIds 때의 그리는 영역으로 스스로 건다. (지금까지는 부르는 쪽의 뷰포트가 같아야 했다)
   - readJumpFloodSteps(거리): 점프 플러딩 걸음 목록. (큰 것부터 1 까지)
+- ToonScreenOutline 번호마다 선 색: setLineColor(lineId, color), removeLineColor(lineId), clearLineColors(), getLineColorCount(). (언리얼 Custom Stencil 꼴, 선의 판에 이미 있는 번호로 색을 고른다) 표는 선 번호 전부를 덮는 128 x 128 찾기 텍스처라 넣는 수에 상한이 없다. 맞닿은 선은 앞쪽 번호의 색이고, 표에 없는 번호는 setColor 의 색 그대로다. 표가 비면 섞기는 지금과 화소가 같다. (광부 키우기 #169 의 바위 강조처럼 고른 모형의 선만 강조 색으로)
+- ToonRenderer 인스턴스마다 빛남: drawMeshInstanced 의 인스턴스에 emissiveColor([r, g, b] sRGB)와 emissiveIntensity(선형 배, 기본 1). 그 인스턴스의 명암과 무늬 위에 더해 그 인스턴스만 밝힌다. (틴트는 곱이라 어둡게만 됐다)
+  - 인스턴스 자료는 그대로 20 수다. 행렬을 아핀 3x4 로 읽고 아래 줄 네 칸(원소 3, 7, 11, 15)에 빛남을 싣는다. (Godot MultiMesh, 유니티 BatchRendererGroup 의 3x4 행렬 꼴) ToonInstanceLayout 의 instanceMatrix 도 같고, 정점 조각에서는 vertex.emissive 다. Matrix4 원소를 그대로 담으면 아래 줄이 0, 0, 0, 1 이라 빛남이 없어 지금 화면 그대로다.
+  - 옮기는 법: 인스턴스 행렬의 아래 줄에 0, 0, 0, 1 이 아닌 값을 넣던 것(사영 인스턴스 행렬)은 이제 아핀으로 읽는다. ToonScreenOutline 의 선의 판도 같다.
 - ToonDrawQueue: setScreenOutline(ToonScreenOutline 이나 null), getScreenOutline(). 맡기면 draw 와 drawWithMatrices 가 몸 앞에 불투명한 것을 선의 판에 그리고(번호는 options.lineId, 주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 바깥선 껍데기 뒤 afterOutline 단계 앞에 섞는다. 모형마다 options.hasScreenOutline, options.hasCreaseLine. 비치는 것은 선의 판에 그리지 않는다. 화면 사각형(setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다. 지금까지 afterOutline 단계 콜백에서 drawOutline 을 부르던 코드는 이것으로 바꾸면 된다
 - 예제 toonstyle: 툰 셰이딩과 바깥선 견주기 장면. (각진 상자, 둥근 공, 큰 면 결정, 잔 면 결정 덩이, 고리, 비스듬한 판, 그림자, 점광, ?scale=0.5 로 반 크기 선의 판, ?toggles=1 로 모형마다의 꼴) 러스트 예제 toonstyle 과 같은 장면이다
 - 러스트 판 반사(#[reflect])와 맞추며 원본에서 고친 것
