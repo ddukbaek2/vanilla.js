@@ -74,7 +74,7 @@ function normalizeDirection(direction) {
 //   direction(빛이 나아가는 쪽)을 주면 스포트라이트다. 각 감쇠는 glTF KHR_lights_punctual 꼴로 clamp(cos 각 x scale + offset, 0, 1) 의 제곱이다. (innerConeAngle 기본 0, outerConeAngle 기본 π/4, 라디안)
 //   받는 몫은 감싸기(wrap) (dot(N, L) + wrap) / (1 + wrap) 이다. (0 이면 램버트, GPU Gems 1 의 wrap lighting)
 // - 빛 꼴: setLightModel({ isEnergyNormalized }) 가 true 면 바탕색 x 빛을 π 로 나누고 하이라이트에 (exponent + 8) / 8π 를 곱한다. (물리 빛 세기를 조도로 주는 약속)
-// - 색은 모두 선형 색이다. (HDR 이면 1 을 넘어도 된다) 램프 텍스처는 sRGB 로 보고 선형으로 바꿔 읽는다.
+// - 색은 모두 선형 색이다. (HDR 이면 1 을 넘어도 된다) 램프 텍스처는 sRGB 로 보고 선형으로 바꿔 읽는다. (감마 색 공간은 셰이더가 pow 2.2 로, 선형 색 공간은 sRGB 텍스처라 GPU 가)
 // - 고치면 판 번호(getVersion)가 오른다. 렌더러는 묶음과 판 번호가 같으면 다시 올리지 않는다.
 //==============================================================================
 /**

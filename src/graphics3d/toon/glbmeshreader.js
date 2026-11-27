@@ -4,6 +4,7 @@
 const System = globalThis;
 import { Matrix4 } from "../../base/matrix4.js";
 import { MeshBuilder } from "./meshbuilder.js";
+import { ColorSpace, readColorSpace, readEngineColorSpace } from "../../core/graphic/colorspace.js";
 
 
 /**
@@ -34,7 +35,7 @@ import { MeshBuilder } from "./meshbuilder.js";
 // 재질 색으로 칠하는 모형을 읽는다. 텍스처 좌표와 재질 텍스처가 있으면 그것도 읽는다.
 //   - 부품 하나가 노드 하나이고, 노드의 메시는 색마다 프리미티브 하나이다. 꼭짓점은 위치와 노멀, 뼈대가 있으면 본 번호와 무게이다.
 //     노멀이 없는 프리미티브는 glTF 2.0 명세대로 평평한 노멀(삼각형마다 하나)로 읽는다. 꼭짓점을 삼각형마다 따로 풀어 면 노멀을 준다. (새로 짓는 바깥선 껍데기도 같다)
-//   - 재질의 baseColorFactor 는 선형 색이라 sRGB 로 바꿔 담고, emissiveFactor 가 있으면 빛남으로 담는다. (emissiveTexture 가 있으면 빛남은 재질 범위로만 넘긴다)
+//   - 재질의 baseColorFactor 는 선형 색이라 sRGB 로 바꿔 담고(감마 색 공간은 pow 1 / 2.2, 선형 색 공간은 sRGB 표준 곡선, 셰이더가 푸는 곡선의 역), emissiveFactor 가 있으면 빛남으로 담는다. (emissiveTexture 가 있으면 빛남은 재질 범위로만 넘긴다)
 //   - TEXCOORD_0 이 있으면 uvData 로, TEXCOORD_1 이 있으면 uv1Data(2 번 UV, 천사 고리)로 담는다. 프리미티브마다 재질 범위(materialRanges)를 담는다.
 //     { name 재질 이름, materialIndex, nodeName, indexStart, indexCount, extras 재질 extras, alphaMode, alphaCutoff, baseColorFactor 선형, emissiveFactor 선형, baseColorImage, emissiveImage (images 차례, 없으면 -1), hasUv }
 //     부품 안에서 칸을 갈라 칠할 때(강조색 칸, 표시판) 재질 이름이나 extras 로 고르고 ToonRenderer.drawMesh 의 indexStart, indexCount 로 그 칸만 그린다.
@@ -409,8 +410,9 @@ function readSkinBindScale(json, binaryBuffer, skin) {
  * @param { Matrix4 } matrix - 부모까지 곱한 노드 행렬. (뼈대 프리미티브는 쓰지 않음)
  * @param { boolean } [isOutlineRebuilt] 바깥선 껍데기를 몸으로 새로 지으면 GLB 의 껍데기는 담지 않는다.
  * @param { object } [partNode] - 재질 범위의 nodeName 으로 쓸 부품 노드. (visitMeshNodes 가 넘긴 것, 없으면 node)
+ * @param { string } [colorSpace] - 색 공간. (ColorSpace, 선형 바탕색을 꼭짓점 sRGB 색으로 바꾸는 곡선, gamma 면 pow 1 / 2.2, linear 면 sRGB 표준 곡선)
  */
-function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt = false, partNode = node) {
+function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt = false, partNode = node, colorSpace = ColorSpace.gamma) {
 	const mode = primitive.mode !== undefined ? primitive.mode : TRIANGLES_MODE;
 	const attributes = primitive.attributes;
 	if (mode !== TRIANGLES_MODE || attributes.POSITION === undefined) {
@@ -459,6 +461,10 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 	}
 	const baseColor = pbrMetallicRoughness.baseColorFactor !== undefined ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
 	const color = [0, 1, 2].map((channelIndex) => {
+		if (colorSpace === ColorSpace.linear) {
+			const linear = System.Math.min(1, System.Math.max(0, baseColor[channelIndex]));
+			return linear <= 0.0031308 ? linear * 12.92 : 1.055 * System.Math.pow(linear, 1 / 2.4) - 0.055;
+		}
 		return System.Math.pow(System.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
 	});
 	// 빛남은 바탕색에 곱하는 세기로 담는다. (셰이더는 바탕색 x 세기를 더함)
@@ -765,6 +771,7 @@ function visitMeshNodes(json, visitEvent) {
  *   width 가 0 이면 껍데기를 하나도 짓지 않는다. (GLB 의 껍데기도 담지 않음)
  *   innerParts(노드 이름들)는 innerWidth 가 0 보다 크면 그 굵기의 껍데기를 하나 더 지어 바깥선 껍데기 끝에 담고, 그 자리를 innerOutlineRanges({ start, count } 들)로 돌려준다. (몸을 그린 뒤 그 부위를 둘레의 가는 선과 함께 한 번 더 그림)
  *   innerParts 와 그 위에 얹힌 innerOverParts(노드 이름들, 유리 위의 빛 반사 등)의 몸이 든 자리는 GLB 의 노드 차례대로 innerBodyRanges 로 돌려준다. (innerParts 가 없으면 빔)
+ * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, 그릴 ToonRenderer 의 getColorSpace 와 같은 값. 선형 baseColorFactor 를 꼭짓점 sRGB 색으로 바꾸는 곡선을 고른다)
  * @returns { object } MeshBuilder.readArrays 의 꼴과 skeleton (없으면 null), innerOutlineRanges, innerBodyRanges. (ToonRenderer.createMesh 에 넘긴다)
  * @example <caption>재질 범위마다 따로 칠하기</caption>
  * import { ToonRenderer, readGlbArrays, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
@@ -785,7 +792,8 @@ function visitMeshNodes(json, visitEvent) {
  * renderer.drawMeshOutline(mesh, modelMatrix);
  * renderer.endFrame();
  */
-export function readGlbArrays(arrayBuffer, outlineOptions = null) {
+export function readGlbArrays(arrayBuffer, outlineOptions = null, colorSpace = readEngineColorSpace()) {
+	const vertexColorSpace = readColorSpace(colorSpace);
 	const chunks = readGlbChunks(arrayBuffer);
 	const json = chunks.json;
 	const binaryBuffer = chunks.binaryBuffer;
@@ -799,7 +807,7 @@ export function readGlbArrays(arrayBuffer, outlineOptions = null) {
 	visitMeshNodes(json, (node, matrix, partNode) => {
 		const bodyStart = builder.getIndexCount();
 		for (const primitive of json.meshes[node.mesh].primitives) {
-			addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt, partNode);
+			addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt, partNode, vertexColorSpace);
 		}
 		if (!isOutlineRebuilt) {
 			return;
@@ -906,6 +914,7 @@ export function decodeGlbImage(image) {
 /**
  * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @param { object | null } [outlineOptions] readGlbArrays 와 같음.
+ * @param { string } [colorSpace] - 색 공간. (readGlbArrays 와 같음, 기본은 엔진의 색 공간)
  * @returns { object } { 노드 이름: MeshBuilder.readArrays 의 꼴과 extras, alpha } 부품마다의 배열.
  * @example <caption>부품마다 메시를 따로 올려 하나만 숨기기</caption>
  * import { ToonRenderer, readGlbNodeArrays, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
@@ -931,7 +940,8 @@ export function decodeGlbImage(image) {
  * }
  * renderer.endFrame();
  */
-export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
+export function readGlbNodeArrays(arrayBuffer, outlineOptions = null, colorSpace = readEngineColorSpace()) {
+	const vertexColorSpace = readColorSpace(colorSpace);
 	const chunks = readGlbChunks(arrayBuffer);
 	const json = chunks.json;
 	const binaryBuffer = chunks.binaryBuffer;
@@ -950,7 +960,7 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 			partExtras[partName] = partNode.extras;
 		}
 		for (const primitive of json.meshes[node.mesh].primitives) {
-			addPrimitive(builders[partName], json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt, partNode);
+			addPrimitive(builders[partName], json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt, partNode, vertexColorSpace);
 			const material = primitive.material !== undefined && json.materials !== undefined ? json.materials[primitive.material] : {};
 			if (material.alphaMode === "BLEND") {
 				const pbrMetallicRoughness = material.pbrMetallicRoughness !== undefined ? material.pbrMetallicRoughness : {};

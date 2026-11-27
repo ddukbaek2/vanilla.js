@@ -8,6 +8,7 @@ import { MultiLevelBloomEffect } from "../multilevelbloomeffect.js";
 import { FullscreenPass } from "../../core/fullscreenpass.js";
 import { Matrix4 } from "../../base/matrix4.js";
 import { ToonScreenOutline } from "./toonscreenoutline.js";
+import { readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../../core/graphic/colorspace.js";
 
 
 /**
@@ -63,10 +64,19 @@ vec3 mapTone(vec3 color) {
 	color *= exposure;
 	return clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
 }
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+vec3 toOutput(vec3 color) {
+	return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), color));
+}
+#endif
 void main() {
 	vec3 scene = texture(sceneTexture, fragmentTextureCoordinate).rgb;
 	vec3 bloom = texture(bloomTexture, fragmentTextureCoordinate).rgb;
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	vec3 color = hdrInput > 0.5 ? toOutput(mapTone(scene + bloom * bloomStrength)) : clamp(scene + bloom * bloomStrength, 0.0, 1.0);
+#else
 	vec3 color = hdrInput > 0.5 ? pow(mapTone(scene + bloom * bloomStrength), vec3(1.0 / 2.2)) : clamp(scene + bloom * bloomStrength, 0.0, 1.0);
+#endif
 	float localBrightness = brightness;
 	if (litCenter.w > 0.0) {
 		float depth = texture(depthTexture, fragmentTextureCoordinate).r;
@@ -302,6 +312,7 @@ void main() {
 // - 블룸: 기본은 반 해상도 9 탭 가우시안(BloomEffect, 문턱 0.9 ~ 1.6, 주고받는 판 RGBA8, setBloomFloatColor 로 RGBA16F).
 //   setBloomLevels(단 수, 문턱, 무릎) 로 단 수를 1 이상 주면 MultiLevelBloomEffect(반씩 줄였다 천막 꼴로 키우며 더함, 씬과 같은 정밀도의 판)로 바꾼다. 0 이면 기본으로 돌린다. 세기는 setBloom 이 둘 다에 쓴다.
 // - 톤매핑은 ACES 근사(Krzysztof Narkowicz 2016, 원문이 CC0 또는 MIT 로 쓰게 함)다. 노출(setExposure)을 곱한 뒤 매핑하고 sRGB 감마를 건다.
+//   감마 색 공간(기본)은 pow(1 / 2.2), 선형 색 공간(options.colorSpace 나 엔진의 ColorSpace.linear)은 sRGB 표준 곡선(IEC 61966-2-1)이다. (ToonRenderer 의 LDR 출력과 같은 곡선)
 // - 색 보정: 감마를 건 뒤 밝기(setBrightness, 밝힌 자리 setLitArea 안은 1 쪽으로), 채도, 색조(밝기 1 로 맞춘 색을 곱함), 안개빛(어두운 곳을 그 색 쪽으로), 대비, 가장자리 어둡게 차례로 건다. (setColorGrade, setVignette)
 //   기본은 밝기 1, 채도 1, 대비 1, 색조 0, 안개빛 0, 가장자리 0 이라 보정이 없다.
 // - 해상도 배율: setResolutionScale(배율) 이면 씬 판을 출력 크기 x 배율로 짓고 end 의 뷰포트로 키워(선형 거르기) 낸다. (3D 만 낮춰 그리고 UI 는 기기 화소 그대로 둘 때, 기본 1)
@@ -358,6 +369,7 @@ export class ToonPostProcess {
 	/** @private @type { object | null } */ #ambientOcclusionPasses; // 모서리 어둠의 세 패스. ({ occlusionPass, blurPass, upsamplePass }, 처음 셀 때 짓는다)
 	/** @private @type { object | null } */ #ambientOcclusionTarget; // 모서리 어둠 판. ({ occlusionTexture, blurTexture, resultTexture 와 그 프레임버퍼, width, height, cellWidth, cellHeight })
 	/** @private @type { ToonScreenOutline | null } */ #ambientOcclusionPrepass; // 바깥선이 없는 장면의 노멀과 깊이 미리 그리기. (선은 긋지 않는다)
+	/** @private @type { string } */ #colorSpace; // 색 공간. (ColorSpace, 생성 때 정함, 톤매핑 뒤 화면 색의 곡선, gamma 는 pow 1 / 2.2, linear 는 sRGB 표준 곡선)
 
 	//==============================================================================
 	// 생성. (화면 픽셀 크기, 옵션 { sampleCount = 0, useFloatColor = true, depthBits = 16, useDepthTexture = false })
@@ -367,10 +379,11 @@ export class ToonPostProcess {
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 툰 렌더러와 같은 컨텍스트.
 	 * @param { number } width - 출력 너비. (픽셀)
 	 * @param { number } height - 출력 높이. (픽셀)
-	 * @param { object | null } [options] - { sampleCount (기본 0), useFloatColor (기본 true), depthBits (16 이나 24), useDepthTexture (기본 false) }
+	 * @param { object | null } [options] - { sampleCount (기본 0), useFloatColor (기본 true), depthBits (16 이나 24), useDepthTexture (기본 false), colorSpace (ColorSpace, 기본은 엔진의 색 공간, ToonRenderer 와 같은 값) }
 	 */
 	constructor(webGL2RenderingContext, width, height, options = null) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
+		this.#colorSpace = options !== null && options.colorSpace !== undefined ? readColorSpace(options.colorSpace) : readEngineColorSpace();
 		webGL2RenderingContext.getExtension("EXT_color_buffer_float");
 		webGL2RenderingContext.getExtension("EXT_color_buffer_half_float");
 		const isFloatColorRequested = options === null || options.useFloatColor !== false;
@@ -386,7 +399,7 @@ export class ToonPostProcess {
 		this.#bloomEffect.resize(System.Math.max(1, width), System.Math.max(1, height));
 		this.#bloomEffect.setThreshold(0.9, 1.6);
 		this.#multiLevelBloomEffect = null;
-		this.#compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENT_SHADER);
+		this.#compositePass = new FullscreenPass(webGL2RenderingContext, addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, this.#colorSpace));
 		this.#exposure = 1;
 		this.#bloomStrength = 0.6;
 		this.#isBloomEnabled = true;
@@ -576,6 +589,24 @@ export class ToonPostProcess {
 	 */
 	getUseFloatColor() {
 		return this.#useFloatColor;
+	}
+
+	//==============================================================================
+	// 색 공간 반환. (생성 때 정한 값, 톤매핑 뒤 화면 색을 내는 곡선을 가른다)
+	//==============================================================================
+	/**
+	 * @returns { string } ColorSpace.gamma 나 ColorSpace.linear.
+	 * @example <caption>렌더러와 같은 색 공간으로 지은 후처리</caption>
+	 * import { ToonRenderer, ToonPostProcess, ColorSpace } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext, { colorSpace: ColorSpace.linear });
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, 320, 180, { colorSpace: renderer.getColorSpace() });
+	 * if (postProcess.getColorSpace() !== ColorSpace.linear) {
+	 * 	throw new Error("color space is not linear");
+	 * }
+	 */
+	getColorSpace() {
+		return this.#colorSpace;
 	}
 
 	//==============================================================================
@@ -923,7 +954,7 @@ export class ToonPostProcess {
 	 */
 	getAmbientOcclusionPrepass() {
 		if (this.#ambientOcclusionPrepass === null) {
-			const prepass = new ToonScreenOutline(this.#webGL2RenderingContext);
+			const prepass = new ToonScreenOutline(this.#webGL2RenderingContext, { colorSpace: this.#colorSpace });
 			prepass.setWidth(0);
 			prepass.setCrease(180, 0);
 			this.#ambientOcclusionPrepass = prepass;

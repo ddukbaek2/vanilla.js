@@ -5,6 +5,7 @@ const System = globalThis;
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
 import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, readInstanceBufferSphere, isSphereInFrustum } from "./toonrenderer.js";
 import { TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_LINE_ID_LOCATION } from "./toonmaterial.js";
+import { readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../../core/graphic/colorspace.js";
 
 
 /**
@@ -437,7 +438,13 @@ void main() {
 	if (strength < 0.004) {
 		discard;
 	}
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	vec3 linearColor = max(lineColor.rgb, vec3(0.0));
+	linearColor = mix(linearColor / 12.92, pow((linearColor + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), linearColor));
+	vec3 color = hdrOutput > 0.5 ? linearColor : lineColor.rgb;
+#else
 	vec3 color = hdrOutput > 0.5 ? pow(lineColor.rgb, vec3(2.2)) : lineColor.rgb;
+#endif
 	fragmentColor = vec4(color * strength, strength);
 }
 `;
@@ -508,6 +515,7 @@ export class ToonScreenOutline {
 	/** @private @type { ShaderProgram } */ #seedGatherProgram;
 	/** @private @type { ShaderProgram } */ #jumpFloodProgram;
 	/** @private @type { ShaderProgram } */ #compositeProgram;
+	/** @private @type { string } */ #colorSpace; // 색 공간. (ColorSpace, 생성 때 정함, HDR 출력에서 선 색을 선형으로 바꾸는 곡선)
 	/** @private @type { WebGLVertexArrayObject } */ #emptyVertexArray; // 화면 세모용 빈 버텍스 어레이.
 	/** @private @type { object | null } */ #lineTarget; // 선의 판. ({ framebuffer, lineTexture, depthTexture, seedFramebuffer, seedTexture, jumpFloodFramebuffers, jumpFloodTextures, jumpFloodIndex, width, height, jumpFloodWidth, jumpFloodHeight })
 	/** @private @type { Array<number> } */ #color; // 선 색. (sRGB, 알파)
@@ -538,14 +546,16 @@ export class ToonScreenOutline {
 	/**
 	 * @constructor
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 툰 렌더러와 같은 컨텍스트.
+	 * @param { object | null } [options] - { colorSpace (ColorSpace, 기본은 엔진의 색 공간, ToonRenderer 와 같은 값) }
 	 */
-	constructor(webGL2RenderingContext) {
+	constructor(webGL2RenderingContext, options = null) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
+		this.#colorSpace = options !== null && options.colorSpace !== undefined ? readColorSpace(options.colorSpace) : readEngineColorSpace();
 		this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, System.Object.assign({ instanceLineId: TOON_INSTANCE_LINE_ID_LOCATION }, TOON_ATTRIBUTE_LOCATIONS));
 		this.#seedProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_FRAGMENT_SHADER, {});
 		this.#seedGatherProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_GATHER_FRAGMENT_SHADER, {});
 		this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
-		this.#compositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, COMPOSITE_FRAGMENT_SHADER, {});
+		this.#compositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, this.#colorSpace), {});
 		this.#emptyVertexArray = webGL2RenderingContext.createVertexArray();
 		this.#lineTarget = null;
 		this.#color = [0.08, 0.07, 0.1, 1];
@@ -576,19 +586,20 @@ export class ToonScreenOutline {
 	//==============================================================================
 	/**
 	 * @static
+	 * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, 지을 ToonScreenOutline 과 같은 값을 준다)
 	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 다섯. (번호, 씨앗, 모으기, 넓히기, 섞기)
 	 * @example <caption>셰이더를 미리 링크할 목록에 넣기</caption>
 	 * import { ToonScreenOutline } from "./vanilla.js";
 	 * const sources = ToonScreenOutline.readProgramSources();
 	 * const vertexShaders = sources.map((source) => source.vertexShader);
 	 */
-	static readProgramSources() {
+	static readProgramSources(colorSpace = readEngineColorSpace()) {
 		return [
 			{ vertexShader: LINE_VERTEX_SHADER, fragmentShader: LINE_FRAGMENT_SHADER, attributeLocationTable: TOON_ATTRIBUTE_LOCATIONS },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_FRAGMENT_SHADER, attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_GATHER_FRAGMENT_SHADER, attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: JUMP_FLOOD_FRAGMENT_SHADER, attributeLocationTable: {} },
-			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: COMPOSITE_FRAGMENT_SHADER, attributeLocationTable: {} },
+			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} },
 		];
 	}
 
@@ -772,6 +783,24 @@ export class ToonScreenOutline {
 	 */
 	setHdrOutput(isHdrOutput) {
 		this.#isHdrOutput = isHdrOutput;
+	}
+
+	//==============================================================================
+	// 색 공간 반환. (생성 때 정한 값, HDR 출력에서 선 색을 선형으로 바꾸는 곡선, gamma 는 pow 2.2, linear 는 sRGB 표준 곡선)
+	//==============================================================================
+	/**
+	 * @returns { string } ColorSpace.gamma 나 ColorSpace.linear.
+	 * @example <caption>렌더러와 같은 색 공간으로 지은 화면 바깥선</caption>
+	 * import { ToonRenderer, ToonScreenOutline, ColorSpace } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const screenOutline = new ToonScreenOutline(webGL2RenderingContext, { colorSpace: renderer.getColorSpace() });
+	 * if (screenOutline.getColorSpace() !== ColorSpace.gamma) {
+	 * 	throw new Error("default color space is not gamma");
+	 * }
+	 */
+	getColorSpace() {
+		return this.#colorSpace;
 	}
 
 	//==============================================================================
