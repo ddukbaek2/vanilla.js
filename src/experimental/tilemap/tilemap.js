@@ -852,10 +852,11 @@ export class Tilemap extends Component {
 	}
 
 	//==============================================================================
-	// 타일셋 넣기.
+	// 타일셋 넣기. (타일셋은 여러 지도가 나눠 쓰는 자산이라 참조로 든다, 러스트 판은 Rc<Tileset>)
+	// - 넣은 뒤에는 타일셋을 고치지 않는다. (나눠 쓰는 다른 지도에도 번진다. 그림 걸기 TiledMapReader.attachImages 처럼 지도를 읽은 바로 뒤에만 고친다)
 	//==============================================================================
 	/**
-	 * @param { Tileset } tileset 넣을 타일셋.
+	 * @param { Tileset } tileset 넣을 타일셋. (다른 지도와 같은 타일셋을 나눠 쓸 수 있다)
 	 * @param { number } firstGid 이 타일셋 0 번 타일의 gid. (0 이하면 앞 타일셋 다음 번호, 첫 타일셋은 1)
 	 * @returns { number } 정한 첫 gid.
 	 */
@@ -893,7 +894,7 @@ export class Tilemap extends Component {
 	 * @returns { Tileset[] } 타일셋. (첫 gid 차례)
 	 */
 	getTilesets() {
-		// 얼린 사본. (안쪽 배열을 밖에서 고쳐 첫 gid 표와 어긋나지 않게, 러스트 판의 &[Tileset] 자리)
+		// 얼린 사본. (안쪽 배열을 밖에서 고쳐 첫 gid 표와 어긋나지 않게, 러스트 판의 &[Rc<Tileset>] 자리)
 		return System.Object.freeze([...this.#tilesets]);
 	}
 
