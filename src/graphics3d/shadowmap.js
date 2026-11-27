@@ -17,6 +17,28 @@ export const SHADOW_ATLAS_MAXIMUM_LIGHTS = 4;
 const CUBE_FACE_FORWARDS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 const CUBE_FACE_UPS = [[0, 1, 0], [0, 1, 0], [0, 0, 1], [0, 0, 1], [0, 1, 0], [0, 1, 0]];
 
+/**
+ * 그림자 깊이를 다시 그리는 방식. (ShadowMap 과 ShadowAtlas 의 setUpdateMode, ToonDrawQueue.drawShadows 와 drawLocalShadows 가 따른다)
+ * - everyFrame: 매 프레임 드리우개 전부를 다시 그린다.
+ * - onChange: 빛과 드리우개가 그대로면 다시 그리지 않는다. 오래 그대로인 드리우개는 따로 구워 두고, 움직이는 것만 매 프레임 그 위에 덧그린다. (기본, 화면은 매 프레임 그린 것과 같다)
+ * - interval: N 프레임마다 한 번 전부 다시 그린다. (사이의 프레임은 앞의 그림자를 그대로 써서, 움직이는 것의 그림자가 늦게 따라온다)
+ * @example <caption>해 그림자는 바뀔 때만, 점광 그림자는 네 프레임마다</caption>
+ * import { ShadowMap, ShadowAtlas, ShadowUpdateMode } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const shadowMap = new ShadowMap(webGL2RenderingContext, 1024);
+ * shadowMap.setUpdateMode(ShadowUpdateMode.onChange);
+ * const shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);
+ * shadowAtlas.setUpdateMode(ShadowUpdateMode.interval, 4);
+ * console.log(shadowMap.getUpdateMode(), shadowAtlas.getUpdateMode(), shadowAtlas.getUpdateInterval());
+ * shadowMap.destroy();
+ * shadowAtlas.destroy();
+ */
+export const ShadowUpdateMode = System.Object.freeze({
+	everyFrame: "everyFrame", // 매 프레임 전부.
+	onChange: "onChange", // 바뀔 때만. (기본)
+	interval: "interval", // N 프레임마다.
+});
+
 
 //==============================================================================
 // 깊이 판 짓기. (하드웨어 비교 샘플링 sampler2DShadow 의 DEPTH_COMPONENT24 텍스처와 컬러 없는 프레임버퍼, 앞의 텍스처와 프레임버퍼 묶음은 돌린다)
@@ -47,6 +69,75 @@ function createDepthTarget(webGL2RenderingContext, resolution) {
 	webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
 	webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
 	return { framebuffer: framebuffer, depthTexture: depthTexture };
+}
+
+
+//==============================================================================
+// 그림자 깊이 캐시 짓기. (ShadowMap 과 ShadowAtlas 가 하나씩 갖는다, 갱신 방식, 움직이지 않는 드리우개를 구운 판, ToonDrawQueue 가 드리우개를 견준 기록)
+// - 유니티 HDRP 의 빛마다의 그림자 갱신 방식(매 프레임, 요청할 때)과 언리얼의 캐시된 그림자 맵(움직이지 않는 것을 구워 두고 움직이는 것만 매 프레임 덧그린다) 꼴이다.
+// - renderTarget 은 다음 beginRender 가 그릴 곳이다. live (판을 비움), cache (구운 판을 비움), copy (구운 판을 판에 옮겨 그 위에 덧그림). beginRender 가 쓰고 live 로 되돌린다.
+//==============================================================================
+/**
+ * @param { number } resolution - 한 변의 크기. (픽셀)
+ * @returns { object } { resolution, updateMode, updateInterval, isUpdateRequested, frameCount, renderTarget, cacheTarget, lightKey, casterRecords, hasCache, isDepthCurrent }
+ */
+function createShadowCache(resolution) {
+	return { resolution: resolution, updateMode: ShadowUpdateMode.onChange, updateInterval: 1, isUpdateRequested: true, frameCount: 0, renderTarget: "live", cacheTarget: null, lightKey: null, casterRecords: [], hasCache: false, isDepthCurrent: false };
+}
+
+//==============================================================================
+// 그림자 깊이 판 묶기. (캐시의 renderTarget 대로 판이나 구운 판을 묶고 비우거나, 구운 판을 판에 옮긴다, 뷰포트는 판 전체)
+//==============================================================================
+/**
+ * @param { WebGL2RenderingContext } webGL2RenderingContext - 렌더링 컨텍스트.
+ * @param { object } shadowCache - createShadowCache 의 결과.
+ * @param { WebGLFramebuffer } framebuffer - 판의 프레임버퍼.
+ */
+function bindShadowTarget(webGL2RenderingContext, shadowCache, framebuffer) {
+	const renderTarget = shadowCache.renderTarget;
+	const resolution = shadowCache.resolution;
+	shadowCache.renderTarget = "live";
+	shadowCache.isDepthCurrent = false;
+	if (renderTarget === "cache" && shadowCache.cacheTarget === null) {
+		shadowCache.cacheTarget = createDepthTarget(webGL2RenderingContext, resolution);
+	}
+	if (renderTarget === "copy" && shadowCache.cacheTarget !== null) {
+		// 깊이 옮기기는 가위 시험을 받는다. (판 전체를 옮기고 앞의 가위 시험은 돌린다)
+		const isScissorEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.SCISSOR_TEST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, shadowCache.cacheTarget.framebuffer);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.DRAW_FRAMEBUFFER, framebuffer);
+		webGL2RenderingContext.blitFramebuffer(0, 0, resolution, resolution, 0, 0, resolution, resolution, webGL2RenderingContext.DEPTH_BUFFER_BIT, webGL2RenderingContext.NEAREST);
+		if (isScissorEnabled) {
+			webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+		}
+	}
+	webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, renderTarget === "cache" ? shadowCache.cacheTarget.framebuffer : framebuffer);
+	webGL2RenderingContext.viewport(0, 0, resolution, resolution);
+	webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+	webGL2RenderingContext.depthMask(true);
+	if (renderTarget !== "copy" || shadowCache.cacheTarget === null) {
+		webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+	}
+}
+
+//==============================================================================
+// 그림자 깊이 캐시 지우기. (구운 판의 프레임버퍼와 텍스처)
+//==============================================================================
+/**
+ * @param { WebGL2RenderingContext } webGL2RenderingContext - 렌더링 컨텍스트.
+ * @param { object } shadowCache - createShadowCache 의 결과.
+ */
+function deleteShadowCache(webGL2RenderingContext, shadowCache) {
+	if (shadowCache.cacheTarget !== null) {
+		webGL2RenderingContext.deleteFramebuffer(shadowCache.cacheTarget.framebuffer);
+		webGL2RenderingContext.deleteTexture(shadowCache.cacheTarget.depthTexture);
+		shadowCache.cacheTarget = null;
+	}
+	shadowCache.casterRecords.length = 0;
+	shadowCache.lightKey = null;
+	shadowCache.hasCache = false;
+	shadowCache.isDepthCurrent = false;
 }
 
 //==============================================================================
@@ -149,6 +240,7 @@ export class ShadowMap extends Object {
 	/** @private @type { WebGLTexture } */ #depthTexture;
 	/** @private @type { number } */ #resolution;
 	/** @private @type { Matrix4 } */ #lightViewProjectionMatrix;
+	/** @private @type { object } */ #shadowCache; // 갱신 방식과 구운 판. (createShadowCache)
 
 	//==============================================================================
 	// 생성.
@@ -167,6 +259,7 @@ export class ShadowMap extends Object {
 		const depthTarget = createDepthTarget(webGL2RenderingContext, resolution);
 		this.#framebuffer = depthTarget.framebuffer;
 		this.#depthTexture = depthTarget.depthTexture;
+		this.#shadowCache = createShadowCache(resolution);
 	}
 
 	//==============================================================================
@@ -213,17 +306,71 @@ export class ShadowMap extends Object {
 	}
 
 	//==============================================================================
-	// 깊이 패스 시작. (프레임버퍼 바인드 + 뷰포트 + 깊이 클리어)
+	// 깊이 패스 시작. (프레임버퍼 바인드 + 뷰포트 + 깊이 클리어, ToonDrawQueue 가 캐시를 쓸 때는 구운 판에 그리거나 구운 판을 옮겨 그 위에 덧그린다)
 	//==============================================================================
 	beginRender() {
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const framebuffer = this.getFramebuffer();
-		const resolution = this.getResolution();
-		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
-		webGL2RenderingContext.viewport(0, 0, resolution, resolution);
-		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
-		webGL2RenderingContext.depthMask(true);
-		webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+		bindShadowTarget(this.getWebGL2RenderingContext(), this.#shadowCache, this.getFramebuffer());
+	}
+
+	//==============================================================================
+	// 그림자를 다시 그리는 방식 정하기. (ToonDrawQueue 가 따른다, 기본 ShadowUpdateMode.onChange, 정하면 다음 그리기에서 전부 다시 그린다)
+	//==============================================================================
+	/**
+	 * @param { string } updateMode - ShadowUpdateMode.
+	 * @param { number } [updateInterval] - interval 일 때 몇 프레임마다 그릴지. (기본 1, 1 보다 작으면 1)
+	 * @example <caption>해 그림자를 세 프레임마다 그리기</caption>
+	 * import { ShadowMap, ShadowUpdateMode } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const shadowTarget = new ShadowMap(webGL2RenderingContext, 1024);
+	 * shadowTarget.setUpdateMode(ShadowUpdateMode.interval, 3);
+	 * console.log(shadowTarget.getUpdateMode(), shadowTarget.getUpdateInterval());
+	 * shadowTarget.setUpdateMode(ShadowUpdateMode.everyFrame);
+	 * shadowTarget.destroy();
+	 */
+	setUpdateMode(updateMode, updateInterval = 1) {
+		const shadowCache = this.#shadowCache;
+		shadowCache.updateMode = updateMode;
+		shadowCache.updateInterval = System.Math.max(1, System.Math.floor(updateInterval));
+		shadowCache.frameCount = 0;
+		shadowCache.isUpdateRequested = true;
+	}
+
+	//==============================================================================
+	// 그림자를 다시 그리는 방식 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } ShadowUpdateMode.
+	 */
+	getUpdateMode() {
+		return this.#shadowCache.updateMode;
+	}
+
+	//==============================================================================
+	// interval 의 프레임 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 몇 프레임마다 그리는지. (1 이상)
+	 */
+	getUpdateInterval() {
+		return this.#shadowCache.updateInterval;
+	}
+
+	//==============================================================================
+	// 다음 그리기에서 전부 다시 그리게 하기. (드리우개 기록이 못 보는 바뀜, 예를 들어 모형의 꼭짓점을 고쳤을 때)
+	//==============================================================================
+	requestUpdate() {
+		this.#shadowCache.isUpdateRequested = true;
+	}
+
+	//==============================================================================
+	// 그림자 깊이 캐시 반환. (ToonDrawQueue 가 쓴다)
+	//==============================================================================
+	/**
+	 * @returns { object } 캐시.
+	 * @private
+	 */
+	getShadowCache() {
+		return this.#shadowCache;
 	}
 
 	//==============================================================================
@@ -277,12 +424,13 @@ export class ShadowMap extends Object {
 	}
 
 	//==============================================================================
-	// 파괴. (프레임버퍼와 깊이 텍스처를 지운다)
+	// 파괴. (프레임버퍼와 깊이 텍스처, 구운 판을 지운다)
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		webGL2RenderingContext.deleteFramebuffer(this.#framebuffer);
 		webGL2RenderingContext.deleteTexture(this.#depthTexture);
+		deleteShadowCache(webGL2RenderingContext, this.#shadowCache);
 	}
 }
 
@@ -327,6 +475,7 @@ export class ShadowAtlas extends Object {
 	/** @private @type { number } */ #tileSize; // 칸 한 변. (픽셀)
 	/** @private @type { Array<object> } */ #lights; // { lightIndex, position, forward, up, tangent (0 이면 점광), near, far, firstTile }
 	/** @private @type { Array<object> } */ #tiles; // { viewProjectionMatrix, x, y, size }
+	/** @private @type { object } */ #shadowCache; // 갱신 방식과 구운 판. (createShadowCache)
 
 	//==============================================================================
 	// 생성. (깊이 텍스처와 컬러 없는 프레임버퍼, 앞의 묶음은 돌린다)
@@ -349,6 +498,7 @@ export class ShadowAtlas extends Object {
 		this.#tileSize = resolution;
 		this.#lights = [];
 		this.#tiles = [];
+		this.#shadowCache = createShadowCache(resolution);
 	}
 
 	//==============================================================================
@@ -421,16 +571,73 @@ export class ShadowAtlas extends Object {
 	}
 
 	//==============================================================================
-	// 깊이 패스 시작. (프레임버퍼를 묶고 판 전체를 비운다, 칸마다 beginTile)
+	// 깊이 패스 시작. (프레임버퍼를 묶고 판 전체를 비운다, 칸마다 beginTile, ToonDrawQueue 가 캐시를 쓸 때는 구운 판에 그리거나 구운 판을 옮겨 그 위에 덧그린다)
 	//==============================================================================
 	beginRender() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
-		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.#framebuffer);
-		webGL2RenderingContext.viewport(0, 0, this.#resolution, this.#resolution);
 		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
-		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
-		webGL2RenderingContext.depthMask(true);
-		webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+		bindShadowTarget(webGL2RenderingContext, this.#shadowCache, this.#framebuffer);
+	}
+
+	//==============================================================================
+	// 그림자를 다시 그리는 방식 정하기. (ToonDrawQueue 가 따른다, 기본 ShadowUpdateMode.onChange, 정하면 다음 그리기에서 전부 다시 그린다)
+	//==============================================================================
+	/**
+	 * @param { string } updateMode - ShadowUpdateMode.
+	 * @param { number } [updateInterval] - interval 일 때 몇 프레임마다 그릴지. (기본 1, 1 보다 작으면 1)
+	 * @example <caption>점광 그림자를 세 프레임마다 그리기</caption>
+	 * import { ShadowAtlas, ShadowUpdateMode } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const shadowTarget = new ShadowAtlas(webGL2RenderingContext, 1024);
+	 * shadowTarget.setUpdateMode(ShadowUpdateMode.interval, 3);
+	 * console.log(shadowTarget.getUpdateMode(), shadowTarget.getUpdateInterval());
+	 * shadowTarget.setUpdateMode(ShadowUpdateMode.everyFrame);
+	 * shadowTarget.destroy();
+	 */
+	setUpdateMode(updateMode, updateInterval = 1) {
+		const shadowCache = this.#shadowCache;
+		shadowCache.updateMode = updateMode;
+		shadowCache.updateInterval = System.Math.max(1, System.Math.floor(updateInterval));
+		shadowCache.frameCount = 0;
+		shadowCache.isUpdateRequested = true;
+	}
+
+	//==============================================================================
+	// 그림자를 다시 그리는 방식 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } ShadowUpdateMode.
+	 */
+	getUpdateMode() {
+		return this.#shadowCache.updateMode;
+	}
+
+	//==============================================================================
+	// interval 의 프레임 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 몇 프레임마다 그리는지. (1 이상)
+	 */
+	getUpdateInterval() {
+		return this.#shadowCache.updateInterval;
+	}
+
+	//==============================================================================
+	// 다음 그리기에서 전부 다시 그리게 하기. (드리우개 기록이 못 보는 바뀜, 예를 들어 모형의 꼭짓점을 고쳤을 때)
+	//==============================================================================
+	requestUpdate() {
+		this.#shadowCache.isUpdateRequested = true;
+	}
+
+	//==============================================================================
+	// 그림자 깊이 캐시 반환. (ToonDrawQueue 가 쓴다)
+	//==============================================================================
+	/**
+	 * @returns { object } 캐시.
+	 * @private
+	 */
+	getShadowCache() {
+		return this.#shadowCache;
 	}
 
 	//==============================================================================
@@ -546,12 +753,13 @@ export class ShadowAtlas extends Object {
 	}
 
 	//==============================================================================
-	// 파괴. (프레임버퍼와 깊이 텍스처를 지운다)
+	// 파괴. (프레임버퍼와 깊이 텍스처, 구운 판을 지운다)
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		webGL2RenderingContext.deleteFramebuffer(this.#framebuffer);
 		webGL2RenderingContext.deleteTexture(this.#depthTexture);
+		deleteShadowCache(webGL2RenderingContext, this.#shadowCache);
 	}
 }
 

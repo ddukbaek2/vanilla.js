@@ -4,6 +4,7 @@
 const System = globalThis;
 import { ToonBlendMode } from "./toonmaterial.js";
 import { TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID } from "./toonscreenoutline.js";
+import { ShadowUpdateMode } from "../shadowmap.js";
 
 
 /**
@@ -60,6 +61,93 @@ function readSortId(value) {
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
+// 그림자 캐시에서 드리우개를 움직이지 않는 것으로 굽기까지 그대로여야 하는 프레임 수. (자주 섰다 움직이는 것이 구운 판을 자꾸 다시 굽지 않게)
+const SHADOW_STATIC_FRAME_COUNT = 30;
+
+
+//==============================================================================
+// 드리우개 기록 쓰기. (그림자 깊이에 닿는 값을 기록과 견주고 새 값으로 바꾼다, 다르면 true)
+// - 모형, 재질, 모형 행렬이나 인스턴스 행렬, 관절 행렬, 번호 버퍼의 범위, 화면 밖 거르기, 뒤집기. (틴트, 색, 바깥선 같은 것은 깊이에 닿지 않는다)
+//==============================================================================
+/**
+ * @param { object } record - { mesh, material, values Float32Array, stableFrameCount, isStatic }
+ * @param { object } item - 담은 것 하나.
+ * @returns { boolean } 앞의 프레임과 다르면 true.
+ */
+function writeCasterRecord(record, item) {
+	const options = item.options;
+	const jointMatrices = options.jointMatrices !== undefined && options.jointMatrices !== null ? options.jointMatrices : null;
+	const matrixCount = item.instances !== null ? item.instances.length : 1;
+	const valueCount = 6 + matrixCount * 16 + (jointMatrices !== null ? jointMatrices.length : 0);
+	let isChanged = record.mesh !== item.mesh || record.material !== options.material;
+	record.mesh = item.mesh;
+	record.material = options.material;
+	if (record.values.length !== valueCount) {
+		record.values = new System.Float32Array(valueCount);
+		isChanged = true;
+	}
+	const values = record.values;
+	let index = 0;
+	const write = (value) => {
+		const rounded = System.Math.fround(value);
+		if (values[index] !== rounded) {
+			values[index] = rounded;
+			isChanged = true;
+		}
+		index += 1;
+	};
+	write(matrixCount);
+	write(options.indexStart !== undefined ? options.indexStart : -1);
+	write(options.indexCount !== undefined ? options.indexCount : -1);
+	write(options.isCulled === false ? 0 : 1);
+	write(options.isMirrored === undefined ? -1 : (options.isMirrored === true ? 1 : 0));
+	write(jointMatrices !== null ? jointMatrices.length : -1);
+	if (item.instances !== null) {
+		for (const instance of item.instances) {
+			const elements = instance.modelMatrix.getElements();
+			for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
+				write(elements[elementIndex]);
+			}
+		}
+	}
+	else {
+		const elements = item.modelMatrix.getElements();
+		for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
+			write(elements[elementIndex]);
+		}
+	}
+	if (jointMatrices !== null) {
+		for (let jointIndex = 0; jointIndex < jointMatrices.length; ++jointIndex) {
+			write(jointMatrices[jointIndex]);
+		}
+	}
+	return isChanged;
+}
+
+//==============================================================================
+// 같은 수 묶음인지. (null 이면 다르다)
+//==============================================================================
+/**
+ * @param { Float32Array | null } values - 앞의 값.
+ * @param { Float32Array } other - 지금 값.
+ * @returns { boolean } 길이와 값이 모두 같으면 true.
+ */
+function isSameValues(values, other) {
+	if (values === null || values.length !== other.length) {
+		return false;
+	}
+	for (let index = 0; index < values.length; ++index) {
+		if (values[index] !== other[index]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+//==============================================================================
+// 전역 상수 목록.
+//==============================================================================
 /**
  * 그리기 줄의 단계. (addPass 의 콜백을 부를 자리)
  * - beforeOpaque: 불투명한 몸 앞. (평면 거울에 비친 모습, 하늘)
@@ -99,6 +187,7 @@ export const ToonDrawStage = System.Object.freeze({
 // - 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.
 // - 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.
 // - 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.
+//   그림자 판의 setUpdateMode(ShadowUpdateMode) 를 따른다. 기본 onChange 는 빛과 드리우개가 그대로면 다시 그리지 않고, 오래 그대로인 것은 구워 두고 움직이는 것만 덧그린다. (화면은 매 프레임 그린 것과 같다)
 //   점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)
 // - 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)
 //   draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)
@@ -267,14 +356,16 @@ export class ToonDrawQueue {
 	 * @param { object } shadowMap - ShadowMap.
 	 */
 	drawShadows(renderer, shadowMap) {
-		renderer.beginShadowPass(shadowMap);
-		for (const item of this.readOpaqueItemList()) {
-			if (item.options.castsShadow === false) {
-				continue;
+		const lightKey = new System.Float32Array(17);
+		lightKey.set(shadowMap.getLightViewProjectionMatrix().getElements());
+		lightKey[16] = shadowMap.getResolution();
+		this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, () => {
+			renderer.beginShadowPass(shadowMap);
+		}, (casterList) => {
+			for (const item of casterList) {
+				this.drawItem(renderer, item, item.options);
 			}
-			this.drawItem(renderer, item, item.options);
-		}
-		renderer.endShadowPass();
+		});
 	}
 
 	//==============================================================================
@@ -304,17 +395,141 @@ export class ToonDrawQueue {
 	 * queue.draw(renderer, camera);
 	 */
 	drawLocalShadows(renderer, shadowAtlas) {
-		renderer.beginShadowAtlasPass(shadowAtlas);
-		for (let tileIndex = 0; tileIndex < shadowAtlas.getTileCount(); ++tileIndex) {
-			renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-			for (const item of this.readOpaqueItemList()) {
-				if (item.options.castsShadow === false) {
-					continue;
+		const tileCount = shadowAtlas.getTileCount();
+		const lightKey = new System.Float32Array(1 + tileCount * 19);
+		lightKey[0] = shadowAtlas.getResolution();
+		for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+			const tile = shadowAtlas.getTile(tileIndex);
+			const offset = 1 + tileIndex * 19;
+			lightKey.set(tile.viewProjectionMatrix.getElements(), offset);
+			lightKey[offset + 16] = tile.x;
+			lightKey[offset + 17] = tile.y;
+			lightKey[offset + 18] = tile.size;
+		}
+		this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, () => {
+			renderer.beginShadowAtlasPass(shadowAtlas);
+		}, (casterList) => {
+			for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+				renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
+				for (const item of casterList) {
+					this.drawItem(renderer, item, item.options);
 				}
-				this.drawItem(renderer, item, item.options);
+			}
+		});
+	}
+
+	//==============================================================================
+	// 그림자 드리우개 그리기. (그림자 판의 갱신 방식대로 다시 그리거나 건너뛴다, 불투명하고 castsShadow 가 false 가 아닌 것만)
+	// - everyFrame: 판을 비우고 전부 그린다.
+	// - interval: N 프레임마다(처음과 requestUpdate 뒤에는 바로) 판을 비우고 전부 그린다. 사이의 프레임은 그리지 않는다.
+	// - onChange: 드리우개를 담은 차례로 앞의 프레임과 견준다. SHADOW_STATIC_FRAME_COUNT 프레임 그대로인 것은 구운 판에 굽고,
+	//   나머지(움직이는 것, 정점 조각이 있는 재질)는 매 프레임 구운 판을 판에 옮긴 뒤 그 위에 덧그린다.
+	//   구운 것이 바뀌거나 빠지거나 새로 구울 것이 생기거나 requestUpdate 를 부르면 다시 굽는다. 움직이는 것이 없고 판이 구운 판과 같으면 아무것도 그리지 않는다.
+	//   빛 행렬이나 칸이 바뀐 프레임은 전부를 판에 바로 그리고, 빛이 멈춘 다음 프레임에 굽는다.
+	//   깊이는 LEQUAL 로 가장 가까운 것이 남으므로 굽고 덧그린 판은 전부를 한 번에 그린 판과 같다.
+	//==============================================================================
+	/**
+	 * @param { object } renderer - ToonRenderer.
+	 * @param { object } shadowCache - ShadowMap 이나 ShadowAtlas 의 getShadowCache().
+	 * @param { Float32Array } lightKey - 빛 행렬과 판의 꼴. (다르면 다시 굽는다)
+	 * @param { Function } beginPass - 깊이 패스를 시작한다. (endShadowPass 로 끝낸다)
+	 * @param { Function } drawCasters - (드리우개 목록) 을 그린다.
+	 * @private
+	 */
+	drawShadowCasters(renderer, shadowCache, lightKey, beginPass, drawCasters) {
+		const casterList = [];
+		for (const item of this.readOpaqueItemList()) {
+			if (item.options.castsShadow !== false) {
+				casterList.push(item);
 			}
 		}
-		renderer.endShadowPass();
+		const drawPass = (renderTarget, itemList) => {
+			shadowCache.renderTarget = renderTarget;
+			beginPass();
+			drawCasters(itemList);
+			renderer.endShadowPass();
+		};
+		const updateMode = shadowCache.updateMode;
+		if (updateMode === ShadowUpdateMode.everyFrame) {
+			shadowCache.casterRecords.length = 0;
+			shadowCache.lightKey = null;
+			shadowCache.hasCache = false;
+			drawPass("live", casterList);
+			return;
+		}
+		if (updateMode === ShadowUpdateMode.interval) {
+			const isDue = shadowCache.isUpdateRequested || shadowCache.frameCount % shadowCache.updateInterval === 0;
+			shadowCache.frameCount += 1;
+			if (isDue) {
+				shadowCache.isUpdateRequested = false;
+				shadowCache.hasCache = false;
+				drawPass("live", casterList);
+			}
+			return;
+		}
+
+		// 바뀔 때만. (드리우개를 담은 차례로 견준다)
+		const isLightChanged = !isSameValues(shadowCache.lightKey, lightKey);
+		let isCacheStale = shadowCache.isUpdateRequested;
+		shadowCache.isUpdateRequested = false;
+		shadowCache.lightKey = lightKey;
+		const recordList = shadowCache.casterRecords;
+		for (let recordIndex = casterList.length; recordIndex < recordList.length; ++recordIndex) {
+			isCacheStale = isCacheStale || recordList[recordIndex].isStatic;
+		}
+		if (recordList.length > casterList.length) {
+			recordList.length = casterList.length;
+		}
+		const staticList = [];
+		const dynamicList = [];
+		for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
+			const item = casterList[casterIndex];
+			if (casterIndex >= recordList.length) {
+				recordList.push({ mesh: null, material: undefined, values: new System.Float32Array(0), stableFrameCount: 0, isStatic: false });
+			}
+			const record = recordList[casterIndex];
+			const material = item.options.material;
+			const isVertexAnimated = material !== undefined && material !== null && material.getVertexChunk() !== "";
+			if (writeCasterRecord(record, item) || isVertexAnimated) {
+				isCacheStale = isCacheStale || record.isStatic;
+				record.isStatic = false;
+				record.stableFrameCount = 0;
+			}
+			else {
+				record.stableFrameCount += 1;
+				if (!record.isStatic && record.stableFrameCount >= SHADOW_STATIC_FRAME_COUNT) {
+					record.isStatic = true;
+					isCacheStale = true;
+				}
+			}
+			if (record.isStatic) {
+				staticList.push(item);
+			}
+			else {
+				dynamicList.push(item);
+			}
+		}
+		if (isLightChanged) {
+			// 빛이 바뀐 프레임은 전부를 판에 바로 그린다. (빛이 매 프레임 움직여도 굽고 옮기는 몫이 더 들지 않게, 구운 판은 빛이 멈춘 다음 프레임에 굽는다)
+			shadowCache.hasCache = false;
+			drawPass("live", casterList);
+			return;
+		}
+		if (isCacheStale || (!shadowCache.hasCache && staticList.length > 0)) {
+			shadowCache.hasCache = staticList.length > 0;
+			if (shadowCache.hasCache) {
+				drawPass("cache", staticList);
+			}
+			shadowCache.isDepthCurrent = false;
+		}
+		if (dynamicList.length > 0) {
+			drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+			return;
+		}
+		if (!shadowCache.isDepthCurrent) {
+			drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+			shadowCache.isDepthCurrent = true;
+		}
 	}
 
 	//==============================================================================

@@ -172,7 +172,7 @@ export { HumanSkinRenderer, SKIN_SHADING_SKIN, SKIN_SHADING_EYE, SKIN_SHADING_HA
 export { AmbientOcclusionEffect } from "./src/graphics3d/ambientocclusioneffect.js";
 export { SubsurfaceScatteringEffect } from "./src/graphics3d/subsurfacescatteringeffect.js";
 export { Material } from "./src/graphics3d/material.js";
-export { ShadowMap, ShadowAtlas, SHADOW_ATLAS_MAXIMUM_LIGHTS } from "./src/graphics3d/shadowmap.js";
+export { ShadowMap, ShadowAtlas, ShadowUpdateMode, SHADOW_ATLAS_MAXIMUM_LIGHTS } from "./src/graphics3d/shadowmap.js";
 
 
 //==============================================================================
