@@ -2790,15 +2790,18 @@ export class ToonRenderer {
 		const isTransparent = alpha < 1 || tintColor[3] < 1 || blendMode !== ToonBlendMode.alpha;
 		const premultipliedOutput = blendMode !== ToonBlendMode.alpha ? 1 : 0;
 		if (isTransparent) {
+			// 알파 칸은 덮은 정도(미리 곱한 알파의 over)로 쌓는다. (유니티 Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha 와 같다)
+			// 캔버스(알파 없음)에는 색이 같고, 투명하게 비운 판(ToonView3D 렌더 스케일, 투명도 층)에 그려 얹을 때 아래가 맞게 비친다.
+			// 더하기는 덮지 않으므로 알파를 바꾸지 않는다.
 			webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 			if (blendMode === ToonBlendMode.additive) {
-				webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE);
+				webGL2RenderingContext.blendFuncSeparate(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE, webGL2RenderingContext.ZERO, webGL2RenderingContext.ONE);
 			}
 			else if (blendMode === ToonBlendMode.premultiplied) {
 				webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 			}
 			else {
-				webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+				webGL2RenderingContext.blendFuncSeparate(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA, webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 			}
 		}
 

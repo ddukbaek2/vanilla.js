@@ -5,6 +5,7 @@ const System = globalThis;
 import { Component } from "../../core/component.js";
 import { Camera3D } from "../camera3d.js";
 import { ToonRenderer } from "./toonrenderer.js";
+import { RenderTarget } from "../rendertarget.js";
 
 
 /**
@@ -69,6 +70,9 @@ export class ToonView3D extends Component {
 	/** @private @type { Function | null } */ #fallbackDrawCallback; // (graphic, contentSize) => void
 	/** @private @type { boolean } */ #isDepthCleared;
 	/** @private @type { object } */ #screenRect; // 이번 그리기의 화면 사각형. ({ x, y, width, height })
+	/** @private @type { number } */ #renderScale; // 3D 를 그리는 판의 배율. (1 이면 화면에 바로, 아니면 그 배율의 판에 그려 선형으로 늘여 얹는다)
+	/** @private @type { RenderTarget | null } */ #renderScaleTarget; // 배율 판. (처음 쓸 때 짓는다)
+	/** @private @type { object } */ #outputScreenRect; // 그리기 함수에 넘기는 사각형. ({ x, y, width, height, outputFramebuffer, outputViewport })
 
 	//==============================================================================
 	// 생성.
@@ -83,10 +87,51 @@ export class ToonView3D extends Component {
 		this.#fallbackDrawCallback = null;
 		this.#isDepthCleared = true;
 		this.#screenRect = { x: 0, y: 0, width: 0, height: 0 };
+		this.#renderScale = 1;
+		this.#renderScaleTarget = null;
+		this.#outputScreenRect = { x: 0, y: 0, width: 0, height: 0, outputFramebuffer: null, outputViewport: [0, 0, 0, 0] };
+	}
+
+	//==============================================================================
+	// 렌더 스케일 설정. (3D 만 이 배율의 판에 그려 선형 거르기로 늘여 얹는다, UI 는 기기 화소 그대로. 유니티 URP renderScale, 언리얼 화면 비율과 같은 뜻)
+	// - 1(기본)이면 지금처럼 화면에 바로 그린다. 1 이 아니면 판(내용 영역의 화면 크기 x 배율, 깊이 포함, 캔버스가 안티에일리어싱이면 멀티샘플 4)에
+	//   투명하게 비운 뒤 그리고, 2D 그리기 길로 source-over 로 얹는다. (2D 자르기를 따르고, 3D 가 덮지 않은 곳은 아래 2D 가 비친다)
+	// - 판은 제 깊이를 쓰므로 setDepthCleared(false) 로 앞의 3D 깊이를 이어 쓰던 것은 배율이 1 일 때만 된다.
+	// - 그리기 함수는 넘겨받은 사각형의 outputFramebuffer, outputViewport 로 내야 배율과 상관없이 맞는 자리에 낸다. (ToonPostProcess.end 같은 것)
+	//==============================================================================
+	/**
+	 * @param { number } renderScale - 배율. (0.05 ~ 4, 1 이면 화면에 바로, 수가 아니면 1)
+	 * @example <caption>3D 만 반 해상도로 그리기</caption>
+	 * import { WorldNode, ToonView3D } from "./vanilla.js";
+	 * const node = new WorldNode();
+	 * node.setContentSizeXY(320, 240);
+	 * const view = node.addComponent(ToonView3D);
+	 * view.setRenderScale(0.5);
+	 * const renderScale = view.getRenderScale();
+	 */
+	setRenderScale(renderScale) {
+		if (typeof renderScale !== "number" || !System.Number.isFinite(renderScale)) {
+			this.#renderScale = 1;
+			return;
+		}
+		this.#renderScale = System.Math.max(0.05, System.Math.min(4, renderScale));
+	}
+
+	//==============================================================================
+	// 렌더 스케일 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 배율. (1 이면 화면에 바로 그린다)
+	 */
+	getRenderScale() {
+		return this.#renderScale;
 	}
 
 	//==============================================================================
 	// 그리기 함수 설정. ((renderer, camera, screenRect, webGL2RenderingContext) => void, null 이면 그리지 않음)
+	// - screenRect 는 { x, y, width, height, outputFramebuffer, outputViewport } 다. x, y, width, height 는 지금 프레임 버퍼에서 그릴 사각형(픽셀, 왼쪽 위 원점),
+	//   outputFramebuffer 는 지금 묶인 프레임 버퍼(null 이면 캔버스), outputViewport 는 그 안의 GL 뷰포트([x, y, 너비, 높이], 정수, 왼쪽 아래 원점)다.
+	//   ToonPostProcess.end 처럼 따로 내는 것은 이 둘로 내야 렌더 스케일, 투명도 층과 상관없이 맞는 자리에 낸다.
 	//==============================================================================
 	/**
 	 * @param { Function | null } drawCallback - (renderer, camera, screenRect, webGL2RenderingContext) => void. (null 이면 그리지 않음)
@@ -106,7 +151,7 @@ export class ToonView3D extends Component {
 	 * 	postProcess.begin([0.05, 0.05, 0.08]);
 	 * 	renderer.beginFrameWithCamera(camera);
 	 * 	renderer.endFrame();
-	 * 	postProcess.end(null, [screenRect.x, webGL2RenderingContext.drawingBufferHeight - screenRect.y - screenRect.height, screenRect.width, screenRect.height]);
+	 * 	postProcess.end(screenRect.outputFramebuffer, screenRect.outputViewport);
 	 * });
 	 */
 	setDrawCallback(drawCallback) {
@@ -311,15 +356,169 @@ export class ToonView3D extends Component {
 		}
 		const camera = this.#camera;
 		camera.setAspectRatio(screenRect.width / screenRect.height);
+		if (this.#renderScale !== 1) {
+			this.drawWithRenderScale(graphic, renderer, drawCallback);
+			return;
+		}
+		const outputScreenRect = this.#outputScreenRect;
 		graphic.runExternalPass((webGL2RenderingContext) => {
+			this.writeOutputScreenRect(graphic, screenRect.x, screenRect.y, screenRect.width, screenRect.height);
 			renderer.setScreenRect(screenRect.x, screenRect.y, screenRect.width, screenRect.height);
 			try {
-				drawCallback(renderer, camera, screenRect, webGL2RenderingContext);
+				drawCallback(renderer, camera, outputScreenRect, webGL2RenderingContext);
 			}
 			finally {
 				renderer.clearScreenRect();
 			}
 		}, { clearDepth: this.#isDepthCleared });
+	}
+
+	//==============================================================================
+	// 그리기 함수에 넘길 사각형 채우기. (지금 묶인 프레임 버퍼와 그 안의 GL 뷰포트, 왼쪽 아래 원점)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } graphic - Graphic
+	 * @param { number } x - 왼쪽. (뷰포트 픽셀, 왼쪽 위 원점)
+	 * @param { number } y - 위. (뷰포트 픽셀, 왼쪽 위 원점)
+	 * @param { number } width - 너비.
+	 * @param { number } height - 높이.
+	 */
+	writeOutputScreenRect(graphic, x, y, width, height) {
+		const outputScreenRect = this.#outputScreenRect;
+		const viewport = graphic.getCurrentViewport();
+		outputScreenRect.x = x;
+		outputScreenRect.y = y;
+		outputScreenRect.width = width;
+		outputScreenRect.height = height;
+		outputScreenRect.outputFramebuffer = graphic.getCurrentFramebuffer();
+		// 정수 픽셀로 반올림한다. (GL 뷰포트는 정수)
+		const outputWidth = System.Math.max(1, System.Math.round(width));
+		const outputHeight = System.Math.max(1, System.Math.round(height));
+		const outputViewport = outputScreenRect.outputViewport;
+		outputViewport[0] = viewport.position.x + System.Math.round(x);
+		outputViewport[1] = viewport.position.y + viewport.height - System.Math.round(y) - outputHeight;
+		outputViewport[2] = outputWidth;
+		outputViewport[3] = outputHeight;
+	}
+
+	//==============================================================================
+	// 배율 판 읽기. (없거나 크기가 다르면 짓거나 고친다, 못 지으면 null)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 컨텍스트.
+	 * @param { number } width - 판 너비. (픽셀)
+	 * @param { number } height - 판 높이. (픽셀)
+	 * @returns { RenderTarget | null } 배율 판.
+	 */
+	readRenderScaleTarget(webGL2RenderingContext, width, height) {
+		let target = this.#renderScaleTarget;
+		if (target === null) {
+			try {
+				// 캔버스가 안티에일리어싱이면 판도 멀티샘플로 그린다. (러스트 데스크탑의 캔버스 표본 수 4 와 같게)
+				const contextAttributes = webGL2RenderingContext.getContextAttributes();
+				const sampleCount = contextAttributes && contextAttributes.antialias ? 4 : 0;
+				target = new RenderTarget(webGL2RenderingContext, width, height, true, { sampleCount: sampleCount, depthBits: 24 });
+			}
+			catch (error) {
+				System.console.error("[ToonView3D] 렌더 스케일 판을 짓지 못해 화면에 바로 그립니다.", error);
+				this.#renderScale = 1;
+				return null;
+			}
+			this.#renderScaleTarget = target;
+			return target;
+		}
+		if (target.getWidth() !== width || target.getHeight() !== height) {
+			target.resize(width, height);
+		}
+		return target;
+	}
+
+	//==============================================================================
+	// 배율 판에 그려 늘여 얹기.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } graphic - Graphic
+	 * @param { ToonRenderer } renderer - 렌더러.
+	 * @param { Function } drawCallback - 그리기 함수.
+	 */
+	drawWithRenderScale(graphic, renderer, drawCallback) {
+		const screenRect = this.#screenRect;
+		const camera = this.#camera;
+		const renderScale = this.#renderScale;
+		const targetWidth = System.Math.max(1, System.Math.round(screenRect.width * renderScale));
+		const targetHeight = System.Math.max(1, System.Math.round(screenRect.height * renderScale));
+		const outputScreenRect = this.#outputScreenRect;
+		let colorTexture = null;
+		graphic.runExternalPass((webGL2RenderingContext) => {
+			const target = this.readRenderScaleTarget(webGL2RenderingContext, targetWidth, targetHeight);
+			if (target === null) {
+				return;
+			}
+			const outputFramebuffer = graphic.getCurrentFramebuffer();
+			// 2D 자르기의 스텐실과 가위는 화면 것이라 판에는 걸지 않는다. (얹을 때 2D 길이 자른다)
+			const isStencilTestEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.STENCIL_TEST);
+			const isScissorTestEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.SCISSOR_TEST);
+			const clearColor = webGL2RenderingContext.getParameter(webGL2RenderingContext.COLOR_CLEAR_VALUE);
+			const colorWriteMask = webGL2RenderingContext.getParameter(webGL2RenderingContext.COLOR_WRITEMASK);
+			webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
+			webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+			target.bind();
+			webGL2RenderingContext.colorMask(true, true, true, true);
+			webGL2RenderingContext.depthMask(true);
+			webGL2RenderingContext.clearColor(0, 0, 0, 0);
+			webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+			webGL2RenderingContext.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+			this.writeOutputScreenRect(graphic, 0, 0, targetWidth, targetHeight);
+			renderer.setScreenRect(0, 0, targetWidth, targetHeight);
+			try {
+				drawCallback(renderer, camera, outputScreenRect, webGL2RenderingContext);
+			}
+			finally {
+				renderer.clearScreenRect();
+				target.resolve();
+				webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, outputFramebuffer);
+				webGL2RenderingContext.colorMask(colorWriteMask[0], colorWriteMask[1], colorWriteMask[2], colorWriteMask[3]);
+				if (isStencilTestEnabled) {
+					webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
+				}
+				if (isScissorTestEnabled) {
+					webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+				}
+			}
+			colorTexture = target.getColorTexture();
+		}, { clearDepth: false });
+		if (colorTexture === null) {
+			return;
+		}
+
+		// 판을 화면 사각형에 단위 행렬, 흰색, 틴트 없이 source-over 로 얹는다. (판은 미리 곱한 알파, 텍스처는 아래가 0 행, 선형 거르기)
+		// 3D 를 화면에 바로 그릴 때처럼 전역 알파는 걸지 않는다.
+		graphic.pushState();
+		graphic.resetTransform();
+		graphic.setGlobalAlpha(1);
+		graphic.setImageTintColor(null);
+		graphic.setBlendMode("source-over");
+		const floatCount = graphic.writeQuad(0, screenRect.x, screenRect.y, screenRect.x + screenRect.width, screenRect.y + screenRect.height, 0, 1, 1, 0);
+		graphic.drawVertices(floatCount / 4, colorTexture, graphic.getWhiteColor());
+		graphic.popState();
+	}
+
+	//==============================================================================
+	// 노드에서 떨어짐. (배율 판을 지운다, 다시 붙으면 처음 쓸 때 다시 짓는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { object } node - 떨어진 노드.
+	 */
+	detach(node) {
+		super.detach(node);
+		if (this.#renderScaleTarget !== null) {
+			this.#renderScaleTarget.destroy();
+			this.#renderScaleTarget = null;
+		}
 	}
 
 	//==============================================================================

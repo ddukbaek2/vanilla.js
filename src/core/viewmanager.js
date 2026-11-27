@@ -72,6 +72,7 @@ export class ViewManager extends Object {
 	/** @private @type { number } */ #devicePixelRatio; // 장치의 화면 배율.
 	/** @private @type { number } */ #targetResolutionScale; // 기준 해상도와 화면 해상도 사이의 크기 배율.
 	/** @private @type { number } */ #maxRenderPixelRatio; // 렌더에 쓸 devicePixelRatio 상한. (0 이면 제한 없음)
+	/** @private @type { boolean } */ #isViewRectPending; // 다음 프레임 머리에 뷰 영역을 다시 셈할지. (렌더 배율 상한을 바꿨을 때)
 	/** @private @type { object | null } */ #safeAreaOverride; // 세이프에어리어 강제값. (CSS px)
 	/** @private @type { HTMLElement | null } */ #safeAreaProbeElement; // env() 측정용 숨은 요소.
 	/** @private @type { string[] } */ #ignoredSafeAreaSides; // 무시할 세이프에어리어 쪽. ("top", "right", "bottom", "left")
@@ -99,6 +100,7 @@ export class ViewManager extends Object {
 		this.#devicePixelRatio = 1.0;
 		this.#targetResolutionScale = 1.0;
 		this.#maxRenderPixelRatio = 0;
+		this.#isViewRectPending = false;
 		this.#safeAreaOverride = null;
 		this.#safeAreaProbeElement = null;
 		this.#ignoredSafeAreaSides = [];
@@ -126,6 +128,7 @@ export class ViewManager extends Object {
 		if (canvas === null || canvas === undefined) {
 			return;
 		}
+		this.#isViewRectPending = false;
 		let devicePixelRatio = System.window.devicePixelRatio || 1;
 		if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
 			devicePixelRatio = this.#maxRenderPixelRatio;
@@ -549,13 +552,36 @@ export class ViewManager extends Object {
 	//==============================================================================
 	// 렌더 배율 상한 설정.
 	// - 고DPI 기기에서 캔버스가 과대해지는 것을 막는다. 0 이면 제한하지 않는다.
+	// - 캔버스 크기는 다음 프레임 머리에서 엔진이 창 크기 바뀜과 같은 길(Engine.resize)로 맞춘다. (씬도 화면 영역이 바뀐 것을 받는다)
+	//   프레임 가운데(tick, draw)에서 캔버스 크기를 바꾸면 그리기 버퍼가 비워지는데 그 프레임은 앞서 맞춘 뷰포트로 그려 한 프레임이 까맸다.
 	//==============================================================================
 	/**
 	 * @param { number } maxRenderPixelRatio 렌더 배율 상한. (0 이면 제한하지 않고, 음수는 0)
 	 */
 	setMaxRenderPixelRatio(maxRenderPixelRatio) {
-		this.#maxRenderPixelRatio = Math.max(0, maxRenderPixelRatio);
-		this.calculateViewRect();
+		const nextMaxRenderPixelRatio = Math.max(0, maxRenderPixelRatio);
+		if (nextMaxRenderPixelRatio === this.#maxRenderPixelRatio) {
+			return;
+		}
+		this.#maxRenderPixelRatio = nextMaxRenderPixelRatio;
+		this.#isViewRectPending = true;
+	}
+
+	//==============================================================================
+	// 다음 프레임 머리에 뷰 영역을 다시 셈할지 반환. (렌더 배율 상한을 바꾼 뒤 아직 맞추지 않았으면 true)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 다시 셈할 것이 남았으면 참. (calculateViewRect 가 맞추면 거짓)
+	 * @example <caption>렌더 배율 상한을 바꾼 뒤 맞출 것이 남았는지 보기</caption>
+	 * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * const viewManager = engine.getViewManager();
+	 * viewManager.setMaxRenderPixelRatio(1);
+	 * console.log(viewManager.isViewRectPending());
+	 */
+	isViewRectPending() {
+		return this.#isViewRectPending;
 	}
 
 	//==============================================================================
