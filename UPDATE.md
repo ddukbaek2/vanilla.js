@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- GameScene 로딩이 덮어쓸 수 있는 훅에 기대지 않게: 첫 프레임 전에 load 가 불렸을 때의 로딩 시각과 로딩 화면 누름을 drawOnLoad 대신 load 가 건 엔진 프레임 함수(엔진이 로딩 중 프레임마다 부르는 자리)가 잡는다. 게임이 drawOnLoad 를 super 없이 덮어쓰면 load 가 끝나지 않고 initialize 도 안 불린 채 오류 없이 멈추던 것을 고쳤다. (tests/core/gamesceneloadchrome.test.mjs)
+  - 옮기는 법: drawOnLoad 를 덮어쓰던 게임은 setLoadingDrawer 로 옮긴다. (덮어써도 이제 멈추지 않음)
 - 찍기 모드 결정성(러스트 판과 같게): 찍기 모드(?capture=)에서 씬을 불러온 뒤 로딩 화면 0.3 초 기다림(SceneManager.loadScene 의 setTimeout 300)과 GameScene, UIScene 의 최소 노출 시간 기다림(setTimeout 50 으로 보던 것, UIScene 은 Date.now)을 엔진 시계(프레임마다 1/60 초)로 엔진 프레임마다 센다. 0.3 초를 다 센 프레임의 머리(씬 갱신 앞)에서 initialize 해 러스트 판처럼 그 프레임부터 씬을 그린다. 그림은 시간 한도로 나누지 않고 한 번에 올린다. 불러오는 동안(애셋 받기처럼 실제 시간이 드는 것, GameScene 과 UIScene 은 loadAssets 까지) 프레임 번호와 시계를 올리지 않아, 다 받은 뒤부터 센다. 같은 예제를 두 번 찍으면 같은 프레임 번호의 그림이 바이트까지 같다. (tests/core/capturedeterminismchrome.test.mjs)
   - 옮기는 법: 없다. (찍기 모드만 바뀐다. 보통 실행은 그대로. 씬의 async load 안에서 엔진 시계를 기다리면 찍기 모드에서는 풀리지 않으니 그런 기다림은 initialize 뒤로 옮긴다)
 - 묶어 그리기 이름을 러스트 판과 같게: Graphic.setSpriteBatchingEnabled, isSpriteBatchingEnabled, flushSpriteBatch 를 setBatchingEnabled, isBatchingEnabled, flushBatch 로 바꿨다(러스트 판 set_batching_enabled, is_batching_enabled, flush_batch). 묶음에는 그림만이 아니라 도형, 글자, 정점 색 쿼드도 들어 '스프라이트' 가 뜻을 좁혔다. flushSpriteBatch 는 툰 파일이 옮길 때까지 감춘 옛 이름으로 남고 다음 판에서 빠진다.

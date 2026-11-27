@@ -451,21 +451,44 @@ export class GameScene extends Scene {
 		this.#isLoadStartTimePending = this.#loadStartTime <= 0;
 		this.#loadTouchedToSkip = false;
 
-		await this.loadAssets();
-		// 애셋을 다 받았으니 찍기 모드의 프레임 세우기를 푼다. (아래 최소 노출 시간은 엔진 시계로 센다)
-		this.setCaptureFrameHeld(false);
-		if (this.#isLoadingProgressReported) {
-			this.#loadingProgress.setProgress(1);
+		// 로딩 시각과 건너뛰기는 엔진이 로딩 중 프레임마다 부르는 자리(엔진 프레임 함수, 시간을 올린 바로 뒤)에서 잡는다.
+		// 덮어쓸 수 있는 drawOnLoad 에 기대지 않아, 게임이 drawOnLoad 를 super 없이 덮어써도 load 가 끝나고 initialize 가 불린다.
+		// (첫 프레임 전에 load 가 불렸으면 첫 엔진 프레임의 시각부터 잰다. 찍기 모드는 그 시각이 엔진 시계다)
+		let isLoadWaitFinished = false;
+		engine.addEngineFrameCallback(() => {
+			if (isLoadWaitFinished) {
+				return true;
+			}
+			if (this.#isLoadStartTimePending) {
+				this.#loadStartTime = timeManager.getRealtimeSinceStartup();
+				this.#isLoadStartTimePending = false;
+			}
+			if (engine.getInputManager().isTouchPressed()) {
+				this.#loadTouchedToSkip = true;
+			}
+			return false;
+		});
+
+		try {
+			await this.loadAssets();
+			// 애셋을 다 받았으니 찍기 모드의 프레임 세우기를 푼다. (아래 최소 노출 시간은 엔진 시계로 센다)
+			this.setCaptureFrameHeld(false);
+			if (this.#isLoadingProgressReported) {
+				this.#loadingProgress.setProgress(1);
+			}
+			// 찍기 모드는 엔진 프레임마다 본다. (50 밀리초 실제 시각으로 보면 문이 열리는 프레임이 실행마다 밀린다, 러스트 판은 프레임마다 본다)
+			const isCaptureTimeStepFixed = engine.isCaptureTimeStepFixed();
+			while (!this.#loadTouchedToSkip && (this.#isLoadStartTimePending || (timeManager.getRealtimeSinceStartup() - this.#loadStartTime) * 1000 < this.#loadMinDurationMs)) {
+				if (isCaptureTimeStepFixed) {
+					await engine.waitForNextEngineFrame();
+				}
+				else {
+					await new Promise((resolve) => System.setTimeout(resolve, 50));
+				}
+			}
 		}
-		// 찍기 모드는 엔진 프레임마다 본다. (50 밀리초 실제 시각으로 보면 문이 열리는 프레임이 실행마다 밀린다, 러스트 판은 프레임마다 본다)
-		const isCaptureTimeStepFixed = engine.isCaptureTimeStepFixed();
-		while (!this.#loadTouchedToSkip && (this.#isLoadStartTimePending || (timeManager.getRealtimeSinceStartup() - this.#loadStartTime) * 1000 < this.#loadMinDurationMs)) {
-			if (isCaptureTimeStepFixed) {
-				await engine.waitForNextEngineFrame();
-			}
-			else {
-				await new Promise((resolve) => System.setTimeout(resolve, 50));
-			}
+		finally {
+			isLoadWaitFinished = true;
 		}
 	}
 
@@ -505,16 +528,9 @@ export class GameScene extends Scene {
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
 		const viewSize = viewManager.getViewSize();
 
-		// 로딩 시각과 건너뛰기. (엔진 시계와 엔진 입력, 첫 프레임 전에 load 가 불렸으면 이 프레임부터 잰다)
+		// 지금 시각. (로딩 시각과 건너뛰기는 load 가 건 엔진 프레임 함수가 잡는다)
 		const timeManager = engine.getTimeManager();
 		const currentTime = timeManager.getRealtimeSinceStartup();
-		if (this.#isLoadStartTimePending) {
-			this.#loadStartTime = currentTime;
-			this.#isLoadStartTimePending = false;
-		}
-		if (engine.getInputManager().isTouchPressed()) {
-			this.#loadTouchedToSkip = true;
-		}
 
 		// 진행률. (맡긴 애셋 함께 받기를 읽고, 보이는 정도를 따라가게 한다)
 		const unscaledTimeDelta = timeManager.getUnscaleDeltaTime();
