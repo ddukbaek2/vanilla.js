@@ -6,10 +6,10 @@ This chapter covers how to load the files made by the engine's authoring tools i
 
 | Tool | Demo | File it makes | Read in the engine by |
 | --- | --- | --- | --- |
-| UI Editor | [Open](https://vanillapunch.com/tools/editor/uieditor/) | `.uiasset.json` (default name `ui.uiasset.json`) | `UIDocument.fromJsonText` |
+| UI Editor | [Open](https://vanillapunch.com/tools/editor/uieditor/) | `.uiasset.json` (default name `ui.uiasset.json`) | `new UIDocument().fromJsonText` |
 | Timeline Editor | [Open](https://vanillapunch.com/tools/editor/timelineeditor/) | `.timeline.json` (default name `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
 | Particle Editor | [Open](https://vanillapunch.com/tools/editor/particleeditor/) | `.vfx.json` (default name `effect.vfx.json`) | `ParticleSystem.applyDescription` |
-| Visual Editor | [Open](https://vanillapunch.com/tools/editor/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
+| Visual Editor | [Open](https://vanillapunch.com/tools/editor/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `new UIDocument().fromJsonText` |
 
 - Each tool's `tools/<tool name>/<tool name>.html` is a build that bundles the engine into one file, so it works when opened as a file without a server. After changing the source, rebuild it with `node tools/<tool name>/build.mjs`.
 - UI Editor, Timeline Editor, and Particle Editor save by downloading the file through the browser. Visual Editor writes directly into a folder opened with Open Folder in Chromium-based browsers, and downloads in other browsers.
@@ -48,7 +48,7 @@ A `.uiasset.json` is a UI document that records a node tree as is. It holds a ve
 }
 ```
 
-`UIDocument.fromJsonText(jsonText)` turns this text back into a live engine node tree (`WorldNode`) and returns its root. Attach it to the scene root and it shows up as is; then find nodes by name and attach behavior. `UIDocument.findNodeByPath(rootNode, pathText)` finds a node by a path of names joined with `/` from the document root (leaving out the root's own name and starting with `/`), and returns `null` when missing.
+`fromJsonText(jsonText)` of a document made with `new UIDocument()` turns this text back into a live engine node tree (`WorldNode`) and returns its root. Attach it to the scene root and it shows up as is; then find nodes by name and attach behavior. `UIDocument.findNodeByPath(rootNode, pathText)` finds a node by a path of names joined with `/` from the document root (leaving out the root's own name and starting with `/`), and returns `null` when missing.
 
 ```javascript
 import { Engine, EngineConfiguration, UIScene, UIDocument, UIButton, UILabel, TextAsset, Vector2 } from "./build/vanilla.js";
@@ -66,7 +66,7 @@ class TitleScene extends UIScene {
 		await super.loadAssets();
 		const textAsset = new TextAsset();
 		await textAsset.load("examples/uisample/assets/title.uiasset.json");
-		this.#documentRoot = UIDocument.fromJsonText(textAsset.text);
+		this.#documentRoot = new UIDocument().fromJsonText(textAsset.text);
 	}
 
 	initialize(engine) {
@@ -99,31 +99,32 @@ engine.run(new TitleScene());
 
 ### Resolving image paths
 
-Documents record only image paths (`imagePath`), not the images themselves. `Sprite` and `UIImageView` use this field. To connect images on restore, register a path to `HTMLImageElement` function with `UIDocument.setImageResolver(resolver)` before calling `fromJsonText`. The function must return immediately (it cannot be asynchronous), so load the images first. Without a resolver, or when it returns `null`, the component is restored without an image and only the path stays in its `imagePath`.
+Documents record only image paths (`imagePath`), not the images themselves. `Sprite` and `UIImageView` use this field. To connect images on restore, register a path to `HTMLImageElement` function on that document with `uiDocument.setImageResolver(resolver)` before calling `fromJsonText`. The function must return immediately (it cannot be asynchronous), so load the images first. Instead of a resolver, you can load the document's images by path first with `await Promise.all(uiDocument.loadImages(jsonText))`. Images still loading are kept by the document and set by `uiDocument.bindPendingImages()` (it returns how many remain). An image that is not found gives a warning, and the component is restored without an image with only the path left in its `imagePath`.
 
 ### Registering component and node types
 
-The components the game-side `UIDocument` knows from the start are `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, and `ShadowImage` (`UIDocument.getComponentTypeNames()`), and the only node type is `WorldNode`. UI Editor registers every component and every `WorldNode`-derived node the engine exports with the document format. So when a type used in the editor is missing from the game-side table, that component is dropped on load with a warning and that node comes back as a plain `WorldNode` with a warning.
+The components the game-side `UIDocument` knows from the start are `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, and `ShadowImage` (`new UIDocument().getComponentTypeNames()`), and the only node type is `WorldNode`. UI Editor registers every component and every `WorldNode`-derived node the engine exports with the document format. So when a type used in the editor is missing from the game-side table, that component is dropped on load with a warning and that node comes back as a plain `WorldNode` with a warning.
 
-A game that loads documents saved by the editors calls `UIDocument.registerEditorTypes()` once before `fromJsonText`. It registers every type the editors register (35 components, 12 node types) under the same names and leaves names that are already registered as they are. To register types one at a time, use `registerNodeType` and `registerComponentType`. For example, the input field (`UIInputField`) and the scroll bar (`UIScrollBar`) are nodes derived from `WorldNode`, while the snap scroll view (`UISnapScrollView`) is a component.
+A game that loads documents saved by the editors calls `uiDocument.registerEditorTypes()` once before `fromJsonText`. It registers every type the editors register (35 components, 12 node types) under the same names and leaves names that are already registered as they are. To register types one at a time, use `registerNodeType` and `registerComponentType`. For example, the input field (`UIInputField`) and the scroll bar (`UIScrollBar`) are nodes derived from `WorldNode`, while the snap scroll view (`UISnapScrollView`) is a component.
 
 ```javascript
-import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade } from "./build/vanilla.js";
+import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade, WorldNode } from "./build/vanilla.js";
 
-UIDocument.registerNodeType("UIInputField", UIInputField);
-UIDocument.registerNodeType("UIScrollBar", UIScrollBar);
-UIDocument.registerComponentType("UISnapScrollView", UISnapScrollView);
-UIDocument.registerEditorTypes();
+const uiDocument = new UIDocument();
+uiDocument.registerNodeType("UIInputField", UIInputField);
+uiDocument.registerNodeType("UIScrollBar", UIScrollBar);
+uiDocument.registerComponentType("UISnapScrollView", UISnapScrollView);
+uiDocument.registerEditorTypes();
 
-const componentTypeNames = UIDocument.getComponentTypeNames();
-console.log(componentTypeNames.includes("UISnapScrollView"), componentTypeNames.length, UIDocument.getComponentType("SoftShade") === SoftShade);
+const componentTypeNames = uiDocument.getComponentTypeNames();
+console.log(componentTypeNames.includes("UISnapScrollView"), componentTypeNames.length, uiDocument.createComponent(new WorldNode(), "SoftShade") instanceof SoftShade);
 ```
 
 Components without dedicated save rules are saved and restored through the values read and written by matching `get` and `set` methods (`saveByReflection`, `loadByReflection`).
 
 ### Saving documents from the game
 
-`UIDocument.toJsonText(rootNode, isPretty = true)` turns a node tree into text of the same shape. Node and component type names are written with the names registered in the tables, so the document is the same even in a bundle that shortens class names (esbuild's `--minify`). Only types that are not registered are written with their JavaScript class names (`constructor.name`), so to save such types as well, use a bundle that keeps class names (`--keep-names`). The README commands and `tools/project.cjs build` minify with `--keep-names`. Loading (`fromJsonText`) looks up the table by the names in the document, so it works with any bundle.
+`uiDocument.toJsonText(rootNode, isPretty = true)` turns a node tree into text of the same shape. Node and component type names are written with the names registered in the tables, so the document is the same even in a bundle that shortens class names (esbuild's `--minify`). Only types that are not registered are written with their JavaScript class names (`constructor.name`), so to save such types as well, use a bundle that keeps class names (`--keep-names`). The README commands and `tools/project.cjs build` minify with `--keep-names`. Loading (`fromJsonText`) looks up the table by the names in the document, so it works with any bundle.
 
 ## Playing Timeline Editor documents
 
@@ -256,7 +257,7 @@ In a game, load the file with `JsonAsset` and loop over `jsonAsset.data.systems`
 
 ## Loading Visual Editor scenes
 
-Visual Editor saves scenes in the same shape as UI documents (`UIDocument`). The default save path is `scenes/untitled.scene.json`, and the frame size used only by the editor (`frameSize`) sits in the same JSON. `UIDocument` skips keys it does not know, so the game reads the file as is with `UIDocument.fromJsonText`. The scene root is a `WorldNode` named `sceneRoot` with its pivot at the top left.
+Visual Editor saves scenes in the same shape as UI documents (`UIDocument`). The default save path is `scenes/untitled.scene.json`, and the frame size used only by the editor (`frameSize`) sits in the same JSON. `UIDocument` skips keys it does not know, so the game reads the file as is with `fromJsonText` of a `new UIDocument()`. The scene root is a `WorldNode` named `sceneRoot` with its pivot at the top left.
 
 ![Visual Editor with the UI Showcase components document open as a scene: hierarchy on the left, the scene view with move handles in the middle, the inspector on the right](../images/tool-visual-editor.webp)
 
@@ -307,16 +308,17 @@ class VisualScene extends Scene {
 		const spritesheetAsset = new ImageAsset();
 		await spritesheetAsset.load("examples/assets/spritesheet.png");
 		imageTable.set("images/spritesheet.png", spritesheetAsset.getImage());
-		UIDocument.setImageResolver((imagePath) => {
+		const uiDocument = new UIDocument();
+		uiDocument.setImageResolver((imagePath) => {
 			return imageTable.has(imagePath) ? imageTable.get(imagePath) : null;
 		});
 
 		const root = this.getRoot();
-		const sceneRoot = UIDocument.fromJsonText(sceneJsonText);
+		const sceneRoot = uiDocument.fromJsonText(sceneJsonText);
 		root.addChild(sceneRoot);
 
 		for (let index = 0; index < 3; ++index) {
-			const coinNode = UIDocument.fromJsonText(prefabJsonText);
+			const coinNode = uiDocument.fromJsonText(prefabJsonText);
 			coinNode.setLocalPosition(Vector2.create(200 + index * 120, 120));
 			sceneRoot.addChild(coinNode);
 		}
@@ -363,7 +365,7 @@ node tools/apidoc.cjs 0.4.0 --check-examples
 
 - UI documents record only image paths. Load the images and register `setImageResolver` before `fromJsonText`.
 - Component and node types used in the editor but missing from the game-side `UIDocument` table are silently dropped or become `WorldNode`. Register any type beyond the 16 built-in components.
-- To save with `UIDocument.toJsonText` in a game, use a bundle that keeps class names.
+- To save with `uiDocument.toJsonText` in a game, use a bundle that keeps class names.
 - A `Timeline` only moves when `tick` is called every frame. For documents with sound, call `Timeline.setAudioManager` first.
 - `applyDescription` does not read `imageDataUrl` in a `.vfx.json`. Load the image yourself and pass it to `setImage`.
 - When you use `mangle.cjs`, put the JSON keys read at run time in the exclusion list.

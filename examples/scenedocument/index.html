@@ -20,7 +20,7 @@ const System = globalThis;
 // UI 문서 예제. (UIDocument 로 씬 파일을 읽어 노드 트리를 짓고 그린다, 러스트 예제 scenedocument 와 같은 장면)
 // - scenedocument.scene.json 은 UIDocument 와 비주얼 에디터 저장 꼴(문서에 frameSize 를 얹은 것)로 만든 씬이다.
 //   Panel 아래 제목 글, 그림(Sprite, 돌린 Sprite, UIImageView), 테(Outline), 진행 고리, 라벨, 단추(content 안의 글), 슬라이더, 진행 막대, 스크롤 뷰(content 안의 줄 넷), 별 셋이 있다.
-// - 그림은 ../timelineshowcase/assets 에서 받아 UIDocument.setImageResolver 로 잇는다. (fromJsonText 앞에 다 받아 둔다)
+// - 그림은 ../timelineshowcase/assets 에서 받아 문서(new UIDocument())의 setImageResolver 로 잇는다. (fromJsonText 앞에 다 받아 둔다)
 // - 지은 트리를 toJsonText 로 다시 내보내 읽은 문서와 같은지 화면 아래에 적는다.
 // - 화면 저장: ?capture=90 (러스트 VANILLA_CAPTURE_FRAMES=90)
 //==============================================================================
@@ -91,6 +91,7 @@ function countNodes(node) {
 //==============================================================================
 class SceneDocumentScene extends Scene {
 	/** @private @type { string } */ #sceneText = "";
+	/** @private @type { UIDocument } */ #uiDocument = new UIDocument(); // 씬을 읽고 쓰는 문서. (그림 해석기를 이 문서에 건다)
 
 	//==============================================================================
 	// 읽기. (씬 파일과 그림을 받는다)
@@ -108,7 +109,7 @@ class SceneDocumentScene extends Scene {
 			await image.decode();
 			imageTable.set(imagePath, image);
 		}));
-		UIDocument.setImageResolver((imagePath) => {
+		this.#uiDocument.setImageResolver((imagePath) => {
 			const image = imageTable.get(imagePath);
 			return image !== undefined ? image : null;
 		});
@@ -120,11 +121,11 @@ class SceneDocumentScene extends Scene {
 	initialize(engine) {
 		super.initialize(engine);
 		const root = this.getRoot();
-		const documentRootNode = UIDocument.fromJsonText(this.#sceneText);
+		const documentRootNode = this.#uiDocument.fromJsonText(this.#sceneText);
 		root.addChild(documentRootNode);
 
 		// 다시 내보내 읽은 문서의 root 와 견준다. (에디터 값 frameSize 는 문서 밖이라 빼고 본다)
-		const exportedText = UIDocument.toJsonText(documentRootNode, true);
+		const exportedText = this.#uiDocument.toJsonText(documentRootNode, true);
 		const readRoot = System.JSON.parse(this.#sceneText).root;
 		const exportedRoot = System.JSON.parse(exportedText).root;
 		const comparison = isSameJsonValue(readRoot, exportedRoot) ? "같다" : "다르다";

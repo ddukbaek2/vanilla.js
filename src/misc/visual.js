@@ -12,12 +12,12 @@ import { UIDocument } from "../ui/uidocument.js";
 // 비주얼 객체. (비주얼 에디터 문서를 정한 자리에 노드 트리로 짓는 컴포넌트)
 // - 문서는 비주얼 에디터(tools/visualeditor)가 저장하는 UIDocument JSON 글이다. ({ version, root, frameSize? }, 씬과 프리팹 모두)
 //   VisualAsset 이 파일을 읽어 문서를 든 Visual 을 만든다.
-// - createNode 가 문서의 노드 트리를 새로 지어 뿌리의 로컬 위치를 location 으로 둔다. (부르는 쪽이 원하는 부모에 붙인다, 부를 때마다 새 트리)
+// - createNode(uiDocument) 가 넘겨받은 문서로 노드 트리를 새로 지어 뿌리의 로컬 위치를 location 으로 둔다. (부르는 쪽이 원하는 부모에 붙인다, 부를 때마다 새 트리)
 // - 스스로 그리거나 갱신하지 않는다.
 //==============================================================================
 /**
  * @example <caption>문서를 든 비주얼로 노드 트리 짓기</caption>
- * import { Visual, WorldNode, Vector2 } from "./build/vanilla.js";
+ * import { Visual, UIDocument, WorldNode, Vector2 } from "./build/vanilla.js";
  *
  * const documentData = {
  * 	version: 1,
@@ -27,7 +27,7 @@ import { UIDocument } from "../ui/uidocument.js";
  * visual.setDocumentText(JSON.stringify(documentData));
  * visual.setLocation(Vector2.create(40, 20));
  * const parentNode = new WorldNode();
- * const badgeNode = visual.createNode();
+ * const badgeNode = visual.createNode(new UIDocument());
  * parentNode.addChild(badgeNode);
  * const localPosition = badgeNode.getLocalPosition();
  * console.log(badgeNode.getName(), localPosition.x, localPosition.y, visual.getComponentType());
@@ -100,32 +100,34 @@ export class Visual extends Component {
 	}
 
 	//==============================================================================
-	// 문서로 노드 트리 짓기.
+	// 문서로 노드 트리 짓기. (넘겨받은 UIDocument 로 짓는다, 게임이 등록한 종류와 그림 해석기를 쓴다)
 	//==============================================================================
 	/**
+	 * @param { UIDocument } uiDocument 노드와 컴포넌트를 지을 문서.
 	 * @returns { WorldNode | null } 새로 지은 뿌리 노드. (어느 부모에도 붙지 않았고 로컬 위치가 location 이다, 문서가 없으면 null, 문서 꼴이 틀리면 예외를 던진다)
 	 * @example <caption>같은 문서로 두 벌 짓기</caption>
-	 * import { Visual, Vector2 } from "./build/vanilla.js";
+	 * import { Visual, UIDocument, Vector2 } from "./build/vanilla.js";
 	 *
+	 * const uiDocument = new UIDocument();
 	 * const documentData = {
 	 * 	version: 1,
 	 * 	root: { type: "WorldNode", name: "Coin", contentSize: [32, 32], components: [], children: [] },
 	 * };
 	 * const visual = new Visual();
-	 * console.log(visual.createNode());
+	 * console.log(visual.createNode(uiDocument));
 	 * visual.setDocumentText(JSON.stringify(documentData));
-	 * const firstNode = visual.createNode();
+	 * const firstNode = visual.createNode(uiDocument);
 	 * visual.setLocation(Vector2.create(48, 0));
-	 * const secondNode = visual.createNode();
+	 * const secondNode = visual.createNode(uiDocument);
 	 * const secondPosition = secondNode.getLocalPosition();
 	 * console.log(firstNode !== secondNode, secondNode.getName(), secondPosition.x);
 	 */
-	createNode() {
+	createNode(uiDocument) {
 		const documentText = this.getDocumentText();
 		if (documentText === null) {
 			return null;
 		}
-		const rootNode = UIDocument.fromJsonText(documentText);
+		const rootNode = uiDocument.fromJsonText(documentText);
 		const location = this.getLocation();
 		rootNode.setLocalPosition(location.clone());
 		return rootNode;

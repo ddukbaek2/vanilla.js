@@ -126,7 +126,7 @@ function formatByteCount(byteCount) {
 // 비주얼 에디터. (유니티처럼 씬을 짓고, 애셋을 다루고, 저장하고, 재생해 본다)
 // - 화면: 위 메뉴와 도구 막대 밑에 도킹 창들(Hierarchy, Scene, Game, Inspector, Project, Console).
 //   창 탭을 끌어 다른 창에 탭으로 합치거나 위아래양옆으로 나누어 붙인다. (docklayout.js)
-// - 씬은 UIDocument 형식(.scene.json)으로 저장한다. 게임은 UIDocument.fromJsonText 로 그대로 읽는다.
+// - 씬은 UIDocument 형식(.scene.json)으로 저장한다. 게임은 new UIDocument() 의 fromJsonText 로 그대로 읽는다.
 //   에디터만 쓰는 값(frameSize)은 같은 JSON 에 함께 둔다. (UIDocument 는 모르는 키를 무시한다)
 // - 되돌리기는 바꾸기 전 문서 전체를 JSON 으로 남기는 방식이다. 고른 노드는 자식 차례 경로로 되찾는다.
 // - 재생은 문서를 남겨 두고 노드를 갱신하다가, 멈추면 남겨 둔 문서로 되돌린다. (유니티처럼 재생 중 바꾼 것은 사라진다)
@@ -151,7 +151,8 @@ export class VisualEditor {
 	/** @private @type { boolean } */ #isSpaceDown;
 	/** @private @type { HTMLElement | null } */ #contextMenuElement;
 	/** @private @type { number } */ #nodeCounter;
-	/** @private @type { object | null } */ #clipboardNodeData; // 복사한 노드. (UIDocument.serializeNode 결과)
+	/** @private @type { object | null } */ #clipboardNodeData; // 복사한 노드. (UIDocument 의 serializeNode 결과)
+	/** @private @type { UIDocument } */ #uiDocument; // 씬과 프리팹을 쓰고 읽는 문서. (그림은 프로젝트 창에서 찾는다)
 	/** @private @type { number } */ #autosaveTimer;
 	/** @private @type { object | null } */ #savedCameraState; // 게임 뷰로 가기 전 씬 뷰 카메라.
 	/** @private @type { DockLayout | null } */ #dockLayout; // 창 도킹 배치.
@@ -174,6 +175,7 @@ export class VisualEditor {
 		this.#contextMenuElement = null;
 		this.#nodeCounter = 0;
 		this.#clipboardNodeData = null;
+		this.#uiDocument = new UIDocument();
 		this.#autosaveTimer = 0;
 		this.#savedCameraState = null;
 		this.#dockLayout = null;
@@ -201,7 +203,7 @@ export class VisualEditor {
 				this.log(`애셋 ${this.#projectPanel.getAssetCount()}개를 읽었다.`);
 			},
 		});
-		UIDocument.setImageResolver((path) => {
+		this.#uiDocument.setImageResolver((path) => {
 			return this.#projectPanel.readImage(path);
 		});
 		this.#hierarchyPanel = new HierarchyPanel(elements.hierarchyBody, {
@@ -229,6 +231,9 @@ export class VisualEditor {
 			},
 			addComponent: (node, typeName) => {
 				this.addComponent(node, typeName);
+			},
+			readComponentTypeNames: () => {
+				return this.#uiDocument.getComponentTypeNames();
 			},
 			removeComponent: (node, component) => {
 				this.change(`${component.constructor.name} 빼기`, () => {
@@ -689,7 +694,7 @@ export class VisualEditor {
 		const documentRoot = this.#scene.getDocumentRoot();
 		return {
 			label: label,
-			jsonText: UIDocument.toJsonText(documentRoot, false),
+			jsonText: this.#uiDocument.toJsonText(documentRoot, false),
 			selectionPath: this.findIndexPath(this.#scene.getSelectedNode()),
 		};
 	}
@@ -701,7 +706,7 @@ export class VisualEditor {
 	 * @param { object } state
 	 */
 	restoreState(state) {
-		const documentRoot = UIDocument.fromJsonText(state.jsonText);
+		const documentRoot = this.#uiDocument.fromJsonText(state.jsonText);
 		this.#scene.replaceDocumentRoot(documentRoot);
 		this.#scene.setSelectedNode(this.findNodeByIndexPath(state.selectionPath));
 		this.#lastChange = { label: "", node: null, time: 0 };
@@ -892,12 +897,11 @@ export class VisualEditor {
 	 * @param { string } typeName
 	 */
 	addComponent(node, typeName) {
-		const componentType = UIDocument.getComponentType(typeName);
-		if (!componentType) {
+		if (!this.#uiDocument.getComponentTypeNames().includes(typeName)) {
 			return;
 		}
 		this.change(`${typeName} 더하기`, () => {
-			node.addComponent(componentType);
+			this.#uiDocument.createComponent(node, typeName);
 		}, true);
 	}
 
@@ -910,8 +914,8 @@ export class VisualEditor {
 			return;
 		}
 		this.change("복제", () => {
-			const nodeData = UIDocument.serializeNode(selectedNode);
-			const copiedNode = UIDocument.deserializeNode(nodeData);
+			const nodeData = this.#uiDocument.serializeNode(selectedNode);
+			const copiedNode = this.#uiDocument.deserializeNode(nodeData);
 			const parentNode = selectedNode.getParent();
 			parentNode.addChild(copiedNode);
 			copiedNode.setSiblingIndex(parentNode.getChildren().indexOf(selectedNode) + 1);
@@ -1341,7 +1345,7 @@ export class VisualEditor {
 		const scene = this.#scene;
 		const playButton = this.#elements.playButton;
 		if (!scene.isPlaying()) {
-			this.#playSnapshot = UIDocument.toJsonText(scene.getDocumentRoot(), false);
+			this.#playSnapshot = this.#uiDocument.toJsonText(scene.getDocumentRoot(), false);
 			scene.setPlaying(true);
 			playButton.classList.add("isPlaying");
 			playButton.textContent = "■ 멈춤";
@@ -1422,7 +1426,7 @@ export class VisualEditor {
 	loadSceneText(jsonText, path) {
 		try {
 			const documentData = System.JSON.parse(jsonText);
-			const documentRoot = UIDocument.fromJsonText(jsonText);
+			const documentRoot = this.#uiDocument.fromJsonText(jsonText);
 			if (System.Array.isArray(documentData.frameSize)) {
 				this.#scene.setFrameSize(Vector2.create(documentData.frameSize[0], documentData.frameSize[1]));
 			}
@@ -1478,7 +1482,7 @@ export class VisualEditor {
 	 * @returns { string }
 	 */
 	buildSceneJsonText() {
-		const documentData = System.JSON.parse(UIDocument.toJsonText(this.#scene.getDocumentRoot(), false));
+		const documentData = System.JSON.parse(this.#uiDocument.toJsonText(this.#scene.getDocumentRoot(), false));
 		const frameSize = this.#scene.getFrameSize();
 		documentData.frameSize = [frameSize.x, frameSize.y];
 		return System.JSON.stringify(documentData, null, "\t");
@@ -1492,7 +1496,7 @@ export class VisualEditor {
 		if (selectedNode === null) {
 			return;
 		}
-		this.#clipboardNodeData = UIDocument.serializeNode(selectedNode);
+		this.#clipboardNodeData = this.#uiDocument.serializeNode(selectedNode);
 		this.log(`복사했다: ${selectedNode.getName()}`);
 	}
 
@@ -1506,7 +1510,7 @@ export class VisualEditor {
 		}
 		const selectedNode = this.#scene.getSelectedNode();
 		this.change("붙여넣기", () => {
-			const pastedNode = UIDocument.deserializeNode(nodeData);
+			const pastedNode = this.#uiDocument.deserializeNode(nodeData);
 			const parentNode = selectedNode !== null ? selectedNode.getParent() : this.#scene.getDocumentRoot();
 			parentNode.addChild(pastedNode);
 			if (selectedNode !== null) {
@@ -1528,7 +1532,7 @@ export class VisualEditor {
 		const safeName = (selectedNode.getName() || "Prefab").replace(/[\\/:*?"<>|]/g, "_");
 		const prefabPath = `prefabs/${safeName}.prefab.json`;
 		try {
-			const savedTo = await this.#projectPanel.writeTextFile(prefabPath, UIDocument.toJsonText(selectedNode, true));
+			const savedTo = await this.#projectPanel.writeTextFile(prefabPath, this.#uiDocument.toJsonText(selectedNode, true));
 			this.log(savedTo === "folder" ? `프리팹을 저장했다: ${prefabPath}` : `프리팹을 내려받았다: ${prefabPath}`);
 		}
 		catch (error) {
@@ -1546,7 +1550,7 @@ export class VisualEditor {
 	async instantiatePrefab(asset, viewPosition) {
 		let prefabNode = null;
 		try {
-			prefabNode = UIDocument.fromJsonText(await asset.file.text());
+			prefabNode = this.#uiDocument.fromJsonText(await asset.file.text());
 		}
 		catch (error) {
 			this.log(`프리팹을 읽지 못했다: ${asset.path}: ${error.message}`, "error");
@@ -1956,7 +1960,7 @@ export class VisualEditor {
 			togglePlay: () => this.togglePlay(),
 			createNode: (presetIndex) => this.createNode(NODE_PRESET_LIST[presetIndex], null),
 			loadSceneText: (jsonText, path) => this.loadSceneText(jsonText, path),
-			saveText: () => UIDocument.toJsonText(this.#scene.getDocumentRoot(), true),
+			saveText: () => this.#uiDocument.toJsonText(this.#scene.getDocumentRoot(), true),
 			showAsset: (asset) => this.showAsset(asset),
 			copy: () => this.copySelected(),
 			paste: () => this.pasteNode(),

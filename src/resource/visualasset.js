@@ -15,7 +15,7 @@ import { Visual } from "../misc/visual.js";
 //==============================================================================
 /**
  * @example <caption>비주얼 에디터 프리팹 읽어 노드 짓기</caption>
- * import { VisualAsset } from "./build/vanilla.js";
+ * import { VisualAsset, UIDocument } from "./build/vanilla.js";
  *
  * const documentData = {
  * 	version: 1,
@@ -25,7 +25,7 @@ import { Visual } from "../misc/visual.js";
  * const visualAsset = new VisualAsset();
  * await visualAsset.load(documentUrl);
  * const visual = visualAsset.getVisual();
- * const panelNode = visual.createNode();
+ * const panelNode = visual.createNode(new UIDocument());
  * console.log(visualAsset.getAssetType(), visualAsset.isLoaded(), panelNode.getName());
  */
 export class VisualAsset extends Asset {
@@ -98,11 +98,11 @@ export class VisualAsset extends Asset {
 	 * @param { string } documentText 비주얼 에디터가 저장한 UIDocument JSON 글.
 	 * @returns { Visual } 그 글을 든 Visual. (JSON 객체가 아니거나 root 객체가 없으면 예외를 던진다)
 	 * @example <caption>문서 글에서 바로 만들기</caption>
-	 * import { VisualAsset } from "./build/vanilla.js";
+	 * import { VisualAsset, UIDocument } from "./build/vanilla.js";
 	 *
 	 * const documentText = JSON.stringify({ version: 1, root: { type: "WorldNode", name: "Icon", components: [], children: [] } });
 	 * const visual = VisualAsset.createVisualFromText(documentText);
-	 * const iconNode = visual.createNode();
+	 * const iconNode = visual.createNode(new UIDocument());
 	 * console.log(iconNode.getName());
 	 */
 	static createVisualFromText(documentText) {

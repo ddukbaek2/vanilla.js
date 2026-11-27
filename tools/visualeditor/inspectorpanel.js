@@ -88,7 +88,7 @@ export class InspectorPanel {
 	//==============================================================================
 	/** @private @type { HTMLElement } */ #bodyElement;
 	/** @private @type { object | null } */ #node;
-	/** @private @type { object } */ #eventHandlers; // { change(label, apply), readImage(path), addComponent(node, typeName), removeComponent(node, component) }
+	/** @private @type { object } */ #eventHandlers; // { change(label, apply), readImage(path), addComponent(node, typeName), removeComponent(node, component), readComponentTypeNames() }
 	/** @private @type { Array<function(): void> } */ #refreshList; // 칸마다 지금 값으로 다시 채우는 함수.
 
 	//==============================================================================
@@ -274,7 +274,7 @@ export class InspectorPanel {
 		placeholderOption.textContent = "＋ 컴포넌트 더하기";
 		placeholderOption.value = "";
 		selectElement.append(placeholderOption);
-		for (const typeName of UIDocument.getComponentTypeNames()) {
+		for (const typeName of this.#eventHandlers.readComponentTypeNames()) {
 			const optionElement = System.document.createElement("option");
 			optionElement.textContent = typeName;
 			optionElement.value = typeName;

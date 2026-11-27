@@ -16,6 +16,8 @@ const outputPath = path.resolve(process.argv[3]);
 // 윈도우의 절대 경로(D:\...)는 import 가 못 받아 file:// 주소로 바꿔 넘긴다.
 const Engine = await import(url.pathToFileURL(path.join(repositoryPath, "import.js")).href);
 const { UIDocument, WorldNode, Component, Pivot, Vector2, Color } = Engine;
+// 문서 하나로 뽑는다. (엔진 기본 종류만 등록한 새 문서, 에디터 종류는 등록하지 않는다)
+const uiDocument = new UIDocument();
 
 // 원본 에디터가 등록하는 종류. (tools/uieditor/uieditor.js 의 등록 고리와 같은 판정, 내보낸 이름 차례)
 const componentTypeNames = [];
@@ -46,18 +48,18 @@ for (const typeName of componentTypeNames) {
 	const documentNode = new WorldNode();
 	documentNode.setName(typeName);
 	documentNode.addComponent(Engine[typeName]);
-	componentDocuments[typeName] = UIDocument.serializeNode(documentNode);
+	componentDocuments[typeName] = uiDocument.serializeNode(documentNode);
 	const inspectedNode = new WorldNode();
 	const component = inspectedNode.addComponent(Engine[typeName]);
 	inspectorGetters[typeName] = collectGetterNames(component);
 	reflectedProperties[typeName] = {
 		properties: UIDocument.getReflectedProperties(component).map((property) => property.name),
-		save: UIDocument.saveByReflection(component),
+		save: uiDocument.saveByReflection(component),
 	};
 }
 const nodeTypeDocuments = {};
 for (const typeName of nodeTypeNames) {
-	nodeTypeDocuments[typeName] = UIDocument.serializeNode(new Engine[typeName]());
+	nodeTypeDocuments[typeName] = uiDocument.serializeNode(new Engine[typeName]());
 }
 
 // 원본 에디터 addWidgetNode 의 팔레트. (PALETTE_DEFINITIONS 차례, 형제 수로 어긋난 자리)
@@ -188,7 +190,7 @@ function buildPaletteDocument(isTicked) {
 	if (isTicked) {
 		documentRoot.tick(0.016);
 	}
-	return UIDocument.toJsonText(documentRoot, false);
+	return uiDocument.toJsonText(documentRoot, false);
 }
 
 fs.mkdirSync(outputPath, { recursive: true });

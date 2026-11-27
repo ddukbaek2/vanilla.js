@@ -23,7 +23,7 @@ const System = globalThis;
 //   노란 점과 이름표는 렌더러와 같은 Camera3D 의 projectToView 로 3D 점 위에 얹은 2D 다. 판 다음 형제인 노란 띠는 3D 위에 그려진다.
 // - 오른쪽 판: 같은 장면을 ToonPostProcess 에 그려 채도 낮춤, 따뜻한 색조, 안개빛, 대비, 가장자리 어둡게를 건다.
 // - 두 판은 ToonView3D.setRenderer 로 렌더러 하나를 나눠 쓰고, 그릴 것은 setDrawCallback 의 함수가 들고 있는다.
-// - 원본 그리기 함수의 화면 사각형은 { x, y, width, height, outputFramebuffer, outputViewport } 다. (러스트는 Rect 의 position, size)
+// - 그리기 함수는 두 엔진 모두 (렌더러, 카메라, 화면 사각형 Rect, GL, 출력) 이다. 출력은 원본 { outputFramebuffer, outputViewport }, 러스트 ToonViewOutput.
 // - ?renderScale=0.5 처럼 주면 두 판의 3D 만 그 배율로 그려 늘여 얹는다. (ToonView3D.setRenderScale, 이름표와 띠 같은 2D 는 기기 화소 그대로)
 //==============================================================================
 import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Paint, Text, TextAlign, MeshBuilder, createPartMatrix, createFacetedChunkGeometry, createBoxGeometry, createSphereGeometry, ToonRenderer, ToonPostProcess, ToonDrawQueue, ToonView3D } from "../../import.js";
@@ -82,7 +82,7 @@ class PanelDrawer {
 	//==============================================================================
 	// 판 그리기. (ToonView3D 의 그리기 함수)
 	//==============================================================================
-	draw(renderer, camera, screenRect, webGL2RenderingContext) {
+	draw(renderer, camera, screenRect, webGL2RenderingContext, output) {
 		if (this.#meshes === null) {
 			this.#meshes = PanelDrawer.createMeshes(renderer);
 		}
@@ -111,8 +111,8 @@ class PanelDrawer {
 		}
 		else {
 			// 실수 렌더 타겟에 그리고 색 보정을 걸어 노드 사각형에 낸다. (렌더러의 화면 사각형은 푼다)
-			const width = System.Math.max(1, System.Math.round(screenRect.width));
-			const height = System.Math.max(1, System.Math.round(screenRect.height));
+			const width = System.Math.max(1, System.Math.round(screenRect.size.x));
+			const height = System.Math.max(1, System.Math.round(screenRect.size.y));
 			if (this.#postProcess === null) {
 				const postProcess = new ToonPostProcess(webGL2RenderingContext, width, height);
 				postProcess.setBloom(false, 0.0, 0.9, 1.6);
@@ -126,7 +126,7 @@ class PanelDrawer {
 			renderer.setHdrOutput(true);
 			postProcess.begin([0.05, 0.06, 0.09]);
 			queue.draw(renderer, camera);
-			postProcess.end(screenRect.outputFramebuffer, screenRect.outputViewport);
+			postProcess.end(output.outputFramebuffer, output.outputViewport);
 		}
 		this.#frameCount += 1;
 		if (this.#frameCount === 30) {
@@ -195,8 +195,8 @@ class ToonViewScene extends Scene {
 			const panelDrawer = new PanelDrawer(isGraded, () => this.#elapsedSeconds);
 			const toonView = panel.addComponent(ToonView3D);
 			toonView.setRenderScale(RENDER_SCALE);
-			toonView.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext) => {
-				panelDrawer.draw(renderer, camera, screenRect, webGL2RenderingContext);
+			toonView.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext, output) => {
+				panelDrawer.draw(renderer, camera, screenRect, webGL2RenderingContext, output);
 			});
 			toonView.setFallbackDrawCallback(drawFallback);
 			toonView.getCamera().setPerspective(0.75, 0.1, 100);
