@@ -906,7 +906,7 @@ export function extractFrustumPlanes(matrix) {
 	};
 	const planes = [combine(row3, row0, 1), combine(row3, row0, -1), combine(row3, row1, 1), combine(row3, row1, -1), combine(row3, row2, 1), combine(row3, row2, -1)];
 	for (const plane of planes) {
-		const length = System.Math.hypot(plane[0], plane[1], plane[2]);
+		const length = readHypot(plane[0], plane[1], plane[2]);
 		if (length > 0) {
 			plane[0] /= length;
 			plane[1] /= length;
@@ -932,6 +932,57 @@ function readDeterminant(first, second, third) {
 }
 
 
+
+//==============================================================================
+// 세 수의 Math.hypot. (V8 의 Math.hypot 과 같은 셈과 차례라 비트가 같다, 인자 배열을 짓지 않는다)
+// - V8 은 인자마다 절댓값 배열을 지어 큰 값으로 나눈 제곱을 카핸 합으로 더하고 sqrt 에 큰 값을 곱한다. (Infinity 가 있으면 Infinity, NaN 이 있으면 NaN, 모두 0 이면 0)
+//   그리기마다 부르는 거르기와 바깥선 굵기에서 Math.hypot 이 부를 때마다 메모리를 잡아 이것으로 바꾼다. (노드 25 에서 5 백만 쌍 비트 같음)
+//==============================================================================
+/**
+ * @param { number } x - 첫 수.
+ * @param { number } y - 둘째 수.
+ * @param { number } z - 셋째 수.
+ * @returns { number } Math.hypot(x, y, z) 와 같은 값.
+ */
+export function readHypot(x, y, z) {
+	const absoluteX = System.Math.abs(x);
+	const absoluteY = System.Math.abs(y);
+	const absoluteZ = System.Math.abs(z);
+	if (absoluteX === System.Infinity || absoluteY === System.Infinity || absoluteZ === System.Infinity) {
+		return System.Infinity;
+	}
+	if (absoluteX !== absoluteX || absoluteY !== absoluteY || absoluteZ !== absoluteZ) {
+		return System.NaN;
+	}
+	let maximum = absoluteX;
+	if (absoluteY > maximum) {
+		maximum = absoluteY;
+	}
+	if (absoluteZ > maximum) {
+		maximum = absoluteZ;
+	}
+	if (maximum === 0) {
+		return 0;
+	}
+	let sum = 0;
+	let compensation = 0;
+	let normalized = absoluteX / maximum;
+	let summand = normalized * normalized - compensation;
+	let preliminary = sum + summand;
+	compensation = (preliminary - sum) - summand;
+	sum = preliminary;
+	normalized = absoluteY / maximum;
+	summand = normalized * normalized - compensation;
+	preliminary = sum + summand;
+	compensation = (preliminary - sum) - summand;
+	sum = preliminary;
+	normalized = absoluteZ / maximum;
+	summand = normalized * normalized - compensation;
+	preliminary = sum + summand;
+	sum = preliminary;
+	return System.Math.sqrt(sum) * maximum;
+}
+
 //==============================================================================
 // 모형 행렬 왼쪽 위 3x3 의 행렬식. (음수면 거울에 비친 행렬, 감기가 뒤집힌다)
 //==============================================================================
@@ -948,7 +999,8 @@ function readDeterminant(first, second, third) {
  * }
  */
 export function readMatrixDeterminant(elements) {
-	return readDeterminant([elements[0], elements[1], elements[2]], [elements[4], elements[5], elements[6]], [elements[8], elements[9], elements[10]]);
+	// readDeterminant(열 0, 열 1, 열 2) 와 같은 셈, 같은 차례. (배열을 짓지 않는다)
+	return elements[0] * (elements[5] * elements[10] - elements[6] * elements[9]) - elements[1] * (elements[4] * elements[10] - elements[6] * elements[8]) + elements[2] * (elements[4] * elements[9] - elements[5] * elements[8]);
 }
 
 
@@ -981,7 +1033,7 @@ export function readFrameCamera(elements) {
 	const row3 = readRow(3);
 	const isMirrored = readDeterminant(row0, row1, row2) > 0;
 	let forward = [row0[1] * row1[2] - row0[2] * row1[1], row0[2] * row1[0] - row0[0] * row1[2], row0[0] * row1[1] - row0[1] * row1[0]];
-	const forwardLength = System.Math.hypot(forward[0], forward[1], forward[2]);
+	const forwardLength = readHypot(forward[0], forward[1], forward[2]);
 	if (forwardLength > 0) {
 		forward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
 	}
@@ -1022,7 +1074,7 @@ export function readViewRotation(elements, forward) {
 	const rowX = [elements[0], elements[4], elements[8]];
 	const along = rowX[0] * forward[0] + rowX[1] * forward[1] + rowX[2] * forward[2];
 	let right = [rowX[0] - forward[0] * along, rowX[1] - forward[1] * along, rowX[2] - forward[2] * along];
-	const rightLength = System.Math.hypot(right[0], right[1], right[2]);
+	const rightLength = readHypot(right[0], right[1], right[2]);
 	right = rightLength > 0.000001 ? [right[0] / rightLength, right[1] / rightLength, right[2] / rightLength] : [1, 0, 0];
 	const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
 	return [right[0], up[0], -forward[0], right[1], up[1], -forward[1], right[2], up[2], -forward[2]];
@@ -1052,8 +1104,8 @@ export function readCameraRoll(viewRotationElements, isMirrored) {
 	const forward = [-viewRotationElements[2], -viewRotationElements[5], -viewRotationElements[8]];
 	const axisSign = isMirrored ? -1 : 1;
 	const rightAxis = [-forward[2] * axisSign, 0, forward[0] * axisSign];
-	const axisLength = System.Math.hypot(rightAxis[0], rightAxis[1], rightAxis[2]);
-	const rightLength = System.Math.hypot(right[0], right[1], right[2]);
+	const axisLength = readHypot(rightAxis[0], rightAxis[1], rightAxis[2]);
+	const rightLength = readHypot(right[0], right[1], right[2]);
 	if (axisLength < 0.000001 || rightLength < 0.000001) {
 		return 0;
 	}
@@ -1077,8 +1129,8 @@ export function readCameraRoll(viewRotationElements, isMirrored) {
  */
 export function readShadowBias(lightViewProjectionMatrix, resolution, depthBias, normalBias) {
 	const elements = lightViewProjectionMatrix.getElements();
-	const widthScale = System.Math.hypot(elements[0], elements[4], elements[8]);
-	const depthScale = System.Math.hypot(elements[2], elements[6], elements[10]) * 0.5;
+	const widthScale = readHypot(elements[0], elements[4], elements[8]);
+	const depthScale = readHypot(elements[2], elements[6], elements[10]) * 0.5;
 	const texelWorldSize = 2 / (System.Math.max(widthScale, 1e-6) * System.Math.max(1, resolution));
 	return [depthBias * SHADOW_FILTER_RADIUS * texelWorldSize * depthScale, normalBias * SHADOW_FILTER_RADIUS * texelWorldSize, SHADOW_SLOPE_BIAS * texelWorldSize * depthScale, SHADOW_MAXIMUM_SLOPE];
 }
@@ -1184,7 +1236,7 @@ export function readOutlineVertexData(outlineVertexData, outlineBaseData) {
  * renderer.endFrame();
  */
 export function createReflectionMatrix(planePoint, planeNormal) {
-	const length = System.Math.hypot(planeNormal[0], planeNormal[1], planeNormal[2]);
+	const length = readHypot(planeNormal[0], planeNormal[1], planeNormal[2]);
 	const normalX = length > 0 ? planeNormal[0] / length : 0;
 	const normalY = length > 0 ? planeNormal[1] / length : 1;
 	const normalZ = length > 0 ? planeNormal[2] / length : 0;
@@ -1215,9 +1267,9 @@ export function createReflectionMatrix(planePoint, planeNormal) {
  * @returns { number } 세 축 길이 가운데 가장 큰 것.
  */
 function readMaximumScale(elements) {
-	const scaleX = System.Math.hypot(elements[0], elements[1], elements[2]);
-	const scaleY = System.Math.hypot(elements[4], elements[5], elements[6]);
-	const scaleZ = System.Math.hypot(elements[8], elements[9], elements[10]);
+	const scaleX = readHypot(elements[0], elements[1], elements[2]);
+	const scaleY = readHypot(elements[4], elements[5], elements[6]);
+	const scaleZ = readHypot(elements[8], elements[9], elements[10]);
 	return System.Math.max(scaleX, scaleY, scaleZ);
 }
 
@@ -1262,7 +1314,7 @@ function readInstanceBounds(instanceLayout, data) {
 	let radius = 0;
 	for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
 		const offset = instanceIndex * floatCount + matrixOffset;
-		radius = System.Math.max(radius, System.Math.hypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
+		radius = System.Math.max(radius, readHypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
 	}
 	return { center: center, radius: radius, scale: scale };
 }
@@ -1291,13 +1343,45 @@ function readInstanceBounds(instanceLayout, data) {
  * }
  */
 export function readInstanceBufferSphere(mesh, instanceBuffer) {
+	const sphere = [0, 0, 0, 0];
+	return writeInstanceBufferSphere(sphere, mesh, instanceBuffer) ? sphere : null;
+}
+
+//==============================================================================
+// 인스턴스 버퍼를 모형으로 그릴 때의 경계 구를 주어진 배열에 쓰기. (readInstanceBufferSphere 와 같은 값, 새 배열을 짓지 않는다)
+//==============================================================================
+/**
+ * @param { Array<number> | Float32Array | Float64Array } sphere - 쓸 칸. ([x, y, z, 반지름], 넷 이상)
+ * @param { object } mesh - createMesh 의 결과.
+ * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
+ * @returns { boolean } 행렬이 없어 경계가 없으면 false. (그때는 sphere 를 고치지 않는다)
+ * @example <caption>프레임마다 같은 칸에 경계 구 쓰기</caption>
+ * import { ToonRenderer, MeshBuilder, createBoxGeometry, writeInstanceBufferSphere, Matrix4 } from "./vanilla.js";
+ * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+ * const builder = new MeshBuilder();
+ * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#808080");
+ * const boxMesh = renderer.createMesh(builder.readArrays());
+ * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }]);
+ * const data = new Float32Array(16 * 2);
+ * data.set(Matrix4.createTranslation(-2, 0, 0).getElements(), 0);
+ * data.set(Matrix4.createTranslation(2, 0, 0).getElements(), 16);
+ * const sphere = [0, 0, 0, 0];
+ * if (!writeInstanceBufferSphere(sphere, boxMesh, renderer.createInstanceBuffer(instanceLayout, data)) || sphere[3] < 2) {
+ * 	throw new Error("bounds failed");
+ * }
+ */
+export function writeInstanceBufferSphere(sphere, mesh, instanceBuffer) {
 	const bounds = instanceBuffer.bounds;
 	if (bounds === null) {
-		return null;
+		return false;
 	}
 	const center = mesh.boundingCenter;
-	const meshReach = System.Math.hypot(center[0], center[1], center[2]) + mesh.boundingRadius;
-	return [bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius + bounds.scale * meshReach];
+	const meshReach = readHypot(center[0], center[1], center[2]) + mesh.boundingRadius;
+	sphere[0] = bounds.center[0];
+	sphere[1] = bounds.center[1];
+	sphere[2] = bounds.center[2];
+	sphere[3] = bounds.radius + bounds.scale * meshReach;
+	return true;
 }
 
 
@@ -1318,7 +1402,8 @@ export function readInstanceBufferSphere(mesh, instanceBuffer) {
  * }
  */
 export function isSphereInFrustum(frustumPlanes, sphere) {
-	for (const plane of frustumPlanes) {
+	for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+		const plane = frustumPlanes[planeIndex];
 		if (plane[0] * sphere[0] + plane[1] * sphere[1] + plane[2] * sphere[2] + plane[3] < -sphere[3]) {
 			return false;
 		}
@@ -1350,7 +1435,7 @@ function readBoundingSphere(positions, stride) {
 	const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
 	let radius = 0;
 	for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
-		radius = System.Math.max(radius, System.Math.hypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
+		radius = System.Math.max(radius, readHypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
 	}
 	return { center: center, radius: radius };
 }
@@ -1393,6 +1478,8 @@ const DRAW_PART_ALL = 3;
 const WHITE_COLOR = System.Object.freeze([1, 1, 1, 1]);
 const BLACK_COLOR = System.Object.freeze([0, 0, 0]);
 const IDENTITY_UV_TRANSFORM = System.Object.freeze([0, 0, 1, 1]);
+const IDENTITY_ELEMENTS = new Matrix4().getElements(); // 인스턴스 버퍼 그리기의 모형 행렬. (단위 행렬, 고치지 않는다, 그리기마다 짓지 않게)
+const INSTANCE_BUFFER_SPHERE = [0, 0, 0, 0]; // 인스턴스 버퍼 거르기의 경계 구 칸. (다시 쓴다)
 export const EMPTY_OPTIONS = System.Object.freeze({}); // 꼴을 주지 않은 그리기의 꼴. (그리기마다 새 빈 객체를 짓지 않아 렌더러가 기억한 푼 칸을 같이 쓴다)
 
 
@@ -1848,6 +1935,10 @@ export class ToonRenderer {
 	/** @private @type { number } */ #trustSerial; // 그리기 줄이 꼴을 고치지 않는다고 맡긴 판 번호. (beginTrustedOptions 마다 오른다)
 	/** @private @type { boolean } */ #isTrusting; // 지금 맡긴 판인지. (맡긴 판에서 한 번 견준 꼴은 다시 견주지 않는다)
 	/** @private @type { WeakMap<object, object> } */ #drawEntryOfOptions; // 그리기 꼴 객체 → { keys, values, numbers (얕은 사본), state (푼 칸), materialBlock, outlineBlock, outlineStates }
+	/** @private @type { number } */ #drawEntryGeneration; // 블록 갈래를 지운 판 번호. (그리기 줄의 칸과 ToonDrawItem 이 쥔 기억 칸의 블록이 지운 것을 가리키지 않게, clearBlockCache 마다 오른다)
+	/** @private @type { object | null } */ #hintOptions; // 그리기 줄이 지금 그리는 담은 칸의 꼴 객체. (readDrawEntry 가 #hintEntry 를 바로 쓴다, 맡긴 판에서만)
+	/** @private @type { object | null } */ #hintEntry; // 그 칸이 푼 기억 칸.
+	/** @private @type { Float32Array } */ #batchModelElements; // drawMeshBatch 의 첫 인스턴스 행렬 칸. (다시 쓴다)
 	/** @private @type { object } */ #materialBlocks; // 몸의 재질 블록 갈래. (createBlockCache)
 	/** @private @type { object } */ #outlineBlocks; // 바깥선 껍데기의 블록 갈래.
 	/** @private @type { object | null } */ #lastProgramKey; // 마지막으로 찾은 프로그램 셋의 머티리얼과 인스턴스 꼴. ({ material, instanceLayout, programSet })
@@ -1870,6 +1961,10 @@ export class ToonRenderer {
 		this.#slotTableProgram = null;
 		this.#slotTable = null;
 		this.#drawEntryOfOptions = new System.WeakMap();
+		this.#drawEntryGeneration = 1;
+		this.#hintOptions = null;
+		this.#hintEntry = null;
+		this.#batchModelElements = new System.Float32Array(16);
 		this.#trustSerial = 1;
 		this.#isTrusting = false;
 		this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
@@ -3147,7 +3242,9 @@ export class ToonRenderer {
 		const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
 		const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
 		const radius = mesh.boundingRadius * readMaximumScale(modelElements);
-		for (const plane of this.#frustumPlanes) {
+		const frustumPlanes = this.#frustumPlanes;
+		for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+			const plane = frustumPlanes[planeIndex];
 			if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
 				return false;
 			}
@@ -3301,12 +3398,12 @@ export class ToonRenderer {
 		if (count <= 0) {
 			return;
 		}
-		if (options.isCulled !== false && instanceBuffer.bounds !== null && !isSphereInFrustum(this.#frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+		if (options.isCulled !== false && writeInstanceBufferSphere(INSTANCE_BUFFER_SPHERE, mesh, instanceBuffer) && !isSphereInFrustum(this.#frustumPlanes, INSTANCE_BUFFER_SPHERE)) {
 			this.#frameStatistics.culledObjectCount += count;
 			return;
 		}
 		this.#frameStatistics.drawnObjectCount += count;
-		this.drawWithCount(mesh, Matrix4.createIdentity().getElements(), count, options, instanceBuffer);
+		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, options, instanceBuffer);
 	}
 
 	//==============================================================================
@@ -3350,7 +3447,19 @@ export class ToonRenderer {
 	 * @private
 	 */
 	readMaterialBlock(options) {
-		const drawEntry = this.readDrawEntry(options);
+		return this.readEntryMaterialBlock(this.readDrawEntry(options), options);
+	}
+
+	//==============================================================================
+	// 기억 칸의 재질 블록 읽기. (readMaterialBlock 과 같다, 그리기 줄이 이미 푼 기억 칸으로)
+	//==============================================================================
+	/**
+	 * @param { object } drawEntry - readDrawEntry 나 writeHeldDrawEntry 의 결과.
+	 * @param { object } options - 그 칸을 푼 꼴.
+	 * @returns { object } 재질 블록.
+	 * @private
+	 */
+	readEntryMaterialBlock(drawEntry, options) {
 		if (drawEntry.materialBlock === null) {
 			writeMaterialBlockValues(this.#materialBlocks.values, options);
 			drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
@@ -3420,10 +3529,14 @@ export class ToonRenderer {
 			if (slot.values.length < floatCount) {
 				slot.values = new System.Float32Array(floatCount);
 			}
-			slot.values.set(instanceData.subarray(0, floatCount));
+			const values = slot.values;
+			for (let index = 0; index < floatCount; ++index) {
+				values[index] = instanceData[index];
+			}
 			slot.count = count;
 			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
-			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+			// WebGL2 의 bufferData(대상, 자료, 쓰임, 시작, 수) 로 앞의 floatCount 만 올린다. (subarray 를 짓지 않는다)
+			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount);
 		}
 		let vertexArrays = slot.vertexArrays.get(mesh);
 		if (vertexArrays === undefined) {
@@ -3433,7 +3546,12 @@ export class ToonRenderer {
 			vertexArrays = this.createBatchVertexArrays(mesh, slot.buffer);
 			slot.vertexArrays.set(mesh, vertexArrays);
 		}
-		this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts, vertexArrays);
+		// 첫 인스턴스의 행렬. (감기와 스킨 없는 그리기의 모형 행렬 칸, 다시 쓰는 칸에 옮긴다)
+		const batchElements = this.#batchModelElements;
+		for (let index = 0; index < 16; ++index) {
+			batchElements[index] = instanceData[index];
+		}
+		this.drawWithCount(mesh, batchElements, count, options, null, parts, vertexArrays);
 	}
 
 	//==============================================================================
@@ -3838,9 +3956,12 @@ export class ToonRenderer {
 	 * @private
 	 */
 	readDrawEntry(options) {
+		if (options === this.#hintOptions) {
+			return this.readHeldDrawEntry(this.#hintEntry);
+		}
 		let entry = this.#drawEntryOfOptions.get(options);
 		if (entry === undefined) {
-			entry = { keys: [], values: [], numbers: [], state: new System.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0 };
+			entry = this.createDrawEntry();
 			this.#drawEntryOfOptions.set(options, entry);
 		}
 		else if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
@@ -3856,6 +3977,91 @@ export class ToonRenderer {
 		entry.outlineBlock = null;
 		entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
 		return entry;
+	}
+
+	//==============================================================================
+	// 꼴 객체마다 기억한 칸 찾기. (readDrawEntry 와 같은데 기억한 것이 없으면 짓지 않고 null)
+	// - 그리기 줄이 처음 보는 꼴 객체(게임이 프레임마다 새로 짓는 꼴)는 꼴 객체마다 기억하지 않고 담은 칸이 쥔 기억 칸에 푼다. (writeHeldDrawEntry)
+	//==============================================================================
+	/**
+	 * @param { object } options - 그리기 꼴.
+	 * @returns { object | null } 기억 칸이나 null.
+	 * @private
+	 */
+	findDrawEntry(options) {
+		if (!this.#drawEntryOfOptions.has(options)) {
+			return null;
+		}
+		return this.readDrawEntry(options);
+	}
+
+	//==============================================================================
+	// 기억 칸 짓기. (readDrawEntry 의 칸과 같은 꼴, 아직 푼 것이 없다)
+	//==============================================================================
+	/**
+	 * @returns { object } 기억 칸.
+	 * @private
+	 */
+	createDrawEntry() {
+		return { keys: [], values: [], numbers: [], state: new System.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0, options: null, generation: this.#drawEntryGeneration };
+	}
+
+	//==============================================================================
+	// 쥔 기억 칸 맞추기. (그리기 줄의 담은 칸과 ToonDrawItem 이 꼴 객체와 상관없이 쥐는 칸, 꼴 객체마다 기억하지 않는다)
+	// - entry 가 null 이면 짓는다. isChanged 면 견주지 않고 다시 푼다. (ToonDrawItem 의 바뀜 표시)
+	//   아니면 얕은 사본과 견주어 다를 때만 다시 푼다. 같으면 푼 칸과 재질 블록을 그대로 쓴다. (게임이 프레임마다 값이 같은 새 꼴 객체를 지어도 할당 없음)
+	//==============================================================================
+	/**
+	 * @param { object | null } entry - 쥔 기억 칸이나 null.
+	 * @param { object } options - 그리기 꼴.
+	 * @param { boolean } isChanged - 꼴이 바뀐 것을 알면 true. (견주지 않는다)
+	 * @returns { object } 기억 칸. (entry 가 null 이면 새 칸)
+	 * @private
+	 */
+	writeHeldDrawEntry(entry, options, isChanged) {
+		if (entry === null) {
+			entry = this.createDrawEntry();
+			isChanged = true;
+		}
+		this.readHeldDrawEntry(entry);
+		if (isChanged || !isSameOptionsSnapshot(entry, options)) {
+			writeOptionsSnapshot(entry, options);
+			writeDrawState(entry.state, options);
+			entry.materialBlock = null;
+			entry.outlineBlock = null;
+		}
+		entry.options = options;
+		return entry;
+	}
+
+	//==============================================================================
+	// 쥔 기억 칸 그대로 쓰기. (블록 갈래를 지운 뒤면 블록만 잊는다)
+	//==============================================================================
+	/**
+	 * @param { object } entry - 쥔 기억 칸.
+	 * @returns { object } entry.
+	 * @private
+	 */
+	readHeldDrawEntry(entry) {
+		if (entry.generation !== this.#drawEntryGeneration) {
+			entry.materialBlock = null;
+			entry.outlineBlock = null;
+			entry.generation = this.#drawEntryGeneration;
+		}
+		return entry;
+	}
+
+	//==============================================================================
+	// 그리기 줄이 지금 그리는 칸 알리기. (맡긴 판에서 그 꼴 객체의 readDrawEntry 가 칸의 기억을 바로 쓴다, null 이면 푼다)
+	//==============================================================================
+	/**
+	 * @param { object | null } options - 담은 칸의 꼴 객체.
+	 * @param { object | null } entry - 그 칸이 이번 프레임에 푼 기억 칸.
+	 * @private
+	 */
+	setDrawEntryHint(options, entry) {
+		this.#hintOptions = this.#isTrusting ? options : null;
+		this.#hintEntry = this.#isTrusting ? entry : null;
 	}
 
 	//==============================================================================
@@ -3878,6 +4084,8 @@ export class ToonRenderer {
 	 */
 	endTrustedOptions() {
 		this.#isTrusting = false;
+		this.#hintOptions = null;
+		this.#hintEntry = null;
 	}
 
 	//==============================================================================
@@ -3889,6 +4097,8 @@ export class ToonRenderer {
 	 */
 	pauseTrustedOptions(isPaused) {
 		this.#isTrusting = !isPaused;
+		this.#hintOptions = null;
+		this.#hintEntry = null;
 	}
 
 	//==============================================================================
@@ -3963,6 +4173,7 @@ export class ToonRenderer {
 		blockCache.count = 0;
 		blockCache.boundBlock = null;
 		this.#drawEntryOfOptions = new System.WeakMap(); // 꼴마다 기억한 블록이 지운 것을 가리키지 않게.
+		this.#drawEntryGeneration += 1; // 쥔 기억 칸도. (readHeldDrawEntry)
 	}
 
 	//==============================================================================

@@ -23,6 +23,11 @@ const cullRect = new Rect();
 const cullDrawnRect = new Rect();
 // 뷰 좌표를 로컬 좌표로 바꿀 때 내용 크기를 읽어 두는 칸. (convertViewToLocal)
 const convertContentSize = Vector2.zero();
+// contains 가 네 귀퉁이와 판정을 쓰는 칸. (UIButton 이 프레임마다 마우스가 올라왔는지 물어도 할당하지 않게)
+const containsCorners = [Vector2.zero(), Vector2.zero(), Vector2.zero(), Vector2.zero()];
+const containsObb = new OBB();
+const containsScale = Vector2.zero();
+const containsVector = Vector2.zero();
 
 
 //==============================================================================
@@ -436,6 +441,33 @@ export class WorldNode extends TransformNode {
     }
 
     //==============================================================================
+    // 기준점을 주어진 벡터에 쓰기. (getPivot 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>기준점 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setPivot(Vector2.create(0.5, 1));
+     * const pivot = node.readPivot(Vector2.create(0, 0));
+     * if (pivot.x !== 0.5 || pivot.y !== 1) {
+     * 	throw new Error("pivot failed");
+     * }
+     */
+    readPivot(out) {
+        if (this.getPivot !== WorldNode.prototype.getPivot) {
+            const pivot = this.getPivot();
+            out.x = pivot.x;
+            out.y = pivot.y;
+            return out;
+        }
+        out.x = this.#pivot.x;
+        out.y = this.#pivot.y;
+        return out;
+    }
+
+    //==============================================================================
     // 실제 내용 크기 설정.
     //==============================================================================
     /**
@@ -508,6 +540,33 @@ export class WorldNode extends TransformNode {
      */
     getContentSize() {
         return this.#contentSize.clone();
+    }
+
+    //==============================================================================
+    // 내용 크기를 주어진 벡터에 쓰기. (getContentSize 와 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>내용 크기 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setContentSize(Vector2.create(120, 40));
+     * const contentSize = node.readContentSize(Vector2.create(0, 0));
+     * if (contentSize.x !== 120 || contentSize.y !== 40) {
+     * 	throw new Error("content size failed");
+     * }
+     */
+    readContentSize(out) {
+        if (this.getContentSize !== WorldNode.prototype.getContentSize) {
+            const contentSize = this.getContentSize();
+            out.x = contentSize.x;
+            out.y = contentSize.y;
+            return out;
+        }
+        out.x = this.#contentSize.x;
+        out.y = this.#contentSize.y;
+        return out;
     }
 
     //==============================================================================
@@ -651,6 +710,51 @@ export class WorldNode extends TransformNode {
     }
 
     //==============================================================================
+    // 글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    // - getPosition 이나 부모의 내용 크기, 기준점 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out. (기준점의 자리)
+     */
+    readPosition(out) {
+        const parent = this.getParent();
+        if (this.getPosition !== WorldNode.prototype.getPosition || !(parent instanceof WorldNode)) {
+            return super.readPosition(out);
+        }
+        this.readLocalPosition(out);
+        const localX = out.x;
+        const localY = out.y;
+        parent.readPosition(out);
+        const parentPositionX = out.x;
+        const parentPositionY = out.y;
+        parent.readContentSize(out);
+        const parentContentSizeX = out.x;
+        const parentContentSizeY = out.y;
+        parent.readPivot(out);
+        const parentPivotX = out.x;
+        const parentPivotY = out.y;
+        const parentRotation = parent.getRotation();
+        parent.readScale(out);
+        const parentScaleX = out.x;
+        const parentScaleY = out.y;
+
+        const totalLocalX = localX - parentContentSizeX * parentPivotX;
+        const totalLocalY = localY - parentContentSizeY * parentPivotY;
+        const radian = Math.degreeToRadian(parentRotation);
+        const cosRadian = Math.cos(radian);
+        const sinRadian = Math.sin(radian);
+        const sx = totalLocalX * parentScaleX;
+        const sy = totalLocalY * parentScaleY;
+        const rx = sx * cosRadian - sy * sinRadian;
+        const ry = sx * sinRadian + sy * cosRadian;
+        out.x = parentPositionX + rx;
+        out.y = parentPositionY + ry;
+        return out;
+    }
+
+    //==============================================================================
     // 글로벌 위치 설정. (getPosition 의 거꾸로)
     // - parent.getPosition() (= 부모 pivot 점의 월드 좌표) 에서 본 차이를 부모 회전/스케일을 풀어 부모 pivot 점 기준 오프셋으로 되돌린 뒤
     //   부모 content top-left 기준(localPosition)으로 옮긴다. 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다.
@@ -764,11 +868,60 @@ export class WorldNode extends TransformNode {
         if (viewPosition === null || viewPosition === undefined) {
             return false;
         }
-        const worldCorners = this.getWorldCorners();
-        const obb = new OBB();
-        obb.setEdges(worldCorners);
-        const inside = obb.contains(viewPosition);
-        return inside;
+        // getWorldCorners 를 덮어쓰지 않았으면 같은 셈을 다시 쓰는 칸에 한다. (프레임마다 마우스 올림을 물어도 할당하지 않는다)
+        if (this.getWorldCorners !== WorldNode.prototype.getWorldCorners) {
+            const worldCorners = this.getWorldCorners();
+            const obb = new OBB();
+            obb.setEdges(worldCorners);
+            return obb.contains(viewPosition);
+        }
+        this.writeWorldCorners(containsCorners);
+        containsObb.setEdges(containsCorners);
+        return containsObb.contains(viewPosition);
+    }
+
+    //==============================================================================
+    // 네 귀퉁이를 주어진 벡터 넷에 쓰기. (getWorldCorners 와 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2[] } corners 쓸 벡터 넷. (왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래 차례)
+     * @returns { Vector2[] } corners.
+     * @private
+     */
+    writeWorldCorners(corners) {
+        const position = this.readPosition(containsVector);
+        const positionX = position.x;
+        const positionY = position.y;
+        const scale = this.readScale(containsScale);
+        const rotation = this.getRotation();
+        const contentSize = this.readContentSize(corners[0]);
+        const contentSizeX = contentSize.x;
+        const contentSizeY = contentSize.y;
+        const pivot = this.readPivot(corners[1]);
+        const pivotX = pivot.x;
+        const pivotY = pivot.y;
+
+        const width = contentSizeX * Math.abs(scale.x);
+        const height = contentSizeY * Math.abs(scale.y);
+
+        const left = -(width * pivotX);
+        const right = width * (1 - pivotX);
+        const top = -(height * pivotY);
+        const bottom = height * (1 - pivotY);
+
+        const radian = Math.degreeToRadian(rotation);
+        const cosR = Math.cos(radian);
+        const sinR = Math.sin(radian);
+
+        corners[0].x = left * cosR - top * sinR + positionX;
+        corners[0].y = left * sinR + top * cosR + positionY;
+        corners[1].x = right * cosR - top * sinR + positionX;
+        corners[1].y = right * sinR + top * cosR + positionY;
+        corners[2].x = right * cosR - bottom * sinR + positionX;
+        corners[2].y = right * sinR + bottom * cosR + positionY;
+        corners[3].x = left * cosR - bottom * sinR + positionX;
+        corners[3].y = left * sinR + bottom * cosR + positionY;
+        return corners;
     }
 
     //==============================================================================

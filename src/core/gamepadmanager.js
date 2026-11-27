@@ -84,6 +84,7 @@ const NINTENDO_GAMEPAD_ID_PARTS = ["057e", "nintendo", "joy-con", "pro controlle
 const XBOX_GAMEPAD_ID_PARTS = ["045e", "xbox", "xinput", "microsoft"];
 // 축이 이만큼 넘게 기울면 그 패드를 쓴 것으로 본다. (가운데의 떨림으로 마지막 장치가 바뀌지 않게)
 const GAMEPAD_ACTIVE_AXIS_THRESHOLD = 0.5;
+const GAMEPAD_RESCAN_INTERVAL = 1; // 붙은 패드가 없을 때 navigator.getGamepads 로 훑는 사이. (초, 사건을 놓친 패드를 붙인다)
 
 
 //==============================================================================
@@ -158,6 +159,7 @@ export class GamepadManager extends Object {
 	/**@private @type { Function | null } */ #inputEventCallback; // 입력 콜백 함수.
 	/**@private @type { boolean } */ #isInputLogEnabled; // 단추와 축이 바뀔 때마다 콘솔에 찍는지.
 	/**@private @type { string } */ #activeGamepadId; // 마지막 갱신에 단추를 누르거나 축을 크게 기울인 패드의 이름. (없으면 빈 글)
+	/**@private @type { number } */ #rescanTime; // 붙은 패드가 없을 때 다음에 훑기까지 남은 시간. (초, 0 이하면 이번 갱신에 훑는다)
 
 	//==============================================================================
 	// 생성.
@@ -173,6 +175,7 @@ export class GamepadManager extends Object {
 		this.#inputEventCallback = null;
 		this.#isInputLogEnabled = false;
 		this.#activeGamepadId = "";
+		this.#rescanTime = 0;
 	}
 
 	//==============================================================================
@@ -182,6 +185,15 @@ export class GamepadManager extends Object {
 	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
+		// 붙은 패드가 없으면 navigator.getGamepads 를 프레임마다 부르지 않는다. (붙는 것은 gamepadconnected 사건이 connect 로 알린다)
+		// 사건을 놓친 경우(updateAllGamepads 머리말)를 위해 첫 갱신과 그 뒤 GAMEPAD_RESCAN_INTERVAL 초마다 한 번 훑는다.
+		if (this.#connectedGamepadIndices.length === 0) {
+			this.#rescanTime -= timeDelta;
+			if (this.#rescanTime > 0) {
+				return;
+			}
+			this.#rescanTime = GAMEPAD_RESCAN_INTERVAL;
+		}
 		this.updateAllGamepads();
 	}
 

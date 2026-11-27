@@ -9,6 +9,51 @@ import * as Math from "./math.js";
 
 
 //==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+const MULTIPLY_RESULT = new System.Float32Array(16); // multiply 의 결과 칸. (다시 쓴다, 프레임마다 할당하지 않게)
+const OPERAND_ELEMENTS = new System.Float32Array(16); // translate, rotateX/Y/Z, scale 의 오른쪽 행렬 칸. (create 함수와 같은 값을 쓴다)
+
+
+//==============================================================================
+// 행렬 곱 누적. (elements = elements x otherElements, 결과 칸을 다시 쓴다)
+//==============================================================================
+/**
+ * @param { Float32Array } elements - 왼쪽이자 결과.
+ * @param { Float32Array } otherElements - 오른쪽.
+ */
+function multiplyElements(elements, otherElements) {
+	const resultElements = MULTIPLY_RESULT;
+	for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
+		for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
+			let sum = 0;
+			for (let termIndex = 0; termIndex < 4; ++termIndex) {
+				sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
+			}
+			resultElements[columnIndex * 4 + rowIndex] = sum;
+		}
+	}
+	elements.set(resultElements);
+}
+
+//==============================================================================
+// 오른쪽 행렬 칸을 단위 행렬로. (translate 같은 것이 create 함수 대신 쓴다)
+//==============================================================================
+/**
+ * @returns { Float32Array } OPERAND_ELEMENTS.
+ */
+function readIdentityOperand() {
+	const elements = OPERAND_ELEMENTS;
+	elements.fill(0);
+	elements[0] = 1;
+	elements[5] = 1;
+	elements[10] = 1;
+	elements[15] = 1;
+	return elements;
+}
+
+
+//==============================================================================
 // 4x4 변환 행렬. (열우선, WebGL uniformMatrix4fv 에 그대로 업로드 가능)
 // - 열우선 배열 인덱스: elements[column * 4 + row]
 // - 점 변환: transformed = matrix x (x, y, z, 1)
@@ -89,19 +134,7 @@ export class Matrix4 extends Object {
 	 * @param { Matrix4 } other 오른쪽에 곱할 행렬.
 	 */
 	multiply(other) {
-		const elements = this.getElements();
-		const otherElements = other.getElements();
-		const resultElements = new System.Float32Array(16);
-		for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
-			for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
-				let sum = 0;
-				for (let termIndex = 0; termIndex < 4; ++termIndex) {
-					sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
-				}
-				resultElements[columnIndex * 4 + rowIndex] = sum;
-			}
-		}
-		elements.set(resultElements);
+		multiplyElements(this.getElements(), other.getElements());
 	}
 
 	//==============================================================================
@@ -113,8 +146,11 @@ export class Matrix4 extends Object {
 	 * @param { number } z Z 이동량.
 	 */
 	translate(x, y, z) {
-		const translationMatrix = Matrix4.createTranslation(x, y, z);
-		this.multiply(translationMatrix);
+		const operand = readIdentityOperand();
+		operand[12] = x;
+		operand[13] = y;
+		operand[14] = z;
+		multiplyElements(this.getElements(), operand);
 	}
 
 	//==============================================================================
@@ -124,8 +160,14 @@ export class Matrix4 extends Object {
 	 * @param { number } radian 회전 각도. (라디안)
 	 */
 	rotateX(radian) {
-		const rotationMatrix = Matrix4.createRotationX(radian);
-		this.multiply(rotationMatrix);
+		const cosRadian = Math.cos(radian);
+		const sinRadian = Math.sin(radian);
+		const operand = readIdentityOperand();
+		operand[5] = cosRadian;
+		operand[6] = sinRadian;
+		operand[9] = -sinRadian;
+		operand[10] = cosRadian;
+		multiplyElements(this.getElements(), operand);
 	}
 
 	//==============================================================================
@@ -135,8 +177,14 @@ export class Matrix4 extends Object {
 	 * @param { number } radian 회전 각도. (라디안)
 	 */
 	rotateY(radian) {
-		const rotationMatrix = Matrix4.createRotationY(radian);
-		this.multiply(rotationMatrix);
+		const cosRadian = Math.cos(radian);
+		const sinRadian = Math.sin(radian);
+		const operand = readIdentityOperand();
+		operand[0] = cosRadian;
+		operand[2] = -sinRadian;
+		operand[8] = sinRadian;
+		operand[10] = cosRadian;
+		multiplyElements(this.getElements(), operand);
 	}
 
 	//==============================================================================
@@ -146,8 +194,14 @@ export class Matrix4 extends Object {
 	 * @param { number } radian 회전 각도. (라디안)
 	 */
 	rotateZ(radian) {
-		const rotationMatrix = Matrix4.createRotationZ(radian);
-		this.multiply(rotationMatrix);
+		const cosRadian = Math.cos(radian);
+		const sinRadian = Math.sin(radian);
+		const operand = readIdentityOperand();
+		operand[0] = cosRadian;
+		operand[1] = sinRadian;
+		operand[4] = -sinRadian;
+		operand[5] = cosRadian;
+		multiplyElements(this.getElements(), operand);
 	}
 
 	//==============================================================================
@@ -159,8 +213,11 @@ export class Matrix4 extends Object {
 	 * @param { number } z Z 배율.
 	 */
 	scale(x, y, z) {
-		const scaleMatrix = Matrix4.createScale(x, y, z);
-		this.multiply(scaleMatrix);
+		const operand = readIdentityOperand();
+		operand[0] = x;
+		operand[5] = y;
+		operand[10] = z;
+		multiplyElements(this.getElements(), operand);
 	}
 
 	//==============================================================================
