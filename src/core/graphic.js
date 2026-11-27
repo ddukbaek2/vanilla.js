@@ -2390,6 +2390,52 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 보이는 사각형(화면과 걸린 자르기)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 읽기. (하위 트리 거르기가 켜졌을 때만, 알면 true)
+	// - 돌림이나 기울임이 있으면 넉넉하다(네 꼭짓점의 경계 상자, 한 디바이스 픽셀씩 넓힘). 이 사각형 밖에 그리는 것은 보이지 않는다.
+	// - 노드가 많은 자식 가운데 보이는 범위를 찾을 때 쓴다(TransformNode.drawChildren). 변환과 자르기가 같으면 다시 셈하지 않는다.
+	// - 화면 밖 거르기나 하위 트리 거르기가 꺼졌거나, 기즈모를 모두 그리거나, 뷰포트를 아직 정하지 않았거나, 변환을 거꾸로 걸 수 없으면(배율 0) false.
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 경계 상자를 적을 곳. (지금 변환의 지역 좌표)
+	 * @returns { boolean } 알면 참. (모르면 rect 를 건드리지 않는다)
+	 * @example <caption>지금 변환에서 보이는 사각형 읽기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Rect } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		const visibleRect = Rect.zero();
+	 * 		graphic.pushState();
+	 * 		graphic.translate(100, 0);
+	 * 		console.log(graphic.readLocalVisibleBounds(visibleRect), visibleRect.position.x < -100);
+	 * 		graphic.popState();
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	readLocalVisibleBounds(rect) {
+		if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || this.#isForceGizmosVisible || !this.#updateLocalVisibleBounds()) {
+			return false;
+		}
+		rect.position.set(this.#localVisibleMinimumX, this.#localVisibleMinimumY);
+		rect.size.set(this.#localVisibleMaximumX - this.#localVisibleMinimumX, this.#localVisibleMaximumY - this.#localVisibleMinimumY);
+		return true;
+	}
+
+	//==============================================================================
+	// 이번 프레임에 화면 밖이라 그리기를 통째로 건너뛴 하위 트리 수 더하기. (TransformNode.drawChildren 이 보이는 범위 밖 자식을 한꺼번에 건너뛰고 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } culledSubtreeCount 더할 하위 트리 수.
+	 */
+	addCulledSubtreeCount(culledSubtreeCount) {
+		this.#culledSubtreeCount += culledSubtreeCount;
+	}
+
+	//==============================================================================
 	// 보이는 사각형(화면과 걸린 자르기, isLocalRectVisible 과 같은 것)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 셈하기. (셈할 수 있으면 true)
 	// - 돌림이나 기울임이 있으면 네 꼭짓점을 옮긴 경계 상자라 넉넉하다. 셈의 오차를 덮으려고 디바이스 사각형을 한 픽셀씩 넓혀 옮긴다.
 	// - 변환과 보이는 디바이스 사각형이 지난번과 같으면 다시 셈하지 않는다. (한 부모의 자식들을 그리는 동안은 같다)

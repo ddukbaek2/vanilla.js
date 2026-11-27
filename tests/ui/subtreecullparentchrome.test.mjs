@@ -3,7 +3,7 @@
 // - 그리기 순회가 자식에 변환을 걸기 전에 부모가 셈해 둔 자식 경계(TransformNode.readParentDrawBounds)를 부모 좌표의 보이는 사각형과 견주어 건너뛰는 길을 본다.
 // - 왼쪽: 스크롤 목록 안 묶음 노드 하나에 이름 칸과 조절 칸 300 개가 바로 자식으로 납작하게 놓인 장면(광부 설정 창 꼴). 프레임마다 소수 픽셀만큼 스크롤한다.
 //   조절 칸마다 그린 수를 세어, 하위 트리 거르기를 켠 길과 끈 길(노드마다 컴포넌트만 거름)이 프레임마다 같은 칸을 그리는지 본다. (스크롤로 들어오는 칸이 그 프레임에 바로 그려진다)
-//   켠 길이 묶음 노드의 자식마다 변환을 걸지 않는지(프레임의 pushState 수) 센다.
+//   켠 길이 묶음 노드의 자식마다 변환을 걸지 않는지(프레임의 pushState 수), 보이는 자식 범위 밖 자식은 drawNode 도 부르지 않는지(이분 찾기, 프레임의 drawNode 수) 센다.
 // - 오른쪽: 둥근 마스크 안에 가로세로 배율이 다른 노드, 그 안에 돌린 노드(기울임이 생긴다), 그 안의 스크롤 목록(자르기가 겹친다)에 칸 144 개를 마스크 가장자리에 걸치게 놓고
 //   스크롤하며 돌림을 바꾼다. 켬과 끔, 거르기를 모두 끈 길(setCullingEnabled(false))의 찍은 화면 화소가 모두 같은지 본다. (넉넉하게 거르는지)
 // - 화면 아래 밖에서 위로 날아오르는 파티클(수동 틱, 씨앗 고정)과 화면 아래 밖에서 올라오는 노드의 꼬리(TrailRenderer)가 화면 밖인 동안 켠 길이 그리지 않고,
@@ -182,9 +182,16 @@ class ParentCullScene extends Scene {
 			pushStateCount += 1;
 			return pushState.call(this);
 		};
+		let drawNodeCount = 0;
+		const drawNode = graphic.drawNode;
+		graphic.drawNode = function (node) {
+			drawNodeCount += 1;
+			return drawNode.call(this, node);
+		};
 		super.draw(graphic);
 		delete graphic.pushState;
-		window.frameList.push({ frameNumber, culledSubtreeCount: -1, pushStateCount, drawCountList: window.drawCountList.slice(), particleDrawCount: window.particleDrawCount, trailDrawCount: window.trailDrawCount });
+		delete graphic.drawNode;
+		window.frameList.push({ frameNumber, culledSubtreeCount: -1, pushStateCount, drawNodeCount, drawCountList: window.drawCountList.slice(), particleDrawCount: window.particleDrawCount, trailDrawCount: window.trailDrawCount });
 		if (frameNumber === LAST_FRAME) {
 			window.isFinished = true;
 		}
@@ -347,6 +354,13 @@ try {
 	checkEqual(onFrameTable.get(40).trailDrawCount, 0, "켜면 화면 밖 꼬리를 그리지 않음");
 	checkEqual(onFrameTable.get(70).trailDrawCount - onFrameTable.get(60).trailDrawCount, 10, "들어온 꼬리는 그림");
 	console.log(`파티클을 처음 그린 프레임: 켬 ${onResult.frameList.find((frame) => frame.particleDrawCount > 0).frameNumber}, 꼬리: 켬 ${onResult.frameList.find((frame) => frame.trailDrawCount > 0).frameNumber}`);
+	// 켠 길은 보이는 자식 범위 밖 자식에 drawNode 를 부르지 않는다. (끈 길은 모든 노드에 부른다)
+	const onDrawNodeCount = onFrameTable.get(30).drawNodeCount;
+	const offDrawNodeCount = offFrameTable.get(30).drawNodeCount;
+	check(offDrawNodeCount - onDrawNodeCount >= 250, `켠 길은 범위 밖 자식에 drawNode 를 부르지 않음 (켬 ${onDrawNodeCount}, 끔 ${offDrawNodeCount})`);
+	const onScrollDrawNodeCount = onFrameTable.get(60).drawNodeCount;
+	check(offFrameTable.get(60).drawNodeCount - onScrollDrawNodeCount >= 250, `스크롤 중에도 부르지 않음 (켬 ${onScrollDrawNodeCount})`);
+	console.log(`drawNode 수: 멈춤(30) 켬 ${onDrawNodeCount} 끔 ${offDrawNodeCount}, 스크롤(60) 켬 ${onScrollDrawNodeCount}`);
 	console.log(`변환 건 수: 멈춤(30) 켬 ${onPushStateCount} 끔 ${offPushStateCount}, 스크롤(60) 켬 ${onScrollPushStateCount} 끔 ${offScrollPushStateCount}, 건너뛴 하위 트리 ${onFrameTable.get(30).culledSubtreeCount}`);
 }
 finally {

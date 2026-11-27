@@ -25,6 +25,17 @@ const subtreeComponentRect = new Rect();
 const subtreeContentSize = Vector2.zero();
 // 하위 트리 경계를 셈한 차례 번호. (셀 때마다 하나씩 늘려 그 노드에 적는다, 자식이 부모 좌표로 옮긴 경계를 언제 적었는지 견준다)
 let drawBoundsStampCounter = 0;
+// 자식 범위 칸의 한 자식 몫. (부모 좌표 경계를 앞에서부터 모은 가장 큰 아래와 오른쪽, 뒤에서부터 모은 가장 작은 위와 왼쪽, 앞 자식 가운데 건너뛰면 세는 수)
+const CHILD_RANGE_STRIDE = 5;
+const CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM = 0;
+const CHILD_RANGE_PREFIX_MAXIMUM_RIGHT = 1;
+const CHILD_RANGE_SUFFIX_MINIMUM_TOP = 2;
+const CHILD_RANGE_SUFFIX_MINIMUM_LEFT = 3;
+const CHILD_RANGE_PREFIX_COUNT = 4;
+// 보이는 자식 범위를 찾을 때 고쳐 쓰는 칸. (찾은 바로 뒤에 읽고 버린다)
+const visibleChildRect = new Rect();
+let visibleChildFirstIndex = 0;
+let visibleChildLastIndex = 0;
 
 
 //==============================================================================
@@ -70,6 +81,9 @@ export class TransformNode extends ComponentNode {
 	/** @private @type { number } */ #parentDrawBoundsStamp; // 부모가 이 노드의 경계를 부모 좌표로 옮겨 적은 때 부모의 차례 번호. (-1 이면 적은 적 없다)
 	/** @private @type { Rect | null } */ #parentDrawBounds; // 부모가 셈하며 적어 둔 이 노드의 하위 트리 경계. (부모의 내용 좌표, 처음 적을 때 만든다)
 	/** @private @type { boolean } */ #isParentDrawBoundsEmpty; // 적어 둔 경계가 아무것도 그리지 않는지. (옮기기 전 크기가 0)
+	/** @private @type { Float64Array | null } */ #childRangeList; // 자식 범위 칸. (자식마다 CHILD_RANGE_STRIDE 칸 + 끝에 건너뛰면 세는 수 합, 자식이 있는 노드가 처음 셀 때 만든다)
+	/** @private @type { number } */ #childRangeStamp; // 자식 범위 칸을 적은 때의 차례 번호. (#drawBoundsStamp 와 같아야 맞다)
+	/** @private @type { number } */ #childRangeCount; // 자식 범위 칸을 적은 때의 자식 수.
 
 	//==============================================================================
 	// 생성.
@@ -96,6 +110,9 @@ export class TransformNode extends ComponentNode {
 		this.#parentDrawBoundsStamp = -1;
 		this.#parentDrawBounds = null;
 		this.#isParentDrawBoundsEmpty = false;
+		this.#childRangeList = null;
+		this.#childRangeStamp = -1;
+		this.#childRangeCount = 0;
 	}
 
 	//==============================================================================
@@ -164,11 +181,142 @@ export class TransformNode extends ComponentNode {
 			}
 
 			// 자식 목록 출력.
-			const children = this.getChildren();
-			for (const child of children) {
-				graphic.drawNode(child);
+			this.drawChildren(graphic);
+		}
+	}
+
+	//==============================================================================
+	// 자식 목록 출력. (자식 차례대로 Graphic.drawNode, draw 가 부른다)
+	// - 하위 트리 거르기가 켜졌으면 부모 좌표의 보이는 사각형(Graphic.readLocalVisibleBounds)으로 보이는 자식 범위를 이분 찾기로 좁혀 그 앞뒤 자식은 부르지 않는다.
+	//   범위는 하위 트리 경계를 셀 때 적어 둔 자식 경계(앞에서부터 모은 가장 큰 아래와 오른쪽, 뒤에서부터 모은 가장 작은 위와 왼쪽)로 찾으므로 자식이 어떤 차례로 놓여도 맞고,
+	//   줄처럼 차례대로 놓이면 보이는 줄만 남는다. 경계를 모르는 자식이 있으면 그 자식을 넘어 좁히지 않는다. 그리기 차례는 그대로다.
+	// - 그리는 동안 이 노드의 경계가 바뀌면(자식이 형제를 옮김 같은) 남은 자식을 모두 부른다.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그릴 그래픽.
+	 * @example <caption>draw 를 덮어쓴 노드가 자식을 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Colors, Rect, Vector2, Pivot } from "./build/vanilla.js";
+	 *
+	 * class FrameNode extends WorldNode {
+	 * 	draw(graphic) {
+	 * 		graphic.setFillColor(Colors.white);
+	 * 		graphic.drawRect(Rect.create(0, 0, 20, 20));
+	 * 		this.drawChildren(graphic);
+	 * 	}
+	 * 	calculateDrawnRect(rect) {
+	 * 		rect.position.set(0, 0);
+	 * 		rect.size.set(20, 20);
+	 * 		return true;
+	 * 	}
+	 * }
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const frameNode = new FrameNode();
+	 * 		frameNode.setPivot(Pivot.topLeft);
+	 * 		this.getRoot().addChild(frameNode);
+	 * 		const childNode = new WorldNode();
+	 * 		childNode.setPivot(Pivot.topLeft);
+	 * 		childNode.setRect(30, 0, 20, 20);
+	 * 		childNode.addComponent(Paint);
+	 * 		frameNode.addChild(childNode);
+	 * 	}
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		console.log(graphic.getLastFrameCulledSubtreeCount());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	drawChildren(graphic) {
+		const children = this.getChildren();
+		let firstIndex = 0;
+		let lastIndex = System.Number.MAX_SAFE_INTEGER;
+		if (this.#findVisibleChildRange(graphic, children.length)) {
+			firstIndex = visibleChildFirstIndex;
+			lastIndex = visibleChildLastIndex;
+		}
+		for (let childIndex = firstIndex; childIndex <= lastIndex && childIndex < children.length; ++childIndex) {
+			graphic.drawNode(children[childIndex]);
+			// 그리다 이 노드의 경계가 바뀌면 찾아 둔 범위가 맞지 않을 수 있어 남은 자식을 모두 본다.
+			if (this.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+				lastIndex = System.Number.MAX_SAFE_INTEGER;
 			}
 		}
+	}
+
+	//==============================================================================
+	// 보이는 자식 범위 찾기. (찾으면 visibleChildFirstIndex, visibleChildLastIndex 에 적고 범위 밖 자식 가운데 건너뛰면 세는 수를 graphic 에 더한 뒤 true)
+	// - 자식 범위 칸이 이번 경계 셈과 같은 차례이고 이 노드가 더럽지 않을 때만. 지금 변환은 이 노드의 내용 좌표.
+	// - 첫 자식: 앞에서부터 모은 가장 큰 아래가 보이는 위 이상이고 가장 큰 오른쪽이 보이는 왼쪽 이상인 첫 자리. (그 앞 자식은 모두 위나 왼쪽 밖)
+	// - 끝 자식: 뒤에서부터 모은 가장 작은 위가 보이는 아래 이하이고 가장 작은 왼쪽이 보이는 오른쪽 이하인 끝 자리. (그 뒤 자식은 모두 아래나 오른쪽 밖)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그릴 그래픽.
+	 * @param { number } childCount 자식 수.
+	 * @returns { boolean } 찾았으면 참.
+	 */
+	#findVisibleChildRange(graphic, childCount) {
+		if (childCount < 2 || this.#childRangeStamp !== this.#drawBoundsStamp || this.#childRangeCount !== childCount || this.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+			return false;
+		}
+		if (this.#drawBoundsGeneration !== Component.getDrawnRectGeneration() || typeof graphic.readLocalVisibleBounds !== "function" || !graphic.readLocalVisibleBounds(visibleChildRect)) {
+			return false;
+		}
+		const visibleMinimumX = visibleChildRect.position.x;
+		const visibleMinimumY = visibleChildRect.position.y;
+		const visibleMaximumX = visibleMinimumX + visibleChildRect.size.x;
+		const visibleMaximumY = visibleMinimumY + visibleChildRect.size.y;
+		const childRangeList = this.#childRangeList;
+
+		// 첫 자식. (조건이 한 번 참이면 뒤로 내내 참이다)
+		let lowIndex = 0;
+		let highIndex = childCount;
+		while (lowIndex < highIndex) {
+			const middleIndex = (lowIndex + highIndex) >>> 1;
+			const middleOffset = middleIndex * CHILD_RANGE_STRIDE;
+			if (childRangeList[middleOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] >= visibleMinimumY && childRangeList[middleOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] >= visibleMinimumX) {
+				highIndex = middleIndex;
+			}
+			else {
+				lowIndex = middleIndex + 1;
+			}
+		}
+		const firstIndex = lowIndex;
+
+		// 끝 자식. (조건이 참인 자리는 앞쪽에 모인다, 처음으로 거짓인 자리 바로 앞)
+		lowIndex = 0;
+		highIndex = childCount;
+		while (lowIndex < highIndex) {
+			const middleIndex = (lowIndex + highIndex) >>> 1;
+			const middleOffset = middleIndex * CHILD_RANGE_STRIDE;
+			if (childRangeList[middleOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] <= visibleMaximumY && childRangeList[middleOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] <= visibleMaximumX) {
+				lowIndex = middleIndex + 1;
+			}
+			else {
+				highIndex = middleIndex;
+			}
+		}
+		const lastIndex = lowIndex - 1;
+
+		// 범위 밖 자식 가운데 건너뛰면 세는 수. (부모 좌표에서 먼저 거르기가 하나씩 건너뛰었을 수와 같다)
+		const totalCount = childRangeList[childCount * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+		let culledCount = totalCount;
+		if (firstIndex <= lastIndex) {
+			const firstCount = childRangeList[firstIndex * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+			const afterLastCount = childRangeList[(lastIndex + 1) * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+			culledCount = firstCount + (totalCount - afterLastCount);
+		}
+		if (culledCount > 0) {
+			graphic.addCulledSubtreeCount(culledCount);
+		}
+		visibleChildFirstIndex = firstIndex;
+		visibleChildLastIndex = lastIndex;
+		return true;
 	}
 
 	//==============================================================================
@@ -849,12 +997,13 @@ export class TransformNode extends ComponentNode {
 	}
 
 	//==============================================================================
-	// 부모가 셈한 이 노드의 부모 좌표 경계 적기. (부모의 calculateSubtreeDrawBounds 가 자식마다 부른다, 값이 수가 아니면 적지 않는다)
+	// 부모가 셈한 이 노드의 부모 좌표 경계 적기. (부모의 calculateSubtreeDrawBounds 가 자식마다 부른다, 값이 수가 아니면 적지 않고 false)
 	//==============================================================================
 	/**
 	 * @param { Rect } rect 부모 좌표로 옮긴 경계.
 	 * @param { boolean } isEmpty 옮기기 전 크기가 0 이었는지.
 	 * @param { number } parentStamp 부모의 차례 번호.
+	 * @returns { boolean } 적었으면 참.
 	 */
 	#writeParentDrawBounds(rect, isEmpty, parentStamp) {
 		const leftX = rect.position.x;
@@ -862,7 +1011,7 @@ export class TransformNode extends ComponentNode {
 		const width = rect.size.x;
 		const height = rect.size.y;
 		if (!isEmpty && !(System.Number.isFinite(leftX) && System.Number.isFinite(topY) && System.Number.isFinite(width) && System.Number.isFinite(height))) {
-			return;
+			return false;
 		}
 		let parentDrawBounds = this.#parentDrawBounds;
 		if (parentDrawBounds === null) {
@@ -873,6 +1022,7 @@ export class TransformNode extends ComponentNode {
 		parentDrawBounds.size.set(width, height);
 		this.#isParentDrawBoundsEmpty = isEmpty;
 		this.#parentDrawBoundsStamp = parentStamp;
+		return true;
 	}
 
 	//==============================================================================
@@ -1072,14 +1222,37 @@ export class TransformNode extends ComponentNode {
 		}
 
 		// 켜지고 보이는 자식. (모르는 것이 나와도 자식이 셈해 두게 끝까지 읽는다)
+		// 자식 범위 칸에 자식마다 부모 좌표 경계를 적는다. 모르는 자식은 막음(위와 왼쪽 -무한, 아래와 오른쪽 +무한), 꺼진 자식과 그리지 않는 자식은 빔(반대).
 		const childRect = childDrawBounds;
 		const children = this.getChildren();
+		const childCount = children.length;
+		let childRangeList = this.#childRangeList;
+		if (childCount > 0 && (childRangeList === null || childRangeList.length < (childCount + 1) * CHILD_RANGE_STRIDE)) {
+			childRangeList = new System.Float64Array((childCount + 1) * CHILD_RANGE_STRIDE);
+			this.#childRangeList = childRangeList;
+		}
+		let childIndex = -1;
 		for (const child of children) {
+			childIndex += 1;
+			const rangeOffset = childIndex * CHILD_RANGE_STRIDE;
+			childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System.Number.POSITIVE_INFINITY;
+			childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System.Number.POSITIVE_INFINITY;
+			childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System.Number.NEGATIVE_INFINITY;
+			childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System.Number.NEGATIVE_INFINITY;
+			childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = 0;
 			if (!(child instanceof TransformNode)) {
 				isKnown = false;
 				continue;
 			}
-			if (!child.isActive() || !child.isVisible()) {
+			// 꺼진 자식은 Graphic.drawNode 가 바로 돌아가므로 빔. 숨긴 자식은 기즈모나 덮어쓴 draw 가 그릴 수 있어 막음.
+			if (!child.isActive()) {
+				childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System.Number.NEGATIVE_INFINITY;
+				childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System.Number.NEGATIVE_INFINITY;
+				childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System.Number.POSITIVE_INFINITY;
+				childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System.Number.POSITIVE_INFINITY;
+				continue;
+			}
+			if (!child.isVisible()) {
 				continue;
 			}
 			if (!child.readSubtreeDrawBounds(childRect)) {
@@ -1091,7 +1264,21 @@ export class TransformNode extends ComponentNode {
 				isKnown = false;
 				continue;
 			}
-			child.#writeParentDrawBounds(childRect, isChildEmpty, this.#drawBoundsStamp);
+			if (child.#writeParentDrawBounds(childRect, isChildEmpty, this.#drawBoundsStamp)) {
+				childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = 1;
+				if (isChildEmpty) {
+					childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System.Number.NEGATIVE_INFINITY;
+					childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System.Number.NEGATIVE_INFINITY;
+					childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System.Number.POSITIVE_INFINITY;
+					childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System.Number.POSITIVE_INFINITY;
+				}
+				else {
+					childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = childRect.position.y + childRect.size.y;
+					childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = childRect.position.x + childRect.size.x;
+					childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = childRect.position.y;
+					childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = childRect.position.x;
+				}
+			}
 			if (!isKnown || isChildEmpty) {
 				continue;
 			}
@@ -1111,6 +1298,39 @@ export class TransformNode extends ComponentNode {
 				maximumY = System.Math.max(maximumY, childBottomY);
 			}
 		}
+
+		// 자식 범위 칸을 앞에서부터(가장 큰 아래와 오른쪽, 건너뛰면 세는 수), 뒤에서부터(가장 작은 위와 왼쪽) 모은다. (자식을 그릴 때 이분 찾기로 보이는 범위를 찾는다)
+		if (childCount > 0 && childIndex === childCount - 1) {
+			let prefixMaximumBottom = System.Number.NEGATIVE_INFINITY;
+			let prefixMaximumRight = System.Number.NEGATIVE_INFINITY;
+			let prefixCount = 0;
+			for (let rangeIndex = 0; rangeIndex < childCount; ++rangeIndex) {
+				const rangeOffset = rangeIndex * CHILD_RANGE_STRIDE;
+				prefixMaximumBottom = System.Math.max(prefixMaximumBottom, childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM]);
+				prefixMaximumRight = System.Math.max(prefixMaximumRight, childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT]);
+				childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = prefixMaximumBottom;
+				childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = prefixMaximumRight;
+				const countable = childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT];
+				childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = prefixCount;
+				prefixCount += countable;
+			}
+			childRangeList[childCount * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT] = prefixCount;
+			let suffixMinimumTop = System.Number.POSITIVE_INFINITY;
+			let suffixMinimumLeft = System.Number.POSITIVE_INFINITY;
+			for (let rangeIndex = childCount - 1; rangeIndex >= 0; --rangeIndex) {
+				const rangeOffset = rangeIndex * CHILD_RANGE_STRIDE;
+				suffixMinimumTop = System.Math.min(suffixMinimumTop, childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP]);
+				suffixMinimumLeft = System.Math.min(suffixMinimumLeft, childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT]);
+				childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = suffixMinimumTop;
+				childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = suffixMinimumLeft;
+			}
+			this.#childRangeStamp = this.#drawBoundsStamp;
+			this.#childRangeCount = childCount;
+		}
+		else {
+			this.#childRangeStamp = -1;
+		}
+
 		if (!isKnown) {
 			return false;
 		}

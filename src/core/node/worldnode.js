@@ -156,11 +156,8 @@ export class WorldNode extends TransformNode {
             maskComponent.beginClip(graphic);
         }
 
-        // 자식 출력.
-        const children = this.getChildren();
-        for (const child of children) {
-            graphic.drawNode(child);
-        }
+        // 자식 출력. (보이는 범위만, TransformNode.drawChildren)
+        this.drawChildren(graphic);
 
         // 마스크가 있으면 클리핑 종료.
         if (maskComponent) {
