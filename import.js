@@ -158,7 +158,7 @@ export { SkinnedModel, MORPH_TARGET_MAXIMUM } from "./src/graphics3d/skinnedmode
 export { SkinnedModelAsset } from "./src/graphics3d/skinnedmodelasset.js";
 export { SkinnedModelRenderer, MORPH_GLSL } from "./src/graphics3d/skinnedmodelrenderer.js";
 export { MeshBuilder, VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT, readColorValues, createPartMatrix, createBoxGeometry, createRoundedBoxGeometry, createCylinderGeometry, createSphereGeometry, createLatheGeometry, createCapsuleGeometry, createTorusGeometry, createOctahedronGeometry, createFacetedChunkGeometry } from "./src/graphics3d/toon/meshbuilder.js";
-export { readGlbArrays, readGlbImages, decodeGlbImage, readGlbNodeArrays, readGlbNodeInfos, readAnimationSwing, writeSkinPose } from "./src/graphics3d/toon/glbmeshreader.js";
+export { readGlbArrays, readGlbImages, decodeGlbImage, readGlbNodeArrays, readGlbNodeInfos, readAnimationSwing, writeSkinPose, adjustBones, BoneModifyMode } from "./src/graphics3d/toon/glbmeshreader.js";
 export { ToonRenderer, extractFrustumPlanes, TOON_MAXIMUM_JOINTS, TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT } from "./src/graphics3d/toon/toonrenderer.js";
 export { ToonPostProcess } from "./src/graphics3d/toon/toonpostprocess.js";
 export { HumanSkinRenderer, SKIN_SHADING_SKIN, SKIN_SHADING_EYE, SKIN_SHADING_HAIR, SKIN_SHADING_OCCLUSION, SKIN_SHADING_FLUID, SKIN_SHADING_FACIALHAIR, SKIN_TEXTURE_UNIT_DETAILHEIGHT, SKIN_TEXTURE_UNIT_MICRO, SKIN_TEXTURE_UNIT_MASKATLAS, SKIN_TEXTURE_UNIT_LAYERNORMAL, SKIN_TEXTURE_UNIT_LAYERCOLOR, SKIN_TEXTURE_UNIT_AUXILIARY, WRINKLE_CHANNEL_COUNT } from "./src/graphics3d/humanskinrenderer.js";
@@ -231,6 +231,7 @@ export { MouseButton, TouchPhase, TouchPoint, InputDevice } from "./src/core/inp
 export { InputActions } from "./src/core/inputactions.js";
 export { GamepadKind, readGamepadKind } from "./src/core/gamepadmanager.js";
 export { Camera3D } from "./src/graphics3d/camera3d.js";
+export { CameraShake, createOffsetViewMatrix } from "./src/graphics3d/camerashake.js";
 export { ToonDrawQueue } from "./src/graphics3d/toon/toondrawqueue.js";
 export { ToonView3D } from "./src/graphics3d/toon/toonview3d.js";
 export { GraphicsQualityGovernor, GraphicsQuality } from "./src/misc/graphicsqualitygovernor.js";
