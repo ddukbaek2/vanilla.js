@@ -24,7 +24,6 @@ const System = globalThis;
 // - 오른쪽 단추로 끌면 가운데 사각형이 돌고, 가운데 단추로 끌면 움직이고, 휠이나 두 손가락으로 키운다.
 //==============================================================================
 const { Engine, EngineConfiguration, Scene, WorldNode, Text, TextAlign, TextBaseline, Paint, Outline, SoftShade, SoftShadeShape, ShadowText, ShadowImage, UILabel, UIButton, UIProgressRing, UIHitArea, ToastMotion, ButtonMotionStyle, attachButtonMotion, setButtonMotionArea, attachToastMotion, CameraGestures, TouchRecognizer, PointerCursor, MouseButton, Color, Pivot, Rect, Vector2, ViewScaleMode } = await import("../../import.js");
-const { setTextAntialiasEnabled } = await import("../../src/core/graphic/textstringtexturecache.js");
 
 // 뷰 크기.
 const VIEW_WIDTH = 1280;
@@ -73,9 +72,9 @@ class AliasedText extends Text {
 	}
 
 	draw(graphic) {
-		setTextAntialiasEnabled(false);
+		graphic.setTextAntialiasEnabled(false);
 		super.draw(graphic);
-		setTextAntialiasEnabled(true);
+		graphic.setTextAntialiasEnabled(true);
 	}
 }
 

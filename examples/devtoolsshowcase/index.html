@@ -17,14 +17,14 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 const System = globalThis;
 
 //==============================================================================
-// 개발자 도구 예제. (러스트 예제 devtoolsshowcase 와 같은 장면, DEVTools 의 F2 하이어라키/인스펙터 패널)
-// - 씬이 DEVTools 를 품고 tick 에서 tick, postDraw 에서 draw 를 부른다. 시작하면 패널을 연다. (F2 로 닫고 연다)
+// 개발자 도구 예제. (러스트 예제 devtoolsshowcase 와 같은 장면, DevTools 의 F2 하이어라키/인스펙터 패널)
+// - 씬이 DevTools 를 품고 tick 에서 tick, postDraw 에서 draw 를 부른다. 시작하면 패널을 연다. (F2 로 닫고 연다)
 // - 노드 몇 개(Paint, Text, 직접 만든 Spin 컴포넌트, 비활성 노드, 중첩)를 놓고 "card" 를 골라 인스펙터에 보인다.
 // - Spin 은 게터(getDegreesPerSecond)를 두어, 인스펙터가 엔진 컴포넌트처럼 불러 보인다.
 // - 주소 ?devtoolsTab= 에 0 ~ 3 을 주면 그 탭으로 연다. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings, 러스트 VANILLA_DEVTOOLS_TAB)
 //==============================================================================
 const { Engine, EngineConfiguration, Scene, WorldNode, Component, Paint, Text, TextAlign, Pivot, Vector2, Rect, LocalStorage } = await import("../../import.js");
-const { DEVTools } = await import("../../src/misc/devtools.js");
+const { DevTools } = await import("../../src/misc/devtools.js");
 
 // 배경색과 글 색.
 const BACKGROUND_COLOR = "#1e1915";
@@ -106,7 +106,7 @@ function createNode(parent, name, position, contentSize, pivot, paintColor) {
 // 첫 씬.
 //==============================================================================
 class MainScene extends Scene {
-	/** @private @type { DEVTools } */ #devTools;
+	/** @private @type { DevTools } */ #devTools;
 	/** @private @type { boolean } */ #isDevToolsOpened;
 	/** @private @type { WorldNode | null } */ #selectedNode;
 
@@ -115,7 +115,7 @@ class MainScene extends Scene {
 	 */
 	constructor() {
 		super();
-		this.#devTools = new DEVTools();
+		this.#devTools = new DevTools();
 		this.#isDevToolsOpened = false;
 		this.#selectedNode = null;
 	}
@@ -134,7 +134,7 @@ class MainScene extends Scene {
 	}
 
 	//==============================================================================
-	// 초기화. (노드 트리를 만들고 DEVTools 에 루트를 준다)
+	// 초기화. (노드 트리를 만들고 DevTools 에 루트를 준다)
 	//==============================================================================
 	/**
 	 * @param { Engine } engine
@@ -177,7 +177,7 @@ class MainScene extends Scene {
 	}
 
 	//==============================================================================
-	// 주기적 갱신. (노드 다음에 DEVTools, 처음 한 번 패널을 연다)
+	// 주기적 갱신. (노드 다음에 DevTools, 처음 한 번 패널을 연다)
 	//==============================================================================
 	/**
 	 * @param { number } timeDelta
@@ -213,7 +213,7 @@ class MainScene extends Scene {
 	}
 
 	//==============================================================================
-	// 이후 출력. (DEVTools 패널)
+	// 이후 출력. (DevTools 패널)
 	//==============================================================================
 	/**
 	 * @param { object } graphic

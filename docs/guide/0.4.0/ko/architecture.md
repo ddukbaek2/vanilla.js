@@ -19,7 +19,7 @@ src/core/graphic/          # ShaderProgram, ShaderWarmer, ImageTextureCache, Tex
 src/resource/              # Asset 파생 (Image/Audio/Text/Json/Font/Blob/Bunch/Visual) + AnimationClip, AssetLoader, SpriteAtlas
 src/effect/                # ParticleSystem, TrailRenderer, ShaderSprite, ScreenEffect, HeatHazeEffect
 src/ui/                    # 두 갈래 UI (Component 계열 UIView / Node 계열 UINode) + 창 쌓기, 모션 + autolayout/
-src/misc/                  # DEVTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
+src/misc/                  # DevTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
                            #     GraphicsQualityGovernor, FixedStepper, LoadingProgress, BuildInfo, VirtualPad, Visual, Indicator 등 부가 기능
 src/web/                   # DOM 영역 유틸 (Pane, WebSocketClient). 캔버스 밖 세계
 src/game/                  # GameScene (게임용 공통 베이스 씬)
@@ -92,7 +92,7 @@ Object (base/object.js)
 │                AmbientOcclusionEffect, SubsurfaceScatteringEffect
 ├── 수학/자료: Vector2/3, Matrix4, Quaternion, TransformMatrix, Rect, OBB, Color,
 │                List/Dictionary/Queue/Stack/Set, FiniteStateMachine, ObjectPool, SeededRandom
-└── 기타: Tween, Animation, Frame, Animator, Action, Timeline, DEVTools, NodeLayout, AssetLoader, SpriteAtlas,
+└── 기타: Tween, Animation, Frame, Animator, Action, Timeline, DevTools, NodeLayout, AssetLoader, SpriteAtlas,
           DynamicFont, VirtualPad, WebSocketClient, Camera2D, FixedStepper, LoadingProgress, BuildInfo ...
 ```
 
@@ -155,7 +155,7 @@ Component ── 소유 노드 (참조)
 UIScene
 ├── LayoutSolver ─────────── 솔버 소유자는 씬. UINode 는 setSolver() 로 주입받아 사용
 ├── screenNode / safeAreaLayoutGuide (UINode) ── 트리에 넣지 않는 순수 가이드
-├── DEVTools (F2 하이어라키/인스펙터, EngineConfiguration.useDevTools 가 꺼져 있으면 없음)
+├── DevTools (F2 하이어라키/인스펙터, EngineConfiguration.useDevTools 가 꺼져 있으면 없음)
 └── TouchRecognizer ──────── UIKit 스타일 제스처 (드래그 임계 + delaysContentTouches)
 
 UINode
@@ -289,7 +289,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 - 저장소 루트의 단일 배럴 파일. 주석 섹션 13블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/컬렉션/애니메이션/셰이더와 풀스크린 패스/3D 그래픽스/폐기 예정/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
 - 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
-- **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DEVTools`, `GameScene`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
+- **의도적 미노출** = 내부 구현 취급: `Layer`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
 
 ---
 

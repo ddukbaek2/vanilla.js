@@ -19,7 +19,7 @@ src/core/graphic/          # ShaderProgram, ShaderWarmer, ImageTextureCache, Tex
 src/resource/              # Asset 파생 (Image/Audio/Text/Json/Font/Blob/Bunch/Visual) + AnimationClip, AssetLoader, SpriteAtlas
 src/effect/                # ParticleSystem, TrailRenderer, ShaderSprite, ScreenEffect, HeatHazeEffect
 src/ui/                    # 두 갈래 UI (Component 계열 UIView / Node 계열 UINode) + 창 쌓기, 모션 + autolayout/
-src/misc/                  # DEVTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
+src/misc/                  # DevTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
                            #     GraphicsQualityGovernor, FixedStepper, LoadingProgress, BuildInfo, VirtualPad, Visual, Indicator 등 부가 기능
 src/web/                   # DOM 영역 유틸 (Pane, WebSocketClient). 캔버스 밖 세계
 src/game/                  # GameScene (게임용 공통 베이스 씬)
@@ -93,7 +93,7 @@ Object (base/object.js)
 │                AmbientOcclusionEffect, SubsurfaceScatteringEffect
 ├── 수학/자료: Vector2/3, Matrix4, Quaternion, TransformMatrix, Rect, OBB, Color,
 │                List/Dictionary/Queue/Stack/Set, FiniteStateMachine, ObjectPool, SeededRandom
-└── 기타: Tween, Animation, Frame, Animator, Action, Timeline, DEVTools, NodeLayout, AssetLoader, SpriteAtlas,
+└── 기타: Tween, Animation, Frame, Animator, Action, Timeline, DevTools, NodeLayout, AssetLoader, SpriteAtlas,
           DynamicFont, VirtualPad, WebSocketClient, Camera2D, FixedStepper, LoadingProgress, BuildInfo ...
 ```
 
@@ -157,7 +157,7 @@ Component ── 소유 노드 (참조)
 UIScene
 ├── LayoutSolver ─────────── 솔버 소유자는 씬. UINode 는 setSolver() 로 주입받아 사용
 ├── screenNode / safeAreaLayoutGuide (UINode) ── 트리에 넣지 않는 순수 가이드
-├── DEVTools (F2 하이어라키/인스펙터, EngineConfiguration.useDevTools 가 꺼져 있으면 없음)
+├── DevTools (F2 하이어라키/인스펙터, EngineConfiguration.useDevTools 가 꺼져 있으면 없음)
 └── TouchRecognizer ──────── UIKit 스타일 제스처 (드래그 임계 + delaysContentTouches)
 
 UINode
@@ -340,7 +340,7 @@ rim        = 색 x mix(0.5 를 가른 pow(1 - N.V, 거듭제곱), 그대로, 부
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
 - 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
 - API 문서 자료(docs/api/<버전>.json)는 tools/apidoc.cjs 가 이 표면의 소스 주석과 JSDoc 에서 뽑는다. 예제는 `@example`, 그 바로 뒤의 `@exampleImage <파일 이름>` 이 예제 그림(docs/guide/<버전>/images/, 가이드와 같이 씀)이다. 자세한 꼴은 tools/TOOLS.md.
-- **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DEVTools`, `GameScene`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
+- **의도적 미노출** = 내부 구현 취급: `Layer`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
 
 ---
 

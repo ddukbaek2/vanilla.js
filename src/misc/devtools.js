@@ -89,7 +89,7 @@ const ResizeMode = {
 //==============================================================================
 // 트리 목록 항목.
 //==============================================================================
-class DEVToolsFlatItem {
+class DevToolsFlatItem {
 	/** @type { TransformNode } */ node;
 	/** @type { number } */ depth;
 	/** @type { boolean } */ effectiveActive;
@@ -158,7 +158,7 @@ class InspectorLine {
 // - 중앙 구분선 드래그로 좌우 비율 조절.
 // - 컴포넌트 헤더 클릭으로 프로퍼티 목록 펼침/접힘 (기본값: 펼침).
 //==============================================================================
-export class DEVTools extends Object {
+export class DevTools extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -187,7 +187,7 @@ export class DEVTools extends Object {
 	/** @private @type { number } */ #treeScrollY;
 	/** @private @type { number } */ #inspectorScrollY;
 	/** @private @type { boolean } */ #prevIsKeyF2;
-	/** @private @type { DEVToolsFlatItem[] } */ #flatList;
+	/** @private @type { DevToolsFlatItem[] } */ #flatList;
 	/** @private @type { Set } */ #expandedNodes;
 	/** @private @type { Set } */ #collapsedComponents;
 	/** @private @type { InspectorLine[] } */ #cachedInspectorLines;
@@ -995,7 +995,7 @@ export class DEVTools extends Object {
 	collectNode(node, depth, parentActive) {
 		const isNodeActive = node.isActive();
 		const effectiveActive = parentActive && isNodeActive;
-		const flatItem = new DEVToolsFlatItem(node, depth, effectiveActive);
+		const flatItem = new DevToolsFlatItem(node, depth, effectiveActive);
 		this.#flatList.push(flatItem);
 
 		const isExpanded = this.#expandedNodes.has(node);

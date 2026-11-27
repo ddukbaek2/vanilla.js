@@ -13,7 +13,7 @@ import { ViewScaleMode } from "../core/viewmanager.js";
 import { TouchRecognizer } from "../ui/touchrecognizer.js";
 import { UIWindowLayer } from "../ui/uiwindowlayer.js";
 import { WorldNode } from "../core/node/worldnode.js";
-import { DEVTools } from "../misc/devtools.js";
+import { DevTools } from "../misc/devtools.js";
 import { ImageAsset } from "../resource/imageasset.js";
 import { LoadingProgress } from "../misc/loadingprogress.js";
 
@@ -22,8 +22,8 @@ import { LoadingProgress } from "../misc/loadingprogress.js";
 // - 로딩 화면 (중앙 이미지 + 게이지 + 터치 단축).
 //   색은 setLoadingColors, 그림 전체는 setLoadingDrawer 로 바꾼다. 게이지는 기본으로 최소 노출 시간의 경과를 보이고,
 //   setLoadingProgress 나 trackAssetLoader 로 진행률을 알리면 그 진행률을 부드럽게 따라간다. (LoadingProgress)
-// - 개발자 도구 (DEVTools).
-// - 터치 입력 라우팅 (TouchRecognizer + DEVTools 캡처 시 무시).
+// - 개발자 도구 (DevTools).
+// - 터치 입력 라우팅 (TouchRecognizer + DevTools 캡처 시 무시).
 // - 세이프 에어리어 노드 + env(safe-area-inset-*) 계산.
 // - viewSize 변화 자동 감지 → layout 재호출.
 // - 캔버스 배경 클리어.
@@ -78,7 +78,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { DEVTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
+	/** @private @type { DevTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
 	/** @private @type { TouchRecognizer } */ #touchRaycaster;
 	/** @private @type { WorldNode } */ #safeAreaNode;
 	/** @private @type { Rect } */ #lastSafeAreaRect;
@@ -274,7 +274,7 @@ export class GameScene extends Scene {
 	// 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
 	//==============================================================================
 	/**
-	 * @returns { DEVTools | null } 개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
+	 * @returns { DevTools | null } 개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
 	 */
 	getDevTools() {
 		return this.#devtools ?? null;
@@ -530,7 +530,7 @@ export class GameScene extends Scene {
 		this.#devtools = null;
 		const engineConfiguration = engine.getEngineConfiguration();
 		if (engineConfiguration.useDevTools !== false) {
-			this.#devtools = new DEVTools();
+			this.#devtools = new DevTools();
 			this.#devtools.setEngine(engine);
 			this.#devtools.setRootNodes([this.getRoot()]);
 		}
@@ -616,7 +616,7 @@ export class GameScene extends Scene {
 	// - viewSize 변화 감지 → 자동 layout 재호출.
 	//   (모바일 주소창 표시/숨김으로 100vh 가 동적으로 변하는 경우 등에서
 	//    resize 이벤트만으로는 누락될 수 있어 매 tick 보정.)
-	// - DEVTools tick 처리.
+	// - DevTools tick 처리.
 	//==============================================================================
 	/**
 	 * @override
@@ -779,7 +779,7 @@ export class GameScene extends Scene {
 	}
 
 	//==============================================================================
-	// postDraw. 어두워지는 막과 DEVTools 를 화면 위에 그린다.
+	// postDraw. 어두워지는 막과 DevTools 를 화면 위에 그린다.
 	//==============================================================================
 	/**
 	 * @override
