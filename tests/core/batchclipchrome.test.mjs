@@ -3,6 +3,10 @@
 // - 축에 맞고 화소 경계에 놓인 자르기는 스텐실 대신 묶음 셰이더로 자른다. 같은 장면을 아주 조금 돌려(1e-9 라디안) 스텐실 길로 그린 것과 화소가 모두 같은지 본다.
 //   장면: 스크롤 칸(UIScrollView, 줄 40 개), 겹친 자르기, 둥근 자르기 안팎, 정점 색 쿼드, 더하기와 셰이더 섞기, 불투명도 층, 바깥 WebGL 패스,
 //   스텐실 테스트를 끄고 돌아오는 바깥 패스 뒤의 둥근 자르기, 축에 맞는 자르기 안에서 바꿔 끼운 셰이더에 셰이더 섞기(overlay)를 준 그리기.
+//   불투명도 층 안에서 깊이를 비우지 않는 바깥 3D 패스(clearDepth: false, 깊이 시험 LESS).
+// - 불투명도 층 칸은 층마다 깊이를 비우고 시작해야 한다. (지난 층이나 지난 프레임의 깊이가 남거나 판 끝에 버린 깊이를 읽으면 3D 가 가려진다)
+//   invalidateFramebuffer 는 버려도 된다는 알림이라 드라이버가 무시해도 된다. 크롬(ANGLE)은 버린 깊이를 1 로 다시 채워 드러나지 않으므로,
+//   페이지에서 invalidateFramebuffer 를 아무것도 하지 않게 바꿔 무시하는 드라이버를 흉내 낸다. (지난 프레임의 깊이 0.5 가 남는다)
 // - 바꿔 끼운 셰이더와 셰이더 섞기는 덧그림 칸에 먼저 그리고 옮겨 섞는다. 옮길 때 자르기 밖을 덮지 않는지(바탕색이 남는지) 본다.
 // - 셰이더 길이 드로 콜이 더 적고, 스크롤 칸 밖 줄의 컴포넌트를 거르는지(getLastFrameCulledNodeCount) 본다.
 // - 씬이 그려진 다섯째 프레임을 찍는다. (씬은 불러온 뒤 로딩 화면을 0.3 초 더 보여서, 정한 프레임 번호로 찍으면 로딩 화면끼리 견주거나 한쪽만 로딩 화면이 된다)
@@ -23,6 +27,7 @@ const contentTypeTable = { ".js": "text/javascript", ".mjs": "text/javascript", 
 
 const PAGE_SOURCE = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{position:absolute;left:0;top:0;width:100%;height:100%}</style><canvas id="mainCanvas"></canvas>
 <script type="module">
+WebGL2RenderingContext.prototype.invalidateFramebuffer = function () {};
 const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Rect, Color, Pivot, Paint, TextAlign, ViewScaleMode, UILabel, UIButton, UIScrollView, ShaderProgram } = await import("/import.js");
 const rotation = new URLSearchParams(location.search).get("rotation") === "1" ? 1e-9 : 0;
 const CAPTURE_DRAWN_FRAME_COUNT = 5;
@@ -36,6 +41,7 @@ function createBoxNode(parentNode, position, size) {
 }
 let externalProgram = null;
 let overrideProgram = null;
+let depthProgram = null;
 let drawnFrameCount = 0;
 class BatchClipScene extends Scene {
 	initialize(engine) {
@@ -170,6 +176,31 @@ class BatchClipScene extends Scene {
 		graphic.setShaderProgramOverride(null);
 		graphic.setBlendMode("source-over");
 		graphic.endClipRect();
+		// 불투명도 층 안에서 깊이를 비우지 않는 바깥 3D 패스. (깊이 0.5 의 사각형을 LESS 로 그린다, 층 칸의 깊이가 1 로 비워져 있어야 보인다)
+		graphic.beginOpacityLayer();
+		graphic.runExternalPass((webGL2RenderingContext) => {
+			if (depthProgram === null) {
+				const vertexShader = webGL2RenderingContext.createShader(webGL2RenderingContext.VERTEX_SHADER);
+				webGL2RenderingContext.shaderSource(vertexShader, "#version 300 es\\nconst vec2 cornerList[6] = vec2[6](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, 1.0), vec2(1.0, 0.0), vec2(1.0, 1.0));\\n"
+					+ "void main() { vec2 corner = cornerList[gl_VertexID]; gl_Position = vec4(mix(0.5625, 0.9375, corner.x), mix(-0.1667, 0.2222, corner.y), 0.0, 1.0); }");
+				webGL2RenderingContext.compileShader(vertexShader);
+				const fragmentShader = webGL2RenderingContext.createShader(webGL2RenderingContext.FRAGMENT_SHADER);
+				webGL2RenderingContext.shaderSource(fragmentShader, "#version 300 es\\nprecision highp float; out vec4 outputColor; void main() { outputColor = vec4(0.2, 0.8, 0.9, 1.0); }");
+				webGL2RenderingContext.compileShader(fragmentShader);
+				depthProgram = webGL2RenderingContext.createProgram();
+				webGL2RenderingContext.attachShader(depthProgram, vertexShader);
+				webGL2RenderingContext.attachShader(depthProgram, fragmentShader);
+				webGL2RenderingContext.linkProgram(depthProgram);
+			}
+			webGL2RenderingContext.useProgram(depthProgram);
+			webGL2RenderingContext.bindVertexArray(null);
+			webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+			webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+			webGL2RenderingContext.depthFunc(webGL2RenderingContext.LESS);
+			webGL2RenderingContext.depthMask(true);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 6);
+		}, { clearDepth: false });
+		graphic.endOpacityLayer();
 		window.drawCallCountList.push(graphic.getLastFrameDrawCallCount());
 		window.culledNodeCountList.push(graphic.getLastFrameCulledNodeCount());
 	}
@@ -274,6 +305,11 @@ try {
 		checkEqual([result.pixels[insideOffset], result.pixels[insideOffset + 1], result.pixels[insideOffset + 2]].join(","), "32,224,112", "바깥 패스가 스텐실을 끈 뒤 둥근 자르기 안");
 		const cornerOffset = ((251 * 3) * result.width + 41 * 3) * 4;
 		checkEqual([result.pixels[cornerOffset], result.pixels[cornerOffset + 1], result.pixels[cornerOffset + 2]].join(","), "0,0,0", "바깥 패스가 스텐실을 끈 뒤 둥근 자르기 모서리 밖");
+	}
+	// 불투명도 층 안의 깊이를 비우지 않는 3D 패스가 보이는지. (560, 175)
+	for (const result of [shaderClipResult, stencilClipResult]) {
+		const depthOffset = ((175 * 3) * result.width + 560 * 3) * 4;
+		checkEqual([result.pixels[depthOffset], result.pixels[depthOffset + 1], result.pixels[depthOffset + 2]].join(","), "51,204,229", "불투명도 층 안의 clearDepth: false 3D 패스");
 	}
 	// 바꿔 끼운 셰이더와 셰이더 섞기: 자르기 밖(260, 290)은 바탕색, 자르기 안(360, 290)은 섞인 색. (화면 배율 3)
 	for (const result of [shaderClipResult, stencilClipResult]) {

@@ -5425,7 +5425,7 @@ export class Graphic extends Object {
 	//==============================================================================
 	// 투명도 층 시작. (CSS opacity, 어도비 투명도 묶음처럼 endOpacityLayer 까지 그린 것을 따로 칸에 모았다가 지금 전역 알파로 한 번에 얹는다)
 	// - 층 안의 그림은 서로 겹친 자리가 비치지 않는다. (노드마다 투명도를 곱해 따로 얹으면 겹친 자리에서 아래 그림이 비친다)
-	// - 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기도 그대로 된다.
+	// - 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 깊이를 비우고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기와 3D 패스(clearDepth: false)도 그대로 된다.
 	//   바깥 자르기는 얹을 때 걸린다. 층은 겹쳐 열 수 있다. 칸을 지을 수 없으면 층 없이 그대로 그린다.
 	// - 노드는 setOpacityLayer 를 켜고 투명도가 1 보다 작으면 그 노드와 자손을 층으로 그린다.
 	//==============================================================================
@@ -5464,8 +5464,10 @@ export class Graphic extends Object {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
 			webGL2RenderingContext.colorMask(true, true, true, true);
 			webGL2RenderingContext.stencilMask(0xFF);
+			webGL2RenderingContext.depthMask(true);
 			webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
-			webGL2RenderingContext.clearBufferiv(webGL2RenderingContext.STENCIL, 0, new Int32Array([this.#stencilClipDepth]));
+			// 깊이는 1 로, 스텐실은 지금 자르기 깊이로 비운다. (지난 층의 깊이가 남거나 판 끝에 버린 깊이는 정해지지 않은 값이라, 층 안의 clearDepth: false 3D 가 읽으면 가려진다)
+			webGL2RenderingContext.clearBufferfi(webGL2RenderingContext.DEPTH_STENCIL, 0, 1.0, this.#stencilClipDepth);
 			this.#globalAlpha = 1.0;
 		}
 		this.#opacityLayerStack.push({ target, previousFramebuffer, globalAlpha });
@@ -5487,7 +5489,7 @@ export class Graphic extends Object {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		// 층 칸의 깊이와 스텐실은 다시 읽지 않으므로 판 끝에 버린다. (모바일 타일 GPU 가 메모리에 쓰지 않는다, 다음 층은 스텐실을 비우고 쓴다)
+		// 층 칸의 깊이와 스텐실은 다시 읽지 않으므로 판 끝에 버린다. (모바일 타일 GPU 가 메모리에 쓰지 않는다, 다음 층은 깊이와 스텐실을 비우고 쓴다)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
 		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
