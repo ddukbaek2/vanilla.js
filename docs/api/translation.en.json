@@ -10332,5 +10332,6 @@
 	"행렬, 틴트, 선 번호를 담는 꼴": "Layout holding matrix, tint and line ID",
 	"인스턴스 꼴에서 화면 공간 바깥선이 인스턴스마다의 선 번호로 읽는 이름. (수 1, 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID)": "The name the screen-space outline reads from an instance layout as the per-instance line ID. (1 value, 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID)",
 	"선 번호 어트리뷰트의 자리. (사용자 어트리뷰트의 마지막 자리, 선의 판 셰이더가 이 자리에서 읽는다)": "Location of the line ID attribute. (The last user attribute location, the line target shader reads from this location)",
-	"그릴 것. (DRAW_PART_OUTLINE 바깥선 껍데기, DRAW_PART_BODY 몸, 기본 둘 다, 꼴의 hasOutline, isBodyDrawn 이 false 면 그것도 뺀다)": "What to draw. (DRAW_PART_OUTLINE the outline shell, DRAW_PART_BODY the body, both by default, hasOutline and isBodyDrawn false in the options also leave that out)"
+	"그릴 것. (DRAW_PART_OUTLINE 바깥선 껍데기, DRAW_PART_BODY 몸, 기본 둘 다, 꼴의 hasOutline, isBodyDrawn 이 false 면 그것도 뺀다)": "What to draw. (DRAW_PART_OUTLINE the outline shell, DRAW_PART_BODY the body, both by default, hasOutline and isBodyDrawn false in the options also leave that out)",
+	"모형 대신 쓸 버텍스 어레이. ({ body, outline }, 자동 인스턴싱의 묶음 자리, 기본 null)": "Vertex arrays to use instead of the mesh's. ({ body, outline }, the batch slot of auto-instancing, null by default)"
 }

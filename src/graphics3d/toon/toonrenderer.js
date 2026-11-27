@@ -7,7 +7,6 @@ import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
 import { WebGLStateCache } from "../../core/graphic/webglstatecache.js";
 import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
 import { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./toonlightset.js";
-import { SHADOW_ATLAS_MAXIMUM_LIGHTS } from "../shadowmap.js";
 import { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME } from "./toonmaterial.js";
 
 
@@ -1259,7 +1258,8 @@ const OUTLINE_BLOCK_FLOAT_COUNT = 12;
 const FRAME_BLOCK_NAME = "ToonFrame"; // 프레임 블록. (FRAME_BLOCK_CHUNK)
 const FRAME_BLOCK_BINDING = 2;
 const FRAME_BLOCK_FLOAT_COUNT = 164;
-const MATERIAL_BLOCK_LIMIT = 1024; // 블록 갈래마다 기억할 블록 수. (넘으면 그 갈래를 모두 지우고 다시 짓는다)
+const MATERIAL_BLOCK_LIMIT = 1024;
+const BATCH_SLOT_MESH_LIMIT = 8; // 묶음 자리마다 버텍스 어레이를 지어 둘 모형 수. (넘으면 그 자리의 것을 모두 지우고 다시) // 블록 갈래마다 기억할 블록 수. (넘으면 그 갈래를 모두 지우고 다시 짓는다)
 const DRAW_PART_OUTLINE = 1; // drawWithCount 가 그릴 것: 바깥선 껍데기.
 const DRAW_PART_BODY = 2; // 몸.
 const DRAW_PART_ALL = 3;
@@ -1702,10 +1702,11 @@ export class ToonRenderer {
 	/** @private @type { Array<number> } */ #outlineDistanceScale; // 껍데기 바깥선의 거리 배. ([기준 거리 (0 이면 끔), 가장 작은 배, 가장 큰 배])
 	/** @private @type { Array<number> } */ #outlineFadeDistance; // 껍데기 바깥선이 사라지는 거리. ([가까운 거리 (지은 굵기), 먼 거리 (0), 먼 거리가 가까운 거리 이하면 끔])
 	/** @private @type { object | null } */ #localShadowInput; // 받을 점광과 스포트라이트 그림자. ({ depthTexture, lights, gridSize, tileSize, texelSize, strength })
-	/** @private @type { WebGLBuffer } */ #frameBlockBuffer; // 프레임 블록(ToonFrame)의 GPU 버퍼.
-	/** @private @type { Float32Array } */ #frameBlockValues; // 프레임 블록의 값. (FRAME_BLOCK_FLOAT_COUNT)
-	/** @private @type { number } */ #frameBlockSerial; // 프레임 블록을 올린 frameSerial. (같으면 다시 올리지 않는다)
-	/** @private @type { boolean } */ #isFrameBlockBound; // 프레임 블록을 바인딩 자리에 묶었다고 아는지. (forgetAllUniformValues 가 잊는다)
+	/** @private @type { Array<object> } */ #batchSlots; // 자동 인스턴싱 묶음 자리. ({ buffer, values, count, vertexArrays }, 그리기 줄이 프레임마다 같은 차례로 고르고 값이 같으면 다시 올리지 않는다)
+	/** @private @type { Array<object> } */ #shadowBatchSlots; // 그림자 패스의 묶음 자리.
+	/** @private @type { object } */ #frameBlocks; // 프레임 블록(ToonFrame) 갈래. (재질 블록과 같은 꼴, 값이 같은 블록은 하나, 지은 버퍼는 고치지 않는다)
+	/** @private @type { object | null } */ #frameBlock; // 지금 frameSerial 의 프레임 블록.
+	/** @private @type { number } */ #frameBlockSerial; // #frameBlock 을 고른 frameSerial. (같으면 다시 고르지 않는다)
 	/** @private @type { WebGLStateCache } */ #stateCache; // 컨텍스트의 GL 상태 기억. (같은 프로그램, 텍스처, 버텍스 어레이, 감김을 다시 걸지 않을 때 묻는다)
 	/** @private @type { WeakMap<ShaderProgram, Map<string, object>> } */ #uniformSlotTable; // 프로그램마다 유니폼 이름별 위치와 마지막으로 올린 값.
 	/** @private @type { number } */ #uniformSerial; // 올린 유니폼 값이 아직 맞는 판 번호. (바뀌면 모든 프로그램의 기억한 값을 잊는다)
@@ -1773,12 +1774,11 @@ export class ToonRenderer {
 		this.#outlineDistanceScale = [0, 0.5, 4];
 		this.#outlineFadeDistance = [0, 0];
 		this.#localShadowInput = null;
-		this.#frameBlockValues = new System.Float32Array(FRAME_BLOCK_FLOAT_COUNT);
-		this.#frameBlockBuffer = webGL2RenderingContext.createBuffer();
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, this.#frameBlockBuffer);
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, this.#frameBlockValues, webGL2RenderingContext.DYNAMIC_DRAW);
+		this.#batchSlots = [];
+		this.#shadowBatchSlots = [];
+		this.#frameBlocks = createBlockCache(FRAME_BLOCK_BINDING, FRAME_BLOCK_FLOAT_COUNT);
+		this.#frameBlock = null;
 		this.#frameBlockSerial = 0;
-		this.#isFrameBlockBound = false;
 	}
 
 	//==============================================================================
@@ -1855,7 +1855,7 @@ export class ToonRenderer {
 		}
 		webGL2RenderingContext.useProgram(previousProgram);
 		const createEntry = (shaderProgram, kind) => {
-			return { program: shaderProgram, kind: kind, frameSerial: 0, lightSet: null, lightVersion: -1 };
+			return { program: shaderProgram, kind: kind, lightSet: null, lightVersion: -1 };
 		};
 		return { solid: createEntry(solidProgram, ToonProgramKind.solid), outline: createEntry(programList[1], ToonProgramKind.outline), depth: createEntry(programList[2], ToonProgramKind.depth) };
 	}
@@ -2525,7 +2525,14 @@ export class ToonRenderer {
 		this.clearBlockCache(this.#outlineBlocks);
 		webGL2RenderingContext.deleteTexture(this.#emptyShadowTexture);
 		webGL2RenderingContext.deleteTexture(this.#whiteTexture);
-		webGL2RenderingContext.deleteBuffer(this.#frameBlockBuffer);
+		this.clearBlockCache(this.#frameBlocks);
+		this.#frameBlock = null;
+		for (const slot of this.#batchSlots.concat(this.#shadowBatchSlots)) {
+			this.deleteBatchVertexArrays(slot, null);
+			webGL2RenderingContext.deleteBuffer(slot.buffer);
+		}
+		this.#batchSlots.length = 0;
+		this.#shadowBatchSlots.length = 0;
 	}
 
 	//==============================================================================
@@ -2539,6 +2546,9 @@ export class ToonRenderer {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		for (const slot of this.#batchSlots.concat(this.#shadowBatchSlots)) {
+			this.deleteBatchVertexArrays(slot, mesh);
+		}
 		webGL2RenderingContext.deleteVertexArray(mesh.bodyVertexArray);
 		if (mesh.outlineVertexArray !== null) {
 			webGL2RenderingContext.deleteVertexArray(mesh.outlineVertexArray);
@@ -3152,8 +3162,9 @@ export class ToonRenderer {
 
 	//==============================================================================
 	// 같은 모형과 꼴의 여럿을 인스턴스 그리기 한 번으로. (그리기 줄의 자동 인스턴싱, 유니티 GPU 인스턴싱과 언리얼 auto-instancing 꼴, 거른 뒤 부른다)
-	// - 행렬을 모형의 인스턴스 버퍼에 한 번 올리고 drawElementsInstanced 하나로 그린다. 틴트는 1, 빛남은 0 이라 그리기마다 그린 것과 화면이 같다.
+	// - 행렬을 묶음 자리의 인스턴스 버퍼에 담고 drawElementsInstanced 하나로 그린다. 틴트는 1, 빛남은 0 이라 그리기마다 그린 것과 화면이 같다.
 	//   (instanced 1 은 보통 그리기와 같은 프로그램의 같은 셈이고 모형 행렬만 어트리뷰트에서 읽는다, 행렬은 아핀)
+	// - 묶음 자리(slot)는 그리기 줄이 프레임마다 같은 차례로 준다. 자리의 값이 앞과 같으면 다시 올리지 않는다. (몸과 바깥선 껍데기가 같은 자리, 움직이지 않는 것은 올림 없음)
 	// - 감기는 첫 행렬로 가린다. (그리기 줄이 감기가 같은 것만 묶는다)
 	//==============================================================================
 	/**
@@ -3163,9 +3174,10 @@ export class ToonRenderer {
 	 * @param { number } count - 그릴 수.
 	 * @param { object } options - 모두에 같은 그리기 꼴. (isSameBatchState 로 견준 것)
 	 * @param { number } parts - 그릴 것. (1 바깥선 껍데기, 2 몸, 3 둘 다, 그림자 패스면 깊이)
+	 * @param { number } slotIndex - 묶음 자리 번호. (그림자 패스는 따로 센다)
 	 * @private
 	 */
-	drawMeshBatch(mesh, modelMatrixList, start, count, options, parts) {
+	drawMeshBatch(mesh, modelMatrixList, start, count, options, parts, slotIndex) {
 		if (mesh === null || count <= 0) {
 			return;
 		}
@@ -3190,34 +3202,106 @@ export class ToonRenderer {
 		if ((parts & DRAW_PART_BODY) !== 0) {
 			this.#frameStatistics.drawnObjectCount += count;
 		}
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
-		this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts);
+		const slots = this.#isShadowPass ? this.#shadowBatchSlots : this.#batchSlots;
+		let slot = slots[slotIndex];
+		if (slot === undefined) {
+			slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System.Float32Array(0), count: 0, vertexArrays: new Map() };
+			slots[slotIndex] = slot;
+		}
+		let isSame = slot.count === count;
+		if (isSame) {
+			const values = slot.values;
+			for (let index = 0; index < floatCount; ++index) {
+				if (!isSameNumber(values[index], instanceData[index])) {
+					isSame = false;
+					break;
+				}
+			}
+		}
+		if (!isSame) {
+			if (slot.values.length < floatCount) {
+				slot.values = new System.Float32Array(floatCount);
+			}
+			slot.values.set(instanceData.subarray(0, floatCount));
+			slot.count = count;
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
+			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+		}
+		let vertexArrays = slot.vertexArrays.get(mesh);
+		if (vertexArrays === undefined) {
+			if (slot.vertexArrays.size >= BATCH_SLOT_MESH_LIMIT) {
+				this.deleteBatchVertexArrays(slot, null);
+			}
+			vertexArrays = this.createBatchVertexArrays(mesh, slot.buffer);
+			slot.vertexArrays.set(mesh, vertexArrays);
+		}
+		this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts, vertexArrays);
 	}
 
 	//==============================================================================
-	// 프로그램의 프레임 값 올리기. (보기와 투영, 카메라, HDR, 그림자, 바깥선 색, 이번 프레임에 이미 올렸으면 건너뛴다)
+	// 모형과 묶음 자리의 버퍼를 함께 묶은 버텍스 어레이 짓기. (모형의 버텍스 어레이와 같은 꼴, 인스턴스 어트리뷰트만 자리의 버퍼에서)
 	//==============================================================================
 	/**
-	 * @param { object } entry - 프로그램 칸.
+	 * @param { object } mesh - createMesh 의 결과.
+	 * @param { WebGLBuffer } buffer - 묶음 자리의 인스턴스 버퍼. (TOON_INSTANCE_FLOAT_COUNT 걸음)
+	 * @returns { object } 몸과 바깥선의 버텍스 어레이. ({ body, outline }, 껍데기가 없으면 outline 은 null)
+	 * @private
+	 */
+	createBatchVertexArrays(mesh, buffer) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const body = webGL2RenderingContext.createVertexArray();
+		webGL2RenderingContext.bindVertexArray(body);
+		this.attachBodyAttributes(mesh);
+		this.attachInstanceAttributes(buffer);
+		let outline = null;
+		if (mesh.outlineVertexArray !== null) {
+			outline = webGL2RenderingContext.createVertexArray();
+			webGL2RenderingContext.bindVertexArray(outline);
+			this.attachOutlineAttributes(mesh);
+			this.attachInstanceAttributes(buffer);
+		}
+		webGL2RenderingContext.bindVertexArray(null);
+		return { body: body, outline: outline };
+	}
+
+	//==============================================================================
+	// 묶음 자리의 버텍스 어레이 지우기. (mesh 가 null 이면 그 자리의 것 모두)
+	//==============================================================================
+	/**
+	 * @param { object } slot - 묶음 자리.
+	 * @param { object | null } mesh - 지울 모형. (null 이면 모두)
+	 * @private
+	 */
+	deleteBatchVertexArrays(slot, mesh) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		for (const [slotMesh, vertexArrays] of slot.vertexArrays) {
+			if (mesh !== null && slotMesh !== mesh) {
+				continue;
+			}
+			webGL2RenderingContext.deleteVertexArray(vertexArrays.body);
+			if (vertexArrays.outline !== null) {
+				webGL2RenderingContext.deleteVertexArray(vertexArrays.outline);
+			}
+			slot.vertexArrays.delete(slotMesh);
+		}
+	}
+
+	//==============================================================================
+	// 프로그램의 프레임 값 올리기. (보기와 투영, 카메라, HDR, 그림자, 바깥선 거리, 점광 그림자를 프레임 블록 ToonFrame 하나로, 패스마다 한 번 고르고 묶였으면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { object } entry - 프로그램 칸. (세 프로그램이 같은 블록을 읽는다)
 	 * @private
 	 */
 	uploadFrameUniforms(entry) {
-		if (entry.frameSerial === this.#frameSerial) {
-			return;
-		}
-		entry.frameSerial = this.#frameSerial;
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		if (this.#frameBlockSerial !== this.#frameSerial) {
+		// 패스(frameSerial)마다 값을 한 번 써서 같은 값의 블록을 찾거나 짓는다. (그리는 중인 버퍼를 고치지 않는다, 카메라와 빛이 그대로면 올림이 없다)
+		const frameBlocks = this.#frameBlocks;
+		if (this.#frameBlockSerial !== this.#frameSerial || this.#frameBlock === null) {
 			this.#frameBlockSerial = this.#frameSerial;
-			this.writeFrameBlockValues(this.#frameBlockValues);
-			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, this.#frameBlockBuffer);
-			webGL2RenderingContext.bufferSubData(webGL2RenderingContext.UNIFORM_BUFFER, 0, this.#frameBlockValues);
+			this.writeFrameBlockValues(frameBlocks.values);
+			this.#frameBlock = this.readUniformBlock(frameBlocks);
 		}
-		if (!this.#isFrameBlockBound) {
-			webGL2RenderingContext.bindBufferBase(webGL2RenderingContext.UNIFORM_BUFFER, FRAME_BLOCK_BINDING, this.#frameBlockBuffer);
-			this.#isFrameBlockBound = true;
-		}
+		this.bindBlock(frameBlocks, this.#frameBlock);
 	}
 
 	//==============================================================================
@@ -3531,7 +3615,7 @@ export class ToonRenderer {
 		this.#uniformSerial += 1;
 		this.#materialBlocks.boundBlock = null;
 		this.#outlineBlocks.boundBlock = null;
-		this.#isFrameBlockBound = false;
+		this.#frameBlocks.boundBlock = null;
 	}
 
 	//==============================================================================
@@ -3838,8 +3922,9 @@ export class ToonRenderer {
 	 * @param { object } options - drawMesh 의 그리기 꼴.
 	 * @param { object | null } instanceBuffer - createInstanceBuffer 의 결과. (없으면 null)
 	 * @param { number } [parts] - 그릴 것. (DRAW_PART_OUTLINE 바깥선 껍데기, DRAW_PART_BODY 몸, 기본 둘 다, 꼴의 hasOutline, isBodyDrawn 이 false 면 그것도 뺀다)
+	 * @param { object | null } [vertexArrays] - 모형 대신 쓸 버텍스 어레이. ({ body, outline }, 자동 인스턴싱의 묶음 자리, 기본 null)
 	 */
-	drawWithCount(mesh, modelElements, instanceCount, options, instanceBuffer, parts = DRAW_PART_ALL) {
+	drawWithCount(mesh, modelElements, instanceCount, options, instanceBuffer, parts = DRAW_PART_ALL, vertexArrays = null) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const drawEntry = this.readDrawEntry(options);
 		const state = drawEntry.state;
@@ -3863,6 +3948,10 @@ export class ToonRenderer {
 			if (!instanceLayout.hasTint()) {
 				webGL2RenderingContext.vertexAttrib4f(TOON_ATTRIBUTE_LOCATIONS.instanceTint, 1, 1, 1, 1);
 			}
+		}
+		if (vertexArrays !== null) {
+			bodyVertexArray = vertexArrays.body;
+			outlineVertexArray = vertexArrays.outline;
 		}
 		const indexStart = System.Math.max(0, System.Math.min(mesh.bodyIndexCount, state[DRAW_STATE_INDEX_START]));
 		const indexCount = state[DRAW_STATE_INDEX_COUNT] > 0 ? System.Math.min(state[DRAW_STATE_INDEX_COUNT], mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;

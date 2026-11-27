@@ -4,6 +4,7 @@
 //   1. 같은 모형, 같은 재질 값(꼴 객체는 따로, 선 번호는 다름)의 불투명한 것은 몸, 바깥선 껍데기, 그림자 깊이, 선의 판을 인스턴스 그리기 하나로.
 //      머티리얼(ToonMaterial)이나 모형이나 틴트가 다르거나 감기가 뒤집힌 것은 묶지 않는다. (인스턴스 수 목록으로 본다)
 //   2. 화면은 묶지 않게 한 그리기 줄(꼴마다 다른 indexCount, 그리는 범위는 같음)과 바이트까지 같다. 비치는 것도 같이 담는다.
+//   3. 묶음 자리는 행렬이 앞 프레임과 같으면 다시 올리지 않는다. (몸과 바깥선 껍데기는 같은 자리)
 //   puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 const System = globalThis;
@@ -63,7 +64,14 @@ try {
 		// isReference 면 꼴마다 다른 indexCount 를 준다. (모형보다 커서 그리는 범위는 같고, 푼 칸이 달라 묶이지 않는다)
 		const createSide = (canvasId, isReference) => {
 			const gl = document.getElementById(canvasId).getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
-			const side = { gl: gl, instanceCounts: [], plainDrawCount: 0 };
+			const side = { gl: gl, instanceCounts: [], plainDrawCount: 0, arrayUploadCount: 0 };
+			const originalBufferData = gl.bufferData.bind(gl);
+			gl.bufferData = (target, ...args) => {
+				if (target === gl.ARRAY_BUFFER) {
+					side.arrayUploadCount += 1;
+				}
+				return originalBufferData(target, ...args);
+			};
 			const originalInstanced = gl.drawElementsInstanced.bind(gl);
 			gl.drawElementsInstanced = (mode, count, type, offset, instanceCount) => {
 				side.instanceCounts.push(instanceCount);
@@ -132,6 +140,7 @@ try {
 			side.drawFrame = () => {
 				side.instanceCounts.length = 0;
 				side.plainDrawCount = 0;
+				side.arrayUploadCount = 0;
 				queue.clear();
 				queue.addMesh(groundMesh, Matrix4.createIdentity(), groundOptions);
 				for (const item of itemList) {
@@ -165,7 +174,7 @@ try {
 					litCount += 1;
 				}
 			}
-			frames.push({ differentCount: differentCount, litCount: litCount, mainInstanceCounts: [...main.instanceCounts], referenceInstanceCounts: [...reference.instanceCounts], mainPlainCount: main.plainDrawCount, referencePlainCount: reference.plainDrawCount });
+			frames.push({ differentCount: differentCount, litCount: litCount, mainInstanceCounts: [...main.instanceCounts], referenceInstanceCounts: [...reference.instanceCounts], mainPlainCount: main.plainDrawCount, referencePlainCount: reference.plainDrawCount, mainUploadCount: main.arrayUploadCount });
 		}
 		return { frames: frames, error: main.gl.getError() + reference.gl.getError() };
 	}, SIZE);
@@ -185,5 +194,7 @@ for (let frame = 0; frame < result.frames.length; ++frame) {
 	check(entry.litCount > 1000, frame + " 프레임 무언가 그렸다 (" + entry.litCount + ")");
 	check(entry.differentCount === 0, frame + " 프레임 화면이 묶지 않고 그린 것과 바이트까지 같음 (다른 바이트 " + entry.differentCount + ")");
 }
+// 묶음 자리는 값이 같으면 다시 올리지 않는다. (몸, 그림자 묶음 넷씩 여덟, 바깥선 껍데기는 몸의 자리를 같이 씀, 선의 판 둘은 프레임마다 올림)
+check(result.frames[1].mainUploadCount === result.frames[0].mainUploadCount - 8 && result.frames[2].mainUploadCount === result.frames[1].mainUploadCount, "같은 행렬이면 묶음 자리를 다시 올리지 않음 (" + result.frames.map((entry) => entry.mainUploadCount).join(", ") + ")");
 check(result.error === 0, "GL 오류 없음 (" + result.error + ")");
 console.log("툰 자동 인스턴싱 크롬 시험 통과 (" + checkCount + " 개 확인)");

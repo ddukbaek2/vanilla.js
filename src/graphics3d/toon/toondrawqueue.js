@@ -256,7 +256,7 @@ export class ToonDrawQueue {
 	/** @private @type { Array<object> } */ #opaqueScratch; // 담은 차례의 불투명한 것. (프레임마다 다시 쓴다)
 	/** @private @type { boolean } */ #isResolved; // 담은 것마다 꼴을 풀었는지. (그리기 앞에 렌더러로 한 번)
 	/** @private @type { Array<object> } */ #batchMatrices; // 자동 인스턴싱으로 묶은 행렬. (프레임마다 다시 쓴다)
-	/** @private @type { Array<any> } */ #outlineBatches; // 바깥선 껍데기를 그릴 것. (담은 것, 행렬 자리, 수를 셋씩)
+	/** @private @type { Array<any> } */ #outlineBatches; // 바깥선 껍데기를 그릴 것. (담은 것, 행렬 자리, 수, 묶음 자리를 넷씩)
 	/** @private @type { Array<number> } */ #lineIds; // 선의 판의 묶은 번호. (#lineMatrices 와 같은 자리)
 	/** @private @type { Array<object> } */ #lineMatrices; // 선의 판의 묶은 행렬.
 
@@ -913,6 +913,7 @@ export class ToonDrawQueue {
 		batchMatrices.length = 0;
 		const opaqueItemList = this.readOpaqueItemList();
 		let itemIndex = 0;
+		let slotIndex = 0;
 		while (itemIndex < opaqueItemList.length) {
 			const item = opaqueItemList[itemIndex];
 			itemIndex += 1;
@@ -934,23 +935,26 @@ export class ToonDrawQueue {
 				renderer.drawMeshBody(item.mesh, item.modelMatrix, item.options);
 			}
 			else {
-				renderer.drawMeshBatch(item.mesh, batchMatrices, start, count, item.options, DRAW_PART_BODY);
+				renderer.drawMeshBatch(item.mesh, batchMatrices, start, count, item.options, DRAW_PART_BODY, slotIndex);
 			}
 			if (item.state[DRAW_STATE_HAS_OUTLINE] && item.mesh.outlineVertexArray !== null) {
-				outlineBatches.push(item, start, count);
+				outlineBatches.push(item, start, count, slotIndex);
+			}
+			if (count > 1) {
+				slotIndex += 1;
 			}
 		}
 		this.runPasses(renderer, ToonDrawStage.afterOpaque);
 
 		// 2. 불투명한 것의 바깥선 껍데기와 화면 공간 바깥선. (몸과 같은 묶음)
-		for (let batchIndex = 0; batchIndex < outlineBatches.length; batchIndex += 3) {
+		for (let batchIndex = 0; batchIndex < outlineBatches.length; batchIndex += 4) {
 			const item = outlineBatches[batchIndex];
 			const count = outlineBatches[batchIndex + 2];
 			if (count === 1) {
 				renderer.drawMeshOutline(item.mesh, item.modelMatrix, item.options);
 			}
 			else {
-				renderer.drawMeshBatch(item.mesh, batchMatrices, outlineBatches[batchIndex + 1], count, item.options, DRAW_PART_OUTLINE);
+				renderer.drawMeshBatch(item.mesh, batchMatrices, outlineBatches[batchIndex + 1], count, item.options, DRAW_PART_OUTLINE, outlineBatches[batchIndex + 3]);
 			}
 		}
 		outlineBatches.length = 0;
@@ -1113,6 +1117,7 @@ export class ToonDrawQueue {
 	drawCasterList(renderer, casterList) {
 		const batchMatrices = this.#batchMatrices;
 		let itemIndex = 0;
+		let slotIndex = 0;
 		while (itemIndex < casterList.length) {
 			const item = casterList[itemIndex];
 			itemIndex += 1;
@@ -1127,7 +1132,8 @@ export class ToonDrawQueue {
 				this.drawItem(renderer, item, item.options);
 			}
 			else {
-				renderer.drawMeshBatch(item.mesh, batchMatrices, 0, batchMatrices.length, item.options, DRAW_PART_ALL);
+				renderer.drawMeshBatch(item.mesh, batchMatrices, 0, batchMatrices.length, item.options, DRAW_PART_ALL, slotIndex);
+				slotIndex += 1;
 			}
 		}
 		batchMatrices.length = 0;

@@ -66,7 +66,8 @@ try {
 			const side = { gl: gl, blockUploadCount: 0, renderer: new ToonRenderer(gl) };
 			const original = gl.bufferData.bind(gl);
 			gl.bufferData = (target, ...args) => {
-				if (target === gl.UNIFORM_BUFFER) {
+				// 재질 블록(float 44)만 센다. (프레임 블록 ToonFrame 은 float 164)
+				if (target === gl.UNIFORM_BUFFER && args[0] !== null && typeof args[0] === "object" && args[0].byteLength === 44 * 4) {
 					side.blockUploadCount += 1;
 				}
 				return original(target, ...args);
