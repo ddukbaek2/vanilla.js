@@ -105,6 +105,10 @@ const BATCH_UNCLIPPED_EXTENT = 16777216;
 
 // 셰이더 자르기 경계가 화소 경계(또는 화소 가운데)에 놓였다고 보는 차이. (디바이스 픽셀, 변환 셈의 float 오차만 받는다)
 const CLIP_EDGE_EPSILON = 1 / 256;
+// 노드의 하위 트리가 보이는 사각형(화면과 걸린 자르기)과 놓인 꼴. (그리기 순회의 화면 밖 거르기)
+const NODE_VISIBILITY_UNKNOWN = 0; // 모른다, 또는 걸친다. (자손을 저마다 본다)
+const NODE_VISIBILITY_OUTSIDE = 1; // 다 밖이다. (건너뛴다)
+const NODE_VISIBILITY_INSIDE = 2; // 다 안이다. (그 아래 자손은 견주지 않고 그린다)
 
 //==============================================================================
 // 자르기 경계가 화소 가운데(정수 + 0.5)에 걸쳤는지. (래스터 동점 규칙이 기기마다 다를 수 있는 자리)
@@ -808,6 +812,16 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #localVisibleMinimumY;
 	/** @private @type { number } */ #localVisibleMaximumX;
 	/** @private @type { number } */ #localVisibleMaximumY;
+	/** @private @type { boolean } */ #isLocalInnerBoundsKnown; // 지역 좌표의 보이는 사각형 안쪽 사각형을 셈했는지. (변환이 축에 맞을 때만, 돌림이나 기울임이 있으면 거짓)
+	/** @private @type { number } */ #localInnerMinimumX; // 보이는 사각형을 한 디바이스 픽셀 좁혀 지금 변환의 지역 좌표로 옮긴 사각형. (이 안에 다 든 것은 보이는 사각형 안에 다 든다)
+	/** @private @type { number } */ #localInnerMinimumY;
+	/** @private @type { number } */ #localInnerMaximumX;
+	/** @private @type { number } */ #localInnerMaximumY;
+	/** @private @type { number } */ #clipStateSerial; // 지금 자르기 상태의 번호. (자르기를 걸면 새 번호, 풀면 걸기 전 번호로 돌아간다, 자르기가 없으면 0)
+	/** @private @type { number } */ #clipStateSerialCounter; // 자르기를 걸 때마다 하나씩 오르는 수.
+	/** @private @type { number } */ #insideVisibleClipStateSerial; // 하위 트리가 보이는 사각형 안에 다 든 노드를 그리는 동안 그 때의 자르기 상태 번호. (-1 이면 없음)
+	/** @private @type { number } */ #insideVisibleViewportWidth; // 그 때의 뷰포트 너비.
+	/** @private @type { number } */ #insideVisibleViewportHeight; // 그 때의 뷰포트 높이.
 	/** @private @type { boolean } */ #isGeometryCachingEnabled; // 컴포넌트가 그린 정점을 캐시해 두고 바뀐 것만 다시 셈할지. (기본 켜짐)
 	/** @private @type { WeakMap<Component, object> } */ #geometryCacheMap; // 컴포넌트마다의 기하 캐시.
 	/** @private @type { object | null } */ #geometryActiveCache; // 지금 적거나 다시 옮기는 기하 캐시.
@@ -1018,6 +1032,16 @@ export class Graphic extends Object {
 		this.#localVisibleMinimumX = 0;
 		this.#localVisibleMinimumY = 0;
 		this.#localVisibleMaximumX = 0;
+		this.#isLocalInnerBoundsKnown = false;
+		this.#localInnerMinimumX = 0;
+		this.#localInnerMinimumY = 0;
+		this.#localInnerMaximumX = 0;
+		this.#localInnerMaximumY = 0;
+		this.#clipStateSerial = 0;
+		this.#clipStateSerialCounter = 0;
+		this.#insideVisibleClipStateSerial = -1;
+		this.#insideVisibleViewportWidth = 0;
+		this.#insideVisibleViewportHeight = 0;
 		this.#localVisibleMaximumY = 0;
 		this.#isGeometryCachingEnabled = true;
 		this.#geometryCacheMap = new WeakMap();
@@ -1130,6 +1154,8 @@ export class Graphic extends Object {
 			this.#clipStack.length = 0;
 			webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
 		}
+		this.#clipStateSerial = 0;
+		this.#insideVisibleClipStateSerial = -1;
 		this.#stencilClipDepth = 0;
 		this.#isShaderClipActive = false;
 		this.#shaderClipSlot = 0;
@@ -2330,53 +2356,130 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 노드의 하위 트리를 화면 밖이라 건너뛸지 반환. (drawNode 가 노드에 변환을 건 뒤 부른다)
+	// 노드의 하위 트리가 보이는 사각형과 놓인 꼴 반환. (drawNode 가 노드에 변환을 건 뒤 부른다)
+	// - 하위 트리 경계를 지금 변환으로 옮긴 경계 상자가 화면과 걸린 자르기 밖이면 밖, 한 디바이스 픽셀 좁힌 보이는 사각형 안에 다 들면 안이다. (돌림, 기울임도 디바이스 좌표로 본다)
 	//==============================================================================
 	/**
 	 * @param { TransformNode } node 그릴 노드.
 	 * @param { boolean } isForceGizmosVisible 기즈모를 모두 그리는지.
-	 * @returns { boolean } 건너뛰면 참.
+	 * @returns { number } NODE_VISIBILITY_OUTSIDE 면 건너뛰고, NODE_VISIBILITY_INSIDE 면 자손은 견주지 않고 그린다. (모르거나 걸치면 NODE_VISIBILITY_UNKNOWN)
 	 */
-	#isNodeSubtreeCulled(node, isForceGizmosVisible) {
+	#readNodeSubtreeVisibility(node, isForceGizmosVisible) {
 		if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || isForceGizmosVisible || typeof node.readSubtreeDrawBounds !== "function") {
-			return false;
+			return NODE_VISIBILITY_UNKNOWN;
 		}
 		const drawBounds = subtreeCullRect;
 		if (!node.readSubtreeDrawBounds(drawBounds)) {
-			return false;
+			return NODE_VISIBILITY_UNKNOWN;
 		}
 		if (!(drawBounds.size.x > 0 && drawBounds.size.y > 0)) {
-			return true;
+			return NODE_VISIBILITY_OUTSIDE;
 		}
-		return !this.isLocalRectVisible(drawBounds);
+		return this.#readLocalRectVisibility(drawBounds);
 	}
 
 	//==============================================================================
-	// 노드를 부모 좌표에서 보아 화면 밖이라 건너뛸지 반환. (drawNode 가 노드에 변환을 걸기 전에 부른다, 지금 변환은 부모의 내용 좌표)
-	// - 부모가 셈해 둔 노드의 경계(TransformNode.readParentDrawBounds)를 부모 좌표의 보이는 사각형과 견준다. 경계가 없으면 건너뛰지 않는다(변환을 건 뒤 #isNodeSubtreeCulled 가 본다).
+	// 노드를 부모 좌표에서 보아 보이는 사각형과 놓인 꼴 반환. (drawNode 가 노드에 변환을 걸기 전에 부른다, 지금 변환은 부모의 내용 좌표)
+	// - 부모가 셈해 둔 노드의 경계(TransformNode.readParentDrawBounds)를 부모 좌표의 보이는 사각형과 견준다. 경계가 없으면 모른다(변환을 건 뒤 #readNodeSubtreeVisibility 가 본다).
+	// - 부모 변환이 축에 맞으면 한 디바이스 픽셀 좁힌 보이는 사각형(부모 좌표)과도 견주어 그 안에 다 들면 안이다. (돌림이나 기울임이 있으면 변환을 건 뒤 본다)
 	// - 보이는 사각형은 부모 하나에 한 번 셈한다. (변환과 자르기가 같으면 셈해 둔 것을 쓴다)
 	//==============================================================================
 	/**
 	 * @param { TransformNode } node 그릴 노드.
-	 * @returns { boolean } 건너뛰면 참.
+	 * @returns { number } NODE_VISIBILITY_OUTSIDE 면 건너뛰고, NODE_VISIBILITY_INSIDE 면 자손은 견주지 않고 그린다. (모르거나 걸치면 NODE_VISIBILITY_UNKNOWN)
 	 */
-	#isNodeCulledInParent(node) {
+	#readNodeVisibilityInParent(node) {
 		if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || this.#isForceGizmosVisible || typeof node.readParentDrawBounds !== "function") {
-			return false;
+			return NODE_VISIBILITY_UNKNOWN;
 		}
 		const drawBounds = subtreeCullRect;
 		if (!node.readParentDrawBounds(drawBounds)) {
-			return false;
+			return NODE_VISIBILITY_UNKNOWN;
 		}
 		if (!(drawBounds.size.x > 0 && drawBounds.size.y > 0)) {
-			return true;
+			return NODE_VISIBILITY_OUTSIDE;
 		}
 		if (!this.#updateLocalVisibleBounds()) {
-			return false;
+			return NODE_VISIBILITY_UNKNOWN;
 		}
 		const leftX = drawBounds.position.x;
 		const topY = drawBounds.position.y;
-		return leftX > this.#localVisibleMaximumX || topY > this.#localVisibleMaximumY || leftX + drawBounds.size.x < this.#localVisibleMinimumX || topY + drawBounds.size.y < this.#localVisibleMinimumY;
+		const rightX = leftX + drawBounds.size.x;
+		const bottomY = topY + drawBounds.size.y;
+		if (leftX > this.#localVisibleMaximumX || topY > this.#localVisibleMaximumY || rightX < this.#localVisibleMinimumX || bottomY < this.#localVisibleMinimumY) {
+			return NODE_VISIBILITY_OUTSIDE;
+		}
+		if (this.#isLocalInnerBoundsKnown && leftX >= this.#localInnerMinimumX && topY >= this.#localInnerMinimumY && rightX <= this.#localInnerMaximumX && bottomY <= this.#localInnerMaximumY) {
+			return NODE_VISIBILITY_INSIDE;
+		}
+		return NODE_VISIBILITY_UNKNOWN;
+	}
+
+	//==============================================================================
+	// 보이는 사각형 안에 다 든 조상 아래에서 노드를 건너뛸지 반환. (drawNode 가 부른다, 견주지 않고 그리는 것이 없는 노드만 건너뛴다)
+	// - 부모가 셈해 둔 경계(변환을 걸기 전)나 하위 트리 경계(변환을 건 뒤)가 크기 0 이면 건너뛴다. (보이는 사각형 안을 하나씩 견주던 때와 건너뛴 수가 같다)
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node 그릴 노드.
+	 * @param { boolean } isTransformed 노드에 변환을 걸었는지. (걸기 전이면 부모가 셈해 둔 경계, 건 뒤면 하위 트리 경계를 본다)
+	 * @returns { number } 크기 0 이면 NODE_VISIBILITY_OUTSIDE, 크기가 있으면 NODE_VISIBILITY_INSIDE, 변환을 걸기 전에 모르면 NODE_VISIBILITY_UNKNOWN.
+	 */
+	#readInsideNodeVisibility(node, isTransformed) {
+		const drawBounds = subtreeCullRect;
+		if (!isTransformed) {
+			if (typeof node.readParentDrawBounds !== "function" || !node.readParentDrawBounds(drawBounds)) {
+				return NODE_VISIBILITY_UNKNOWN;
+			}
+		}
+		else if (typeof node.readSubtreeDrawBounds !== "function" || !node.readSubtreeDrawBounds(drawBounds)) {
+			return NODE_VISIBILITY_INSIDE;
+		}
+		return (drawBounds.size.x > 0 && drawBounds.size.y > 0) ? NODE_VISIBILITY_INSIDE : NODE_VISIBILITY_OUTSIDE;
+	}
+
+	//==============================================================================
+	// 하위 트리가 보이는 사각형 안에 다 든 노드를 그리는 중인지 반환. (그리기 순회가 정한다)
+	// - 하위 트리 거르기가 노드의 하위 트리 경계가 보이는 사각형(화면과 걸린 자르기를 한 디바이스 픽셀 좁힌 것) 안에 다 든다고 보면, 그 노드를 그리는 동안 참이다.
+	//   그 아래 자손은 화면 밖 견주기(하위 트리 경계, 컴포넌트 거르기, 보이는 자식 범위)를 하지 않고 그린다. 그리는 것이 없는 자손(경계 크기 0)만 건너뛴다.
+	// - 그 아래에서 자르기(beginClipRect, 마스크와 스크롤 칸)를 새로 걸면 그 자르기를 풀 때까지 거짓이다. (새 자르기 안에서 다시 견준다)
+	// - 화면 밖 거르기나 하위 트리 거르기가 꺼졌거나 기즈모를 모두 그리면 거짓.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 지금 그리는 노드가 보이는 사각형 안에 다 들면 참.
+	 * @example <caption>보이는 사각형 안에 다 든 노드의 컴포넌트가 견주기를 건너뛰기</caption>
+	 * import { Engine, EngineConfiguration, Scene, WorldNode, Component, Paint, Rect, Vector2, Pivot, Colors } from "./build/vanilla.js";
+	 *
+	 * class InsideProbe extends Component {
+	 * 	isDrawnInsideContent() {
+	 * 		return true;
+	 * 	}
+	 * 	draw(graphic) {
+	 * 		graphic.setFillColor(Colors.white);
+	 * 		graphic.drawRect(Rect.create(0, 0, 10, 10));
+	 * 		console.log(graphic.isInsideVisibleBounds());
+	 * 	}
+	 * }
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const node = new WorldNode();
+	 * 		node.setPivot(Pivot.topLeft);
+	 * 		node.setRect(100, 100, 40, 40);
+	 * 		node.addComponent(Paint);
+	 * 		node.addComponent(InsideProbe);
+	 * 		this.getRoot().addChild(node);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	isInsideVisibleBounds() {
+		return this.#insideVisibleClipStateSerial === this.#clipStateSerial && this.#insideVisibleViewportWidth === this.#appliedViewportWidth && this.#insideVisibleViewportHeight === this.#appliedViewportHeight
+			&& this.#isCullingEnabled && this.#isSubtreeCullingEnabled && !this.#isForceGizmosVisible;
 	}
 
 	//==============================================================================
@@ -2477,6 +2580,7 @@ export class Graphic extends Object {
 
 		// 거꾸로 건다. (지역 = 역행렬 x (디바이스 - 옮김))
 		const determinant = matrixA * matrixD - matrixB * matrixC;
+		this.#isLocalInnerBoundsKnown = false;
 		if (determinant === 0 || !System.Number.isFinite(determinant)) {
 			this.#isLocalVisibleBoundsKnown = false;
 			return false;
@@ -2504,6 +2608,19 @@ export class Graphic extends Object {
 		this.#localVisibleMaximumX = maximumX;
 		this.#localVisibleMaximumY = maximumY;
 		this.#isLocalVisibleBoundsKnown = isFinite;
+
+		// 축에 맞으면(돌림, 기울임 없음) 한 디바이스 픽셀 좁힌 보이는 사각형도 옮겨 둔다. (이 안에 다 든 것은 보이는 사각형 안에 다 든다)
+		if (isFinite && matrixB === 0 && matrixC === 0 && visibleMaximumX - visibleMinimumX > 2 && visibleMaximumY - visibleMinimumY > 2) {
+			const innerLeftX = (visibleMinimumX + 1 - matrixE) / matrixA;
+			const innerRightX = (visibleMaximumX - 1 - matrixE) / matrixA;
+			const innerTopY = (visibleMinimumY + 1 - matrixF) / matrixD;
+			const innerBottomY = (visibleMaximumY - 1 - matrixF) / matrixD;
+			this.#localInnerMinimumX = System.Math.min(innerLeftX, innerRightX);
+			this.#localInnerMinimumY = System.Math.min(innerTopY, innerBottomY);
+			this.#localInnerMaximumX = System.Math.max(innerLeftX, innerRightX);
+			this.#localInnerMaximumY = System.Math.max(innerTopY, innerBottomY);
+			this.#isLocalInnerBoundsKnown = System.Number.isFinite(this.#localInnerMinimumX) && System.Number.isFinite(this.#localInnerMinimumY) && System.Number.isFinite(this.#localInnerMaximumX) && System.Number.isFinite(this.#localInnerMaximumY);
+		}
 		return isFinite;
 	}
 
@@ -2518,10 +2635,23 @@ export class Graphic extends Object {
 	 * @returns { boolean } 화면에 걸치면 참.
 	 */
 	isLocalRectVisible(rect) {
+		return this.#readLocalRectVisibility(rect) !== NODE_VISIBILITY_OUTSIDE;
+	}
+
+	//==============================================================================
+	// 지금 변환으로 옮긴 사각형이 보이는 사각형(화면과 걸린 자르기)과 놓인 꼴 반환. (isLocalRectVisible 과 하위 트리 거르기가 쓴다)
+	// - 네 꼭짓점을 옮긴 경계 상자가 보이는 사각형에 걸치지 않으면 밖, 한 디바이스 픽셀 좁힌 보이는 사각형 안에 다 들면 안이다.
+	// - 뷰포트를 아직 정하지 않았으면 모른다. (걸치는 것으로 본다)
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 지금 변환으로 옮기기 전의 사각형. (로컬 좌표)
+	 * @returns { number } NODE_VISIBILITY_OUTSIDE, NODE_VISIBILITY_INSIDE, 걸치거나 모르면 NODE_VISIBILITY_UNKNOWN.
+	 */
+	#readLocalRectVisibility(rect) {
 		const viewportWidth = this.#appliedViewportWidth;
 		const viewportHeight = this.#appliedViewportHeight;
 		if (viewportWidth <= 0 || viewportHeight <= 0) {
-			return true;
+			return NODE_VISIBILITY_UNKNOWN;
 		}
 		const transformMatrix = this.#transformMatrix;
 		const matrixA = transformMatrix.a;
@@ -2562,7 +2692,14 @@ export class Graphic extends Object {
 			visibleMaximumX = System.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
 			visibleMaximumY = System.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
 		}
-		return maximumX >= visibleMinimumX && maximumY >= visibleMinimumY && minimumX <= visibleMaximumX && minimumY <= visibleMaximumY;
+		// 걸치는지는 옛 꼴 그대로 본다. (값이 수가 아니면 밖)
+		if (!(maximumX >= visibleMinimumX && maximumY >= visibleMinimumY && minimumX <= visibleMaximumX && minimumY <= visibleMaximumY)) {
+			return NODE_VISIBILITY_OUTSIDE;
+		}
+		if (minimumX >= visibleMinimumX + 1 && minimumY >= visibleMinimumY + 1 && maximumX <= visibleMaximumX - 1 && maximumY <= visibleMaximumY - 1) {
+			return NODE_VISIBILITY_INSIDE;
+		}
+		return NODE_VISIBILITY_UNKNOWN;
 	}
 
 	//==============================================================================
@@ -5375,23 +5512,38 @@ export class Graphic extends Object {
 			return;
 		}
 
-		// 부모가 셈해 둔 이 노드의 경계(부모 좌표)가 부모 좌표의 보이는 사각형 밖이면 변환을 걸지 않고 건너뛴다. (스크롤 목록의 많은 줄을 하나씩 들어가지 않는다)
-		if (this.#isNodeCulledInParent(node)) {
+		// 하위 트리가 보이는 사각형 안에 다 든 조상 아래면 견주지 않고, 그리는 것이 없는 노드만 건너뛴다. (절두체 거르기의 '다 안' 표시)
+		// 아니면 부모가 셈해 둔 이 노드의 경계(부모 좌표)가 부모 좌표의 보이는 사각형 밖이면 변환을 걸지 않고 건너뛴다. (스크롤 목록의 많은 줄을 하나씩 들어가지 않는다)
+		const isInsideVisible = this.isInsideVisibleBounds();
+		let visibility = isInsideVisible ? this.#readInsideNodeVisibility(node, false) : this.#readNodeVisibilityInParent(node);
+		if (visibility === NODE_VISIBILITY_OUTSIDE) {
 			this.#culledSubtreeCount += 1;
 			return;
 		}
 
-		// 그리다 예외가 나도 넣은 변환을 꺼내 변환 스택을 맞춘다. (예외는 그대로 위로 간다)
+		// 그리다 예외가 나도 넣은 변환을 꺼내 변환 스택을 맞추고 '다 안' 표시를 되돌린다. (예외는 그대로 위로 간다)
+		const previousInsideVisibleClipStateSerial = this.#insideVisibleClipStateSerial;
+		const previousInsideVisibleViewportWidth = this.#insideVisibleViewportWidth;
+		const previousInsideVisibleViewportHeight = this.#insideVisibleViewportHeight;
 		node.pushTransform(this);
 		try {
 			// 배율이 움직이는 노드의 글은 묶은 배율로 굽는다. (자식은 저마다 다시 정한다, 다 그리면 푼다)
 			this.#isTextBakeScaleMoving = this.readNodeTextBakeScaleMoving(node);
 			const isForceGizmosVisible = this.isForceGizmosVisible();
 			// 하위 트리 그리기 경계가 화면과 자르기 밖이면 이 노드와 자손의 그리기를 통째로 건너뛴다.
-			if (this.#isNodeSubtreeCulled(node, isForceGizmosVisible)) {
+			if (visibility === NODE_VISIBILITY_UNKNOWN) {
+				visibility = isInsideVisible ? this.#readInsideNodeVisibility(node, true) : this.#readNodeSubtreeVisibility(node, isForceGizmosVisible);
+			}
+			if (visibility === NODE_VISIBILITY_OUTSIDE) {
 				this.#culledSubtreeCount += 1;
 			}
 			else {
+				// 하위 트리가 보이는 사각형 안에 다 들면 이 노드를 그리는 동안 자손은 견주지 않는다. (지금 자르기 상태에서만, 새 자르기 안에서는 다시 견준다)
+				if (visibility === NODE_VISIBILITY_INSIDE && !isInsideVisible) {
+					this.#insideVisibleClipStateSerial = this.#clipStateSerial;
+					this.#insideVisibleViewportWidth = this.#appliedViewportWidth;
+					this.#insideVisibleViewportHeight = this.#appliedViewportHeight;
+				}
 				node.draw(this);
 			}
 			this.#isTextBakeScaleMoving = false;
@@ -5402,6 +5554,9 @@ export class Graphic extends Object {
 			}
 		}
 		finally {
+			this.#insideVisibleClipStateSerial = previousInsideVisibleClipStateSerial;
+			this.#insideVisibleViewportWidth = previousInsideVisibleViewportWidth;
+			this.#insideVisibleViewportHeight = previousInsideVisibleViewportHeight;
 			this.#isTextBakeScaleMoving = false;
 			node.popTransform(this);
 		}
@@ -5457,6 +5612,7 @@ export class Graphic extends Object {
 				cullMinimumY: 0,
 				cullMaximumX: 0,
 				cullMaximumY: 0,
+				previousClipStateSerial: 0,
 			};
 			this.#clipEntryPool.push(clipEntry);
 		}
@@ -5539,6 +5695,10 @@ export class Graphic extends Object {
 			clipEntry.shaderClipSlotGeneration = -1;
 		}
 		this.#clipStack.push(clipEntry);
+		// 새 자르기 상태 번호. (보이는 사각형 안에 다 든 조상 아래라도 이 자르기 안에서는 다시 견준다)
+		clipEntry.previousClipStateSerial = this.#clipStateSerial;
+		this.#clipStateSerialCounter += 1;
+		this.#clipStateSerial = this.#clipStateSerialCounter;
 		this.applyShaderClipFromStack();
 		if (isShaderClip) {
 			return;
@@ -5846,6 +6006,8 @@ export class Graphic extends Object {
 		if (!clipEntry) {
 			return;
 		}
+		// 걸기 전 자르기 상태로 돌아간다. (그 상태에서 보이는 사각형 안에 다 든 노드는 다시 견주지 않는다)
+		this.#clipStateSerial = clipEntry.previousClipStateSerial;
 
 		// 셰이더 자르기는 바깥 자르기로 돌아가기만 한다. (묶음을 끊지 않는다)
 		if (clipEntry.isShaderClip) {

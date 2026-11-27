@@ -35,6 +35,7 @@ window.captureList = [];
 window.frameList = [];
 
 // 그리기 순회가 노드를 돌 때마다 세는 컴포넌트. (화면 밖 거르기가 컴포넌트마다 isDrawnInsideContent 를 묻는다, 내용 영역 안에 작은 점)
+// 보이는 사각형 안에 다 든 하위 트리(Graphic.isInsideVisibleBounds)는 묻지 않고 그리므로 그때는 draw 에서 센다.
 class VisitCounter extends Component {
 	countList = null;
 	countIndex = -1;
@@ -43,6 +44,9 @@ class VisitCounter extends Component {
 		return true;
 	}
 	draw(graphic) {
+		if (typeof graphic.isInsideVisibleBounds === "function" && graphic.isInsideVisibleBounds()) {
+			this.countList[this.countIndex] += 1;
+		}
 		graphic.setFillColor(Colors.white);
 		graphic.drawRect(Rect.create(1, 1, 2, 2));
 	}

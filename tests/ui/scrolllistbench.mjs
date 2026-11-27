@@ -9,7 +9,7 @@
 //   (기준 해상도 1280x720, 줄 높이 56 과 사이 12, 보이는 칸 높이 572, 이름 칸과 조절 칸이 묶음 노드 아래 바로 자식으로 납작하게 놓임,
 //    슬라이더 줄(UISlider 손잡이 반지름 13, 켬 칸 단추와 체크 그림, 누름 자리), 고르기 줄(글 단추 셋과 누름 자리), 언어 단추, 계정 줄, 판 줄, 무리 머리글과 줄을 120 줄만큼 되풀이,
 //    글 단추는 칠, UIButton, ButtonMotion, 글 노드의 UILabel. 게임만의 컴포넌트(GlossSkin, GlossSlider, HitArea)는 넣지 않는다. 게임 거르기는 ScrollCulling 처럼 보이는 칸과 위아래 한 줄 밖의 바로 자식을 끈다)
-// - 부하와 상관없는 근거로 59 번(멈춤)과 250 번(스크롤) 프레임에 변환을 건 수(Graphic.pushState 수)를 센다.
+// - 부하와 상관없는 근거로 59 번(멈춤)과 250 번(스크롤) 프레임에 변환을 건 수(Graphic.pushState 수)와 그리기 순회 단계별 호출 수를 센다.
 // - 시험이 아니다. (tests/run.mjs 가 돌리지 않는다, 값은 기계마다 다르다) 크롬 경로는 CHROME_PATH 로 바꿀 수 있다.
 //==============================================================================
 import fs from "node:fs";
@@ -32,7 +32,7 @@ function parseRepeatCount(text) {
 
 const PAGE_SOURCE = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{position:absolute;left:0;top:0;width:100%;height:100%}</style><canvas id="mainCanvas"></canvas>
 <script type="module">
-const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Color, Pivot, Paint, Outline, Sprite, TextAlign, ViewScaleMode, UIView, UILabel, UIButton, UIScrollView, UISlider, ButtonMotion } = await import("/import.js");
+const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Color, Pivot, Paint, Outline, Sprite, TextAlign, ViewScaleMode, UIView, UILabel, UIButton, UIScrollView, UISlider, ButtonMotion, TransformNode } = await import("/import.js");
 const mode = new URLSearchParams(location.search).get("mode");
 const sceneName = new URLSearchParams(location.search).get("scene");
 const ROW_COUNT = 120;
@@ -42,26 +42,55 @@ const STATIC_FIRST_FRAME = 60;
 const SCROLL_FIRST_FRAME = 180;
 const LAST_FRAME = 299;
 window.frameList = [];
-// 센 프레임(멈춤 59, 스크롤 250)에만 그리기 순회가 변환을 건 수(pushState 수, 노드마다 하나 + 자르기와 층)를 센다. (부하와 상관없는 근거, 59 는 재는 구간 밖이다)
+// 센 프레임(멈춤 59, 스크롤 250)에만 그리기 순회가 변환을 건 수(pushState 수, 노드마다 하나 + 자르기와 층)와 단계별 호출 수를 센다. (부하와 상관없는 근거, 59 는 재는 구간 밖이다)
+// - 단계: drawNode(노드 방문), drawComponent(컴포넌트 그리기), isLocalRectVisible(변환 뒤 하위 트리 견주기와 컴포넌트 거르기의 화면 견주기),
+//   readParentDrawBounds(부모 좌표 먼저 거르기), readSubtreeDrawBounds(하위 트리 경계 읽기).
 const PUSH_STATE_COUNT_FRAME_LIST = [59, 250];
-function beginPushStateCount(graphic, frameNumber) {
+const STAGE_NAME_LIST = ["pushState", "drawNode", "drawComponent", "isLocalRectVisible", "readParentDrawBounds", "readSubtreeDrawBounds"];
+const transformNodePrototype = TransformNode.prototype;
+function wrapCountedFunction(owner, functionName, counter) {
+	const originalFunction = owner[functionName];
+	if (typeof originalFunction !== "function") {
+		return;
+	}
+	owner[functionName] = function (...argumentList) {
+		counter[functionName] += 1;
+		return originalFunction.apply(this, argumentList);
+	};
+	counter.restoreList.push(() => {
+		if (owner === transformNodePrototype) {
+			owner[functionName] = originalFunction;
+		}
+		else {
+			delete owner[functionName];
+		}
+	});
+}
+function beginStageCount(graphic, frameNumber) {
 	if (!PUSH_STATE_COUNT_FRAME_LIST.includes(frameNumber)) {
 		return null;
 	}
-	const counter = { count: 0 };
-	const pushState = graphic.pushState;
-	graphic.pushState = function () {
-		counter.count += 1;
-		return pushState.call(this);
-	};
+	const counter = { restoreList: [] };
+	for (const stageName of STAGE_NAME_LIST) {
+		counter[stageName] = 0;
+	}
+	for (const functionName of ["pushState", "drawNode", "drawComponent", "isLocalRectVisible"]) {
+		wrapCountedFunction(graphic, functionName, counter);
+	}
+	for (const functionName of ["readParentDrawBounds", "readSubtreeDrawBounds"]) {
+		wrapCountedFunction(transformNodePrototype, functionName, counter);
+	}
 	return counter;
 }
-function endPushStateCount(graphic, counter) {
+function endStageCount(graphic, counter) {
 	if (counter === null) {
-		return -1;
+		return null;
 	}
-	delete graphic.pushState;
-	return counter.count;
+	for (const restore of counter.restoreList) {
+		restore();
+	}
+	delete counter.restoreList;
+	return counter;
 }
 function createBoxNode(parentNode, x, y, width, height) {
 	const node = new WorldNode();
@@ -141,12 +170,12 @@ class SettingsScene extends Scene {
 		if (mode === "game") {
 			this.applyGameScrollCulling();
 		}
-		const pushStateCounter = beginPushStateCount(graphic, frameNumber);
+		const stageCounter = beginStageCount(graphic, frameNumber);
 		const startTime = performance.now();
 		super.draw(graphic);
 		const drawTime = performance.now() - startTime;
-		const pushStateCount = endPushStateCount(graphic, pushStateCounter);
-		window.frameList.push({ frameNumber, drawTime, pushStateCount, drawCallCount: graphic.getLastFrameDrawCallCount(), culledSubtreeCount: (typeof graphic.getLastFrameCulledSubtreeCount === "function") ? graphic.getLastFrameCulledSubtreeCount() : 0 });
+		const stageCount = endStageCount(graphic, stageCounter);
+		window.frameList.push({ frameNumber, drawTime, stageCount, drawCallCount: graphic.getLastFrameDrawCallCount(), culledSubtreeCount: (typeof graphic.getLastFrameCulledSubtreeCount === "function") ? graphic.getLastFrameCulledSubtreeCount() : 0 });
 		if (frameNumber === LAST_FRAME) {
 			window.isFinished = true;
 		}
@@ -267,12 +296,12 @@ class RimminerSettingsScene extends Scene {
 		if (mode === "game") {
 			this.applyGameScrollCulling();
 		}
-		const pushStateCounter = beginPushStateCount(graphic, frameNumber);
+		const stageCounter = beginStageCount(graphic, frameNumber);
 		const startTime = performance.now();
 		super.draw(graphic);
 		const drawTime = performance.now() - startTime;
-		const pushStateCount = endPushStateCount(graphic, pushStateCounter);
-		window.frameList.push({ frameNumber, drawTime, pushStateCount, drawCallCount: graphic.getLastFrameDrawCallCount(), culledSubtreeCount: (typeof graphic.getLastFrameCulledSubtreeCount === "function") ? graphic.getLastFrameCulledSubtreeCount() : 0 });
+		const stageCount = endStageCount(graphic, stageCounter);
+		window.frameList.push({ frameNumber, drawTime, stageCount, drawCallCount: graphic.getLastFrameDrawCallCount(), culledSubtreeCount: (typeof graphic.getLastFrameCulledSubtreeCount === "function") ? graphic.getLastFrameCulledSubtreeCount() : 0 });
 		if (frameNumber === LAST_FRAME) {
 			window.isFinished = true;
 		}
@@ -359,9 +388,14 @@ async function measureOnce(mode, sceneName) {
 		scrollTime: readMedian(scrollList.map((frame) => frame.drawTime)),
 		drawCallCount: readMedian(staticList.map((frame) => frame.drawCallCount)),
 		culledSubtreeCount: readMedian(staticList.map((frame) => frame.culledSubtreeCount)),
-		staticPushStateCount: frameList.find((frame) => frame.frameNumber === 59).pushStateCount,
-		scrollPushStateCount: frameList.find((frame) => frame.frameNumber === 250).pushStateCount,
+		staticStageCount: frameList.find((frame) => frame.frameNumber === 59).stageCount,
+		scrollStageCount: frameList.find((frame) => frame.frameNumber === 250).stageCount,
 	};
+}
+
+// 단계별 호출 수 글. (센 프레임 하나)
+function formatStageCount(stageCount) {
+	return ["drawNode", "drawComponent", "isLocalRectVisible", "readParentDrawBounds", "readSubtreeDrawBounds"].map((stageName) => stageName + " " + stageCount[stageName]).join(", ");
 }
 
 try {
@@ -382,9 +416,11 @@ try {
 			const scrollTime = readMedian(resultList.map((result) => result.scrollTime));
 			const drawCallCount = readMedian(resultList.map((result) => result.drawCallCount));
 			const culledSubtreeCount = readMedian(resultList.map((result) => result.culledSubtreeCount));
-			const staticPushStateCount = readMedian(resultList.map((result) => result.staticPushStateCount));
-			const scrollPushStateCount = readMedian(resultList.map((result) => result.scrollPushStateCount));
-			console.log(`${modeNameTable[mode]}: 멈춤 ${staticTime.toFixed(3)}, 스크롤 ${scrollTime.toFixed(3)}, 드로 콜 ${drawCallCount}, 건너뛴 하위 트리 ${culledSubtreeCount}, 변환 건 수 멈춤 ${staticPushStateCount} 스크롤 ${scrollPushStateCount}`);
+			const staticStageCount = resultList[0].staticStageCount;
+			const scrollStageCount = resultList[0].scrollStageCount;
+			console.log(`${modeNameTable[mode]}: 멈춤 ${staticTime.toFixed(3)}, 스크롤 ${scrollTime.toFixed(3)}, 드로 콜 ${drawCallCount}, 건너뛴 하위 트리 ${culledSubtreeCount}, 변환 건 수 멈춤 ${staticStageCount.pushState} 스크롤 ${scrollStageCount.pushState}`);
+			console.log(`  단계별 호출 수 멈춤: ${formatStageCount(staticStageCount)}`);
+			console.log(`  단계별 호출 수 스크롤: ${formatStageCount(scrollStageCount)}`);
 		}
 	}
 }

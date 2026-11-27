@@ -191,6 +191,7 @@ export class TransformNode extends ComponentNode {
 	//   범위는 하위 트리 경계를 셀 때 적어 둔 자식 경계(앞에서부터 모은 가장 큰 아래와 오른쪽, 뒤에서부터 모은 가장 작은 위와 왼쪽)로 찾으므로 자식이 어떤 차례로 놓여도 맞고,
 	//   줄처럼 차례대로 놓이면 보이는 줄만 남는다. 경계를 모르는 자식이 있으면 그 자식을 넘어 좁히지 않는다. 그리기 차례는 그대로다.
 	// - 그리는 동안 이 노드의 경계가 바뀌면(자식이 형제를 옮김 같은) 남은 자식을 모두 부른다.
+	// - 이 노드가 보이는 사각형 안에 다 든 하위 트리를 그리는 중이면(Graphic.isInsideVisibleBounds) 좁히지 않고 모두 부른다. (자식도 모두 보이는 사각형 안이다)
 	//==============================================================================
 	/**
 	 * @param { Graphic } graphic 그릴 그래픽.
@@ -262,6 +263,9 @@ export class TransformNode extends ComponentNode {
 	 */
 	#findVisibleChildRange(graphic, childCount) {
 		if (childCount < 2 || this.#childRangeStamp !== this.#drawBoundsStamp || this.#childRangeCount !== childCount || this.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+			return false;
+		}
+		if (typeof graphic.isInsideVisibleBounds === "function" && graphic.isInsideVisibleBounds()) {
 			return false;
 		}
 		if (this.#drawBoundsGeneration !== Component.getDrawnRectGeneration() || typeof graphic.readLocalVisibleBounds !== "function" || !graphic.readLocalVisibleBounds(visibleChildRect)) {

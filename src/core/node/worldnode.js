@@ -176,6 +176,7 @@ export class WorldNode extends TransformNode {
     // - 내용 영역 안에서만 그린다고 알리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 본다. (나인 슬라이스가 크기를 올림해 한 단위 안쪽으로 넘칠 수 있다)
     // - 밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 가 알려 준 사각형으로 본다. (넘친 글 등, 모르면 거르지 않는다)
     // - 자식은 여기서 보지 않는다. 자식은 저마다 따로 본다.
+    // - 하위 트리가 보이는 사각형 안에 다 든 노드를 그리는 중이면(Graphic.isInsideVisibleBounds) 견주지 않는다. (컴포넌트가 그리는 곳은 하위 트리 경계 안이다)
     //==============================================================================
     /**
      * @param { Graphic } graphic 화면 밖 거르기를 물을 그래픽.
@@ -183,7 +184,7 @@ export class WorldNode extends TransformNode {
      * @returns { boolean } 컴포넌트 그리기를 건너뛰어도 되면 참.
      */
     #isComponentDrawCulled(graphic, components) {
-        if (!graphic.isCullingEnabled()) {
+        if (!graphic.isCullingEnabled() || (typeof graphic.isInsideVisibleBounds === "function" && graphic.isInsideVisibleBounds())) {
             return false;
         }
 

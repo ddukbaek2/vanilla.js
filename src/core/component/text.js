@@ -970,16 +970,19 @@ export class Text extends Component {
 	// - 한 줄 글: 정렬로 놓은 글의 너비(맞춘 크기, 넘쳐도 그 너비)에 외곽선과 글꼴 크기의 반만큼을 양옆에 더하고,
 	//   세로는 베이스라인 자리에서 위아래로 글꼴 크기의 1.5 배씩 넉넉히 잡는다.
 	// - 줄을 바꾸는 글: 나눈 줄 가운데 가장 넓은 줄로 가로를 잡고, 세로는 줄 묶음(줄 수 × 줄 높이)에 글꼴 크기만큼씩 넉넉히 잡는다.
-	// - 글이 없거나 잴 수 없으면 false. (거르지 않는다)
+	// - 글이 비었으면 그리는 것이 없으므로 크기 0 을 적고 true. (draw 도 그리지 않는다, 빈 글 라벨이 든 하위 트리도 건너뛸 수 있다)
+	// - 잴 수 없으면 false. (거르지 않는다)
 	//==============================================================================
 	/**
 	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
-	 * @returns { boolean } 적었으면 참. (글이 없거나 잴 수 없으면 거짓)
+	 * @returns { boolean } 적었으면 참. (잴 수 없으면 거짓)
 	 */
 	calculateDrawnRect(rect) {
 		const text = this.#text;
 		if (!text) {
-			return false;
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
 		}
 		const node = this.getNode();
 		if (node === null || node === undefined || typeof node.copyContentSizeTo !== "function") {
