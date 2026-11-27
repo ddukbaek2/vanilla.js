@@ -10,6 +10,7 @@
 //    슬라이더 줄(UISlider 손잡이 반지름 13, 켬 칸 단추와 체크 그림, 누름 자리), 고르기 줄(글 단추 셋과 누름 자리), 언어 단추, 계정 줄, 판 줄, 무리 머리글과 줄을 120 줄만큼 되풀이,
 //    글 단추는 칠, UIButton, ButtonMotion, 글 노드의 UILabel. 게임만의 컴포넌트(GlossSkin, GlossSlider, HitArea)는 넣지 않는다. 게임 거르기는 ScrollCulling 처럼 보이는 칸과 위아래 한 줄 밖의 바로 자식을 끈다)
 // - 부하와 상관없는 근거로 59 번(멈춤)과 250 번(스크롤) 프레임에 변환을 건 수(Graphic.pushState 수)를 센다.
+// - BENCH_ALLOCATION=1 이면 시간 대신 켬 길의 두 장면에서 멈춘 구간(프레임 60 ~ 179)의 프레임당 할당을 CDP HeapProfiler 표본(1 KB 마다)으로 잰다. (엔진 몫과 함수마다 위)
 // - 시험이 아니다. (tests/run.mjs 가 돌리지 않는다, 값은 기계마다 다르다) 크롬 경로는 CHROME_PATH 로 바꿀 수 있다.
 //==============================================================================
 import fs from "node:fs";
@@ -364,27 +365,73 @@ async function measureOnce(mode, sceneName) {
 	};
 }
 
-try {
-	const modeList = ["off", "on", "game"];
-	const modeNameTable = { off: "끔", on: "켬", game: "게임 거르기" };
-	const sceneNameTable = { engine: "엔진 장면", rimminer: "광부 설정 창 꼴" };
-	for (const sceneName of ["engine", "rimminer"]) {
-		const resultTable = { off: [], on: [], game: [] };
-		for (let repeatIndex = 0; repeatIndex < repeatCount; ++repeatIndex) {
-			for (const mode of modeList) {
-				resultTable[mode].push(await measureOnce(mode, sceneName));
+// 켬 길의 멈춘 구간 할당 재기. (엔진 몫: 할당한 자리에서 위로 src/base 밖의 첫 자리가 엔진 src)
+async function measureAllocation(sceneName) {
+	const page = await browser.newPage();
+	await page.setViewport({ width: 640 * 2, height: 360 * 2, deviceScaleFactor: 1.5 });
+	const session = await page.target().createCDPSession();
+	await session.send("HeapProfiler.enable");
+	await page.goto("http://127.0.0.1:" + port + "/?mode=on&scene=" + sceneName);
+	await page.waitForFunction(() => window.frameList.length >= 60, { timeout: 120000, polling: 1 });
+	const startFrame = await page.evaluate(() => window.frameList.length);
+	await session.send("HeapProfiler.startSampling", { samplingInterval: 1024, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+	await page.waitForFunction(() => window.frameList.length >= 175, { timeout: 120000, polling: 1 });
+	const { profile } = await session.send("HeapProfiler.stopSampling");
+	const endFrame = await page.evaluate(() => window.frameList.length);
+	await page.close();
+	const frameCount = endFrame - startFrame;
+	const ownerTable = new Map();
+	let engineSize = 0;
+	let totalSize = 0;
+	const visit = (node, owner) => {
+		const callFrame = node.callFrame;
+		const nextOwner = (!callFrame.url.includes("/src/base/") && callFrame.url !== "") ? callFrame : owner;
+		if (node.selfSize > 0) {
+			totalSize += node.selfSize;
+			if (nextOwner !== null && nextOwner.url.includes("/src/")) {
+				engineSize += node.selfSize;
+				const key = (nextOwner.functionName || "(anonymous)") + " " + path.basename(nextOwner.url) + ":" + nextOwner.lineNumber;
+				ownerTable.set(key, (ownerTable.get(key) ?? 0) + node.selfSize);
 			}
 		}
-		console.log(`${sceneNameTable[sceneName]} 그리기 가운데 값 (반복 ${repeatCount}, ms)`);
-		for (const mode of modeList) {
-			const resultList = resultTable[mode];
-			const staticTime = readMedian(resultList.map((result) => result.staticTime));
-			const scrollTime = readMedian(resultList.map((result) => result.scrollTime));
-			const drawCallCount = readMedian(resultList.map((result) => result.drawCallCount));
-			const culledSubtreeCount = readMedian(resultList.map((result) => result.culledSubtreeCount));
-			const staticPushStateCount = readMedian(resultList.map((result) => result.staticPushStateCount));
-			const scrollPushStateCount = readMedian(resultList.map((result) => result.scrollPushStateCount));
-			console.log(`${modeNameTable[mode]}: 멈춤 ${staticTime.toFixed(3)}, 스크롤 ${scrollTime.toFixed(3)}, 드로 콜 ${drawCallCount}, 건너뛴 하위 트리 ${culledSubtreeCount}, 변환 건 수 멈춤 ${staticPushStateCount} 스크롤 ${scrollPushStateCount}`);
+		for (const child of node.children ?? []) {
+			visit(child, nextOwner);
+		}
+	};
+	visit(profile.head, null);
+	const toKilobyte = (size) => (size / 1024 / frameCount).toFixed(2);
+	const topList = [...ownerTable.entries()].sort((first, second) => second[1] - first[1]).slice(0, 10).map(([key, size]) => key + " " + toKilobyte(size));
+	console.log(`${sceneName} 켬 멈춤 할당 (KB/프레임, ${frameCount} 프레임): 전체 ${toKilobyte(totalSize)}, 엔진 몫 ${toKilobyte(engineSize)}\n  ${topList.join(" | ")}`);
+}
+
+try {
+	if (process.env.BENCH_ALLOCATION === "1") {
+		for (const sceneName of ["engine", "rimminer"]) {
+			await measureAllocation(sceneName);
+		}
+	}
+	else {
+		const modeList = ["off", "on", "game"];
+		const modeNameTable = { off: "끔", on: "켬", game: "게임 거르기" };
+		const sceneNameTable = { engine: "엔진 장면", rimminer: "광부 설정 창 꼴" };
+		for (const sceneName of ["engine", "rimminer"]) {
+			const resultTable = { off: [], on: [], game: [] };
+			for (let repeatIndex = 0; repeatIndex < repeatCount; ++repeatIndex) {
+				for (const mode of modeList) {
+					resultTable[mode].push(await measureOnce(mode, sceneName));
+				}
+			}
+			console.log(`${sceneNameTable[sceneName]} 그리기 가운데 값 (반복 ${repeatCount}, ms)`);
+			for (const mode of modeList) {
+				const resultList = resultTable[mode];
+				const staticTime = readMedian(resultList.map((result) => result.staticTime));
+				const scrollTime = readMedian(resultList.map((result) => result.scrollTime));
+				const drawCallCount = readMedian(resultList.map((result) => result.drawCallCount));
+				const culledSubtreeCount = readMedian(resultList.map((result) => result.culledSubtreeCount));
+				const staticPushStateCount = readMedian(resultList.map((result) => result.staticPushStateCount));
+				const scrollPushStateCount = readMedian(resultList.map((result) => result.scrollPushStateCount));
+				console.log(`${modeNameTable[mode]}: 멈춤 ${staticTime.toFixed(3)}, 스크롤 ${scrollTime.toFixed(3)}, 드로 콜 ${drawCallCount}, 건너뛴 하위 트리 ${culledSubtreeCount}, 변환 건 수 멈춤 ${staticPushStateCount} 스크롤 ${scrollPushStateCount}`);
+			}
 		}
 	}
 }
