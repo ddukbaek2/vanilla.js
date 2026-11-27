@@ -1784,7 +1784,11 @@ export class Graphic extends Object {
 		webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
 		webGL2RenderingContext.scissor(backdropRect.x, backdropRect.y, backdropRect.width, backdropRect.height);
 		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
+		// 비운 가위를 셰이더 자르기 가위로 되돌린다. (자르기가 없으면 가위를 끈다)
+		// 떠 오기는 가위에 잘려 자르기 안만 떠 왔으므로, 옮겨 섞을 때 가위가 없으면 자르기 밖을 낡은 떠 온 값으로 덮는다.
 		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		this.#isClipScissorEnabled = false;
+		this.applyClipScissor();
 		this.useShaderProgram(shaderProgramOverride);
 		this.uploadDrawUniforms(shaderProgramOverride, color);
 		this.bindTexture(texture);

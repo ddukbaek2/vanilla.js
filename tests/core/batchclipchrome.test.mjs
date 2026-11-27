@@ -2,7 +2,8 @@
 // 2D 묶음의 셰이더 자르기와 자르기 안 거르기 크롬 시험. (NODE_PATH=$(npm root -g) node tests/core/batchclipchrome.test.mjs)
 // - 축에 맞고 화소 경계에 놓인 자르기는 스텐실 대신 묶음 셰이더로 자른다. 같은 장면을 아주 조금 돌려(1e-9 라디안) 스텐실 길로 그린 것과 화소가 모두 같은지 본다.
 //   장면: 스크롤 칸(UIScrollView, 줄 40 개), 겹친 자르기, 둥근 자르기 안팎, 정점 색 쿼드, 더하기와 셰이더 섞기, 불투명도 층, 바깥 WebGL 패스,
-//   스텐실 테스트를 끄고 돌아오는 바깥 패스 뒤의 둥근 자르기.
+//   스텐실 테스트를 끄고 돌아오는 바깥 패스 뒤의 둥근 자르기, 축에 맞는 자르기 안에서 바꿔 끼운 셰이더에 셰이더 섞기(overlay)를 준 그리기.
+// - 바꿔 끼운 셰이더와 셰이더 섞기는 덧그림 칸에 먼저 그리고 옮겨 섞는다. 옮길 때 자르기 밖을 덮지 않는지(바탕색이 남는지) 본다.
 // - 셰이더 길이 드로 콜이 더 적고, 스크롤 칸 밖 줄의 컴포넌트를 거르는지(getLastFrameCulledNodeCount) 본다.
 // - 씬이 그려진 다섯째 프레임을 찍는다. (씬은 불러온 뒤 로딩 화면을 0.3 초 더 보여서, 정한 프레임 번호로 찍으면 로딩 화면끼리 견주거나 한쪽만 로딩 화면이 된다)
 //   찍은 화면이 로딩 화면(검정)이 아닌지도 본다.
@@ -22,7 +23,7 @@ const contentTypeTable = { ".js": "text/javascript", ".mjs": "text/javascript", 
 
 const PAGE_SOURCE = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{position:absolute;left:0;top:0;width:100%;height:100%}</style><canvas id="mainCanvas"></canvas>
 <script type="module">
-const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Rect, Color, Pivot, Paint, TextAlign, ViewScaleMode, UILabel, UIButton, UIScrollView } = await import("/import.js");
+const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Rect, Color, Pivot, Paint, TextAlign, ViewScaleMode, UILabel, UIButton, UIScrollView, ShaderProgram } = await import("/import.js");
 const rotation = new URLSearchParams(location.search).get("rotation") === "1" ? 1e-9 : 0;
 const CAPTURE_DRAWN_FRAME_COUNT = 5;
 function createBoxNode(parentNode, position, size) {
@@ -34,6 +35,7 @@ function createBoxNode(parentNode, position, size) {
 	return node;
 }
 let externalProgram = null;
+let overrideProgram = null;
 let drawnFrameCount = 0;
 class BatchClipScene extends Scene {
 	initialize(engine) {
@@ -150,6 +152,24 @@ class BatchClipScene extends Scene {
 		graphic.setFillColor("#20e070");
 		graphic.drawRect(Rect.create(0, 230, 200, 130));
 		graphic.endClipRect();
+		// 축에 맞는 자르기 안에서 바꿔 끼운 셰이더에 셰이더 섞기를 준다. (바탕을 깔고, 자르기보다 넓게 그린다)
+		graphic.setFillColor("#406080");
+		graphic.drawRect(Rect.create(220, 230, 400, 120));
+		if (overrideProgram === null) {
+			const vertexShaderSource = "#version 300 es\\nin vec2 vertexPosition; in vec2 vertexTextureCoordinate; uniform mat3 projectionMatrix; uniform mat3 modelMatrix; out vec2 textureCoordinate;\\n"
+				+ "void main() { vec3 position = projectionMatrix * modelMatrix * vec3(vertexPosition, 1.0); gl_Position = vec4(position.xy, 0.0, 1.0); textureCoordinate = vertexTextureCoordinate; }";
+			const fragmentShaderSource = "#version 300 es\\nprecision highp float; in vec2 textureCoordinate; uniform sampler2D mainTexture; uniform vec4 mainColor; uniform float globalAlpha; out vec4 outputColor;\\n"
+				+ "void main() { float alpha = texture(mainTexture, textureCoordinate).a * mainColor.a * globalAlpha; outputColor = vec4(vec3(1.0, 0.3, 0.1) * alpha, alpha); }";
+			overrideProgram = new ShaderProgram(graphic.getWebGL2RenderingContext(), vertexShaderSource, fragmentShaderSource);
+		}
+		graphic.beginClipRect(Rect.create(300, 260, 120, 60));
+		graphic.setBlendMode("overlay");
+		graphic.setShaderProgramOverride(overrideProgram);
+		graphic.setFillColor("#ffffff");
+		graphic.drawRect(Rect.create(240, 240, 300, 100));
+		graphic.setShaderProgramOverride(null);
+		graphic.setBlendMode("source-over");
+		graphic.endClipRect();
 		window.drawCallCountList.push(graphic.getLastFrameDrawCallCount());
 		window.culledNodeCountList.push(graphic.getLastFrameCulledNodeCount());
 	}
@@ -254,6 +274,13 @@ try {
 		checkEqual([result.pixels[insideOffset], result.pixels[insideOffset + 1], result.pixels[insideOffset + 2]].join(","), "32,224,112", "바깥 패스가 스텐실을 끈 뒤 둥근 자르기 안");
 		const cornerOffset = ((251 * 3) * result.width + 41 * 3) * 4;
 		checkEqual([result.pixels[cornerOffset], result.pixels[cornerOffset + 1], result.pixels[cornerOffset + 2]].join(","), "0,0,0", "바깥 패스가 스텐실을 끈 뒤 둥근 자르기 모서리 밖");
+	}
+	// 바꿔 끼운 셰이더와 셰이더 섞기: 자르기 밖(260, 290)은 바탕색, 자르기 안(360, 290)은 섞인 색. (화면 배율 3)
+	for (const result of [shaderClipResult, stencilClipResult]) {
+		const outsideOffset = ((290 * 3) * result.width + 260 * 3) * 4;
+		checkEqual([result.pixels[outsideOffset], result.pixels[outsideOffset + 1], result.pixels[outsideOffset + 2]].join(","), "64,96,128", "바꿔 끼운 셰이더 섞기 자르기 밖");
+		const insideOffset = ((290 * 3) * result.width + 360 * 3) * 4;
+		check(result.pixels[insideOffset] !== 64 || result.pixels[insideOffset + 1] !== 96 || result.pixels[insideOffset + 2] !== 128, "바꿔 끼운 셰이더 섞기 자르기 안은 섞였다");
 	}
 	const shaderDrawCallCount = shaderClipResult.drawCallCountList[shaderClipResult.drawCallCountList.length - 1];
 	const stencilDrawCallCount = stencilClipResult.drawCallCountList[stencilClipResult.drawCallCountList.length - 1];
