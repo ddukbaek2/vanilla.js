@@ -96,6 +96,7 @@ void main() {
 // - 색 공간: 씬 렌더 타겟에는 선형 색을 쓴다. (ToonRenderer.setHdrOutput(true), ToonScreenOutline.setHdrOutput(true), ToonVfx 색도 선형으로 본다)
 //   감마를 건 색 g 를 실수 판에 쓰고 합성에서 g^2.2 로 되돌리던 게임은 그 값을 미리 선형으로 바꿔 넘긴다. 색은 c^2.2, 감마 쪽에서 곱하던 밝기 배 k 는 선형 k^2.2 다.
 //   (예: 1.37 은 선형 2, 1.6 은 2.81, 2.08 은 5, 밝기 1.6 에 배 1.6 이면 (1.6 x 1.6)^2.2 = 7.9) 블룸 문턱과 무릎은 선형 밝기다.
+//   이 예는 감마 쪽(감마를 건 색 g)에서 곱하던 배일 때만 맞다. 선형 색에 곱하던 배와 블룸 문턱, 무릎처럼 처음부터 선형인 값은 바꾸지 않고 그대로 넘긴다.
 // - 실수 판을 못 쓰는 기기: useFloatColor(기본 true)여도 ToonPostProcess.isFloatColorSupported 가 false 면 RGBA8 판으로 짓는다. (getUseFloatColor 가 false)
 //   그때와 useFloatColor: false 는 LDR 길이다. 씬에는 화면 색(감마를 건 색, ToonRenderer.setHdrOutput(false))을 그리고, 합성은 톤매핑과 감마 없이 블룸을 더해 색 보정만 건다.
 // - 블룸: 기본은 반 해상도 9 탭 가우시안(BloomEffect, 문턱 0.9 ~ 1.6, 주고받는 판 RGBA8, setBloomFloatColor 로 RGBA16F).

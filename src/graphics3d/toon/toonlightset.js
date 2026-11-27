@@ -66,6 +66,7 @@ function normalizeDirection(direction) {
 // - 빛 색 쓰기(setLightColorUsage): 색마다 빛 색을 곱할지 고른다. 끄면 그 색은 빛의 세기(0.299 R + 0.587 G + 0.114 B)만 받고, 림과 매트캡과 천사 고리와 바깥선은 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬)
 // - 빛 세기 막기(setLightIntensityLimited): 빛마다 받은 몫을 1 로 막는다. 해와 채움 빛은 채널마다 1 로 자르고, 점광과 스포트라이트는 감쇠까지 곱한 색의 세기가 1 을 넘으면 세기로 나눈다.
 //   (유니티 툰 셰이더의 Limit Light Intensity, 기본 켬) HDR 블룸에 센 빛을 쓰려면 끈다.
+//   옛 게임 셰이더(빛 세기를 막지 않던 것)를 옮길 때나 세기 1 을 넘는 점광, HDR 블룸을 쓸 때는 setLightIntensityLimited(false).
 // - 점광과 스포트라이트: TOON_MAXIMUM_POINT_LIGHTS 까지. { position, color(선형), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle, castsShadow, shadowNear }
 //   castsShadow 가 true 인 빛은 ShadowAtlas.updateLights 가 그림자 칸을 준다. (점광은 큐브 여섯 면, 스포트라이트는 원근 한 칸, 먼 거리는 range, 가까운 거리는 shadowNear 기본 0.05)
 //   감쇠는 창 x 거리 감쇠다. 창은 range 가 0 보다 크면 (1 - (거리 / range)^rangeExponent) 를 0 ~ 1 로 막아 제곱, 0 이면 1. 거리 감쇠는 decay 가 0 보다 크면 1 / max(거리^decay, 0.01), 0 이면 1.
@@ -372,6 +373,7 @@ export class ToonLightSet {
 	// - 해와 채움 빛은 색의 채널마다 1 로 자른다. (주광의 saturate)
 	// - 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. (추가 빛의 min(색, 색 / 세기))
 	// - 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 1 로 막는다.
+	// - 옛 게임 셰이더(빛 세기를 막지 않던 것)를 옮길 때나 세기 1 을 넘는 점광, HDR 블룸을 쓸 때는 setLightIntensityLimited(false).
 	//==============================================================================
 	/**
 	 * @param { boolean } isLimited - true 면 막는다.

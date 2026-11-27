@@ -620,7 +620,9 @@
 - 빛 세기 막기: ToonLightSet.setLightIntensityLimited(참 거짓), isLightIntensityLimited() (렌더러에도 setLightIntensityLimited). 유니티 툰 셰이더의 Limit Light Intensity 와 같은 셈이고 기본은 유니티 툰 셰이더 기본처럼 켬이다
   - 해와 채움 빛은 채널마다 1 로 자르고, 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 막는다
   - 1 을 넘는 해나 센 점광을 쓰던 장면은 화면이 바뀐다. (HDR 블룸에 센 빛을 쓰던 것) 지금까지 모습은 setLightIntensityLimited(false)
+  - 옛 게임 셰이더(빛 세기를 막지 않던 것)를 옮길 때나 세기 1 을 넘는 점광, HDR 블룸을 쓸 때는 setLightIntensityLimited(false)
   - 빛 색 쓰기를 끈 색이 받는 세기도 유니티 툰 셰이더와 같은 0.299 R + 0.587 G + 0.114 B 로 바꿨다. 껍데기 바깥선에 곱하는 해의 색은 세기가 1 이상이면 세기로 나눈다 (유니티 툰 셰이더 바깥선)
+- 툰 GLB 접근자 읽기: 바이너리 덩어리 밖을 읽는 접근자는 빈 모형이 아니라 오류("GLB 접근자 N 가 바이너리 덩어리 밖을 읽습니다.")를 던지고, bufferView 가 없는 접근자는 glTF 명세대로 0 으로 채운다 (러스트 판과 같다)
 - ShadowAtlas: 칸 크기를 유니티 URP 기본과 같게 했다. new ShadowAtlas(컨텍스트, 해상도 기본 2048, 칸 해상도 기본 1024) 로 칸마다 1024 를 바라고, 다 들어가지 않으면 다 들어갈 때까지 반씩 줄인다 (URP 추가 빛 그림자 아틀라스 기본 2048, 해상도 단계 High 기본 1024, 빛의 기본 단계 High). getTileResolution
   - 지금까지는 칸 수의 제곱근으로 격자를 나눠 점광 하나가 682 였는데 이제 512, 스포트라이트 하나는 2048 이었는데 이제 1024 다. 더 곱게 하려면 해상도와 칸 해상도를 올린다
 - 예제 toonstyle: ?roll=라디안 으로 카메라를 기울인다 (천사 고리 기울임 되돌리기)

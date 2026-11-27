@@ -97,7 +97,7 @@ const LOOP_ONCE = "once";
 
 
 //==============================================================================
-// 접근자 하나 읽기. (촘촘한 것과 byteStride 로 띄운 것)
+// 접근자 하나 읽기. (촘촘한 것과 byteStride 로 띄운 것, 바이너리 덩어리 밖을 읽으면 오류, bufferView 가 없으면 glTF 명세대로 0 으로 채움)
 //==============================================================================
 /**
  * @param { object } json - glTF 의 JSON 덩어리.
@@ -109,6 +109,9 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
 	const accessor = json.accessors[accessorIndex];
 	const componentCount = TYPE_COMPONENT_COUNTS[accessor.type];
 	const ArrayConstructor = COMPONENT_ARRAYS[accessor.componentType];
+	if (accessor.bufferView === undefined) {
+		return new ArrayConstructor(accessor.count * componentCount);
+	}
 	const bufferView = json.bufferViews[accessor.bufferView];
 	if ((bufferView.buffer || 0) !== 0) {
 		throw new System.Error(`GLB 의 바깥 버퍼(buffers[${bufferView.buffer}])는 읽지 못합니다. (바이너리 덩어리 buffers[0] 만 읽는다, EXT_meshopt_compression 의 fallback 버퍼도 여기 든다)`);
@@ -116,6 +119,13 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
 	const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
 	const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
 	const byteStride = bufferView.byteStride || 0;
+	const stride = byteStride === 0 ? tightByteSize : byteStride;
+	if (accessor.count > 0) {
+		const endOffset = elementOffset + (accessor.count - 1) * stride + tightByteSize;
+		if (endOffset > binaryBuffer.byteLength) {
+			throw new System.Error(`GLB 접근자 ${accessorIndex} 가 바이너리 덩어리 밖을 읽습니다. (바이트 ${elementOffset} ~ ${endOffset}, 바이너리 덩어리 ${binaryBuffer.byteLength} 바이트)`);
+		}
+	}
 	if (byteStride === 0 || byteStride === tightByteSize) {
 		return new ArrayConstructor(binaryBuffer.slice(elementOffset, elementOffset + accessor.count * tightByteSize));
 	}

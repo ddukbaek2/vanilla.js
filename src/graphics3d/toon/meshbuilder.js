@@ -202,7 +202,7 @@ export function createRoundedBoxGeometry(width, height, depth, segments, radius)
 						return System.Math.max(-innerSizes[valueIndex], System.Math.min(innerSizes[valueIndex], value));
 					});
 					const direction = [point[0] - inner[0], point[1] - inner[1], point[2] - inner[2]];
-					const length = System.Math.hypot(direction[0], direction[1], direction[2]);
+					const length = System.Math.sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
 					const normal = length > 0 ? direction.map((value) => {
 						return value / length;
 					}) : [0, 0, 0];
@@ -251,7 +251,7 @@ export function createCylinderGeometry(radiusTop, radiusBottom, height, radialSe
 		const angle = segmentIndex / radialSegments * System.Math.PI * 2;
 		const sine = System.Math.sin(angle);
 		const cosine = System.Math.cos(angle);
-		const normalLength = System.Math.hypot(1, slope);
+		const normalLength = System.Math.sqrt(1 + slope * slope);
 		geometry.positions.push(radiusTop * sine, halfHeight, radiusTop * cosine);
 		geometry.normals.push(sine / normalLength, slope / normalLength, cosine / normalLength);
 		geometry.positions.push(radiusBottom * sine, -halfHeight, radiusBottom * cosine);
@@ -342,7 +342,7 @@ export function createLatheGeometry(points, segments) {
 		const next = points[System.Math.min(points.length - 1, pointIndex + 1)];
 		const tangentX = next[0] - previous[0];
 		const tangentY = next[1] - previous[1];
-		const length = System.Math.hypot(tangentX, tangentY);
+		const length = System.Math.sqrt(tangentX * tangentX + tangentY * tangentY);
 		if (length <= 0) {
 			return [1, 0];
 		}
@@ -495,7 +495,7 @@ export function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
 	const faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
 	const scaleCount = vertexScales.length;
 	const corners = baseCorners.map((corner, cornerIndex) => {
-		const length = System.Math.hypot(corner[0], corner[1], corner[2]);
+		const length = System.Math.sqrt(corner[0] * corner[0] + corner[1] * corner[1] + corner[2] * corner[2]);
 		const vertexScale = scaleCount > 0 ? vertexScales[cornerIndex % scaleCount] : 1;
 		const scale = radius * vertexScale / length;
 		return [corner[0] * scale * axisScale[0], corner[1] * scale * axisScale[1], corner[2] * scale * axisScale[2]];
@@ -515,7 +515,7 @@ export function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
 			third = swapped;
 			normal = [-normal[0], -normal[1], -normal[2]];
 		}
-		const normalLength = System.Math.max(0.000001, System.Math.hypot(normal[0], normal[1], normal[2]));
+		const normalLength = System.Math.max(0.000001, System.Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]));
 		const startIndex = geometry.positions.length / 3;
 		for (const corner of [first, second, third]) {
 			geometry.positions.push(corner[0], corner[1], corner[2]);
@@ -778,7 +778,7 @@ export class MeshBuilder {
 			const startIndex = this.#outlinePositions.length / 3;
 			for (const corner of corners) {
 				const entry = pointNormals.get(readPointKey(corner));
-				const sumLength = System.Math.hypot(entry.sum[0], entry.sum[1], entry.sum[2]);
+				const sumLength = System.Math.sqrt(entry.sum[0] * entry.sum[0] + entry.sum[1] * entry.sum[1] + entry.sum[2] * entry.sum[2]);
 				const scale = sumLength > 0 ? outlineWidth / sumLength : 0;
 				this.#outlinePositions.push(corner[0] + entry.sum[0] * scale, corner[1] + entry.sum[1] * scale, corner[2] + entry.sum[2] * scale);
 				this.#outlineBasePositions.push(corner[0], corner[1], corner[2]);
@@ -1291,9 +1291,9 @@ export class MeshBuilder {
 	 * @returns { number } 세 축 길이 가운데 가장 큰 것.
 	 */
 	readMaximumScale(elements) {
-		const scaleX = System.Math.hypot(elements[0], elements[1], elements[2]);
-		const scaleY = System.Math.hypot(elements[4], elements[5], elements[6]);
-		const scaleZ = System.Math.hypot(elements[8], elements[9], elements[10]);
+		const scaleX = System.Math.sqrt(elements[0] * elements[0] + elements[1] * elements[1] + elements[2] * elements[2]);
+		const scaleY = System.Math.sqrt(elements[4] * elements[4] + elements[5] * elements[5] + elements[6] * elements[6]);
+		const scaleZ = System.Math.sqrt(elements[8] * elements[8] + elements[9] * elements[9] + elements[10] * elements[10]);
 		return System.Math.max(scaleX, scaleY, scaleZ);
 	}
 
