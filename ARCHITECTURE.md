@@ -340,7 +340,7 @@ rim        = 색 x mix(0.5 를 가른 pow(1 - N.V, 거듭제곱), 그대로, 부
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
 - 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
 - API 문서 자료(docs/api/<버전>.json)는 tools/apidoc.cjs 가 이 표면의 소스 주석과 JSDoc 에서 뽑는다. 예제는 `@example`, 그 바로 뒤의 `@exampleImage <파일 이름>` 이 예제 그림(docs/guide/<버전>/images/, 가이드와 같이 씀)이다. 자세한 꼴은 tools/TOOLS.md.
-- **의도적 미노출** = 내부 구현 취급: `Layer`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
+- **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DevTools`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
 
 ---
 

@@ -289,7 +289,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 - A single barrel file at the repository root. Its 13 comment-section blocks (built-in/base/core/basic components/UI/resources/other/collections/animation/shaders and fullscreen pass/3D graphics/to be deprecated/experimental) are the logical layer divisions, and after the experimental block come exports with a one-line comment per branch.
 - Enums are exported on the same line together with their class (`export { ViewScaleMode, ViewManager }`).
 - Function-collection modules are exported as namespaces (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
-- **Intentionally unexposed** = treated as internal implementation: `Layer`, `FbxLoader` (via SkinnedModel), the 2 texture caches and sharedbakecache, autolayout internal types (`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`). Projects that need an unexposed class import it directly by file path.
+- **Intentionally unexposed** = treated as internal implementation: `AudioManager` (used via Engine), `Layer`, `DevTools`, `FbxLoader` (via SkinnedModel), the 2 texture caches and sharedbakecache, autolayout internal types (`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), all of src/web (`Pane`, `WebSocketClient`). Projects that need an unexposed class import it directly by file path.
 
 ---
 

@@ -16,12 +16,13 @@ import { ShaderSprite, ShaderSpriteEffect } from "../effect/shadersprite.js";
 import { AudioAsset } from "../resource/audioasset.js";
 
 
-//==============================================================================
-// 이징 이름 목록. ("linear" / "step" / "bezier" / "<종류>.<in|out|inOut>")
-//==============================================================================
 // 자료 속 방향 이름("in", "out", "inOut")과 트윈 함수 이름(easeIn, easeOut, easeInOut)의 짝. (자료 꼴은 그대로 둔다)
 const TIMELINE_EASING_DIRECTION_FUNCTION_NAMES = { in: "easeIn", out: "easeOut", inOut: "easeInOut" };
 
+
+//==============================================================================
+// 이징 이름 목록. ("linear" / "step" / "bezier" / "<종류>.<in|out|inOut>")
+//==============================================================================
 export const TIMELINE_EASING_NAMES = (() => {
 	const nameList = ["linear", "step", "bezier"];
 	for (const familyName of ["quadratic", "cubic", "quartic", "quintic", "sinusoidal", "exponential", "circular", "elastic", "back", "bounce"]) {

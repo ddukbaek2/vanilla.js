@@ -289,7 +289,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 - 저장소 루트의 단일 배럴 파일. 주석 섹션 13블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/컬렉션/애니메이션/셰이더와 풀스크린 패스/3D 그래픽스/폐기 예정/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
 - 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
-- **의도적 미노출** = 내부 구현 취급: `Layer`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
+- **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DevTools`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
 
 ---
 
