@@ -10361,6 +10361,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "measure_gpu_throughput"
+							},
 							"examples": [
 								{
 									"title": {
@@ -104540,6 +104546,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonscreenoutline",
+								"class": "ToonScreenOutline",
+								"name": "set_depth_margin"
+							},
 							"examples": [
 								{
 									"title": {
@@ -105039,8 +105051,8 @@
 							"signature": "endLineIds()",
 							"params": [],
 							"description": {
-								"ko": "번호 그리기 끝. (가는 선은 씨앗 쪽 판 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)\n- 가는 선(굵기가 THIN_LINE_MAXIMUM_WIDTH 이하, 약 3.24 픽셀까지): 화면 전체 패스가 씨앗 쪽 판 하나다. 섞기가 둘레 3 x 3 화소의 씨앗을 본다. (씨앗, 모으기, 넓히기 없음)\n- 굵은 선: 씨앗, 모으기, 넓히기 걸음마다 한 패스. (씨앗 판과 넓히기 판은 처음 굵은 선을 그을 때 짓는다)\n- 판을 통째로 덮어쓰는 패스는 앞에 invalidateFramebuffer 를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰)",
-								"en": "End ID drawing. (Thin lines pick one seed side target, thick lines pick seeds and widen them with jump flooding, then restores the framebuffer, viewport and state)\n- Thin lines (width at most THIN_LINE_MAXIMUM_WIDTH, about 3.24 pixels): one full-screen pass for the seed side target. The composite looks at the seeds of the surrounding 3 x 3 pixels. (No seed, gather or widening)\n- Thick lines: one pass each for seed, gather and every widening step. (The seed and widening targets are built the first time a thick line is drawn)\n- Passes that overwrite a whole target call invalidateFramebuffer first so the old contents are not loaded. (Removes target loads on tile GPUs)"
+								"ko": "번호 그리기 끝. (가는 선은 씨앗 쪽 판 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)\n- 가는 선(굵기가 THIN_LINE_MAXIMUM_WIDTH 이하, 약 3.24 픽셀까지): 화면 전체 패스가 씨앗 쪽 판 하나다. 섞기가 둘레 3 x 3 화소의 씨앗을 본다. (씨앗, 모으기, 넓히기 없음)\n- 굵은 선: 씨앗, 모으기, 넓히기 걸음마다 한 패스. (씨앗 판과 넓히기 판은 처음 굵은 선을 그을 때 짓는다)\n- 판을 통째로 덮어쓰는 패스는 앞에 판 비우기(clearBufferuiv, clearBufferfv)를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰, invalidateFramebuffer 는 아이패드와 아이폰 사파리에서 프레임마다 약 10 ~ 25 ms 가 붙어 쓰지 않는다)",
+								"en": "End ID drawing. (Thin lines pick one seed side target, thick lines pick seeds and widen them with jump flooding, then restores the framebuffer, viewport and state)\n- Thin lines (width at most THIN_LINE_MAXIMUM_WIDTH, about 3.24 pixels): one full-screen pass for the seed side target. The composite looks at the seeds of the surrounding 3 x 3 pixels. (No seed, gather or widening)\n- Thick lines: one pass each for seed, gather and every widening step. (The seed and widening targets are built the first time a thick line is drawn)\n- Passes that overwrite a whole target clear it first (clearBufferuiv, clearBufferfv) so the old contents are not loaded. (Removes target loads on tile GPUs; invalidateFramebuffer is not used because it added about 10 to 25 ms per frame in iPad and iPhone Safari)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",

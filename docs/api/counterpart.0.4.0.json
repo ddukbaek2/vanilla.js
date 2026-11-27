@@ -8994,6 +8994,18 @@
 		{
 			"vanilla-engine": {
 				"module": "core/engine",
+				"class": "Engine",
+				"name": "measure_gpu_throughput"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "measureGpuThroughput"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
 				"class": "PageEvent"
 			},
 			"vanilla.js": {
@@ -24047,6 +24059,18 @@
 				"module": "graphics3d/toon/toonscreenoutline",
 				"class": "ToonScreenOutline",
 				"name": "setDepthThreshold"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "set_depth_margin"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "setDepthMargin"
 			}
 		},
 		{

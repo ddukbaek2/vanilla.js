@@ -43786,6 +43786,8 @@ var MultiLevelBloomEffect = class extends Object2 {
 };
 var System109 = globalThis;
 var ToonOutlineWidthUnit = System109.Object.freeze({ world: "world", pixel: "pixel" });
+var ZERO_CLEAR_VALUE = new System109.Uint32Array(4);
+var ZERO_CLEAR_FLOAT_VALUE = new System109.Float32Array(4);
 var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
 var BATCH_SLOT_MESH_LIMIT2 = 8;
 var IDENTITY_ELEMENTS2 = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -44723,10 +44725,9 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.depthMask(false);
     webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
-    const discardedAttachments = [webGL2RenderingContext.COLOR_ATTACHMENT0];
     if (isThinLine) {
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.edgeMaskFramebuffer);
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+      webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
       this.useEdgeProgram(this.#edgeMaskProgram, lineTarget, lineWidths);
       webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
       lineTarget.outlinePath = "thin";
@@ -44739,7 +44740,7 @@ var ToonScreenOutline = class {
       return;
     }
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffer);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+    webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
     this.useEdgeProgram(this.#seedProgram, lineTarget, lineWidths);
     webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
@@ -44749,7 +44750,7 @@ var ToonScreenOutline = class {
     const seedGatherProgram = this.#seedGatherProgram;
     webGL2RenderingContext.viewport(0, 0, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight);
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[0]);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+    webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
     seedGatherProgram.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTexture);
@@ -44764,7 +44765,7 @@ var ToonScreenOutline = class {
     let seedIndex = 0;
     for (const stepSize of readJumpFloodSteps(reach)) {
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[1 - seedIndex]);
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+      webGL2RenderingContext.clearBufferuiv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_VALUE);
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[seedIndex]);
       webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("stepSize"), stepSize);
@@ -44804,7 +44805,7 @@ var ToonScreenOutline = class {
     const program = this.#thinCoverageProgram;
     const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.coverageFramebuffer);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
     program.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.edgeMaskTexture);
