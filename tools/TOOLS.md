@@ -83,4 +83,6 @@ node tools/apidoc.cjs <버전> --check-examples [--only <경로 앞>] [--exclude
 
 ## 크롬 트레이스로 프레임 전체 시간을 재는 도구. (헤드리스 크롬, 전역 puppeteer-core 를 씀: NODE_PATH=$(npm root -g))
 node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--out 결과.json] [--chrome 크롬 경로]
+node tools/perftrace.mjs --attach <http://127.0.0.1:9222 또는 ws://...> [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--out 결과.json] [--keep-trace 트레이스.json]
+- --attach 는 --remote-debugging-port 로 떠 있는 크롬의 열린 페이지에 붙어 해상도 그대로 재고 떨어진다(크롬을 끄지 않음). 모듈로도 부른다: import { measureAttached } from "tools/perftrace.mjs"; await measureAttached(page 또는 browser, { seconds, warmup, target, silent }) 가 같은 결과 객체를 돌려준다. 쓰는 법은 파일 머리 주석.
 - 렌더러 메인 스레드 바쁜 시간, 그 안의 명령 버퍼 기다림, GPU 프로세스 메인 스레드 바쁜 시간, rAF 콜백 시간, 프레임 간격을 프레임마다 재어 가운데 값, 평균, p95 로 찍는다. 뜻과 셈은 파일 머리 주석.
