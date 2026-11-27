@@ -1074,6 +1074,12 @@ export class ToonScreenOutline {
 		const frame = this.#frame;
 		const lineWidths = this.readLineWidths();
 		this.#lineWidths = lineWidths;
+		// 바깥 선과 꺾임 선이 모두 0 이면 선의 판(노멀, 번호, 깊이)만 남긴다. (모서리 어둠의 미리 그리기, drawOutline 은 긋지 않는다)
+		if (lineWidths[0] <= 0 && lineWidths[1] <= 0) {
+			lineTarget.jumpFloodIndex = -1;
+			this.restoreState();
+			return;
+		}
 		webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
 		webGL2RenderingContext.viewport(0, 0, lineTarget.width, lineTarget.height);
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
@@ -1145,7 +1151,7 @@ export class ToonScreenOutline {
 	drawOutline() {
 		const lineTarget = this.#lineTarget;
 		const frame = this.#frame;
-		if (lineTarget === null || frame === null) {
+		if (lineTarget === null || frame === null || lineTarget.jumpFloodIndex < 0) {
 			return;
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;

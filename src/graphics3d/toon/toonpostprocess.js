@@ -6,6 +6,8 @@ import { RenderTarget } from "../rendertarget.js";
 import { BloomEffect } from "../bloomeffect.js";
 import { MultiLevelBloomEffect } from "../multilevelbloomeffect.js";
 import { FullscreenPass } from "../../core/fullscreenpass.js";
+import { Matrix4 } from "../../base/matrix4.js";
+import { ToonScreenOutline } from "./toonscreenoutline.js";
 
 
 /**
@@ -84,6 +86,204 @@ void main() {
 }
 `;
 
+// 화면 공간 모서리 어둠(GTAO) 셰이더의 공용 머리. (선의 판의 노멀과 깊이를 읽는다)
+// - 깊이는 역투영 행렬로 보기 공간 자리로 되돌려 원근과 직교를 함께 받는다. 노멀은 선의 판의 팔면체 노멀(월드)을 보기 회전으로 돌린다.
+// - 반 해상도 칸 j 가 읽는 온 해상도 화소는 floor(j x 배 + 0.5) 다. (흐림과 키우기가 같은 화소를 다시 찾는다)
+const AMBIENT_OCCLUSION_COMMON_CHUNK = `#version 300 es
+precision highp float;
+uniform sampler2D lineTexture;
+uniform sampler2D depthTexture;
+uniform mat4 inverseProjectionMatrix;
+uniform mat3 viewRotation;
+uniform vec2 sourceSize;
+uniform vec2 sourceScale;
+out vec4 fragmentColor;
+float readDepth(ivec2 pixel) {
+	return texelFetch(depthTexture, pixel, 0).r;
+}
+vec3 readViewPosition(ivec2 pixel, float depth) {
+	vec2 point = (vec2(pixel) + 0.5) / sourceSize;
+	vec4 position = inverseProjectionMatrix * vec4(point * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	return position.xyz / position.w;
+}
+vec3 readViewNormal(ivec2 pixel) {
+	vec2 folded = texelFetch(lineTexture, pixel, 0).rg * 2.0 - 1.0;
+	vec3 normal = vec3(folded.x, 1.0 - abs(folded.x) - abs(folded.y), folded.y);
+	float fold = max(-normal.y, 0.0);
+	normal.x += normal.x >= 0.0 ? -fold : fold;
+	normal.z += normal.z >= 0.0 ? -fold : fold;
+	return normalize(viewRotation * normal);
+}
+ivec2 readSourcePixel(ivec2 cell) {
+	return ivec2(floor(vec2(cell) * sourceScale + 0.5));
+}
+`;
+// 반 해상도 GTAO. (Jimenez, Wu, Pesce, Jarabo 2016 "Practical Realtime Strategies for Accurate Indirect Occlusion" 의 지평선 적분)
+// - 칸마다 화면 방향 조각 SLICE_COUNT 개를 돌려 양쪽으로 STEP_COUNT 걸음씩 가장 높은 지평선을 찾고, 투영한 노멀로 코사인 가중 보임을 닫힌 식으로 적분한다.
+// - 조각 각과 걸음 자리는 인터리브드 그래디언트 잡음(Jimenez 2014)으로 칸마다 흩는다. 프레임마다 바꾸지 않으니 멈춘 화면은 그대로다. (뒤의 흐림이 잡음을 지운다)
+// - 반지름 밖 표본은 0.6 반지름부터 반지름까지 줄여 가장 낮은 지평선 쪽으로 보낸다. (먼 벽이 가리지 않게)
+// - 보임을 0.96 으로 나눠 1 에서 자른다. (트인 바닥과 볼록한 면은 정확히 1 이라 화면이 그대로다)
+const AMBIENT_OCCLUSION_FRAGMENT_SHADER = AMBIENT_OCCLUSION_COMMON_CHUNK + `
+uniform vec4 projectionRow;
+uniform float isPerspective;
+uniform float radius;
+uniform float pixelsPerUnit;
+const int SLICE_COUNT = 4;
+const int STEP_COUNT = 6;
+const float PI = 3.14159265;
+const float HALF_PI = 1.57079633;
+// 트인 면의 보임이 이 값 이상이면 1 로 본다. (8 비트 팔면체 노멀과 깊이 정밀도, 조각 넷의 잡음으로 평평하거나 볼록한 면이 0.98 쯤으로 셈해지는 것을 지운다)
+const float SELF_OCCLUSION_LIMIT = 0.96;
+float readNoise(vec2 pixel) {
+	return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+}
+float readArc(float horizon, float normalAngle) {
+	return 0.25 * (-cos(2.0 * horizon - normalAngle) + cos(normalAngle) + 2.0 * horizon * sin(normalAngle));
+}
+void main() {
+	ivec2 cell = ivec2(gl_FragCoord.xy);
+	ivec2 pixel = readSourcePixel(cell);
+	float depth = readDepth(pixel);
+	if (depth >= 1.0) {
+		fragmentColor = vec4(1.0);
+		return;
+	}
+	vec3 position = readViewPosition(pixel, depth);
+	vec3 normal = readViewNormal(pixel);
+	vec3 viewVector = isPerspective > 0.5 ? normalize(-position) : vec3(0.0, 0.0, 1.0);
+	float radiusPixels = min(radius * pixelsPerUnit / max(dot(projectionRow, vec4(position, 1.0)), 0.0001), sourceSize.y * 0.25);
+	if (radiusPixels < 1.0) {
+		fragmentColor = vec4(1.0);
+		return;
+	}
+	float sliceNoise = readNoise(gl_FragCoord.xy);
+	float stepNoise = readNoise(gl_FragCoord.yx + vec2(23.0, 61.0));
+	float falloffScale = 1.0 / (radius * 0.4);
+	ivec2 maximumPixel = ivec2(sourceSize) - 1;
+	vec2 center = vec2(pixel);
+	float visibility = 0.0;
+	for (int sliceIndex = 0; sliceIndex < SLICE_COUNT; ++sliceIndex) {
+		float angle = (float(sliceIndex) + sliceNoise) * (PI / float(SLICE_COUNT));
+		vec2 direction = vec2(cos(angle), sin(angle));
+		vec3 directionVector = vec3(direction, 0.0);
+		vec3 orthoDirection = directionVector - dot(directionVector, viewVector) * viewVector;
+		vec3 axis = normalize(cross(directionVector, viewVector));
+		vec3 projectedNormal = normal - axis * dot(normal, axis);
+		float projectedLength = length(projectedNormal);
+		float cosineNormal = clamp(dot(projectedNormal, viewVector) / max(projectedLength, 0.0001), -1.0, 1.0);
+		float normalAngle = (dot(orthoDirection, projectedNormal) >= 0.0 ? 1.0 : -1.0) * acos(cosineNormal);
+		float lowCosine0 = cos(normalAngle + HALF_PI);
+		float lowCosine1 = cos(normalAngle - HALF_PI);
+		float horizonCosine0 = lowCosine0;
+		float horizonCosine1 = lowCosine1;
+		for (int stepIndex = 0; stepIndex < STEP_COUNT; ++stepIndex) {
+			float fraction = (float(stepIndex) + stepNoise) / float(STEP_COUNT);
+			vec2 offset = direction * max(fraction * fraction * radiusPixels, float(stepIndex) + 1.0);
+			ivec2 samplePixel0 = ivec2(floor(center + offset + 0.5));
+			ivec2 samplePixel1 = ivec2(floor(center - offset + 0.5));
+			if (all(greaterThanEqual(samplePixel0, ivec2(0))) && all(lessThanEqual(samplePixel0, maximumPixel))) {
+				vec3 delta = readViewPosition(samplePixel0, readDepth(samplePixel0)) - position;
+				float deltaLength = length(delta);
+				float weight = clamp((radius - deltaLength) * falloffScale, 0.0, 1.0);
+				horizonCosine0 = max(horizonCosine0, mix(lowCosine0, dot(delta, viewVector) / max(deltaLength, 0.0001), weight));
+			}
+			if (all(greaterThanEqual(samplePixel1, ivec2(0))) && all(lessThanEqual(samplePixel1, maximumPixel))) {
+				vec3 delta = readViewPosition(samplePixel1, readDepth(samplePixel1)) - position;
+				float deltaLength = length(delta);
+				float weight = clamp((radius - deltaLength) * falloffScale, 0.0, 1.0);
+				horizonCosine1 = max(horizonCosine1, mix(lowCosine1, dot(delta, viewVector) / max(deltaLength, 0.0001), weight));
+			}
+		}
+		float horizon0 = normalAngle + min(acos(clamp(horizonCosine0, -1.0, 1.0)) - normalAngle, HALF_PI);
+		float horizon1 = normalAngle + max(-acos(clamp(horizonCosine1, -1.0, 1.0)) - normalAngle, -HALF_PI);
+		visibility += projectedLength * (readArc(horizon0, normalAngle) + readArc(horizon1, normalAngle));
+	}
+	fragmentColor = vec4(clamp(visibility / (float(SLICE_COUNT) * SELF_OCCLUSION_LIMIT), 0.0, 1.0), 0.0, 0.0, 1.0);
+}
+`;
+// 가장자리 지키는 흐림의 무게. (탭 자리가 가운데의 접평면에서 떨어진 거리와 두 노멀의 각으로, Kopf 2007 joint bilateral 꼴)
+const AMBIENT_OCCLUSION_WEIGHT_CHUNK = `
+uniform float planeTolerance;
+uniform sampler2D occlusionTexture;
+uniform vec2 occlusionSize;
+float readTapWeight(vec3 position, vec3 normal, ivec2 cell, out float occlusion) {
+	ivec2 clampedCell = clamp(cell, ivec2(0), ivec2(occlusionSize) - 1);
+	occlusion = texelFetch(occlusionTexture, clampedCell, 0).r;
+	ivec2 pixel = readSourcePixel(clampedCell);
+	float depth = readDepth(pixel);
+	if (depth >= 1.0) {
+		return 0.0;
+	}
+	vec3 tapPosition = readViewPosition(pixel, depth);
+	float planeDistance = abs(dot(tapPosition - position, normal)) / planeTolerance;
+	float normalWeight = pow(max(dot(readViewNormal(pixel), normal), 0.0), 8.0);
+	return exp(-planeDistance * planeDistance) * normalWeight;
+}
+`;
+// 가로 흐림. (반 해상도, 가우스 7 탭)
+const AMBIENT_OCCLUSION_BLUR_FRAGMENT_SHADER = AMBIENT_OCCLUSION_COMMON_CHUNK + AMBIENT_OCCLUSION_WEIGHT_CHUNK + `
+const float GAUSSIAN_WEIGHTS[4] = float[4](1.0, 0.8, 0.45, 0.2);
+void main() {
+	ivec2 cell = ivec2(gl_FragCoord.xy);
+	ivec2 pixel = readSourcePixel(cell);
+	float depth = readDepth(pixel);
+	if (depth >= 1.0) {
+		fragmentColor = vec4(1.0);
+		return;
+	}
+	vec3 position = readViewPosition(pixel, depth);
+	vec3 normal = readViewNormal(pixel);
+	float occlusionSum = 0.0;
+	float weightSum = 0.0;
+	for (int offset = -3; offset <= 3; ++offset) {
+		float occlusion;
+		float weight = GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, cell + ivec2(offset, 0), occlusion);
+		occlusionSum += occlusion * weight;
+		weightSum += weight;
+	}
+	fragmentColor = vec4(weightSum > 0.0001 ? occlusionSum / weightSum : 1.0, 0.0, 0.0, 1.0);
+}
+`;
+// 세로 흐림과 온 해상도로 키우기. (화소에서 가까운 반 해상도 두 줄 x 7 탭을 화소의 깊이와 노멀로 고른다, 세기를 걸고 깊이 24 비트를 gba 에)
+// - 몸 셰이더가 제 깊이와 견주어 같은 면일 때만 읽는다. (비치는 것, 선의 판에 없는 것은 어둡히지 않는다)
+const AMBIENT_OCCLUSION_UPSAMPLE_FRAGMENT_SHADER = AMBIENT_OCCLUSION_COMMON_CHUNK + AMBIENT_OCCLUSION_WEIGHT_CHUNK + `
+uniform float intensity;
+const float GAUSSIAN_WEIGHTS[4] = float[4](1.0, 0.8, 0.45, 0.2);
+vec3 packDepth(float depth) {
+	float value = floor(depth * 16777215.0 + 0.5);
+	float high = floor(value / 65536.0);
+	float middle = floor((value - high * 65536.0) / 256.0);
+	return vec3(high, middle, value - high * 65536.0 - middle * 256.0) / 255.0;
+}
+void main() {
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	float depth = readDepth(pixel);
+	if (depth >= 1.0) {
+		fragmentColor = vec4(1.0);
+		return;
+	}
+	vec3 position = readViewPosition(pixel, depth);
+	vec3 normal = readViewNormal(pixel);
+	vec2 point = (gl_FragCoord.xy - 0.5) / sourceScale;
+	ivec2 nearestCell = ivec2(floor(point + 0.5));
+	int sideX = point.x >= float(nearestCell.x) ? 1 : -1;
+	float occlusionSum = 0.0;
+	float weightSum = 0.0;
+	for (int column = 0; column < 2; ++column) {
+		int cellX = nearestCell.x + column * sideX;
+		float columnWeight = column == 0 ? 1.0 : 0.5;
+		for (int offset = -3; offset <= 3; ++offset) {
+			float occlusion;
+			float weight = columnWeight * GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, ivec2(cellX, nearestCell.y + offset), occlusion);
+			occlusionSum += occlusion * weight;
+			weightSum += weight;
+		}
+	}
+	float visibility = weightSum > 0.0001 ? occlusionSum / weightSum : 1.0;
+	fragmentColor = vec4(1.0 - intensity * (1.0 - visibility), packDepth(depth));
+}
+`;
+
 
 //==============================================================================
 // 툰 HDR 마무리. (실수 렌더 타겟에 그린 선형 색을 블룸, 노출, 톤매핑, 감마로 화면에 낸다)
@@ -105,6 +305,11 @@ void main() {
 //   기본은 밝기 1, 채도 1, 대비 1, 색조 0, 안개빛 0, 가장자리 0 이라 보정이 없다.
 // - 해상도 배율: setResolutionScale(배율) 이면 씬 판을 출력 크기 x 배율로 짓고 end 의 뷰포트로 키워(선형 거르기) 낸다. (3D 만 낮춰 그리고 UI 는 기기 화소 그대로 둘 때, 기본 1)
 // - 노드 사각형 안에 낼 때: resize(사각형 너비, 높이) → begin → 그리기(ToonRenderer 의 화면 사각형은 풀어 둔다) → end(null, [x, 드로잉 버퍼 높이 - y - 높이, 너비, 높이]).
+// - 모서리 어둠(화면 공간 AO): setAmbientOcclusion(켬, 세기, 반지름, 해상도 배율) 로 켠다. (기본 꺼짐, 세기 0.5, 반지름 0.5 월드 길이, 반 해상도)
+//   GTAO(Jimenez 2016)를 반 해상도로 셈하고, 접평면 거리와 노멀로 가장자리를 지키며 가로로 흐린 뒤 세로로 흐리며 온 해상도로 키운다. (잡음은 고정 무늬라 멈춘 화면은 흔들리지 않는다)
+//   노멀과 깊이는 화면 바깥선(ToonScreenOutline)의 선의 판을 다시 쓴다. 바깥선이 없는 장면은 선은 긋지 않고 선의 판만 그리는 getAmbientOcclusionPrepass() 를 쓴다.
+//   ToonDrawQueue.setPostProcess(이것) 이면 큐가 선의 판 뒤, 몸 앞에 drawAmbientOcclusion 을 부르고 렌더러에 결과를 건다. 몸 셰이더는 바탕빛(하늘과 땅 빛)에만 곱한다. (해 칸, 채움빛, 점광은 그대로)
+//   엔진에 있던 AmbientOcclusionEffect 는 원근의 시야각과 가까운, 먼 면으로만 깊이를 풀고 RGB 월드 노멀과 커버리지 알파를 받는 반구 표본 꼴이라 직교 카메라와 선의 판(팔면체 노멀)에 맞지 않아 따로 짓는다.
 //==============================================================================
 /**
  * @example <caption>3D 만 낮춰 그리고 색 보정 걸기</caption>
@@ -148,6 +353,10 @@ export class ToonPostProcess {
 	/** @private @type { Array<number> } */ #hazeColor;
 	/** @private @type { number } */ #hazeAmount;
 	/** @private @type { number } */ #vignetteStrength;
+	/** @private @type { object } */ #ambientOcclusion; // 모서리 어둠 설정. ({ isEnabled, intensity, radius, resolutionScale })
+	/** @private @type { object | null } */ #ambientOcclusionPasses; // 모서리 어둠의 세 패스. ({ occlusionPass, blurPass, upsamplePass }, 처음 셀 때 짓는다)
+	/** @private @type { object | null } */ #ambientOcclusionTarget; // 모서리 어둠 판. ({ occlusionTexture, blurTexture, resultTexture 와 그 프레임버퍼, width, height, cellWidth, cellHeight })
+	/** @private @type { ToonScreenOutline | null } */ #ambientOcclusionPrepass; // 바깥선이 없는 장면의 노멀과 깊이 미리 그리기. (선은 긋지 않는다)
 
 	//==============================================================================
 	// 생성. (화면 픽셀 크기, 옵션 { sampleCount = 0, useFloatColor = true, depthBits = 16, useDepthTexture = false })
@@ -191,6 +400,10 @@ export class ToonPostProcess {
 		this.#hazeColor = [0, 0, 0];
 		this.#hazeAmount = 0;
 		this.#vignetteStrength = 0;
+		this.#ambientOcclusion = { isEnabled: false, intensity: 0.5, radius: 0.5, resolutionScale: 0.5 };
+		this.#ambientOcclusionPasses = null;
+		this.#ambientOcclusionTarget = null;
+		this.#ambientOcclusionPrepass = null;
 	}
 
 	//==============================================================================
@@ -637,6 +850,321 @@ export class ToonPostProcess {
 	}
 
 	//==============================================================================
+	// 모서리 어둠(화면 공간 AO) 설정. (기본 꺼짐, 켜면 drawAmbientOcclusion 이 셈하고 몸 셰이더가 바탕빛에만 곱한다)
+	// - 벽과 바닥이 만나는 곳, 물건 밑, 발밑이 엷게 어두워진다. 세기 1 이면 가린 만큼 다 어둡고 0.5 면 그 반이다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isEnabled - 켤지.
+	 * @param { number } [intensity] - 세기 0 ~ 1. (기본 0.5)
+	 * @param { number } [radius] - 가림을 찾는 반지름. (월드 길이, 기본 0.5)
+	 * @param { number } [resolutionScale] - 셈하는 해상도 배율 0.25 ~ 1. (기본 0.5, 흐림과 키우기는 선의 판 해상도)
+	 * @example <caption>바깥선 없는 장면에 모서리 어둠 켜기</caption>
+	 * import { ToonRenderer, ToonPostProcess, ToonDrawQueue, MeshBuilder, createBoxGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+	 * const canvas = Object.assign(document.createElement("canvas"), { width: 320, height: 180 });
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, canvas.width, canvas.height, { depthBits: 24 });
+	 * postProcess.setAmbientOcclusion(true, 0.5, 0.5, 0.5);
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * renderer.setHdrOutput(postProcess.getUseFloatColor());
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), "#a0a8b0", { hasOutline: false });
+	 * builder.addPart(createBoxGeometry(0.6, 0.6, 0.6), Matrix4.createTranslation(0, 0.3, 0), "#d08060", { hasOutline: false });
+	 * const mesh = renderer.createMesh(builder.readArrays());
+	 * const camera = new Camera3D();
+	 * camera.setPerspective(0.8, 0.1, 50);
+	 * camera.setAspectRatio(canvas.width / canvas.height);
+	 * camera.lookAt(Vector3.create(2, 2.5, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+	 * const queue = new ToonDrawQueue();
+	 * queue.setPostProcess(postProcess);
+	 * queue.addMesh(mesh, Matrix4.createIdentity());
+	 * postProcess.begin([0.05, 0.05, 0.08]);
+	 * queue.draw(renderer, camera);
+	 * postProcess.end(null, [0, 0, canvas.width, canvas.height]);
+	 * if (postProcess.getAmbientOcclusionTexture() === null) {
+	 * 	throw new Error("ambient occlusion texture is missing");
+	 * }
+	 */
+	setAmbientOcclusion(isEnabled, intensity = 0.5, radius = 0.5, resolutionScale = 0.5) {
+		this.#ambientOcclusion = {
+			isEnabled: isEnabled === true,
+			intensity: System.Math.max(0, System.Math.min(1, intensity)),
+			radius: System.Math.max(0.0001, radius),
+			resolutionScale: System.Math.max(0.25, System.Math.min(1, resolutionScale)),
+		};
+	}
+
+	//==============================================================================
+	// 모서리 어둠 설정 반환.
+	//==============================================================================
+	/**
+	 * @returns { object } { isEnabled, intensity, radius, resolutionScale } (새 객체)
+	 */
+	getAmbientOcclusion() {
+		const ambientOcclusion = this.#ambientOcclusion;
+		return { isEnabled: ambientOcclusion.isEnabled, intensity: ambientOcclusion.intensity, radius: ambientOcclusion.radius, resolutionScale: ambientOcclusion.resolutionScale };
+	}
+
+	//==============================================================================
+	// 모서리 어둠이 켜졌는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } setAmbientOcclusion 으로 켰으면 true.
+	 */
+	isAmbientOcclusionEnabled() {
+		return this.#ambientOcclusion.isEnabled;
+	}
+
+	//==============================================================================
+	// 바깥선이 없는 장면의 노멀과 깊이 미리 그리기 반환. (선은 긋지 않는 ToonScreenOutline, 처음 부를 때 짓는다)
+	//==============================================================================
+	/**
+	 * @returns { ToonScreenOutline } 선의 판만 그리는 화면 바깥선. (beginLineIds, drawMesh, endLineIds 로 그리고 getLineTarget 을 drawAmbientOcclusion 에 준다)
+	 */
+	getAmbientOcclusionPrepass() {
+		if (this.#ambientOcclusionPrepass === null) {
+			const prepass = new ToonScreenOutline(this.#webGL2RenderingContext);
+			prepass.setWidth(0);
+			prepass.setCrease(180, 0);
+			this.#ambientOcclusionPrepass = prepass;
+		}
+		return this.#ambientOcclusionPrepass;
+	}
+
+	//==============================================================================
+	// 모서리 어둠 셈하기. (선의 판의 노멀과 깊이로 반 해상도 GTAO → 가로 흐림 → 세로 흐림과 키우기, 꺼졌으면 null)
+	// - 선의 판을 그린 뒤, 몸을 그리기 전에 부른다. 프레임버퍼, 뷰포트, 프로그램, 버텍스 어레이, 고른 유닛은 부르기 전으로 돌린다.
+	// - 결과 텍스처는 선의 판 크기의 RGBA8 이다. (r 세기를 건 보임, gba 깊이 24 비트) ToonRenderer.setAmbientOcclusionTexture 에 준다.
+	//==============================================================================
+	/**
+	 * @param { object } lineTarget - ToonScreenOutline.getLineTarget() 의 결과. ({ lineTexture, depthTexture, width, height })
+	 * @param { Matrix4 } viewMatrix - 선의 판을 그린 보기 행렬.
+	 * @param { Matrix4 } projectionMatrix - 선의 판을 그린 투영 행렬. (원근이나 직교)
+	 * @returns { WebGLTexture | null } 결과 텍스처. (꺼졌거나 판을 짓지 못했으면 null)
+	 * @example <caption>렌더러로 바로 그릴 때 선의 판, 모서리 어둠, 몸 차례로</caption>
+	 * import { ToonRenderer, ToonPostProcess, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, 300, 150, { depthBits: 24 });
+	 * postProcess.setAmbientOcclusion(true);
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createBoxGeometry(3, 0.2, 3), Matrix4.createIdentity(), "#909090", { hasOutline: false });
+	 * const mesh = renderer.createMesh(builder.readArrays());
+	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(2, 3, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+	 * const projectionMatrix = Matrix4.createOrthographic(-2, 2, -1, 1, 0.1, 20);
+	 * postProcess.begin([0, 0, 0]);
+	 * const prepass = postProcess.getAmbientOcclusionPrepass();
+	 * if (prepass.beginLineIds(viewMatrix, projectionMatrix)) {
+	 * 	prepass.drawMesh(mesh, Matrix4.createIdentity(), 1);
+	 * 	prepass.endLineIds();
+	 * }
+	 * renderer.setAmbientOcclusionTexture(postProcess.drawAmbientOcclusion(prepass.getLineTarget(), viewMatrix, projectionMatrix));
+	 * renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
+	 * renderer.drawMesh(mesh, Matrix4.createIdentity());
+	 * renderer.endFrame();
+	 * renderer.setAmbientOcclusionTexture(null);
+	 * postProcess.end(null, [0, 0, 300, 150]);
+	 */
+	drawAmbientOcclusion(lineTarget, viewMatrix, projectionMatrix) {
+		const ambientOcclusion = this.#ambientOcclusion;
+		if (!ambientOcclusion.isEnabled || lineTarget === null) {
+			return null;
+		}
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const width = lineTarget.width;
+		const height = lineTarget.height;
+		const target = this.readAmbientOcclusionTarget(width, height, System.Math.max(1, System.Math.ceil(width * ambientOcclusion.resolutionScale)), System.Math.max(1, System.Math.ceil(height * ambientOcclusion.resolutionScale)));
+		if (target === null) {
+			return null;
+		}
+		const passes = this.readAmbientOcclusionPasses();
+		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		const previousViewport = webGL2RenderingContext.getParameter(webGL2RenderingContext.VIEWPORT);
+		const previousProgram = webGL2RenderingContext.getParameter(webGL2RenderingContext.CURRENT_PROGRAM);
+		const previousVertexArray = webGL2RenderingContext.getParameter(webGL2RenderingContext.VERTEX_ARRAY_BINDING);
+		const previousActiveTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.ACTIVE_TEXTURE);
+		const isDepthTestEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.DEPTH_TEST);
+		const isBlendEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.BLEND);
+		const isScissorTestEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.SCISSOR_TEST);
+		const isCullFaceEnabled = webGL2RenderingContext.isEnabled(webGL2RenderingContext.CULL_FACE);
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		const viewElements = viewMatrix.getElements();
+		const projectionElements = projectionMatrix.getElements();
+		const inverseProjectionElements = Matrix4.createInverse(projectionMatrix).getElements();
+		const viewRotation = [viewElements[0], viewElements[1], viewElements[2], viewElements[4], viewElements[5], viewElements[6], viewElements[8], viewElements[9], viewElements[10]];
+		const sourceScaleX = width / target.cellWidth;
+		const sourceScaleY = height / target.cellHeight;
+		const bindCommon = (pass, occlusionTexture) => {
+			pass.useProgram();
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
+			webGL2RenderingContext.uniform1i(pass.getUniformLocation("lineTexture"), 0);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
+			webGL2RenderingContext.uniform1i(pass.getUniformLocation("depthTexture"), 1);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, occlusionTexture);
+			webGL2RenderingContext.uniform1i(pass.getUniformLocation("occlusionTexture"), 2);
+			webGL2RenderingContext.uniformMatrix4fv(pass.getUniformLocation("inverseProjectionMatrix"), false, inverseProjectionElements);
+			webGL2RenderingContext.uniformMatrix3fv(pass.getUniformLocation("viewRotation"), false, viewRotation);
+			webGL2RenderingContext.uniform2f(pass.getUniformLocation("sourceSize"), width, height);
+			webGL2RenderingContext.uniform2f(pass.getUniformLocation("sourceScale"), sourceScaleX, sourceScaleY);
+			webGL2RenderingContext.uniform2f(pass.getUniformLocation("occlusionSize"), target.cellWidth, target.cellHeight);
+			webGL2RenderingContext.uniform1f(pass.getUniformLocation("planeTolerance"), ambientOcclusion.radius * 0.1);
+		};
+
+		// 1. 반 해상도 GTAO. (빈 칸 유닛 2 에는 결과 판이 아닌 흐림 판을 묶어 둔다)
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
+		webGL2RenderingContext.viewport(0, 0, target.cellWidth, target.cellHeight);
+		const occlusionPass = passes.occlusionPass;
+		bindCommon(occlusionPass, target.blurTexture);
+		webGL2RenderingContext.uniform4f(occlusionPass.getUniformLocation("projectionRow"), projectionElements[3], projectionElements[7], projectionElements[11], projectionElements[15]);
+		webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("isPerspective"), System.Math.abs(projectionElements[11]) > 0.5 ? 1 : 0);
+		webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("radius"), ambientOcclusion.radius);
+		webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("pixelsPerUnit"), 0.5 * System.Math.abs(projectionElements[0]) * width);
+		occlusionPass.draw();
+
+		// 2. 가로 흐림. (반 해상도)
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.blurFramebuffer);
+		bindCommon(passes.blurPass, target.occlusionTexture);
+		passes.blurPass.draw();
+
+		// 3. 세로 흐림과 키우기. (선의 판 해상도, 세기를 건다)
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.resultFramebuffer);
+		webGL2RenderingContext.viewport(0, 0, width, height);
+		const upsamplePass = passes.upsamplePass;
+		bindCommon(upsamplePass, target.blurTexture);
+		webGL2RenderingContext.uniform1f(upsamplePass.getUniformLocation("intensity"), ambientOcclusion.intensity);
+		upsamplePass.draw();
+
+		for (const unit of [2, 1, 0]) {
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + unit);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		}
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
+		webGL2RenderingContext.viewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
+		webGL2RenderingContext.useProgram(previousProgram);
+		webGL2RenderingContext.bindVertexArray(previousVertexArray);
+		webGL2RenderingContext.activeTexture(previousActiveTexture);
+		const restoreCapability = (capability, isEnabled) => {
+			if (isEnabled) {
+				webGL2RenderingContext.enable(capability);
+			}
+		};
+		restoreCapability(webGL2RenderingContext.DEPTH_TEST, isDepthTestEnabled);
+		restoreCapability(webGL2RenderingContext.BLEND, isBlendEnabled);
+		restoreCapability(webGL2RenderingContext.SCISSOR_TEST, isScissorTestEnabled);
+		restoreCapability(webGL2RenderingContext.CULL_FACE, isCullFaceEnabled);
+		return target.resultTexture;
+	}
+
+	//==============================================================================
+	// 모서리 어둠 결과 텍스처 반환. (아직 셈하지 않았거나 꺼졌으면 null)
+	//==============================================================================
+	/**
+	 * @returns { WebGLTexture | null } 선의 판 크기의 RGBA8. (r 세기를 건 보임, gba 깊이 24 비트)
+	 */
+	getAmbientOcclusionTexture() {
+		const target = this.#ambientOcclusionTarget;
+		return this.#ambientOcclusion.isEnabled && target !== null ? target.resultTexture : null;
+	}
+
+	//==============================================================================
+	// 모서리 어둠의 세 패스 반환. (처음 부를 때 짓는다)
+	//==============================================================================
+	/**
+	 * @returns { object } { occlusionPass, blurPass, upsamplePass }
+	 * @private
+	 */
+	readAmbientOcclusionPasses() {
+		if (this.#ambientOcclusionPasses === null) {
+			const webGL2RenderingContext = this.#webGL2RenderingContext;
+			this.#ambientOcclusionPasses = {
+				occlusionPass: new FullscreenPass(webGL2RenderingContext, AMBIENT_OCCLUSION_FRAGMENT_SHADER),
+				blurPass: new FullscreenPass(webGL2RenderingContext, AMBIENT_OCCLUSION_BLUR_FRAGMENT_SHADER),
+				upsamplePass: new FullscreenPass(webGL2RenderingContext, AMBIENT_OCCLUSION_UPSAMPLE_FRAGMENT_SHADER),
+			};
+		}
+		return this.#ambientOcclusionPasses;
+	}
+
+	//==============================================================================
+	// 모서리 어둠 판 반환. (크기가 같으면 있던 것, 다르면 다시 짓는다, 짓지 못하면 null)
+	//==============================================================================
+	/**
+	 * @param { number } width - 선의 판 너비.
+	 * @param { number } height - 선의 판 높이.
+	 * @param { number } cellWidth - 셈하는 판 너비.
+	 * @param { number } cellHeight - 셈하는 판 높이.
+	 * @returns { object | null } 판. (짓지 못했으면 null)
+	 * @private
+	 */
+	readAmbientOcclusionTarget(width, height, cellWidth, cellHeight) {
+		const existingTarget = this.#ambientOcclusionTarget;
+		if (existingTarget !== null && existingTarget.width === width && existingTarget.height === height && existingTarget.cellWidth === cellWidth && existingTarget.cellHeight === cellHeight) {
+			return existingTarget;
+		}
+		this.deleteAmbientOcclusionTarget();
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		let isComplete = true;
+		const createLayer = (textureWidth, textureHeight) => {
+			const texture = webGL2RenderingContext.createTexture();
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+			webGL2RenderingContext.texStorage2D(webGL2RenderingContext.TEXTURE_2D, 1, webGL2RenderingContext.RGBA8, textureWidth, textureHeight);
+			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+			const framebuffer = webGL2RenderingContext.createFramebuffer();
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+			webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
+			isComplete = isComplete && webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER) === webGL2RenderingContext.FRAMEBUFFER_COMPLETE;
+			return { texture: texture, framebuffer: framebuffer };
+		};
+		const occlusionLayer = createLayer(cellWidth, cellHeight);
+		const blurLayer = createLayer(cellWidth, cellHeight);
+		const resultLayer = createLayer(width, height);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
+		this.#ambientOcclusionTarget = {
+			occlusionTexture: occlusionLayer.texture, occlusionFramebuffer: occlusionLayer.framebuffer,
+			blurTexture: blurLayer.texture, blurFramebuffer: blurLayer.framebuffer,
+			resultTexture: resultLayer.texture, resultFramebuffer: resultLayer.framebuffer,
+			width: width, height: height, cellWidth: cellWidth, cellHeight: cellHeight,
+		};
+		if (!isComplete) {
+			this.deleteAmbientOcclusionTarget();
+			return null;
+		}
+		return this.#ambientOcclusionTarget;
+	}
+
+	//==============================================================================
+	// 모서리 어둠 판 지우기.
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	deleteAmbientOcclusionTarget() {
+		const target = this.#ambientOcclusionTarget;
+		if (target === null) {
+			return;
+		}
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		for (const texture of [target.occlusionTexture, target.blurTexture, target.resultTexture]) {
+			webGL2RenderingContext.deleteTexture(texture);
+		}
+		for (const framebuffer of [target.occlusionFramebuffer, target.blurFramebuffer, target.resultFramebuffer]) {
+			webGL2RenderingContext.deleteFramebuffer(framebuffer);
+		}
+		this.#ambientOcclusionTarget = null;
+	}
+
+	//==============================================================================
 	// 씬 렌더 타겟 반환. (다른 후처리를 끼울 때)
 	//==============================================================================
 	/**
@@ -665,5 +1193,17 @@ export class ToonPostProcess {
 			this.#multiLevelBloomEffect = null;
 		}
 		this.#compositePass.destroy();
+		this.deleteAmbientOcclusionTarget();
+		const ambientOcclusionPasses = this.#ambientOcclusionPasses;
+		if (ambientOcclusionPasses !== null) {
+			ambientOcclusionPasses.occlusionPass.destroy();
+			ambientOcclusionPasses.blurPass.destroy();
+			ambientOcclusionPasses.upsamplePass.destroy();
+			this.#ambientOcclusionPasses = null;
+		}
+		if (this.#ambientOcclusionPrepass !== null) {
+			this.#ambientOcclusionPrepass.destroy();
+			this.#ambientOcclusionPrepass = null;
+		}
 	}
 }

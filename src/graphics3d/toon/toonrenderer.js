@@ -58,6 +58,8 @@ const EMISSIVE_TEXTURE_UNIT = 5;
 const DECAL_TEXTURE_UNIT = 6;
 const ANGEL_RING_TEXTURE_UNIT = 7;
 const FIRST_MATERIAL_TEXTURE_UNIT = 8;
+// 모서리 어둠(화면 공간 AO) 텍스처 유닛. (조각 셰이더 유닛 16 개를 머티리얼까지 다 쓰므로 그 뒤, WebGL2 가 보장하는 합친 유닛 32 안)
+const AMBIENT_OCCLUSION_TEXTURE_UNIT = 16;
 
 // 머티리얼이 그리기마다 묶을 수 있는 텍스처 수의 상한. (유닛 8 ~ 15)
 export const TOON_MAXIMUM_MATERIAL_TEXTURES = 8;
@@ -284,6 +286,10 @@ uniform vec4 cameraPosition;
 uniform vec3 cameraForward;
 uniform mat3 viewRotation;
 uniform vec2 cameraRoll;
+#ifdef TOON_AMBIENT_OCCLUSION
+uniform sampler2D ambientOcclusionTexture;
+uniform vec2 ambientOcclusionOrigin;
+#endif
 layout(std140) uniform ToonDrawMaterial {
 	vec4 tintColor;
 	vec4 emissiveColor;
@@ -490,6 +496,18 @@ vec3 readViewDirection() {
 	}
 	return -cameraForward;
 }
+float readAmbientOcclusion() {
+#ifdef TOON_AMBIENT_OCCLUSION
+	if (alpha * tintColor.a < 1.0) {
+		return 1.0;
+	}
+	vec4 occlusion = texelFetch(ambientOcclusionTexture, ivec2(gl_FragCoord.xy - ambientOcclusionOrigin), 0);
+	float depth = dot(floor(occlusion.gba * 255.0 + 0.5), vec3(65536.0, 256.0, 1.0)) / 16777215.0;
+	return abs(depth - gl_FragCoord.z) <= 0.0000153 ? occlusion.r : 1.0;
+#else
+	return 1.0;
+#endif
+}
 `;
 
 // 몸을 그리는 조각 셰이더의 몸통. (표면 → 표면 조각 → 틴트 → 빛 → 빛 조각 → 합치기)
@@ -544,7 +562,11 @@ ToonLighting readLighting(ToonSurface surface) {
 	vec3 sunRamp = readShadeRamp(readToonCoordinate(sunCosine, surface.shadeOffset) * shadow);
 	float sunLevel = readShadeLevel(sunRamp, sunCosine * shadow);
 	vec3 sunLight = sunRamp * mix(readLightColor(sunLightColor, lightColorUsage.y), readLightColor(sunLightColor, lightColorUsage.x), sunLevel);
+#ifdef TOON_AMBIENT_OCCLUSION
+	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5) * readAmbientOcclusion();
+#else
 	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5);
+#endif
 	if (hasSpecular) {
 		specularSum += readLightColor(sunLightColor, lightColorUsage.z) * readToonSpecular(normal, toSun, viewDirection) * sunLevel;
 	}
@@ -725,6 +747,7 @@ void main() {
 /**
  * @param { ToonMaterial | null } material - 셰이더 조각을 끼울 머티리얼. (null 이면 빈 조각)
  * @param { ToonInstanceLayout | null } instanceLayout - 사용자 어트리뷰트를 선언할 인스턴스 꼴. (null 이면 없음)
+ * @param { boolean } [isAmbientOcclusion] - 몸 조각 셰이더에 TOON_AMBIENT_OCCLUSION 을 정의해 모서리 어둠 텍스처를 바탕빛에 곱할지. (기본 false)
  * @returns { object } 세 프로그램의 소스와 어트리뷰트 자리. ({ solidVertexShader, solidFragmentShader, outlineVertexShader, outlineFragmentShader, depthVertexShader, depthFragmentShader, attributeLocationTable })
  * @example <caption>머티리얼과 인스턴스 꼴로 지은 몸 프로그램을 직접 컴파일해 보기</caption>
  * import { composeToonProgramSources, ToonMaterial, ToonInstanceLayout } from "./vanilla.js";
@@ -740,7 +763,7 @@ void main() {
  * }
  * context.deleteShader(shader);
  */
-export function composeToonProgramSources(material, instanceLayout) {
+export function composeToonProgramSources(material, instanceLayout, isAmbientOcclusion = false) {
 	const vertexChunk = material !== null && material.getVertexChunk() !== "" ? material.getVertexChunk() : DEFAULT_VERTEX_CHUNK;
 	const uniformChunk = material !== null ? material.getUniformChunk() : "";
 	const surfaceChunk = material !== null && material.getSurfaceChunk() !== "" ? material.getSurfaceChunk() : DEFAULT_SURFACE_CHUNK;
@@ -757,7 +780,7 @@ export function composeToonProgramSources(material, instanceLayout) {
 	}
 	return {
 		solidVertexShader: vertexHead + SOLID_VERTEX_BODY,
-		solidFragmentShader: SOLID_FRAGMENT_HEAD + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY,
+		solidFragmentShader: (isAmbientOcclusion ? SOLID_FRAGMENT_HEAD.replace("#version 300 es\n", "#version 300 es\n#define TOON_AMBIENT_OCCLUSION\n") : SOLID_FRAGMENT_HEAD) + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY,
 		outlineVertexShader: vertexHead + OUTLINE_VERTEX_BODY,
 		outlineFragmentShader: OUTLINE_FRAGMENT_SHADER,
 		depthVertexShader: vertexHead + DEPTH_VERTEX_BODY,
@@ -1648,6 +1671,7 @@ export class ToonRenderer {
 	/** @private @type { Array<number> } */ #outlineColor; // 바깥선 색. (sRGB, 알파)
 	/** @private @type { boolean } */ #isHdrOutput; // 선형 색을 낼지.
 	/** @private @type { object | null } */ #shadowInput; // 받을 그림자. ({ depthTexture, lightViewProjectionMatrix, resolution, strength })
+	/** @private @type { object | null } */ #ambientOcclusionInput; // 모서리 어둠. ({ texture, origin [x, y] 이번 프레임 뷰포트의 왼쪽 아래 }, null 이면 기본 몸 프로그램)
 	/** @private @type { boolean } */ #isShadowPass; // 그림자 깊이 패스 중인지.
 	/** @private @type { number } */ #frameSerial; // 프레임 값이 바뀔 때마다 오르는 번호. (프로그램마다 마지막으로 올린 번호와 견준다)
 	/** @private @type { object | null } */ #savedState; // 앞의 그리기 상태. (끝이 돌린다)
@@ -1720,6 +1744,7 @@ export class ToonRenderer {
 		this.#outlineColor = [0.05, 0.05, 0.08, 1];
 		this.#isHdrOutput = false;
 		this.#shadowInput = null;
+		this.#ambientOcclusionInput = null;
 		this.#isShadowPass = false;
 		this.#frameSerial = 1;
 		this.#savedState = null;
@@ -1754,6 +1779,7 @@ export class ToonRenderer {
 	 * @static
 	 * @param { ToonMaterial | null } [material] - 셰이더 조각을 끼울 머티리얼. (기본 null)
 	 * @param { ToonInstanceLayout | null } [instanceLayout] - 인스턴스 꼴. (기본 null)
+	 * @param { boolean } [isAmbientOcclusion] - 모서리 어둠을 켠 프레임의 몸 프로그램인지. (기본 false, setAmbientOcclusionTexture 로 텍스처를 건 프레임은 이 몸 프로그램을 쓴다)
 	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 의 배열. (몸, 바깥선, 그림자 깊이)
 	 * @example <caption>로딩 동안 기본과 머티리얼의 프로그램을 뒤에서 링크해 두기</caption>
 	 * import { ToonRenderer, ToonMaterial, ShaderWarmer } from "./vanilla.js";
@@ -1764,8 +1790,8 @@ export class ToonRenderer {
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
 	 * renderer.prepareMaterial(material);
 	 */
-	static readProgramSources(material = null, instanceLayout = null) {
-		const sources = composeToonProgramSources(material, instanceLayout);
+	static readProgramSources(material = null, instanceLayout = null, isAmbientOcclusion = false) {
+		const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion);
 		return [
 			{ vertexShader: sources.solidVertexShader, fragmentShader: sources.solidFragmentShader, attributeLocationTable: sources.attributeLocationTable },
 			{ vertexShader: sources.outlineVertexShader, fragmentShader: sources.outlineFragmentShader, attributeLocationTable: sources.attributeLocationTable },
@@ -1779,17 +1805,20 @@ export class ToonRenderer {
 	/**
 	 * @param { ToonMaterial | null } material - 머티리얼. (null 이면 빈 조각)
 	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴. (null 이면 없음)
-	 * @returns { object } 세 프로그램 칸. ({ solid, outline, depth } 마다 { program, kind, frameSerial, lightSet, lightVersion })
+	 * @param { object | null } [baseProgramSet] - 모서리 어둠 몸 프로그램만 짓고 바깥선과 그림자 깊이는 이 칸의 것을 같이 쓸 때. (기본 null)
+	 * @returns { object } 세 프로그램 칸. ({ solid, outline, depth } 마다 { program, kind, frameSerial, lightSet, lightVersion }, 같이 쓰면 isAmbientOcclusion true)
 	 * @private
 	 */
-	createProgramSet(material, instanceLayout) {
+	createProgramSet(material, instanceLayout, baseProgramSet = null) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const sources = composeToonProgramSources(material, instanceLayout);
+		const sources = composeToonProgramSources(material, instanceLayout, baseProgramSet !== null);
 		const programList = [];
 		try {
 			programList.push(new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable));
-			programList.push(new ShaderProgram(webGL2RenderingContext, sources.outlineVertexShader, sources.outlineFragmentShader, sources.attributeLocationTable));
-			programList.push(new ShaderProgram(webGL2RenderingContext, sources.depthVertexShader, sources.depthFragmentShader, sources.attributeLocationTable));
+			if (baseProgramSet === null) {
+				programList.push(new ShaderProgram(webGL2RenderingContext, sources.outlineVertexShader, sources.outlineFragmentShader, sources.attributeLocationTable));
+				programList.push(new ShaderProgram(webGL2RenderingContext, sources.depthVertexShader, sources.depthFragmentShader, sources.attributeLocationTable));
+			}
 		}
 		catch (error) {
 			for (const shaderProgram of programList) {
@@ -1808,6 +1837,9 @@ export class ToonRenderer {
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("matcapTexture"), MATCAP_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("localShadowTexture"), LOCAL_SHADOW_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("angelRingTexture"), ANGEL_RING_TEXTURE_UNIT);
+		if (baseProgramSet !== null) {
+			webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("ambientOcclusionTexture"), AMBIENT_OCCLUSION_TEXTURE_UNIT);
+		}
 		const bindBlock = (shaderProgram, blockName, binding) => {
 			const blockIndex = webGL2RenderingContext.getUniformBlockIndex(shaderProgram.getProgram(), blockName);
 			if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
@@ -1815,11 +1847,15 @@ export class ToonRenderer {
 			}
 		};
 		bindBlock(solidProgram, MATERIAL_BLOCK_NAME, MATERIAL_BLOCK_BINDING);
-		bindBlock(programList[1], OUTLINE_BLOCK_NAME, OUTLINE_BLOCK_BINDING);
-		webGL2RenderingContext.useProgram(previousProgram);
 		const createEntry = (shaderProgram, kind) => {
 			return { program: shaderProgram, kind: kind, frameSerial: 0, lightSet: null, lightVersion: -1 };
 		};
+		if (baseProgramSet !== null) {
+			webGL2RenderingContext.useProgram(previousProgram);
+			return { solid: createEntry(solidProgram, ToonProgramKind.solid), outline: baseProgramSet.outline, depth: baseProgramSet.depth, isAmbientOcclusion: true };
+		}
+		bindBlock(programList[1], OUTLINE_BLOCK_NAME, OUTLINE_BLOCK_BINDING);
+		webGL2RenderingContext.useProgram(previousProgram);
 		return { solid: createEntry(solidProgram, ToonProgramKind.solid), outline: createEntry(programList[1], ToonProgramKind.outline), depth: createEntry(programList[2], ToonProgramKind.depth) };
 	}
 
@@ -1833,27 +1869,54 @@ export class ToonRenderer {
 	 * @private
 	 */
 	readProgramSet(material, instanceLayout) {
-		if (material === null && instanceLayout === null) {
+		return this.readProgramSetVariant(material, instanceLayout, this.#ambientOcclusionInput !== null);
+	}
+
+	//==============================================================================
+	// 머티리얼과 인스턴스 꼴과 모서리 어둠 변형의 프로그램 반환. (readProgramSet 이 부른다)
+	//==============================================================================
+	/**
+	 * @param { ToonMaterial | null } material - 머티리얼. (null 이면 빈 조각)
+	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴. (null 이면 없음)
+	 * @param { boolean } isAmbientOcclusion - 모서리 어둠 몸 프로그램인지.
+	 * @returns { object | null } { solid, outline, depth } 프로그램 칸. (짓지 못했으면 null)
+	 * @private
+	 */
+	readProgramSetVariant(material, instanceLayout, isAmbientOcclusion) {
+		if (material === null && instanceLayout === null && !isAmbientOcclusion) {
 			return this.#defaultProgramSet;
 		}
 		// 정렬한 그리기 줄은 같은 머티리얼이 이어진다. 마지막에 찾은 것이면 열쇠 글을 짓지 않는다.
 		const lastProgramKey = this.#lastProgramKey;
-		if (lastProgramKey !== null && lastProgramKey.material === material && lastProgramKey.instanceLayout === instanceLayout) {
+		if (lastProgramKey !== null && lastProgramKey.material === material && lastProgramKey.instanceLayout === instanceLayout && lastProgramKey.isAmbientOcclusion === isAmbientOcclusion) {
 			return lastProgramKey.programSet;
 		}
-		const key = `${material !== null ? material.getId() : 0}/${instanceLayout !== null ? instanceLayout.getId() : 0}`;
+		const baseKey = `${material !== null ? material.getId() : 0}/${instanceLayout !== null ? instanceLayout.getId() : 0}`;
+		const key = isAmbientOcclusion ? `${baseKey}/ao` : baseKey;
 		if (this.#programSets.has(key)) {
 			const programSet = this.#programSets.get(key);
-			this.#lastProgramKey = { material: material, instanceLayout: instanceLayout, programSet: programSet };
+			this.#lastProgramKey = { material: material, instanceLayout: instanceLayout, isAmbientOcclusion: isAmbientOcclusion, programSet: programSet };
 			return programSet;
+		}
+		// 모서리 어둠 몸 프로그램은 바깥선과 그림자 깊이를 기본 칸과 같이 쓴다. 짓지 못하면 (머티리얼 텍스처가 조각 셰이더 유닛을 다 쓴 기기 같은) 모서리 어둠 없이 기본 칸으로 그린다.
+		let baseProgramSet = null;
+		if (isAmbientOcclusion) {
+			baseProgramSet = this.readProgramSetVariant(material, instanceLayout, false);
+			if (baseProgramSet === null) {
+				this.#programSets.set(key, null);
+				return null;
+			}
 		}
 		let programSet = null;
 		try {
-			programSet = this.createProgramSet(material, instanceLayout);
+			programSet = this.createProgramSet(material, instanceLayout, baseProgramSet);
 		}
 		catch (error) {
 			const name = material !== null && material.getName() !== "" ? material.getName() : key;
 			System.console.error(`ToonRenderer: 머티리얼 ${name} 의 셰이더를 짓지 못했습니다.`, error);
+			if (baseProgramSet !== null) {
+				programSet = { solid: baseProgramSet.solid, outline: baseProgramSet.outline, depth: baseProgramSet.depth, isAmbientOcclusion: true, isShared: true };
+			}
 		}
 		this.#programSets.set(key, programSet);
 		return programSet;
@@ -1924,6 +1987,13 @@ export class ToonRenderer {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		// 모서리 어둠 칸은 몸만 제 것이다. (바깥선과 그림자 깊이는 기본 칸이 지운다, 짓지 못해 기본 칸을 빌린 것은 몸도 빌린 것)
+		if (programSet.isAmbientOcclusion === true) {
+			if (programSet.isShared !== true) {
+				webGL2RenderingContext.deleteProgram(programSet.solid.program.getProgram());
+			}
+			return;
+		}
 		webGL2RenderingContext.deleteProgram(programSet.solid.program.getProgram());
 		webGL2RenderingContext.deleteProgram(programSet.outline.program.getProgram());
 		webGL2RenderingContext.deleteProgram(programSet.depth.program.getProgram());
@@ -2639,6 +2709,12 @@ export class ToonRenderer {
 		this.saveState();
 		this.applyScreenRect();
 		this.applyFrameState();
+		const ambientOcclusionInput = this.#ambientOcclusionInput;
+		if (ambientOcclusionInput !== null) {
+			const webGL2RenderingContext = this.getWebGL2RenderingContext();
+			const viewport = webGL2RenderingContext.getParameter(webGL2RenderingContext.VIEWPORT);
+			ambientOcclusionInput.origin = [viewport[0], viewport[1]];
+		}
 	}
 
 	//==============================================================================
@@ -3139,6 +3215,10 @@ export class ToonRenderer {
 		}
 		else {
 			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowEnabled"), 0);
+		}
+		const ambientOcclusionInput = this.#ambientOcclusionInput;
+		if (ambientOcclusionInput !== null) {
+			webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("ambientOcclusionOrigin"), ambientOcclusionInput.origin[0], ambientOcclusionInput.origin[1]);
 		}
 		this.uploadLocalShadowUniforms(shaderProgram);
 	}
@@ -3872,6 +3952,9 @@ export class ToonRenderer {
 		this.bindTextureUnit(MATCAP_TEXTURE_UNIT, matcapTexture);
 		this.bindTextureUnit(ANGEL_RING_TEXTURE_UNIT, angelRingTexture);
 		this.bindTexture2D(LOCAL_SHADOW_TEXTURE_UNIT, this.#localShadowInput !== null ? this.#localShadowInput.depthTexture : this.#emptyShadowTexture);
+		if (this.#ambientOcclusionInput !== null) {
+			this.bindTexture2D(AMBIENT_OCCLUSION_TEXTURE_UNIT, this.#ambientOcclusionInput.texture);
+		}
 		if (state[DRAW_STATE_TEXTURES] !== null) {
 			let unit = FIRST_MATERIAL_TEXTURE_UNIT;
 			for (const [uniformName, texture] of System.Object.entries(state[DRAW_STATE_TEXTURES])) {
@@ -4279,6 +4362,44 @@ export class ToonRenderer {
 			return;
 		}
 		this.#shadowInput = { depthTexture: shadowMap.getDepthTexture(), lightViewProjectionMatrix: shadowMap.getLightViewProjectionMatrix(), resolution: shadowMap.getResolution(), strength: strength };
+	}
+
+	//==============================================================================
+	// 모서리 어둠 텍스처 설정. (ToonPostProcess.drawAmbientOcclusion 의 결과나 null, 다음 beginFrame 부터)
+	// - 텍스처를 건 동안 몸은 모서리 어둠 몸 프로그램(TOON_AMBIENT_OCCLUSION)으로 그리고, 화면 자리의 보임을 바탕빛(하늘과 땅 빛)에만 곱한다.
+	//   해 칸, 채움빛, 점광, 반사광, 테두리빛은 그대로다. 비치는 것(alpha 나 틴트 알파가 1 보다 작음)과 텍스처의 깊이와 다른 면(선의 판에 없던 것)은 곱하지 않는다.
+	// - null 이면 기본 몸 프로그램으로 돌아가 텍스처를 읽지 않는다. (끈 화면은 건 적이 없을 때와 같다)
+	// - 머티리얼 텍스처 8 개를 다 쓰는 머티리얼은 조각 셰이더 유닛이 16 개인 기기에서 모서리 어둠 없이 그린다.
+	//==============================================================================
+	/**
+	 * @param { WebGLTexture | null } texture - 선의 판 크기의 RGBA8. (r 보임, gba 깊이 24 비트, null 이면 끈다)
+	 * @example <caption>모서리 어둠을 걸고 그린 뒤 풀기</caption>
+	 * import { ToonRenderer } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const texture = webGL2RenderingContext.createTexture();
+	 * webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+	 * webGL2RenderingContext.texStorage2D(webGL2RenderingContext.TEXTURE_2D, 1, webGL2RenderingContext.RGBA8, 300, 150);
+	 * renderer.setAmbientOcclusionTexture(texture);
+	 * if (renderer.getAmbientOcclusionTexture() !== texture) {
+	 * 	throw new Error("ambient occlusion texture is not set");
+	 * }
+	 * renderer.setAmbientOcclusionTexture(null);
+	 */
+	setAmbientOcclusionTexture(texture) {
+		this.#frameSerial += 1;
+		this.#lastProgramKey = null;
+		this.#ambientOcclusionInput = texture !== null && texture !== undefined ? { texture: texture, origin: [0, 0] } : null;
+	}
+
+	//==============================================================================
+	// 모서리 어둠 텍스처 반환. (걸지 않았으면 null)
+	//==============================================================================
+	/**
+	 * @returns { WebGLTexture | null } setAmbientOcclusionTexture 로 건 텍스처.
+	 */
+	getAmbientOcclusionTexture() {
+		return this.#ambientOcclusionInput !== null ? this.#ambientOcclusionInput.texture : null;
 	}
 
 	//==============================================================================

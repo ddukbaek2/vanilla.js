@@ -193,6 +193,7 @@ export const ToonDrawStage = System.Object.freeze({
 // - 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.
 //   번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId, 인스턴스 버퍼는 꼴의 instanceLineId 칸이 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.
 //   비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.
+// - 모서리 어둠: setPostProcess(ToonPostProcess) 를 주고 후처리에서 setAmbientOcclusion 을 켜면 선의 판 뒤, 몸 앞에 셈해 렌더러에 걸고 endFrame 뒤에 푼다. (바깥선이 없으면 선 없이 선의 판만 그린다)
 // - 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.
 // - 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.
 //   인스턴스마다 걸러 그릴 때마다 올린다. (몸, 그림자, 선의 판이 같은 배열을 따로 올림) 오래 두는 것은 addMeshInstanceBuffer 로 한 번 올린 버퍼를 같이 쓴다.
@@ -232,6 +233,7 @@ export class ToonDrawQueue {
 	/** @private @type { Array<object> } */ #itemList; // { mesh, modelMatrix, instances, instanceBuffer, instanceCount, options, isTransparent, depthPosition, depth }
 	/** @private @type { Array<object> } */ #passList; // { stage, callback }
 	/** @private @type { object | null } */ #screenOutline; // ToonScreenOutline. (없으면 null)
+	/** @private @type { object | null } */ #postProcess; // ToonPostProcess. (모서리 어둠을 몸 앞에 셈한다, 없으면 null)
 	/** @private @type { Array<object> | null } */ #opaqueItemList; // 정렬한 불투명한 것. (담거나 비우면 null, 처음 그릴 때 만든다)
 	/** @private @type { Array<object> } */ #itemPool; // 담은 것 칸을 프레임마다 다시 쓴다. (clear 뒤에도 남는다)
 	/** @private @type { Int32Array } */ #sortKeys; // 앞의 정렬의 불투명한 것 열쇠. (하나에 재질, 모형, 텍스처 번호 셋, 담은 차례대로)
@@ -247,6 +249,7 @@ export class ToonDrawQueue {
 		this.#itemList = [];
 		this.#passList = [];
 		this.#screenOutline = null;
+		this.#postProcess = null;
 		this.#opaqueItemList = null;
 		this.#itemPool = [];
 		this.#sortKeys = new System.Int32Array(0);
@@ -364,6 +367,74 @@ export class ToonDrawQueue {
 	 */
 	getScreenOutline() {
 		return this.#screenOutline;
+	}
+
+	//==============================================================================
+	// 툰 후처리 맡기기. (모서리 어둠을 켰으면 draw 가 선의 판 뒤, 몸 앞에 셈해 렌더러에 걸고 endFrame 뒤에 푼다, null 이면 맡기지 않음)
+	// - 화면 공간 바깥선이 있으면 그 선의 판을, 없으면 후처리의 미리 그리기(getAmbientOcclusionPrepass)로 노멀과 깊이만 그린다.
+	//==============================================================================
+	/**
+	 * @param { object | null } postProcess - ToonPostProcess 나 null.
+	 * @example <caption>바깥선과 모서리 어둠을 함께</caption>
+	 * import { ToonDrawQueue, ToonScreenOutline, ToonPostProcess } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, 640, 360, { depthBits: 24 });
+	 * postProcess.setAmbientOcclusion(true, 0.5, 0.5, 0.5);
+	 * const queue = new ToonDrawQueue();
+	 * queue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));
+	 * queue.setPostProcess(postProcess);
+	 */
+	setPostProcess(postProcess) {
+		this.#postProcess = postProcess;
+	}
+
+	//==============================================================================
+	// 맡긴 툰 후처리 반환. (없으면 null)
+	//==============================================================================
+	/**
+	 * @returns { object | null } ToonPostProcess 나 null.
+	 */
+	getPostProcess() {
+		return this.#postProcess;
+	}
+
+	//==============================================================================
+	// 노멀과 깊이를 그릴 선의 판 주인. (화면 공간 바깥선, 없고 모서리 어둠을 켰으면 후처리의 미리 그리기, 둘 다 아니면 null)
+	//==============================================================================
+	/**
+	 * @returns { object | null } ToonScreenOutline 이나 null.
+	 * @private
+	 */
+	readLineSource() {
+		if (this.#screenOutline !== null) {
+			return this.#screenOutline;
+		}
+		const postProcess = this.#postProcess;
+		return postProcess !== null && postProcess.isAmbientOcclusionEnabled() ? postProcess.getAmbientOcclusionPrepass() : null;
+	}
+
+	//==============================================================================
+	// 모서리 어둠 셈하고 렌더러에 걸기. (켜지 않았으면 아무것도 하지 않고 false)
+	//==============================================================================
+	/**
+	 * @param { object } renderer - ToonRenderer.
+	 * @param { Matrix4 } viewMatrix - 보기 행렬.
+	 * @param { Matrix4 } projectionMatrix - 투영 행렬.
+	 * @returns { boolean } 렌더러에 걸었으면 true. (endFrame 뒤에 풀어야 한다)
+	 * @private
+	 */
+	drawAmbientOcclusion(renderer, viewMatrix, projectionMatrix) {
+		const postProcess = this.#postProcess;
+		if (postProcess === null || !postProcess.isAmbientOcclusionEnabled()) {
+			return false;
+		}
+		const lineSource = this.readLineSource();
+		const texture = postProcess.drawAmbientOcclusion(lineSource.getLineTarget(), viewMatrix, projectionMatrix);
+		if (texture === null) {
+			return false;
+		}
+		renderer.setAmbientOcclusionTexture(texture);
+		return true;
 	}
 
 	//==============================================================================
@@ -696,8 +767,10 @@ export class ToonDrawQueue {
 	 */
 	draw(renderer, camera) {
 		renderer.beginTrustedOptions();
+		let isAmbientOcclusionApplied = false;
 		try {
 			this.drawLineIds(renderer, camera.getViewMatrix(), camera.getProjectionMatrix());
+			isAmbientOcclusionApplied = this.drawAmbientOcclusion(renderer, camera.getViewMatrix(), camera.getProjectionMatrix());
 			renderer.beginFrameWithCamera(camera);
 			this.drawStages(renderer, (position) => {
 				return camera.readViewDepth(position.x, position.y, position.z);
@@ -705,6 +778,9 @@ export class ToonDrawQueue {
 			renderer.endFrame();
 		}
 		finally {
+			if (isAmbientOcclusionApplied) {
+				renderer.setAmbientOcclusionTexture(null);
+			}
 			renderer.endTrustedOptions();
 		}
 	}
@@ -719,8 +795,10 @@ export class ToonDrawQueue {
 	 */
 	drawWithMatrices(renderer, viewMatrix, projectionMatrix) {
 		renderer.beginTrustedOptions();
+		let isAmbientOcclusionApplied = false;
 		try {
 			this.drawLineIds(renderer, viewMatrix, projectionMatrix);
+			isAmbientOcclusionApplied = this.drawAmbientOcclusion(renderer, viewMatrix, projectionMatrix);
 			renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
 			const elements = viewMatrix.getElements();
 			this.drawStages(renderer, (position) => {
@@ -729,6 +807,9 @@ export class ToonDrawQueue {
 			renderer.endFrame();
 		}
 		finally {
+			if (isAmbientOcclusionApplied) {
+				renderer.setAmbientOcclusionTexture(null);
+			}
 			renderer.endTrustedOptions();
 		}
 	}
@@ -743,7 +824,7 @@ export class ToonDrawQueue {
 	 */
 	drawLineIds(renderer, viewMatrix, projectionMatrix) {
 		this.resolveItems(renderer);
-		const screenOutline = this.#screenOutline;
+		const screenOutline = this.readLineSource();
 		if (screenOutline === null) {
 			return;
 		}
