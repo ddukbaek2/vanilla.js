@@ -1,15 +1,13 @@
-# 원본 시험. (원본만 바꾼 푸시도 시험이 돌게 한다)
-# - 시험: node tests/run.mjs (node 시험과 헤드리스 크롬 시험 모두), 리눅스, 윈도우, 맥.
-#   러스트 판 CI(vanilla-engine .github/workflows/platforms.yml)도 같은 시험을 세 기계에서 돌리므로 원본 쪽에서 먼저 걸리게 같은 기계를 쓴다.
+# 원본 시험.
+# - 손으로만 돌린다(workflow_dispatch). 고친 것은 먼저 로컬(맥, 도커 리눅스)에서 node tests/run.mjs 와 apidoc 검사로 확인하고, 문제가 없을 때 윈도우, 리눅스 마지막 확인으로 한 번 돌린다.
+#   CI 로 문제를 찾거나 고치며 되풀이해 돌리지 않는다. 맥은 로컬 기계로 확인하므로 맥 러너는 쓰지 않는다. (2026-11-27 뚝백이님)
+# - 시험: node tests/run.mjs (node 시험과 헤드리스 크롬 시험 모두), 리눅스, 윈도우.
 # - API 문서 검사: node tools/apidoc.cjs 0.4.0 --check (자료 꼴, 그림 파일), --check-examples (예제 문법, 엔진 이름, node 와 헤드리스 크롬으로 돌려 보기).
 # - 크롬은 러너에 깔린 것을 쓰지 않고 browser-actions/setup-chrome 으로 Chrome for Testing 판을 고정한다. (러스트 판 CI 와 같은 158.0.8127.88, CHROME_PATH)
 #   puppeteer-core 도 러스트 판 CI 와 같은 판을 받는다. (NODE_PATH)
 name: 원본 시험
 
 on:
-  push:
-    branches: [dev, release, "ci-*"]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -30,8 +28,6 @@ jobs:
             os: ubuntu-latest
           - tag: windows
             os: windows-latest
-          - tag: macos
-            os: macos-latest
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
