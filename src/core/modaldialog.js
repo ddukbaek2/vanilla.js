@@ -17,7 +17,7 @@
 import { Rect } from "../base/rect.js";
 import { Vector2 } from "../base/vector2.js";
 import { Color } from "../base/color.js";
-import { PlatformType, SYSTEM_FONT_STRING } from "../base/platform.js";
+import { PlatformType } from "../base/platform.js";
 import { BlurredRoundRectShadow, viewsShadowBlurToSigma } from "./blurshadow.js";
 import { BrowserUiText, readBrowserUiText } from "./browseruitext.js";
 const System = globalThis;
@@ -236,6 +236,8 @@ export class ModalDialogHandle {
 // 질문 창 모양. (러스트 판 desktop_dialog 와 같은 크롬 main 의 값)
 // - MessageBoxView 폭 400, 안쪽 20, 제목 500 16px 줄 24, 본문 13px 줄 20, 제목과 본문 사이 8, 본문과 입력 칸 사이 8,
 //   아래 여백 입력 칸이 있으면 24 없으면 16, 단추 사이 8, 단추 최소 폭 64 안쪽 16 글 500 13px 알약 꼴, 입력 칸 안쪽 10 모서리 8, 대화 상자 모서리 12.
+// - 글꼴은 system-ui 다. 크롬 질문 창(views)은 운영체제 UI 글꼴(맥 NSFont systemFontOfSize, 윈도우 NONCLIENTMETRICS, 리눅스 GTK 글꼴)로 그리고,
+//   크롬의 system-ui 도 같은 글꼴을 고른다. (SYSTEM_FONT_STRING 은 맥 크롬이 -apple-system 을 몰라 Apple SD Gothic Neo 로 넘어가 다르다)
 //==============================================================================
 const DEFAULT_PROMPT_MAXIMUM_LENGTH = 2000; // 크롬 prompt 기본값의 최대 길이. (kDefaultPromptMaxSize)
 const MESSAGE_MAXIMUM_ROW_COUNT = 24; // 묻는 글의 최대 줄 수. (kMessageTextMaxRows)
@@ -247,10 +249,10 @@ const DIALOG_PADDING_TOP = 20;
 const DIALOG_PADDING_SIDE = 20;
 const DIALOG_PADDING_BOTTOM = 20;
 const DIALOG_CORNER_RADIUS = 12;
-const TITLE_FONT_STRING = `500 16px ${SYSTEM_FONT_STRING}`;
+const TITLE_FONT_STRING = "500 16px system-ui";
 const TITLE_LINE_HEIGHT = 24;
-const MESSAGE_FONT_STRING = `13px ${SYSTEM_FONT_STRING}`;
-const FIELD_FONT_STRING = `13px ${SYSTEM_FONT_STRING}`;
+const MESSAGE_FONT_STRING = "13px system-ui";
+const FIELD_FONT_STRING = "13px system-ui";
 const MESSAGE_LINE_HEIGHT = 20;
 const TITLE_MESSAGE_GAP = 8;
 const MESSAGE_FIELD_GAP = 8;
@@ -263,7 +265,7 @@ const BUTTON_HEIGHT = 36;
 const BUTTON_MINIMUM_WIDTH = 64;
 const BUTTON_PADDING_X = 16;
 const BUTTON_GAP = 8;
-const BUTTON_FONT_STRING = `500 13px ${SYSTEM_FONT_STRING}`;
+const BUTTON_FONT_STRING = "500 13px system-ui";
 const COLOR_DIALOG_BACKGROUND = "#ffffff";
 const COLOR_DIALOG_BORDER = "#e1e3e1";
 const COLOR_TITLE = "#1f1f1f";
