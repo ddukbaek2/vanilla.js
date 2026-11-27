@@ -6536,1226 +6536,8 @@ var TransformNode = class _TransformNode extends ComponentNode {
   }
 };
 
-// src/core/graphic/shaderprogram.js
-var ShaderProgram = class extends Object2 {
-  static {
-    __name(this, "ShaderProgram");
-  }
-  //==============================================================================
-  // 멤버 변수 목록.
-  //==============================================================================
-  /** @private @type { WebGL2RenderingContext } */
-  #webGL2RenderingContext;
-  /** @private @type { WebGLProgram } */
-  #program;
-  /** @private @type { Map<string, GLint> } */
-  #attributeLocations;
-  /** @private @type { Map<string, WebGLUniformLocation> } */
-  #uniformLocations;
-  //==============================================================================
-  // 생성.
-  // - 컴파일이나 링크에 실패하면 그때까지 지은 셰이더와 프로그램을 지우고 오류를 던진다.
-  //==============================================================================
-  /**
-   * @constructor
-   * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
-   * @param { string } vertexShaderSource 버텍스 셰이더 GLSL 소스.
-   * @param { string } fragmentShaderSource 프래그먼트 셰이더 GLSL 소스.
-   * @param { object | null } attributeLocationTable - 링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 }, 다른 프로그램의 버텍스 어레이를 함께 쓸 때)
-   */
-  constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null) {
-    super();
-    this.#webGL2RenderingContext = webGL2RenderingContext;
-    this.#attributeLocations = /* @__PURE__ */ new Map();
-    this.#uniformLocations = /* @__PURE__ */ new Map();
-    const vertexShader = this.createShader(webGL2RenderingContext.VERTEX_SHADER, vertexShaderSource);
-    let fragmentShader = null;
-    try {
-      fragmentShader = this.createShader(webGL2RenderingContext.FRAGMENT_SHADER, fragmentShaderSource);
-    } catch (error) {
-      webGL2RenderingContext.deleteShader(vertexShader);
-      throw error;
-    }
-    const program = webGL2RenderingContext.createProgram();
-    webGL2RenderingContext.attachShader(program, vertexShader);
-    webGL2RenderingContext.attachShader(program, fragmentShader);
-    if (attributeLocationTable) {
-      for (const attributeName in attributeLocationTable) {
-        webGL2RenderingContext.bindAttribLocation(program, attributeLocationTable[attributeName], attributeName);
-      }
-    }
-    webGL2RenderingContext.linkProgram(program);
-    if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
-      const programError = webGL2RenderingContext.getProgramInfoLog(program);
-      webGL2RenderingContext.deleteProgram(program);
-      webGL2RenderingContext.deleteShader(vertexShader);
-      webGL2RenderingContext.deleteShader(fragmentShader);
-      throw new Error(`ShaderProgram link failed: ${programError}`);
-    }
-    webGL2RenderingContext.deleteShader(vertexShader);
-    webGL2RenderingContext.deleteShader(fragmentShader);
-    this.#program = program;
-  }
-  //==============================================================================
-  // 셰이더 객체 생성.
-  //==============================================================================
-  /**
-   * @param { GLenum } shaderType 셰이더 갈래. (VERTEX_SHADER 또는 FRAGMENT_SHADER)
-   * @param { string } shaderSource GLSL 소스.
-   * @returns { WebGLShader } 컴파일한 셰이더. (컴파일에 실패하면 오류를 던진다)
-   */
-  createShader(shaderType, shaderSource) {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const shader = webGL2RenderingContext.createShader(shaderType);
-    webGL2RenderingContext.shaderSource(shader, shaderSource);
-    webGL2RenderingContext.compileShader(shader);
-    if (!webGL2RenderingContext.getShaderParameter(shader, webGL2RenderingContext.COMPILE_STATUS)) {
-      const shaderError = webGL2RenderingContext.getShaderInfoLog(shader);
-      webGL2RenderingContext.deleteShader(shader);
-      throw new Error(`ShaderProgram compile failed: ${shaderError}`);
-    }
-    return shader;
-  }
-  //==============================================================================
-  // 프로그램 사용 시작.
-  //==============================================================================
-  use() {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const program = this.getProgram();
-    webGL2RenderingContext.useProgram(program);
-  }
-  //==============================================================================
-  // 어트리뷰트 로케이션 반환. (캐시)
-  //==============================================================================
-  /**
-   * @param { string } attributeName 어트리뷰트 이름.
-   * @returns { GLint } 어트리뷰트 위치. (없으면 -1)
-   */
-  getAttributeLocation(attributeName) {
-    if (this.#attributeLocations.has(attributeName)) {
-      return this.#attributeLocations.get(attributeName);
-    }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const program = this.getProgram();
-    const attributeLocation = webGL2RenderingContext.getAttribLocation(program, attributeName);
-    this.#attributeLocations.set(attributeName, attributeLocation);
-    return attributeLocation;
-  }
-  //==============================================================================
-  // 유니폼 로케이션 반환. (캐시)
-  //==============================================================================
-  /**
-   * @param { string } uniformName 유니폼 이름.
-   * @returns { WebGLUniformLocation } 유니폼 위치. (없으면 null)
-   */
-  getUniformLocation(uniformName) {
-    if (this.#uniformLocations.has(uniformName)) {
-      return this.#uniformLocations.get(uniformName);
-    }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const program = this.getProgram();
-    const uniformLocation = webGL2RenderingContext.getUniformLocation(program, uniformName);
-    this.#uniformLocations.set(uniformName, uniformLocation);
-    return uniformLocation;
-  }
-  //==============================================================================
-  // 렌더링 컨텍스트 반환.
-  //==============================================================================
-  /**
-   * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
-   */
-  getWebGL2RenderingContext() {
-    return this.#webGL2RenderingContext;
-  }
-  //==============================================================================
-  // 프로그램 객체 반환.
-  //==============================================================================
-  /**
-   * @returns { WebGLProgram } 링크한 프로그램 객체.
-   */
-  getProgram() {
-    return this.#program;
-  }
-};
-
-// src/core/graphic/imagetexturecache.js
-var ImageTextureCache = class extends Object2 {
-  static {
-    __name(this, "ImageTextureCache");
-  }
-  //==============================================================================
-  // 멤버 변수 목록.
-  //==============================================================================
-  /** @private @type { WebGL2RenderingContext } */
-  #webGL2RenderingContext;
-  /** @private @type { WeakMap<object, { texture: WebGLTexture, isSmoothingApplied: boolean, isMipmapApplied: boolean, hasMipmap: boolean }> } */
-  #entries;
-  /** @private @type { ((texture: WebGLTexture) => void) | null } */
-  #textureBinder;
-  // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
-  //==============================================================================
-  // 생성.
-  //==============================================================================
-  /**
-   * @constructor
-   * @param { WebGL2RenderingContext } webGL2RenderingContext
-   * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
-   */
-  constructor(webGL2RenderingContext, textureBinder = null) {
-    super();
-    this.#webGL2RenderingContext = webGL2RenderingContext;
-    this.#entries = /* @__PURE__ */ new WeakMap();
-    this.#textureBinder = textureBinder;
-  }
-  //==============================================================================
-  // 이미지에 대응하는 텍스처 반환. (없으면 업로드 후 반환)
-  // - 아직 로드되지 않은 이미지(크기 0)는 null 을 반환한다.
-  // - 밉맵은 스무딩이 켜졌을 때만 쓴다. 처음 필요할 때 한 번 만든다.
-  //==============================================================================
-  /**
-   * @param { HTMLImageElement | HTMLCanvasElement | OffscreenCanvas } image
-   * @param { boolean } isSmoothingEnabled
-   * @param { boolean } isMipmapEnabled 줄여 그릴 때 밉맵을 쓸지. (기본 false)
-   * @returns { WebGLTexture | null }
-   */
-  getTexture(image, isSmoothingEnabled, isMipmapEnabled = false) {
-    if (image === null || image === void 0) {
-      return null;
-    }
-    if (!image.width || !image.height) {
-      return null;
-    }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    let entry = this.#entries.get(image);
-    if (!entry) {
-      const texture = webGL2RenderingContext.createTexture();
-      this.bindTexture(texture);
-      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, image);
-      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-      entry = { texture, isSmoothingApplied: !isSmoothingEnabled, isMipmapApplied: isMipmapEnabled, hasMipmap: false };
-      this.#entries.set(image, entry);
-    }
-    if (entry.isSmoothingApplied !== isSmoothingEnabled || entry.isMipmapApplied !== isMipmapEnabled) {
-      this.bindTexture(entry.texture);
-      const filter = isSmoothingEnabled ? webGL2RenderingContext.LINEAR : webGL2RenderingContext.NEAREST;
-      let minificationFilter = filter;
-      if (isSmoothingEnabled && isMipmapEnabled) {
-        if (!entry.hasMipmap) {
-          webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);
-          entry.hasMipmap = true;
-        }
-        minificationFilter = webGL2RenderingContext.LINEAR_MIPMAP_LINEAR;
-      }
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, minificationFilter);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, filter);
-      entry.isSmoothingApplied = isSmoothingEnabled;
-      entry.isMipmapApplied = isMipmapEnabled;
-    }
-    return entry.texture;
-  }
-  //==============================================================================
-  // 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
-  //==============================================================================
-  /**
-   * @param { WebGLTexture } texture
-   */
-  bindTexture(texture) {
-    const textureBinder = this.#textureBinder;
-    if (textureBinder) {
-      textureBinder(texture);
-      return;
-    }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-  }
-  //==============================================================================
-  // 렌더링 컨텍스트 반환.
-  //==============================================================================
-  /**
-   * @returns { WebGL2RenderingContext }
-   */
-  getWebGL2RenderingContext() {
-    return this.#webGL2RenderingContext;
-  }
-};
-
-// src/core/graphic/textstringtexturecache.js
-var System14 = globalThis;
-var MAXIMUM_ENTRY_COUNT = 1024;
-var ATLAS_PAGE_SIZE = 1024;
-var MAXIMUM_ATLAS_PAGE_COUNT = 8;
-var SUBPIXEL_SLOT_COUNT = 8;
-var MAXIMUM_ATLAS_FONT_SIZE = 256;
-var STROKE_MITER_LIMIT = 10;
-var RIGHT_TO_LEFT_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
-var JOINING_CLUSTER_PATTERN = /^[\p{L}\p{M}]/u;
-var STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}]/u;
-var COMBINING_MARK_PATTERN = /\p{M}/u;
-var EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
-var isTextAntialiasEnabled = true;
-var ALPHA_THRESHOLD = 128;
-var MAXIMUM_MEASURE_COUNT = 2048;
-var measureCache = new System14.Map();
-var measureCanvasRenderingContext = null;
-var measureFontLoadCount = 0;
-var measuredFontLoadCount = 0;
-var measuredFontFaceCount = -1;
-if (System14.document !== void 0 && System14.document.fonts !== void 0) {
-  System14.document.fonts.addEventListener("loadingdone", () => {
-    measureFontLoadCount += 1;
-  });
-}
-var FONT_SIZE_PATTERN = /^(?:[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?(?:px|pt|pc|in|cm|mm|q|em|rem|ex|ch|vw|vh|vmin|vmax|%)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|larger|smaller)(?:\/.*)?$/i;
-var DEFAULT_FONT_FAMILY = "default";
-function resolveFontString(fontString) {
-  if (!/default/i.test(fontString)) {
-    return fontString;
-  }
-  const wordPattern = /\S+/g;
-  let familyListStart = -1;
-  let wordMatch = wordPattern.exec(fontString);
-  while (wordMatch !== null) {
-    if (wordMatch[0].includes(",") || wordMatch[0].includes('"') || wordMatch[0].includes("'")) {
-      break;
-    }
-    if (FONT_SIZE_PATTERN.test(wordMatch[0])) {
-      familyListStart = wordMatch.index + wordMatch[0].length;
-      const lineHeightMatch = /^\s*\/\s*\S+/.exec(fontString.slice(familyListStart));
-      if (lineHeightMatch !== null && !wordMatch[0].includes("/")) {
-        familyListStart += lineHeightMatch[0].length;
-      }
-      break;
-    }
-    wordMatch = wordPattern.exec(fontString);
-  }
-  if (familyListStart < 0) {
-    return fontString;
-  }
-  const familyListText = fontString.slice(familyListStart);
-  const familyNameList = [];
-  let familyName = "";
-  let quoteCharacter = "";
-  for (const character of familyListText) {
-    if (quoteCharacter !== "") {
-      familyName += character;
-      if (character === quoteCharacter) {
-        quoteCharacter = "";
-      }
-      continue;
-    }
-    if (character === '"' || character === "'") {
-      quoteCharacter = character;
-      familyName += character;
-      continue;
-    }
-    if (character === ",") {
-      familyNameList.push(familyName.trim());
-      familyName = "";
-      continue;
-    }
-    familyName += character;
-  }
-  familyNameList.push(familyName.trim());
-  let isDefaultRequested = false;
-  const resolvedFamilyNameList = familyNameList.map((name) => {
-    const unquotedName = /^(["'])(.*)\1$/.exec(name);
-    const bareName = unquotedName !== null ? unquotedName[2] : name;
-    if (bareName.toLowerCase() !== DEFAULT_FONT_FAMILY) {
-      return name;
-    }
-    isDefaultRequested = true;
-    return `"${DEFAULT_FONT_FAMILY}"`;
-  });
-  if (!isDefaultRequested) {
-    return fontString;
-  }
-  resolvedFamilyNameList.push(SYSTEM_FONT_STRING);
-  return fontString.slice(0, familyListStart).trimEnd() + " " + resolvedFamilyNameList.join(", ");
-}
-__name(resolveFontString, "resolveFontString");
-function measureTextMetrics(fontString, text) {
-  const document2 = System14.document;
-  if (document2 === void 0 || document2 === null) {
-    return null;
-  }
-  if (measureCanvasRenderingContext === null) {
-    const measureCanvas = document2.createElement("canvas");
-    measureCanvasRenderingContext = measureCanvas.getContext("2d");
-  }
-  const fontFaceCount = document2.fonts !== void 0 ? document2.fonts.size : 0;
-  if (measuredFontLoadCount !== measureFontLoadCount || measuredFontFaceCount !== fontFaceCount) {
-    measureCache.clear();
-    measuredFontLoadCount = measureFontLoadCount;
-    measuredFontFaceCount = fontFaceCount;
-  }
-  const cacheKey = fontString + "\0" + text;
-  const cachedTextMetrics = measureCache.get(cacheKey);
-  if (cachedTextMetrics !== void 0) {
-    measureCache.delete(cacheKey);
-    measureCache.set(cacheKey, cachedTextMetrics);
-    return cachedTextMetrics;
-  }
-  measureCanvasRenderingContext.font = resolveFontString(fontString);
-  const textMetrics = measureCanvasRenderingContext.measureText(text);
-  measureCache.set(cacheKey, textMetrics);
-  while (measureCache.size > MAXIMUM_MEASURE_COUNT) {
-    const oldestKey = measureCache.keys().next().value;
-    measureCache.delete(oldestKey);
-  }
-  return textMetrics;
-}
-__name(measureTextMetrics, "measureTextMetrics");
-function measureTextWithoutGraphic(fontString, text) {
-  return measureTextMetrics(fontString, text);
-}
-__name(measureTextWithoutGraphic, "measureTextWithoutGraphic");
-function parseUnicodeRange(unicodeRange) {
-  const ranges = [];
-  if (typeof unicodeRange !== "string" || unicodeRange === "") {
-    ranges.push([0, 1114111]);
-    return ranges;
-  }
-  for (const rangeText of unicodeRange.split(",")) {
-    const rangeMatch = rangeText.trim().match(/^U\+([0-9a-fA-F?]+)(?:-([0-9a-fA-F]+))?$/i);
-    if (rangeMatch === null) {
-      continue;
-    }
-    const startText = rangeMatch[1].replace(/\?/g, "0");
-    const endText = rangeMatch[2] !== void 0 ? rangeMatch[2] : rangeMatch[1].replace(/\?/g, "F");
-    ranges.push([System14.parseInt(startText, 16), System14.parseInt(endText, 16)]);
-  }
-  return ranges;
-}
-__name(parseUnicodeRange, "parseUnicodeRange");
-function hasCharacterInRanges(text, ranges) {
-  for (const character of text) {
-    const codePoint = character.codePointAt(0);
-    for (const range of ranges) {
-      if (codePoint >= range[0] && codePoint <= range[1]) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-__name(hasCharacterInRanges, "hasCharacterInRanges");
-var TextStringTextureCache = class extends Object2 {
-  static {
-    __name(this, "TextStringTextureCache");
-  }
-  //==============================================================================
-  // 멤버 변수 목록.
-  //==============================================================================
-  /** @private @type { WebGL2RenderingContext } */
-  #webGL2RenderingContext;
-  /** @private @type { Map<string, object> } */
-  #entries;
-  // 글 배치 엔트리. (LRU)
-  /** @private @type { Map<string, object[]> } */
-  #entriesByText;
-  // 문자열마다 그 문자열의 엔트리 목록. (찾을 때 열쇠 문자열을 만들지 않으려고)
-  /** @private @type { Map<string, object> } */
-  #glyphs;
-  // 구운 글리프. (열쇠: 글꼴 열쇠, 글자 덩어리, 자리 열쇠)
-  /** @private @type { object[] } */
-  #atlasPages;
-  // 아틀라스 장 목록.
-  /** @private @type { number } */
-  #useSerial;
-  // 엔트리를 줄 때마다 늘리는 번호. (장의 LRU)
-  /** @private @type { number } */
-  #bakedGlyphCount;
-  // 지금까지 구운 글리프 수. (통계)
-  /** @private @type { number } */
-  #uploadCount;
-  // 지금까지 아틀라스에 올린 수. (통계, 굽기 캔버스 한 장이 한 번)
-  /** @private @type { object | null } */
-  #segmenter;
-  // 글자 덩어리 나누기. (Intl.Segmenter, 없으면 null)
-  /** @private @type { HTMLCanvasElement } */
-  #bakeCanvas;
-  /** @private @type { CanvasRenderingContext2D } */
-  #bakeCanvasRenderingContext;
-  /** @private @type { CanvasRenderingContext2D } */
-  #measurementCanvasRenderingContext;
-  /** @private @type { CanvasRenderingContext2D } */
-  #layoutCanvasRenderingContext;
-  // 글 배치 재기용. (글꼴을 바꿀 때만 다시 건다)
-  /** @private @type { ((texture: WebGLTexture) => void) | null } */
-  #textureBinder;
-  // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
-  /** @private @type { (() => void) | null } */
-  #beforeTextureOverwrite;
-  // 아틀라스 장을 비워 덮어쓰기 전에 부르는 함수. (주인 Graphic 이 쌓아 둔 묶음을 먼저 그린다)
-  //==============================================================================
-  // 생성.
-  //==============================================================================
-  /**
-   * @constructor
-   * @param { WebGL2RenderingContext } webGL2RenderingContext
-   * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
-   * @param { (() => void) | null } beforeTextureOverwrite - 아틀라스 장을 비워 덮어쓰기 전에 부르는 함수. (쌓아 둔 그리기를 먼저 내보낸다, null 이면 부르지 않는다)
-   */
-  constructor(webGL2RenderingContext, textureBinder = null, beforeTextureOverwrite = null) {
-    super();
-    this.#webGL2RenderingContext = webGL2RenderingContext;
-    this.#entries = /* @__PURE__ */ new Map();
-    this.#entriesByText = /* @__PURE__ */ new Map();
-    this.#glyphs = /* @__PURE__ */ new Map();
-    this.#atlasPages = [];
-    this.#useSerial = 0;
-    this.#bakedGlyphCount = 0;
-    this.#uploadCount = 0;
-    this.#textureBinder = textureBinder;
-    this.#beforeTextureOverwrite = beforeTextureOverwrite;
-    this.#segmenter = System14.Intl !== void 0 && typeof System14.Intl.Segmenter === "function" ? new System14.Intl.Segmenter(void 0, { granularity: "grapheme" }) : null;
-    const bakeCanvas = System14.document.createElement("canvas");
-    this.#bakeCanvas = bakeCanvas;
-    this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
-    const measurementCanvas = System14.document.createElement("canvas");
-    this.#measurementCanvasRenderingContext = measurementCanvas.getContext("2d");
-    const layoutCanvas = System14.document.createElement("canvas");
-    this.#layoutCanvasRenderingContext = layoutCanvas.getContext("2d");
-  }
-  //==============================================================================
-  // 문자열 측정. (화면에 보이지 않는 오프스크린 컨텍스트 사용, 글꼴 문자열과 글이 같으면 캐시한 것을 준다)
-  // - 돌려준 TextMetrics 는 캐시가 나눠 쓰므로 고치지 않는다. (measureTextMetrics)
-  //==============================================================================
-  /**
-   * @param { string } fontString
-   * @param { string } text
-   * @returns { TextMetrics }
-   */
-  measureText(fontString, text) {
-    const textMetrics = measureTextMetrics(fontString, text);
-    if (textMetrics !== null) {
-      return textMetrics;
-    }
-    const measurementCanvasRenderingContext2 = this.getMeasurementCanvasRenderingContext();
-    measurementCanvasRenderingContext2.font = resolveFontString(fontString);
-    return measurementCanvasRenderingContext2.measureText(text);
-  }
-  //==============================================================================
-  // 폰트 문자열의 픽셀 크기를 배율만큼 확대한 문자열 반환.
-  //==============================================================================
-  /**
-   * @param { string } fontString
-   * @param { number } scale
-   * @returns { string }
-   */
-  buildScaledFontString(fontString, scale) {
-    if (scale === 1) {
-      return fontString;
-    }
-    return fontString.replace(/(\d+(?:\.\d+)?)px/, (matched, sizeText) => {
-      const scaledSize = System14.Number.parseFloat(sizeText) * scale;
-      return `${scaledSize}px`;
-    });
-  }
-  //==============================================================================
-  // 글 배치 엔트리 반환. (없으면 배치하고 처음 보는 글리프만 구워 반환)
-  // - mode: "fill" 또는 "stroke".
-  // - textDirection: 문단의 방향. ("ltr" 또는 "rtl", 캔버스의 direction 으로 굽는다)
-  // - 반환 필드는 전부 논리 좌표(스케일 나눔) 기준. 문자열을 통째로 구웠을 때의 사각형(quadWidth, quadHeight, penOffsetX, baselineOffsetY)과
-  //   그 사각형 왼쪽 위 기준의 글리프 사각형(glyphTextures, glyphRects 의 왼, 위, 오른, 아래, u0, v0, u1, v1 여덟 값씩)을 준다.
-  //==============================================================================
-  /**
-   * @param { string } mode
-   * @param { string } text
-   * @param { string } fontString
-   * @param { string } colorString
-   * @param { number } lineWidth
-   * @param { number } scale
-   * @param { string } textDirection 기본 "ltr".
-   * @returns { object | null }
-   */
-  getEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
-    if (!text) {
-      return null;
-    }
-    this.#useSerial += 1;
-    const useSerial = this.#useSerial;
-    const entries = this.getEntries();
-    const entryList = this.#entriesByText.get(text);
-    if (entryList !== void 0) {
-      for (const entry2 of entryList) {
-        if (entry2.mode !== mode || entry2.textDirection !== textDirection || entry2.scale !== scale || entry2.lineWidth !== lineWidth || entry2.colorString !== colorString || entry2.fontString !== fontString) {
-          continue;
-        }
-        const entryKey2 = entry2.entryKey;
-        entries.delete(entryKey2);
-        entries.set(entryKey2, entry2);
-        for (const atlasPage of entry2.atlasPages) {
-          atlasPage.lastUseSerial = useSerial;
-        }
-        return entry2;
-      }
-    }
-    const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
-    const entry = this.buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
-    if (!entry) {
-      return null;
-    }
-    entry.entryKey = entryKey;
-    entry.mode = mode;
-    entry.text = text;
-    entry.fontString = fontString;
-    entry.colorString = colorString;
-    entry.lineWidth = lineWidth;
-    entry.scale = scale;
-    entry.textDirection = textDirection;
-    const collidedEntry = entries.get(entryKey);
-    if (collidedEntry !== void 0) {
-      this.removeEntry(entryKey, collidedEntry);
-    }
-    entries.set(entryKey, entry);
-    const textEntryList = this.#entriesByText.get(text);
-    if (textEntryList !== void 0) {
-      textEntryList.push(entry);
-    } else {
-      this.#entriesByText.set(text, [entry]);
-    }
-    while (entries.size > MAXIMUM_ENTRY_COUNT) {
-      const oldestEntryKey = entries.keys().next().value;
-      const oldestEntry = entries.get(oldestEntryKey);
-      this.removeEntry(oldestEntryKey, oldestEntry);
-    }
-    return entry;
-  }
-  //==============================================================================
-  // 글을 글자 덩어리로 나눠 배치하고, 처음 보는 글리프를 아틀라스에 굽는다.
-  //==============================================================================
-  /**
-   * @param { string } mode
-   * @param { string } text
-   * @param { string } fontString
-   * @param { string } colorString
-   * @param { number } lineWidth
-   * @param { number } scale
-   * @param { string } textDirection 기본 "ltr".
-   * @returns { object | null }
-   */
-  buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
-    const scaledFontString = this.buildScaledFontString(resolveFontString(fontString), scale);
-    const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
-    layoutCanvasRenderingContext.font = scaledFontString;
-    layoutCanvasRenderingContext.direction = textDirection;
-    layoutCanvasRenderingContext.textAlign = "left";
-    const scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
-    const actualLeft = ceil(max(scaledTextMetrics.actualBoundingBoxLeft || 0, 0));
-    const actualRight = ceil(max(scaledTextMetrics.actualBoundingBoxRight || scaledTextMetrics.width, 0));
-    let scaledFontAscent = scaledTextMetrics.fontBoundingBoxAscent;
-    if (scaledFontAscent === void 0) {
-      scaledFontAscent = scaledTextMetrics.actualBoundingBoxAscent || 0;
-    }
-    let scaledFontDescent = scaledTextMetrics.fontBoundingBoxDescent;
-    if (scaledFontDescent === void 0) {
-      scaledFontDescent = scaledTextMetrics.actualBoundingBoxDescent || 0;
-    }
-    const scaledPadding = ceil(lineWidth * scale / 2) + 2;
-    const scaledPenX = scaledPadding + actualLeft;
-    const scaledBaselineY = scaledPadding + ceil(scaledFontAscent);
-    const bakeWidth = scaledPenX + actualRight + scaledPadding;
-    const bakeHeight = scaledBaselineY + ceil(scaledFontDescent) + scaledPadding;
-    if (bakeWidth <= 0 || bakeHeight <= 0) {
-      return null;
-    }
-    const chunks = this.splitTextChunks(text, scaledFontString, textDirection);
-    this.measureChunkPositions(text, chunks, scaledFontString);
-    const cellPadding = mode === "stroke" ? ceil(lineWidth * scale * STROKE_MITER_LIMIT / 2) + 2 : scaledPadding + 1;
-    const isNearest = !isTextAntialiasEnabled;
-    const strikeKey = `${mode}|${lineWidth * scale}|${isNearest ? 1 : 0}|${textDirection}|${scaledFontString}`;
-    const useSerial = this.#useSerial;
-    const glyphList = [];
-    const missingGlyphList = [];
-    for (const chunk of chunks) {
-      const startPosition = chunk.positions[0];
-      const anchorX = floor(startPosition);
-      const fractionX = startPosition - anchorX;
-      let positionKey;
-      if (chunk.isExactPosition) {
-        positionKey = "x" + fractionX;
-      } else {
-        positionKey = "";
-        for (const position of chunk.positions) {
-          const slotIndex = floor(position * SUBPIXEL_SLOT_COUNT);
-          positionKey += System14.String.fromCharCode(97 + (slotIndex % SUBPIXEL_SLOT_COUNT + SUBPIXEL_SLOT_COUNT) % SUBPIXEL_SLOT_COUNT);
-        }
-      }
-      const glyphKey = strikeKey + chunk.text + "" + positionKey;
-      let glyph = this.#glyphs.get(glyphKey);
-      if (glyph === void 0 && missingGlyphList.length > 0) {
-        glyph = missingGlyphList.find((missingGlyph) => missingGlyph.glyphKey === glyphKey);
-      }
-      if (glyph === void 0) {
-        const chunkMetrics = chunk.isWholeText ? scaledTextMetrics : this.measureLayoutText(scaledFontString, chunk.text);
-        const chunkLeft = ceil(max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
-        const chunkRight = ceil(max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
-        const originX = cellPadding + chunkLeft;
-        glyph = {
-          glyphKey,
-          text: chunk.text,
-          scaledFontString,
-          fractionX,
-          originX,
-          width: originX + 1 + chunkRight + cellPadding,
-          height: bakeHeight,
-          baselineY: scaledBaselineY,
-          atlasPage: null,
-          atlasX: 0,
-          atlasY: 0
-        };
-        missingGlyphList.push(glyph);
-      } else if (glyph.atlasPage !== null) {
-        glyph.atlasPage.lastUseSerial = useSerial;
-      }
-      glyphList.push(glyph, anchorX);
-    }
-    if (missingGlyphList.length > 0) {
-      this.bakeGlyphs(missingGlyphList, mode, colorString, lineWidth * scale, textDirection);
-    }
-    const glyphTextures = [];
-    const glyphRects = [];
-    const atlasPages = [];
-    for (let glyphIndex = 0; glyphIndex < glyphList.length; glyphIndex += 2) {
-      const glyph = glyphList[glyphIndex];
-      const anchorX = glyphList[glyphIndex + 1];
-      const atlasPage = glyph.atlasPage;
-      if (atlasPage === null) {
-        continue;
-      }
-      const cellLeft = scaledPenX + anchorX - glyph.originX;
-      const cellTop = scaledBaselineY - glyph.baselineY;
-      const clippedLeft = max(cellLeft, 0);
-      const clippedRight = min(cellLeft + glyph.width, bakeWidth);
-      const clippedTop = max(cellTop, 0);
-      const clippedBottom = min(cellTop + glyph.height, bakeHeight);
-      if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) {
-        continue;
-      }
-      glyphTextures.push(atlasPage.texture);
-      glyphRects.push(
-        clippedLeft / scale,
-        clippedTop / scale,
-        clippedRight / scale,
-        clippedBottom / scale,
-        (glyph.atlasX + clippedLeft - cellLeft) / atlasPage.width,
-        (glyph.atlasY + clippedTop - cellTop) / atlasPage.height,
-        (glyph.atlasX + clippedRight - cellLeft) / atlasPage.width,
-        (glyph.atlasY + clippedBottom - cellTop) / atlasPage.height
-      );
-      if (!atlasPages.includes(atlasPage)) {
-        atlasPages.push(atlasPage);
-      }
-    }
-    const entry = {
-      glyphTextures,
-      glyphRects,
-      atlasPages,
-      quadWidth: bakeWidth / scale,
-      quadHeight: bakeHeight / scale,
-      penOffsetX: scaledPenX / scale,
-      baselineOffsetY: scaledBaselineY / scale,
-      advanceWidth: scaledTextMetrics.width / scale,
-      fontAscent: scaledFontAscent / scale,
-      fontDescent: scaledFontDescent / scale
-    };
-    return entry;
-  }
-  //==============================================================================
-  // 글을 따로 구울 글자 덩어리로 나누기.
-  // - 덩어리마다 text, start(글 안 UTF-16 자리), clusterEnds(덩어리 안 글자 덩어리마다 끝 자리), isExactPosition(자리를 1/8 칸으로 묶지 못함), isWholeText.
-  // - 한글, 한자, 가나, 숫자, 문장 부호, 공백, 이모지는 글자 덩어리마다 따로. 그 밖의 글자(라틴, 키릴, 태국 같은)는 이어진 낱말째.
-  // - 결합 부호가 붙은 덩어리는 부호 글리프의 자리가 덩어리 시작과 따로 놀아 칸으로 묶지 않고 정확한 자리로 굽는다.
-  // - 오른쪽에서 왼쪽 글, 아주 큰 글꼴, 나누기를 못 하는 곳은 글 전체가 한 덩어리.
-  //==============================================================================
-  /**
-   * @param { string } text
-   * @param { string } scaledFontString
-   * @param { string } textDirection
-   * @returns { object[] }
-   */
-  splitTextChunks(text, scaledFontString, textDirection) {
-    const segmenter = this.#segmenter;
-    const fontSizeMatch = scaledFontString.match(/(\d+(?:\.\d+)?)px/);
-    const fontSize = fontSizeMatch !== null ? System14.Number.parseFloat(fontSizeMatch[1]) : Infinity;
-    if (segmenter === null || textDirection !== "ltr" || fontSize > MAXIMUM_ATLAS_FONT_SIZE || RIGHT_TO_LEFT_PATTERN.test(text)) {
-      return [{ text, start: 0, clusterEnds: [text.length], isExactPosition: true, isWholeText: true, positions: [0] }];
-    }
-    const chunks = [];
-    let previousChunk = null;
-    let isPreviousJoining = false;
-    for (const segment of segmenter.segment(text)) {
-      const clusterText = segment.segment;
-      const clusterEnd = segment.index + clusterText.length;
-      const isJoining = JOINING_CLUSTER_PATTERN.test(clusterText) && !STANDALONE_SCRIPT_PATTERN.test(clusterText);
-      const isExactPosition = clusterText.length > 1 && COMBINING_MARK_PATTERN.test(clusterText) && !EMOJI_CLUSTER_PATTERN.test(clusterText);
-      if (isJoining && isPreviousJoining && previousChunk !== null) {
-        previousChunk.text += clusterText;
-        previousChunk.clusterEnds.push(clusterEnd);
-        previousChunk.isExactPosition = previousChunk.isExactPosition || isExactPosition;
-        continue;
-      }
-      previousChunk = { text: clusterText, start: segment.index, clusterEnds: [clusterEnd], isExactPosition, isWholeText: false, positions: null };
-      chunks.push(previousChunk);
-      isPreviousJoining = isJoining;
-    }
-    return chunks;
-  }
-  //==============================================================================
-  // 덩어리 안 글자 덩어리마다 펜에서의 가로 자리 재기. (굽는 배율 텍셀)
-  // - 자리(k) = 자리(k-1) + (앞 글자 덩어리와 이 글자 덩어리를 붙인 너비) - (이 글자 덩어리만의 너비).
-  //   붙인 너비에서 뒤 덩어리 너비를 빼면 앞 덩어리의 커닝까지 든 전진폭이다. 크롬이 셈한 자리와 같다.
-  // - 짝 너비와 덩어리 너비는 글 재기 캐시에 남아 숫자처럼 되풀이되는 짝은 다시 재지 않는다. (글 길이에 비례)
-  // - 자리는 크롬의 글리프 자리처럼 32 비트 실수로 쌓는다.
-  //==============================================================================
-  /**
-   * @param { string } text
-   * @param { object[] } chunks
-   * @param { string } scaledFontString
-   */
-  measureChunkPositions(text, chunks, scaledFontString) {
-    if (chunks.length === 1 && chunks[0].isWholeText) {
-      return;
-    }
-    let previousClusterText = null;
-    let previousPosition = 0;
-    for (const chunk of chunks) {
-      const positions = [];
-      let clusterStart = chunk.start;
-      for (const clusterEnd of chunk.clusterEnds) {
-        const clusterText = text.substring(clusterStart, clusterEnd);
-        let position = 0;
-        if (previousClusterText !== null) {
-          const pairWidth = this.measureLayoutText(scaledFontString, previousClusterText + clusterText).width;
-          const clusterWidth = this.measureLayoutText(scaledFontString, clusterText).width;
-          position = System14.Math.fround(previousPosition + System14.Math.fround(pairWidth - clusterWidth));
-        }
-        positions.push(position);
-        previousClusterText = clusterText;
-        previousPosition = position;
-        clusterStart = clusterEnd;
-      }
-      chunk.positions = positions;
-    }
-  }
-  //==============================================================================
-  // 글자 덩어리 재기. (왼쪽에서 오른쪽, 캐시를 거친다, 배치용 컨텍스트에 그 글꼴이 걸려 있어야 한다)
-  //==============================================================================
-  /**
-   * @param { string } scaledFontString
-   * @param { string } text
-   * @returns { TextMetrics }
-   */
-  measureLayoutText(scaledFontString, text) {
-    const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
-    const textMetrics = measureTextMetrics(scaledFontString, text);
-    if (textMetrics !== null) {
-      return textMetrics;
-    }
-    return layoutCanvasRenderingContext.measureText(text);
-  }
-  //==============================================================================
-  // 글리프들을 아틀라스에 굽기. (한 줄에 이어 놓인 칸은 굽기 캔버스 한 장에 그려 한 번에 올린다)
-  //==============================================================================
-  /**
-   * @param { object[] } glyphList
-   * @param { string } mode
-   * @param { string } colorString
-   * @param { number } scaledLineWidth
-   * @param { string } textDirection
-   */
-  bakeGlyphs(glyphList, mode, colorString, scaledLineWidth, textDirection) {
-    const isNearest = !isTextAntialiasEnabled;
-    const spans = [];
-    let currentSpan = null;
-    for (const glyph of glyphList) {
-      this.allocateGlyphCell(glyph, isNearest);
-      if (glyph.atlasPage === null) {
-        continue;
-      }
-      if (currentSpan !== null && currentSpan.atlasPage === glyph.atlasPage && currentSpan.atlasY === glyph.atlasY && currentSpan.atlasX + currentSpan.width === glyph.atlasX && currentSpan.height === glyph.height) {
-        currentSpan.width += glyph.width;
-        currentSpan.glyphs.push(glyph);
-        continue;
-      }
-      currentSpan = { atlasPage: glyph.atlasPage, atlasX: glyph.atlasX, atlasY: glyph.atlasY, width: glyph.width, height: glyph.height, glyphs: [glyph] };
-      spans.push(currentSpan);
-    }
-    const bakeCanvas = this.getBakeCanvas();
-    const bakeCanvasRenderingContext = this.getBakeCanvasRenderingContext();
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    for (const span of spans) {
-      bakeCanvas.width = span.width;
-      bakeCanvas.height = span.height;
-      bakeCanvasRenderingContext.clearRect(0, 0, span.width, span.height);
-      bakeCanvasRenderingContext.font = span.glyphs[0].scaledFontString;
-      bakeCanvasRenderingContext.direction = textDirection;
-      bakeCanvasRenderingContext.textAlign = "left";
-      bakeCanvasRenderingContext.textBaseline = "alphabetic";
-      if (mode === "stroke") {
-        bakeCanvasRenderingContext.strokeStyle = colorString;
-        bakeCanvasRenderingContext.lineWidth = scaledLineWidth;
-      } else {
-        bakeCanvasRenderingContext.fillStyle = colorString;
-      }
-      for (const glyph of span.glyphs) {
-        const penX = glyph.atlasX - span.atlasX + glyph.originX + glyph.fractionX;
-        if (mode === "stroke") {
-          bakeCanvasRenderingContext.strokeText(glyph.text, penX, glyph.baselineY);
-        } else {
-          bakeCanvasRenderingContext.fillText(glyph.text, penX, glyph.baselineY);
-        }
-      }
-      if (isNearest) {
-        const imageData = bakeCanvasRenderingContext.getImageData(0, 0, span.width, span.height);
-        const pixels = imageData.data;
-        for (let pixelIndex = 3; pixelIndex < pixels.length; pixelIndex += 4) {
-          pixels[pixelIndex] = pixels[pixelIndex] >= ALPHA_THRESHOLD ? 255 : 0;
-        }
-        bakeCanvasRenderingContext.putImageData(imageData, 0, 0);
-      }
-      this.bindTexture(span.atlasPage.texture);
-      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-      webGL2RenderingContext.texSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, span.atlasX, span.atlasY, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bakeCanvas);
-      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-      this.#bakedGlyphCount += span.glyphs.length;
-      this.#uploadCount += 1;
-    }
-  }
-  //==============================================================================
-  // 글리프 칸 자리 잡기. (가장 나중에 연 장의 같은 높이 줄에 이어 놓고, 없으면 새 줄, 새 장, 장 수가 상한이면 가장 오래 안 쓴 장을 비운다)
-  // - 이번 엔트리가 쓰는 장(lastUseSerial 이 지금 번호)은 비우지 않는다. 그것뿐이면 상한을 넘겨 새 장을 연다.
-  //==============================================================================
-  /**
-   * @param { object } glyph
-   * @param { boolean } isNearest
-   */
-  allocateGlyphCell(glyph, isNearest) {
-    const useSerial = this.#useSerial;
-    const atlasPages = this.#atlasPages;
-    const width = glyph.width;
-    const height = glyph.height;
-    if (width > ATLAS_PAGE_SIZE || height > ATLAS_PAGE_SIZE) {
-      this.makeRoomForAtlasPage();
-      const atlasPage2 = this.createAtlasPage(width, height, isNearest, true);
-      this.placeGlyph(glyph, atlasPage2, 0, 0);
-      return;
-    }
-    for (let atlasPageIndex = atlasPages.length - 1; atlasPageIndex >= 0; --atlasPageIndex) {
-      const atlasPage2 = atlasPages[atlasPageIndex];
-      if (atlasPage2.isNearest !== isNearest || atlasPage2.isDedicated) {
-        continue;
-      }
-      if (this.tryPlaceGlyph(glyph, atlasPage2)) {
-        return;
-      }
-      break;
-    }
-    this.makeRoomForAtlasPage();
-    const atlasPage = this.createAtlasPage(ATLAS_PAGE_SIZE, ATLAS_PAGE_SIZE, isNearest, false);
-    atlasPage.lastUseSerial = useSerial;
-    this.tryPlaceGlyph(glyph, atlasPage);
-  }
-  //==============================================================================
-  // 장 하나에 글리프 칸 놓아 보기. (같은 높이 줄의 남은 자리, 없으면 새 줄)
-  //==============================================================================
-  /**
-   * @param { object } glyph
-   * @param { object } atlasPage
-   * @returns { boolean } 놓았으면 참.
-   */
-  tryPlaceGlyph(glyph, atlasPage) {
-    const width = glyph.width;
-    const height = glyph.height;
-    for (const shelf of atlasPage.shelves) {
-      if (shelf.height === height && shelf.cursorX + width <= atlasPage.width) {
-        this.placeGlyph(glyph, atlasPage, shelf.cursorX, shelf.y);
-        shelf.cursorX += width;
-        return true;
-      }
-    }
-    if (atlasPage.nextShelfY + height <= atlasPage.height) {
-      const shelf = { y: atlasPage.nextShelfY, height, cursorX: width };
-      atlasPage.shelves.push(shelf);
-      atlasPage.nextShelfY += height;
-      this.placeGlyph(glyph, atlasPage, 0, shelf.y);
-      return true;
-    }
-    return false;
-  }
-  //==============================================================================
-  // 글리프를 장의 자리에 적고 글리프 맵에 넣기.
-  //==============================================================================
-  /**
-   * @param { object } glyph
-   * @param { object } atlasPage
-   * @param { number } atlasX
-   * @param { number } atlasY
-   */
-  placeGlyph(glyph, atlasPage, atlasX, atlasY) {
-    glyph.atlasPage = atlasPage;
-    glyph.atlasX = atlasX;
-    glyph.atlasY = atlasY;
-    atlasPage.glyphs.push(glyph);
-    atlasPage.lastUseSerial = this.#useSerial;
-    this.#glyphs.set(glyph.glyphKey, glyph);
-  }
-  //==============================================================================
-  // 장 수가 상한이면 가장 오래 안 쓴 장 하나를 지워 자리를 낸다. (이번 엔트리가 쓰는 장은 지우지 않는다)
-  //==============================================================================
-  makeRoomForAtlasPage() {
-    const atlasPages = this.#atlasPages;
-    if (atlasPages.length < MAXIMUM_ATLAS_PAGE_COUNT) {
-      return;
-    }
-    let oldestAtlasPage = null;
-    for (const atlasPage of atlasPages) {
-      if (atlasPage.lastUseSerial >= this.#useSerial) {
-        continue;
-      }
-      if (oldestAtlasPage === null || atlasPage.lastUseSerial < oldestAtlasPage.lastUseSerial) {
-        oldestAtlasPage = atlasPage;
-      }
-    }
-    if (oldestAtlasPage === null) {
-      return;
-    }
-    this.removeAtlasPage(oldestAtlasPage);
-  }
-  //==============================================================================
-  // 아틀라스 장 만들기.
-  //==============================================================================
-  /**
-   * @param { number } width
-   * @param { number } height
-   * @param { boolean } isNearest 가까운 텍셀로 뽑을지. (안티앨리어싱을 끈 글자)
-   * @param { boolean } isDedicated 칸 하나만 담는 장인지.
-   * @returns { object }
-   */
-  createAtlasPage(width, height, isNearest, isDedicated) {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const texture = webGL2RenderingContext.createTexture();
-    this.bindTexture(texture);
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-    const textureFilter = isNearest ? webGL2RenderingContext.NEAREST : webGL2RenderingContext.LINEAR;
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, textureFilter);
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, textureFilter);
-    const atlasPage = {
-      texture,
-      width,
-      height,
-      isNearest,
-      isDedicated,
-      shelves: [],
-      nextShelfY: 0,
-      glyphs: [],
-      lastUseSerial: this.#useSerial
-    };
-    this.#atlasPages.push(atlasPage);
-    return atlasPage;
-  }
-  //==============================================================================
-  // 아틀라스 장 지우기. (그 장의 글리프와 그 장을 쓰는 엔트리도 버린다, 쌓아 둔 그리기를 먼저 내보낸다)
-  //==============================================================================
-  /**
-   * @param { object } atlasPage
-   */
-  removeAtlasPage(atlasPage) {
-    const beforeTextureOverwrite = this.#beforeTextureOverwrite;
-    if (beforeTextureOverwrite !== null) {
-      beforeTextureOverwrite();
-    }
-    for (const glyph of atlasPage.glyphs) {
-      if (this.#glyphs.get(glyph.glyphKey) === glyph) {
-        this.#glyphs.delete(glyph.glyphKey);
-      }
-      glyph.atlasPage = null;
-    }
-    const entries = this.getEntries();
-    for (const [entryKey, entry] of System14.Array.from(entries)) {
-      if (entry.atlasPages.includes(atlasPage)) {
-        this.removeEntry(entryKey, entry);
-      }
-    }
-    const atlasPageIndex = this.#atlasPages.indexOf(atlasPage);
-    if (atlasPageIndex >= 0) {
-      this.#atlasPages.splice(atlasPageIndex, 1);
-    }
-    this.getWebGL2RenderingContext().deleteTexture(atlasPage.texture);
-  }
-  //==============================================================================
-  // 모든 엔트리와 글리프 파기. (아틀라스 텍스처 삭제 포함)
-  //==============================================================================
-  clear() {
-    const beforeTextureOverwrite = this.#beforeTextureOverwrite;
-    if (beforeTextureOverwrite !== null && this.#atlasPages.length > 0) {
-      beforeTextureOverwrite();
-    }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    for (const atlasPage of this.#atlasPages) {
-      webGL2RenderingContext.deleteTexture(atlasPage.texture);
-      for (const glyph of atlasPage.glyphs) {
-        glyph.atlasPage = null;
-      }
-    }
-    this.#atlasPages.length = 0;
-    this.#glyphs.clear();
-    this.getEntries().clear();
-    this.#entriesByText.clear();
-  }
-  //==============================================================================
-  // 엔트리 하나를 맵과 문자열별 목록에서 뺀다.
-  //==============================================================================
-  /**
-   * @param { string } entryKey
-   * @param { object } entry
-   */
-  removeEntry(entryKey, entry) {
-    const entries = this.getEntries();
-    entries.delete(entryKey);
-    const entryList = this.#entriesByText.get(entry.text);
-    if (entryList === void 0) {
-      return;
-    }
-    const entryIndex = entryList.indexOf(entry);
-    if (entryIndex >= 0) {
-      entryList.splice(entryIndex, 1);
-    }
-    if (entryList.length === 0) {
-      this.#entriesByText.delete(entry.text);
-    }
-  }
-  //==============================================================================
-  // 받아진 웹 폰트로 다시 구울 엔트리와 글리프 파기.
-  //
-  // 늦게 받아진 폰트 얼굴(FontFace)의 이름을 쓰는 폰트 문자열로 구웠고, 그 얼굴의 글자 범위(unicodeRange)에 든 글자가 있는
-  // 엔트리와 글리프만 버린다. 다음에 그 글자를 그릴 때 받은 폰트로 다시 굽는다. 나머지는 그대로 쓴다.
-  // (캐시를 통째로 비우면 폰트가 받아질 때마다 모든 글자를 한꺼번에 다시 구워 그 프레임이 길어진다)
-  // 버린 글리프의 칸은 그 장이 비워질 때 다시 쓴다.
-  //==============================================================================
-  /**
-   * @param { Iterable<FontFace> } fontFaces
-   * @returns { number } 버린 엔트리 수.
-   */
-  invalidateFontFaces(fontFaces) {
-    const targets = [];
-    for (const fontFace of fontFaces) {
-      const familyName = System14.String(fontFace.family).replace(/["']/g, "").trim().toLowerCase();
-      if (familyName === "") {
-        continue;
-      }
-      targets.push({ familyName, ranges: parseUnicodeRange(fontFace.unicodeRange) });
-    }
-    if (targets.length === 0) {
-      return 0;
-    }
-    const isAffected = /* @__PURE__ */ __name((fontString, text) => {
-      const lowerFontString = fontString.toLowerCase();
-      return targets.some((target) => {
-        return lowerFontString.includes(target.familyName) && hasCharacterInRanges(text, target.ranges);
-      });
-    }, "isAffected");
-    for (const [glyphKey, glyph] of System14.Array.from(this.#glyphs)) {
-      if (isAffected(glyph.scaledFontString, glyph.text)) {
-        this.#glyphs.delete(glyphKey);
-      }
-    }
-    const entries = this.getEntries();
-    let removedCount = 0;
-    for (const [entryKey, entry] of System14.Array.from(entries)) {
-      if (!isAffected(resolveFontString(entry.fontString), entry.text)) {
-        continue;
-      }
-      this.removeEntry(entryKey, entry);
-      removedCount += 1;
-    }
-    return removedCount;
-  }
-  //==============================================================================
-  // 아틀라스 통계. (시험과 통계용: 장 수, 글리프 수, 지금까지 구운 글리프 수, 지금까지 올린 수, 엔트리 수)
-  //==============================================================================
-  /**
-   * @returns { { atlasPageCount: number, glyphCount: number, bakedGlyphCount: number, uploadCount: number, entryCount: number } }
-   */
-  readAtlasStatistics() {
-    return {
-      atlasPageCount: this.#atlasPages.length,
-      glyphCount: this.#glyphs.size,
-      bakedGlyphCount: this.#bakedGlyphCount,
-      uploadCount: this.#uploadCount,
-      entryCount: this.getEntries().size
-    };
-  }
-  //==============================================================================
-  // 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
-  //==============================================================================
-  /**
-   * @param { WebGLTexture } texture
-   */
-  bindTexture(texture) {
-    const textureBinder = this.#textureBinder;
-    if (textureBinder) {
-      textureBinder(texture);
-      return;
-    }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-  }
-  //==============================================================================
-  // 렌더링 컨텍스트 반환.
-  //==============================================================================
-  /**
-   * @returns { WebGL2RenderingContext }
-   */
-  getWebGL2RenderingContext() {
-    return this.#webGL2RenderingContext;
-  }
-  //==============================================================================
-  // 엔트리 맵 반환.
-  //==============================================================================
-  /**
-   * @returns { Map<string, object> }
-   */
-  getEntries() {
-    return this.#entries;
-  }
-  //==============================================================================
-  // 굽기용 캔버스 반환.
-  //==============================================================================
-  /**
-   * @returns { HTMLCanvasElement }
-   */
-  getBakeCanvas() {
-    return this.#bakeCanvas;
-  }
-  //==============================================================================
-  // 굽기용 캔버스 렌더링 컨텍스트 반환.
-  //==============================================================================
-  /**
-   * @returns { CanvasRenderingContext2D }
-   */
-  getBakeCanvasRenderingContext() {
-    return this.#bakeCanvasRenderingContext;
-  }
-  //==============================================================================
-  // 측정용 캔버스 렌더링 컨텍스트 반환.
-  //==============================================================================
-  /**
-   * @returns { CanvasRenderingContext2D }
-   */
-  getMeasurementCanvasRenderingContext() {
-    return this.#measurementCanvasRenderingContext;
-  }
-};
-
 // src/core/graphic/webglstatecache.js
-var System15 = globalThis;
+var System14 = globalThis;
 var FRAMEBUFFER = 36160;
 var READ_FRAMEBUFFER = 36008;
 var DRAW_FRAMEBUFFER = 36009;
@@ -7790,7 +6572,7 @@ var PACK_ALIGNMENT = 3333;
 var UNPACK_ALIGNMENT = 3317;
 var TEXTURE_TARGET_LIST = [3553, 34067, 32879, 35866];
 var TEXTURE_BINDING_LIST = [32873, 34068, 32874, 35869];
-var CAPABILITY_SET = new System15.Set([
+var CAPABILITY_SET = new System14.Set([
   3042,
   // BLEND
   2884,
@@ -7812,12 +6594,12 @@ var CAPABILITY_SET = new System15.Set([
   35977
   // RASTERIZER_DISCARD
 ]);
-var BLEND_FACTOR_SET = new System15.Set([0, 1, 768, 769, 770, 771, 772, 773, 774, 775, 776, 32769, 32770, 32771, 32772]);
-var CONSTANT_COLOR_FACTOR_SET = new System15.Set([32769, 32770]);
-var CONSTANT_ALPHA_FACTOR_SET = new System15.Set([32771, 32772]);
+var BLEND_FACTOR_SET = new System14.Set([0, 1, 768, 769, 770, 771, 772, 773, 774, 775, 776, 32769, 32770, 32771, 32772]);
+var CONSTANT_COLOR_FACTOR_SET = new System14.Set([32769, 32770]);
+var CONSTANT_ALPHA_FACTOR_SET = new System14.Set([32771, 32772]);
 var SOURCE_ALPHA_SATURATE = 776;
-var BLEND_EQUATION_SET = new System15.Set([32774, 32778, 32779, 32775, 32776]);
-var CONSTANT_PARAMETER_SET = new System15.Set([
+var BLEND_EQUATION_SET = new System14.Set([32774, 32778, 32779, 32775, 32776]);
+var CONSTANT_PARAMETER_SET = new System14.Set([
   3379,
   // MAX_TEXTURE_SIZE
   34076,
@@ -7873,12 +6655,12 @@ var CONSTANT_PARAMETER_SET = new System15.Set([
   37446
   // UNMASKED_RENDERER_WEBGL
 ]);
-var stateCacheTable = new System15.WeakMap();
+var stateCacheTable = new System14.WeakMap();
 function copyParameterValue(value) {
-  if (System15.ArrayBuffer.isView(value)) {
+  if (System14.ArrayBuffer.isView(value)) {
     return value.slice();
   }
-  if (System15.Array.isArray(value)) {
+  if (System14.Array.isArray(value)) {
     return value.slice();
   }
   return value;
@@ -7976,13 +6758,13 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
   constructor(webGL2RenderingContext) {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
-    this.#textureBindingTable = new System15.Map();
-    this.#capabilityTable = new System15.Map();
-    this.#pixelStoreTable = new System15.Map();
-    this.#constantParameterTable = new System15.Map();
-    this.#textureTargetTable = new System15.WeakMap();
-    this.#programLinkStatusTable = new System15.WeakMap();
-    this.#deletedObjectSet = new System15.WeakSet();
+    this.#textureBindingTable = new System14.Map();
+    this.#capabilityTable = new System14.Map();
+    this.#pixelStoreTable = new System14.Map();
+    this.#constantParameterTable = new System14.Map();
+    this.#textureTargetTable = new System14.WeakMap();
+    this.#programLinkStatusTable = new System14.WeakMap();
+    this.#deletedObjectSet = new System14.WeakSet();
     this.#originalGetParameter = webGL2RenderingContext.getParameter;
     this.#originalIsEnabled = webGL2RenderingContext.isEnabled;
     this.reset();
@@ -8345,6 +7127,86 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
     return this.#capabilityTable.get(capability);
   }
   //==============================================================================
+  // 쓰는 프로그램이 이것인지. (기억한 값과 견주어 같은 값을 다시 거는 호출을 건너뛸 때 쓴다)
+  // - 기억한 값이 주어진 것과 같을 때만 참이다. 모르는 값(처음, reset 뒤, 검사하지 못한 인자를 받은 뒤)이면 거짓이라 부르는 쪽이 GL 에 다시 건다.
+  // - GL 에 묻지 않는다. (컨텍스트를 잃거나 되살리면 기억을 잊으므로 거짓이 된다, 잃은 동안 건너뛴 호출은 GL 도 무시한다)
+  //==============================================================================
+  /**
+   * @param { WebGLProgram | null } program 견줄 프로그램.
+   * @returns { boolean } 지금 쓰는 프로그램이 이것이라고 기억하면 참.
+   */
+  isProgramInUse(program) {
+    return this.#program !== void 0 && this.#program === program;
+  }
+  //==============================================================================
+  // 묶은 버텍스 어레이가 이것인지. (모르면 거짓)
+  //==============================================================================
+  /**
+   * @param { WebGLVertexArrayObject | null } vertexArray 견줄 버텍스 어레이. (null 이면 기본)
+   * @returns { boolean } 묶은 버텍스 어레이가 이것이라고 기억하면 참.
+   */
+  isVertexArrayBound(vertexArray) {
+    return this.#vertexArray !== void 0 && this.#vertexArray === vertexArray;
+  }
+  //==============================================================================
+  // 활성 텍스처 유닛이 이것인지. (모르면 거짓)
+  //==============================================================================
+  /**
+   * @param { number } textureUnit 견줄 유닛. (TEXTURE0 + 번호)
+   * @returns { boolean } 활성 텍스처 유닛이 이것이라고 기억하면 참.
+   */
+  isActiveTexture(textureUnit) {
+    return this.#activeTexture !== void 0 && this.#activeTexture === textureUnit;
+  }
+  //==============================================================================
+  // 유닛의 대상에 묶인 텍스처가 이것인지. (모르면 거짓)
+  //==============================================================================
+  /**
+   * @param { number } textureUnit 유닛. (TEXTURE0 + 번호)
+   * @param { number } target 텍스처 대상. (TEXTURE_2D, TEXTURE_CUBE_MAP, TEXTURE_3D, TEXTURE_2D_ARRAY)
+   * @param { WebGLTexture | null } texture 견줄 텍스처.
+   * @returns { boolean } 그 유닛의 그 대상에 이 텍스처가 묶였다고 기억하면 참.
+   */
+  isTextureBound(textureUnit, target, texture) {
+    const textureTargetIndex = TEXTURE_TARGET_LIST.indexOf(target);
+    if (textureTargetIndex < 0) {
+      return false;
+    }
+    const key = (textureUnit - TEXTURE0) * 4 + textureTargetIndex;
+    return this.#textureBindingTable.has(key) && this.#textureBindingTable.get(key) === texture;
+  }
+  //==============================================================================
+  // 앞면 감김 방향이 이것인지. (모르면 거짓)
+  //==============================================================================
+  /**
+   * @param { number } mode 견줄 감김 방향. (CW, CCW)
+   * @returns { boolean } 앞면 감김 방향이 이것이라고 기억하면 참.
+   */
+  isFrontFace(mode) {
+    return this.#frontFace !== void 0 && this.#frontFace === mode;
+  }
+  //==============================================================================
+  // 가리는 면이 이것인지. (모르면 거짓)
+  //==============================================================================
+  /**
+   * @param { number } mode 견줄 가리는 면. (FRONT, BACK, FRONT_AND_BACK)
+   * @returns { boolean } 가리는 면이 이것이라고 기억하면 참.
+   */
+  isCullFace(mode) {
+    return this.#cullFaceMode !== void 0 && this.#cullFaceMode === mode;
+  }
+  //==============================================================================
+  // 컨텍스트에 걸린 상태 캐시 찾기. (걸지 않는다, 없으면 null)
+  //==============================================================================
+  /**
+   * @param { WebGL2RenderingContext } webGL2RenderingContext 컨텍스트.
+   * @returns { WebGLStateCache | null } 그 컨텍스트의 상태 캐시. (attach 를 부른 적이 없으면 null)
+   */
+  static find(webGL2RenderingContext) {
+    const stateCache = stateCacheTable.get(webGL2RenderingContext);
+    return stateCache !== void 0 ? stateCache : null;
+  }
+  //==============================================================================
   // 컨텍스트의 상태 함수 가로채기. (원래 함수를 부른 뒤 바뀐 값을 기억한다)
   // - 원래 함수가 던지면(인자 꼴이 틀림) 기억을 바꾸지 않는다.
   // - 검사하지 못한 인자는 그 값을 모른다로 두어, 다음에 읽을 때 GL 에 묻는다. (GL 이 오류로 무시했을 수 있다)
@@ -8418,7 +7280,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
     };
     wrap("bindFramebuffer", (target, framebufferOrUndefined) => {
       const framebuffer = framebufferOrUndefined === void 0 ? null : framebufferOrUndefined;
-      if (framebuffer !== null && (!(framebuffer instanceof System15.Object) || this.#deletedObjectSet.has(framebuffer))) {
+      if (framebuffer !== null && (!(framebuffer instanceof System14.Object) || this.#deletedObjectSet.has(framebuffer))) {
         this.#drawFramebuffer = void 0;
         this.#readFramebuffer = void 0;
         return;
@@ -8455,7 +7317,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
         this.#viewport = void 0;
         return;
       }
-      this.#viewport = System15.Int32Array.of(x | 0, y | 0, System15.Math.min(viewportWidth, maximumViewportSize[0]), System15.Math.min(viewportHeight, maximumViewportSize[1]));
+      this.#viewport = System14.Int32Array.of(x | 0, y | 0, System14.Math.min(viewportWidth, maximumViewportSize[0]), System14.Math.min(viewportHeight, maximumViewportSize[1]));
     });
     wrap("scissor", (x, y, width, height) => {
       const scissorWidth = width | 0;
@@ -8463,7 +7325,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
       if (scissorWidth < 0 || scissorHeight < 0) {
         return;
       }
-      this.#scissorBox = System15.Int32Array.of(x | 0, y | 0, scissorWidth, scissorHeight);
+      this.#scissorBox = System14.Int32Array.of(x | 0, y | 0, scissorWidth, scissorHeight);
     });
     wrap("enable", (capability) => {
       if (CAPABILITY_SET.has(capability)) {
@@ -8476,7 +7338,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
       }
     });
     wrap("clearColor", (red, green, blue, alpha) => {
-      this.#clearColor = System15.Float32Array.of(red, green, blue, alpha);
+      this.#clearColor = System14.Float32Array.of(red, green, blue, alpha);
     });
     wrap("colorMask", (red, green, blue, alpha) => {
       this.#colorWriteMask = [!!red, !!green, !!blue, !!alpha];
@@ -8532,15 +7394,15 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
     });
     wrap("useProgram", (programOrUndefined) => {
       const program = programOrUndefined === void 0 ? null : programOrUndefined;
-      this.#program = program === null || program instanceof System15.Object && this.#programLinkStatusTable.get(program) === true ? program : void 0;
+      this.#program = program === null || program instanceof System14.Object && this.#programLinkStatusTable.get(program) === true ? program : void 0;
     });
     wrap("linkProgram", (program) => {
-      if (program instanceof System15.Object) {
+      if (program instanceof System14.Object) {
         this.#programLinkStatusTable.delete(program);
       }
     });
     wrap("deleteProgram", (program) => {
-      if (program instanceof System15.Object) {
+      if (program instanceof System14.Object) {
         this.#programLinkStatusTable.set(program, false);
       }
     });
@@ -8548,7 +7410,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
     if (typeof originalGetProgramParameter === "function") {
       webGL2RenderingContext.getProgramParameter = (program, parameterName) => {
         const value = originalGetProgramParameter.call(webGL2RenderingContext, program, parameterName);
-        if (parameterName === LINK_STATUS && typeof value === "boolean" && program instanceof System15.Object && this.#programLinkStatusTable.get(program) !== false) {
+        if (parameterName === LINK_STATUS && typeof value === "boolean" && program instanceof System14.Object && this.#programLinkStatusTable.get(program) !== false) {
           this.#programLinkStatusTable.set(program, value);
         }
         return value;
@@ -8556,7 +7418,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
     }
     wrap("bindVertexArray", (vertexArrayOrUndefined) => {
       const vertexArray = vertexArrayOrUndefined === void 0 ? null : vertexArrayOrUndefined;
-      this.#vertexArray = vertexArray === null || vertexArray instanceof System15.Object && !this.#deletedObjectSet.has(vertexArray) ? vertexArray : void 0;
+      this.#vertexArray = vertexArray === null || vertexArray instanceof System14.Object && !this.#deletedObjectSet.has(vertexArray) ? vertexArray : void 0;
     });
     wrap("deleteVertexArray", (vertexArray) => {
       if (vertexArray === null || vertexArray === void 0) {
@@ -8591,7 +7453,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
         this.#textureBindingTable.set(key, null);
         return;
       }
-      if (!(texture instanceof System15.Object) || this.#deletedObjectSet.has(texture)) {
+      if (!(texture instanceof System14.Object) || this.#deletedObjectSet.has(texture)) {
         this.#textureBindingTable.delete(key);
         return;
       }
@@ -8657,8 +7519,1468 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
   }
 };
 
-// src/core/graphic.js
+// src/core/graphic/shaderprogram.js
+var ShaderProgram = class extends Object2 {
+  static {
+    __name(this, "ShaderProgram");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { WebGLProgram } */
+  #program;
+  /** @private @type { Map<string, GLint> } */
+  #attributeLocations;
+  /** @private @type { Map<string, WebGLUniformLocation> } */
+  #uniformLocations;
+  //==============================================================================
+  // 생성.
+  // - 컴파일이나 링크에 실패하면 그때까지 지은 셰이더와 프로그램을 지우고 오류를 던진다.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+   * @param { string } vertexShaderSource 버텍스 셰이더 GLSL 소스.
+   * @param { string } fragmentShaderSource 프래그먼트 셰이더 GLSL 소스.
+   * @param { object | null } attributeLocationTable - 링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 }, 다른 프로그램의 버텍스 어레이를 함께 쓸 때)
+   */
+  constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#attributeLocations = /* @__PURE__ */ new Map();
+    this.#uniformLocations = /* @__PURE__ */ new Map();
+    const vertexShader = this.createShader(webGL2RenderingContext.VERTEX_SHADER, vertexShaderSource);
+    let fragmentShader = null;
+    try {
+      fragmentShader = this.createShader(webGL2RenderingContext.FRAGMENT_SHADER, fragmentShaderSource);
+    } catch (error) {
+      webGL2RenderingContext.deleteShader(vertexShader);
+      throw error;
+    }
+    const program = webGL2RenderingContext.createProgram();
+    webGL2RenderingContext.attachShader(program, vertexShader);
+    webGL2RenderingContext.attachShader(program, fragmentShader);
+    if (attributeLocationTable) {
+      for (const attributeName in attributeLocationTable) {
+        webGL2RenderingContext.bindAttribLocation(program, attributeLocationTable[attributeName], attributeName);
+      }
+    }
+    webGL2RenderingContext.linkProgram(program);
+    if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
+      const programError = webGL2RenderingContext.getProgramInfoLog(program);
+      webGL2RenderingContext.deleteProgram(program);
+      webGL2RenderingContext.deleteShader(vertexShader);
+      webGL2RenderingContext.deleteShader(fragmentShader);
+      throw new Error(`ShaderProgram link failed: ${programError}`);
+    }
+    webGL2RenderingContext.deleteShader(vertexShader);
+    webGL2RenderingContext.deleteShader(fragmentShader);
+    this.#program = program;
+  }
+  //==============================================================================
+  // 셰이더 객체 생성.
+  //==============================================================================
+  /**
+   * @param { GLenum } shaderType 셰이더 갈래. (VERTEX_SHADER 또는 FRAGMENT_SHADER)
+   * @param { string } shaderSource GLSL 소스.
+   * @returns { WebGLShader } 컴파일한 셰이더. (컴파일에 실패하면 오류를 던진다)
+   */
+  createShader(shaderType, shaderSource) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shader = webGL2RenderingContext.createShader(shaderType);
+    webGL2RenderingContext.shaderSource(shader, shaderSource);
+    webGL2RenderingContext.compileShader(shader);
+    if (!webGL2RenderingContext.getShaderParameter(shader, webGL2RenderingContext.COMPILE_STATUS)) {
+      const shaderError = webGL2RenderingContext.getShaderInfoLog(shader);
+      webGL2RenderingContext.deleteShader(shader);
+      throw new Error(`ShaderProgram compile failed: ${shaderError}`);
+    }
+    return shader;
+  }
+  //==============================================================================
+  // 프로그램 사용 시작. (컨텍스트의 상태 캐시가 이미 이 프로그램을 쓴다고 기억하면 다시 걸지 않는다)
+  //==============================================================================
+  use() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const program = this.getProgram();
+    const stateCache = WebGLStateCache.find(webGL2RenderingContext);
+    if (stateCache !== null && stateCache.isProgramInUse(program)) {
+      return;
+    }
+    webGL2RenderingContext.useProgram(program);
+  }
+  //==============================================================================
+  // 어트리뷰트 로케이션 반환. (캐시)
+  //==============================================================================
+  /**
+   * @param { string } attributeName 어트리뷰트 이름.
+   * @returns { GLint } 어트리뷰트 위치. (없으면 -1)
+   */
+  getAttributeLocation(attributeName) {
+    if (this.#attributeLocations.has(attributeName)) {
+      return this.#attributeLocations.get(attributeName);
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const program = this.getProgram();
+    const attributeLocation = webGL2RenderingContext.getAttribLocation(program, attributeName);
+    this.#attributeLocations.set(attributeName, attributeLocation);
+    return attributeLocation;
+  }
+  //==============================================================================
+  // 유니폼 로케이션 반환. (캐시)
+  //==============================================================================
+  /**
+   * @param { string } uniformName 유니폼 이름.
+   * @returns { WebGLUniformLocation } 유니폼 위치. (없으면 null)
+   */
+  getUniformLocation(uniformName) {
+    if (this.#uniformLocations.has(uniformName)) {
+      return this.#uniformLocations.get(uniformName);
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const program = this.getProgram();
+    const uniformLocation = webGL2RenderingContext.getUniformLocation(program, uniformName);
+    this.#uniformLocations.set(uniformName, uniformLocation);
+    return uniformLocation;
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 프로그램 객체 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGLProgram } 링크한 프로그램 객체.
+   */
+  getProgram() {
+    return this.#program;
+  }
+};
+
+// src/core/graphic/decodedimagestore.js
+var System15 = globalThis;
+var HEADER_BYTE_COUNT = 262144;
+var IMAGE_BITMAP_OPTIONS = { premultiplyAlpha: "premultiply", colorSpaceConversion: "default", imageOrientation: "from-image" };
+var DecodedImageStore = class _DecodedImageStore {
+  static {
+    __name(this, "DecodedImageStore");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WeakMap<object, ImageBitmap | null> } */
+  static #decodedImageMap = /* @__PURE__ */ new WeakMap();
+  // 그림 요소 → 미리 푼 그림. (null 이면 미리 풀지 않은 그림, 둘 다 아직 올리지 않은 것)
+  /** @private @type { Array<WeakRef<object>> } */
+  static #pendingImageReferenceList = [];
+  // 아직 올리지 않은 그림 요소. (약한 참조라 버린 그림은 함께 수거된다)
+  /** @private @type { number } */
+  static #compactionLength = 64;
+  // 이만큼 쌓이면 수거된 참조와 올린 그림을 걸러 낸다.
+  //==============================================================================
+  // 그림 바이트를 ImageBitmap 으로 풀기. (그림 요소를 올린 결과와 같게 풀 수 있는 꼴만, 아니면 null)
+  // - createImageBitmap 이 없거나 풀지 못하면 null 이다. (그러면 그림 요소를 그대로 올린다)
+  //==============================================================================
+  /**
+   * @param { Blob } blob 그림 파일의 바이트.
+   * @returns { Promise<ImageBitmap | null> } 미리 곱한 알파, sRGB 로 푼 그림. (같게 풀 수 없는 꼴이거나 풀지 못하면 null)
+   */
+  static async decode(blob) {
+    if (typeof System15.createImageBitmap !== "function" || !(blob instanceof System15.Blob)) {
+      return null;
+    }
+    try {
+      const headerBuffer = await blob.slice(0, HEADER_BYTE_COUNT).arrayBuffer();
+      const isExactlyDecodable = _DecodedImageStore.isExactlyDecodable(new System15.Uint8Array(headerBuffer));
+      if (!isExactlyDecodable) {
+        return null;
+      }
+      return await System15.createImageBitmap(blob, IMAGE_BITMAP_OPTIONS);
+    } catch (error) {
+      return null;
+    }
+  }
+  //==============================================================================
+  // ImageBitmap 으로 풀어도 그림 요소를 올린 결과와 화소까지 같은 꼴인지 보기. (파일 머리만 본다)
+  // - JPEG 는 알파가 없어 곱하는 차례가 결과를 바꾸지 않는다.
+  // - PNG 는 8 비트 이하이고, 알파가 없거나 색 조각이 없거나 sRGB 조각만 있을 때. (iCCP 는 sRGB 프로필이어도 보지 않고 뺀다)
+  // - WebP 는 알파와 움직임이 없을 때. (VP8 은 늘, VP8L 은 알파 표시가 0 일 때, VP8X 는 알파와 움직임 표시가 없을 때)
+  //==============================================================================
+  /**
+   * @param { Uint8Array } bytes 그림 파일의 앞 바이트.
+   * @returns { boolean } 같게 풀 수 있으면 true.
+   */
+  static isExactlyDecodable(bytes) {
+    const byteCount = bytes.length;
+    if (byteCount >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+      return true;
+    }
+    const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (byteCount >= 8 && pngSignature.every((value, index) => bytes[index] === value)) {
+      return _DecodedImageStore.isExactlyDecodablePng(bytes);
+    }
+    const readText = /* @__PURE__ */ __name((offset) => {
+      return System15.String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+    }, "readText");
+    if (byteCount >= 30 && readText(0) === "RIFF" && readText(8) === "WEBP") {
+      const chunkType = readText(12);
+      if (chunkType === "VP8 ") {
+        return true;
+      }
+      if (chunkType === "VP8L") {
+        const isAlphaUsed = (bytes[24] & 16) !== 0;
+        return bytes[20] === 47 && !isAlphaUsed;
+      }
+      if (chunkType === "VP8X") {
+        const flags = bytes[20];
+        const isAlphaUsed = (flags & 16) !== 0;
+        const isAnimated = (flags & 2) !== 0;
+        return !isAlphaUsed && !isAnimated;
+      }
+    }
+    return false;
+  }
+  //==============================================================================
+  // PNG 머리 보기. (IHDR 부터 IDAT 까지의 조각)
+  //==============================================================================
+  /**
+   * @param { Uint8Array } bytes PNG 파일의 앞 바이트.
+   * @returns { boolean } 같게 풀 수 있으면 true.
+   */
+  static isExactlyDecodablePng(bytes) {
+    const byteCount = bytes.length;
+    const readUint32 = /* @__PURE__ */ __name((offset2) => {
+      return (bytes[offset2] << 24 >>> 0) + (bytes[offset2 + 1] << 16) + (bytes[offset2 + 2] << 8) + bytes[offset2 + 3];
+    }, "readUint32");
+    const readText = /* @__PURE__ */ __name((offset2) => {
+      return System15.String.fromCharCode(bytes[offset2], bytes[offset2 + 1], bytes[offset2 + 2], bytes[offset2 + 3]);
+    }, "readText");
+    let bitDepth = 0;
+    let colorType = 0;
+    let hasTransparencyChunk = false;
+    let hasSrgbChunk = false;
+    let hasIccChunk = false;
+    let hasColorChunk = false;
+    let offset = 8;
+    while (offset + 8 <= byteCount) {
+      const chunkLength = readUint32(offset);
+      const chunkType = readText(offset + 4);
+      const dataOffset = offset + 8;
+      if (chunkType === "IHDR") {
+        if (dataOffset + 10 > byteCount) {
+          return false;
+        }
+        bitDepth = bytes[dataOffset + 8];
+        colorType = bytes[dataOffset + 9];
+      } else if (chunkType === "IDAT") {
+        if (bitDepth === 0 || bitDepth > 8) {
+          return false;
+        }
+        const hasAlpha = colorType === 4 || colorType === 6 || hasTransparencyChunk;
+        if (!hasAlpha) {
+          return true;
+        }
+        if (hasIccChunk) {
+          return false;
+        }
+        return hasSrgbChunk || !hasColorChunk;
+      } else if (chunkType === "tRNS") {
+        hasTransparencyChunk = true;
+      } else if (chunkType === "sRGB") {
+        hasSrgbChunk = true;
+      } else if (chunkType === "iCCP") {
+        hasIccChunk = true;
+      } else if (chunkType === "gAMA" || chunkType === "cHRM" || chunkType === "cICP") {
+        hasColorChunk = true;
+      }
+      offset = dataOffset + chunkLength + 4;
+    }
+    return false;
+  }
+  //==============================================================================
+  // 읽은 그림 맡기기. (아직 올리지 않은 그림으로 모은다, 미리 푼 그림이 없으면 null)
+  //==============================================================================
+  /**
+   * @param { object } image 그림 요소. (ImageAsset 의 HTMLImageElement)
+   * @param { ImageBitmap | null } imageBitmap 미리 푼 그림. (없으면 null)
+   */
+  static register(image, imageBitmap) {
+    _DecodedImageStore.release(image);
+    _DecodedImageStore.#decodedImageMap.set(image, imageBitmap);
+    const pendingImageReferenceList = _DecodedImageStore.#pendingImageReferenceList;
+    pendingImageReferenceList.push(new System15.WeakRef(image));
+    if (pendingImageReferenceList.length >= _DecodedImageStore.#compactionLength) {
+      _DecodedImageStore.compact();
+      _DecodedImageStore.#compactionLength = System15.Math.max(64, pendingImageReferenceList.length * 2);
+    }
+  }
+  //==============================================================================
+  // 그림이 아직 올리지 않은 것인지.
+  //==============================================================================
+  /**
+   * @param { object } image 그림 요소.
+   * @returns { boolean } 맡겨 두고 아직 꺼내지 않았으면 true.
+   */
+  static isPending(image) {
+    return _DecodedImageStore.#decodedImageMap.has(image);
+  }
+  //==============================================================================
+  // 미리 푼 그림 꺼내기. (꺼내면 보관소에서 빠진다, 받은 쪽이 올린 뒤 닫는다)
+  //==============================================================================
+  /**
+   * @param { object } image 그림 요소.
+   * @returns { ImageBitmap | null } 미리 푼 그림. (없거나 이미 꺼냈으면 null)
+   */
+  static take(image) {
+    const decodedImageMap = _DecodedImageStore.#decodedImageMap;
+    if (!decodedImageMap.has(image)) {
+      return null;
+    }
+    const imageBitmap = decodedImageMap.get(image);
+    decodedImageMap.delete(image);
+    return imageBitmap;
+  }
+  //==============================================================================
+  // 맡긴 그림 놓기. (미리 푼 그림이 있으면 닫는다, ImageAsset 을 내리거나 다른 그림으로 바꿀 때)
+  //==============================================================================
+  /**
+   * @param { object } image 그림 요소.
+   */
+  static release(image) {
+    const imageBitmap = _DecodedImageStore.take(image);
+    if (imageBitmap !== null) {
+      imageBitmap.close();
+    }
+  }
+  //==============================================================================
+  // 아직 올리지 않은 그림 목록. (맡긴 차례)
+  //==============================================================================
+  /**
+   * @returns { Array<object> } 그림 요소 목록.
+   */
+  static getPendingImageList() {
+    _DecodedImageStore.compact();
+    const pendingImageList = [];
+    for (const imageReference of _DecodedImageStore.#pendingImageReferenceList) {
+      pendingImageList.push(imageReference.deref());
+    }
+    return pendingImageList;
+  }
+  //==============================================================================
+  // 수거된 참조와 이미 꺼낸 그림, 겹친 참조 걸러 내기. (같은 그림을 다시 맡기면 참조가 겹칠 수 있다)
+  //==============================================================================
+  static compact() {
+    const decodedImageMap = _DecodedImageStore.#decodedImageMap;
+    const seenImageSet = new System15.Set();
+    _DecodedImageStore.#pendingImageReferenceList = _DecodedImageStore.#pendingImageReferenceList.filter((imageReference) => {
+      const image = imageReference.deref();
+      if (image === void 0 || !decodedImageMap.has(image) || seenImageSet.has(image)) {
+        return false;
+      }
+      seenImageSet.add(image);
+      return true;
+    });
+  }
+};
+
+// src/core/graphic/imagetexturecache.js
+var ImageTextureCache = class extends Object2 {
+  static {
+    __name(this, "ImageTextureCache");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { WeakMap<object, { texture: WebGLTexture, isSmoothingApplied: boolean, isMipmapApplied: boolean, hasMipmap: boolean }> } */
+  #entries;
+  /** @private @type { ((texture: WebGLTexture) => void) | null } */
+  #textureBinder;
+  // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
+   */
+  constructor(webGL2RenderingContext, textureBinder = null) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#entries = /* @__PURE__ */ new WeakMap();
+    this.#textureBinder = textureBinder;
+  }
+  //==============================================================================
+  // 이미지에 대응하는 텍스처 반환. (없으면 업로드 후 반환)
+  // - 아직 로드되지 않은 이미지(크기 0)는 null 을 반환한다.
+  // - 밉맵은 스무딩이 켜졌을 때만 쓴다. 처음 필요할 때 한 번 만든다.
+  //==============================================================================
+  /**
+   * @param { HTMLImageElement | HTMLCanvasElement | OffscreenCanvas } image
+   * @param { boolean } isSmoothingEnabled
+   * @param { boolean } isMipmapEnabled 줄여 그릴 때 밉맵을 쓸지. (기본 false)
+   * @returns { WebGLTexture | null }
+   */
+  getTexture(image, isSmoothingEnabled, isMipmapEnabled = false) {
+    if (image === null || image === void 0) {
+      return null;
+    }
+    if (!image.width || !image.height) {
+      return null;
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    let entry = this.#entries.get(image);
+    if (!entry) {
+      const texture = webGL2RenderingContext.createTexture();
+      this.bindTexture(texture);
+      const decodedImage = DecodedImageStore.take(image);
+      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, decodedImage !== null ? decodedImage : image);
+      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      if (decodedImage !== null) {
+        decodedImage.close();
+      }
+      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+      entry = { texture, isSmoothingApplied: !isSmoothingEnabled, isMipmapApplied: isMipmapEnabled, hasMipmap: false };
+      this.#entries.set(image, entry);
+    }
+    if (entry.isSmoothingApplied !== isSmoothingEnabled || entry.isMipmapApplied !== isMipmapEnabled) {
+      this.bindTexture(entry.texture);
+      const filter = isSmoothingEnabled ? webGL2RenderingContext.LINEAR : webGL2RenderingContext.NEAREST;
+      let minificationFilter = filter;
+      if (isSmoothingEnabled && isMipmapEnabled) {
+        if (!entry.hasMipmap) {
+          webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);
+          entry.hasMipmap = true;
+        }
+        minificationFilter = webGL2RenderingContext.LINEAR_MIPMAP_LINEAR;
+      }
+      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, minificationFilter);
+      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, filter);
+      entry.isSmoothingApplied = isSmoothingEnabled;
+      entry.isMipmapApplied = isMipmapEnabled;
+    }
+    return entry.texture;
+  }
+  //==============================================================================
+  // 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
+  //==============================================================================
+  /**
+   * @param { WebGLTexture } texture
+   */
+  bindTexture(texture) {
+    const textureBinder = this.#textureBinder;
+    if (textureBinder) {
+      textureBinder(texture);
+      return;
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+};
+
+// src/core/graphic/textstringtexturecache.js
 var System16 = globalThis;
+var MAXIMUM_ENTRY_COUNT = 1024;
+var ATLAS_PAGE_SIZE = 1024;
+var MAXIMUM_ATLAS_PAGE_COUNT = 8;
+var SUBPIXEL_SLOT_COUNT = 8;
+var MAXIMUM_ATLAS_FONT_SIZE = 256;
+var STROKE_MITER_LIMIT = 10;
+var RIGHT_TO_LEFT_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
+var JOINING_CLUSTER_PATTERN = /^[\p{L}\p{M}]/u;
+var STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}]/u;
+var COMBINING_MARK_PATTERN = /\p{M}/u;
+var EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+var isTextAntialiasEnabled = true;
+var ALPHA_THRESHOLD = 128;
+function setTextAntialiasEnabled(value) {
+  isTextAntialiasEnabled = value;
+}
+__name(setTextAntialiasEnabled, "setTextAntialiasEnabled");
+function isTextAntialiasOn() {
+  return isTextAntialiasEnabled;
+}
+__name(isTextAntialiasOn, "isTextAntialiasOn");
+var MAXIMUM_MEASURE_COUNT = 2048;
+var measureCache = new System16.Map();
+var measureCanvasRenderingContext = null;
+var measureFontLoadCount = 0;
+var measuredFontLoadCount = 0;
+var measuredFontFaceCount = -1;
+if (System16.document !== void 0 && System16.document.fonts !== void 0) {
+  System16.document.fonts.addEventListener("loadingdone", () => {
+    measureFontLoadCount += 1;
+  });
+}
+var FONT_SIZE_PATTERN = /^(?:[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?(?:px|pt|pc|in|cm|mm|q|em|rem|ex|ch|vw|vh|vmin|vmax|%)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|larger|smaller)(?:\/.*)?$/i;
+var DEFAULT_FONT_FAMILY = "default";
+function resolveFontString(fontString) {
+  if (!/default/i.test(fontString)) {
+    return fontString;
+  }
+  const wordPattern = /\S+/g;
+  let familyListStart = -1;
+  let wordMatch = wordPattern.exec(fontString);
+  while (wordMatch !== null) {
+    if (wordMatch[0].includes(",") || wordMatch[0].includes('"') || wordMatch[0].includes("'")) {
+      break;
+    }
+    if (FONT_SIZE_PATTERN.test(wordMatch[0])) {
+      familyListStart = wordMatch.index + wordMatch[0].length;
+      const lineHeightMatch = /^\s*\/\s*\S+/.exec(fontString.slice(familyListStart));
+      if (lineHeightMatch !== null && !wordMatch[0].includes("/")) {
+        familyListStart += lineHeightMatch[0].length;
+      }
+      break;
+    }
+    wordMatch = wordPattern.exec(fontString);
+  }
+  if (familyListStart < 0) {
+    return fontString;
+  }
+  const familyListText = fontString.slice(familyListStart);
+  const familyNameList = [];
+  let familyName = "";
+  let quoteCharacter = "";
+  for (const character of familyListText) {
+    if (quoteCharacter !== "") {
+      familyName += character;
+      if (character === quoteCharacter) {
+        quoteCharacter = "";
+      }
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quoteCharacter = character;
+      familyName += character;
+      continue;
+    }
+    if (character === ",") {
+      familyNameList.push(familyName.trim());
+      familyName = "";
+      continue;
+    }
+    familyName += character;
+  }
+  familyNameList.push(familyName.trim());
+  let isDefaultRequested = false;
+  const resolvedFamilyNameList = familyNameList.map((name) => {
+    const unquotedName = /^(["'])(.*)\1$/.exec(name);
+    const bareName = unquotedName !== null ? unquotedName[2] : name;
+    if (bareName.toLowerCase() !== DEFAULT_FONT_FAMILY) {
+      return name;
+    }
+    isDefaultRequested = true;
+    return `"${DEFAULT_FONT_FAMILY}"`;
+  });
+  if (!isDefaultRequested) {
+    return fontString;
+  }
+  resolvedFamilyNameList.push(SYSTEM_FONT_STRING);
+  return fontString.slice(0, familyListStart).trimEnd() + " " + resolvedFamilyNameList.join(", ");
+}
+__name(resolveFontString, "resolveFontString");
+function measureTextMetrics(fontString, text) {
+  const document2 = System16.document;
+  if (document2 === void 0 || document2 === null) {
+    return null;
+  }
+  if (measureCanvasRenderingContext === null) {
+    const measureCanvas = document2.createElement("canvas");
+    measureCanvasRenderingContext = measureCanvas.getContext("2d");
+  }
+  const fontFaceCount = document2.fonts !== void 0 ? document2.fonts.size : 0;
+  if (measuredFontLoadCount !== measureFontLoadCount || measuredFontFaceCount !== fontFaceCount) {
+    measureCache.clear();
+    measuredFontLoadCount = measureFontLoadCount;
+    measuredFontFaceCount = fontFaceCount;
+  }
+  const cacheKey = fontString + "\0" + text;
+  const cachedTextMetrics = measureCache.get(cacheKey);
+  if (cachedTextMetrics !== void 0) {
+    measureCache.delete(cacheKey);
+    measureCache.set(cacheKey, cachedTextMetrics);
+    return cachedTextMetrics;
+  }
+  measureCanvasRenderingContext.font = resolveFontString(fontString);
+  const textMetrics = measureCanvasRenderingContext.measureText(text);
+  measureCache.set(cacheKey, textMetrics);
+  while (measureCache.size > MAXIMUM_MEASURE_COUNT) {
+    const oldestKey = measureCache.keys().next().value;
+    measureCache.delete(oldestKey);
+  }
+  return textMetrics;
+}
+__name(measureTextMetrics, "measureTextMetrics");
+function measureTextWithoutGraphic(fontString, text) {
+  return measureTextMetrics(fontString, text);
+}
+__name(measureTextWithoutGraphic, "measureTextWithoutGraphic");
+function parseUnicodeRange(unicodeRange) {
+  const ranges = [];
+  if (typeof unicodeRange !== "string" || unicodeRange === "") {
+    ranges.push([0, 1114111]);
+    return ranges;
+  }
+  for (const rangeText of unicodeRange.split(",")) {
+    const rangeMatch = rangeText.trim().match(/^U\+([0-9a-fA-F?]+)(?:-([0-9a-fA-F]+))?$/i);
+    if (rangeMatch === null) {
+      continue;
+    }
+    const startText = rangeMatch[1].replace(/\?/g, "0");
+    const endText = rangeMatch[2] !== void 0 ? rangeMatch[2] : rangeMatch[1].replace(/\?/g, "F");
+    ranges.push([System16.parseInt(startText, 16), System16.parseInt(endText, 16)]);
+  }
+  return ranges;
+}
+__name(parseUnicodeRange, "parseUnicodeRange");
+function hasCharacterInRanges(text, ranges) {
+  for (const character of text) {
+    const codePoint = character.codePointAt(0);
+    for (const range of ranges) {
+      if (codePoint >= range[0] && codePoint <= range[1]) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+__name(hasCharacterInRanges, "hasCharacterInRanges");
+var TextStringTextureCache = class extends Object2 {
+  static {
+    __name(this, "TextStringTextureCache");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { Map<string, object> } */
+  #entries;
+  // 글 배치 엔트리. (LRU)
+  /** @private @type { Map<string, object[]> } */
+  #entriesByText;
+  // 문자열마다 그 문자열의 엔트리 목록. (찾을 때 열쇠 문자열을 만들지 않으려고)
+  /** @private @type { Map<string, object> } */
+  #glyphs;
+  // 구운 글리프. (열쇠: 글꼴 열쇠, 글자 덩어리, 자리 열쇠)
+  /** @private @type { object[] } */
+  #atlasPages;
+  // 아틀라스 장 목록.
+  /** @private @type { number } */
+  #useSerial;
+  // 엔트리를 줄 때마다 늘리는 번호. (장의 LRU)
+  /** @private @type { number } */
+  #bakedGlyphCount;
+  // 지금까지 구운 글리프 수. (통계)
+  /** @private @type { number } */
+  #uploadCount;
+  // 지금까지 아틀라스에 올린 수. (통계, 굽기 캔버스 한 장이 한 번)
+  /** @private @type { object | null } */
+  #segmenter;
+  // 글자 덩어리 나누기. (Intl.Segmenter, 없으면 null)
+  /** @private @type { HTMLCanvasElement } */
+  #bakeCanvas;
+  /** @private @type { CanvasRenderingContext2D } */
+  #bakeCanvasRenderingContext;
+  /** @private @type { CanvasRenderingContext2D } */
+  #measurementCanvasRenderingContext;
+  /** @private @type { CanvasRenderingContext2D } */
+  #layoutCanvasRenderingContext;
+  // 글 배치 재기용. (글꼴을 바꿀 때만 다시 건다)
+  /** @private @type { ((texture: WebGLTexture) => void) | null } */
+  #textureBinder;
+  // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
+  /** @private @type { (() => void) | null } */
+  #beforeTextureOverwrite;
+  // 아틀라스 장을 비워 덮어쓰기 전에 부르는 함수. (주인 Graphic 이 쌓아 둔 묶음을 먼저 그린다)
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
+   * @param { (() => void) | null } beforeTextureOverwrite - 아틀라스 장을 비워 덮어쓰기 전에 부르는 함수. (쌓아 둔 그리기를 먼저 내보낸다, null 이면 부르지 않는다)
+   */
+  constructor(webGL2RenderingContext, textureBinder = null, beforeTextureOverwrite = null) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#entries = /* @__PURE__ */ new Map();
+    this.#entriesByText = /* @__PURE__ */ new Map();
+    this.#glyphs = /* @__PURE__ */ new Map();
+    this.#atlasPages = [];
+    this.#useSerial = 0;
+    this.#bakedGlyphCount = 0;
+    this.#uploadCount = 0;
+    this.#textureBinder = textureBinder;
+    this.#beforeTextureOverwrite = beforeTextureOverwrite;
+    this.#segmenter = System16.Intl !== void 0 && typeof System16.Intl.Segmenter === "function" ? new System16.Intl.Segmenter(void 0, { granularity: "grapheme" }) : null;
+    const bakeCanvas = System16.document.createElement("canvas");
+    this.#bakeCanvas = bakeCanvas;
+    this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
+    const measurementCanvas = System16.document.createElement("canvas");
+    this.#measurementCanvasRenderingContext = measurementCanvas.getContext("2d");
+    const layoutCanvas = System16.document.createElement("canvas");
+    this.#layoutCanvasRenderingContext = layoutCanvas.getContext("2d");
+  }
+  //==============================================================================
+  // 문자열 측정. (화면에 보이지 않는 오프스크린 컨텍스트 사용, 글꼴 문자열과 글이 같으면 캐시한 것을 준다)
+  // - 돌려준 TextMetrics 는 캐시가 나눠 쓰므로 고치지 않는다. (measureTextMetrics)
+  //==============================================================================
+  /**
+   * @param { string } fontString
+   * @param { string } text
+   * @returns { TextMetrics }
+   */
+  measureText(fontString, text) {
+    const textMetrics = measureTextMetrics(fontString, text);
+    if (textMetrics !== null) {
+      return textMetrics;
+    }
+    const measurementCanvasRenderingContext2 = this.getMeasurementCanvasRenderingContext();
+    measurementCanvasRenderingContext2.font = resolveFontString(fontString);
+    return measurementCanvasRenderingContext2.measureText(text);
+  }
+  //==============================================================================
+  // 폰트 문자열의 픽셀 크기를 배율만큼 확대한 문자열 반환.
+  //==============================================================================
+  /**
+   * @param { string } fontString
+   * @param { number } scale
+   * @returns { string }
+   */
+  buildScaledFontString(fontString, scale) {
+    if (scale === 1) {
+      return fontString;
+    }
+    return fontString.replace(/(\d+(?:\.\d+)?)px/, (matched, sizeText) => {
+      const scaledSize = System16.Number.parseFloat(sizeText) * scale;
+      return `${scaledSize}px`;
+    });
+  }
+  //==============================================================================
+  // 글 배치 엔트리 반환. (없으면 배치하고 처음 보는 글리프만 구워 반환)
+  // - mode: "fill" 또는 "stroke".
+  // - textDirection: 문단의 방향. ("ltr" 또는 "rtl", 캔버스의 direction 으로 굽는다)
+  // - 반환 필드는 전부 논리 좌표(스케일 나눔) 기준. 문자열을 통째로 구웠을 때의 사각형(quadWidth, quadHeight, penOffsetX, baselineOffsetY)과
+  //   그 사각형 왼쪽 위 기준의 글리프 사각형(glyphTextures, glyphRects 의 왼, 위, 오른, 아래, u0, v0, u1, v1 여덟 값씩)을 준다.
+  //==============================================================================
+  /**
+   * @param { string } mode
+   * @param { string } text
+   * @param { string } fontString
+   * @param { string } colorString
+   * @param { number } lineWidth
+   * @param { number } scale
+   * @param { string } textDirection 기본 "ltr".
+   * @returns { object | null }
+   */
+  getEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
+    if (!text) {
+      return null;
+    }
+    this.#useSerial += 1;
+    const useSerial = this.#useSerial;
+    const entries = this.getEntries();
+    const entryList = this.#entriesByText.get(text);
+    if (entryList !== void 0) {
+      for (const entry2 of entryList) {
+        if (entry2.mode !== mode || entry2.textDirection !== textDirection || entry2.scale !== scale || entry2.lineWidth !== lineWidth || entry2.colorString !== colorString || entry2.fontString !== fontString) {
+          continue;
+        }
+        const entryKey2 = entry2.entryKey;
+        entries.delete(entryKey2);
+        entries.set(entryKey2, entry2);
+        for (const atlasPage of entry2.atlasPages) {
+          atlasPage.lastUseSerial = useSerial;
+        }
+        return entry2;
+      }
+    }
+    const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
+    const entry = this.buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
+    if (!entry) {
+      return null;
+    }
+    entry.entryKey = entryKey;
+    entry.mode = mode;
+    entry.text = text;
+    entry.fontString = fontString;
+    entry.colorString = colorString;
+    entry.lineWidth = lineWidth;
+    entry.scale = scale;
+    entry.textDirection = textDirection;
+    const collidedEntry = entries.get(entryKey);
+    if (collidedEntry !== void 0) {
+      this.removeEntry(entryKey, collidedEntry);
+    }
+    entries.set(entryKey, entry);
+    const textEntryList = this.#entriesByText.get(text);
+    if (textEntryList !== void 0) {
+      textEntryList.push(entry);
+    } else {
+      this.#entriesByText.set(text, [entry]);
+    }
+    while (entries.size > MAXIMUM_ENTRY_COUNT) {
+      const oldestEntryKey = entries.keys().next().value;
+      const oldestEntry = entries.get(oldestEntryKey);
+      this.removeEntry(oldestEntryKey, oldestEntry);
+    }
+    return entry;
+  }
+  //==============================================================================
+  // 글을 글자 덩어리로 나눠 배치하고, 처음 보는 글리프를 아틀라스에 굽는다.
+  //==============================================================================
+  /**
+   * @param { string } mode
+   * @param { string } text
+   * @param { string } fontString
+   * @param { string } colorString
+   * @param { number } lineWidth
+   * @param { number } scale
+   * @param { string } textDirection 기본 "ltr".
+   * @returns { object | null }
+   */
+  buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
+    const scaledFontString = this.buildScaledFontString(resolveFontString(fontString), scale);
+    const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
+    layoutCanvasRenderingContext.font = scaledFontString;
+    layoutCanvasRenderingContext.direction = textDirection;
+    layoutCanvasRenderingContext.textAlign = "left";
+    const scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
+    const actualLeft = ceil(max(scaledTextMetrics.actualBoundingBoxLeft || 0, 0));
+    const actualRight = ceil(max(scaledTextMetrics.actualBoundingBoxRight || scaledTextMetrics.width, 0));
+    let scaledFontAscent = scaledTextMetrics.fontBoundingBoxAscent;
+    if (scaledFontAscent === void 0) {
+      scaledFontAscent = scaledTextMetrics.actualBoundingBoxAscent || 0;
+    }
+    let scaledFontDescent = scaledTextMetrics.fontBoundingBoxDescent;
+    if (scaledFontDescent === void 0) {
+      scaledFontDescent = scaledTextMetrics.actualBoundingBoxDescent || 0;
+    }
+    const scaledPadding = ceil(lineWidth * scale / 2) + 2;
+    const scaledPenX = scaledPadding + actualLeft;
+    const scaledBaselineY = scaledPadding + ceil(scaledFontAscent);
+    const bakeWidth = scaledPenX + actualRight + scaledPadding;
+    const bakeHeight = scaledBaselineY + ceil(scaledFontDescent) + scaledPadding;
+    if (bakeWidth <= 0 || bakeHeight <= 0) {
+      return null;
+    }
+    const chunks = this.splitTextChunks(text, scaledFontString, textDirection);
+    this.measureChunkPositions(text, chunks, scaledFontString);
+    const cellPadding = mode === "stroke" ? ceil(lineWidth * scale * STROKE_MITER_LIMIT / 2) + 2 : scaledPadding + 1;
+    const isNearest = !isTextAntialiasEnabled;
+    const strikeKey = `${mode}|${lineWidth * scale}|${isNearest ? 1 : 0}|${textDirection}|${scaledFontString}`;
+    const useSerial = this.#useSerial;
+    const glyphList = [];
+    const missingGlyphList = [];
+    for (const chunk of chunks) {
+      const startPosition = chunk.positions[0];
+      const anchorX = floor(startPosition);
+      const fractionX = startPosition - anchorX;
+      let positionKey;
+      if (chunk.isExactPosition) {
+        positionKey = "x" + fractionX;
+      } else {
+        positionKey = "";
+        for (const position of chunk.positions) {
+          const slotIndex = floor(position * SUBPIXEL_SLOT_COUNT);
+          positionKey += System16.String.fromCharCode(97 + (slotIndex % SUBPIXEL_SLOT_COUNT + SUBPIXEL_SLOT_COUNT) % SUBPIXEL_SLOT_COUNT);
+        }
+      }
+      const glyphKey = strikeKey + chunk.text + "" + positionKey;
+      let glyph = this.#glyphs.get(glyphKey);
+      if (glyph === void 0 && missingGlyphList.length > 0) {
+        glyph = missingGlyphList.find((missingGlyph) => missingGlyph.glyphKey === glyphKey);
+      }
+      if (glyph === void 0) {
+        const chunkMetrics = chunk.isWholeText ? scaledTextMetrics : this.measureLayoutText(scaledFontString, chunk.text);
+        const chunkLeft = ceil(max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
+        const chunkRight = ceil(max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
+        const originX = cellPadding + chunkLeft;
+        glyph = {
+          glyphKey,
+          text: chunk.text,
+          scaledFontString,
+          fractionX,
+          originX,
+          width: originX + 1 + chunkRight + cellPadding,
+          height: bakeHeight,
+          baselineY: scaledBaselineY,
+          atlasPage: null,
+          atlasX: 0,
+          atlasY: 0
+        };
+        missingGlyphList.push(glyph);
+      } else if (glyph.atlasPage !== null) {
+        glyph.atlasPage.lastUseSerial = useSerial;
+      }
+      glyphList.push(glyph, anchorX);
+    }
+    if (missingGlyphList.length > 0) {
+      this.bakeGlyphs(missingGlyphList, mode, colorString, lineWidth * scale, textDirection);
+    }
+    const glyphTextures = [];
+    const glyphRects = [];
+    const atlasPages = [];
+    for (let glyphIndex = 0; glyphIndex < glyphList.length; glyphIndex += 2) {
+      const glyph = glyphList[glyphIndex];
+      const anchorX = glyphList[glyphIndex + 1];
+      const atlasPage = glyph.atlasPage;
+      if (atlasPage === null) {
+        continue;
+      }
+      const cellLeft = scaledPenX + anchorX - glyph.originX;
+      const cellTop = scaledBaselineY - glyph.baselineY;
+      const clippedLeft = max(cellLeft, 0);
+      const clippedRight = min(cellLeft + glyph.width, bakeWidth);
+      const clippedTop = max(cellTop, 0);
+      const clippedBottom = min(cellTop + glyph.height, bakeHeight);
+      if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) {
+        continue;
+      }
+      glyphTextures.push(atlasPage.texture);
+      glyphRects.push(
+        clippedLeft / scale,
+        clippedTop / scale,
+        clippedRight / scale,
+        clippedBottom / scale,
+        (glyph.atlasX + clippedLeft - cellLeft) / atlasPage.width,
+        (glyph.atlasY + clippedTop - cellTop) / atlasPage.height,
+        (glyph.atlasX + clippedRight - cellLeft) / atlasPage.width,
+        (glyph.atlasY + clippedBottom - cellTop) / atlasPage.height
+      );
+      if (!atlasPages.includes(atlasPage)) {
+        atlasPages.push(atlasPage);
+      }
+    }
+    const entry = {
+      glyphTextures,
+      glyphRects,
+      atlasPages,
+      quadWidth: bakeWidth / scale,
+      quadHeight: bakeHeight / scale,
+      penOffsetX: scaledPenX / scale,
+      baselineOffsetY: scaledBaselineY / scale,
+      advanceWidth: scaledTextMetrics.width / scale,
+      fontAscent: scaledFontAscent / scale,
+      fontDescent: scaledFontDescent / scale
+    };
+    return entry;
+  }
+  //==============================================================================
+  // 글을 따로 구울 글자 덩어리로 나누기.
+  // - 덩어리마다 text, start(글 안 UTF-16 자리), clusterEnds(덩어리 안 글자 덩어리마다 끝 자리), isExactPosition(자리를 1/8 칸으로 묶지 못함), isWholeText.
+  // - 한글, 한자, 가나, 숫자, 문장 부호, 공백, 이모지는 글자 덩어리마다 따로. 그 밖의 글자(라틴, 키릴, 태국 같은)는 이어진 낱말째.
+  // - 결합 부호가 붙은 덩어리는 부호 글리프의 자리가 덩어리 시작과 따로 놀아 칸으로 묶지 않고 정확한 자리로 굽는다.
+  // - 오른쪽에서 왼쪽 글, 아주 큰 글꼴, 나누기를 못 하는 곳은 글 전체가 한 덩어리.
+  //==============================================================================
+  /**
+   * @param { string } text
+   * @param { string } scaledFontString
+   * @param { string } textDirection
+   * @returns { object[] }
+   */
+  splitTextChunks(text, scaledFontString, textDirection) {
+    const segmenter = this.#segmenter;
+    const fontSizeMatch = scaledFontString.match(/(\d+(?:\.\d+)?)px/);
+    const fontSize = fontSizeMatch !== null ? System16.Number.parseFloat(fontSizeMatch[1]) : Infinity;
+    if (segmenter === null || textDirection !== "ltr" || fontSize > MAXIMUM_ATLAS_FONT_SIZE || RIGHT_TO_LEFT_PATTERN.test(text)) {
+      return [{ text, start: 0, clusterEnds: [text.length], isExactPosition: true, isWholeText: true, positions: [0] }];
+    }
+    const chunks = [];
+    let previousChunk = null;
+    let isPreviousJoining = false;
+    for (const segment of segmenter.segment(text)) {
+      const clusterText = segment.segment;
+      const clusterEnd = segment.index + clusterText.length;
+      const isJoining = JOINING_CLUSTER_PATTERN.test(clusterText) && !STANDALONE_SCRIPT_PATTERN.test(clusterText);
+      const isExactPosition = clusterText.length > 1 && COMBINING_MARK_PATTERN.test(clusterText) && !EMOJI_CLUSTER_PATTERN.test(clusterText);
+      if (isJoining && isPreviousJoining && previousChunk !== null) {
+        previousChunk.text += clusterText;
+        previousChunk.clusterEnds.push(clusterEnd);
+        previousChunk.isExactPosition = previousChunk.isExactPosition || isExactPosition;
+        continue;
+      }
+      previousChunk = { text: clusterText, start: segment.index, clusterEnds: [clusterEnd], isExactPosition, isWholeText: false, positions: null };
+      chunks.push(previousChunk);
+      isPreviousJoining = isJoining;
+    }
+    return chunks;
+  }
+  //==============================================================================
+  // 덩어리 안 글자 덩어리마다 펜에서의 가로 자리 재기. (굽는 배율 텍셀)
+  // - 자리(k) = 자리(k-1) + (앞 글자 덩어리와 이 글자 덩어리를 붙인 너비) - (이 글자 덩어리만의 너비).
+  //   붙인 너비에서 뒤 덩어리 너비를 빼면 앞 덩어리의 커닝까지 든 전진폭이다. 크롬이 셈한 자리와 같다.
+  // - 짝 너비와 덩어리 너비는 글 재기 캐시에 남아 숫자처럼 되풀이되는 짝은 다시 재지 않는다. (글 길이에 비례)
+  // - 자리는 크롬의 글리프 자리처럼 32 비트 실수로 쌓는다.
+  //==============================================================================
+  /**
+   * @param { string } text
+   * @param { object[] } chunks
+   * @param { string } scaledFontString
+   */
+  measureChunkPositions(text, chunks, scaledFontString) {
+    if (chunks.length === 1 && chunks[0].isWholeText) {
+      return;
+    }
+    let previousClusterText = null;
+    let previousPosition = 0;
+    for (const chunk of chunks) {
+      const positions = [];
+      let clusterStart = chunk.start;
+      for (const clusterEnd of chunk.clusterEnds) {
+        const clusterText = text.substring(clusterStart, clusterEnd);
+        let position = 0;
+        if (previousClusterText !== null) {
+          const pairWidth = this.measureLayoutText(scaledFontString, previousClusterText + clusterText).width;
+          const clusterWidth = this.measureLayoutText(scaledFontString, clusterText).width;
+          position = System16.Math.fround(previousPosition + System16.Math.fround(pairWidth - clusterWidth));
+        }
+        positions.push(position);
+        previousClusterText = clusterText;
+        previousPosition = position;
+        clusterStart = clusterEnd;
+      }
+      chunk.positions = positions;
+    }
+  }
+  //==============================================================================
+  // 글자 덩어리 재기. (왼쪽에서 오른쪽, 캐시를 거친다, 배치용 컨텍스트에 그 글꼴이 걸려 있어야 한다)
+  //==============================================================================
+  /**
+   * @param { string } scaledFontString
+   * @param { string } text
+   * @returns { TextMetrics }
+   */
+  measureLayoutText(scaledFontString, text) {
+    const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
+    const textMetrics = measureTextMetrics(scaledFontString, text);
+    if (textMetrics !== null) {
+      return textMetrics;
+    }
+    return layoutCanvasRenderingContext.measureText(text);
+  }
+  //==============================================================================
+  // 글리프들을 아틀라스에 굽기. (한 줄에 이어 놓인 칸은 굽기 캔버스 한 장에 그려 한 번에 올린다)
+  //==============================================================================
+  /**
+   * @param { object[] } glyphList
+   * @param { string } mode
+   * @param { string } colorString
+   * @param { number } scaledLineWidth
+   * @param { string } textDirection
+   */
+  bakeGlyphs(glyphList, mode, colorString, scaledLineWidth, textDirection) {
+    const isNearest = !isTextAntialiasEnabled;
+    const spans = [];
+    let currentSpan = null;
+    for (const glyph of glyphList) {
+      this.allocateGlyphCell(glyph, isNearest);
+      if (glyph.atlasPage === null) {
+        continue;
+      }
+      if (currentSpan !== null && currentSpan.atlasPage === glyph.atlasPage && currentSpan.atlasY === glyph.atlasY && currentSpan.atlasX + currentSpan.width === glyph.atlasX && currentSpan.height === glyph.height) {
+        currentSpan.width += glyph.width;
+        currentSpan.glyphs.push(glyph);
+        continue;
+      }
+      currentSpan = { atlasPage: glyph.atlasPage, atlasX: glyph.atlasX, atlasY: glyph.atlasY, width: glyph.width, height: glyph.height, glyphs: [glyph] };
+      spans.push(currentSpan);
+    }
+    const bakeCanvas = this.getBakeCanvas();
+    const bakeCanvasRenderingContext = this.getBakeCanvasRenderingContext();
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    for (const span of spans) {
+      bakeCanvas.width = span.width;
+      bakeCanvas.height = span.height;
+      bakeCanvasRenderingContext.clearRect(0, 0, span.width, span.height);
+      bakeCanvasRenderingContext.font = span.glyphs[0].scaledFontString;
+      bakeCanvasRenderingContext.direction = textDirection;
+      bakeCanvasRenderingContext.textAlign = "left";
+      bakeCanvasRenderingContext.textBaseline = "alphabetic";
+      if (mode === "stroke") {
+        bakeCanvasRenderingContext.strokeStyle = colorString;
+        bakeCanvasRenderingContext.lineWidth = scaledLineWidth;
+      } else {
+        bakeCanvasRenderingContext.fillStyle = colorString;
+      }
+      for (const glyph of span.glyphs) {
+        const penX = glyph.atlasX - span.atlasX + glyph.originX + glyph.fractionX;
+        if (mode === "stroke") {
+          bakeCanvasRenderingContext.strokeText(glyph.text, penX, glyph.baselineY);
+        } else {
+          bakeCanvasRenderingContext.fillText(glyph.text, penX, glyph.baselineY);
+        }
+      }
+      if (isNearest) {
+        const imageData = bakeCanvasRenderingContext.getImageData(0, 0, span.width, span.height);
+        const pixels = imageData.data;
+        for (let pixelIndex = 3; pixelIndex < pixels.length; pixelIndex += 4) {
+          pixels[pixelIndex] = pixels[pixelIndex] >= ALPHA_THRESHOLD ? 255 : 0;
+        }
+        bakeCanvasRenderingContext.putImageData(imageData, 0, 0);
+      }
+      this.bindTexture(span.atlasPage.texture);
+      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      webGL2RenderingContext.texSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, span.atlasX, span.atlasY, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bakeCanvas);
+      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      this.#bakedGlyphCount += span.glyphs.length;
+      this.#uploadCount += 1;
+    }
+  }
+  //==============================================================================
+  // 글리프 칸 자리 잡기. (가장 나중에 연 장의 같은 높이 줄에 이어 놓고, 없으면 새 줄, 새 장, 장 수가 상한이면 가장 오래 안 쓴 장을 비운다)
+  // - 이번 엔트리가 쓰는 장(lastUseSerial 이 지금 번호)은 비우지 않는다. 그것뿐이면 상한을 넘겨 새 장을 연다.
+  //==============================================================================
+  /**
+   * @param { object } glyph
+   * @param { boolean } isNearest
+   */
+  allocateGlyphCell(glyph, isNearest) {
+    const useSerial = this.#useSerial;
+    const atlasPages = this.#atlasPages;
+    const width = glyph.width;
+    const height = glyph.height;
+    if (width > ATLAS_PAGE_SIZE || height > ATLAS_PAGE_SIZE) {
+      this.makeRoomForAtlasPage();
+      const atlasPage2 = this.createAtlasPage(width, height, isNearest, true);
+      this.placeGlyph(glyph, atlasPage2, 0, 0);
+      return;
+    }
+    for (let atlasPageIndex = atlasPages.length - 1; atlasPageIndex >= 0; --atlasPageIndex) {
+      const atlasPage2 = atlasPages[atlasPageIndex];
+      if (atlasPage2.isNearest !== isNearest || atlasPage2.isDedicated) {
+        continue;
+      }
+      if (this.tryPlaceGlyph(glyph, atlasPage2)) {
+        return;
+      }
+      break;
+    }
+    this.makeRoomForAtlasPage();
+    const atlasPage = this.createAtlasPage(ATLAS_PAGE_SIZE, ATLAS_PAGE_SIZE, isNearest, false);
+    atlasPage.lastUseSerial = useSerial;
+    this.tryPlaceGlyph(glyph, atlasPage);
+  }
+  //==============================================================================
+  // 장 하나에 글리프 칸 놓아 보기. (같은 높이 줄의 남은 자리, 없으면 새 줄)
+  //==============================================================================
+  /**
+   * @param { object } glyph
+   * @param { object } atlasPage
+   * @returns { boolean } 놓았으면 참.
+   */
+  tryPlaceGlyph(glyph, atlasPage) {
+    const width = glyph.width;
+    const height = glyph.height;
+    for (const shelf of atlasPage.shelves) {
+      if (shelf.height === height && shelf.cursorX + width <= atlasPage.width) {
+        this.placeGlyph(glyph, atlasPage, shelf.cursorX, shelf.y);
+        shelf.cursorX += width;
+        return true;
+      }
+    }
+    if (atlasPage.nextShelfY + height <= atlasPage.height) {
+      const shelf = { y: atlasPage.nextShelfY, height, cursorX: width };
+      atlasPage.shelves.push(shelf);
+      atlasPage.nextShelfY += height;
+      this.placeGlyph(glyph, atlasPage, 0, shelf.y);
+      return true;
+    }
+    return false;
+  }
+  //==============================================================================
+  // 글리프를 장의 자리에 적고 글리프 맵에 넣기.
+  //==============================================================================
+  /**
+   * @param { object } glyph
+   * @param { object } atlasPage
+   * @param { number } atlasX
+   * @param { number } atlasY
+   */
+  placeGlyph(glyph, atlasPage, atlasX, atlasY) {
+    glyph.atlasPage = atlasPage;
+    glyph.atlasX = atlasX;
+    glyph.atlasY = atlasY;
+    atlasPage.glyphs.push(glyph);
+    atlasPage.lastUseSerial = this.#useSerial;
+    this.#glyphs.set(glyph.glyphKey, glyph);
+  }
+  //==============================================================================
+  // 장 수가 상한이면 가장 오래 안 쓴 장 하나를 지워 자리를 낸다. (이번 엔트리가 쓰는 장은 지우지 않는다)
+  //==============================================================================
+  makeRoomForAtlasPage() {
+    const atlasPages = this.#atlasPages;
+    if (atlasPages.length < MAXIMUM_ATLAS_PAGE_COUNT) {
+      return;
+    }
+    let oldestAtlasPage = null;
+    for (const atlasPage of atlasPages) {
+      if (atlasPage.lastUseSerial >= this.#useSerial) {
+        continue;
+      }
+      if (oldestAtlasPage === null || atlasPage.lastUseSerial < oldestAtlasPage.lastUseSerial) {
+        oldestAtlasPage = atlasPage;
+      }
+    }
+    if (oldestAtlasPage === null) {
+      return;
+    }
+    this.removeAtlasPage(oldestAtlasPage);
+  }
+  //==============================================================================
+  // 아틀라스 장 만들기.
+  //==============================================================================
+  /**
+   * @param { number } width
+   * @param { number } height
+   * @param { boolean } isNearest 가까운 텍셀로 뽑을지. (안티앨리어싱을 끈 글자)
+   * @param { boolean } isDedicated 칸 하나만 담는 장인지.
+   * @returns { object }
+   */
+  createAtlasPage(width, height, isNearest, isDedicated) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const texture = webGL2RenderingContext.createTexture();
+    this.bindTexture(texture);
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+    const textureFilter = isNearest ? webGL2RenderingContext.NEAREST : webGL2RenderingContext.LINEAR;
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, textureFilter);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, textureFilter);
+    const atlasPage = {
+      texture,
+      width,
+      height,
+      isNearest,
+      isDedicated,
+      shelves: [],
+      nextShelfY: 0,
+      glyphs: [],
+      lastUseSerial: this.#useSerial
+    };
+    this.#atlasPages.push(atlasPage);
+    return atlasPage;
+  }
+  //==============================================================================
+  // 아틀라스 장 지우기. (그 장의 글리프와 그 장을 쓰는 엔트리도 버린다, 쌓아 둔 그리기를 먼저 내보낸다)
+  //==============================================================================
+  /**
+   * @param { object } atlasPage
+   */
+  removeAtlasPage(atlasPage) {
+    const beforeTextureOverwrite = this.#beforeTextureOverwrite;
+    if (beforeTextureOverwrite !== null) {
+      beforeTextureOverwrite();
+    }
+    for (const glyph of atlasPage.glyphs) {
+      if (this.#glyphs.get(glyph.glyphKey) === glyph) {
+        this.#glyphs.delete(glyph.glyphKey);
+      }
+      glyph.atlasPage = null;
+    }
+    const entries = this.getEntries();
+    for (const [entryKey, entry] of System16.Array.from(entries)) {
+      if (entry.atlasPages.includes(atlasPage)) {
+        this.removeEntry(entryKey, entry);
+      }
+    }
+    const atlasPageIndex = this.#atlasPages.indexOf(atlasPage);
+    if (atlasPageIndex >= 0) {
+      this.#atlasPages.splice(atlasPageIndex, 1);
+    }
+    this.getWebGL2RenderingContext().deleteTexture(atlasPage.texture);
+  }
+  //==============================================================================
+  // 모든 엔트리와 글리프 파기. (아틀라스 텍스처 삭제 포함)
+  //==============================================================================
+  clear() {
+    const beforeTextureOverwrite = this.#beforeTextureOverwrite;
+    if (beforeTextureOverwrite !== null && this.#atlasPages.length > 0) {
+      beforeTextureOverwrite();
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    for (const atlasPage of this.#atlasPages) {
+      webGL2RenderingContext.deleteTexture(atlasPage.texture);
+      for (const glyph of atlasPage.glyphs) {
+        glyph.atlasPage = null;
+      }
+    }
+    this.#atlasPages.length = 0;
+    this.#glyphs.clear();
+    this.getEntries().clear();
+    this.#entriesByText.clear();
+  }
+  //==============================================================================
+  // 엔트리 하나를 맵과 문자열별 목록에서 뺀다.
+  //==============================================================================
+  /**
+   * @param { string } entryKey
+   * @param { object } entry
+   */
+  removeEntry(entryKey, entry) {
+    const entries = this.getEntries();
+    entries.delete(entryKey);
+    const entryList = this.#entriesByText.get(entry.text);
+    if (entryList === void 0) {
+      return;
+    }
+    const entryIndex = entryList.indexOf(entry);
+    if (entryIndex >= 0) {
+      entryList.splice(entryIndex, 1);
+    }
+    if (entryList.length === 0) {
+      this.#entriesByText.delete(entry.text);
+    }
+  }
+  //==============================================================================
+  // 받아진 웹 폰트로 다시 구울 엔트리와 글리프 파기.
+  //
+  // 늦게 받아진 폰트 얼굴(FontFace)의 이름을 쓰는 폰트 문자열로 구웠고, 그 얼굴의 글자 범위(unicodeRange)에 든 글자가 있는
+  // 엔트리와 글리프만 버린다. 다음에 그 글자를 그릴 때 받은 폰트로 다시 굽는다. 나머지는 그대로 쓴다.
+  // (캐시를 통째로 비우면 폰트가 받아질 때마다 모든 글자를 한꺼번에 다시 구워 그 프레임이 길어진다)
+  // 버린 글리프의 칸은 그 장이 비워질 때 다시 쓴다.
+  //==============================================================================
+  /**
+   * @param { Iterable<FontFace> } fontFaces
+   * @returns { number } 버린 엔트리 수.
+   */
+  invalidateFontFaces(fontFaces) {
+    const targets = [];
+    for (const fontFace of fontFaces) {
+      const familyName = System16.String(fontFace.family).replace(/["']/g, "").trim().toLowerCase();
+      if (familyName === "") {
+        continue;
+      }
+      targets.push({ familyName, ranges: parseUnicodeRange(fontFace.unicodeRange) });
+    }
+    if (targets.length === 0) {
+      return 0;
+    }
+    const isAffected = /* @__PURE__ */ __name((fontString, text) => {
+      const lowerFontString = fontString.toLowerCase();
+      return targets.some((target) => {
+        return lowerFontString.includes(target.familyName) && hasCharacterInRanges(text, target.ranges);
+      });
+    }, "isAffected");
+    for (const [glyphKey, glyph] of System16.Array.from(this.#glyphs)) {
+      if (isAffected(glyph.scaledFontString, glyph.text)) {
+        this.#glyphs.delete(glyphKey);
+      }
+    }
+    const entries = this.getEntries();
+    let removedCount = 0;
+    for (const [entryKey, entry] of System16.Array.from(entries)) {
+      if (!isAffected(resolveFontString(entry.fontString), entry.text)) {
+        continue;
+      }
+      this.removeEntry(entryKey, entry);
+      removedCount += 1;
+    }
+    return removedCount;
+  }
+  //==============================================================================
+  // 아틀라스 통계. (시험과 통계용: 장 수, 글리프 수, 지금까지 구운 글리프 수, 지금까지 올린 수, 엔트리 수)
+  //==============================================================================
+  /**
+   * @returns { { atlasPageCount: number, glyphCount: number, bakedGlyphCount: number, uploadCount: number, entryCount: number } }
+   */
+  readAtlasStatistics() {
+    return {
+      atlasPageCount: this.#atlasPages.length,
+      glyphCount: this.#glyphs.size,
+      bakedGlyphCount: this.#bakedGlyphCount,
+      uploadCount: this.#uploadCount,
+      entryCount: this.getEntries().size
+    };
+  }
+  //==============================================================================
+  // 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
+  //==============================================================================
+  /**
+   * @param { WebGLTexture } texture
+   */
+  bindTexture(texture) {
+    const textureBinder = this.#textureBinder;
+    if (textureBinder) {
+      textureBinder(texture);
+      return;
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 엔트리 맵 반환.
+  //==============================================================================
+  /**
+   * @returns { Map<string, object> }
+   */
+  getEntries() {
+    return this.#entries;
+  }
+  //==============================================================================
+  // 굽기용 캔버스 반환.
+  //==============================================================================
+  /**
+   * @returns { HTMLCanvasElement }
+   */
+  getBakeCanvas() {
+    return this.#bakeCanvas;
+  }
+  //==============================================================================
+  // 굽기용 캔버스 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { CanvasRenderingContext2D }
+   */
+  getBakeCanvasRenderingContext() {
+    return this.#bakeCanvasRenderingContext;
+  }
+  //==============================================================================
+  // 측정용 캔버스 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { CanvasRenderingContext2D }
+   */
+  getMeasurementCanvasRenderingContext() {
+    return this.#measurementCanvasRenderingContext;
+  }
+};
+
+// src/core/graphic.js
+var System17 = globalThis;
 var VERTEXSHADER_SOURCE = `#version 300 es
 in vec2 vertexPosition;
 in vec2 vertexTextureCoordinate;
@@ -8723,8 +9045,8 @@ var BATCH_TEXTURE_SLOT_LIMIT = 16;
 var BATCH_UNCLIPPED_EXTENT = 16777216;
 var CLIP_EDGE_EPSILON = 1 / 256;
 function isClipEdgeOnPixelCenter(edge) {
-  const fraction = edge - System16.Math.floor(edge);
-  return System16.Math.abs(fraction - 0.5) < CLIP_EDGE_EPSILON;
+  const fraction = edge - System17.Math.floor(edge);
+  return System17.Math.abs(fraction - 0.5) < CLIP_EDGE_EPSILON;
 }
 __name(isClipEdgeOnPixelCenter, "isClipEdgeOnPixelCenter");
 var BATCH_VERTEXSHADER_SOURCE = `#version 300 es
@@ -8998,8 +9320,8 @@ var BATCH_VERTEX_CAPACITY = 6 * 8192;
 var VERTEX_CAPACITY = 4096;
 var CORNER_SEGMENT_COUNT = 8;
 var ROUND_RECT_POSITION_COUNT = 4 * (CORNER_SEGMENT_COUNT + 1);
-var ROUND_RECT_COSINE_TABLE = new System16.Float64Array(ROUND_RECT_POSITION_COUNT);
-var ROUND_RECT_SINE_TABLE = new System16.Float64Array(ROUND_RECT_POSITION_COUNT);
+var ROUND_RECT_COSINE_TABLE = new System17.Float64Array(ROUND_RECT_POSITION_COUNT);
+var ROUND_RECT_SINE_TABLE = new System17.Float64Array(ROUND_RECT_POSITION_COUNT);
 var ROUND_RECT_CORNER_START_RADIAN_LIST = [-PI / 2, 0, PI / 2, PI];
 for (let cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
   const startRadian = ROUND_RECT_CORNER_START_RADIAN_LIST[cornerIndex];
@@ -9010,7 +9332,7 @@ for (let cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
     ROUND_RECT_SINE_TABLE[positionIndex] = sin(radian);
   }
 }
-var ROUND_RECT_POSITION_DATA = new System16.Float64Array(ROUND_RECT_POSITION_COUNT * 2);
+var ROUND_RECT_POSITION_DATA = new System17.Float64Array(ROUND_RECT_POSITION_COUNT * 2);
 var MAXIMUM_TEXT_BAKE_SCALE = 8;
 var DEFAULT_TEXT_BAKE_SCALE_STEP = 0.25;
 var RIGHT_TO_LEFT_CHARACTER_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
@@ -9066,7 +9388,7 @@ var Graphic = class extends Object2 {
   /** @private @type { ShaderProgram } */
   #shaderProgram;
   /** @private @type { Map<string, ShaderProgram | null> } */
-  #resolvedShaderProgramTable = new System16.Map();
+  #resolvedShaderProgramTable = new System17.Map();
   // resolveShaderProgram 이 담아 둔 프로그램. ("묶음\u0000이름" → 프로그램, 실패는 null)
   /** @private @type { ShaderProgram | null } */
   #shaderProgramOverride;
@@ -10192,28 +10514,28 @@ var Graphic = class extends Object2 {
     const matrixD = transformMatrix.d;
     const matrixE = transformMatrix.e;
     const matrixF = transformMatrix.f;
-    let minimumX = System16.Infinity;
-    let minimumY = System16.Infinity;
-    let maximumX = -System16.Infinity;
-    let maximumY = -System16.Infinity;
+    let minimumX = System17.Infinity;
+    let minimumY = System17.Infinity;
+    let maximumX = -System17.Infinity;
+    let maximumY = -System17.Infinity;
     let offset = firstVertexIndex * floatsPerVertex;
     for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
       const positionX = vertexData[offset];
       const positionY = vertexData[offset + 1];
       const deviceX = matrixA * positionX + matrixC * positionY + matrixE;
       const deviceY = matrixB * positionX + matrixD * positionY + matrixF;
-      minimumX = System16.Math.min(minimumX, deviceX);
-      minimumY = System16.Math.min(minimumY, deviceY);
-      maximumX = System16.Math.max(maximumX, deviceX);
-      maximumY = System16.Math.max(maximumY, deviceY);
+      minimumX = System17.Math.min(minimumX, deviceX);
+      minimumY = System17.Math.min(minimumY, deviceY);
+      maximumX = System17.Math.max(maximumX, deviceX);
+      maximumY = System17.Math.max(maximumY, deviceY);
       offset += floatsPerVertex;
     }
     const viewportWidth = this.#appliedViewportWidth;
     const viewportHeight = this.#appliedViewportHeight;
-    const leftX = System16.Math.max(0, System16.Math.floor(minimumX));
-    const topY = System16.Math.max(0, System16.Math.floor(minimumY));
-    const rightX = System16.Math.min(viewportWidth, System16.Math.ceil(maximumX));
-    const bottomY = System16.Math.min(viewportHeight, System16.Math.ceil(maximumY));
+    const leftX = System17.Math.max(0, System17.Math.floor(minimumX));
+    const topY = System17.Math.max(0, System17.Math.floor(minimumY));
+    const rightX = System17.Math.min(viewportWidth, System17.Math.ceil(maximumX));
+    const bottomY = System17.Math.min(viewportHeight, System17.Math.ceil(maximumY));
     if (!(rightX > leftX && bottomY > topY)) {
       return false;
     }
@@ -10532,7 +10854,7 @@ var Graphic = class extends Object2 {
    */
   getLastFrameTriangleCount() {
     const lastFrameVertexCount = this.getLastFrameVertexCount();
-    return System16.Math.floor(lastFrameVertexCount / 3);
+    return System17.Math.floor(lastFrameVertexCount / 3);
   }
   //==============================================================================
   // 화면 밖 거르기 설정. (기본 true)
@@ -10591,10 +10913,10 @@ var Graphic = class extends Object2 {
     const leftBottomY = matrixB * leftX + matrixD * bottomY + matrixF;
     const rightBottomX = matrixA * rightX + matrixC * bottomY + matrixE;
     const rightBottomY = matrixB * rightX + matrixD * bottomY + matrixF;
-    const minimumX = System16.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
-    const maximumX = System16.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
-    const minimumY = System16.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
-    const maximumY = System16.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+    const minimumX = System17.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+    const maximumX = System17.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+    const minimumY = System17.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+    const maximumY = System17.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
     let visibleMinimumX = 0;
     let visibleMinimumY = 0;
     let visibleMaximumX = viewportWidth;
@@ -10602,10 +10924,10 @@ var Graphic = class extends Object2 {
     const clipStack = this.#clipStack;
     if (clipStack.length > 0) {
       const clipEntry = clipStack[clipStack.length - 1];
-      visibleMinimumX = System16.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
-      visibleMinimumY = System16.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
-      visibleMaximumX = System16.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
-      visibleMaximumY = System16.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
+      visibleMinimumX = System17.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
+      visibleMinimumY = System17.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
+      visibleMaximumX = System17.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
+      visibleMaximumY = System17.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
     }
     return maximumX >= visibleMinimumX && maximumY >= visibleMinimumY && minimumX <= visibleMaximumX && minimumY <= visibleMaximumY;
   }
@@ -10667,7 +10989,7 @@ var Graphic = class extends Object2 {
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const maximumTextureUnitCount = webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_TEXTURE_IMAGE_UNITS);
-    const textureSlotCount = System16.Math.max(1, System16.Math.min(maximumTextureUnitCount, BATCH_TEXTURE_SLOT_LIMIT));
+    const textureSlotCount = System17.Math.max(1, System17.Math.min(maximumTextureUnitCount, BATCH_TEXTURE_SLOT_LIMIT));
     this.#batchTextureSlotCount = textureSlotCount;
     this.#batchTextureList = new Array(textureSlotCount).fill(null);
     this.#batchTextureCount = 0;
@@ -11101,7 +11423,7 @@ var Graphic = class extends Object2 {
     const quadRect = this.#backdropRect;
     const groupRectList = this.#particleGroupRectList;
     const groupRect = { x: 0, y: 0, width: 0, height: 0 };
-    const quadCount = System16.Math.floor(vertexCount / 6);
+    const quadCount = System17.Math.floor(vertexCount / 6);
     let groupStartQuadIndex = 0;
     let groupRectCount = 0;
     const drawGroup = /* @__PURE__ */ __name((endQuadIndex) => {
@@ -11140,10 +11462,10 @@ var Graphic = class extends Object2 {
         groupRect.width = quadRect.width;
         groupRect.height = quadRect.height;
       } else {
-        const leftX = System16.Math.min(groupRect.x, quadRect.x);
-        const bottomY = System16.Math.min(groupRect.y, quadRect.y);
-        const rightX = System16.Math.max(groupRect.x + groupRect.width, quadRect.x + quadRect.width);
-        const topY = System16.Math.max(groupRect.y + groupRect.height, quadRect.y + quadRect.height);
+        const leftX = System17.Math.min(groupRect.x, quadRect.x);
+        const bottomY = System17.Math.min(groupRect.y, quadRect.y);
+        const rightX = System17.Math.max(groupRect.x + groupRect.width, quadRect.x + quadRect.width);
+        const topY = System17.Math.max(groupRect.y + groupRect.height, quadRect.y + quadRect.height);
         groupRect.x = leftX;
         groupRect.y = bottomY;
         groupRect.width = rightX - leftX;
@@ -11165,7 +11487,7 @@ var Graphic = class extends Object2 {
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const textureSize = 64;
-    const pixels = new System16.Uint8Array(textureSize * textureSize * 4);
+    const pixels = new System17.Uint8Array(textureSize * textureSize * 4);
     const halfSize = textureSize * 0.5;
     for (let pixelY = 0; pixelY < textureSize; ++pixelY) {
       for (let pixelX = 0; pixelX < textureSize; ++pixelX) {
@@ -11586,7 +11908,7 @@ var Graphic = class extends Object2 {
   drawArc(center, radius, startRadian, endRadian, lineWidth = 1) {
     const halfWidth = lineWidth * 0.5;
     const strokeColor = this.getStrokeColor();
-    this.drawRingWithColor(center.x, center.y, System16.Math.max(0, radius - halfWidth), radius + halfWidth, startRadian, endRadian, strokeColor);
+    this.drawRingWithColor(center.x, center.y, System17.Math.max(0, radius - halfWidth), radius + halfWidth, startRadian, endRadian, strokeColor);
   }
   //==============================================================================
   // 고리 출력의 셈. (drawRing, drawArc 가 부른다)
@@ -11609,19 +11931,19 @@ var Graphic = class extends Object2 {
     const clampedSpanRadian = clamp(spanRadian, -fullRadian, fullRadian);
     const maximumScale = this.#transformMatrix.getMaximumScale();
     const fullSegmentCount = clamp(ceil(outerRadius * maximumScale * 0.5), 16, 64);
-    const segmentCount = System16.Math.max(1, ceil(fullSegmentCount * System16.Math.abs(clampedSpanRadian) / fullRadian));
+    const segmentCount = System17.Math.max(1, ceil(fullSegmentCount * System17.Math.abs(clampedSpanRadian) / fullRadian));
     const vertexData = this.getVertexData();
     let offset = 0;
     let vertexCount = 0;
-    let previousCosine = System16.Math.cos(startRadian);
-    let previousSine = System16.Math.sin(startRadian);
+    let previousCosine = System17.Math.cos(startRadian);
+    let previousSine = System17.Math.sin(startRadian);
     for (let segmentIndex = 1; segmentIndex <= segmentCount; ++segmentIndex) {
       if ((vertexCount + 6) * FLOATS_PER_VERTEX > vertexData.length) {
         break;
       }
       const radian = startRadian + clampedSpanRadian * (segmentIndex / segmentCount);
-      const cosine = System16.Math.cos(radian);
-      const sine = System16.Math.sin(radian);
+      const cosine = System17.Math.cos(radian);
+      const sine = System17.Math.sin(radian);
       const previousInnerX = centerX + previousCosine * innerRadius;
       const previousInnerY = centerY + previousSine * innerRadius;
       const previousOuterX = centerX + previousCosine * outerRadius;
@@ -11703,7 +12025,7 @@ var Graphic = class extends Object2 {
     const vertexData = this.getVertexData();
     let offset = 0;
     let vertexCount = 0;
-    const segmentCount = System16.Math.floor(positionValues.length / 4);
+    const segmentCount = System17.Math.floor(positionValues.length / 4);
     for (let segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex) {
       const valueIndex = segmentIndex * 4;
       const startX = positionValues[valueIndex];
@@ -11750,6 +12072,98 @@ var Graphic = class extends Object2 {
       vertexCount += 6;
     }
     this.drawVertices(vertexCount, whiteTexture, strokeColor);
+  }
+  //==============================================================================
+  // 그림을 미리 GPU 에 올리기. (로딩 때 불러, 처음 그리는 프레임에 풀기와 올리기가 몰리지 않게)
+  // - 지금 이미지 스무딩과 밉맵 설정으로 올린다. (그릴 때 설정이 다르면 그때 거르기만 바꾼다)
+  // - 이미 올린 그림이면 아무것도 하지 않는다. 아직 읽히지 않은 그림(크기 0)은 올리지 않는다.
+  // - 코드로 만든 캔버스처럼 ImageAsset 으로 읽지 않은 그림을 씬의 load 에서 올려 둘 때 쓴다.
+  //==============================================================================
+  /**
+   * @param { HTMLImageElement | HTMLCanvasElement | OffscreenCanvas } image 올릴 그림.
+   * @returns { boolean } 텍스처가 있으면 true. (null 이거나 아직 읽히지 않은 그림이면 false)
+   * @example <caption>씬을 불러오는 동안 코드로 만든 그림을 올려 두기</caption>
+   * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+   *
+   * class MainScene extends Scene {
+   * 	async load(engine) {
+   * 		await super.load(engine);
+   * 		this.dotImage = new OffscreenCanvas(32, 32);
+   * 		const context = this.dotImage.getContext("2d");
+   * 		context.fillStyle = "#ff6600";
+   * 		context.fillRect(0, 0, 32, 32);
+   * 		const isPrepared = engine.getGraphic().prepareImage(this.dotImage);
+   * 		console.log(isPrepared);
+   * 	}
+   *
+   * 	draw(graphic) {
+   * 		super.draw(graphic);
+   * 		graphic.drawImage(this.dotImage, Vector2.create(304, 164), Vector2.create(32, 32));
+   * 	}
+   * }
+   *
+   * const engineConfiguration = new EngineConfiguration();
+   * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+   * const engine = new Engine(engineConfiguration);
+   * engine.run(new MainScene());
+   */
+  prepareImage(image) {
+    if (image === null || image === void 0) {
+      return false;
+    }
+    this.flushSpriteBatch();
+    const imageTextureCache = this.getImageTextureCache();
+    const texture = imageTextureCache.getTexture(image, this.isImageSmoothingEnabled(), this.isImageMipmapEnabled());
+    return texture !== null;
+  }
+  //==============================================================================
+  // 읽었지만 아직 올리지 않은 그림 올리기. (ImageAsset 이 읽은 그림, 읽은 차례로)
+  // - SceneManager 가 씬의 load 가 끝난 뒤(로딩 화면 동안) 프레임마다 나눠 부른다. 씬이 따로 부를 일은 없다.
+  // - 시간 한도를 주면 그 시간을 넘긴 뒤에는 멈추고 남은 수를 돌려준다. (한 번에 적어도 하나는 올린다, 유니티의 asyncUploadTimeSlice 와 같다)
+  // - 미리 푼 그림(ImageBitmap)은 올린 뒤 닫는다. 미리 풀지 않은 꼴의 그림은 그림 요소를 그대로 올린다.
+  //==============================================================================
+  /**
+   * @param { number } timeLimitMilliseconds 이번에 쓸 시간 한도. (밀리초, 기본 Infinity 는 모두)
+   * @returns { number } 아직 올리지 않고 남은 그림 수. (0 이면 다 올렸다)
+   * @example <caption>그림을 읽은 뒤 바로 올리기</caption>
+   * import { Engine, EngineConfiguration, Scene, ImageAsset, Vector2 } from "./build/vanilla.js";
+   *
+   * class MainScene extends Scene {
+   * 	async load(engine) {
+   * 		await super.load(engine);
+   * 		this.imageAsset = new ImageAsset();
+   * 		await this.imageAsset.load("examples/assets/spritesheet.png");
+   * 		const remainingCount = engine.getGraphic().prepareLoadedImages();
+   * 		console.log(remainingCount);
+   * 	}
+   *
+   * 	draw(graphic) {
+   * 		super.draw(graphic);
+   * 		graphic.drawImage(this.imageAsset.getImage(), Vector2.create(170, 30), Vector2.create(300, 300));
+   * 	}
+   * }
+   *
+   * const engineConfiguration = new EngineConfiguration();
+   * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+   * const engine = new Engine(engineConfiguration);
+   * engine.run(new MainScene());
+   */
+  prepareLoadedImages(timeLimitMilliseconds = System17.Infinity) {
+    const pendingImageList = DecodedImageStore.getPendingImageList();
+    const startTime = System17.performance.now();
+    let imageIndex = 0;
+    while (imageIndex < pendingImageList.length) {
+      const image = pendingImageList[imageIndex];
+      ++imageIndex;
+      const isPrepared = this.prepareImage(image);
+      if (!isPrepared) {
+        DecodedImageStore.release(image);
+      }
+      if (System17.performance.now() - startTime >= timeLimitMilliseconds) {
+        break;
+      }
+    }
+    return pendingImageList.length - imageIndex;
   }
   //==============================================================================
   // 이미지 출력.
@@ -12188,6 +12602,49 @@ var Graphic = class extends Object2 {
     return this.#isTextPixelSnapEnabled;
   }
   //==============================================================================
+  // 글자 안티앨리어싱 켬 / 끔. (러스트 Graphic::set_text_antialias_enabled 와 같다)
+  //
+  // 끄면 구운 글자의 알파를 문턱값 128 로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다. (도트 글꼴용)
+  // 켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다. (기본 켬)
+  //==============================================================================
+  /**
+   * @param { boolean } isTextAntialiasEnabled 켜면 참.
+   * @example <caption>도트 글꼴처럼 또렷한 글자</caption>
+   * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+   *
+   * class MainScene extends Scene {
+   * 	initialize(engine) {
+   * 		engine.getGraphic().setTextAntialiasEnabled(false);
+   * 	}
+   *
+   * 	draw(graphic) {
+   * 		super.draw(graphic);
+   * 		graphic.setFillColor("#ffffff");
+   * 		graphic.setFontString("16px sans-serif");
+   * 		graphic.setTextAlign("left");
+   * 		graphic.setTextBaseline("top");
+   * 		graphic.drawFillText("PIXEL 123", 20, 20);
+   * 	}
+   * }
+   *
+   * const engineConfiguration = new EngineConfiguration();
+   * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+   * const engine = new Engine(engineConfiguration);
+   * engine.run(new MainScene());
+   */
+  setTextAntialiasEnabled(isTextAntialiasEnabled2) {
+    setTextAntialiasEnabled(isTextAntialiasEnabled2);
+  }
+  //==============================================================================
+  // 글자 안티앨리어싱이 켜져 있는지.
+  //==============================================================================
+  /**
+   * @returns { boolean } 켜졌으면 참.
+   */
+  isTextAntialiasEnabled() {
+    return isTextAntialiasOn();
+  }
+  //==============================================================================
   // 텍스트 베이크 스케일 계산. (현재 변환 행렬 기반, 양자화 단위는 setTextBakeScaleStep)
   //==============================================================================
   /**
@@ -12414,15 +12871,15 @@ var Graphic = class extends Object2 {
     const leftBottomY = matrixB * leftX + matrixD * bottomY + transformMatrix.f;
     const rightBottomX = matrixA * rightX + matrixC * bottomY + transformMatrix.e;
     const rightBottomY = matrixB * rightX + matrixD * bottomY + transformMatrix.f;
-    const minimumX = System16.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
-    const maximumX = System16.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
-    const minimumY = System16.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
-    const maximumY = System16.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+    const minimumX = System17.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+    const maximumX = System17.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+    const minimumY = System17.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+    const maximumY = System17.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
     const parentEntry = previousClipDepth > 0 ? this.#clipStack[previousClipDepth - 1] : null;
-    clipEntry.cullMinimumX = parentEntry ? System16.Math.max(parentEntry.cullMinimumX, minimumX) : minimumX;
-    clipEntry.cullMinimumY = parentEntry ? System16.Math.max(parentEntry.cullMinimumY, minimumY) : minimumY;
-    clipEntry.cullMaximumX = parentEntry ? System16.Math.min(parentEntry.cullMaximumX, maximumX) : maximumX;
-    clipEntry.cullMaximumY = parentEntry ? System16.Math.min(parentEntry.cullMaximumY, maximumY) : maximumY;
+    clipEntry.cullMinimumX = parentEntry ? System17.Math.max(parentEntry.cullMinimumX, minimumX) : minimumX;
+    clipEntry.cullMinimumY = parentEntry ? System17.Math.max(parentEntry.cullMinimumY, minimumY) : minimumY;
+    clipEntry.cullMaximumX = parentEntry ? System17.Math.min(parentEntry.cullMaximumX, maximumX) : maximumX;
+    clipEntry.cullMaximumY = parentEntry ? System17.Math.min(parentEntry.cullMaximumY, maximumY) : maximumY;
     const isAxisAligned = matrixB === 0 && matrixC === 0 || matrixA === 0 && matrixD === 0;
     let isShaderClip = false;
     let shaderMinimumX = minimumX;
@@ -12431,11 +12888,11 @@ var Graphic = class extends Object2 {
     let shaderMaximumY = maximumY;
     if (roundSize <= 0 && isAxisAligned) {
       if (this.isFramebufferMultisampled()) {
-        shaderMinimumX = System16.Math.round(minimumX);
-        shaderMinimumY = System16.Math.round(minimumY);
-        shaderMaximumX = System16.Math.round(maximumX);
-        shaderMaximumY = System16.Math.round(maximumY);
-        isShaderClip = System16.Math.abs(shaderMinimumX - minimumX) < CLIP_EDGE_EPSILON && System16.Math.abs(shaderMinimumY - minimumY) < CLIP_EDGE_EPSILON && System16.Math.abs(shaderMaximumX - maximumX) < CLIP_EDGE_EPSILON && System16.Math.abs(shaderMaximumY - maximumY) < CLIP_EDGE_EPSILON;
+        shaderMinimumX = System17.Math.round(minimumX);
+        shaderMinimumY = System17.Math.round(minimumY);
+        shaderMaximumX = System17.Math.round(maximumX);
+        shaderMaximumY = System17.Math.round(maximumY);
+        isShaderClip = System17.Math.abs(shaderMinimumX - minimumX) < CLIP_EDGE_EPSILON && System17.Math.abs(shaderMinimumY - minimumY) < CLIP_EDGE_EPSILON && System17.Math.abs(shaderMaximumX - maximumX) < CLIP_EDGE_EPSILON && System17.Math.abs(shaderMaximumY - maximumY) < CLIP_EDGE_EPSILON;
       } else {
         isShaderClip = !isClipEdgeOnPixelCenter(minimumX) && !isClipEdgeOnPixelCenter(minimumY) && !isClipEdgeOnPixelCenter(maximumX) && !isClipEdgeOnPixelCenter(maximumY);
       }
@@ -12448,10 +12905,10 @@ var Graphic = class extends Object2 {
       clipEntry.shaderClipSlot = parentEntry.shaderClipSlot;
       clipEntry.shaderClipSlotGeneration = parentEntry.shaderClipSlotGeneration;
       if (isShaderClip) {
-        shaderClipRect[0] = System16.Math.max(shaderClipRect[0], shaderMinimumX);
-        shaderClipRect[1] = System16.Math.max(shaderClipRect[1], shaderMinimumY);
-        shaderClipRect[2] = System16.Math.min(shaderClipRect[2], shaderMaximumX);
-        shaderClipRect[3] = System16.Math.min(shaderClipRect[3], shaderMaximumY);
+        shaderClipRect[0] = System17.Math.max(shaderClipRect[0], shaderMinimumX);
+        shaderClipRect[1] = System17.Math.max(shaderClipRect[1], shaderMinimumY);
+        shaderClipRect[2] = System17.Math.min(shaderClipRect[2], shaderMaximumX);
+        shaderClipRect[3] = System17.Math.min(shaderClipRect[3], shaderMaximumY);
         clipEntry.shaderClipSlotGeneration = -1;
       }
     } else {
@@ -12535,10 +12992,10 @@ var Graphic = class extends Object2 {
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const shaderClipRect = this.#shaderClipRect;
-    const leftX = System16.Math.ceil(shaderClipRect[0] - 0.5);
-    const topY = System16.Math.ceil(shaderClipRect[1] - 0.5);
-    const rightX = System16.Math.max(leftX, System16.Math.ceil(shaderClipRect[2] - 0.5));
-    const bottomY = System16.Math.max(topY, System16.Math.ceil(shaderClipRect[3] - 0.5));
+    const leftX = System17.Math.ceil(shaderClipRect[0] - 0.5);
+    const topY = System17.Math.ceil(shaderClipRect[1] - 0.5);
+    const rightX = System17.Math.max(leftX, System17.Math.ceil(shaderClipRect[2] - 0.5));
+    const bottomY = System17.Math.max(topY, System17.Math.ceil(shaderClipRect[3] - 0.5));
     webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
     webGL2RenderingContext.scissor(leftX, this.#appliedViewportHeight - bottomY, rightX - leftX, bottomY - topY);
     this.#isClipScissorEnabled = true;
@@ -12672,6 +13129,8 @@ var Graphic = class extends Object2 {
       return;
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
     const viewportWidth = this.#appliedViewportWidth;
     const viewportHeight = this.#appliedViewportHeight;
@@ -12904,13 +13363,13 @@ var Graphic = class extends Object2 {
    */
   readFramebufferPixels() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const width = System16.Math.max(0, this.#appliedViewportWidth);
-    const height = System16.Math.max(0, this.#appliedViewportHeight);
+    const width = System17.Math.max(0, this.#appliedViewportWidth);
+    const height = System17.Math.max(0, this.#appliedViewportHeight);
     const rowByteCount = width * 4;
-    const bottomUpPixels = new System16.Uint8Array(rowByteCount * height);
+    const bottomUpPixels = new System17.Uint8Array(rowByteCount * height);
     webGL2RenderingContext.pixelStorei(webGL2RenderingContext.PACK_ALIGNMENT, 1);
     webGL2RenderingContext.readPixels(0, 0, width, height, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bottomUpPixels);
-    const topDownPixels = new System16.Uint8Array(rowByteCount * height);
+    const topDownPixels = new System17.Uint8Array(rowByteCount * height);
     for (let rowIndex = 0; rowIndex < height; rowIndex++) {
       const sourceStart = (height - 1 - rowIndex) * rowByteCount;
       topDownPixels.set(bottomUpPixels.subarray(sourceStart, sourceStart + rowByteCount), rowIndex * rowByteCount);
@@ -13220,7 +13679,7 @@ var Graphic = class extends Object2 {
 };
 
 // src/core/viewmanager.js
-var System17 = globalThis;
+var System18 = globalThis;
 var ViewScaleMode = {
   // 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
   none: "none",
@@ -13327,11 +13786,11 @@ var ViewManager = class extends Object2 {
       return;
     }
     this.#isViewRectPending = false;
-    let devicePixelRatio = System17.window.devicePixelRatio || 1;
+    let devicePixelRatio = System18.window.devicePixelRatio || 1;
     if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
       devicePixelRatio = this.#maxRenderPixelRatio;
     }
-    const clientNativeSize = Vector2.create(System17.window.innerWidth, System17.window.innerHeight);
+    const clientNativeSize = Vector2.create(System18.window.innerWidth, System18.window.innerHeight);
     const canvasNativeRect = canvas.getBoundingClientRect();
     const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
     const canvasPixelSize = Vector2.create(Math.round(canvasNativeSize.x * devicePixelRatio), Math.round(canvasNativeSize.y * devicePixelRatio));
@@ -13742,8 +14201,8 @@ var ViewManager = class extends Object2 {
   applyAspectViewScaleMode() {
     const referenceResolutionSize = this.getReferenceResolutionSize();
     const canvas = this.getCanvas();
-    let screenWidth = System17.window.innerWidth;
-    let screenHeight = System17.window.innerHeight;
+    let screenWidth = System18.window.innerWidth;
+    let screenHeight = System18.window.innerHeight;
     if (canvas) {
       const canvasNativeRect = canvas.getBoundingClientRect();
       if (canvasNativeRect.width > 0 && canvasNativeRect.height > 0) {
@@ -13840,12 +14299,12 @@ var ViewManager = class extends Object2 {
    */
   readSafeAreaFromUrl() {
     try {
-      const parameters = new System17.URLSearchParams(System17.window.location.search);
+      const parameters = new System18.URLSearchParams(System18.window.location.search);
       const safeAreaText = parameters.get("safeArea");
       if (!safeAreaText) {
         return null;
       }
-      const parts = safeAreaText.split(",").map((part) => System17.parseFloat(part) || 0);
+      const parts = safeAreaText.split(",").map((part) => System18.parseFloat(part) || 0);
       return { top: parts[0] || 0, right: parts[1] || 0, bottom: parts[2] || 0, left: parts[3] || 0 };
     } catch (parseError) {
       return null;
@@ -13859,7 +14318,7 @@ var ViewManager = class extends Object2 {
    * @returns { object }
    */
   readSafeAreaFromEnvironment() {
-    const documentObject = System17.document;
+    const documentObject = System18.document;
     if (!documentObject || !documentObject.body) {
       return { top: 0, right: 0, bottom: 0, left: 0 };
     }
@@ -13869,18 +14328,18 @@ var ViewManager = class extends Object2 {
       documentObject.body.appendChild(probeElement);
       this.#safeAreaProbeElement = probeElement;
     }
-    const computedStyle = System17.getComputedStyle(this.#safeAreaProbeElement);
+    const computedStyle = System18.getComputedStyle(this.#safeAreaProbeElement);
     return {
-      top: System17.parseFloat(computedStyle.paddingTop) || 0,
-      right: System17.parseFloat(computedStyle.paddingRight) || 0,
-      bottom: System17.parseFloat(computedStyle.paddingBottom) || 0,
-      left: System17.parseFloat(computedStyle.paddingLeft) || 0
+      top: System18.parseFloat(computedStyle.paddingTop) || 0,
+      right: System18.parseFloat(computedStyle.paddingRight) || 0,
+      bottom: System18.parseFloat(computedStyle.paddingBottom) || 0,
+      left: System18.parseFloat(computedStyle.paddingLeft) || 0
     };
   }
 };
 
 // src/core/gamepadmanager.js
-var System18 = globalThis;
+var System19 = globalThis;
 var GamepadAnalogStickCode = {
   LEFT_X: 0,
   // 왼쪽 스틱 가로축.
@@ -13935,7 +14394,7 @@ var GamepadButtonCode = {
   TOUCHPAD: 17
   // 터치패드 누름.
 };
-var GamepadKind = System18.Object.freeze({
+var GamepadKind = System19.Object.freeze({
   xbox: "xbox",
   // 엑스박스 패드.
   playstation: "playstation",
@@ -14072,7 +14531,7 @@ var GamepadManager = class extends Object2 {
   // 모든 게임패드 갱신.
   //==============================================================================
   updateAllGamepads() {
-    const gamepads = System18.navigator.getGamepads();
+    const gamepads = System19.navigator.getGamepads();
     this.#activeGamepadId = "";
     const isInputLogEnabled = this.isInputLogEnabled();
     for (let index = 0; index < gamepads.length; ++index) {
@@ -14142,8 +14601,8 @@ var GamepadManager = class extends Object2 {
         const lastAxisValue = state.axes.get(i);
         if (Math.abs(lastAxisValue - currentAxisValue) > 0.01) {
           state.axes.set(i, currentAxisValue);
-          const isLastAxisBeyond = System18.Math.abs(lastAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
-          const isCurrentAxisBeyond = System18.Math.abs(currentAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
+          const isLastAxisBeyond = System19.Math.abs(lastAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
+          const isCurrentAxisBeyond = System19.Math.abs(currentAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
           if (isCurrentAxisBeyond && !isLastAxisBeyond) {
             this.#activeGamepadId = gamepad.id;
           }
@@ -14243,7 +14702,7 @@ var GamepadManager = class extends Object2 {
    * @returns { Gamepad[] } 연결된 게임패드 목록. (브라우저의 지금 Gamepad)
    */
   getAllConnectedGamepads() {
-    const gamepads = System18.navigator.getGamepads();
+    const gamepads = System19.navigator.getGamepads();
     const connected = [];
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
@@ -14274,7 +14733,7 @@ var GamepadManager = class extends Object2 {
       return void 0;
     }
     const hardwareIndex = this.#connectedGamepadIndices.at(gamepadIndex);
-    const gamepads = System18.navigator.getGamepads();
+    const gamepads = System19.navigator.getGamepads();
     return gamepads[hardwareIndex];
   }
   //==============================================================================
@@ -14325,13 +14784,13 @@ var GamepadManager = class extends Object2 {
    * console.log(connectedGamepadCount);
    */
   vibrate(strongMagnitude, weakMagnitude, seconds2) {
-    if (typeof System18.navigator.getGamepads !== "function") {
+    if (typeof System19.navigator.getGamepads !== "function") {
       return;
     }
-    const durationMilliseconds = System18.Math.max(0, System18.Math.round(seconds2 * 1e3));
-    const clampedStrongMagnitude = System18.Math.min(1, System18.Math.max(0, strongMagnitude));
-    const clampedWeakMagnitude = System18.Math.min(1, System18.Math.max(0, weakMagnitude));
-    const gamepads = System18.navigator.getGamepads();
+    const durationMilliseconds = System19.Math.max(0, System19.Math.round(seconds2 * 1e3));
+    const clampedStrongMagnitude = System19.Math.min(1, System19.Math.max(0, strongMagnitude));
+    const clampedWeakMagnitude = System19.Math.min(1, System19.Math.max(0, weakMagnitude));
+    const gamepads = System19.navigator.getGamepads();
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
       if (gamepad === null || gamepad === void 0) {
@@ -14350,7 +14809,7 @@ var GamepadManager = class extends Object2 {
 };
 
 // src/core/inputactions.js
-var System19 = globalThis;
+var System20 = globalThis;
 var DEFAULT_DEAD_ZONE = 0.2;
 var DEFAULT_AXIS_PRESS_THRESHOLD = 0.5;
 var SOURCE_PRESS_THRESHOLD = 0.5;
@@ -14406,11 +14865,11 @@ var InputActions = class extends Object2 {
   //==============================================================================
   constructor() {
     super();
-    this.#keyBindings = new System19.Map();
-    this.#gamepadButtonBindings = new System19.Map();
-    this.#axisBindings = new System19.Map();
-    this.#repeats = new System19.Map();
-    this.#states = new System19.Map();
+    this.#keyBindings = new System20.Map();
+    this.#gamepadButtonBindings = new System20.Map();
+    this.#axisBindings = new System20.Map();
+    this.#repeats = new System20.Map();
+    this.#states = new System20.Map();
     this.#sources = [];
     this.#deadZone = DEFAULT_DEAD_ZONE;
     this.#axisPressThreshold = DEFAULT_AXIS_PRESS_THRESHOLD;
@@ -14522,7 +14981,7 @@ var InputActions = class extends Object2 {
       this.#repeats.delete(action);
       return;
     }
-    this.#repeats.set(action, { delaySeconds: System19.Math.max(0, delaySeconds), intervalSeconds });
+    this.#repeats.set(action, { delaySeconds: System20.Math.max(0, delaySeconds), intervalSeconds });
   }
   //==============================================================================
   // 죽은 구역 설정. (0 ~ 1 미만, 처음은 0.2)
@@ -14531,7 +14990,7 @@ var InputActions = class extends Object2 {
    * @param { number } deadZone 죽은 구역. (0 ~ 0.99 로 자른다)
    */
   setDeadZone(deadZone) {
-    this.#deadZone = System19.Math.min(0.99, System19.Math.max(0, deadZone));
+    this.#deadZone = System20.Math.min(0.99, System20.Math.max(0, deadZone));
   }
   //==============================================================================
   // 죽은 구역 반환.
@@ -14549,7 +15008,7 @@ var InputActions = class extends Object2 {
    * @param { number } axisPressThreshold 눌린 것으로 보는 기울기. (0 ~ 1 로 자른다)
    */
   setAxisPressThreshold(axisPressThreshold) {
-    this.#axisPressThreshold = System19.Math.min(1, System19.Math.max(0, axisPressThreshold));
+    this.#axisPressThreshold = System20.Math.min(1, System20.Math.max(0, axisPressThreshold));
   }
   //==============================================================================
   // 축에 묶은 동작을 눌린 것으로 보는 기울기 반환.
@@ -14670,7 +15129,7 @@ var InputActions = class extends Object2 {
           }
           isPressed = true;
           const buttonValue = gamepadManager.getButtonValue(gamepadIndex, buttonCode);
-          value = System19.Math.max(value, buttonValue > 0 ? buttonValue : 1);
+          value = System20.Math.max(value, buttonValue > 0 ? buttonValue : 1);
         }
         for (const axisBinding of axisBindingList) {
           const axisValue = gamepadManager.getAxisValue(gamepadIndex, axisBinding.axisIndex);
@@ -14679,7 +15138,7 @@ var InputActions = class extends Object2 {
             isPressed = true;
           }
           const scaledValue = this.applyDeadZone(directedValue);
-          value = System19.Math.max(value, scaledValue);
+          value = System20.Math.max(value, scaledValue);
         }
       }
       for (const source of this.#sources) {
@@ -14687,11 +15146,11 @@ var InputActions = class extends Object2 {
           continue;
         }
         const sourceValue = source.readActionValue(action);
-        const numberValue = sourceValue === true ? 1 : typeof sourceValue === "number" && System19.Number.isFinite(sourceValue) ? System19.Math.min(1, System19.Math.max(0, sourceValue)) : 0;
+        const numberValue = sourceValue === true ? 1 : typeof sourceValue === "number" && System20.Number.isFinite(sourceValue) ? System20.Math.min(1, System20.Math.max(0, sourceValue)) : 0;
         if (numberValue <= 0) {
           continue;
         }
-        value = System19.Math.max(value, numberValue);
+        value = System20.Math.max(value, numberValue);
         if (numberValue >= SOURCE_PRESS_THRESHOLD) {
           isPressed = true;
           if (typeof source.readGamepadKind === "function") {
@@ -14727,8 +15186,8 @@ var InputActions = class extends Object2 {
         continue;
       }
       const clampedMoveAxis = this.clampLength(moveAxis.x, moveAxis.y);
-      const clampedLength = System19.Math.hypot(clampedMoveAxis.x, clampedMoveAxis.y);
-      const currentLength = System19.Math.hypot(sourceMoveAxis.x, sourceMoveAxis.y);
+      const clampedLength = System20.Math.hypot(clampedMoveAxis.x, clampedMoveAxis.y);
+      const currentLength = System20.Math.hypot(sourceMoveAxis.x, sourceMoveAxis.y);
       if (clampedLength > currentLength) {
         sourceMoveAxis = clampedMoveAxis;
       }
@@ -14749,7 +15208,7 @@ var InputActions = class extends Object2 {
       }, "isAnyKeyPressed");
       const directionX = (isAnyKeyPressed(MOVE_RIGHT_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_LEFT_KEYS) ? 1 : 0);
       const directionY = (isAnyKeyPressed(MOVE_DOWN_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_UP_KEYS) ? 1 : 0);
-      const keyLength = System19.Math.hypot(directionX, directionY);
+      const keyLength = System20.Math.hypot(directionX, directionY);
       if (keyLength > 0) {
         keyMoveAxis = Vector2.create(directionX / keyLength, directionY / keyLength);
       }
@@ -14857,9 +15316,9 @@ var InputActions = class extends Object2 {
     for (const axisValueList of this.#gamepadAxisList) {
       const axisX = axisValueList[xAxisIndex] ?? 0;
       const axisY = axisValueList[yAxisIndex] ?? 0;
-      const length = System19.Math.hypot(axisX, axisY);
+      const length = System20.Math.hypot(axisX, axisY);
       const scaledLength = this.applyDeadZone(length);
-      const currentLength = System19.Math.hypot(stickVector.x, stickVector.y);
+      const currentLength = System20.Math.hypot(stickVector.x, stickVector.y);
       if (scaledLength > currentLength) {
         stickVector = Vector2.create(axisX / length * scaledLength, axisY / length * scaledLength);
       }
@@ -14878,8 +15337,8 @@ var InputActions = class extends Object2 {
     const stickVector = this.readGamepadStick(GamepadAnalogStickCode.LEFT_X, GamepadAnalogStickCode.LEFT_Y);
     const candidateVectors = [stickVector, this.#sourceMoveAxis];
     for (const candidateVector of candidateVectors) {
-      const candidateLength = System19.Math.hypot(candidateVector.x, candidateVector.y);
-      const currentLength = System19.Math.hypot(moveVector.x, moveVector.y);
+      const candidateLength = System20.Math.hypot(candidateVector.x, candidateVector.y);
+      const currentLength = System20.Math.hypot(moveVector.x, moveVector.y);
       if (candidateLength > currentLength) {
         moveVector = Vector2.create(candidateVector.x, candidateVector.y);
       }
@@ -14894,10 +15353,10 @@ var InputActions = class extends Object2 {
    * @returns { number } 죽은 구역을 뺀 값. (0 ~ 1)
    */
   applyDeadZone(value) {
-    if (!System19.Number.isFinite(value) || value <= this.#deadZone) {
+    if (!System20.Number.isFinite(value) || value <= this.#deadZone) {
       return 0;
     }
-    const clampedValue = System19.Math.min(1, value);
+    const clampedValue = System20.Math.min(1, value);
     return (clampedValue - this.#deadZone) / (1 - this.#deadZone);
   }
   //==============================================================================
@@ -14909,9 +15368,9 @@ var InputActions = class extends Object2 {
    * @returns { Vector2 } 길이가 1 이하인 새 벡터.
    */
   clampLength(x, y) {
-    const vectorX = System19.Number.isFinite(x) ? x : 0;
-    const vectorY = System19.Number.isFinite(y) ? y : 0;
-    const length = System19.Math.hypot(vectorX, vectorY);
+    const vectorX = System20.Number.isFinite(x) ? x : 0;
+    const vectorY = System20.Number.isFinite(y) ? y : 0;
+    const length = System20.Math.hypot(vectorX, vectorY);
     if (length <= 1) {
       return Vector2.create(vectorX, vectorY);
     }
@@ -14920,7 +15379,7 @@ var InputActions = class extends Object2 {
 };
 
 // src/core/inputmanager.js
-var System20 = globalThis;
+var System21 = globalThis;
 var KeyCode = {
   a: "KeyA",
   // A 키.
@@ -15135,7 +15594,7 @@ var KeyCode = {
   numpad9: "Numpad9"
   // 텐키 9.
 };
-var MouseButton = System20.Object.freeze({
+var MouseButton = System21.Object.freeze({
   left: 0,
   // 왼쪽 단추.
   middle: 1,
@@ -15144,7 +15603,7 @@ var MouseButton = System20.Object.freeze({
   // 오른쪽 단추.
 });
 var MOUSE_BUTTON_COUNT = 3;
-var TouchPhase = System20.Object.freeze({
+var TouchPhase = System21.Object.freeze({
   began: "began",
   // 이번 프레임에 닿음.
   moved: "moved",
@@ -15156,7 +15615,7 @@ var TouchPhase = System20.Object.freeze({
   cancelled: "cancelled"
   // 취소됨. (브라우저가 터치를 거둠)
 });
-var InputDevice = System20.Object.freeze({
+var InputDevice = System21.Object.freeze({
   keyboard: "keyboard",
   // 키보드.
   mouse: "mouse",
@@ -15308,14 +15767,14 @@ var InputManager = class extends Object2 {
     this.#wheelDeltaX = 0;
     this.#wheelDeltaY = 0;
     this.#engine = engine;
-    this.#mouseButtonsDown = new System20.Array(MOUSE_BUTTON_COUNT).fill(false);
-    this.#mouseButtonsJustPressed = new System20.Array(MOUSE_BUTTON_COUNT).fill(false);
-    this.#mouseButtonsJustReleased = new System20.Array(MOUSE_BUTTON_COUNT).fill(false);
+    this.#mouseButtonsDown = new System21.Array(MOUSE_BUTTON_COUNT).fill(false);
+    this.#mouseButtonsJustPressed = new System21.Array(MOUSE_BUTTON_COUNT).fill(false);
+    this.#mouseButtonsJustReleased = new System21.Array(MOUSE_BUTTON_COUNT).fill(false);
     this.#touchPoints = [];
     this.#endedTouchPoints = [];
     this.#lastInputDevice = InputDevice.keyboard;
-    if (typeof System20.matchMedia === "function") {
-      const mediaQueryList = System20.matchMedia("(pointer: coarse)");
+    if (typeof System21.matchMedia === "function") {
+      const mediaQueryList = System21.matchMedia("(pointer: coarse)");
       if (mediaQueryList.matches) {
         this.#lastInputDevice = InputDevice.touch;
       }
@@ -15913,7 +16372,7 @@ var InputManager = class extends Object2 {
    * @returns { string[] } 막는 키 코드 목록의 사본.
    */
   getPreventedKeys() {
-    return System20.Array.from(this.#preventedKeys);
+    return System21.Array.from(this.#preventedKeys);
   }
   //==============================================================================
   // 그 키의 기본 동작을 막는지.
@@ -15936,7 +16395,7 @@ var InputManager = class extends Object2 {
     if (engine && engine.isTextInputFocused()) {
       return true;
     }
-    const document2 = System20.document;
+    const document2 = System21.document;
     if (!document2 || !document2.activeElement) {
       return false;
     }
@@ -16041,7 +16500,7 @@ var Mask = class _Mask extends Component {
 };
 
 // src/core/node/worldnode.js
-var System21 = globalThis;
+var System22 = globalThis;
 var cullContentSize = Vector2.zero();
 var cullRect = new Rect();
 var cullDrawnRect = new Rect();
@@ -16199,10 +16658,10 @@ var WorldNode = class _WorldNode extends TransformNode {
         maximumY = drawnBottomY;
         isDrawnRectFound = true;
       } else {
-        minimumX = System21.Math.min(minimumX, drawnRect.position.x);
-        minimumY = System21.Math.min(minimumY, drawnRect.position.y);
-        maximumX = System21.Math.max(maximumX, drawnRightX);
-        maximumY = System21.Math.max(maximumY, drawnBottomY);
+        minimumX = System22.Math.min(minimumX, drawnRect.position.x);
+        minimumY = System22.Math.min(minimumY, drawnRect.position.y);
+        maximumX = System22.Math.max(maximumX, drawnRightX);
+        maximumY = System22.Math.max(maximumY, drawnBottomY);
       }
     }
     if (enabledComponentCount === 0) {
@@ -16221,10 +16680,10 @@ var WorldNode = class _WorldNode extends TransformNode {
         maximumY = contentSize.y + 1;
         isDrawnRectFound = true;
       } else {
-        minimumX = System21.Math.min(minimumX, -1);
-        minimumY = System21.Math.min(minimumY, -1);
-        maximumX = System21.Math.max(maximumX, contentSize.x + 1);
-        maximumY = System21.Math.max(maximumY, contentSize.y + 1);
+        minimumX = System22.Math.min(minimumX, -1);
+        minimumY = System22.Math.min(minimumY, -1);
+        maximumX = System22.Math.max(maximumX, contentSize.x + 1);
+        maximumY = System22.Math.max(maximumY, contentSize.y + 1);
       }
     }
     if (!isDrawnRectFound) {
@@ -16712,7 +17171,7 @@ var WorldNode = class _WorldNode extends TransformNode {
   convertViewPositionToNodePosition(viewPosition) {
     const affine = this.calculateWorldAffine();
     const determinant = affine.a * affine.d - affine.b * affine.c;
-    if (determinant === 0 || !System21.Number.isFinite(determinant)) {
+    if (determinant === 0 || !System22.Number.isFinite(determinant)) {
       return null;
     }
     const offsetX = viewPosition.x - affine.e;
@@ -17132,8 +17591,8 @@ var TouchRaycaster = class extends Object2 {
 };
 
 // src/core/tween.js
-var System22 = globalThis;
-var TweenProperty = System22.Object.freeze({
+var System23 = globalThis;
+var TweenProperty = System23.Object.freeze({
   localPosition: "localPosition",
   // 로컬 위치. (Vector2, setLocalPosition)
   localScale: "localScale",
@@ -17252,7 +17711,7 @@ var Tween = class _Tween extends Object2 {
    * 		const root = this.getRoot();
    * 		root.addChild(node);
    * 		const tween = Tween.createNodeTween(node, TweenProperty.localPosition, Vector2.create(0, 0), Vector2.create(200, 100), 0.5);
-   * 		tween.easing(Tween.easingFunction.cubic.inOut);
+   * 		tween.easing(Tween.easingFunction.cubic.easeInOut);
    * 		tween.setComplete(() => {
    * 			const localPosition = node.getLocalPosition();
    * 			console.log(localPosition.x, localPosition.y);
@@ -17460,94 +17919,94 @@ Tween.easingFunction = {
     return k;
   }, "linear"),
   quadratic: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       return k * k;
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       return k * (2 - k);
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       if ((k *= 2) < 1) {
         return 0.5 * k * k;
       }
       return -0.5 * (--k * (k - 2) - 1);
-    }, "inOut")
+    }, "easeInOut")
   },
   cubic: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       return k * k * k;
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       return --k * k * k + 1;
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       if ((k *= 2) < 1) return 0.5 * k * k * k;
       return 0.5 * ((k -= 2) * k * k + 2);
-    }, "inOut")
+    }, "easeInOut")
   },
   quartic: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       return k * k * k * k;
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       return 1 - --k * k * k * k;
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       if ((k *= 2) < 1) return 0.5 * k * k * k * k;
       return -0.5 * ((k -= 2) * k * k * k - 2);
-    }, "inOut")
+    }, "easeInOut")
   },
   quintic: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       return k * k * k * k * k;
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       return --k * k * k * k * k + 1;
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       if ((k *= 2) < 1) return 0.5 * k * k * k * k * k;
       return 0.5 * ((k -= 2) * k * k * k * k + 2);
-    }, "inOut")
+    }, "easeInOut")
   },
   sinusoidal: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       return 1 - cos(k * PI / 2);
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       return sin(k * PI / 2);
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       return 0.5 * (1 - cos(PI * k));
-    }, "inOut")
+    }, "easeInOut")
   },
   exponential: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       return k === 0 ? 0 : pow(1024, k - 1);
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       return k === 1 ? 1 : 1 - pow(2, -10 * k);
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       if (k === 0) return 0;
       if (k === 1) return 1;
       if ((k *= 2) < 1) return 0.5 * pow(1024, k - 1);
       return 0.5 * (-pow(2, -10 * (k - 1)) + 2);
-    }, "inOut")
+    }, "easeInOut")
   },
   circular: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       return 1 - sqrt(1 - k * k);
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       return sqrt(1 - --k * k);
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       if ((k *= 2) < 1) return -0.5 * (sqrt(1 - k * k) - 1);
       return 0.5 * (sqrt(1 - (k -= 2) * k) + 1);
-    }, "inOut")
+    }, "easeInOut")
   },
   elastic: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       let s, a = 0.1, p = 0.4;
       if (k === 0) return 0;
       if (k === 1) return 1;
@@ -17556,8 +18015,8 @@ Tween.easingFunction = {
         s = p / 4;
       } else s = p * asin(1 / a) / (2 * PI);
       return -(a * pow(2, 10 * (k -= 1)) * sin((k - s) * (2 * PI) / p));
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       let s, a = 0.1, p = 0.4;
       if (k === 0) return 0;
       if (k === 1) return 1;
@@ -17566,8 +18025,8 @@ Tween.easingFunction = {
         s = p / 4;
       } else s = p * asin(1 / a) / (2 * PI);
       return a * pow(2, -10 * k) * sin((k - s) * (2 * PI) / p) + 1;
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       let s, a = 0.1, p = 0.4;
       if (k === 0) return 0;
       if (k === 1) return 1;
@@ -17577,28 +18036,28 @@ Tween.easingFunction = {
       } else s = p * asin(1 / a) / (2 * PI);
       if ((k *= 2) < 1) return -0.5 * (a * pow(2, 10 * (k -= 1)) * sin((k - s) * (2 * PI) / p));
       return a * pow(2, -10 * (k -= 1)) * sin((k - s) * (2 * PI) / p) * 0.5 + 1;
-    }, "inOut")
+    }, "easeInOut")
   },
   back: {
-    in: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
       const s = 1.70158;
       return k * k * ((s + 1) * k - s);
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       const s = 1.70158;
       return --k * k * ((s + 1) * k + s) + 1;
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
       const s = 1.70158 * 1.525;
       if ((k *= 2) < 1) return 0.5 * (k * k * ((s + 1) * k - s));
       return 0.5 * ((k -= 2) * k * ((s + 1) * k + s) + 2);
-    }, "inOut")
+    }, "easeInOut")
   },
   bounce: {
-    in: /* @__PURE__ */ __name(function(k) {
-      return 1 - Tween.easingFunction.bounce.out(1 - k);
-    }, "in"),
-    out: /* @__PURE__ */ __name(function(k) {
+    easeIn: /* @__PURE__ */ __name(function(k) {
+      return 1 - Tween.easingFunction.bounce.easeOut(1 - k);
+    }, "easeIn"),
+    easeOut: /* @__PURE__ */ __name(function(k) {
       if (k < 1 / 2.75) {
         return 7.5625 * k * k;
       } else if (k < 2 / 2.75) {
@@ -17608,11 +18067,11 @@ Tween.easingFunction = {
       } else {
         return 7.5625 * (k -= 2.625 / 2.75) * k + 0.984375;
       }
-    }, "out"),
-    inOut: /* @__PURE__ */ __name(function(k) {
-      if (k < 0.5) return Tween.easingFunction.bounce.in(k * 2) * 0.5;
-      return Tween.easingFunction.bounce.out(k * 2 - 1) * 0.5 + 0.5;
-    }, "inOut")
+    }, "easeOut"),
+    easeInOut: /* @__PURE__ */ __name(function(k) {
+      if (k < 0.5) return Tween.easingFunction.bounce.easeIn(k * 2) * 0.5;
+      return Tween.easingFunction.bounce.easeOut(k * 2 - 1) * 0.5 + 0.5;
+    }, "easeInOut")
   }
 };
 
@@ -18241,7 +18700,8 @@ var Scene = class extends Object2 {
 };
 
 // src/core/scenemanager.js
-var System23 = globalThis;
+var System24 = globalThis;
+var IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS = 2;
 var SceneManager = class extends Object2 {
   static {
     __name(this, "SceneManager");
@@ -18280,9 +18740,24 @@ var SceneManager = class extends Object2 {
       scene.setEngine(engine);
       loadedScenes.push(scene);
       await scene.load(engine);
-      await new System23.Promise((resolve) => {
-        System23.setTimeout(resolve, 300);
+      const minimumWaitPromise = new System24.Promise((resolve) => {
+        System24.setTimeout(resolve, 300);
       });
+      const graphic = engine ? engine.getGraphic() : null;
+      if (graphic) {
+        while (graphic.prepareLoadedImages(IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS) > 0) {
+          await new System24.Promise((resolve) => {
+            const timeoutIdentifier = System24.setTimeout(resolve, 50);
+            if (typeof System24.requestAnimationFrame === "function") {
+              System24.requestAnimationFrame(() => {
+                System24.clearTimeout(timeoutIdentifier);
+                resolve();
+              });
+            }
+          });
+        }
+      }
+      await minimumWaitPromise;
       scene.setLoaded(true);
       scene.initialize(engine);
     }
@@ -18335,8 +18810,8 @@ var SceneManager = class extends Object2 {
 };
 
 // src/core/asset.js
-var System24 = globalThis;
-var AssetType = System24.Object.freeze({
+var System25 = globalThis;
+var AssetType = System25.Object.freeze({
   none: "none",
   // 애셋 종류 없음.
   image: "image",
@@ -18392,7 +18867,7 @@ var Asset = class extends Object2 {
       return;
     }
     this.setAssetPath(assetPath);
-    System24.Promise.resolve();
+    System25.Promise.resolve();
   }
   //==============================================================================
   // 애셋 언로드.
@@ -18466,7 +18941,7 @@ var Asset = class extends Object2 {
 };
 
 // src/resource/audioasset.js
-var System25 = globalThis;
+var System26 = globalThis;
 var DECODE_SAMPLE_RATE = 44100;
 var AudioAsset = class extends Asset {
   static {
@@ -18509,9 +18984,9 @@ var AudioAsset = class extends Asset {
       return;
     }
     try {
-      const response = await System25.fetch(assetPath);
+      const response = await System26.fetch(assetPath);
       if (!response.ok) {
-        throw new System25.Error(`HTTP ${response.status}`);
+        throw new System26.Error(`HTTP ${response.status}`);
       }
       const arrayBuffer = await response.arrayBuffer();
       await this.decodeArrayBuffer(arrayBuffer);
@@ -18564,8 +19039,8 @@ var AudioAsset = class extends Asset {
    * @param { ArrayBuffer } arrayBuffer 디코딩이 떼어 가므로 뒤에 다시 쓰지 않는다.
    */
   async decodeArrayBuffer(arrayBuffer) {
-    const offlineAudioContextType = System25.window.OfflineAudioContext || System25.window.webkitOfflineAudioContext;
-    const audioContextType = System25.window.AudioContext || System25.window.webkitAudioContext;
+    const offlineAudioContextType = System26.window.OfflineAudioContext || System26.window.webkitOfflineAudioContext;
+    const audioContextType = System26.window.AudioContext || System26.window.webkitAudioContext;
     if (offlineAudioContextType) {
       const decodeAudioContext = new offlineAudioContextType(1, 1, DECODE_SAMPLE_RATE);
       this.#audioBuffer = await decodeAudioContext.decodeAudioData(arrayBuffer);
@@ -18608,7 +19083,7 @@ var AudioAsset = class extends Asset {
   }
 };
 function copyToArrayBuffer(bytes) {
-  if (bytes instanceof System25.ArrayBuffer) {
+  if (bytes instanceof System26.ArrayBuffer) {
     return bytes.slice(0);
   }
   const byteOffset = bytes.byteOffset;
@@ -18617,14 +19092,14 @@ function copyToArrayBuffer(bytes) {
 }
 __name(copyToArrayBuffer, "copyToArrayBuffer");
 function isAudioDecodingSupported() {
-  const offlineAudioContextType = System25.window.OfflineAudioContext || System25.window.webkitOfflineAudioContext;
-  const audioContextType = System25.window.AudioContext || System25.window.webkitAudioContext;
+  const offlineAudioContextType = System26.window.OfflineAudioContext || System26.window.webkitOfflineAudioContext;
+  const audioContextType = System26.window.AudioContext || System26.window.webkitAudioContext;
   return offlineAudioContextType !== void 0 || audioContextType !== void 0;
 }
 __name(isAudioDecodingSupported, "isAudioDecodingSupported");
 
 // src/core/audioplayer.js
-var System26 = globalThis;
+var System27 = globalThis;
 function readPlaybackPosition(startTime, elapsedSeconds, duration, isLoop) {
   const position = startTime + elapsedSeconds;
   if (!(duration > 0)) {
@@ -18633,7 +19108,7 @@ function readPlaybackPosition(startTime, elapsedSeconds, duration, isLoop) {
   if (isLoop) {
     return position % duration;
   }
-  return System26.Math.min(position, duration);
+  return System27.Math.min(position, duration);
 }
 __name(readPlaybackPosition, "readPlaybackPosition");
 var AudioPlayer = class {
@@ -18786,7 +19261,7 @@ var AudioPlayer = class {
    * @param { number } playbackRate 재생 빠르기. (1 이면 그대로)
    */
   setPlaybackRate(playbackRate) {
-    const isValid = typeof playbackRate === "number" && System26.Number.isFinite(playbackRate) && playbackRate > 0;
+    const isValid = typeof playbackRate === "number" && System27.Number.isFinite(playbackRate) && playbackRate > 0;
     this.#playbackRate = isValid ? playbackRate : 1;
   }
   //==============================================================================
@@ -18826,7 +19301,7 @@ var AudioPlayer = class {
    * @param { number } volume 음량. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
    */
   setVolume(volume) {
-    const clampedVolume = System26.Number.isFinite(volume) ? System26.Math.max(0, System26.Math.min(1, volume)) : 1;
+    const clampedVolume = System27.Number.isFinite(volume) ? System27.Math.max(0, System27.Math.min(1, volume)) : 1;
     this.#volume = clampedVolume;
     if (this.#gainNode && !this.#isMuted) {
       this.#gainNode.gain.value = clampedVolume;
@@ -18903,7 +19378,7 @@ var AudioPlayer = class {
     if (!this.#isPlaying || !audioContext) {
       return this.#time;
     }
-    const elapsedSeconds = System26.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
+    const elapsedSeconds = System27.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
     return readPlaybackPosition(this.#time, elapsedSeconds, this.#startDuration, this.#isLoop);
   }
   //==============================================================================
@@ -18931,7 +19406,7 @@ var AudioPlayer = class {
 };
 
 // src/core/audiobus.js
-var System27 = globalThis;
+var System28 = globalThis;
 var AudioBus = class {
   static {
     __name(this, "AudioBus");
@@ -19000,7 +19475,7 @@ var AudioBus = class {
    * @param { number } volume 크기. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
    */
   setVolume(volume) {
-    const clampedVolume = System27.Number.isFinite(volume) ? System27.Math.max(0, System27.Math.min(1, volume)) : 1;
+    const clampedVolume = System28.Number.isFinite(volume) ? System28.Math.max(0, System28.Math.min(1, volume)) : 1;
     this.#volume = clampedVolume;
     if (this.#gainNode && !this.#isMuted) {
       this.#gainNode.gain.value = clampedVolume;
@@ -19046,7 +19521,7 @@ var AudioBus = class {
 };
 
 // src/core/audiomanager.js
-var System28 = globalThis;
+var System29 = globalThis;
 var CONTEXT_CLOCK_CHECK_INTERVAL = 0.5;
 var CONTEXT_CLOCK_MINIMUM_RATIO = 0.25;
 var AudioManager = class extends Object2 {
@@ -19080,7 +19555,7 @@ var AudioManager = class extends Object2 {
     const platform = engine.getPlatform();
     const platformInfo = platform.getPlatformInfo();
     const platformName = platformInfo.platformName;
-    const isDesktopModeIPad = platformName === PlatformType.macOS && System28.navigator.maxTouchPoints > 1;
+    const isDesktopModeIPad = platformName === PlatformType.macOS && System29.navigator.maxTouchPoints > 1;
     this.#isIOS = platformName === PlatformType.iOS || platformName === PlatformType.iPadOS || isDesktopModeIPad;
     this.#isVerifyingContextClock = false;
   }
@@ -19110,7 +19585,7 @@ var AudioManager = class extends Object2 {
     if (this.#audioContext) {
       return this.#audioContext;
     }
-    const audioContextType = System28.window.AudioContext || System28.window.webkitAudioContext;
+    const audioContextType = System29.window.AudioContext || System29.window.webkitAudioContext;
     if (audioContextType) {
       this.#audioContext = new audioContextType();
     }
@@ -19167,14 +19642,14 @@ var AudioManager = class extends Object2 {
       return;
     }
     this.#isVerifyingContextClock = true;
-    const startTime = System28.performance.now() / 1e3;
+    const startTime = System29.performance.now() / 1e3;
     const startContextTime = audioContext.currentTime;
-    System28.setTimeout(() => {
+    System29.setTimeout(() => {
       this.#isVerifyingContextClock = false;
-      if (audioContext !== this.#audioContext || audioContext.state !== "running" || System28.document.visibilityState !== "visible") {
+      if (audioContext !== this.#audioContext || audioContext.state !== "running" || System29.document.visibilityState !== "visible") {
         return;
       }
-      const elapsedTime = System28.performance.now() / 1e3 - startTime;
+      const elapsedTime = System29.performance.now() / 1e3 - startTime;
       const contextElapsedTime = audioContext.currentTime - startContextTime;
       if (contextElapsedTime >= elapsedTime * CONTEXT_CLOCK_MINIMUM_RATIO) {
         return;
@@ -19187,7 +19662,7 @@ var AudioManager = class extends Object2 {
           this.verifyContextClock(audioContext);
         }
       }).catch(() => {
-        System28.setTimeout(() => {
+        System29.setTimeout(() => {
           this.resumeContext();
         }, CONTEXT_CLOCK_CHECK_INTERVAL * 1e3);
       });
@@ -19363,7 +19838,7 @@ function copyToArrayBuffer2(bytes) {
 __name(copyToArrayBuffer2, "copyToArrayBuffer");
 
 // src/core/pointercursor.js
-var System29 = globalThis;
+var System30 = globalThis;
 var SHOWN_CURSOR_NAMES = ["pointer", "crosshair", "not-allowed", "grab", "grabbing", "text", "move", "help", "wait", "progress", "none"];
 var PointerCursor = class _PointerCursor extends Singleton {
   static {
@@ -19402,7 +19877,7 @@ var PointerCursor = class _PointerCursor extends Singleton {
   constructor() {
     super();
     this.#isEnabled = false;
-    this.#imageCursorValues = new System29.Map();
+    this.#imageCursorValues = new System30.Map();
     this.#buttonCursorName = "pointer";
     this.#defaultCursorName = "default";
     this.#screenCursorName = "default";
@@ -19501,11 +19976,11 @@ var PointerCursor = class _PointerCursor extends Singleton {
    * @param { string } fallbackCursorName - 그림을 못 쓸 때의 CSS cursor 이름.
    */
   registerImageCursor(name, url, url2x, hotspotX, hotspotY, fallbackCursorName) {
-    const roundedHotspotX = System29.Math.round(hotspotX);
-    const roundedHotspotY = System29.Math.round(hotspotY);
+    const roundedHotspotX = System30.Math.round(hotspotX);
+    const roundedHotspotY = System30.Math.round(hotspotY);
     const hotspotText = ` ${roundedHotspotX} ${roundedHotspotY}, ${fallbackCursorName}`;
     let cursorValue = `url("${url}")${hotspotText}`;
-    const css = System29.CSS;
+    const css = System30.CSS;
     if (url2x !== "" && css !== void 0 && typeof css.supports === "function") {
       const imageSetValue = `-webkit-image-set(url("${url}") 1x, url("${url2x}") 2x)${hotspotText}`;
       if (css.supports("cursor", imageSetValue)) {
@@ -19514,9 +19989,9 @@ var PointerCursor = class _PointerCursor extends Singleton {
     }
     this.#imageCursorValues.set(name, cursorValue);
     if (!_PointerCursor.isCoarsePointer()) {
-      const devicePixelRatio = System29.devicePixelRatio || 1;
+      const devicePixelRatio = System30.devicePixelRatio || 1;
       const preloadUrl = url2x !== "" && devicePixelRatio > 1 ? url2x : url;
-      const image = new System29.Image();
+      const image = new System30.Image();
       image.src = preloadUrl;
     }
   }
@@ -19567,10 +20042,10 @@ var PointerCursor = class _PointerCursor extends Singleton {
    * @returns { boolean } 주된 손이 손가락이면 참.
    */
   static isCoarsePointer() {
-    if (typeof System29.matchMedia !== "function") {
+    if (typeof System30.matchMedia !== "function") {
       return false;
     }
-    const mediaQueryList = System29.matchMedia("(pointer: coarse)");
+    const mediaQueryList = System30.matchMedia("(pointer: coarse)");
     return mediaQueryList.matches;
   }
   //==============================================================================
@@ -19581,7 +20056,7 @@ var PointerCursor = class _PointerCursor extends Singleton {
    * @returns { HTMLCanvasElement | null } 엔진의 캔버스. (엔진이 없으면 null)
    */
   static readEngineCanvas() {
-    const engine = System29.vanillaEngine;
+    const engine = System30.vanillaEngine;
     if (!engine) {
       return null;
     }
@@ -19591,14 +20066,14 @@ var PointerCursor = class _PointerCursor extends Singleton {
 };
 
 // src/core/engine.js
-var System30 = globalThis;
+var System31 = globalThis;
 var FRAME_LIMIT_TOLERANCE_MILLISECONDS = 4;
 var FRAME_LIMIT_RESYNC_MILLISECONDS = 1;
 var COMPATIBILITY_MOUSE_MILLISECONDS = 800;
 var MOUSE_DEVICE_MOVE_THRESHOLD = 6;
 var DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
 var CAPTURE_FRAME_MILLISECONDS = 1e3 / 60;
-var PageEvent = System30.Object.freeze({
+var PageEvent = System31.Object.freeze({
   hidden: "hidden",
   // 페이지가 가려짐. (다른 탭, 앱 전환)
   visible: "visible",
@@ -19774,13 +20249,13 @@ var Engine = class extends Object2 {
   constructor(engineConfiguration) {
     super();
     if (engineConfiguration === null || engineConfiguration === void 0 || engineConfiguration instanceof EngineConfiguration === false) {
-      throw new System30.Error(`engineConfiguration is invalid.`);
+      throw new System31.Error(`engineConfiguration is invalid.`);
     }
     this.#engineConfiguration = engineConfiguration;
     this.#platform = new Platform();
     this.#modalDialogList = [];
     if (engineConfiguration.title !== "") {
-      System30.document.title = engineConfiguration.title;
+      System31.document.title = engineConfiguration.title;
     }
     const canvasId = this.#engineConfiguration.canvasId;
     const canvas = this.#platform.getOrAddCanvas(canvasId);
@@ -19802,12 +20277,12 @@ var Engine = class extends Object2 {
     this.#frameLimitFramePerSecond = 0;
     this.#statisticsTextRect = Rect.zero();
     this.#version = Version.create(0, 3, 2);
-    this.#frameCaptureRequests = new System30.Map();
+    this.#frameCaptureRequests = new System31.Map();
     this.#isCaptureTimeStepFixed = false;
     this.#isExitRequested = false;
-    this.#isPageHidden = System30.document.visibilityState === "hidden";
+    this.#isPageHidden = System31.document.visibilityState === "hidden";
     this.#pageEventListeners = [];
-    System30.vanillaEngine = this;
+    System31.vanillaEngine = this;
     this.setupAllDocumentEvents();
     this.resize();
     this.requestFrameCapturesFromUrl();
@@ -19820,25 +20295,25 @@ var Engine = class extends Object2 {
    */
   run(scene) {
     if (scene === null || scene === void 0 || scene instanceof Scene === false) {
-      throw new System30.Error(`scene is invalid.`);
+      throw new System31.Error(`scene is invalid.`);
     }
     const startEngine = /* @__PURE__ */ __name(() => {
       const sceneManager = this.getSceneManager();
       sceneManager.loadScene(scene).catch((error) => {
         console.error(error);
       });
-      System30.window.addEventListener("resize", this.#resizeCallback);
-      if (System30.window.visualViewport) {
-        System30.window.visualViewport.addEventListener("resize", this.#resizeCallback);
-        System30.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+      System31.window.addEventListener("resize", this.#resizeCallback);
+      if (System31.window.visualViewport) {
+        System31.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+        System31.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
       }
       ++this.#frameNumber;
-      System30.window.requestAnimationFrame(this.#updateEngineCallback);
+      System31.window.requestAnimationFrame(this.#updateEngineCallback);
     }, "startEngine");
     startEngine();
     const engineConfiguration = this.getEngineConfiguration();
-    if (engineConfiguration.rebakeTextOnFontLoad && System30.document.fonts) {
-      System30.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
+    if (engineConfiguration.rebakeTextOnFontLoad && System31.document.fonts) {
+      System31.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
         const graphic = this.getGraphic();
         const textStringTextureCache = graphic.getTextStringTextureCache();
         textStringTextureCache.invalidateFontFaces(fontFaceSetLoadEvent.fontfaces);
@@ -19880,13 +20355,13 @@ var Engine = class extends Object2 {
     const engineConfiguration = this.getEngineConfiguration();
     const viewManager = this.getViewManager();
     if (engineConfiguration.autoResizeOnWindowResize) {
-      const visualViewport = System30.window.visualViewport;
-      const clientWidth = visualViewport ? visualViewport.width : System30.window.innerWidth;
-      let clientHeight = visualViewport ? visualViewport.height : System30.window.innerHeight;
+      const visualViewport = System31.window.visualViewport;
+      const clientWidth = visualViewport ? visualViewport.width : System31.window.innerWidth;
+      let clientHeight = visualViewport ? visualViewport.height : System31.window.innerHeight;
       const appliedClientNativeSize = this.#appliedClientNativeSize;
       const isTextInputFocused = this.isTextInputFocused();
       if (engineConfiguration.ignoreVirtualKeyboardResize && isTextInputFocused && appliedClientNativeSize !== null) {
-        const isSameWidth = System30.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
+        const isSameWidth = System31.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
         if (isSameWidth && clientHeight < appliedClientNativeSize.y) {
           clientHeight = appliedClientNativeSize.y;
         }
@@ -19896,10 +20371,10 @@ var Engine = class extends Object2 {
       const canvas = viewManager.getCanvas();
       const maxCanvasAspectRatio = engineConfiguration.maxCanvasAspectRatio;
       if (maxCanvasAspectRatio > 0) {
-        const canvasWidth = System30.Math.floor(System30.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
-        const canvasHeight = System30.Math.floor(System30.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
-        const canvasLeft = System30.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
-        const canvasTop = System30.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
+        const canvasWidth = System31.Math.floor(System31.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
+        const canvasHeight = System31.Math.floor(System31.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
+        const canvasLeft = System31.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
+        const canvasTop = System31.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
         canvas.style.width = `${canvasWidth}px`;
         canvas.style.height = `${canvasHeight}px`;
         canvas.style.marginLeft = `${canvasLeft}px`;
@@ -19933,7 +20408,7 @@ var Engine = class extends Object2 {
    * @returns { boolean } 글자 입력칸이 포커스되어 있으면 참.
    */
   isTextInputFocused() {
-    const activeElement = System30.document.activeElement;
+    const activeElement = System31.document.activeElement;
     if (!activeElement) {
       return false;
     }
@@ -19968,7 +20443,7 @@ var Engine = class extends Object2 {
         inputManager2.clear();
       }
     }, "recoverEngineState");
-    System30.document.addEventListener("resume", () => {
+    System31.document.addEventListener("resume", () => {
       console.log(`[Engine] resume: persisted`);
       recoverEngineState();
       const sceneManager = this.getSceneManager();
@@ -19977,7 +20452,7 @@ var Engine = class extends Object2 {
         loadedScene.onPageProcessRestored();
       }
     });
-    System30.window.addEventListener("pageshow", (pageTransitionEvent) => {
+    System31.window.addEventListener("pageshow", (pageTransitionEvent) => {
       if (pageTransitionEvent.persisted) {
         console.log(`[Engine] pageshow: persisted`);
         recoverEngineState();
@@ -19988,8 +20463,8 @@ var Engine = class extends Object2 {
         }
       }
     });
-    System30.document.addEventListener("visibilitychange", () => {
-      if (System30.document.visibilityState === "visible") {
+    System31.document.addEventListener("visibilitychange", () => {
+      if (System31.document.visibilityState === "visible") {
         console.log(`[Engine] visibilitychange: visible`);
         recoverEngineState();
         const sceneManager = this.getSceneManager();
@@ -20001,12 +20476,12 @@ var Engine = class extends Object2 {
     });
     let lastTouchTimestamp = -COMPATIBILITY_MOUSE_MILLISECONDS;
     const noteMouseDevice = /* @__PURE__ */ __name(() => {
-      if (System30.performance.now() - lastTouchTimestamp < COMPATIBILITY_MOUSE_MILLISECONDS) {
+      if (System31.performance.now() - lastTouchTimestamp < COMPATIBILITY_MOUSE_MILLISECONDS) {
         return;
       }
       inputManager.setLastInputDevice(InputDevice.mouse);
     }, "noteMouseDevice");
-    System30.document.addEventListener("keydown", (keyboardEvent) => {
+    System31.document.addEventListener("keydown", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.pushKey(key);
       inputManager.setLastInputDevice(InputDevice.keyboard);
@@ -20015,7 +20490,7 @@ var Engine = class extends Object2 {
         keyboardEvent.preventDefault();
       }
     });
-    System30.document.addEventListener("keyup", (keyboardEvent) => {
+    System31.document.addEventListener("keyup", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.popKey(key);
     });
@@ -20038,7 +20513,7 @@ var Engine = class extends Object2 {
       this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
     });
     canvas.addEventListener("mousemove", (touchEvent) => {
-      const movement = System30.Math.abs(touchEvent.movementX) + System30.Math.abs(touchEvent.movementY);
+      const movement = System31.Math.abs(touchEvent.movementX) + System31.Math.abs(touchEvent.movementY);
       if (movement >= MOUSE_DEVICE_MOVE_THRESHOLD) {
         noteMouseDevice();
       }
@@ -20063,7 +20538,7 @@ var Engine = class extends Object2 {
       this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
       wheelEvent.preventDefault();
     }, { passive: false });
-    System30.window.addEventListener("mouseup", (touchEvent) => {
+    System31.window.addEventListener("mouseup", (touchEvent) => {
       const inputManager2 = this.getInputManager();
       inputManager2.setMouseButtonDown(touchEvent.button, false);
       if (!inputManager2.isTouchMoved()) {
@@ -20079,7 +20554,7 @@ var Engine = class extends Object2 {
       this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
     });
     canvas.addEventListener("touchstart", (touchEvent) => {
-      lastTouchTimestamp = System30.performance.now();
+      lastTouchTimestamp = System31.performance.now();
       this.updateTouchPoints(touchEvent);
       const touch = touchEvent.changedTouches[0];
       if (!touch) {
@@ -20093,7 +20568,7 @@ var Engine = class extends Object2 {
       touchEvent.preventDefault();
     }, { passive: false });
     canvas.addEventListener("touchmove", (touchEvent) => {
-      lastTouchTimestamp = System30.performance.now();
+      lastTouchTimestamp = System31.performance.now();
       this.updateTouchPoints(touchEvent);
       const touch = touchEvent.changedTouches[0];
       if (!touch) {
@@ -20103,7 +20578,7 @@ var Engine = class extends Object2 {
       touchEvent.preventDefault();
     }, { passive: false });
     canvas.addEventListener("touchend", (touchEvent) => {
-      lastTouchTimestamp = System30.performance.now();
+      lastTouchTimestamp = System31.performance.now();
       this.updateTouchPoints(touchEvent);
       const touch = touchEvent.changedTouches[0];
       if (touch) {
@@ -20115,7 +20590,7 @@ var Engine = class extends Object2 {
       inputManager2.setTouchReleased(true);
       touchEvent.preventDefault();
     }, { passive: false });
-    System30.window.addEventListener("touchmove", (touchEvent) => {
+    System31.window.addEventListener("touchmove", (touchEvent) => {
       const touch = touchEvent.changedTouches[0];
       if (!touch) {
         return;
@@ -20129,7 +20604,7 @@ var Engine = class extends Object2 {
       }
     });
     canvas.addEventListener("touchcancel", (touchEvent) => {
-      lastTouchTimestamp = System30.performance.now();
+      lastTouchTimestamp = System31.performance.now();
       this.updateTouchPoints(touchEvent);
       const touch = touchEvent.changedTouches[0];
       if (touch) {
@@ -20140,52 +20615,52 @@ var Engine = class extends Object2 {
       inputManager2.setTouchDown(false);
       inputManager2.setTouchCancelled(true);
     });
-    System30.window.addEventListener("blur", (focusEvent) => {
+    System31.window.addEventListener("blur", (focusEvent) => {
       const inputManager2 = this.getInputManager();
       inputManager2.clear();
       inputManager2.setTouchReleased(true);
       focusEvent.preventDefault();
     }, { passive: false });
     const userGestureHandler = this.resumeOnUserGesture.bind(this);
-    System30.window.addEventListener("click", userGestureHandler);
-    System30.window.addEventListener("touchstart", userGestureHandler);
-    System30.window.addEventListener("keydown", userGestureHandler);
+    System31.window.addEventListener("click", userGestureHandler);
+    System31.window.addEventListener("touchstart", userGestureHandler);
+    System31.window.addEventListener("keydown", userGestureHandler);
     if (this.#engineConfiguration.resumeAudioOnTouchEnd) {
-      System30.window.addEventListener("touchend", userGestureHandler);
-      System30.window.addEventListener("pointerup", userGestureHandler);
+      System31.window.addEventListener("touchend", userGestureHandler);
+      System31.window.addEventListener("pointerup", userGestureHandler);
     }
-    System30.window.addEventListener("focus", this.#resumeCallback);
-    System30.document.addEventListener("visibilitychange", () => {
-      if (System30.document.visibilityState === "visible") {
+    System31.window.addEventListener("focus", this.#resumeCallback);
+    System31.document.addEventListener("visibilitychange", () => {
+      if (System31.document.visibilityState === "visible") {
         this.resume();
       }
     });
-    System30.document.addEventListener("pointerlockchange", () => {
+    System31.document.addEventListener("pointerlockchange", () => {
       if (document.pointerLockElement === canvas) {
       } else {
       }
     });
-    System30.document.addEventListener("visibilitychange", () => {
-      const isHidden = System30.document.visibilityState === "hidden";
+    System31.document.addEventListener("visibilitychange", () => {
+      const isHidden = System31.document.visibilityState === "hidden";
       const pageEvent = isHidden ? PageEvent.hidden : PageEvent.visible;
       this.dispatchPageEvent(pageEvent);
     });
-    System30.window.addEventListener("blur", () => {
+    System31.window.addEventListener("blur", () => {
       this.dispatchPageEvent(PageEvent.blurred);
     });
-    System30.window.addEventListener("focus", () => {
+    System31.window.addEventListener("focus", () => {
       this.dispatchPageEvent(PageEvent.focused);
     });
-    System30.window.addEventListener("pointerdown", () => {
+    System31.window.addEventListener("pointerdown", () => {
       this.dispatchPageEvent(PageEvent.pointerDown);
     });
-    System30.window.addEventListener("gamepadconnected", (gamepadEvent) => {
+    System31.window.addEventListener("gamepadconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.connectGamepad(gamepad);
       console.log(`gamepadconnected: ${gamepad.id}`);
     });
-    System30.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
+    System31.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.disconnectGamepad(gamepad);
@@ -20229,7 +20704,7 @@ var Engine = class extends Object2 {
         }
       }
     }
-    const touchingIdentifiers = new System30.Set();
+    const touchingIdentifiers = new System31.Set();
     const touches = touchEvent.touches;
     for (let touchIndex = 0; touchIndex < touches.length; ++touchIndex) {
       touchingIdentifiers.add(touches[touchIndex].identifier);
@@ -20357,7 +20832,7 @@ var Engine = class extends Object2 {
       const dueTimestamp = this.#frameLimitStartTimestamp + this.#frameLimitFrameCount * frameInterval;
       const earlyMilliseconds = dueTimestamp - timestamp;
       if (earlyMilliseconds > FRAME_LIMIT_TOLERANCE_MILLISECONDS) {
-        System30.window.requestAnimationFrame(this.#updateEngineCallback);
+        System31.window.requestAnimationFrame(this.#updateEngineCallback);
         return;
       }
       if (earlyMilliseconds < -frameInterval || earlyMilliseconds > 0 && earlyMilliseconds <= FRAME_LIMIT_RESYNC_MILLISECONDS) {
@@ -20429,7 +20904,7 @@ var Engine = class extends Object2 {
     inputManager.updateFrameSnapshot();
     this.captureFrameIfRequested();
     ++this.#frameNumber;
-    System30.window.requestAnimationFrame(this.#updateEngineCallback);
+    System31.window.requestAnimationFrame(this.#updateEngineCallback);
   }
   //==============================================================================
   // 커서 보이기 설정.
@@ -20536,7 +21011,7 @@ var Engine = class extends Object2 {
    */
   setMaximumFramePerSecond(maximumFramePerSecond) {
     const engineConfiguration = this.getEngineConfiguration();
-    if (typeof maximumFramePerSecond !== "number" || !System30.Number.isFinite(maximumFramePerSecond) || maximumFramePerSecond < 0) {
+    if (typeof maximumFramePerSecond !== "number" || !System31.Number.isFinite(maximumFramePerSecond) || maximumFramePerSecond < 0) {
       engineConfiguration.maximumFramePerSecond = 0;
       return;
     }
@@ -20569,7 +21044,7 @@ var Engine = class extends Object2 {
   exitApplication() {
     this.#isExitRequested = true;
     try {
-      const capacitor = System30.Capacitor;
+      const capacitor = System31.Capacitor;
       if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
         capacitor.Plugins.App.exitApp();
         return;
@@ -20577,7 +21052,7 @@ var Engine = class extends Object2 {
     } catch (nativeError) {
     }
     try {
-      System30.window.close();
+      System31.window.close();
     } catch (closeError) {
     }
   }
@@ -20606,7 +21081,7 @@ var Engine = class extends Object2 {
    * @param { string } title 창 제목.
    */
   setTitle(title) {
-    System30.document.title = title;
+    System31.document.title = title;
   }
   //==============================================================================
   // 알림 창. (window.alert 자리, 엔진이 그린 창, 러스트 판 Engine::alert 와 같다)
@@ -20648,7 +21123,7 @@ var Engine = class extends Object2 {
    * @returns { Promise<void> } 닫히면 풀린다.
    */
   alertAsync(message) {
-    return new System30.Promise((resolve) => {
+    return new System31.Promise((resolve) => {
       this.alert(message).setCallback(() => {
         resolve();
       });
@@ -20662,7 +21137,7 @@ var Engine = class extends Object2 {
    * @returns { Promise<boolean> } 확인하면 참.
    */
   confirmAsync(message) {
-    return new System30.Promise((resolve) => {
+    return new System31.Promise((resolve) => {
       this.confirm(message).setCallback((result) => {
         resolve(result.isConfirmed());
       });
@@ -20677,7 +21152,7 @@ var Engine = class extends Object2 {
    * @returns { Promise<string | null> } 입력한 글. (취소하면 null)
    */
   promptAsync(message, defaultValue = "") {
-    return new System30.Promise((resolve) => {
+    return new System31.Promise((resolve) => {
       this.prompt(message, defaultValue).setCallback((result) => {
         resolve(result.isConfirmed() ? result.getText() : null);
       });
@@ -20704,11 +21179,11 @@ var Engine = class extends Object2 {
   #showModalDialog(kind, message, defaultValue) {
     const handle = new ModalDialogHandle();
     const viewManager = this.getViewManager();
-    if (!System30.document || !viewManager || !viewManager.getCanvas()) {
+    if (!System31.document || !viewManager || !viewManager.getCanvas()) {
       handle.finish(kind === ModalDialogKind.alert ? ModalDialogResult.confirmed("") : ModalDialogResult.cancelled());
       return handle;
     }
-    this.#modalDialogList.push(new ModalDialog(kind, System30.String(message), System30.String(defaultValue), handle, this.getPlatform().platformName));
+    this.#modalDialogList.push(new ModalDialog(kind, System31.String(message), System31.String(defaultValue), handle, this.getPlatform().platformName));
     return handle;
   }
   //==============================================================================
@@ -20743,7 +21218,7 @@ var Engine = class extends Object2 {
    * @param { string } text 클립보드에 쓸 글.
    */
   writeClipboardText(text) {
-    const clipboard = System30.navigator ? System30.navigator.clipboard : void 0;
+    const clipboard = System31.navigator ? System31.navigator.clipboard : void 0;
     if (!clipboard || typeof clipboard.writeText !== "function") {
       return;
     }
@@ -20774,7 +21249,7 @@ var Engine = class extends Object2 {
    * });
    */
   async readClipboardText() {
-    const clipboard = System30.navigator ? System30.navigator.clipboard : void 0;
+    const clipboard = System31.navigator ? System31.navigator.clipboard : void 0;
     if (!clipboard || typeof clipboard.readText !== "function") {
       return null;
     }
@@ -20946,8 +21421,8 @@ var Engine = class extends Object2 {
    */
   requestFrameCapture(frameNumber) {
     const currentFrameNumber = this.getFrameNumber();
-    const targetFrameNumber = System30.Math.max(System30.Math.floor(frameNumber), currentFrameNumber);
-    const promise = new System30.Promise((resolve) => {
+    const targetFrameNumber = System31.Math.max(System31.Math.floor(frameNumber), currentFrameNumber);
+    const promise = new System31.Promise((resolve) => {
       let captureHandlers = this.#frameCaptureRequests.get(targetFrameNumber);
       if (captureHandlers === void 0) {
         captureHandlers = [];
@@ -20981,18 +21456,18 @@ var Engine = class extends Object2 {
   // 주소 쿼리의 화면 저장 요청 걸기. (capture, captureName, captureExit)
   //==============================================================================
   requestFrameCapturesFromUrl() {
-    if (!System30.location || typeof System30.URLSearchParams !== "function") {
+    if (!System31.location || typeof System31.URLSearchParams !== "function") {
       return;
     }
-    const searchParameters = new System30.URLSearchParams(System30.location.search);
+    const searchParameters = new System31.URLSearchParams(System31.location.search);
     const captureText = searchParameters.get("capture");
     if (captureText === null) {
       return;
     }
     const frameNumbers = [];
     for (const frameText of captureText.split(",")) {
-      const frameNumber = System30.Number.parseInt(frameText.trim(), 10);
-      if (System30.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
+      const frameNumber = System31.Number.parseInt(frameText.trim(), 10);
+      if (System31.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
         frameNumbers.push(frameNumber);
       }
     }
@@ -21007,11 +21482,11 @@ var Engine = class extends Object2 {
     for (const frameNumber of frameNumbers) {
       const capturePromise = this.requestFrameCapture(frameNumber);
       capturePromise.then((dataUrl) => {
-        const fileName = captureFileName.split("{frame}").join(System30.String(frameNumber));
-        const anchorElement = System30.document.createElement("a");
+        const fileName = captureFileName.split("{frame}").join(System31.String(frameNumber));
+        const anchorElement = System31.document.createElement("a");
         anchorElement.href = dataUrl;
         anchorElement.download = fileName;
-        System30.document.body.appendChild(anchorElement);
+        System31.document.body.appendChild(anchorElement);
         anchorElement.click();
         anchorElement.remove();
         const canvas = this.getCanvas();
@@ -21030,7 +21505,7 @@ var Engine = class extends Object2 {
    * @returns { Engine } 마지막으로 만든 엔진. (만든 적이 없으면 undefined)
    */
   static getEngine() {
-    return System30.vanillaEngine;
+    return System31.vanillaEngine;
   }
 };
 
@@ -21747,7 +22222,7 @@ var UIScrollBar = class extends WorldNode {
 };
 
 // src/ui/uiscrollview.js
-var System31 = globalThis;
+var System32 = globalThis;
 var SCROLLBAR_THICKNESS = 12;
 var SCROLLBAR_MARGIN = 6;
 var WHEEL_SCROLL_SCALE = 1;
@@ -22181,8 +22656,8 @@ var UIScrollView = class extends UIView {
     if (horizontalEnabled && verticalEnabled) {
       return true;
     }
-    const absoluteX = System31.Math.abs(deltaX);
-    const absoluteY = System31.Math.abs(deltaY);
+    const absoluteX = System32.Math.abs(deltaX);
+    const absoluteY = System32.Math.abs(deltaY);
     if (verticalEnabled) {
       return absoluteY >= absoluteX;
     }
@@ -22421,7 +22896,7 @@ var UIScrollView = class extends UIView {
 };
 
 // src/ui/touchrecognizer.js
-var System32 = globalThis;
+var System33 = globalThis;
 var DRAG_THRESHOLD = 10;
 var DELAY_PRESS_MS = 150;
 var TouchRecognizer = class extends TouchRaycaster {
@@ -22483,7 +22958,7 @@ var TouchRecognizer = class extends TouchRaycaster {
     }
     if (this.#scrollView) {
       const pressPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-      this.#pressTimerId = System32.setTimeout(() => {
+      this.#pressTimerId = System33.setTimeout(() => {
         this.#pressTimerId = null;
         if (this.#isDragging) return;
         if (this.#target !== target) return;
@@ -22519,20 +22994,20 @@ var TouchRecognizer = class extends TouchRaycaster {
     if (this.#scrollView && this.#pressPosition) {
       const dx = viewInputPosition.x - this.#pressPosition.x;
       const dy = viewInputPosition.y - this.#pressPosition.y;
-      if ((System32.Math.abs(dx) > DRAG_THRESHOLD || System32.Math.abs(dy) > DRAG_THRESHOLD) && !this.#scrollView.isScrollDrag(dx, dy)) {
+      if ((System33.Math.abs(dx) > DRAG_THRESHOLD || System33.Math.abs(dy) > DRAG_THRESHOLD) && !this.#scrollView.isScrollDrag(dx, dy)) {
         this.#scrollView = null;
         if (this.#pressTimerId !== null) {
-          System32.clearTimeout(this.#pressTimerId);
+          System33.clearTimeout(this.#pressTimerId);
           this.#pressTimerId = null;
           if (this.#target) {
             this.#pressDelivered = true;
             this.#target.touchPress(this.#pressPosition);
           }
         }
-      } else if (System32.Math.abs(dx) > DRAG_THRESHOLD || System32.Math.abs(dy) > DRAG_THRESHOLD) {
+      } else if (System33.Math.abs(dx) > DRAG_THRESHOLD || System33.Math.abs(dy) > DRAG_THRESHOLD) {
         this.#isDragging = true;
         if (this.#pressTimerId !== null) {
-          System32.clearTimeout(this.#pressTimerId);
+          System33.clearTimeout(this.#pressTimerId);
           this.#pressTimerId = null;
         } else if (this.#pressDelivered && this.#target) {
           this.#target.touchCancel(viewInputPosition);
@@ -22566,7 +23041,7 @@ var TouchRecognizer = class extends TouchRaycaster {
       }
     } else if (this.#target) {
       if (this.#pressTimerId !== null) {
-        System32.clearTimeout(this.#pressTimerId);
+        System33.clearTimeout(this.#pressTimerId);
         this.#pressTimerId = null;
         this.#target.touchPress(this.#pressPosition || viewInputPosition);
         this.#pressDelivered = true;
@@ -22620,7 +23095,7 @@ var TouchRecognizer = class extends TouchRaycaster {
   //==============================================================================
   reset() {
     if (this.#pressTimerId !== null) {
-      System32.clearTimeout(this.#pressTimerId);
+      System33.clearTimeout(this.#pressTimerId);
       this.#pressTimerId = null;
     }
     this.#target = null;
@@ -22673,7 +23148,7 @@ var UIControl = class extends UIView {
 };
 
 // src/resource/imageasset.js
-var System33 = globalThis;
+var System34 = globalThis;
 var ImageAsset = class extends Asset {
   static {
     __name(this, "ImageAsset");
@@ -22690,7 +23165,7 @@ var ImageAsset = class extends Asset {
   constructor() {
     super();
     this.setAssetType(AssetType.image);
-    this.image = new System33.window.Image();
+    this.image = new System34.window.Image();
   }
   //==============================================================================
   // 비동기 애셋 로드.
@@ -22706,10 +23181,27 @@ var ImageAsset = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    this.image = new System33.window.Image();
+    let response = null;
+    try {
+      response = await System34.fetch(assetPath);
+    } catch (error) {
+      response = null;
+    }
+    if (response !== null) {
+      if (!response.ok) {
+        throw new Error(`Load fail: ${assetPath}`);
+      }
+      const blob = await response.blob();
+      await this.loadFromBlob(assetPath, blob);
+      this.setLoaded(true);
+      return;
+    }
+    DecodedImageStore.release(this.image);
+    this.image = new System34.window.Image();
     this.image.src = assetPath;
     await new Promise((resolve, reject) => {
       this.image.onload = () => {
+        DecodedImageStore.register(this.image, null);
         this.setLoaded(true);
         resolve();
       };
@@ -22739,10 +23231,27 @@ var ImageAsset = class extends Asset {
   async loadFromBytes(assetPath, bytes) {
     this.setLoaded(false);
     this.setAssetPath(assetPath);
-    const blob = bytes instanceof System33.Blob ? bytes : new System33.Blob([bytes]);
-    const objectUrl = System33.URL.createObjectURL(blob);
-    const image = new System33.window.Image();
+    const blob = bytes instanceof System34.Blob ? bytes : new System34.Blob([bytes]);
+    await this.loadFromBlob(assetPath, blob);
+    this.setLoaded(true);
+  }
+  //==============================================================================
+  // Blob 으로 그림 요소와 미리 푼 그림 짓기. (load, loadFromBytes 가 같이 쓴다, 읽힘 표시는 부른 쪽이 한다)
+  // - 그림 요소는 blob: 주소로 읽고, 같은 바이트를 createImageBitmap 으로 함께 푼다.
+  // - 다 되면 그림 요소를 아직 올리지 않은 그림으로 맡긴다. (미리 풀지 않은 꼴이면 미리 푼 그림 없이)
+  //==============================================================================
+  /**
+   * @private
+   * @param { string } assetPath 실패 알림에 쓸 이름.
+   * @param { Blob } blob 그림 파일의 바이트.
+   * @returns { Promise<void> } 그림이 다 풀리면 풀리는 프로미스. (그림 요소가 풀지 못하면 거부된다)
+   */
+  async loadFromBlob(assetPath, blob) {
+    DecodedImageStore.release(this.image);
+    const objectUrl = System34.URL.createObjectURL(blob);
+    const image = new System34.window.Image();
     this.image = image;
+    const decodePromise = DecodedImageStore.decode(blob);
     try {
       await new Promise((resolve, reject) => {
         image.onload = () => {
@@ -22753,10 +23262,37 @@ var ImageAsset = class extends Asset {
         };
         image.src = objectUrl;
       });
-      this.setLoaded(true);
+    } catch (error) {
+      const imageBitmap2 = await decodePromise;
+      if (imageBitmap2 !== null) {
+        imageBitmap2.close();
+      }
+      throw error;
     } finally {
-      System33.URL.revokeObjectURL(objectUrl);
+      System34.URL.revokeObjectURL(objectUrl);
     }
+    let imageBitmap = await decodePromise;
+    if (imageBitmap !== null && (imageBitmap.width !== image.width || imageBitmap.height !== image.height)) {
+      imageBitmap.close();
+      imageBitmap = null;
+    }
+    if (this.image !== image) {
+      if (imageBitmap !== null) {
+        imageBitmap.close();
+      }
+      return;
+    }
+    DecodedImageStore.register(image, imageBitmap);
+  }
+  //==============================================================================
+  // 애셋 언로드. (아직 올리지 않은 미리 푼 그림이 있으면 닫는다)
+  //==============================================================================
+  /**
+   * @override
+   */
+  unload() {
+    DecodedImageStore.release(this.image);
+    super.unload();
   }
   //==============================================================================
   // 이미지 반환.
@@ -23307,7 +23843,7 @@ var Sprite = class _Sprite extends Paint {
 };
 
 // src/core/component/text.js
-var System34 = globalThis;
+var System35 = globalThis;
 var TextAlign = {
   left: "left",
   // 왼쪽 맞춤. (내용 왼쪽 끝에 놓는다)
@@ -23337,7 +23873,7 @@ var TextBaseline = {
 var measurementCanvasRenderingContext = null;
 function getMeasurementCanvasRenderingContext() {
   if (measurementCanvasRenderingContext === null) {
-    const document2 = System34.document;
+    const document2 = System35.document;
     if (document2 === null || document2 === void 0) {
       return null;
     }
@@ -23351,11 +23887,11 @@ var graphemeSegmenter = null;
 var wordSegmenter = null;
 var NO_BREAK_SPACE = "\xA0";
 function splitGraphemes(text) {
-  if (graphemeSegmenter === null && System34.Intl && typeof System34.Intl.Segmenter === "function") {
-    graphemeSegmenter = new System34.Intl.Segmenter(void 0, { granularity: "grapheme" });
+  if (graphemeSegmenter === null && System35.Intl && typeof System35.Intl.Segmenter === "function") {
+    graphemeSegmenter = new System35.Intl.Segmenter(void 0, { granularity: "grapheme" });
   }
   if (graphemeSegmenter === null) {
-    return System34.Array.from(text);
+    return System35.Array.from(text);
   }
   const pieces = [];
   for (const segmentData of graphemeSegmenter.segment(text)) {
@@ -23365,8 +23901,8 @@ function splitGraphemes(text) {
 }
 __name(splitGraphemes, "splitGraphemes");
 function splitWords(text) {
-  if (wordSegmenter === null && System34.Intl && typeof System34.Intl.Segmenter === "function") {
-    wordSegmenter = new System34.Intl.Segmenter(void 0, { granularity: "word" });
+  if (wordSegmenter === null && System35.Intl && typeof System35.Intl.Segmenter === "function") {
+    wordSegmenter = new System35.Intl.Segmenter(void 0, { granularity: "word" });
   }
   if (wordSegmenter === null) {
     return [text];
@@ -23426,13 +23962,13 @@ function buildFontString(fontFace, fontSize, bold, italic) {
 __name(buildFontString, "buildFontString");
 var drawnRectContentSize = Vector2.zero();
 var fontLoadCount = 0;
-if (System34.document !== void 0 && System34.document.fonts !== void 0) {
-  System34.document.fonts.addEventListener("loadingdone", () => {
+if (System35.document !== void 0 && System35.document.fonts !== void 0) {
+  System35.document.fonts.addEventListener("loadingdone", () => {
     fontLoadCount += 1;
   });
 }
 function readFontFaceCount() {
-  const document2 = System34.document;
+  const document2 = System35.document;
   if (document2 === void 0 || document2.fonts === void 0) {
     return 0;
   }
@@ -23652,7 +24188,7 @@ var Text = class _Text extends Component {
     graphic.setTextBaseline("middle");
     const strokeColor = this.getStrokeColor();
     const textColor = this.getTextColor();
-    const decorationLineWidth = System34.Math.max(1, this.#fontSize / 16);
+    const decorationLineWidth = System35.Math.max(1, this.#fontSize / 16);
     let remainCount = this.#visibleCharacterCount;
     for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
       let lineText = lineList[lineIndex];
@@ -23664,7 +24200,7 @@ var Text = class _Text extends Component {
         if (lineCharacterCount > remainCount) {
           lineText = sliceGraphemes(lineText, remainCount);
         }
-        remainCount = System34.Math.max(0, remainCount - lineCharacterCount);
+        remainCount = System35.Math.max(0, remainCount - lineCharacterCount);
       }
       if (lineText.length === 0) {
         continue;
@@ -23833,11 +24369,11 @@ var Text = class _Text extends Component {
     if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
       return { width: this.measurePlainTextWidth(text), height: this.#fontSize * this.#lineSpacing, lineCount: 1 };
     }
-    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : System34.Number.POSITIVE_INFINITY;
+    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : System35.Number.POSITIVE_INFINITY;
     const lineList = this.wrapTextToLines(text, wrapWidth);
     let maxLineWidth = 0;
     for (const lineText of lineList) {
-      maxLineWidth = System34.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
+      maxLineWidth = System35.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
     }
     return { width: maxLineWidth, height: lineList.length * this.#fontSize * this.#lineSpacing, lineCount: lineList.length };
   }
@@ -23885,7 +24421,7 @@ var Text = class _Text extends Component {
       const textWidth = this.measureText(text, fontSize);
       const startX = this.computeUnderlineStartX(drawX, textWidth, textAlign);
       graphic.setStrokeColor(textColor);
-      const lineWidth = System34.Math.max(1, fontSize / 16);
+      const lineWidth = System35.Math.max(1, fontSize / 16);
       if (this.#underline) {
         const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
         this.strokeHorizontalLine(graphic, startX, underlineY, textWidth, lineWidth);
@@ -23964,8 +24500,8 @@ var Text = class _Text extends Component {
    * engine.run(new MainScene());
    */
   setFitWidth(width, minimumRatio = 0.55) {
-    this.#fitWidth = System34.Math.max(0, width);
-    this.#fitMinimumRatio = System34.Math.min(1, System34.Math.max(0, minimumRatio));
+    this.#fitWidth = System35.Math.max(0, width);
+    this.#fitMinimumRatio = System35.Math.min(1, System35.Math.max(0, minimumRatio));
   }
   //==============================================================================
   // 맞출 너비 반환. (0 이면 맞추지 않는다)
@@ -24005,8 +24541,8 @@ var Text = class _Text extends Component {
     let fittedFontSize = this.#fontSize;
     const textWidth = this.measureText(text, this.#fontSize);
     if (textWidth > this.#fitWidth) {
-      const fitRatio = System34.Math.max(this.#fitMinimumRatio, this.#fitWidth / textWidth);
-      fittedFontSize = System34.Math.floor(this.#fontSize * fitRatio * 10) / 10;
+      const fitRatio = System35.Math.max(this.#fitMinimumRatio, this.#fitWidth / textWidth);
+      fittedFontSize = System35.Math.floor(this.#fontSize * fitRatio * 10) / 10;
     }
     fitCache.text = text;
     fitCache.fontFace = this.#fontFace;
@@ -24073,8 +24609,8 @@ var Text = class _Text extends Component {
       leftX = (contentSize.x - textWidth) * 0.5;
       rightX = leftX + textWidth;
     } else {
-      leftX = System34.Math.min(0, contentSize.x - textWidth);
-      rightX = System34.Math.max(textWidth, contentSize.x);
+      leftX = System35.Math.min(0, contentSize.x - textWidth);
+      rightX = System35.Math.max(textWidth, contentSize.x);
     }
     let anchorY;
     if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
@@ -24104,7 +24640,7 @@ var Text = class _Text extends Component {
     const lineList = this.readWrappedLines(text, wrapWidth);
     let maximumLineWidth = 0;
     for (const lineText of lineList) {
-      maximumLineWidth = System34.Math.max(maximumLineWidth, this.measureText(lineText, this.#fontSize));
+      maximumLineWidth = System35.Math.max(maximumLineWidth, this.measureText(lineText, this.#fontSize));
     }
     const textAlign = this.#textAlign;
     let leftX;
@@ -24119,8 +24655,8 @@ var Text = class _Text extends Component {
       leftX = (contentSize.x - maximumLineWidth) * 0.5;
       rightX = leftX + maximumLineWidth;
     } else {
-      leftX = System34.Math.min(0, contentSize.x - maximumLineWidth);
-      rightX = System34.Math.max(maximumLineWidth, contentSize.x);
+      leftX = System35.Math.min(0, contentSize.x - maximumLineWidth);
+      rightX = System35.Math.max(maximumLineWidth, contentSize.x);
     }
     const lineHeight = this.#fontSize * this.#lineSpacing;
     const blockHeight = lineList.length * lineHeight;
@@ -24310,7 +24846,7 @@ var Text = class _Text extends Component {
    * engine.run(new MainScene());
    */
   setWordWrapWidth(wordWrapWidth) {
-    this.#wordWrapWidth = System34.Math.max(0, wordWrapWidth);
+    this.#wordWrapWidth = System35.Math.max(0, wordWrapWidth);
   }
   //==============================================================================
   // 자동 줄바꿈 폭 반환.
@@ -24346,7 +24882,7 @@ var Text = class _Text extends Component {
    * @param { number } lineSpacing 줄 간격 배율. (글자 크기에 곱한다, 0.1 보다 작으면 0.1, 처음은 1.25)
    */
   setLineSpacing(lineSpacing) {
-    this.#lineSpacing = System34.Math.max(0.1, lineSpacing);
+    this.#lineSpacing = System35.Math.max(0.1, lineSpacing);
   }
   //==============================================================================
   // 줄 간격 배율 반환.
@@ -24394,7 +24930,7 @@ var Text = class _Text extends Component {
    * engine.run(new MainScene());
    */
   setVisibleCharacterCount(visibleCharacterCount) {
-    this.#visibleCharacterCount = System34.Math.max(-1, System34.Math.floor(visibleCharacterCount));
+    this.#visibleCharacterCount = System35.Math.max(-1, System35.Math.floor(visibleCharacterCount));
   }
   //==============================================================================
   // 표시 글자 수 반환.
@@ -24912,7 +25448,7 @@ var UIImageView = class extends UIView {
 };
 
 // src/core/component/richtext.js
-var System35 = globalThis;
+var System36 = globalThis;
 var NAMED_COLORS = {
   red: "#ff0000",
   green: "#00ff00",
@@ -24967,8 +25503,8 @@ function buildAttributesForTag(tagName, value) {
     }
     case "size": {
       const trimmed = value !== void 0 && value !== null ? value.trim() : "";
-      const fontSize = System35.parseInt(trimmed, 10);
-      if (System35.Number.isFinite(fontSize) === false || fontSize <= 0) {
+      const fontSize = System36.parseInt(trimmed, 10);
+      if (System36.Number.isFinite(fontSize) === false || fontSize <= 0) {
         return null;
       }
       return { fontSize };
@@ -24994,7 +25530,7 @@ __name(buildAttributesForTag, "buildAttributesForTag");
 function mergeAttributeStack(stack) {
   const result = {};
   for (const attributes of stack) {
-    for (const key of System35.Object.keys(attributes)) {
+    for (const key of System36.Object.keys(attributes)) {
       if (key === "__tagName") {
         continue;
       }
@@ -25283,7 +25819,7 @@ var RichText = class extends Text {
       }
       graphic.setFillColor(segmentTextColor.toHEXString());
       graphic.drawFillText(segmentText, cursorX, baselineY);
-      const segmentLineWidth = System35.Math.max(1, segmentFontSize / 16);
+      const segmentLineWidth = System36.Math.max(1, segmentFontSize / 16);
       if (segmentUnderline) {
         const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
         graphic.setStrokeColor(segmentTextColor.toHEXString());
@@ -26096,7 +26632,7 @@ var UILabel = class extends UIView {
 };
 
 // src/ui/uibutton.js
-var System36 = globalThis;
+var System37 = globalThis;
 var ButtonState = {
   normal: Enum.begin(),
   // 평상시 상태.
@@ -26326,7 +26862,7 @@ var UIButton = class _UIButton extends UIControl {
     if (currentButtonState === ButtonState.pressed || currentButtonState === ButtonState.disabled) {
       return;
     }
-    const engine = System36.vanillaEngine;
+    const engine = System37.vanillaEngine;
     if (!engine) {
       return;
     }
@@ -26709,7 +27245,7 @@ var UIButton = class _UIButton extends UIControl {
    * @param { number } minimumPressedSeconds 눌린 모습을 보여 줄 가장 짧은 시간. (초, 0 보다 작으면 0, 기본 0 이면 바로)
    */
   setMinimumPressedSeconds(minimumPressedSeconds) {
-    this.#minimumPressedSeconds = System36.Math.max(0, minimumPressedSeconds);
+    this.#minimumPressedSeconds = System37.Math.max(0, minimumPressedSeconds);
   }
   //==============================================================================
   // 최소 눌림 표시 시간 반환.
@@ -26912,7 +27448,7 @@ var UIButton = class _UIButton extends UIControl {
 };
 
 // src/ui/popupmotion.js
-var System37 = globalThis;
+var System38 = globalThis;
 var PopupMotionState = {
   closed: "closed",
   // 닫힘. (배율 0, 가림 0)
@@ -27034,14 +27570,14 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      const ratio2 = System37.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      const ratio2 = System38.Math.min(1, this.#elapsedSeconds / this.#openDuration);
       const smooth = ratio2 * ratio2 * (3 - 2 * ratio2);
       if (smooth < 0.72) {
         return 0.45 + (1.18 - 0.45) * (smooth / 0.72);
       }
       return 1.18 - (1.18 - 1) * ((smooth - 0.72) / 0.28);
     }
-    const ratio = System37.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    const ratio = System38.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
     if (ratio < 0.25) {
       return 1 + (1.08 - 1) * (ratio / 0.25);
     }
@@ -27063,9 +27599,9 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      return System37.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      return System38.Math.min(1, this.#elapsedSeconds / this.#openDuration);
     }
-    return 1 - System37.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    return 1 - System38.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
   }
   //==============================================================================
   // 조작 가능 여부. (완전히 열린 뒤에만 참)
@@ -27125,7 +27661,7 @@ var PopupMotion = class extends Object2 {
 };
 
 // src/ui/uiwindow.js
-var System38 = globalThis;
+var System39 = globalThis;
 var DEFAULT_MAXIMUM_WIDTH = 480;
 var DEFAULT_MARGIN = 16;
 var DEFAULT_PANEL_HEIGHT = 240;
@@ -27349,7 +27885,7 @@ var UIWindow = class extends WorldNode {
    * @param { number } maximumWidth 판 너비의 한계. (UI 층 단위, 1 보다 작으면 1, 기본 480)
    */
   setMaximumWidth(maximumWidth) {
-    this.#maximumWidth = System38.Math.max(1, maximumWidth);
+    this.#maximumWidth = System39.Math.max(1, maximumWidth);
   }
   //==============================================================================
   // 창의 가로 한계 반환.
@@ -27367,7 +27903,7 @@ var UIWindow = class extends WorldNode {
    * @param { number } margin 영역 가장자리와 판 사이 거리. (UI 층 단위, 음수면 0, 기본 16)
    */
   setMargin(margin) {
-    this.#margin = System38.Math.max(0, margin);
+    this.#margin = System39.Math.max(0, margin);
   }
   //==============================================================================
   // 영역 가장자리와 판 사이 거리 반환.
@@ -27385,7 +27921,7 @@ var UIWindow = class extends WorldNode {
    * @param { number } panelHeight 판의 세로. (UI 층 단위, 1 보다 작으면 1, 기본 240)
    */
   setPanelHeight(panelHeight) {
-    this.#panelHeight = System38.Math.max(1, panelHeight);
+    this.#panelHeight = System39.Math.max(1, panelHeight);
   }
   //==============================================================================
   // 판의 세로 반환.
@@ -27489,10 +28025,10 @@ var UIWindow = class extends WorldNode {
    * @param { number } left 왼쪽으로 더 덮는 너비. (UI 층 단위, 음수면 0)
    */
   setViewBleed(top, right, bottom, left) {
-    this.#viewBleed.top = System38.Math.max(0, top);
-    this.#viewBleed.right = System38.Math.max(0, right);
-    this.#viewBleed.bottom = System38.Math.max(0, bottom);
-    this.#viewBleed.left = System38.Math.max(0, left);
+    this.#viewBleed.top = System39.Math.max(0, top);
+    this.#viewBleed.right = System39.Math.max(0, right);
+    this.#viewBleed.bottom = System39.Math.max(0, bottom);
+    this.#viewBleed.left = System39.Math.max(0, left);
     this.placeDimNode();
   }
   //==============================================================================
@@ -27514,8 +28050,8 @@ var UIWindow = class extends WorldNode {
    * @param { number } viewHeight 영역의 높이. (UI 층 단위, 1 보다 작으면 1)
    */
   setViewSize(viewWidth, viewHeight) {
-    this.#viewWidth = System38.Math.max(1, viewWidth);
-    this.#viewHeight = System38.Math.max(1, viewHeight);
+    this.#viewWidth = System39.Math.max(1, viewWidth);
+    this.#viewHeight = System39.Math.max(1, viewHeight);
     this.refreshLayout();
   }
   //==============================================================================
@@ -27528,14 +28064,14 @@ var UIWindow = class extends WorldNode {
     this.setContentSize(Vector2.create(viewWidth, viewHeight));
     this.placeDimNode();
     const maximumWidth = this.getMaximumWidth();
-    const panelWidth = System38.Math.max(1, System38.Math.min(viewWidth - margin * 2, maximumWidth));
-    const panelHeight = System38.Math.max(1, this.layoutContent(panelWidth));
-    const availableHeight = System38.Math.max(1, viewHeight - margin * 2);
+    const panelWidth = System39.Math.max(1, System39.Math.min(viewWidth - margin * 2, maximumWidth));
+    const panelHeight = System39.Math.max(1, this.layoutContent(panelWidth));
+    const availableHeight = System39.Math.max(1, viewHeight - margin * 2);
     const panelScale = panelHeight > availableHeight ? availableHeight / panelHeight : 1;
     const scaledWidth = panelWidth * panelScale;
     const scaledHeight = panelHeight * panelScale;
     const panelLeft = (viewWidth - scaledWidth) * 0.5;
-    const panelTop = System38.Math.max(margin * panelScale, (viewHeight - scaledHeight) * 0.5);
+    const panelTop = System39.Math.max(margin * panelScale, (viewHeight - scaledHeight) * 0.5);
     this.#panelRect = Rect.create(panelLeft, panelTop, scaledWidth, scaledHeight);
     this.#panelScale = panelScale;
     const frameNode = this.getFrameNode();
@@ -27661,7 +28197,7 @@ var UIWindow = class extends WorldNode {
 };
 
 // src/ui/uiscale.js
-var System39 = globalThis;
+var System40 = globalThis;
 var DEFAULT_MINIMUM_CSS_SCALE = 0.8;
 var DEFAULT_MAXIMUM_SCALE = 1.8;
 var DEFAULT_MINIMUM_LAYER_HEIGHT = 0;
@@ -27731,13 +28267,13 @@ var UIScale = class _UIScale {
     const desiredScale = minimumCssScale / cssPixelScale;
     const isPortrait = _UIScale.isPortrait(viewWidth, viewHeight, portraitRatio);
     if (isPortrait) {
-      return System39.Math.max(1, desiredScale);
+      return System40.Math.max(1, desiredScale);
     }
-    let uiScale = System39.Math.min(maximumScale, desiredScale);
+    let uiScale = System40.Math.min(maximumScale, desiredScale);
     if (minimumLayerHeight > 0 && viewHeight > 0) {
-      uiScale = System39.Math.min(uiScale, viewHeight / minimumLayerHeight);
+      uiScale = System40.Math.min(uiScale, viewHeight / minimumLayerHeight);
     }
-    return System39.Math.max(1, uiScale);
+    return System40.Math.max(1, uiScale);
   }
   //==============================================================================
   // 세로 화면인지. (가로가 세로의 portraitRatio 배 이하)
@@ -27768,7 +28304,7 @@ var UIScale = class _UIScale {
 };
 
 // src/ui/uiwindowlayer.js
-var System40 = globalThis;
+var System41 = globalThis;
 var UIWindowLayer = class _UIWindowLayer extends WorldNode {
   static {
     __name(this, "UIWindowLayer");
@@ -27898,8 +28434,8 @@ var UIWindowLayer = class _UIWindowLayer extends WorldNode {
    * @param { number } viewHeight 영역의 높이. (부모 단위, 1 보다 작으면 1)
    */
   setViewSize(viewWidth, viewHeight) {
-    this.#viewWidth = System40.Math.max(1, viewWidth);
-    this.#viewHeight = System40.Math.max(1, viewHeight);
+    this.#viewWidth = System41.Math.max(1, viewWidth);
+    this.#viewHeight = System41.Math.max(1, viewHeight);
     const uiScaleOptions = this.#uiScaleOptions;
     this.#uiScale = uiScaleOptions === null ? 1 : UIScale.read(this.#viewWidth, this.#viewHeight, uiScaleOptions);
     const uiScale = this.getUIScale();
@@ -27917,10 +28453,10 @@ var UIWindowLayer = class _UIWindowLayer extends WorldNode {
    * @param { number } left 왼쪽으로 더 덮는 너비. (부모 단위, 음수면 0)
    */
   setViewBleed(top, right, bottom, left) {
-    this.#viewBleed.top = System40.Math.max(0, top);
-    this.#viewBleed.right = System40.Math.max(0, right);
-    this.#viewBleed.bottom = System40.Math.max(0, bottom);
-    this.#viewBleed.left = System40.Math.max(0, left);
+    this.#viewBleed.top = System41.Math.max(0, top);
+    this.#viewBleed.right = System41.Math.max(0, right);
+    this.#viewBleed.bottom = System41.Math.max(0, bottom);
+    this.#viewBleed.left = System41.Math.max(0, left);
     this.placeAllWindows();
   }
   //==============================================================================
@@ -28144,7 +28680,7 @@ var UIWindowLayer = class _UIWindowLayer extends WorldNode {
 };
 
 // src/misc/localstorage.js
-var System41 = globalThis;
+var System42 = globalThis;
 var LocalStorage = class _LocalStorage extends Object2 {
   static {
     __name(this, "LocalStorage");
@@ -28156,7 +28692,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   static #backend = null;
   // 갈아 끼운 저장소. (null 이면 window.localStorage)
   /** @private @type { Map<string, string> } */
-  static #memoryItemMap = new System41.Map();
+  static #memoryItemMap = new System42.Map();
   // 못 쓴 값을 대신 두는 곳.
   /** @private @type { boolean } */
   static #isMemoryFallback = false;
@@ -28235,7 +28771,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
       return backend;
     }
     try {
-      const storage = System41.window.localStorage;
+      const storage = System42.window.localStorage;
       return storage !== void 0 && storage !== null ? storage : null;
     } catch (error) {
       return null;
@@ -28262,7 +28798,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
       if (value === null || value === void 0) {
         return null;
       }
-      return System41.String(value);
+      return System42.String(value);
     } catch (error) {
       return null;
     }
@@ -28459,7 +28995,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @returns { string[] } 저장소와 메모리의 키를 합쳐 정렬한 배열.
    */
   static getKeys() {
-    const keySet = new System41.Set();
+    const keySet = new System42.Set();
     const storage = _LocalStorage.readStorage();
     if (storage !== null) {
       try {
@@ -28483,7 +29019,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
     for (const key of _LocalStorage.#memoryItemMap.keys()) {
       keySet.add(key);
     }
-    const keys = System41.Array.from(keySet);
+    const keys = System42.Array.from(keySet);
     keys.sort();
     return keys;
   }
@@ -28501,7 +29037,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
       return defaultValue;
     }
     try {
-      return System41.JSON.parse(stringValue);
+      return System42.JSON.parse(stringValue);
     } catch (error) {
       return defaultValue;
     }
@@ -28517,7 +29053,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   static setJson(key, value) {
     let stringValue = "";
     try {
-      stringValue = System41.JSON.stringify(value);
+      stringValue = System42.JSON.stringify(value);
     } catch (error) {
       console.warn(`[LocalStorage] JSON \uC73C\uB85C \uBC14\uAFC0 \uC218 \uC5C6\uB294 \uAC12\uC785\uB2C8\uB2E4: ${key}`, error);
       return false;
@@ -28530,7 +29066,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
 };
 
 // src/misc/devtools.js
-var System42 = globalThis;
+var System43 = globalThis;
 var TITLE_HEIGHT = 28;
 var TAB_HEIGHT = 24;
 var ITEM_HEIGHT = 20;
@@ -28541,7 +29077,7 @@ var GIZMO_CHECKBOX_MARGIN = 4;
 var FONT_SIZE = 12;
 var PADDING = 7;
 var LABEL_COLUMN_WIDTH = 144;
-var COMPONENT_GETTER_EXCLUDE_NAMES = new System42.Set([
+var COMPONENT_GETTER_EXCLUDE_NAMES = new System43.Set([
   "constructor",
   "getNode",
   "getImagePath"
@@ -28587,9 +29123,9 @@ var ResizeMode = {
   bottomRight: "bottomRight",
   splitter: "splitter"
 };
-var DEVToolsFlatItem = class {
+var DevToolsFlatItem = class {
   static {
-    __name(this, "DEVToolsFlatItem");
+    __name(this, "DevToolsFlatItem");
   }
   /** @type { TransformNode } */
   node;
@@ -28655,9 +29191,9 @@ var InspectorLine = class {
     this.isComponentProperty = isComponentProperty || false;
   }
 };
-var DEVTools = class extends Object2 {
+var DevTools = class extends Object2 {
   static {
-    __name(this, "DEVTools");
+    __name(this, "DevTools");
   }
   //==============================================================================
   // 멤버 변수 목록.
@@ -28712,7 +29248,7 @@ var DEVTools = class extends Object2 {
   #inspectorScrollY;
   /** @private @type { boolean } */
   #prevIsKeyF2;
-  /** @private @type { DEVToolsFlatItem[] } */
+  /** @private @type { DevToolsFlatItem[] } */
   #flatList;
   /** @private @type { Set } */
   #expandedNodes;
@@ -29088,7 +29624,7 @@ var DEVTools = class extends Object2 {
     }
     if (touchY <= panelY + TITLE_HEIGHT + TAB_HEIGHT) {
       const tabWidth = panelWidth / TABS.length;
-      const tabIndex = System42.Math.floor((touchX - panelX) / tabWidth);
+      const tabIndex = System43.Math.floor((touchX - panelX) / tabWidth);
       if (tabIndex >= 0 && tabIndex < TABS.length) {
         this.#activeTab = tabIndex;
       }
@@ -29120,7 +29656,7 @@ var DEVTools = class extends Object2 {
     if (touchX < panelX + leftWidth) {
       const treeItemsY = contentY + ITEM_HEIGHT * 2;
       const localY2 = touchY - treeItemsY + this.#treeScrollY;
-      const clickedIndex = System42.Math.floor(localY2 / ITEM_HEIGHT);
+      const clickedIndex = System43.Math.floor(localY2 / ITEM_HEIGHT);
       if (clickedIndex >= 0 && clickedIndex < this.#flatList.length) {
         const clickedItem = this.#flatList[clickedIndex];
         const clickedNode = clickedItem.node;
@@ -29158,7 +29694,7 @@ var DEVTools = class extends Object2 {
       return;
     }
     const localY = touchY - contentY + this.#inspectorScrollY;
-    const clickedLineIndex = System42.Math.floor(localY / ITEM_HEIGHT);
+    const clickedLineIndex = System43.Math.floor(localY / ITEM_HEIGHT);
     if (clickedLineIndex >= 0 && clickedLineIndex < this.#cachedInspectorLines.length) {
       const clickedLine = this.#cachedInspectorLines[clickedLineIndex];
       if (clickedLine.isComponentHeader && clickedLine.componentRef) {
@@ -29195,7 +29731,7 @@ var DEVTools = class extends Object2 {
       const isRightMode = this.#resizeMode === ResizeMode.right || this.#resizeMode === ResizeMode.bottomRight;
       if (isRightMode) {
         const newWidth = this.#resizeDragStartPanelWidth + deltaX;
-        this.#panelWidth = System42.Math.max(MIN_PANEL_WIDTH, newWidth);
+        this.#panelWidth = System43.Math.max(MIN_PANEL_WIDTH, newWidth);
       }
       const isLeftMode = this.#resizeMode === ResizeMode.left || this.#resizeMode === ResizeMode.topLeft || this.#resizeMode === ResizeMode.bottomLeft;
       if (isLeftMode) {
@@ -29208,7 +29744,7 @@ var DEVTools = class extends Object2 {
       const isBottomMode = this.#resizeMode === ResizeMode.bottom || this.#resizeMode === ResizeMode.bottomRight || this.#resizeMode === ResizeMode.bottomLeft;
       if (isBottomMode) {
         const newHeight = this.#resizeDragStartPanelHeight + deltaY;
-        this.#panelHeight = System42.Math.max(MIN_PANEL_HEIGHT, newHeight);
+        this.#panelHeight = System43.Math.max(MIN_PANEL_HEIGHT, newHeight);
       }
       const isTopMode = this.#resizeMode === ResizeMode.top || this.#resizeMode === ResizeMode.topLeft;
       if (isTopMode) {
@@ -29221,28 +29757,28 @@ var DEVTools = class extends Object2 {
       if (this.#resizeMode === ResizeMode.splitter) {
         const newLeftWidth = this.#resizeDragStartLeftWidth + deltaX;
         const maxLeftWidth = this.#panelWidth - MIN_LEFT_WIDTH;
-        this.#leftWidth = System42.Math.max(MIN_LEFT_WIDTH, System42.Math.min(maxLeftWidth, newLeftWidth));
+        this.#leftWidth = System43.Math.max(MIN_LEFT_WIDTH, System43.Math.min(maxLeftWidth, newLeftWidth));
       }
     }
     if (this.#isTreeScrollDragging) {
       const deltaY = touchY - this.#treeScrollDragStartMouseY;
       const newScrollY = this.#treeScrollDragStartScrollY - deltaY;
-      this.#treeScrollY = System42.Math.max(0, newScrollY);
+      this.#treeScrollY = System43.Math.max(0, newScrollY);
     }
     if (this.#isInspectorScrollDragging) {
       const deltaY = touchY - this.#inspectorScrollDragStartMouseY;
       const newScrollY = this.#inspectorScrollDragStartScrollY - deltaY;
-      this.#inspectorScrollY = System42.Math.max(0, newScrollY);
+      this.#inspectorScrollY = System43.Math.max(0, newScrollY);
     }
     if (this.#isLocalStorageScrollDragging) {
       const deltaY = touchY - this.#localStorageScrollDragStartMouseY;
       const newScrollY = this.#localStorageScrollDragStartScrollY - deltaY;
-      this.#localStorageScrollY = System42.Math.max(0, newScrollY);
+      this.#localStorageScrollY = System43.Math.max(0, newScrollY);
     }
     if (this.#isStatisticsScrollDragging) {
       const deltaY = touchY - this.#statisticsScrollDragStartMouseY;
       const newScrollY = this.#statisticsScrollDragStartScrollY - deltaY;
-      this.#statisticsScrollY = System42.Math.max(0, newScrollY);
+      this.#statisticsScrollY = System43.Math.max(0, newScrollY);
     }
   }
   //==============================================================================
@@ -29363,7 +29899,7 @@ var DEVTools = class extends Object2 {
     const keys = LocalStorage.getKeys();
     const delColWidth = 24;
     const localY = touchY - itemsY + this.#localStorageScrollY;
-    const clickedIndex = System42.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System43.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < keys.length) {
       const clickedKey = keys[clickedIndex];
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
@@ -29413,7 +29949,7 @@ var DEVTools = class extends Object2 {
   collectNode(node, depth, parentActive) {
     const isNodeActive = node.isActive();
     const effectiveActive = parentActive && isNodeActive;
-    const flatItem = new DEVToolsFlatItem(node, depth, effectiveActive);
+    const flatItem = new DevToolsFlatItem(node, depth, effectiveActive);
     this.#flatList.push(flatItem);
     const isExpanded = this.#expandedNodes.has(node);
     if (!isExpanded) {
@@ -29434,9 +29970,9 @@ var DEVTools = class extends Object2 {
   getComponentProperties(component) {
     const properties = [];
     const seenNames = /* @__PURE__ */ new Set();
-    let proto = System42.Object.getPrototypeOf(component);
-    while (proto && proto.constructor && proto.constructor !== Component && proto !== System42.Object.prototype) {
-      const methodNames = System42.Object.getOwnPropertyNames(proto);
+    let proto = System43.Object.getPrototypeOf(component);
+    while (proto && proto.constructor && proto.constructor !== Component && proto !== System43.Object.prototype) {
+      const methodNames = System43.Object.getOwnPropertyNames(proto);
       for (let i = 0; i < methodNames.length; ++i) {
         const methodName = methodNames[i];
         if (seenNames.has(methodName)) {
@@ -29462,7 +29998,7 @@ var DEVTools = class extends Object2 {
         } catch (error) {
         }
       }
-      proto = System42.Object.getPrototypeOf(proto);
+      proto = System43.Object.getPrototypeOf(proto);
     }
     return properties;
   }
@@ -29522,9 +30058,9 @@ var DEVTools = class extends Object2 {
         return `(${rectX}, ${rectY}, ${value.width.toFixed(1)}, ${value.height.toFixed(1)})`;
       }
       if (typeof value.red === "number" && typeof value.green === "number" && typeof value.blue === "number") {
-        const r = System42.Math.round(value.red * 255);
-        const g = System42.Math.round(value.green * 255);
-        const b = System42.Math.round(value.blue * 255);
+        const r = System43.Math.round(value.red * 255);
+        const g = System43.Math.round(value.green * 255);
+        const b = System43.Math.round(value.blue * 255);
         const a = typeof value.alpha === "number" ? value.alpha.toFixed(2) : "1";
         return `rgba(${r}, ${g}, ${b}, ${a})`;
       }
@@ -29729,7 +30265,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextAlign("left");
     graphic.setTextBaseline("middle");
     const textMetrics = graphic.measureText(framePerSecondText);
-    const boxWidth = System42.Math.ceil(textMetrics.width) + PADDING * 2;
+    const boxWidth = System43.Math.ceil(textMetrics.width) + PADDING * 2;
     graphic.setFillColor(COLOR_BACKGROUND);
     graphic.drawRect(Rect.create(PADDING, PADDING, boxWidth, ITEM_HEIGHT));
     graphic.setStrokeColor(COLOR_BORDER_NORMAL);
@@ -29779,7 +30315,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = this.#flatList.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
-      this.#treeScrollY = System42.Math.min(this.#treeScrollY, maxTreeScrollY);
+      this.#treeScrollY = System43.Math.min(this.#treeScrollY, maxTreeScrollY);
     } else {
       this.#treeScrollY = 0;
     }
@@ -29824,7 +30360,7 @@ var DEVTools = class extends Object2 {
         graphic.setTextAlign("right");
         const checkboxRightX = panelX + panelWidth - SCROLL_BAR_WIDTH - GIZMO_CHECKBOX_MARGIN;
         const checkboxX = checkboxRightX - GIZMO_CHECKBOX_SIZE;
-        const checkboxY = System42.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+        const checkboxY = System43.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
         const isGizmoVisible = typeof node.isGizmoVisible === "function" ? node.isGizmoVisible() : false;
         graphic.setFillColor(COLOR_ACCENT);
         graphic.drawRect(Rect.create(checkboxX, checkboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
@@ -29849,7 +30385,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#treeScrollY / maxTreeScrollY;
-      const barHeight = System42.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System43.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -29881,7 +30417,7 @@ var DEVTools = class extends Object2 {
     const totalContentHeight = inspectorLines.length * ITEM_HEIGHT;
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
-      this.#inspectorScrollY = System42.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
+      this.#inspectorScrollY = System43.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
     } else {
       this.#inspectorScrollY = 0;
     }
@@ -29953,7 +30489,7 @@ var DEVTools = class extends Object2 {
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
       const scrollRatio = this.#inspectorScrollY / maxInspectorScrollY;
-      const barHeight = System42.Math.max(20, panelHeight * panelHeight / totalContentHeight);
+      const barHeight = System43.Math.max(20, panelHeight * panelHeight / totalContentHeight);
       const barY = panelY + scrollRatio * (panelHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -30001,7 +30537,7 @@ var DEVTools = class extends Object2 {
     graphic.drawRect(Rect.create(panelX, columnHeaderY, panelWidth, ITEM_HEIGHT));
     const delColWidth = 24;
     const availableWidth = panelWidth - delColWidth - SCROLL_BAR_WIDTH;
-    const keyColWidth = System42.Math.floor(availableWidth * 0.4);
+    const keyColWidth = System43.Math.floor(availableWidth * 0.4);
     const valueColWidth = availableWidth - keyColWidth;
     graphic.setFillColor(COLOR_TEXT_DIM);
     graphic.setFontString(`${FONT_SIZE - 1}px monospace`);
@@ -30019,7 +30555,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = keys.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
-      this.#localStorageScrollY = System42.Math.min(this.#localStorageScrollY, maxScrollY);
+      this.#localStorageScrollY = System43.Math.min(this.#localStorageScrollY, maxScrollY);
     } else {
       this.#localStorageScrollY = 0;
     }
@@ -30046,12 +30582,12 @@ var DEVTools = class extends Object2 {
       graphic.setFontString(`${FONT_SIZE}px monospace`);
       graphic.setTextAlign("left");
       graphic.setTextBaseline("middle");
-      const maxKeyChars = System42.Math.floor(keyColWidth / 7);
+      const maxKeyChars = System43.Math.floor(keyColWidth / 7);
       const keyText = key.length > maxKeyChars ? key.slice(0, maxKeyChars - 3) + "..." : key;
       graphic.drawFillText(keyText, panelX + PADDING, itemMidY);
       graphic.setFillColor(COLOR_PROPERTY_VALUE);
       const valueStr = rawValue !== null ? rawValue : "(null)";
-      const maxValueChars = System42.Math.floor(valueColWidth / 7);
+      const maxValueChars = System43.Math.floor(valueColWidth / 7);
       const valueText = valueStr.length > maxValueChars ? valueStr.slice(0, maxValueChars - 3) + "..." : valueStr;
       graphic.drawFillText(valueText, panelX + keyColWidth + PADDING, itemMidY);
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
@@ -30073,7 +30609,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#localStorageScrollY / maxScrollY;
-      const barHeight = System42.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System43.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -30098,7 +30634,7 @@ var DEVTools = class extends Object2 {
       const contextButtonWidths = [];
       for (let labelIndex = 0; labelIndex < contextButtonCount; ++labelIndex) {
         const measuredTextWidth = graphic.measureText(contextButtonTexts[labelIndex]).width;
-        contextButtonWidths.push(System42.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
+        contextButtonWidths.push(System43.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
       }
       let totalContextButtonWidth = contextButtonGap * (contextButtonCount - 1);
       for (let widthIndex = 0; widthIndex < contextButtonWidths.length; ++widthIndex) {
@@ -30197,7 +30733,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Dim Background", panelX + PADDING, dimRowMidY);
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System42.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System43.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isDimEnabled ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(dimCheckboxX, dimCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isDimEnabled) {
@@ -30212,7 +30748,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show All Gizmos", panelX + PADDING, gizmosRowMidY);
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System42.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System43.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isAllGizmosVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(gizmosCheckboxX, gizmosCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isAllGizmosVisible) {
@@ -30227,7 +30763,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Height Aspect Guide", panelX + PADDING, heightAspectGuideRowMidY);
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System42.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System43.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isHeightAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(heightAspectGuideCheckboxX, heightAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isHeightAspectGuideVisible) {
@@ -30242,7 +30778,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Width Aspect Guide", panelX + PADDING, widthAspectGuideRowMidY);
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System42.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System43.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isWidthAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(widthAspectGuideCheckboxX, widthAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isWidthAspectGuideVisible) {
@@ -30257,7 +30793,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show FPS", panelX + PADDING, framePerSecondRowMidY);
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System42.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System43.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isFramePerSecondVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(framePerSecondCheckboxX, framePerSecondCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isFramePerSecondVisible) {
@@ -30281,7 +30817,7 @@ var DEVTools = class extends Object2 {
     const dimRowY = panelY + ITEM_HEIGHT;
     const dimRowMidY = dimRowY + ITEM_HEIGHT * 0.5;
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System42.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System43.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isDimCheckboxHit = touchX >= dimCheckboxX && touchX <= dimCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= dimCheckboxY && touchY <= dimCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isDimCheckboxHit) {
       this.#isDimEnabled = !this.#isDimEnabled;
@@ -30291,7 +30827,7 @@ var DEVTools = class extends Object2 {
     const gizmosRowY = panelY + ITEM_HEIGHT * 2;
     const gizmosRowMidY = gizmosRowY + ITEM_HEIGHT * 0.5;
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System42.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System43.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isGizmosCheckboxHit = touchX >= gizmosCheckboxX && touchX <= gizmosCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= gizmosCheckboxY && touchY <= gizmosCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isGizmosCheckboxHit) {
       this.#isAllGizmosVisible = !this.#isAllGizmosVisible;
@@ -30303,7 +30839,7 @@ var DEVTools = class extends Object2 {
     const heightAspectGuideRowY = panelY + ITEM_HEIGHT * 3;
     const heightAspectGuideRowMidY = heightAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System42.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System43.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isHeightAspectGuideCheckboxHit = touchX >= heightAspectGuideCheckboxX && touchX <= heightAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= heightAspectGuideCheckboxY && touchY <= heightAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isHeightAspectGuideCheckboxHit) {
       this.#isHeightAspectGuideVisible = !this.#isHeightAspectGuideVisible;
@@ -30313,7 +30849,7 @@ var DEVTools = class extends Object2 {
     const widthAspectGuideRowY = panelY + ITEM_HEIGHT * 4;
     const widthAspectGuideRowMidY = widthAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System42.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System43.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isWidthAspectGuideCheckboxHit = touchX >= widthAspectGuideCheckboxX && touchX <= widthAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= widthAspectGuideCheckboxY && touchY <= widthAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isWidthAspectGuideCheckboxHit) {
       this.#isWidthAspectGuideVisible = !this.#isWidthAspectGuideVisible;
@@ -30323,7 +30859,7 @@ var DEVTools = class extends Object2 {
     const framePerSecondRowY = panelY + ITEM_HEIGHT * 5;
     const framePerSecondRowMidY = framePerSecondRowY + ITEM_HEIGHT * 0.5;
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System42.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System43.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isFramePerSecondCheckboxHit = touchX >= framePerSecondCheckboxX && touchX <= framePerSecondCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= framePerSecondCheckboxY && touchY <= framePerSecondCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isFramePerSecondCheckboxHit) {
       this.#isFramePerSecondVisible = !this.#isFramePerSecondVisible;
@@ -30339,7 +30875,7 @@ var DEVTools = class extends Object2 {
     }
     const settingsJson = LocalStorage.getString(SETTINGS_STORAGE_KEY);
     try {
-      const settingsObject = System42.JSON.parse(settingsJson);
+      const settingsObject = System43.JSON.parse(settingsJson);
       if (typeof settingsObject.dimEnabled === "boolean") {
         this.#isDimEnabled = settingsObject.dimEnabled;
       }
@@ -30363,7 +30899,7 @@ var DEVTools = class extends Object2 {
   //==============================================================================
   saveSettings() {
     const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
-    const settingsJson = System42.JSON.stringify(settingsObject);
+    const settingsJson = System43.JSON.stringify(settingsObject);
     LocalStorage.setString(SETTINGS_STORAGE_KEY, settingsJson);
   }
   //==============================================================================
@@ -30434,7 +30970,7 @@ var DEVTools = class extends Object2 {
     const timeDeltaText = `${timeDelta.toFixed(3)}s`;
     items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
     items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
-    const performanceMemory = System42.window.performance ? System42.window.performance.memory : null;
+    const performanceMemory = System43.window.performance ? System43.window.performance.memory : null;
     const isHeapRead = !!performanceMemory && typeof performanceMemory.usedJSHeapSize === "number" && typeof performanceMemory.totalJSHeapSize === "number";
     if (isHeapRead) {
       const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
@@ -30470,20 +31006,20 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Statistics", panelX + PADDING, panelY + ITEM_HEIGHT * 0.5);
     const availableWidth = panelWidth - SCROLL_BAR_WIDTH;
-    const keyColumnWidth = System42.Math.floor(availableWidth * 0.4);
+    const keyColumnWidth = System43.Math.floor(availableWidth * 0.4);
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const itemsHeight = panelHeight - ITEM_HEIGHT;
     const totalItemsHeight = statisticsItems.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
-      this.#statisticsScrollY = System42.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
+      this.#statisticsScrollY = System43.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
     } else {
       this.#statisticsScrollY = 0;
     }
     const valueColumnWidth = availableWidth - keyColumnWidth;
-    const maxKeyCharacters = System42.Math.floor(keyColumnWidth / 7);
-    const maxValueCharacters = System42.Math.floor(valueColumnWidth / 7);
+    const maxKeyCharacters = System43.Math.floor(keyColumnWidth / 7);
+    const maxValueCharacters = System43.Math.floor(valueColumnWidth / 7);
     graphic.beginClipRect(Rect.create(panelX, itemsY, panelWidth, itemsHeight));
     for (let itemIndex = 0; itemIndex < statisticsItems.length; ++itemIndex) {
       const statisticsItem = statisticsItems[itemIndex];
@@ -30536,7 +31072,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#statisticsScrollY / maxStatisticsScrollY;
-      const barHeight = System42.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System43.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -30558,7 +31094,7 @@ var DEVTools = class extends Object2 {
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const localY = touchY - itemsY + this.#statisticsScrollY;
-    const clickedIndex = System42.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System43.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < statisticsItems.length) {
       const clickedItem = statisticsItems[clickedIndex];
       if (!clickedItem.isSeparator && !clickedItem.isSectionHeader) {
@@ -30580,7 +31116,7 @@ var DEVTools = class extends Object2 {
 };
 
 // src/misc/loadingprogress.js
-var System43 = globalThis;
+var System44 = globalThis;
 var DEFAULT_FOLLOW_RATE = 6;
 var SNAP_DISTANCE = 5e-4;
 var LoadingProgress = class extends Object2 {
@@ -30619,11 +31155,11 @@ var LoadingProgress = class extends Object2 {
    * @param { number } progress 알려 줄 정도. (0 ~ 1)
    */
   setProgress(progress) {
-    if (typeof progress !== "number" || System43.Number.isNaN(progress)) {
+    if (typeof progress !== "number" || System44.Number.isNaN(progress)) {
       return;
     }
-    const clampedProgress = System43.Math.max(0, System43.Math.min(1, progress));
-    this.#targetProgress = System43.Math.max(this.#targetProgress, clampedProgress);
+    const clampedProgress = System44.Math.max(0, System44.Math.min(1, progress));
+    this.#targetProgress = System44.Math.max(this.#targetProgress, clampedProgress);
   }
   //==============================================================================
   // 알려 준 정도 반환.
@@ -30650,14 +31186,14 @@ var LoadingProgress = class extends Object2 {
    * @param { number } timeDelta 지난 프레임부터의 시간. (초)
    */
   update(timeDelta) {
-    if (typeof timeDelta !== "number" || !System43.Number.isFinite(timeDelta) || timeDelta <= 0) {
+    if (typeof timeDelta !== "number" || !System44.Number.isFinite(timeDelta) || timeDelta <= 0) {
       return;
     }
     const targetProgress = this.getProgress();
     const followRate = this.getFollowRate();
-    const followRatio = 1 - System43.Math.exp(-followRate * timeDelta);
+    const followRatio = 1 - System44.Math.exp(-followRate * timeDelta);
     this.#shownProgress += (targetProgress - this.#shownProgress) * followRatio;
-    if (System43.Math.abs(targetProgress - this.#shownProgress) < SNAP_DISTANCE) {
+    if (System44.Math.abs(targetProgress - this.#shownProgress) < SNAP_DISTANCE) {
       this.#shownProgress = targetProgress;
     }
   }
@@ -30668,7 +31204,7 @@ var LoadingProgress = class extends Object2 {
    * @param { number } followRate 따라가는 빠르기. (초당 남은 거리의 비율)
    */
   setFollowRate(followRate) {
-    if (typeof followRate !== "number" || !System43.Number.isFinite(followRate) || followRate <= 0) {
+    if (typeof followRate !== "number" || !System44.Number.isFinite(followRate) || followRate <= 0) {
       return;
     }
     this.#followRate = followRate;
@@ -30701,7 +31237,36 @@ var LoadingProgress = class extends Object2 {
 };
 
 // src/game/gamescene.js
-var System44 = globalThis;
+var System45 = globalThis;
+var ScreenFadeHold = class extends Object2 {
+  static {
+    __name(this, "ScreenFadeHold");
+  }
+  /** @private @type { boolean } */
+  #isReleased;
+  //==============================================================================
+  // 생성. (아직 놓지 않음)
+  //==============================================================================
+  constructor() {
+    super();
+    this.#isReleased = false;
+  }
+  //==============================================================================
+  // 놓기. (막이 밝아진다)
+  //==============================================================================
+  release() {
+    this.#isReleased = true;
+  }
+  //==============================================================================
+  // 놓았는지.
+  //==============================================================================
+  /**
+   * @returns { boolean } release 를 불렀으면 참.
+   */
+  isReleased() {
+    return this.#isReleased;
+  }
+};
 var GameScene = class _GameScene extends Scene {
   static {
     __name(this, "GameScene");
@@ -30709,7 +31274,7 @@ var GameScene = class _GameScene extends Scene {
   //==============================================================================
   // 멤버 변수 목록.
   //==============================================================================
-  /** @private @type { DEVTools | null } */
+  /** @private @type { DevTools | null } */
   #devtools;
   // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
   /** @private @type { TouchRecognizer } */
@@ -30766,6 +31331,9 @@ var GameScene = class _GameScene extends Scene {
   /** @private @type { Function | null } */
   #screenFadeEvent;
   // 다 어두워지면 부를 함수.
+  /** @private @type { ScreenFadeHold | null } */
+  #screenFadeHold;
+  // onDark 가 돌려준, 놓기를 기다리는 손잡이.
   /** @private @type { Color } */
   #screenFadeColor;
   /** @private @type { number } */
@@ -30814,6 +31382,7 @@ var GameScene = class _GameScene extends Scene {
     this.#screenFadeAlpha = 0;
     this.#screenFadeDirection = 0;
     this.#isScreenFadeWaiting = false;
+    this.#screenFadeHold = null;
     this.#screenFadeEvent = null;
     this.#screenFadeColor = Color.black();
     this.#screenFadeSeconds = 0.35;
@@ -30941,7 +31510,7 @@ var GameScene = class _GameScene extends Scene {
   // 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
   //==============================================================================
   /**
-   * @returns { DEVTools | null } 개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
+   * @returns { DevTools | null } 개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
    */
   getDevTools() {
     return this.#devtools ?? null;
@@ -30974,8 +31543,8 @@ var GameScene = class _GameScene extends Scene {
     const insetRight = insets.right / scale;
     const insetBottom = insets.bottom / scale;
     const insetLeft = insets.left / scale;
-    const width = System44.Math.max(viewSize.x - insetLeft - insetRight, 0);
-    const height = System44.Math.max(viewSize.y - insetTop - insetBottom, 0);
+    const width = System45.Math.max(viewSize.x - insetLeft - insetRight, 0);
+    const height = System45.Math.max(viewSize.y - insetTop - insetBottom, 0);
     return Rect.create(insetLeft, insetTop, width, height);
   }
   //==============================================================================
@@ -31066,7 +31635,7 @@ var GameScene = class _GameScene extends Scene {
       this.#loadingProgress.setProgress(1);
     }
     while (!this.#loadTouchedToSkip && (this.#isLoadStartTimePending || (timeManager.getRealtimeSinceStartup() - this.#loadStartTime) * 1e3 < this.#loadMinDurationMs)) {
-      await new Promise((resolve) => System44.setTimeout(resolve, 50));
+      await new Promise((resolve) => System45.setTimeout(resolve, 50));
     }
   }
   //==============================================================================
@@ -31115,7 +31684,7 @@ var GameScene = class _GameScene extends Scene {
     const loadingProgress = this.#loadingProgress;
     loadingProgress.update(unscaledTimeDelta);
     const elapsed = (currentTime - this.#loadStartTime) * 1e3;
-    let progress = System44.Math.min(1, System44.Math.max(0, elapsed / this.#loadMinDurationMs));
+    let progress = System45.Math.min(1, System45.Math.max(0, elapsed / this.#loadMinDurationMs));
     if (this.#isLoadingProgressReported) {
       progress = loadingProgress.getShownProgress();
     }
@@ -31163,7 +31732,7 @@ var GameScene = class _GameScene extends Scene {
     this.#devtools = null;
     const engineConfiguration = engine.getEngineConfiguration();
     if (engineConfiguration.useDevTools !== false) {
-      this.#devtools = new DEVTools();
+      this.#devtools = new DevTools();
       this.#devtools.setEngine(engine);
       this.#devtools.setRootNodes([this.getRoot()]);
     }
@@ -31226,8 +31795,8 @@ var GameScene = class _GameScene extends Scene {
     const safeAreaInsets = viewManager.getSafeAreaInsets();
     const x = safeAreaInsets.left;
     const y = safeAreaInsets.top;
-    const width = System44.Math.max(viewWidth - safeAreaInsets.left - safeAreaInsets.right, 0);
-    const height = System44.Math.max(viewHeight - safeAreaInsets.top - safeAreaInsets.bottom, 0);
+    const width = System45.Math.max(viewWidth - safeAreaInsets.left - safeAreaInsets.right, 0);
+    const height = System45.Math.max(viewHeight - safeAreaInsets.top - safeAreaInsets.bottom, 0);
     return Rect.create(x, y, width, height);
   }
   //==============================================================================
@@ -31235,7 +31804,7 @@ var GameScene = class _GameScene extends Scene {
   // - viewSize 변화 감지 → 자동 layout 재호출.
   //   (모바일 주소창 표시/숨김으로 100vh 가 동적으로 변하는 경우 등에서
   //    resize 이벤트만으로는 누락될 수 있어 매 tick 보정.)
-  // - DEVTools tick 처리.
+  // - DevTools tick 처리.
   //==============================================================================
   /**
    * @override
@@ -31383,7 +31952,7 @@ var GameScene = class _GameScene extends Scene {
     this.drawSceneBackground(graphic);
   }
   //==============================================================================
-  // postDraw. 어두워지는 막과 DEVTools 를 화면 위에 그린다.
+  // postDraw. 어두워지는 막과 DevTools 를 화면 위에 그린다.
   //==============================================================================
   /**
    * @override
@@ -31398,12 +31967,12 @@ var GameScene = class _GameScene extends Scene {
   }
   //==============================================================================
   // 어두워졌다 밝아지기.
-  // - 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도) 어둡게 두었다가 밝힌다.
+  // - 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도), ScreenFadeHold 를 돌려주면 release 할 때까지 어둡게 두었다가 밝힌다.
   // - 막이 걸린 동안(어두워지고, 기다리고, 밝아지는 동안)은 누름과 휠을 받지 않는다.
   // - 이미 페이드 중이면 무시하고 false.
   //==============================================================================
   /**
-   * @param { Function | null } onDark () => void | Promise
+   * @param { Function | null } onDark () => void | Promise | ScreenFadeHold
    * @returns { boolean } 시작했는지.
    */
   fadeScreen(onDark) {
@@ -31413,6 +31982,22 @@ var GameScene = class _GameScene extends Scene {
     this.#screenFadeEvent = onDark;
     this.#screenFadeDirection = 1;
     return true;
+  }
+  //==============================================================================
+  // 어두워졌다 밝아지기의 손잡이 꼴. (러스트 판 fade_screen_with_hold 와 같다)
+  // - 다 어두워지면 onDark 에 새 ScreenFadeHold 를 넘기고, 그 손잡이를 release 할 때까지 어둡게 둔다.
+  // - 이미 페이드 중이면 무시하고 false.
+  //==============================================================================
+  /**
+   * @param { function(ScreenFadeHold): void } onDark 다 어두워지면 손잡이를 받아 부를 함수.
+   * @returns { boolean } 시작했는지.
+   */
+  fadeScreenWithHold(onDark) {
+    return this.fadeScreen(() => {
+      const screenFadeHold = new ScreenFadeHold();
+      onDark(screenFadeHold);
+      return screenFadeHold;
+    });
   }
   //==============================================================================
   // 페이드 중인지. (어두워지거나, onDark 를 기다리거나, 밝아지는 중)
@@ -31440,7 +32025,7 @@ var GameScene = class _GameScene extends Scene {
    * @param { number } seconds 어두워지는 시간이자 밝아지는 시간. (초, 기본 0.35, 0 이면 바로)
    */
   setScreenFadeSeconds(seconds2) {
-    this.#screenFadeSeconds = System44.Math.max(0, seconds2);
+    this.#screenFadeSeconds = System45.Math.max(0, seconds2);
   }
   //==============================================================================
   // 어두워지는 막의 진하기. (0 ~ 1)
@@ -31455,22 +32040,27 @@ var GameScene = class _GameScene extends Scene {
   // 막 갱신. (tick 이 부른다, 배율을 곱하지 않은 시간으로 움직여 놀이를 멈춰도 돈다, 한 프레임은 0.1 초까지)
   //==============================================================================
   updateScreenFade() {
+    if (this.#screenFadeHold !== null && this.#screenFadeHold.isReleased()) {
+      this.#screenFadeHold = null;
+      this.#isScreenFadeWaiting = false;
+      this.#screenFadeDirection = -1;
+    }
     if (this.#screenFadeDirection === 0) {
       return;
     }
     const engine = this.getEngine();
     const timeManager = engine.getTimeManager();
-    const unscaledTimeDelta = System44.Math.min(timeManager.getUnscaleDeltaTime(), 0.1);
+    const unscaledTimeDelta = System45.Math.min(timeManager.getUnscaleDeltaTime(), 0.1);
     const screenFadeSeconds = this.#screenFadeSeconds;
     const fadeStep = screenFadeSeconds > 0 ? unscaledTimeDelta / screenFadeSeconds : 1;
     if (this.#screenFadeDirection < 0) {
-      this.#screenFadeAlpha = System44.Math.max(0, this.#screenFadeAlpha - fadeStep);
+      this.#screenFadeAlpha = System45.Math.max(0, this.#screenFadeAlpha - fadeStep);
       if (this.#screenFadeAlpha <= 0) {
         this.#screenFadeDirection = 0;
       }
       return;
     }
-    this.#screenFadeAlpha = System44.Math.min(1, this.#screenFadeAlpha + fadeStep);
+    this.#screenFadeAlpha = System45.Math.min(1, this.#screenFadeAlpha + fadeStep);
     if (this.#screenFadeAlpha < 1) {
       return;
     }
@@ -31492,7 +32082,9 @@ var GameScene = class _GameScene extends Scene {
     } catch (error) {
       console.error(error);
     }
-    if (result && typeof result.then === "function") {
+    if (result instanceof ScreenFadeHold) {
+      this.#screenFadeHold = result;
+    } else if (result && typeof result.then === "function") {
       result.then(brighten, (error) => {
         console.error(error);
         brighten();
@@ -31631,7 +32223,7 @@ var GameScene = class _GameScene extends Scene {
    * @param { boolean } isLandscape 참이면 가로, 거짓이면 세로가 고정 쪽.
    */
   setPlayAreaReference(fixedLength, isLandscape) {
-    this.#playAreaFixedLength = System44.Math.max(0, fixedLength);
+    this.#playAreaFixedLength = System45.Math.max(0, fixedLength);
     this.#isPlayAreaLandscape = isLandscape;
     if (this.#playAreaFixedLength <= 0) {
       return;
@@ -31674,7 +32266,7 @@ var GameScene = class _GameScene extends Scene {
     }
     const referenceResolutionSize = viewManager.getReferenceResolutionSize();
     const currentReferenceLength = isLandscape ? referenceResolutionSize.x : referenceResolutionSize.y;
-    if (System44.Math.abs(currentReferenceLength - referenceLength) < 1e-4) {
+    if (System45.Math.abs(currentReferenceLength - referenceLength) < 1e-4) {
       return;
     }
     viewManager.applyReferenceResolutionSize(Vector2.create(referenceLength, referenceLength));
@@ -31920,7 +32512,7 @@ var LayoutStrength = class _LayoutStrength {
 };
 
 // src/ui/autolayout/layoutconstraint.js
-var System45 = globalThis;
+var System46 = globalThis;
 var LayoutConstraint = class _LayoutConstraint {
   static {
     __name(this, "LayoutConstraint");
@@ -31945,7 +32537,7 @@ var LayoutConstraint = class _LayoutConstraint {
    */
   constructor(expression, relation, strength) {
     if (!(expression instanceof LayoutExpression)) {
-      throw new System45.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
+      throw new System46.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
     }
     this.#expression = expression;
     this.#relation = relation;
@@ -32011,7 +32603,7 @@ var LayoutConstraint = class _LayoutConstraint {
 };
 
 // src/ui/autolayout/layoutexpression.js
-var System46 = globalThis;
+var System47 = globalThis;
 var LayoutExpression = class _LayoutExpression {
   static {
     __name(this, "LayoutExpression");
@@ -32034,7 +32626,7 @@ var LayoutExpression = class _LayoutExpression {
    * @param { number } [constant] 상수항. (숫자가 아니면 0)
    */
   constructor(terms, constant) {
-    this.#terms = System46.Array.isArray(terms) ? terms.slice() : [];
+    this.#terms = System47.Array.isArray(terms) ? terms.slice() : [];
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -32093,7 +32685,7 @@ var LayoutExpression = class _LayoutExpression {
     if (typeof input === "number") {
       return _LayoutExpression.fromConstant(input);
     }
-    throw new System46.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
+    throw new System47.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
   }
   //==============================================================================
   // 항 배열 반환.
@@ -32191,7 +32783,7 @@ var LayoutExpression = class _LayoutExpression {
    */
   multiply(coefficient) {
     if (typeof coefficient !== "number") {
-      throw new System46.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System47.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     const ownTerms = this.getTerms();
     const newTerms = [];
@@ -32214,10 +32806,10 @@ var LayoutExpression = class _LayoutExpression {
    */
   divide(denominator) {
     if (typeof denominator !== "number") {
-      throw new System46.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System47.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     if (denominator === 0) {
-      throw new System46.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
+      throw new System47.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
     }
     const result = this.multiply(1 / denominator);
     return result;
@@ -32365,7 +32957,7 @@ var LayoutSymbol = class _LayoutSymbol {
 };
 
 // src/ui/autolayout/layoutrow.js
-var System47 = globalThis;
+var System48 = globalThis;
 var LayoutRow = class _LayoutRow {
   static {
     __name(this, "LayoutRow");
@@ -32385,7 +32977,7 @@ var LayoutRow = class _LayoutRow {
    * @param { number } [constant]
    */
   constructor(constant) {
-    this.#cells = new System47.Map();
+    this.#cells = new System48.Map();
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -32511,7 +33103,7 @@ var LayoutRow = class _LayoutRow {
     const inverse = -1 / subjectCoefficient;
     cells.delete(subject);
     this.setConstant(this.getConstant() * inverse);
-    const updatedCells = new System47.Map();
+    const updatedCells = new System48.Map();
     for (const [symbol, value] of cells) {
       updatedCells.set(symbol, value * inverse);
     }
@@ -32571,7 +33163,7 @@ function nearZero(value) {
 __name(nearZero, "nearZero");
 
 // src/ui/autolayout/layoutsolver.js
-var System48 = globalThis;
+var System49 = globalThis;
 var LayoutSolver = class {
   static {
     __name(this, "LayoutSolver");
@@ -32600,10 +33192,10 @@ var LayoutSolver = class {
    * @constructor
    */
   constructor() {
-    this.#constraintTags = new System48.Map();
-    this.#rows = new System48.Map();
-    this.#variableSymbols = new System48.Map();
-    this.#editInfos = new System48.Map();
+    this.#constraintTags = new System49.Map();
+    this.#rows = new System49.Map();
+    this.#variableSymbols = new System49.Map();
+    this.#editInfos = new System49.Map();
     this.#infeasibleRows = [];
     this.#objective = new LayoutRow(0);
     this.#artificial = null;
@@ -32616,21 +33208,21 @@ var LayoutSolver = class {
    */
   addConstraint(constraint) {
     if (this.#constraintTags.has(constraint)) {
-      throw new System48.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
+      throw new System49.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
     }
     const tag = new LayoutTag();
     const row = this.createRow(constraint, tag);
     let subject = this.chooseSubject(row, tag);
     if (subject.isInvalid() && allDummies(row)) {
       if (!nearZero2(row.getConstant())) {
-        throw new System48.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System49.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
       subject = tag.getMarker();
     }
     if (subject.isInvalid()) {
       const success = this.addWithArtificialVariable(row);
       if (!success) {
-        throw new System48.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System49.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
     } else {
       row.solveFor(subject);
@@ -32649,7 +33241,7 @@ var LayoutSolver = class {
   removeConstraint(constraint) {
     const tag = this.#constraintTags.get(constraint);
     if (tag === void 0) {
-      throw new System48.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
+      throw new System49.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
     }
     this.#constraintTags.delete(constraint);
     this.removeConstraintEffects(constraint, tag);
@@ -32659,7 +33251,7 @@ var LayoutSolver = class {
     } else {
       const leavingSymbol = this.getMarkerLeavingSymbol(marker);
       if (leavingSymbol.isInvalid()) {
-        throw new System48.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328: leaving row \uC5C6\uC74C.");
+        throw new System49.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328: leaving row \uC5C6\uC74C.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -32700,11 +33292,11 @@ var LayoutSolver = class {
    */
   addEditVariable(variable, strength) {
     if (this.#editInfos.has(variable)) {
-      throw new System48.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
+      throw new System49.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
     }
     const clipped = LayoutStrength.clipStrength(strength);
     if (clipped >= LayoutStrength.required) {
-      throw new System48.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
+      throw new System49.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
     }
     const expression = LayoutExpression.fromVariable(variable);
     const constraint = new LayoutConstraint(expression, LayoutRelation.equal, clipped);
@@ -32722,7 +33314,7 @@ var LayoutSolver = class {
   removeEditVariable(variable) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System48.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System49.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     this.removeConstraint(editInfo.getConstraint());
     this.#editInfos.delete(variable);
@@ -32766,7 +33358,7 @@ var LayoutSolver = class {
   suggestValue(variable, value) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System48.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System49.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     const delta = value - editInfo.getConstant();
     editInfo.setConstant(value);
@@ -33007,7 +33599,7 @@ var LayoutSolver = class {
       }
       const leavingSymbol = this.getLeavingSymbol(enteringSymbol);
       if (leavingSymbol.isInvalid()) {
-        throw new System48.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300: bound \uAC00 \uBD80\uC871\uD568.");
+        throw new System49.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300: bound \uAC00 \uBD80\uC871\uD568.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -33015,7 +33607,7 @@ var LayoutSolver = class {
       this.substitute(enteringSymbol, leavingRow);
       this.#rows.set(enteringSymbol, leavingRow);
     }
-    throw new System48.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System49.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: dual simplex 최적화. infeasible 행을 처리.
@@ -33036,14 +33628,14 @@ var LayoutSolver = class {
       }
       const enteringSymbol = this.getDualEnteringSymbol(row);
       if (enteringSymbol.isInvalid()) {
-        throw new System48.Error("[LayoutSolver] dual optimize \uC2E4\uD328: entering \uC5C6\uC74C.");
+        throw new System49.Error("[LayoutSolver] dual optimize \uC2E4\uD328: entering \uC5C6\uC74C.");
       }
       this.#rows.delete(leavingSymbol);
       row.solveForPair(leavingSymbol, enteringSymbol);
       this.substitute(enteringSymbol, row);
       this.#rows.set(enteringSymbol, row);
     }
-    throw new System48.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System49.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: leaving symbol 결정. (Bland's rule 변형 + 비율 테스트)
@@ -33053,7 +33645,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol } 나갈 행의 심볼. (비율이 가장 작은 것, 없으면 invalid 심볼)
    */
   getLeavingSymbol(enteringSymbol) {
-    let ratio = System48.Number.POSITIVE_INFINITY;
+    let ratio = System49.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     for (const [symbol, row] of this.#rows) {
       if (symbol.getType() === LayoutSymbolType.external) {
@@ -33078,7 +33670,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol } 들어올 심볼. (비율이 가장 작은 것, 없으면 invalid 심볼)
    */
   getDualEnteringSymbol(row) {
-    let ratio = System48.Number.POSITIVE_INFINITY;
+    let ratio = System49.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     const cells = row.getCells();
     for (const [symbol, value] of cells) {
@@ -33101,8 +33693,8 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol } marker 와 바꿔 피벗할 행의 심볼. (음수 계수 비율 최소, 양수 계수 비율 최소, external 행 차례, 없으면 invalid 심볼)
    */
   getMarkerLeavingSymbol(marker) {
-    let ratio1 = System48.Number.POSITIVE_INFINITY;
-    let ratio2 = System48.Number.POSITIVE_INFINITY;
+    let ratio1 = System49.Number.POSITIVE_INFINITY;
+    let ratio2 = System49.Number.POSITIVE_INFINITY;
     let result1 = LayoutSymbol.invalid();
     let result2 = LayoutSymbol.invalid();
     let result3 = LayoutSymbol.invalid();
@@ -33306,8 +33898,8 @@ var LayoutPriority = class {
 };
 
 // src/ui/autolayout/layoutconstraintaxis.js
-var System49 = globalThis;
-var LayoutConstraintAxis = System49.Object.freeze({
+var System50 = globalThis;
+var LayoutConstraintAxis = System50.Object.freeze({
   horizontal: "horizontal",
   // 가로 축.
   vertical: "vertical"
@@ -33315,7 +33907,7 @@ var LayoutConstraintAxis = System49.Object.freeze({
 });
 
 // src/ui/uinode.js
-var System50 = globalThis;
+var System51 = globalThis;
 var NO_INTRINSIC_METRIC = -1;
 var UINode = class _UINode extends TransformNode {
   static {
@@ -33562,7 +34154,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalHuggingPriority;
     }
-    throw new System50.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System51.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content hugging 우선순위 설정. (UIKit 의 setContentHuggingPriority(_:for:))
@@ -33578,7 +34170,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalHuggingPriority = priority;
     } else {
-      throw new System50.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System51.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -33597,7 +34189,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalCompressionResistancePriority;
     }
-    throw new System50.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System51.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content compression resistance 우선순위 설정.
@@ -33614,7 +34206,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalCompressionResistancePriority = priority;
     } else {
-      throw new System50.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System51.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -34258,7 +34850,7 @@ var UINode = class _UINode extends TransformNode {
 UINode.noIntrinsicMetric = NO_INTRINSIC_METRIC;
 
 // src/core/frame.js
-var System51 = globalThis;
+var System52 = globalThis;
 var Frame = class extends Object2 {
   static {
     __name(this, "Frame");
@@ -34283,7 +34875,7 @@ var Frame = class extends Object2 {
     super();
     this.#image = image;
     if (image === null || image === void 0) {
-      throw new System51.Error("image is null.");
+      throw new System52.Error("image is null.");
     }
     if (rect === null || rect === void 0) {
       this.#rect = Rect.create(0, 0, image.width, image.height);
@@ -34565,7 +35157,7 @@ var Animation = class extends Object2 {
 };
 
 // src/core/component/outline.js
-var System52 = globalThis;
+var System53 = globalThis;
 var outlineRect = new Rect();
 var outlineContentSize = new Vector2();
 var outlineCenter = new Vector2();
@@ -34625,7 +35217,7 @@ var Outline = class _Outline extends Component {
     const color = this.getColor();
     graphic.setStrokeColor(color);
     if (this.isCircle()) {
-      const radius = System52.Math.min(contentSize.x, contentSize.y) * 0.5 - halfLineWidth;
+      const radius = System53.Math.min(contentSize.x, contentSize.y) * 0.5 - halfLineWidth;
       if (radius <= 0) {
         return;
       }
@@ -34641,7 +35233,7 @@ var Outline = class _Outline extends Component {
     const rect = outlineRect;
     rect.position.set(halfLineWidth, halfLineWidth);
     rect.size.set(width, height);
-    const roundSize = System52.Math.max(0, this.getRoundSize() - halfLineWidth);
+    const roundSize = System53.Math.max(0, this.getRoundSize() - halfLineWidth);
     graphic.drawStrokeRoundRect(rect, roundSize, lineWidth);
   }
   //==============================================================================
@@ -34736,11 +35328,11 @@ var Outline = class _Outline extends Component {
 };
 
 // src/core/graphic/sharedbakecache.js
-var System53 = globalThis;
+var System54 = globalThis;
 var MAXIMUM_IDLE_BAKE_COUNT = 128;
-var bakeEntries = new System53.Map();
+var bakeEntries = new System54.Map();
 var idleBakeCount = 0;
-var holderRegistry = typeof System53.FinalizationRegistry === "function" ? new System53.FinalizationRegistry((bakeKey) => {
+var holderRegistry = typeof System54.FinalizationRegistry === "function" ? new System54.FinalizationRegistry((bakeKey) => {
   dereferenceBake(bakeKey);
 }) : null;
 function acquireSharedBake(bakeKey, holder, createBake) {
@@ -34799,17 +35391,17 @@ function dereferenceBake(bakeKey) {
 __name(dereferenceBake, "dereferenceBake");
 
 // src/core/component/shadowtext.js
-var System54 = globalThis;
+var System55 = globalThis;
 var BAKE_PADDING = 2;
 var fontLoadCount2 = 0;
-if (System54.document !== void 0 && System54.document.fonts !== void 0) {
-  System54.document.fonts.addEventListener("loadingdone", () => {
+if (System55.document !== void 0 && System55.document.fonts !== void 0) {
+  System55.document.fonts.addEventListener("loadingdone", () => {
     fontLoadCount2 += 1;
   });
 }
 function buildRGBAString(colorText, opacity) {
   const hexText = colorText.slice(1);
-  const value = System54.parseInt(hexText, 16);
+  const value = System55.parseInt(hexText, 16);
   const red = value >> 16 & 255;
   const green = value >> 8 & 255;
   const blue = value & 255;
@@ -34959,8 +35551,8 @@ var ShadowText = class extends Component {
     const isPixelSnapEnabled = graphic.isTextPixelSnapEnabled();
     if (isPixelSnapEnabled && transformMatrix.b === 0 && transformMatrix.c === 0 && transformMatrix.a > 0 && transformMatrix.d > 0) {
       const devicePoint = transformMatrix.transformPoint(quadX, quadY);
-      quadX += (System54.Math.round(devicePoint.x) - devicePoint.x) / transformMatrix.a;
-      quadY += (System54.Math.round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
+      quadX += (System55.Math.round(devicePoint.x) - devicePoint.x) / transformMatrix.a;
+      quadY += (System55.Math.round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
     }
     const quadWidth = bakeCanvas.width / bakeMetrics.scale;
     const quadHeight = bakeCanvas.height / bakeMetrics.scale;
@@ -34992,7 +35584,7 @@ var ShadowText = class extends Component {
    * @param { FontFace | null } fontFace 글꼴. (null 이면 시스템 글꼴)
    */
   bakeText(graphic, text, fitWidth, bakeScale, textDirection, fontFace) {
-    const bakeCanvas = System54.document.createElement("canvas");
+    const bakeCanvas = System55.document.createElement("canvas");
     const canvasRenderingContext = bakeCanvas.getContext("2d");
     if (canvasRenderingContext === null) {
       this.#bakeCanvas = null;
@@ -35001,16 +35593,16 @@ var ShadowText = class extends Component {
     let fontSize = this.#fontSize;
     const textWidth = this.measureTextWidth(graphic);
     if (fitWidth > 0 && textWidth > fitWidth) {
-      const fitRatio = System54.Math.max(this.#fitMinimumRatio, fitWidth / textWidth);
-      fontSize = System54.Math.floor(this.#fontSize * fitRatio * 10) / 10;
+      const fitRatio = System55.Math.max(this.#fitMinimumRatio, fitWidth / textWidth);
+      fontSize = System55.Math.floor(this.#fontSize * fitRatio * 10) / 10;
     }
     const scaledFontString = buildFontString(fontFace, fontSize * bakeScale, this.#isBold, this.#isItalic);
     canvasRenderingContext.font = scaledFontString;
     canvasRenderingContext.direction = textDirection;
     canvasRenderingContext.textAlign = "left";
     const textMetrics = canvasRenderingContext.measureText(text);
-    const actualLeft = System54.Math.ceil(System54.Math.max(textMetrics.actualBoundingBoxLeft || 0, 0));
-    const actualRight = System54.Math.ceil(System54.Math.max(textMetrics.actualBoundingBoxRight || textMetrics.width, 0));
+    const actualLeft = System55.Math.ceil(System55.Math.max(textMetrics.actualBoundingBoxLeft || 0, 0));
+    const actualRight = System55.Math.ceil(System55.Math.max(textMetrics.actualBoundingBoxRight || textMetrics.width, 0));
     let scaledFontAscent = textMetrics.fontBoundingBoxAscent;
     if (scaledFontAscent === void 0) {
       scaledFontAscent = textMetrics.actualBoundingBoxAscent || 0;
@@ -35021,16 +35613,16 @@ var ShadowText = class extends Component {
     }
     const scaledShadowOffset = this.#shadowOffset * bakeScale;
     const scaledShadowBlur = this.#shadowBlur * bakeScale;
-    const bakePadding = BAKE_PADDING + System54.Math.ceil(scaledShadowBlur);
+    const bakePadding = BAKE_PADDING + System55.Math.ceil(scaledShadowBlur);
     const scaledPenX = bakePadding + actualLeft;
-    const scaledBaselineY = bakePadding + System54.Math.ceil(scaledFontAscent);
+    const scaledBaselineY = bakePadding + System55.Math.ceil(scaledFontAscent);
     const bakeWidth = scaledPenX + actualRight + bakePadding;
-    const scaledDecorationLineWidth = System54.Math.max(1, fontSize / 16) * bakeScale;
+    const scaledDecorationLineWidth = System55.Math.max(1, fontSize / 16) * bakeScale;
     const scaledMiddleY = scaledBaselineY - (scaledFontAscent - scaledFontDescent) * 0.5;
     const scaledUnderlineY = scaledMiddleY + (fontSize * 0.5 + 2) * bakeScale;
-    let bakeHeight = scaledBaselineY + System54.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
+    let bakeHeight = scaledBaselineY + System55.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
     if (this.#isUnderline) {
-      bakeHeight = System54.Math.max(bakeHeight, System54.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
+      bakeHeight = System55.Math.max(bakeHeight, System55.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
     }
     if (bakeWidth <= 0 || bakeHeight <= 0) {
       this.#bakeCanvas = null;
@@ -35278,7 +35870,7 @@ var ShadowText = class extends Component {
    * @param { number } fitMinimumRatio 넘칠 때 줄이는 가장 작은 비율. (0.01 ~ 1 로 자른다, 1 이면 줄이지 않는다)
    */
   setFitMinimumRatio(fitMinimumRatio) {
-    this.#fitMinimumRatio = System54.Math.max(0.01, System54.Math.min(1, fitMinimumRatio));
+    this.#fitMinimumRatio = System55.Math.max(0.01, System55.Math.min(1, fitMinimumRatio));
   }
   //==============================================================================
   // 넘칠 때 줄이는 가장 작은 비율 반환.
@@ -35301,8 +35893,8 @@ var ShadowText = class extends Component {
 };
 
 // src/core/component/softshade.js
-var System55 = globalThis;
-var SoftShadeShape = System55.Object.freeze({
+var System56 = globalThis;
+var SoftShadeShape = System56.Object.freeze({
   band: "band",
   // 가운데 가로줄이 가장 짙고 위아래 끝으로 차츰 엷어지는 띠. (양옆은 fadeWidth 안쪽까지 차츰)
   bottom: "bottom"
@@ -35312,7 +35904,7 @@ function readSmoothRise(edge, value) {
   if (edge <= 0) {
     return value > 0 ? 1 : 0;
   }
-  const ratio = System55.Math.min(1, System55.Math.max(0, value / edge));
+  const ratio = System56.Math.min(1, System56.Math.max(0, value / edge));
   return ratio * ratio * (3 - 2 * ratio);
 }
 __name(readSmoothRise, "readSmoothRise");
@@ -35382,10 +35974,10 @@ var SoftShade = class _SoftShade extends Component {
     }
     const bakeUnit = this.getBakeUnit();
     const bakeMaximumSize = this.getBakeMaximumSize();
-    const bakeWidth = System55.Math.max(2, System55.Math.min(bakeMaximumSize, System55.Math.ceil(contentWidth / bakeUnit)));
-    const bakeHeight = System55.Math.max(2, System55.Math.min(bakeMaximumSize, System55.Math.ceil(contentHeight / bakeUnit)));
+    const bakeWidth = System56.Math.max(2, System56.Math.min(bakeMaximumSize, System56.Math.ceil(contentWidth / bakeUnit)));
+    const bakeHeight = System56.Math.max(2, System56.Math.min(bakeMaximumSize, System56.Math.ceil(contentHeight / bakeUnit)));
     const fadeWidth = this.getFadeWidth();
-    const fadeRatio = System55.Math.min(0.5, fadeWidth / contentWidth);
+    const fadeRatio = System56.Math.min(0.5, fadeWidth / contentWidth);
     const shape = this.getShape();
     const color = this.getColor();
     const fadeRatioText = fadeRatio.toFixed(3);
@@ -35438,7 +36030,7 @@ var SoftShade = class _SoftShade extends Component {
    * @param { number } fadeRatio 양옆이 엷어지는 너비의 내용 너비에 대한 비. (0 ~ 0.5, 0 이면 엷어지지 않는다, band 모양만 쓴다)
    */
   bakeShade(bakeWidth, bakeHeight, fadeRatio) {
-    const bakeCanvas = System55.document.createElement("canvas");
+    const bakeCanvas = System56.document.createElement("canvas");
     const canvasRenderingContext = bakeCanvas.getContext("2d");
     if (canvasRenderingContext === null) {
       this.#bakeCanvas = null;
@@ -35448,7 +36040,7 @@ var SoftShade = class _SoftShade extends Component {
     bakeCanvas.height = bakeHeight;
     const color = this.getColor();
     const colorText = color.slice(1);
-    const colorValue = System55.parseInt(colorText, 16);
+    const colorValue = System56.parseInt(colorText, 16);
     const red = colorValue >> 16 & 255;
     const green = colorValue >> 8 & 255;
     const blue = colorValue & 255;
@@ -35459,15 +36051,15 @@ var SoftShade = class _SoftShade extends Component {
     const pixels = imageData.data;
     for (let row = 0; row < bakeHeight; ++row) {
       const down = (row + 0.5) / bakeHeight;
-      const rowShade = isBand ? readSmoothRise(0.5, System55.Math.min(down, 1 - down)) : down;
+      const rowShade = isBand ? readSmoothRise(0.5, System56.Math.min(down, 1 - down)) : down;
       for (let column = 0; column < bakeWidth; ++column) {
         const across = (column + 0.5) / bakeWidth;
-        const columnShade = isBand ? readSmoothRise(fadeRatio, System55.Math.min(across, 1 - across)) : 1;
+        const columnShade = isBand ? readSmoothRise(fadeRatio, System56.Math.min(across, 1 - across)) : 1;
         const pixelIndex = (row * bakeWidth + column) * 4;
         pixels[pixelIndex] = red;
         pixels[pixelIndex + 1] = green;
         pixels[pixelIndex + 2] = blue;
-        pixels[pixelIndex + 3] = System55.Math.round(255 * opacity * rowShade * columnShade);
+        pixels[pixelIndex + 3] = System56.Math.round(255 * opacity * rowShade * columnShade);
       }
     }
     canvasRenderingContext.putImageData(imageData, 0, 0);
@@ -35497,8 +36089,8 @@ var SoftShade = class _SoftShade extends Component {
    * @param { number } bakeMaximumSize 구운 캔버스의 가로세로 상한. (픽셀, 2 보다 작으면 2, 처음은 256)
    */
   setBakeResolution(bakeUnit, bakeMaximumSize) {
-    this.#bakeUnit = System55.Math.max(1, bakeUnit);
-    this.#bakeMaximumSize = System55.Math.max(2, bakeMaximumSize);
+    this.#bakeUnit = System56.Math.max(1, bakeUnit);
+    this.#bakeMaximumSize = System56.Math.max(2, bakeMaximumSize);
   }
   //==============================================================================
   // 모양 반환.
@@ -35566,9 +36158,9 @@ var SoftShade = class _SoftShade extends Component {
 };
 
 // src/core/component/shadowimage.js
-var System56 = globalThis;
+var System57 = globalThis;
 var BAKE_PADDING2 = 2;
-var imageIdentifiers = new System56.WeakMap();
+var imageIdentifiers = new System57.WeakMap();
 var nextImageIdentifier = 1;
 var ShadowImage = class extends Component {
   static {
@@ -35656,7 +36248,7 @@ var ShadowImage = class extends Component {
     if (contentWidth <= 0 || contentHeight <= 0) {
       return;
     }
-    const fitScale = System56.Math.min(contentWidth / sourceRect.width, contentHeight / sourceRect.height);
+    const fitScale = System57.Math.min(contentWidth / sourceRect.width, contentHeight / sourceRect.height);
     const imageWidth = sourceRect.width * fitScale;
     const imageHeight = sourceRect.height * fitScale;
     const bakeScale = graphic.calculateTextBakeScale();
@@ -35729,14 +36321,14 @@ var ShadowImage = class extends Component {
    * @param { number } bakeScale 굽는 배율. (Graphic.calculateTextBakeScale)
    */
   bakeImage(image, sourceRect, imageWidth, imageHeight, bakeScale) {
-    const scaledImageWidth = System56.Math.max(1, System56.Math.round(imageWidth * bakeScale));
-    const scaledImageHeight = System56.Math.max(1, System56.Math.round(imageHeight * bakeScale));
+    const scaledImageWidth = System57.Math.max(1, System57.Math.round(imageWidth * bakeScale));
+    const scaledImageHeight = System57.Math.max(1, System57.Math.round(imageHeight * bakeScale));
     const scaledShadowOffset = this.#shadowOffset * bakeScale;
     const scaledShadowBlur = this.#shadowBlur * bakeScale;
-    const bakePadding = BAKE_PADDING2 + System56.Math.ceil(scaledShadowBlur);
-    const bakeCanvas = System56.document.createElement("canvas");
+    const bakePadding = BAKE_PADDING2 + System57.Math.ceil(scaledShadowBlur);
+    const bakeCanvas = System57.document.createElement("canvas");
     bakeCanvas.width = scaledImageWidth + bakePadding * 2;
-    bakeCanvas.height = scaledImageHeight + bakePadding * 2 + System56.Math.ceil(scaledShadowOffset);
+    bakeCanvas.height = scaledImageHeight + bakePadding * 2 + System57.Math.ceil(scaledShadowOffset);
     const canvasRenderingContext = bakeCanvas.getContext("2d");
     if (canvasRenderingContext === null) {
       this.#bakeCanvas = null;
@@ -35766,7 +36358,7 @@ var ShadowImage = class extends Component {
    * @returns { HTMLCanvasElement | null } 줄인 그림을 담은 새 캔버스. (2D 컨텍스트를 얻지 못하면 null)
    */
   readScaledImage(image, sourceRect, scaledImageWidth, scaledImageHeight) {
-    const scaledCanvas = System56.document.createElement("canvas");
+    const scaledCanvas = System57.document.createElement("canvas");
     scaledCanvas.width = scaledImageWidth;
     scaledCanvas.height = scaledImageHeight;
     const canvasRenderingContext = scaledCanvas.getContext("2d");
@@ -35882,7 +36474,7 @@ var ShadowImage = class extends Component {
 };
 
 // src/ui/uiscene.js
-var System57 = globalThis;
+var System58 = globalThis;
 var UIScene = class extends Scene {
   static {
     __name(this, "UIScene");
@@ -35890,7 +36482,7 @@ var UIScene = class extends Scene {
   //==============================================================================
   // 멤버 변수 목록.
   //==============================================================================
-  /** @private @type { DEVTools | null } */
+  /** @private @type { DevTools | null } */
   #devtools;
   // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
   /** @private @type { TouchRecognizer } */
@@ -36048,19 +36640,19 @@ var UIScene = class extends Scene {
    */
   async load(engine) {
     await super.load(engine);
-    this.#loadStartTime = System57.Date.now();
+    this.#loadStartTime = System58.Date.now();
     this.#loadTouchedToSkip = false;
     const skipHandler = /* @__PURE__ */ __name(() => {
       this.#loadTouchedToSkip = true;
     }, "skipHandler");
-    System57.window.addEventListener("pointerdown", skipHandler, { once: true });
+    System58.window.addEventListener("pointerdown", skipHandler, { once: true });
     try {
       await this.loadAssets();
-      while (System57.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
-        await new Promise((resolve) => System57.setTimeout(resolve, 50));
+      while (System58.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
+        await new Promise((resolve) => System58.setTimeout(resolve, 50));
       }
     } finally {
-      System57.window.removeEventListener("pointerdown", skipHandler);
+      System58.window.removeEventListener("pointerdown", skipHandler);
     }
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
@@ -36115,8 +36707,8 @@ var UIScene = class extends Scene {
       const positionY = (viewSize.y - targetHeight) * 0.5;
       graphic.drawImage(image, Vector2.create(positionX, positionY), Vector2.create(targetWidth, targetHeight));
     }
-    const elapsed = System57.Date.now() - this.#loadStartTime;
-    const progress = System57.Math.min(1, System57.Math.max(0, elapsed / this.#loadMinDurationMs));
+    const elapsed = System58.Date.now() - this.#loadStartTime;
+    const progress = System58.Math.min(1, System58.Math.max(0, elapsed / this.#loadMinDurationMs));
     const barWidth = viewSize.x * 0.6;
     const barHeight = 24;
     const barX = (viewSize.x - barWidth) * 0.5;
@@ -36139,7 +36731,7 @@ var UIScene = class extends Scene {
     this.#devtools = null;
     const engineConfiguration = engine.getEngineConfiguration();
     if (engineConfiguration.useDevTools !== false) {
-      this.#devtools = new DEVTools();
+      this.#devtools = new DevTools();
       this.#devtools.setEngine(engine);
       this.#devtools.setRootNodes([this.getRoot()]);
     }
@@ -36176,8 +36768,8 @@ var UIScene = class extends Scene {
     const safeAreaRect = this.computeSafeAreaRect();
     const insetTop = safeAreaRect.position.y;
     const insetLeft = safeAreaRect.position.x;
-    const insetRight = System57.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
-    const insetBottom = System57.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
+    const insetRight = System58.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
+    const insetBottom = System58.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
     const previousInsets = this.#safeAreaInsets;
     if (previousInsets.top !== insetTop || previousInsets.left !== insetLeft || previousInsets.right !== insetRight || previousInsets.bottom !== insetBottom) {
       this.setSafeAreaInsets({
@@ -36218,8 +36810,8 @@ var UIScene = class extends Scene {
     const safeAreaInsets = viewManager.getSafeAreaInsets();
     const x = safeAreaInsets.left;
     const y = safeAreaInsets.top;
-    const width = System57.Math.max(viewSize.x - safeAreaInsets.left - safeAreaInsets.right, 0);
-    const height = System57.Math.max(viewSize.y - safeAreaInsets.top - safeAreaInsets.bottom, 0);
+    const width = System58.Math.max(viewSize.x - safeAreaInsets.left - safeAreaInsets.right, 0);
+    const height = System58.Math.max(viewSize.y - safeAreaInsets.top - safeAreaInsets.bottom, 0);
     return Rect.create(x, y, width, height);
   }
   //==============================================================================
@@ -36228,7 +36820,7 @@ var UIScene = class extends Scene {
   //   (모바일 주소창 토글로 100vh 가 동적으로 변하는 경우 등에서 resize 이벤트만으론
   //    누락될 수 있어 매 tick 보정.)
   // - 트리 내 새로 추가된 UINode 들을 솔버에 자동 부착 후 솔버 한 번 풀이.
-  // - DEVTools tick.
+  // - DevTools tick.
   //==============================================================================
   /**
    * @override
@@ -36356,7 +36948,7 @@ var UIScene = class extends Scene {
   // 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
   //==============================================================================
   /**
-   * @returns { DEVTools | null } 개발자 도구. (만들지 않았으면 null)
+   * @returns { DevTools | null } 개발자 도구. (만들지 않았으면 null)
    * @example <caption>개발자 도구를 끈 엔진에서는 null</caption>
    * import { Engine, EngineConfiguration, UIScene, Vector2 } from "./build/vanilla.js";
    *
@@ -36475,7 +37067,7 @@ var UIScene = class extends Scene {
     this.drawSceneBackground(graphic);
   }
   //==============================================================================
-  // postDraw. DEVTools 를 화면 위에 그린다.
+  // postDraw. DevTools 를 화면 위에 그린다.
   //==============================================================================
   /**
    * @override
@@ -36968,7 +37560,7 @@ var UIProgressView = class _UIProgressView extends UIView {
 };
 
 // src/ui/uiprogressring.js
-var System58 = globalThis;
+var System59 = globalThis;
 var CORNER_STEPS = 10;
 var UIProgressRing = class _UIProgressRing extends Component {
   static {
@@ -37031,7 +37623,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     if (width <= 1 || height <= 1) {
       return;
     }
-    const roundSize = System58.Math.max(0, this.getRoundSize() - inset);
+    const roundSize = System59.Math.max(0, this.getRoundSize() - inset);
     const perimeterKey = `${width},${height},${roundSize},${inset}`;
     if (perimeterKey !== this.#perimeterKey) {
       this.#perimeterPoints = this.readPerimeterPoints(inset, inset, width, height, roundSize);
@@ -37077,21 +37669,21 @@ var UIProgressRing = class _UIProgressRing extends Component {
    * @returns { Array<Vector2> } 둘레의 점. (위 가운데 점 하나와 귀퉁이마다 11 개, 모두 45 개)
    */
   readPerimeterPoints(left, top, width, height, roundSize) {
-    const radius = System58.Math.min(roundSize, width * 0.5, height * 0.5);
+    const radius = System59.Math.min(roundSize, width * 0.5, height * 0.5);
     const right = left + width;
     const bottom = top + height;
     const points = [Vector2.create(left + width * 0.5, top)];
     const corners = [
-      { x: right - radius, y: top + radius, start: -System58.Math.PI * 0.5 },
+      { x: right - radius, y: top + radius, start: -System59.Math.PI * 0.5 },
       { x: right - radius, y: bottom - radius, start: 0 },
-      { x: left + radius, y: bottom - radius, start: System58.Math.PI * 0.5 },
-      { x: left + radius, y: top + radius, start: System58.Math.PI }
+      { x: left + radius, y: bottom - radius, start: System59.Math.PI * 0.5 },
+      { x: left + radius, y: top + radius, start: System59.Math.PI }
     ];
     for (const corner of corners) {
       for (let stepIndex = 0; stepIndex <= CORNER_STEPS; ++stepIndex) {
-        const angle = corner.start + System58.Math.PI * 0.5 * stepIndex / CORNER_STEPS;
-        const pointX = corner.x + System58.Math.cos(angle) * radius;
-        const pointY = corner.y + System58.Math.sin(angle) * radius;
+        const angle = corner.start + System59.Math.PI * 0.5 * stepIndex / CORNER_STEPS;
+        const pointX = corner.x + System59.Math.cos(angle) * radius;
+        const pointY = corner.y + System59.Math.sin(angle) * radius;
         points.push(Vector2.create(pointX, pointY));
       }
     }
@@ -37111,7 +37703,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     for (let pointIndex = 1; pointIndex < closedPoints.length; ++pointIndex) {
       const from = closedPoints[pointIndex - 1];
       const to = closedPoints[pointIndex];
-      totalLength += System58.Math.hypot(to.x - from.x, to.y - from.y);
+      totalLength += System59.Math.hypot(to.x - from.x, to.y - from.y);
     }
     const targetLength = totalLength * ratio;
     const partialPoints = [closedPoints[0]];
@@ -37119,7 +37711,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     for (let pointIndex = 1; pointIndex < closedPoints.length; ++pointIndex) {
       const from = closedPoints[pointIndex - 1];
       const to = closedPoints[pointIndex];
-      const segmentLength = System58.Math.hypot(to.x - from.x, to.y - from.y);
+      const segmentLength = System59.Math.hypot(to.x - from.x, to.y - from.y);
       if (walkedLength + segmentLength >= targetLength) {
         const segmentRatio = segmentLength > 0 ? (targetLength - walkedLength) / segmentLength : 0;
         const pointX = from.x + (to.x - from.x) * segmentRatio;
@@ -37139,7 +37731,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
    * @param { number } ratio 채운 몫. (0 ~ 1)
    */
   setRatio(ratio) {
-    this.#ratio = System58.Math.max(0, System58.Math.min(1, ratio));
+    this.#ratio = System59.Math.max(0, System59.Math.min(1, ratio));
   }
   //==============================================================================
   // 채운 몫 반환.
@@ -37252,7 +37844,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
 };
 
 // src/ui/uihitarea.js
-var System59 = globalThis;
+var System60 = globalThis;
 var UIHitArea = class _UIHitArea extends Component {
   static {
     __name(this, "UIHitArea");
@@ -37310,8 +37902,8 @@ var UIHitArea = class _UIHitArea extends Component {
     const targetLeft = targetPosition.x - targetPivot.x * targetSize.x;
     const targetTop = targetPosition.y - targetPivot.y * targetSize.y;
     const minimumSize = this.getMinimumSize();
-    const width = System59.Math.max(targetSize.x, minimumSize);
-    const height = System59.Math.max(targetSize.y, minimumSize);
+    const width = System60.Math.max(targetSize.x, minimumSize);
+    const height = System60.Math.max(targetSize.y, minimumSize);
     let left = targetLeft - (width - targetSize.x) * 0.5;
     let top = targetTop - (height - targetSize.y) * 0.5;
     let right = left + width;
@@ -37322,25 +37914,25 @@ var UIHitArea = class _UIHitArea extends Component {
       const clipCorners = clipNode.getWorldCorners();
       const parentCorners = parentNode.getWorldCorners();
       const parentScale = parentNode.getScale();
-      const scaleX = System59.Math.max(1e-4, System59.Math.abs(parentScale.x));
-      const scaleY = System59.Math.max(1e-4, System59.Math.abs(parentScale.y));
-      const clipMinimumX = System59.Math.min(clipCorners[0].x, clipCorners[2].x);
-      const clipMinimumY = System59.Math.min(clipCorners[0].y, clipCorners[2].y);
-      const clipMaximumX = System59.Math.max(clipCorners[0].x, clipCorners[2].x);
-      const clipMaximumY = System59.Math.max(clipCorners[0].y, clipCorners[2].y);
-      const parentLeft = System59.Math.min(parentCorners[0].x, parentCorners[2].x);
-      const parentTop = System59.Math.min(parentCorners[0].y, parentCorners[2].y);
+      const scaleX = System60.Math.max(1e-4, System60.Math.abs(parentScale.x));
+      const scaleY = System60.Math.max(1e-4, System60.Math.abs(parentScale.y));
+      const clipMinimumX = System60.Math.min(clipCorners[0].x, clipCorners[2].x);
+      const clipMinimumY = System60.Math.min(clipCorners[0].y, clipCorners[2].y);
+      const clipMaximumX = System60.Math.max(clipCorners[0].x, clipCorners[2].x);
+      const clipMaximumY = System60.Math.max(clipCorners[0].y, clipCorners[2].y);
+      const parentLeft = System60.Math.min(parentCorners[0].x, parentCorners[2].x);
+      const parentTop = System60.Math.min(parentCorners[0].y, parentCorners[2].y);
       const clipLeft = (clipMinimumX - parentLeft) / scaleX;
       const clipTop = (clipMinimumY - parentTop) / scaleY;
       const clipRight = (clipMaximumX - parentLeft) / scaleX;
       const clipBottom = (clipMaximumY - parentTop) / scaleY;
-      left = System59.Math.max(left, System59.Math.min(clipLeft, targetLeft));
-      top = System59.Math.max(top, System59.Math.min(clipTop, targetTop));
-      right = System59.Math.min(right, System59.Math.max(clipRight, targetLeft + targetSize.x));
-      bottom = System59.Math.min(bottom, System59.Math.max(clipBottom, targetTop + targetSize.y));
+      left = System60.Math.max(left, System60.Math.min(clipLeft, targetLeft));
+      top = System60.Math.max(top, System60.Math.min(clipTop, targetTop));
+      right = System60.Math.min(right, System60.Math.max(clipRight, targetLeft + targetSize.x));
+      bottom = System60.Math.min(bottom, System60.Math.max(clipBottom, targetTop + targetSize.y));
     }
     const hitPosition = Vector2.create(left, top);
-    const hitSize = Vector2.create(System59.Math.max(0, right - left), System59.Math.max(0, bottom - top));
+    const hitSize = Vector2.create(System60.Math.max(0, right - left), System60.Math.max(0, bottom - top));
     node.setLocalPosition(hitPosition);
     node.setContentSize(hitSize);
   }
@@ -37447,14 +38039,14 @@ var UIHitArea = class _UIHitArea extends Component {
 };
 
 // src/ui/buttonmotion.js
-var System60 = globalThis;
-var ButtonMotionStyle = System60.Object.freeze({
+var System61 = globalThis;
+var ButtonMotionStyle = System61.Object.freeze({
   normal: "normal",
   // 올리면 커지고, 누르는 동안 줄고, 떼면 통 튄다.
   inset: "inset"
   // 창 안의 단추. (커지지 않고, 올리면 바탕이 밝아지고 안쪽에 흰 테가 서며, 누르면 조금 줄었다 돌아온다)
 });
-var MOTION_STYLES = System60.Object.freeze({
+var MOTION_STYLES = System61.Object.freeze({
   [ButtonMotionStyle.normal]: { hoverScale: 1.06, hoverSeconds: 0.08, pressScale: 0.92, pressSeconds: 0.05, releaseScale: 1.04, isHoverLit: false },
   [ButtonMotionStyle.inset]: { hoverScale: 1, hoverSeconds: 0.08, pressScale: 0.96, pressSeconds: 0.08, releaseScale: 1, isHoverLit: true }
 });
@@ -37466,7 +38058,7 @@ var SHAKE_DISTANCE = 2;
 var SHAKE_SECONDS = 0.25;
 var SHAKE_COUNT = 3;
 var SCALE_EPSILON = 1e-3;
-var areaStyles = new System60.WeakMap();
+var areaStyles = new System61.WeakMap();
 var ButtonMotion = class extends Component {
   static {
     __name(this, "ButtonMotion");
@@ -37633,21 +38225,21 @@ var ButtonMotion = class extends Component {
     }
     const isLit = motion.isHoverLit && !this.#isCoarse && (isHovered || isPressed);
     this.placeLitParts(node, isLit, isPressed);
-    const step = timeDelta > 0 ? System60.Math.min(1, timeDelta / seconds2) : 0;
+    const step = timeDelta > 0 ? System61.Math.min(1, timeDelta / seconds2) : 0;
     this.#scale += (targetScale - this.#scale) * step;
     let scale = this.#scale;
     if (this.#releaseSeconds > 0) {
-      this.#releaseSeconds = System60.Math.max(0, this.#releaseSeconds - timeDelta);
+      this.#releaseSeconds = System61.Math.max(0, this.#releaseSeconds - timeDelta);
       const releaseRatio = 1 - this.#releaseSeconds / RELEASE_SECONDS;
-      scale += (MOTION_STYLES[ButtonMotionStyle.normal].releaseScale - 1) * System60.Math.sin(releaseRatio * System60.Math.PI);
+      scale += (MOTION_STYLES[ButtonMotionStyle.normal].releaseScale - 1) * System61.Math.sin(releaseRatio * System61.Math.PI);
     }
     let shakeOffset = 0;
     if (this.#shakeSeconds > 0) {
-      this.#shakeSeconds = System60.Math.max(0, this.#shakeSeconds - timeDelta);
+      this.#shakeSeconds = System61.Math.max(0, this.#shakeSeconds - timeDelta);
       const shakeRatio = 1 - this.#shakeSeconds / SHAKE_SECONDS;
-      shakeOffset = System60.Math.sin(shakeRatio * System60.Math.PI * 2 * SHAKE_COUNT) * SHAKE_DISTANCE * (1 - shakeRatio);
+      shakeOffset = System61.Math.sin(shakeRatio * System61.Math.PI * 2 * SHAKE_COUNT) * SHAKE_DISTANCE * (1 - shakeRatio);
     }
-    const isResting = System60.Math.abs(scale - 1) < SCALE_EPSILON && this.#releaseSeconds <= 0 && this.#shakeSeconds <= 0 && targetScale === 1;
+    const isResting = System61.Math.abs(scale - 1) < SCALE_EPSILON && this.#releaseSeconds <= 0 && this.#shakeSeconds <= 0 && targetScale === 1;
     if (isResting && !this.#isMoving) {
       return;
     }
@@ -37689,7 +38281,7 @@ var ButtonMotion = class extends Component {
    */
   readScrollPressed(node, buttonState) {
     const scrollView = this.readScrollView(node);
-    const engine = System60.vanillaEngine;
+    const engine = System61.vanillaEngine;
     if (scrollView === null || !engine) {
       return false;
     }
@@ -37709,7 +38301,7 @@ var ButtonMotion = class extends Component {
     if (scrollHold === null) {
       return false;
     }
-    if (System60.Math.abs(scrollOffset.x - scrollHold.x) > 1 || System60.Math.abs(scrollOffset.y - scrollHold.y) > 1) {
+    if (System61.Math.abs(scrollOffset.x - scrollHold.x) > 1 || System61.Math.abs(scrollOffset.y - scrollHold.y) > 1) {
       this.#scrollHold = null;
       return false;
     }
@@ -37777,12 +38369,12 @@ var ButtonMotion = class extends Component {
     litParts.ringNode.setLocalPosition(Vector2.create(0, 0));
     litParts.ringNode.setContentSize(Vector2.create(contentSize.x, contentSize.y));
     litParts.ringPaint.setRoundSize(roundSize);
-    const fillWidth = System60.Math.max(0, contentSize.x - LIT_RING_WIDTH * 2);
-    const fillHeight = System60.Math.max(0, contentSize.y - LIT_RING_WIDTH * 2);
+    const fillWidth = System61.Math.max(0, contentSize.x - LIT_RING_WIDTH * 2);
+    const fillHeight = System61.Math.max(0, contentSize.y - LIT_RING_WIDTH * 2);
     litParts.fillNode.setActive(true);
     litParts.fillNode.setLocalPosition(Vector2.create(LIT_RING_WIDTH, LIT_RING_WIDTH));
     litParts.fillNode.setContentSize(Vector2.create(fillWidth, fillHeight));
-    litParts.fillPaint.setRoundSize(System60.Math.max(0, roundSize - LIT_RING_WIDTH));
+    litParts.fillPaint.setRoundSize(System61.Math.max(0, roundSize - LIT_RING_WIDTH));
     const fillColor = litParts.fillColor;
     fillColor.red = color.red + (1 - color.red) * LIT_LIGHTEN;
     fillColor.green = color.green + (1 - color.green) * LIT_LIGHTEN;
@@ -37827,7 +38419,7 @@ var ButtonMotion = class extends Component {
    * @returns { boolean } 입력 위치가 노드 안이면 참. (엔진(System.vanillaEngine)이 없으면 거짓)
    */
   isInputOver(node) {
-    const engine = System60.vanillaEngine;
+    const engine = System61.vanillaEngine;
     if (!engine) {
       return false;
     }
@@ -37897,7 +38489,7 @@ function shakeButton(node) {
 __name(shakeButton, "shakeButton");
 
 // src/ui/uiinputfield.js
-var System61 = globalThis;
+var System62 = globalThis;
 var UIInputFieldMenuAction = {
   cut: "cut",
   // 잘라내기.
@@ -38376,7 +38968,7 @@ var UIInputField = class extends WorldNode {
    * @param { number | null } lineHeight 줄 높이. (내용 크기 단위, null 이면 CSS normal)
    */
   setLineHeight(lineHeight) {
-    this.#lineHeight = typeof lineHeight === "number" && System61.Number.isFinite(lineHeight) ? lineHeight : null;
+    this.#lineHeight = typeof lineHeight === "number" && System62.Number.isFinite(lineHeight) ? lineHeight : null;
     this.#textAreaLayoutKey = null;
   }
   //==============================================================================
@@ -38388,7 +38980,7 @@ var UIInputField = class extends WorldNode {
   getLineHeight() {
     if (this.#lineHeight !== null) return this.#lineHeight;
     const normalLineHeight = measureNormalLineHeight(buildFontString(this.#fontFace, this.#fontSize, false, false));
-    return normalLineHeight !== null ? normalLineHeight : System61.Math.round(this.#fontSize * 1.2);
+    return normalLineHeight !== null ? normalLineHeight : System62.Math.round(this.#fontSize * 1.2);
   }
   //==============================================================================
   // 탭 크기 설정. (여러 줄 필드, 공백 몇 개 폭, CSS tab-size)
@@ -38397,7 +38989,7 @@ var UIInputField = class extends WorldNode {
    * @param { number } tabSize 탭 크기. (공백 몇 개 폭, 음수는 0, 기본 8)
    */
   setTabSize(tabSize) {
-    this.#tabSize = System61.Math.max(0, System61.Number(tabSize) || 0);
+    this.#tabSize = System62.Math.max(0, System62.Number(tabSize) || 0);
     this.#textAreaLayoutKey = null;
     if (this.#domInput) this.#domInput.style.tabSize = String(this.#tabSize);
   }
@@ -38426,7 +39018,7 @@ var UIInputField = class extends WorldNode {
    * @param { number } scrollTop 위로 넘길 만큼. (내용 크기 단위, 음수는 0)
    */
   setScrollTop(scrollTop) {
-    this.#scrollTop = System61.Math.max(0, System61.Number(scrollTop) || 0);
+    this.#scrollTop = System62.Math.max(0, System62.Number(scrollTop) || 0);
   }
   //==============================================================================
   // 되돌릴 것이 있는지.
@@ -38573,8 +39165,8 @@ var UIInputField = class extends WorldNode {
   /** @private */
   #syncDOMSelection() {
     if (!this.#domInput) return;
-    const start = System61.Math.min(this.#selectionStart, this.#cursorIndex);
-    const end = System61.Math.max(this.#selectionStart, this.#cursorIndex);
+    const start = System62.Math.min(this.#selectionStart, this.#cursorIndex);
+    const end = System62.Math.max(this.#selectionStart, this.#cursorIndex);
     this.#domInput.setSelectionRange(start, end, this.#cursorIndex < this.#selectionStart ? "backward" : "forward");
   }
   //==============================================================================
@@ -38638,7 +39230,7 @@ var UIInputField = class extends WorldNode {
   #buildTextAreaLayoutWithGutter(contentSize, scrollbarGutter) {
     const displayText = this.getDisplayText();
     const fontString = buildFontString(this.#fontFace, this.#fontSize, false, false);
-    const wrapWidth = System61.Math.max(0, contentSize.x - this.#padding * 2 - scrollbarGutter);
+    const wrapWidth = System62.Math.max(0, contentSize.x - this.#padding * 2 - scrollbarGutter);
     const lineHeight = this.getLineHeight();
     const layoutKey = `${fontString}\0${wrapWidth}\0${lineHeight}\0${this.#tabSize}\0${displayText}`;
     if (this.#textAreaLayout && this.#textAreaLayoutKey === layoutKey) {
@@ -38669,7 +39261,7 @@ var UIInputField = class extends WorldNode {
    */
   #getMaximumScrollTop(contentHeight) {
     const layout = this.#ensureTextAreaLayout();
-    return System61.Math.max(0, layout.getContentHeight() + this.#padding * 2 - contentHeight);
+    return System62.Math.max(0, layout.getContentHeight() + this.#padding * 2 - contentHeight);
   }
   //==============================================================================
   // 커서가 보이게 스크롤. (블링크 RevealSelection: 맥이 아니면 ifNeeded 는 가장자리, always 는 맨 위. 맥은 가운데)
@@ -38695,7 +39287,7 @@ var UIInputField = class extends WorldNode {
     } else if (caretBottom > this.#scrollTop + contentHeight) {
       this.#scrollTop = caretBottom - contentHeight;
     }
-    this.#scrollTop = System61.Math.max(0, System61.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop));
+    this.#scrollTop = System62.Math.max(0, System62.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop));
   }
   //==============================================================================
   // 위아래로 커서 옮기기. (블링크 MoveUp, MoveDown, MovePageUp, MovePageDown)
@@ -38718,10 +39310,10 @@ var UIInputField = class extends WorldNode {
       target = layout.moveVertically(cursorIndex, this.#isCaretUpstream, preferredX, key === "ArrowUp" ? -1 : 1);
     } else {
       const pageStep = calculatePageStep(this.getContentSize().y);
-      const lineCount = System61.Math.max(1, System61.Math.floor(pageStep / System61.Math.max(1, layout.lineHeight)));
+      const lineCount = System62.Math.max(1, System62.Math.floor(pageStep / System62.Math.max(1, layout.lineHeight)));
       const lineIndex = layout.findLineIndex(cursorIndex, this.#isCaretUpstream);
-      const lastLineIndex = System61.Math.max(0, layout.lineList.length - 1);
-      const targetLine = key === "PageUp" ? System61.Math.max(0, lineIndex - lineCount) : System61.Math.min(lastLineIndex, lineIndex + lineCount);
+      const lastLineIndex = System62.Math.max(0, layout.lineList.length - 1);
+      const targetLine = key === "PageUp" ? System62.Math.max(0, lineIndex - lineCount) : System62.Math.min(lastLineIndex, lineIndex + lineCount);
       target = layout.findCharacterIndexInLine(targetLine, preferredX);
       revealKind = "always";
     }
@@ -38770,7 +39362,7 @@ var UIInputField = class extends WorldNode {
   scrollTextAreaByWheel(deltaY) {
     if (!this.#isMultilineEnabled) return false;
     const previousScrollTop = this.#scrollTop;
-    this.#scrollTop = System61.Math.max(0, System61.Math.min(this.#getMaximumScrollTop(this.getContentSize().y), this.#scrollTop + deltaY));
+    this.#scrollTop = System62.Math.max(0, System62.Math.min(this.#getMaximumScrollTop(this.getContentSize().y), this.#scrollTop + deltaY));
     return this.#scrollTop !== previousScrollTop;
   }
   //==============================================================================
@@ -38808,7 +39400,7 @@ var UIInputField = class extends WorldNode {
     const layout = this.#ensureTextAreaLayout();
     if (!isOverlay) {
       this.#applyCaretReveal();
-      this.#scrollTop = System61.Math.max(0, System61.Math.min(this.#getMaximumScrollTop(contentSize.y), this.#scrollTop));
+      this.#scrollTop = System62.Math.max(0, System62.Math.min(this.#getMaximumScrollTop(contentSize.y), this.#scrollTop));
     }
     const padding = this.#padding;
     const originY = padding - this.#scrollTop;
@@ -38853,8 +39445,8 @@ var UIInputField = class extends WorldNode {
         graphic.setStrokeColor(this.#compositionUnderlineColor.toHEXString());
         for (let lineIndex = 0; lineIndex < layout.lineList.length; ++lineIndex) {
           const line = layout.lineList[lineIndex];
-          const segmentStart = System61.Math.max(compositionStart, line.start);
-          const segmentEnd = System61.Math.min(compositionEnd, line.end);
+          const segmentStart = System62.Math.max(compositionStart, line.start);
+          const segmentEnd = System62.Math.min(compositionEnd, line.end);
           if (segmentStart >= segmentEnd) continue;
           const underlineY = originY + line.top + lineHeight * 0.5 + this.#fontSize * 0.55;
           graphic.drawLine([
@@ -38904,11 +39496,11 @@ var UIInputField = class extends WorldNode {
         return null;
       }
       const trackLeft = contentSize.x - this.#textAreaScrollbarGutter;
-      return Rect.create(trackLeft + metrics.thumbCrossOffset, thumbSpan.start + metrics.thumbLengthInset, metrics.thumbThickness, System61.Math.max(0, thumbSpan.length - metrics.thumbLengthInset * 2));
+      return Rect.create(trackLeft + metrics.thumbCrossOffset, thumbSpan.start + metrics.thumbLengthInset, metrics.thumbThickness, System62.Math.max(0, thumbSpan.length - metrics.thumbLengthInset * 2));
     }
-    const thumbLength = System61.Math.min(contentSize.y, System61.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / scrollHeight));
+    const thumbLength = System62.Math.min(contentSize.y, System62.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / scrollHeight));
     const maximumScrollTop = scrollHeight - contentSize.y;
-    const thumbTop = (contentSize.y - thumbLength) * System61.Math.max(0, System61.Math.min(1, this.#scrollTop / maximumScrollTop));
+    const thumbTop = (contentSize.y - thumbLength) * System62.Math.max(0, System62.Math.min(1, this.#scrollTop / maximumScrollTop));
     return Rect.create(contentSize.x - TEXT_AREA_SCROLLBAR_THICKNESS, thumbTop, TEXT_AREA_SCROLLBAR_THICKNESS, thumbLength);
   }
   //==============================================================================
@@ -38925,16 +39517,16 @@ var UIInputField = class extends WorldNode {
     const metrics = this.#textAreaScrollbarGutter > 0 ? readClassicScrollbarMetrics() : null;
     let trackRoom = 1;
     if (metrics) {
-      const thumbRoom = System61.Math.max(1, contentSize.y - metrics.buttonLength * 2);
-      const thumbLength = System61.Math.min(thumbRoom, System61.Math.max(metrics.thumbMinimumLength, System61.Math.round(thumbRoom * contentSize.y / System61.Math.max(1, scrollHeight))));
-      trackRoom = System61.Math.max(1, thumbRoom - thumbLength);
+      const thumbRoom = System62.Math.max(1, contentSize.y - metrics.buttonLength * 2);
+      const thumbLength = System62.Math.min(thumbRoom, System62.Math.max(metrics.thumbMinimumLength, System62.Math.round(thumbRoom * contentSize.y / System62.Math.max(1, scrollHeight))));
+      trackRoom = System62.Math.max(1, thumbRoom - thumbLength);
     } else {
-      const thumbLength = System61.Math.min(contentSize.y, System61.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / System61.Math.max(1, scrollHeight)));
-      trackRoom = System61.Math.max(1, contentSize.y - thumbLength);
+      const thumbLength = System62.Math.min(contentSize.y, System62.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / System62.Math.max(1, scrollHeight)));
+      trackRoom = System62.Math.max(1, contentSize.y - thumbLength);
     }
     const maximumScrollTop = this.#getMaximumScrollTop(contentSize.y);
     const dragStart = this.#scrollbarDragStart;
-    this.#scrollTop = System61.Math.max(0, System61.Math.min(maximumScrollTop, dragStart.startScrollTop + (localY - dragStart.startY) / trackRoom * maximumScrollTop));
+    this.#scrollTop = System62.Math.max(0, System62.Math.min(maximumScrollTop, dragStart.startScrollTop + (localY - dragStart.startY) / trackRoom * maximumScrollTop));
   }
   //==============================================================================
   // 값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다, 되돌리기와 다시 하기 목록을 비운다)
@@ -39010,7 +39602,7 @@ var UIInputField = class extends WorldNode {
   setFont(font) {
     if (font === null || font === void 0) {
       this.#fontFace = null;
-    } else if (font instanceof System61.FontFace) {
+    } else if (font instanceof System62.FontFace) {
       this.#fontFace = font;
     } else if (font instanceof FontAsset) {
       this.#fontFace = font.fontFace;
@@ -39354,8 +39946,8 @@ var UIInputField = class extends WorldNode {
         const selEnd = this.#domInput.selectionEnd;
         const selStart = this.#domInput.selectionStart;
         if (typeof selEnd === "number" && typeof selStart === "number") {
-          const ourMin = System61.Math.min(this.#cursorIndex, this.#selectionStart);
-          const ourMax = System61.Math.max(this.#cursorIndex, this.#selectionStart);
+          const ourMin = System62.Math.min(this.#cursorIndex, this.#selectionStart);
+          const ourMax = System62.Math.max(this.#cursorIndex, this.#selectionStart);
           if (selStart !== ourMin || selEnd !== ourMax) {
             const isBackward = this.#domInput.selectionDirection === "backward";
             this.#cursorIndex = isBackward ? selStart : selEnd;
@@ -39429,8 +40021,8 @@ var UIInputField = class extends WorldNode {
       this.#dragGranularity = { granularity: clickCount === 2 ? "word" : "paragraph", start: range.start, end: range.end };
     }
     if (this.#domInput) {
-      const selectionStart = System61.Math.min(this.#selectionStart, this.#cursorIndex);
-      const selectionEnd = System61.Math.max(this.#selectionStart, this.#cursorIndex);
+      const selectionStart = System62.Math.min(this.#selectionStart, this.#cursorIndex);
+      const selectionEnd = System62.Math.max(this.#selectionStart, this.#cursorIndex);
       this.#domInput.setSelectionRange(selectionStart, selectionEnd);
     }
     this.#requestCaretReveal("ifNeeded");
@@ -39468,12 +40060,12 @@ var UIInputField = class extends WorldNode {
         this.#cursorIndex = unitRange.start;
       } else {
         this.#selectionStart = dragGranularity.start;
-        this.#cursorIndex = System61.Math.max(unitRange.end, dragGranularity.end);
+        this.#cursorIndex = System62.Math.max(unitRange.end, dragGranularity.end);
       }
     }
     if (this.#domInput) {
-      const selStart = System61.Math.min(this.#selectionStart, this.#cursorIndex);
-      const selEnd = System61.Math.max(this.#selectionStart, this.#cursorIndex);
+      const selStart = System62.Math.min(this.#selectionStart, this.#cursorIndex);
+      const selEnd = System62.Math.max(this.#selectionStart, this.#cursorIndex);
       this.#domInput.setSelectionRange(selStart, selEnd);
     }
     this.#requestCaretReveal("ifNeeded");
@@ -39570,7 +40162,7 @@ var UIInputField = class extends WorldNode {
   refreshTextPositions() {
     const size = this.getContentSize();
     if (size.x <= 0 || size.y <= 0) return;
-    const inner = Vector2.create(System61.Math.max(0, size.x - this.#padding * 2), size.y);
+    const inner = Vector2.create(System62.Math.max(0, size.x - this.#padding * 2), size.y);
     this.#textTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
     this.#textTextNode.setContentSize(inner);
     this.#placeholderTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
@@ -39584,7 +40176,7 @@ var UIInputField = class extends WorldNode {
   /** @private */
   attachDOMInput() {
     if (this.#domInput) return;
-    const doc = System61.document;
+    const doc = System62.document;
     ensureGlobalHiddenInputStyle(doc);
     const input = doc.createElement(this.#isMultilineEnabled ? "textarea" : "input");
     if (!this.#isMultilineEnabled) input.type = "text";
@@ -39702,7 +40294,7 @@ var UIInputField = class extends WorldNode {
       }
       if (!this.#domInput) return;
       if (pointerEvent.type === "mousedown") {
-        this.#pointerClickCount = System61.Math.max(1, pointerEvent.detail || 1);
+        this.#pointerClickCount = System62.Math.max(1, pointerEvent.detail || 1);
       } else if (pointerEvent.type === "touchstart") {
         this.#pointerClickCount = 1;
       }
@@ -39758,8 +40350,8 @@ var UIInputField = class extends WorldNode {
     if (!canvas) return;
     const canvasRect = canvas.getBoundingClientRect();
     const targetScale = viewManager.getTargetResolutionScale() || 1;
-    const scrollX = System61.scrollX || 0;
-    const scrollY = System61.scrollY || 0;
+    const scrollX = System62.scrollX || 0;
+    const scrollY = System62.scrollY || 0;
     const globalPos = this.getPosition();
     const contentSize = this.getContentSize();
     this.#domInput.style.left = `${canvasRect.left + scrollX + globalPos.x * targetScale}px`;
@@ -39835,10 +40427,10 @@ var UIInputField = class extends WorldNode {
     }
     if (this.#isComposing || event.isComposing || !this.#domInput) return;
     const snapshot = this.#createDOMSnapshot();
-    const domStart = System61.Math.min(snapshot.selectionStart, snapshot.cursorIndex);
-    const domEnd = System61.Math.max(snapshot.selectionStart, snapshot.cursorIndex);
-    const engineStart = System61.Math.min(this.#selectionStart, this.#cursorIndex);
-    const engineEnd = System61.Math.max(this.#selectionStart, this.#cursorIndex);
+    const domStart = System62.Math.min(snapshot.selectionStart, snapshot.cursorIndex);
+    const domEnd = System62.Math.max(snapshot.selectionStart, snapshot.cursorIndex);
+    const engineStart = System62.Math.min(this.#selectionStart, this.#cursorIndex);
+    const engineEnd = System62.Math.max(this.#selectionStart, this.#cursorIndex);
     if (domStart !== engineStart || domEnd !== engineEnd) this.#openEditKind = null;
     const editKind = DOM_INPUT_EDIT_KIND_TABLE[inputType];
     this.#pendingDOMEdit = { editKind: editKind ? editKind : TextEditKind.paste, snapshot };
@@ -39925,7 +40517,7 @@ var UIInputField = class extends WorldNode {
       if (isMac && !event.altKey) {
         const contentHeight = this.getContentSize().y;
         const direction = key === "PageUp" ? -1 : 1;
-        this.#scrollTop = System61.Math.max(0, System61.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop + calculatePageStep(contentHeight) * direction));
+        this.#scrollTop = System62.Math.max(0, System62.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop + calculatePageStep(contentHeight) * direction));
         return true;
       }
       if (isMac === event.altKey) {
@@ -39940,7 +40532,7 @@ var UIInputField = class extends WorldNode {
         if (!isShift) {
           const contentHeight = this.getContentSize().y;
           const targetScrollTop = isEnd ? this.#getMaximumScrollTop(contentHeight) : 0;
-          if (System61.Math.abs(targetScrollTop - this.#scrollTop) > 0) {
+          if (System62.Math.abs(targetScrollTop - this.#scrollTop) > 0) {
             this.#scrollTop = targetScrollTop;
             return true;
           }
@@ -39964,7 +40556,7 @@ var UIInputField = class extends WorldNode {
   attachCanvasKeyboard() {
     if (this.#canvasKeydownHandler) return;
     this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
-    System61.document.addEventListener("keydown", this.#canvasKeydownHandler);
+    System62.document.addEventListener("keydown", this.#canvasKeydownHandler);
   }
   //==============================================================================
   // 캔버스 모드 키보드 사건 떼기.
@@ -39972,7 +40564,7 @@ var UIInputField = class extends WorldNode {
   /** @private */
   detachCanvasKeyboard() {
     if (!this.#canvasKeydownHandler) return;
-    System61.document.removeEventListener("keydown", this.#canvasKeydownHandler);
+    System62.document.removeEventListener("keydown", this.#canvasKeydownHandler);
     this.#canvasKeydownHandler = null;
   }
   //==============================================================================
@@ -40133,7 +40725,7 @@ var UIInputField = class extends WorldNode {
    * @param { boolean } extendSelection 참이면 선택의 고정 끝을 두고 선택을 늘린다.
    */
   moveCursor(newIndex, extendSelection) {
-    let clamped = System61.Math.max(0, System61.Math.min(this.#value.length, newIndex));
+    let clamped = System62.Math.max(0, System62.Math.min(this.#value.length, newIndex));
     if (isInsideSurrogatePair(this.#value, clamped)) {
       clamped += 1;
     }
@@ -40165,8 +40757,8 @@ var UIInputField = class extends WorldNode {
    * @private
    */
   deleteRange(startIndex, endIndex, editKind = TextEditKind.deleteForward) {
-    const start = System61.Math.max(0, startIndex);
-    const end = System61.Math.min(this.#value.length, endIndex);
+    const start = System62.Math.max(0, startIndex);
+    const end = System62.Math.min(this.#value.length, endIndex);
     if (end <= start) {
       return;
     }
@@ -40197,7 +40789,7 @@ var UIInputField = class extends WorldNode {
     this.#cursorVisible = true;
     if (this.#useDirectTouch && this.#domInput) {
       const input = this.#domInput;
-      System61.setTimeout(() => {
+      System62.setTimeout(() => {
         if (this.#domInput !== input) return;
         const length = input.value.length;
         input.setSelectionRange(length, length);
@@ -40230,8 +40822,8 @@ var UIInputField = class extends WorldNode {
   getSelectionRange() {
     if (!this.hasSelection()) return null;
     return {
-      start: System61.Math.min(this.#cursorIndex, this.#selectionStart),
-      end: System61.Math.max(this.#cursorIndex, this.#selectionStart)
+      start: System62.Math.min(this.#cursorIndex, this.#selectionStart),
+      end: System62.Math.max(this.#cursorIndex, this.#selectionStart)
     };
   }
   //==============================================================================
@@ -40270,12 +40862,12 @@ var UIInputField = class extends WorldNode {
     text = sanitizedText;
     let insertedText = text;
     if (this.#maxLength > 0) {
-      const appendableLength = System61.Math.max(0, this.#maxLength - (this.#value.length - (range.end - range.start)));
+      const appendableLength = System62.Math.max(0, this.#maxLength - (this.#value.length - (range.end - range.start)));
       insertedText = limitTextLength(text, appendableLength);
     }
     const next = this.#value.slice(0, range.start) + insertedText + this.#value.slice(range.end);
     this.#value = next;
-    this.#cursorIndex = System61.Math.min(range.start + insertedText.length, next.length);
+    this.#cursorIndex = System62.Math.min(range.start + insertedText.length, next.length);
     this.#selectionStart = this.#cursorIndex;
     this.#pendingDOMEdit = null;
     if (this.#domInput) {
@@ -40391,8 +40983,8 @@ var UIInputField = class extends WorldNode {
    */
   writeClipboard(text) {
     try {
-      if (System61.navigator && System61.navigator.clipboard) {
-        System61.navigator.clipboard.writeText(text).catch(() => {
+      if (System62.navigator && System62.navigator.clipboard) {
+        System62.navigator.clipboard.writeText(text).catch(() => {
         });
       }
     } catch (error) {
@@ -40407,12 +40999,12 @@ var UIInputField = class extends WorldNode {
    */
   readClipboard() {
     try {
-      if (System61.navigator && System61.navigator.clipboard) {
-        return System61.navigator.clipboard.readText();
+      if (System62.navigator && System62.navigator.clipboard) {
+        return System62.navigator.clipboard.readText();
       }
     } catch (error) {
     }
-    return System61.Promise.resolve("");
+    return System62.Promise.resolve("");
   }
   //==============================================================================
   // 컨텍스트 메뉴 (우클릭).
@@ -40649,7 +41241,7 @@ var UIInputFieldContextMenu = class extends Component {
     if (itemY < 0) {
       return -1;
     }
-    const itemIndex = System61.Math.floor(itemY / CONTEXT_MENU_ITEM_HEIGHT);
+    const itemIndex = System62.Math.floor(itemY / CONTEXT_MENU_ITEM_HEIGHT);
     if (itemIndex >= CONTEXT_MENU_ITEM_LIST.length) {
       return -1;
     }
@@ -40811,8 +41403,8 @@ var BackgroundLayerRenderer = class extends Component {
     if (state.composition.length === 0 && state.selectionStart !== state.cursorIndex) {
       graphic.pushState();
       graphic.setFontString(buildFontString(state.fontFace, state.fontSize, false, false));
-      const selStart = System61.Math.min(state.selectionStart, state.cursorIndex);
-      const selEnd = System61.Math.max(state.selectionStart, state.cursorIndex);
+      const selStart = System62.Math.min(state.selectionStart, state.cursorIndex);
+      const selEnd = System62.Math.max(state.selectionStart, state.cursorIndex);
       const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
       const endX = state.padding + graphic.measureText(state.value.slice(0, selEnd)).width;
       const halfH = state.fontSize * 0.65;
@@ -40885,7 +41477,7 @@ var OverlayLayerRenderer = class extends Component {
       const y = inset;
       const rectW = contentSize.x - w;
       const rectH = contentSize.y - w;
-      const radius = System61.Math.max(0, state.bgRoundSize - inset);
+      const radius = System62.Math.max(0, state.bgRoundSize - inset);
       graphic.drawStrokeRoundRect(Rect.create(x, y, rectW, rectH), radius, w);
     }
     graphic.popState();
@@ -40894,7 +41486,7 @@ var OverlayLayerRenderer = class extends Component {
 var graphemeSegmenter2 = void 0;
 function getGraphemeSegmenter() {
   if (graphemeSegmenter2 === void 0) {
-    const intl = System61.Intl;
+    const intl = System62.Intl;
     const segmenterClass = intl ? intl.Segmenter : void 0;
     graphemeSegmenter2 = typeof segmenterClass === "function" ? new segmenterClass(void 0, { granularity: "grapheme" }) : null;
   }
@@ -40977,7 +41569,7 @@ function findBackwardDeletionBoundary(text, index) {
       codePointLength = 2;
     }
     const codePoint = text.codePointAt(position - codePointLength);
-    const character = System61.String.fromCodePoint(codePoint);
+    const character = System62.String.fromCodePoint(codePoint);
     position -= codePointLength;
     const isVariationSelector = VARIATION_SELECTOR_PATTERN.test(character);
     const isExtendedPictographic = EXTENDED_PICTOGRAPHIC_GB11_PATTERN.test(character);
@@ -41153,13 +41745,13 @@ function findBackwardDeletionBoundary(text, index) {
       break;
     }
   }
-  return System61.Math.max(0, index - deleteCount);
+  return System62.Math.max(0, index - deleteCount);
 }
 __name(findBackwardDeletionBoundary, "findBackwardDeletionBoundary");
 var wordSegmenter2 = void 0;
 function collectWordBoundaries(text) {
   if (wordSegmenter2 === void 0) {
-    const intl = System61.Intl;
+    const intl = System62.Intl;
     const segmenterClass = intl ? intl.Segmenter : void 0;
     wordSegmenter2 = typeof segmenterClass === "function" ? new segmenterClass(void 0, { granularity: "word" }) : null;
   }
@@ -41201,7 +41793,7 @@ function findWordRangeAt(text, index) {
 }
 __name(findWordRangeAt, "findWordRangeAt");
 function findParagraphRangeAt(text, index) {
-  const clampedIndex = System61.Math.max(0, System61.Math.min(text.length, index));
+  const clampedIndex = System62.Math.max(0, System62.Math.min(text.length, index));
   let startProbe = clampedIndex;
   if (clampedIndex === text.length && clampedIndex > 0 && text.charCodeAt(clampedIndex - 1) === 10) {
     startProbe = clampedIndex - 1;
@@ -41224,13 +41816,13 @@ function skipTrailingWhitespace(text, index) {
 }
 __name(skipTrailingWhitespace, "skipTrailingWhitespace");
 function isWindowsPlatform() {
-  const navigator = System61.navigator;
+  const navigator = System62.navigator;
   const platform = navigator && typeof navigator.platform === "string" ? navigator.platform : "";
   return platform.startsWith("Win");
 }
 __name(isWindowsPlatform, "isWindowsPlatform");
 function isMacPlatform() {
-  const navigator = System61.navigator;
+  const navigator = System62.navigator;
   const platform = navigator && typeof navigator.platform === "string" ? navigator.platform : "";
   return platform.startsWith("Mac");
 }
@@ -41288,15 +41880,15 @@ function isWordBreakCodeUnit(codeUnit) {
   if (isSurrogateCodeUnit(codeUnit) || isLineBreakCodeUnit(codeUnit) || codeUnit === 95) {
     return true;
   }
-  return !/\p{C}/u.test(System61.String.fromCharCode(codeUnit)) && !isEditingWhitespaceCodeUnit(codeUnit);
+  return !/\p{C}/u.test(System62.String.fromCharCode(codeUnit)) && !isEditingWhitespaceCodeUnit(codeUnit);
 }
 __name(isWordBreakCodeUnit, "isWordBreakCodeUnit");
 function isWordBoundaryCodeUnit(codeUnit) {
-  return isSurrogateCodeUnit(codeUnit) || /[\p{P}\p{S}]/u.test(System61.String.fromCharCode(codeUnit));
+  return isSurrogateCodeUnit(codeUnit) || /[\p{P}\p{S}]/u.test(System62.String.fromCharCode(codeUnit));
 }
 __name(isWordBoundaryCodeUnit, "isWordBoundaryCodeUnit");
 function isAlphanumericCodeUnit(codeUnit) {
-  return !isSurrogateCodeUnit(codeUnit) && /[\p{L}\p{Nd}]/u.test(System61.String.fromCharCode(codeUnit));
+  return !isSurrogateCodeUnit(codeUnit) && /[\p{L}\p{Nd}]/u.test(System62.String.fromCharCode(codeUnit));
 }
 __name(isAlphanumericCodeUnit, "isAlphanumericCodeUnit");
 function readCodeUnit(text, index) {
@@ -41408,7 +42000,7 @@ function collectRunBoundaries(boundaryList, runStart, runEnd) {
 }
 __name(collectRunBoundaries, "collectRunBoundaries");
 function findNextWordPosition(text, index, isSkipSpaces) {
-  const position = System61.Math.max(0, System61.Math.min(text.length, index));
+  const position = System62.Math.max(0, System62.Math.min(text.length, index));
   const boundaryList = collectWordBoundaries(text);
   const runStartList = collectWordSearchRunStarts(text);
   let runIndex = runStartList.length - 1;
@@ -41429,7 +42021,7 @@ function findNextWordPosition(text, index, isSkipSpaces) {
 }
 __name(findNextWordPosition, "findNextWordPosition");
 function findPreviousWordPosition(text, index) {
-  const position = System61.Math.max(0, System61.Math.min(text.length, index));
+  const position = System62.Math.max(0, System62.Math.min(text.length, index));
   const boundaryList = collectWordBoundaries(text);
   const runStartList = collectWordSearchRunStarts(text);
   let runIndex = runStartList.length - 1;
@@ -41450,7 +42042,7 @@ function findPreviousWordPosition(text, index) {
 }
 __name(findPreviousWordPosition, "findPreviousWordPosition");
 function limitTextLength(text, maxLength) {
-  let newLength = System61.Math.min(maxLength, text.length);
+  let newLength = System62.Math.min(maxLength, text.length);
   if (newLength === text.length) {
     return text;
   }
@@ -41464,7 +42056,7 @@ function limitTextLength(text, maxLength) {
 }
 __name(limitTextLength, "limitTextLength");
 function hasStickyUserActivation() {
-  const navigator = System61.navigator;
+  const navigator = System62.navigator;
   const userActivation = navigator ? navigator.userActivation : void 0;
   if (!userActivation) {
     return true;
@@ -41476,7 +42068,7 @@ var offscreenMeasureCanvas = null;
 function getOffscreenMeasureContext() {
   if (!offscreenMeasureCanvas) {
     try {
-      offscreenMeasureCanvas = System61.document.createElement("canvas");
+      offscreenMeasureCanvas = System62.document.createElement("canvas");
     } catch (error) {
       return null;
     }
@@ -41525,7 +42117,7 @@ function findHistoryCommand(event) {
 }
 __name(findHistoryCommand, "findHistoryCommand");
 function measureNormalLineHeight(fontString) {
-  const doc = System61.document;
+  const doc = System62.document;
   if (!doc || !doc.body) return null;
   const fontSet = doc.fonts;
   const fontSetSize = fontSet && typeof fontSet.size === "number" ? fontSet.size : 0;
@@ -41557,7 +42149,7 @@ var classicScrollbarThickness = null;
 function readClassicScrollbarMetrics() {
   if (classicScrollbarThickness === null) {
     classicScrollbarThickness = 0;
-    const doc = System61.document;
+    const doc = System62.document;
     if (doc && doc.body) {
       const probeElement = doc.createElement("div");
       const style = probeElement.style;
@@ -41570,7 +42162,7 @@ function readClassicScrollbarMetrics() {
       style.overflow = "scroll";
       style.scrollbarWidth = "auto";
       doc.body.appendChild(probeElement);
-      classicScrollbarThickness = System61.Math.max(0, probeElement.offsetWidth - probeElement.clientWidth);
+      classicScrollbarThickness = System62.Math.max(0, probeElement.offsetWidth - probeElement.clientWidth);
       probeElement.remove();
     }
   }
@@ -41579,13 +42171,13 @@ function readClassicScrollbarMetrics() {
     return null;
   }
   const proportion = thickness / 15;
-  const thumbThickness = System61.Math.floor(9 * proportion);
+  const thumbThickness = System62.Math.floor(9 * proportion);
   return {
     thickness,
-    buttonLength: System61.Math.floor(18 * proportion),
+    buttonLength: System62.Math.floor(18 * proportion),
     thumbThickness,
-    thumbCrossOffset: System61.Math.floor((thickness - thumbThickness) * 0.5),
-    thumbMinimumLength: System61.Math.floor(17 * proportion),
+    thumbCrossOffset: System62.Math.floor((thickness - thumbThickness) * 0.5),
+    thumbMinimumLength: System62.Math.floor(17 * proportion),
     thumbLengthInset: 0
   };
 }
@@ -41595,9 +42187,9 @@ function calculateClassicThumbSpan(metrics, trackLength, viewportLength, extentL
   if (extentLength <= viewportLength + 0.5 || thumbRoom < metrics.thumbMinimumLength || viewportLength <= 0) {
     return null;
   }
-  const thumbLength = System61.Math.min(thumbRoom, System61.Math.max(metrics.thumbMinimumLength, System61.Math.round(thumbRoom * viewportLength / extentLength)));
+  const thumbLength = System62.Math.min(thumbRoom, System62.Math.max(metrics.thumbMinimumLength, System62.Math.round(thumbRoom * viewportLength / extentLength)));
   const maximumOffset = extentLength - viewportLength;
-  const thumbStart = metrics.buttonLength + (thumbRoom - thumbLength) * System61.Math.max(0, System61.Math.min(1, offset / maximumOffset));
+  const thumbStart = metrics.buttonLength + (thumbRoom - thumbLength) * System62.Math.max(0, System62.Math.min(1, offset / maximumOffset));
   return { start: thumbStart, length: thumbLength };
 }
 __name(calculateClassicThumbSpan, "calculateClassicThumbSpan");
@@ -41619,7 +42211,7 @@ function advanceToTabStop(x, tabWidth) {
   if (tabWidth <= 0) {
     return x;
   }
-  return (System61.Math.floor(x / tabWidth) + 1) * tabWidth;
+  return (System62.Math.floor(x / tabWidth) + 1) * tabWidth;
 }
 __name(advanceToTabStop, "advanceToTabStop");
 function trimHangingSpaces(text) {
@@ -41650,7 +42242,7 @@ function findLineBreakList(paragraph) {
 }
 __name(findLineBreakList, "findLineBreakList");
 function findLineBreakListFromDocument(paragraph) {
-  const doc = System61.document;
+  const doc = System62.document;
   if (!doc || !doc.body || typeof doc.createRange !== "function") {
     return null;
   }
@@ -41779,7 +42371,7 @@ var TextAreaLayout = class {
     if (!line) {
       return 0;
     }
-    const localIndex = System61.Math.max(line.start, System61.Math.min(line.end, characterIndex)) - line.start;
+    const localIndex = System62.Math.max(line.start, System62.Math.min(line.end, characterIndex)) - line.start;
     const offset = line.offsets[localIndex];
     return typeof offset === "number" ? offset : 0;
   }
@@ -41826,7 +42418,7 @@ var TextAreaLayout = class {
     if (this.lineList.length === 0 || this.lineHeight <= 0) {
       return { index: 0, isUpstream: false };
     }
-    const lineIndex = System61.Math.min(this.lineList.length - 1, System61.Math.max(0, System61.Math.floor(y / this.lineHeight)));
+    const lineIndex = System62.Math.min(this.lineList.length - 1, System62.Math.max(0, System62.Math.floor(y / this.lineHeight)));
     return this.findCharacterIndexInLine(lineIndex, x);
   }
   //==============================================================================
@@ -41885,15 +42477,15 @@ var TextAreaLayout = class {
     }
     for (let lineIndex = 0; lineIndex < this.lineList.length; ++lineIndex) {
       const line = this.lineList[lineIndex];
-      const lineSelectionStart = System61.Math.max(startIndex, line.start);
-      const lineSelectionEnd = System61.Math.min(endIndex, line.end);
+      const lineSelectionStart = System62.Math.max(startIndex, line.start);
+      const lineSelectionEnd = System62.Math.min(endIndex, line.end);
       const isLineBreakSelected = line.isHardBreak && startIndex <= line.end && endIndex > line.end;
       if (lineSelectionStart > lineSelectionEnd || lineSelectionStart === lineSelectionEnd && !isLineBreakSelected) {
         continue;
       }
       const startX = this.getXInLine(lineIndex, lineSelectionStart);
       const endX = this.getXInLine(lineIndex, lineSelectionEnd);
-      rectList.push(Rect.create(startX, line.top, System61.Math.max(0, endX - startX), this.lineHeight));
+      rectList.push(Rect.create(startX, line.top, System62.Math.max(0, endX - startX), this.lineHeight));
     }
     return rectList;
   }
@@ -41982,7 +42574,7 @@ function findBoundaryIndexAtOffset(offsets, boundaryList, targetX) {
 __name(findBoundaryIndexAtOffset, "findBoundaryIndexAtOffset");
 function calculatePageStep(visibleHeight) {
   const pageStep = visibleHeight * 0.875;
-  return isMacPlatform() ? System61.Math.max(pageStep, visibleHeight - 40) : pageStep;
+  return isMacPlatform() ? System62.Math.max(pageStep, visibleHeight - 40) : pageStep;
 }
 __name(calculatePageStep, "calculatePageStep");
 
@@ -42483,7 +43075,7 @@ var UISlider = class extends UIControl {
 };
 
 // src/effect/heathazeeffect.js
-var System62 = globalThis;
+var System63 = globalThis;
 var PARTICLE_FLOATS_PER_VERTEX2 = 8;
 var DEFAULT_CONTENT_SIZE = 300;
 var HeatHazeEffect = class extends Component {
@@ -42578,25 +43170,25 @@ var HeatHazeEffect = class extends Component {
     const matrixF = transformMatrix.f;
     const cornerXList = [matrixE, matrixA * contentSize.x + matrixE, matrixC * contentSize.y + matrixE, matrixA * contentSize.x + matrixC * contentSize.y + matrixE];
     const cornerYList = [matrixF, matrixB * contentSize.x + matrixF, matrixD * contentSize.y + matrixF, matrixB * contentSize.x + matrixD * contentSize.y + matrixF];
-    const minimumX = System62.Math.min(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
-    const maximumX = System62.Math.max(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
-    const minimumY = System62.Math.min(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
-    const maximumY = System62.Math.max(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
+    const minimumX = System63.Math.min(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
+    const maximumX = System63.Math.max(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
+    const minimumY = System63.Math.min(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
+    const maximumY = System63.Math.max(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
     const boundsHeight = maximumY - minimumY;
     const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
     const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
     const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
-    const regionX = System62.Math.max(0, System62.Math.floor(minimumX));
-    const regionY = System62.Math.max(0, System62.Math.floor(minimumY));
-    const regionRight = System62.Math.min(bufferWidth, System62.Math.ceil(maximumX));
-    const regionBottom = System62.Math.min(bufferHeight, System62.Math.ceil(maximumY));
+    const regionX = System63.Math.max(0, System63.Math.floor(minimumX));
+    const regionY = System63.Math.max(0, System63.Math.floor(minimumY));
+    const regionRight = System63.Math.min(bufferWidth, System63.Math.ceil(maximumX));
+    const regionBottom = System63.Math.min(bufferHeight, System63.Math.ceil(maximumY));
     const regionWidth = regionRight - regionX;
     const regionHeight = regionBottom - regionY;
     if (maximumX - minimumX > 0 && boundsHeight > 0 && regionWidth > 0 && regionHeight > 0) {
       const captureTexture = this.ensureCaptureTexture(graphic, regionWidth, regionHeight);
       graphic.bindTexture(captureTexture);
       webGL2RenderingContext.copyTexSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, 0, 0, regionX, bufferHeight - regionBottom, regionWidth, regionHeight);
-      const rowCount = System62.Math.max(1, System62.Math.ceil(contentSize.y));
+      const rowCount = System63.Math.max(1, System63.Math.ceil(contentSize.y));
       const rowHeight = contentSize.y / rowCount;
       const leftU = (minimumX - regionX) / regionWidth;
       const rightU = (maximumX - regionX) / regionWidth;
@@ -42754,12 +43346,12 @@ var HeatHazeEffect = class extends Component {
    * @returns { number } 좌우로 옮길 거리. (노드 로컬 픽셀)
    */
   calculateRowOffset(localY) {
-    return System62.Math.sin(this.#timer + localY * this.getFrequency()) * this.getAmplitude();
+    return System63.Math.sin(this.#timer + localY * this.getFrequency()) * this.getAmplitude();
   }
 };
 
 // src/base/seededrandom.js
-var System63 = globalThis;
+var System64 = globalThis;
 var SeededRandom = class _SeededRandom extends Object2 {
   static {
     __name(this, "SeededRandom");
@@ -42825,8 +43417,8 @@ var SeededRandom = class _SeededRandom extends Object2 {
   nextValue() {
     this.#state = this.#state + 1831565813 >>> 0;
     let mixed = this.#state;
-    mixed = System63.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
-    mixed ^= mixed + System63.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+    mixed = System64.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+    mixed ^= mixed + System64.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
     const value = ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
     return value;
   }
@@ -42851,7 +43443,7 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @returns { number } minValue 이상 maxValue 이하의 정수.
    */
   nextInt(minValue, maxValue) {
-    const value = minValue + System63.Math.floor(this.nextValue() * (maxValue - minValue + 1));
+    const value = minValue + System64.Math.floor(this.nextValue() * (maxValue - minValue + 1));
     return value;
   }
   //==============================================================================
@@ -42897,7 +43489,7 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @returns { number } 시드. (32 비트 부호 없는 정수, 0 이면 1)
    */
   static createDailySeed(dateNumber, baseSeed = 2654435761) {
-    const mixed = (baseSeed ^ System63.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
+    const mixed = (baseSeed ^ System64.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
     return mixed || 1;
   }
   //==============================================================================
@@ -42917,14 +43509,14 @@ var SeededRandom = class _SeededRandom extends Object2 {
     * const sameDayValue = sameDayRandom.nextInt(1, 100);
     * console.log(boardValue === sameDayValue);
    */
-  static fromDate(date = new System63.Date(), baseSeed = 2654435761) {
+  static fromDate(date = new System64.Date(), baseSeed = 2654435761) {
     const dateNumber = date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate();
     return new _SeededRandom(_SeededRandom.createDailySeed(dateNumber, baseSeed));
   }
 };
 
 // src/effect/particlesystem.js
-var System64 = globalThis;
+var System65 = globalThis;
 var ParticleEmitterShape = {
   point: "point",
   // 노드 원점 한 점에서 무작위 방향.
@@ -42954,10 +43546,10 @@ function countBurstFires(burstTime, previousTime, currentTime, isStartIncluded, 
   }
   let firstCycle = 0;
   if (!isStartIncluded) {
-    firstCycle = System64.Math.max(0, System64.Math.floor((previousTime - burstTime) / loopDuration) + 1);
+    firstCycle = System65.Math.max(0, System65.Math.floor((previousTime - burstTime) / loopDuration) + 1);
   }
-  const lastCycle = System64.Math.floor((currentTime - burstTime) / loopDuration);
-  return System64.Math.max(0, lastCycle - firstCycle + 1);
+  const lastCycle = System65.Math.floor((currentTime - burstTime) / loopDuration);
+  return System65.Math.max(0, lastCycle - firstCycle + 1);
 }
 __name(countBurstFires, "countBurstFires");
 var ParticleSystem = class extends Component {
@@ -43238,7 +43830,7 @@ var ParticleSystem = class extends Component {
       if (this.#attractorPosition) {
         const toCenterX = this.#attractorPosition.x - particle.x;
         const toCenterY = this.#attractorPosition.y - particle.y;
-        const centerDistance = System64.Math.max(System64.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
+        const centerDistance = System65.Math.max(System65.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
         const directionX = toCenterX / centerDistance;
         const directionY = toCenterY / centerDistance;
         particle.velocityX += directionX * this.#attractorStrength * timeDelta;
@@ -43247,7 +43839,7 @@ var ParticleSystem = class extends Component {
         particle.velocityY += directionX * this.#attractorSwirl * timeDelta;
       }
       if (this.#damping > 0) {
-        const dampingBlend = System64.Math.max(0, 1 - this.#damping * timeDelta);
+        const dampingBlend = System65.Math.max(0, 1 - this.#damping * timeDelta);
         particle.velocityX *= dampingBlend;
         particle.velocityY *= dampingBlend;
       }
@@ -43274,19 +43866,19 @@ var ParticleSystem = class extends Component {
     let directionY = -1;
     const shape = this.#emitterShape;
     if (shape === ParticleEmitterShape.circle) {
-      const angle = this.randomRange(0, System64.Math.PI * 2);
-      const radius = this.#shapeRadius * System64.Math.sqrt(this.randomRange(0, 1));
-      spawnX = System64.Math.cos(angle) * radius;
-      spawnY = System64.Math.sin(angle) * radius;
-      directionX = System64.Math.cos(angle);
-      directionY = System64.Math.sin(angle);
+      const angle = this.randomRange(0, System65.Math.PI * 2);
+      const radius = this.#shapeRadius * System65.Math.sqrt(this.randomRange(0, 1));
+      spawnX = System65.Math.cos(angle) * radius;
+      spawnY = System65.Math.sin(angle) * radius;
+      directionX = System65.Math.cos(angle);
+      directionY = System65.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.cone) {
-      const angle = -System64.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+      const angle = -System65.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
       const radius = this.randomRange(0, this.#shapeRadius);
-      spawnX = System64.Math.cos(angle) * radius;
-      spawnY = System64.Math.sin(angle) * radius;
-      directionX = System64.Math.cos(angle);
-      directionY = System64.Math.sin(angle);
+      spawnX = System65.Math.cos(angle) * radius;
+      spawnY = System65.Math.sin(angle) * radius;
+      directionX = System65.Math.cos(angle);
+      directionY = System65.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.box) {
       spawnX = this.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
       spawnY = this.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
@@ -43294,9 +43886,9 @@ var ParticleSystem = class extends Component {
       spawnX = this.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
       directionY = 1;
     } else {
-      const angle = this.randomRange(0, System64.Math.PI * 2);
-      directionX = System64.Math.cos(angle);
-      directionY = System64.Math.sin(angle);
+      const angle = this.randomRange(0, System65.Math.PI * 2);
+      directionX = System65.Math.cos(angle);
+      directionY = System65.Math.sin(angle);
     }
     if (originOffset) {
       spawnX += originOffset.x;
@@ -43320,7 +43912,7 @@ var ParticleSystem = class extends Component {
     particle.size = this.randomRange(this.#startSizeMin, this.#startSizeMax);
     particle.rotation = this.randomRange(this.#startRotationMin, this.#startRotationMax);
     particle.angularVelocity = this.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-    particle.wobblePhase = this.randomRange(0, System64.Math.PI * 2);
+    particle.wobblePhase = this.randomRange(0, System65.Math.PI * 2);
     particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
     particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
     particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -43353,8 +43945,8 @@ var ParticleSystem = class extends Component {
           break;
         }
       }
-      const keySpan = System64.Math.max(nextKey.time - previousKey.time, 1e-4);
-      const keyBlend = System64.Math.max(0, System64.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
+      const keySpan = System65.Math.max(nextKey.time - previousKey.time, 1e-4);
+      const keyBlend = System65.Math.max(0, System65.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
       red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
       green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
       blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
@@ -43363,7 +43955,7 @@ var ParticleSystem = class extends Component {
     outChannels[0] = red;
     outChannels[1] = green;
     outChannels[2] = blue;
-    outChannels[3] = System64.Math.max(0, System64.Math.min(1, alpha));
+    outChannels[3] = System65.Math.max(0, System65.Math.min(1, alpha));
   }
   //==============================================================================
   // 출력. (정점 색 배치, 파티클 수와 무관하게 시스템당 드로우 한 번)
@@ -43428,16 +44020,16 @@ var ParticleSystem = class extends Component {
     for (const particle of this.#particleList) {
       const lifeRatio = particle.age / particle.lifetime;
       const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-      const drawSize = System64.Math.max(0.1, particle.size * sizeScale);
+      const drawSize = System65.Math.max(0.1, particle.size * sizeScale);
       this.evaluateColorChannels(particle, lifeRatio, colorChannels);
       let drawX = particle.x + baseOffsetX;
       const drawY = particle.y + baseOffsetY;
       if (this.#wobbleAmplitude > 0) {
-        drawX += System64.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+        drawX += System65.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
       }
       if (isStreak) {
-        const speed = System64.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
-        const safeSpeed = System64.Math.max(speed, 1e-3);
+        const speed = System65.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
+        const safeSpeed = System65.Math.max(speed, 1e-3);
         const directionX = particle.velocityX / safeSpeed;
         const directionY = particle.velocityY / safeSpeed;
         const tailX = drawX - particle.velocityX * this.#streakScale;
@@ -43453,8 +44045,8 @@ var ParticleSystem = class extends Component {
         writeVertex(tailX + sideX, tailY + sideY, 0, 1);
       } else if (isRect && particle.rotation !== 0) {
         const halfSize = drawSize * 0.5;
-        const cosValue = System64.Math.cos(particle.rotation);
-        const sinValue = System64.Math.sin(particle.rotation);
+        const cosValue = System65.Math.cos(particle.rotation);
+        const sinValue = System65.Math.sin(particle.rotation);
         const axisX1 = cosValue * halfSize;
         const axisY1 = sinValue * halfSize;
         const axisX2 = -sinValue * halfSize;
@@ -43491,16 +44083,16 @@ var ParticleSystem = class extends Component {
     for (const particle of this.#particleList) {
       const lifeRatio = particle.age / particle.lifetime;
       const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-      const drawSize = System64.Math.max(0.1, particle.size * sizeScale);
+      const drawSize = System65.Math.max(0.1, particle.size * sizeScale);
       let drawX = particle.x + baseOffsetX;
       const drawY = particle.y + baseOffsetY;
       if (this.#wobbleAmplitude > 0) {
-        drawX += System64.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+        drawX += System65.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
       }
       graphic.pushState();
       graphic.translate(drawX, drawY);
       graphic.rotate(particle.rotation);
-      graphic.multiplyGlobalAlpha(System64.Math.max(0, System64.Math.min(1, particle.alpha * (1 - lifeRatio))));
+      graphic.multiplyGlobalAlpha(System65.Math.max(0, System65.Math.min(1, particle.alpha * (1 - lifeRatio))));
       const image = this.#image;
       graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
       graphic.popState();
@@ -43940,8 +44532,8 @@ var ParticleSystem = class extends Component {
       this.setWorldSpace(description.worldSpace);
     }
     if (description.imageDataUrl !== void 0) {
-      if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System64.Image === "function") {
-        const imageElement = new System64.Image();
+      if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System65.Image === "function") {
+        const imageElement = new System65.Image();
         imageElement.src = description.imageDataUrl;
         this.setImage(imageElement);
       } else {
@@ -44063,7 +44655,7 @@ var ParticleSystem = class extends Component {
 };
 
 // src/effect/shadersprite.js
-var System65 = globalThis;
+var System66 = globalThis;
 var ShaderSpriteEffect = {
   none: "none",
   // 효과 없음. (Sprite 와 같게 그린다)
@@ -44738,7 +45330,7 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
     this.#effect = ShaderSpriteEffect.none;
     this.#effectProgress = 0;
     this.#effectTime = 0;
-    this.#effectSeed = System65.Math.random() * 100;
+    this.#effectSeed = System66.Math.random() * 100;
     this.#effectColor = Color.white();
     this.#effectParameters = [0, 0, 0, 0];
   }
@@ -44776,8 +45368,8 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
     if (imageRect === null || imageRect === void 0 || imageRect.isZero()) {
       imageRect = Rect.create(0, 0, image.width, image.height);
     }
-    const imageWidth = System65.Math.max(1, image.width);
-    const imageHeight = System65.Math.max(1, image.height);
+    const imageWidth = System66.Math.max(1, image.width);
+    const imageHeight = System66.Math.max(1, image.height);
     const effectColor = this.getEffectColor();
     const effectParameters = this.getEffectParameters();
     webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("effectTime"), this.getEffectTime());
@@ -44840,7 +45432,7 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
    * @param { number } effectProgress 진행도. (0 ~ 1 로 자른다)
    */
   setEffectProgress(effectProgress) {
-    this.#effectProgress = System65.Math.max(0, System65.Math.min(1, effectProgress));
+    this.#effectProgress = System66.Math.max(0, System66.Math.min(1, effectProgress));
   }
   //==============================================================================
   // 진행도 반환.
@@ -44965,7 +45557,7 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
 };
 
 // src/effect/trailrenderer.js
-var System66 = globalThis;
+var System67 = globalThis;
 var TrailRenderer = class extends Component {
   static {
     __name(this, "TrailRenderer");
@@ -45064,10 +45656,10 @@ var TrailRenderer = class extends Component {
       const nextPoint = this.#pointList[pointIndex + 1];
       const ageRatio = point.age / this.#pointLifetime;
       const freshRatio = 1 - ageRatio;
-      const segmentWidth = System66.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
-      const red = System66.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
-      const green = System66.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
-      const blue = System66.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
+      const segmentWidth = System67.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
+      const red = System67.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
+      const green = System67.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
+      const blue = System67.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
       const alpha = this.#endColor.alpha + (this.#startColor.alpha - this.#endColor.alpha) * freshRatio;
       graphic.setStrokeColor(`rgba(${red}, ${green}, ${blue}, ${alpha})`);
       graphic.drawLine([
@@ -45343,7 +45935,7 @@ var PlatformerBody = class extends Component {
 };
 
 // src/misc/spriteanimator.js
-var System67 = globalThis;
+var System68 = globalThis;
 var SpriteAnimator = class _SpriteAnimator extends Component {
   static {
     __name(this, "SpriteAnimator");
@@ -45365,7 +45957,7 @@ var SpriteAnimator = class _SpriteAnimator extends Component {
   constructor() {
     super();
     this.setComponentType("SpriteAnimator");
-    this.#clipTable = new System67.Map();
+    this.#clipTable = new System68.Map();
     this.#clipName = null;
     this.#animation = new Animation();
     this.#sprite = null;
@@ -45570,7 +46162,7 @@ var SpriteAnimator = class _SpriteAnimator extends Component {
 };
 
 // src/misc/floatingtext.js
-var System68 = globalThis;
+var System69 = globalThis;
 var FloatingText = class extends WorldNode {
   static {
     __name(this, "FloatingText");
@@ -45648,7 +46240,7 @@ var FloatingText = class extends WorldNode {
     for (let index = this.#activeList.length - 1; index >= 0; --index) {
       const item = this.#activeList[index];
       item.elapsedSeconds += timeDelta;
-      const linearRatio = System68.Math.min(1, item.elapsedSeconds / item.duration);
+      const linearRatio = System69.Math.min(1, item.elapsedSeconds / item.duration);
       const easedRatio = 1 - (1 - linearRatio) * (1 - linearRatio);
       item.node.setLocalPosition(Vector2.create(item.startPosition.x, item.startPosition.y - item.rise * easedRatio));
       item.node.setLocalOpacity(1 - linearRatio * linearRatio);
@@ -45681,12 +46273,12 @@ var FloatingText = class extends WorldNode {
 };
 
 // src/misc/toucheffect.js
-var System69 = globalThis;
+var System70 = globalThis;
 var PARTICLE_GRADIENT_CANVAS_SIZE = 64;
 var particleGradientCanvas = null;
 function getParticleGradientCanvas() {
   if (particleGradientCanvas === null) {
-    const canvas = System69.document.createElement("canvas");
+    const canvas = System70.document.createElement("canvas");
     canvas.width = PARTICLE_GRADIENT_CANVAS_SIZE;
     canvas.height = PARTICLE_GRADIENT_CANVAS_SIZE;
     const canvasRenderingContext = canvas.getContext("2d");
@@ -45870,7 +46462,7 @@ var TouchEffect = class extends WorldNode {
 };
 
 // src/ui/toastmotion.js
-var System70 = globalThis;
+var System71 = globalThis;
 var ENTER_DISTANCE = 10;
 var ENTER_SECONDS = 0.18;
 var ENTER_SETTLE_SECONDS = 0.08;
@@ -45884,7 +46476,7 @@ var REPEAT_SECONDS = 0.15;
 var LONG_TEXT_CHARACTERS = 20;
 var LONG_TEXT_EXTRA_SECONDS = 0.5;
 var MAXIMUM_STAY_SECONDS = 4;
-var ToastPhase = System70.Object.freeze({
+var ToastPhase = System71.Object.freeze({
   hidden: "hidden",
   // 숨음. (노드가 꺼져 있다)
   enter: "enter",
@@ -45895,9 +46487,9 @@ var ToastPhase = System70.Object.freeze({
   // 사라지는 중. (떠오르며 투명해진다)
 });
 function readToastSeconds(text, baseSeconds) {
-  const characterCount = System70.Array.from(text).length;
-  const extraSteps = System70.Math.max(0, System70.Math.ceil((characterCount - LONG_TEXT_CHARACTERS) / LONG_TEXT_CHARACTERS));
-  return System70.Math.min(MAXIMUM_STAY_SECONDS, System70.Math.max(baseSeconds, baseSeconds + extraSteps * LONG_TEXT_EXTRA_SECONDS));
+  const characterCount = System71.Array.from(text).length;
+  const extraSteps = System71.Math.max(0, System71.Math.ceil((characterCount - LONG_TEXT_CHARACTERS) / LONG_TEXT_CHARACTERS));
+  return System71.Math.min(MAXIMUM_STAY_SECONDS, System71.Math.max(baseSeconds, baseSeconds + extraSteps * LONG_TEXT_EXTRA_SECONDS));
 }
 __name(readToastSeconds, "readToastSeconds");
 var ToastMotion = class extends Component {
@@ -46068,14 +46660,14 @@ var ToastMotion = class extends Component {
     let opacity = 1;
     switch (this.#phase) {
       case ToastPhase.enter: {
-        const enterRatio = System70.Math.min(1, this.#phaseSeconds / ENTER_SECONDS);
+        const enterRatio = System71.Math.min(1, this.#phaseSeconds / ENTER_SECONDS);
         const easedRatio = 1 - (1 - enterRatio) * (1 - enterRatio);
         offsetY = this.#enterSide * ENTER_DISTANCE * (1 - easedRatio);
         opacity = easedRatio;
         if (this.#phaseSeconds <= ENTER_SECONDS) {
           scale = ENTER_START_SCALE + (ENTER_PEAK_SCALE - ENTER_START_SCALE) * easedRatio;
         } else {
-          const settleRatio = System70.Math.min(1, (this.#phaseSeconds - ENTER_SECONDS) / ENTER_SETTLE_SECONDS);
+          const settleRatio = System71.Math.min(1, (this.#phaseSeconds - ENTER_SECONDS) / ENTER_SETTLE_SECONDS);
           scale = ENTER_PEAK_SCALE + (1 - ENTER_PEAK_SCALE) * settleRatio;
         }
         if (this.#phaseSeconds >= ENTER_SECONDS + ENTER_SETTLE_SECONDS) {
@@ -46087,8 +46679,8 @@ var ToastMotion = class extends Component {
       case ToastPhase.stay: {
         this.#staySeconds -= timeDelta;
         if (this.#repeatSeconds > 0) {
-          this.#repeatSeconds = System70.Math.max(0, this.#repeatSeconds - timeDelta);
-          scale = 1 + (REPEAT_SCALE - 1) * System70.Math.sin((1 - this.#repeatSeconds / REPEAT_SECONDS) * System70.Math.PI);
+          this.#repeatSeconds = System71.Math.max(0, this.#repeatSeconds - timeDelta);
+          scale = 1 + (REPEAT_SCALE - 1) * System71.Math.sin((1 - this.#repeatSeconds / REPEAT_SECONDS) * System71.Math.PI);
         }
         if (this.#staySeconds <= 0) {
           this.startExit(EXIT_SECONDS);
@@ -46096,7 +46688,7 @@ var ToastMotion = class extends Component {
         break;
       }
       case ToastPhase.exit: {
-        const exitRatio = System70.Math.min(1, this.#phaseSeconds / this.#exitLength);
+        const exitRatio = System71.Math.min(1, this.#phaseSeconds / this.#exitLength);
         offsetY = -EXIT_DISTANCE * exitRatio;
         opacity = 1 - exitRatio;
         if (exitRatio >= 1) {
@@ -46155,7 +46747,7 @@ function attachToastMotion(node, enterSide) {
 __name(attachToastMotion, "attachToastMotion");
 
 // src/graphics3d/camera3d.js
-var System71 = globalThis;
+var System72 = globalThis;
 var MINIMUM_FRONT_DEPTH = 1e-4;
 var Camera3D = class {
   static {
@@ -46399,7 +46991,7 @@ var Camera3D = class {
     const eyeZ = -(viewElements[8] * translationX + viewElements[9] * translationY + viewElements[10] * translationZ);
     this.#rawViewMatrix = rawViewMatrix;
     this.#rawProjectionMatrix = rawProjectionMatrix;
-    this.#isOrthographic = System71.Math.abs(projectionElements[11]) < 0.5;
+    this.#isOrthographic = System72.Math.abs(projectionElements[11]) < 0.5;
     this.#eyePosition = Vector3.create(eyeX, eyeY, eyeZ);
     this.#targetPosition = Vector3.create(eyeX - viewElements[2], eyeY - viewElements[6], eyeZ - viewElements[10]);
     this.#upDirection = Vector3.create(viewElements[1], viewElements[5], viewElements[9]);
@@ -46537,7 +47129,7 @@ var Camera3D = class {
     const clip = this.getViewProjectionMatrix().transformPoint(x, y, z);
     const depth = this.readViewDepth(x, y, z);
     result.depth = depth;
-    if (depth < MINIMUM_FRONT_DEPTH || System71.Math.abs(clip.w) < MINIMUM_FRONT_DEPTH) {
+    if (depth < MINIMUM_FRONT_DEPTH || System72.Math.abs(clip.w) < MINIMUM_FRONT_DEPTH) {
       result.x = 0;
       result.y = 0;
       result.isInFront = false;
@@ -46592,7 +47184,7 @@ var Camera3D = class {
     const farY = farPoint.y / farPoint.w;
     const farZ = farPoint.z / farPoint.w;
     const deltaY = farY - nearY;
-    if (System71.Math.abs(deltaY) < 1e-6) {
+    if (System72.Math.abs(deltaY) < 1e-6) {
       return null;
     }
     const ratio = (planeHeight - nearY) / deltaY;
@@ -46621,14 +47213,14 @@ __export(meshbuilder_exports, {
   createTorusGeometry: () => createTorusGeometry,
   readColorValues: () => readColorValues
 });
-var System72 = globalThis;
+var System73 = globalThis;
 var VERTEX_FLOAT_COUNT = 15;
 var SKIN_FLOAT_COUNT = 8;
 var DEFAULT_OUTLINE_WIDTH = 0.02;
 var MINIMUM_OUTLINE_MITER_COSINE = 0.85;
 var DEGENERATE_AREA = 1e-12;
 function readColorValues(colorText) {
-  const value = System72.parseInt(colorText.slice(1), 16);
+  const value = System73.parseInt(colorText.slice(1), 16);
   return [(value >> 16 & 255) / 255, (value >> 8 & 255) / 255, (value & 255) / 255];
 }
 __name(readColorValues, "readColorValues");
@@ -46675,7 +47267,7 @@ function createRoundedBoxGeometry(width, height, depth, segments, radius) {
   const geometry = { positions: [], normals: [], indices: [] };
   const halfSizes = [width * 0.5, height * 0.5, depth * 0.5];
   const innerSizes = halfSizes.map((halfSize) => {
-    return System72.Math.max(0, halfSize - radius);
+    return System73.Math.max(0, halfSize - radius);
   });
   const axisSamples = halfSizes.map((halfSize, axisIndex) => {
     const innerSize = innerSizes[axisIndex];
@@ -46702,10 +47294,10 @@ function createRoundedBoxGeometry(width, height, depth, segments, radius) {
           point[firstAxis] = firstValue;
           point[secondAxis] = secondValue;
           const inner = point.map((value, valueIndex) => {
-            return System72.Math.max(-innerSizes[valueIndex], System72.Math.min(innerSizes[valueIndex], value));
+            return System73.Math.max(-innerSizes[valueIndex], System73.Math.min(innerSizes[valueIndex], value));
           });
           const direction = [point[0] - inner[0], point[1] - inner[1], point[2] - inner[2]];
-          const length = System72.Math.hypot(direction[0], direction[1], direction[2]);
+          const length = System73.Math.hypot(direction[0], direction[1], direction[2]);
           const normal = length > 0 ? direction.map((value) => {
             return value / length;
           }) : [0, 0, 0];
@@ -46734,10 +47326,10 @@ function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments)
   const slope = (radiusBottom - radiusTop) / height;
   const sideStart = 0;
   for (let segmentIndex = 0; segmentIndex <= radialSegments; ++segmentIndex) {
-    const angle = segmentIndex / radialSegments * System72.Math.PI * 2;
-    const sine = System72.Math.sin(angle);
-    const cosine = System72.Math.cos(angle);
-    const normalLength = System72.Math.hypot(1, slope);
+    const angle = segmentIndex / radialSegments * System73.Math.PI * 2;
+    const sine = System73.Math.sin(angle);
+    const cosine = System73.Math.cos(angle);
+    const normalLength = System73.Math.hypot(1, slope);
     geometry.positions.push(radiusTop * sine, halfHeight, radiusTop * cosine);
     geometry.normals.push(sine / normalLength, slope / normalLength, cosine / normalLength);
     geometry.positions.push(radiusBottom * sine, -halfHeight, radiusBottom * cosine);
@@ -46755,8 +47347,8 @@ function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments)
     geometry.positions.push(0, halfHeight * sign, 0);
     geometry.normals.push(0, sign, 0);
     for (let segmentIndex = 0; segmentIndex <= radialSegments; ++segmentIndex) {
-      const angle = segmentIndex / radialSegments * System72.Math.PI * 2;
-      geometry.positions.push(radius * System72.Math.sin(angle), halfHeight * sign, radius * System72.Math.cos(angle));
+      const angle = segmentIndex / radialSegments * System73.Math.PI * 2;
+      geometry.positions.push(radius * System73.Math.sin(angle), halfHeight * sign, radius * System73.Math.cos(angle));
       geometry.normals.push(0, sign, 0);
     }
     for (let segmentIndex = 0; segmentIndex < radialSegments; ++segmentIndex) {
@@ -46766,15 +47358,15 @@ function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments)
   return geometry;
 }
 __name(createCylinderGeometry, "createCylinderGeometry");
-function createSphereGeometry(radius, widthSegments, heightSegments, thetaLength = System72.Math.PI) {
+function createSphereGeometry(radius, widthSegments, heightSegments, thetaLength = System73.Math.PI) {
   const geometry = { positions: [], normals: [], indices: [], uvs: [] };
   for (let heightIndex = 0; heightIndex <= heightSegments; ++heightIndex) {
     const theta = heightIndex / heightSegments * thetaLength;
     for (let widthIndex = 0; widthIndex <= widthSegments; ++widthIndex) {
-      const phi = widthIndex / widthSegments * System72.Math.PI * 2;
-      const normalX = System72.Math.sin(theta) * System72.Math.sin(phi);
-      const normalY = System72.Math.cos(theta);
-      const normalZ = System72.Math.sin(theta) * System72.Math.cos(phi);
+      const phi = widthIndex / widthSegments * System73.Math.PI * 2;
+      const normalX = System73.Math.sin(theta) * System73.Math.sin(phi);
+      const normalY = System73.Math.cos(theta);
+      const normalZ = System73.Math.sin(theta) * System73.Math.cos(phi);
       geometry.positions.push(normalX * radius, normalY * radius, normalZ * radius);
       geometry.normals.push(normalX, normalY, normalZ);
       geometry.uvs.push(widthIndex / widthSegments, heightIndex / heightSegments);
@@ -46793,20 +47385,20 @@ __name(createSphereGeometry, "createSphereGeometry");
 function createLatheGeometry(points, segments) {
   const geometry = { positions: [], normals: [], indices: [] };
   const profileNormals = points.map((point, pointIndex) => {
-    const previous = points[System72.Math.max(0, pointIndex - 1)];
-    const next = points[System72.Math.min(points.length - 1, pointIndex + 1)];
+    const previous = points[System73.Math.max(0, pointIndex - 1)];
+    const next = points[System73.Math.min(points.length - 1, pointIndex + 1)];
     const tangentX = next[0] - previous[0];
     const tangentY = next[1] - previous[1];
-    const length = System72.Math.hypot(tangentX, tangentY);
+    const length = System73.Math.hypot(tangentX, tangentY);
     if (length <= 0) {
       return [1, 0];
     }
     return [tangentY / length, -tangentX / length];
   });
   for (let segmentIndex = 0; segmentIndex <= segments; ++segmentIndex) {
-    const phi = segmentIndex / segments * System72.Math.PI * 2;
-    const sine = System72.Math.sin(phi);
-    const cosine = System72.Math.cos(phi);
+    const phi = segmentIndex / segments * System73.Math.PI * 2;
+    const sine = System73.Math.sin(phi);
+    const cosine = System73.Math.cos(phi);
     for (let pointIndex = 0; pointIndex < points.length; ++pointIndex) {
       const point = points[pointIndex];
       const profileNormal = profileNormals[pointIndex];
@@ -46828,27 +47420,27 @@ function createCapsuleGeometry(radius, length, capSegments, radialSegments) {
   const points = [];
   const halfLength = length * 0.5;
   for (let segmentIndex = 0; segmentIndex <= capSegments; ++segmentIndex) {
-    const angle = -System72.Math.PI * 0.5 + segmentIndex / capSegments * System72.Math.PI * 0.5;
-    points.push([System72.Math.cos(angle) * radius, -halfLength + System72.Math.sin(angle) * radius]);
+    const angle = -System73.Math.PI * 0.5 + segmentIndex / capSegments * System73.Math.PI * 0.5;
+    points.push([System73.Math.cos(angle) * radius, -halfLength + System73.Math.sin(angle) * radius]);
   }
   for (let segmentIndex = 0; segmentIndex <= capSegments; ++segmentIndex) {
-    const angle = segmentIndex / capSegments * System72.Math.PI * 0.5;
-    points.push([System72.Math.cos(angle) * radius, halfLength + System72.Math.sin(angle) * radius]);
+    const angle = segmentIndex / capSegments * System73.Math.PI * 0.5;
+    points.push([System73.Math.cos(angle) * radius, halfLength + System73.Math.sin(angle) * radius]);
   }
   return createLatheGeometry(points, radialSegments);
 }
 __name(createCapsuleGeometry, "createCapsuleGeometry");
-function createTorusGeometry(radius, tube, radialSegments, tubularSegments, arc = System72.Math.PI * 2) {
+function createTorusGeometry(radius, tube, radialSegments, tubularSegments, arc = System73.Math.PI * 2) {
   const geometry = { positions: [], normals: [], indices: [] };
   for (let radialIndex = 0; radialIndex <= radialSegments; ++radialIndex) {
-    const tubeAngle = radialIndex / radialSegments * System72.Math.PI * 2;
+    const tubeAngle = radialIndex / radialSegments * System73.Math.PI * 2;
     for (let tubularIndex = 0; tubularIndex <= tubularSegments; ++tubularIndex) {
       const ringAngle = tubularIndex / tubularSegments * arc;
-      const centerX = radius * System72.Math.cos(ringAngle);
-      const centerY = radius * System72.Math.sin(ringAngle);
-      const normalX = System72.Math.cos(tubeAngle) * System72.Math.cos(ringAngle);
-      const normalY = System72.Math.cos(tubeAngle) * System72.Math.sin(ringAngle);
-      const normalZ = System72.Math.sin(tubeAngle);
+      const centerX = radius * System73.Math.cos(ringAngle);
+      const centerY = radius * System73.Math.sin(ringAngle);
+      const normalX = System73.Math.cos(tubeAngle) * System73.Math.cos(ringAngle);
+      const normalY = System73.Math.cos(tubeAngle) * System73.Math.sin(ringAngle);
+      const normalZ = System73.Math.sin(tubeAngle);
       geometry.positions.push(centerX + normalX * tube, centerY + normalY * tube, normalZ * tube);
       geometry.normals.push(normalX, normalY, normalZ);
     }
@@ -46869,7 +47461,7 @@ function createOctahedronGeometry(radius) {
     for (const signY of [-1, 1]) {
       for (const signZ of [-1, 1]) {
         const corners = [[radius * signX, 0, 0], [0, radius * signY, 0], [0, 0, radius * signZ]];
-        const normalLength = System72.Math.sqrt(3);
+        const normalLength = System73.Math.sqrt(3);
         const startIndex = geometry.positions.length / 3;
         for (const corner of corners) {
           geometry.positions.push(corner[0], corner[1], corner[2]);
@@ -46884,12 +47476,12 @@ function createOctahedronGeometry(radius) {
 __name(createOctahedronGeometry, "createOctahedronGeometry");
 function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
   const geometry = { positions: [], normals: [], indices: [] };
-  const golden = (1 + System72.Math.sqrt(5)) / 2;
+  const golden = (1 + System73.Math.sqrt(5)) / 2;
   const baseCorners = [[-1, golden, 0], [1, golden, 0], [-1, -golden, 0], [1, -golden, 0], [0, -1, golden], [0, 1, golden], [0, -1, -golden], [0, 1, -golden], [golden, 0, -1], [golden, 0, 1], [-golden, 0, -1], [-golden, 0, 1]];
   const faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
   const scaleCount = vertexScales.length;
   const corners = baseCorners.map((corner, cornerIndex) => {
-    const length = System72.Math.hypot(corner[0], corner[1], corner[2]);
+    const length = System73.Math.hypot(corner[0], corner[1], corner[2]);
     const vertexScale = scaleCount > 0 ? vertexScales[cornerIndex % scaleCount] : 1;
     const scale = radius * vertexScale / length;
     return [corner[0] * scale * axisScale[0], corner[1] * scale * axisScale[1], corner[2] * scale * axisScale[2]];
@@ -46908,7 +47500,7 @@ function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
       third = swapped;
       normal = [-normal[0], -normal[1], -normal[2]];
     }
-    const normalLength = System72.Math.max(1e-6, System72.Math.hypot(normal[0], normal[1], normal[2]));
+    const normalLength = System73.Math.max(1e-6, System73.Math.hypot(normal[0], normal[1], normal[2]));
     const startIndex = geometry.positions.length / 3;
     for (const corner of [first, second, third]) {
       geometry.positions.push(corner[0], corner[1], corner[2]);
@@ -47042,7 +47634,7 @@ var MeshBuilder = class {
       const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
       const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
       const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-      const normalLength = System72.Math.hypot(normalX, normalY, normalZ);
+      const normalLength = System73.Math.hypot(normalX, normalY, normalZ);
       const unitX = normalLength > 0 ? normalX / normalLength : 0;
       const unitY = normalLength > 0 ? normalY / normalLength : 1;
       const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -47130,12 +47722,12 @@ var MeshBuilder = class {
    */
   addQuadShell(quads, outlineWidth) {
     const readPointKey = /* @__PURE__ */ __name((corner) => {
-      return System72.Math.round(corner[0] * 1e4) + "," + System72.Math.round(corner[1] * 1e4) + "," + System72.Math.round(corner[2] * 1e4);
+      return System73.Math.round(corner[0] * 1e4) + "," + System73.Math.round(corner[1] * 1e4) + "," + System73.Math.round(corner[2] * 1e4);
     }, "readPointKey");
-    const pointNormals = new System72.Map();
+    const pointNormals = new System73.Map();
     for (const quad of quads) {
       const normal = quad.normal;
-      const normalKey = System72.Math.round(normal[0] * 1e3) + "," + System72.Math.round(normal[1] * 1e3) + "," + System72.Math.round(normal[2] * 1e3);
+      const normalKey = System73.Math.round(normal[0] * 1e3) + "," + System73.Math.round(normal[1] * 1e3) + "," + System73.Math.round(normal[2] * 1e3);
       for (const corner of quad.corners) {
         const pointKey = readPointKey(corner);
         let entry = pointNormals.get(pointKey);
@@ -47158,7 +47750,7 @@ var MeshBuilder = class {
       const startIndex = this.#outlinePositions.length / 3;
       for (const corner of corners) {
         const entry = pointNormals.get(readPointKey(corner));
-        const sumLength = System72.Math.hypot(entry.sum[0], entry.sum[1], entry.sum[2]);
+        const sumLength = System73.Math.hypot(entry.sum[0], entry.sum[1], entry.sum[2]);
         const scale = sumLength > 0 ? outlineWidth / sumLength : 0;
         this.#outlinePositions.push(corner[0] + entry.sum[0] * scale, corner[1] + entry.sum[1] * scale, corner[2] + entry.sum[2] * scale);
         this.#outlineBasePositions.push(corner[0], corner[1], corner[2]);
@@ -47210,7 +47802,7 @@ var MeshBuilder = class {
       const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
       const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
       const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-      const normalLength = System72.Math.hypot(normalX, normalY, normalZ);
+      const normalLength = System73.Math.hypot(normalX, normalY, normalZ);
       const unitX = normalLength > 0 ? normalX / normalLength : 0;
       const unitY = normalLength > 0 ? normalY / normalLength : 1;
       const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -47282,7 +47874,7 @@ var MeshBuilder = class {
       const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
       const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
       const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-      const normalLength = System72.Math.hypot(normalX, normalY, normalZ);
+      const normalLength = System73.Math.hypot(normalX, normalY, normalZ);
       const unitX = normalLength > 0 ? normalX / normalLength : 0;
       const unitY = normalLength > 0 ? normalY / normalLength : 1;
       const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -47392,23 +47984,23 @@ var MeshBuilder = class {
    */
   readArrays() {
     const vertexCount = this.#vertices.length / VERTEX_FLOAT_COUNT;
-    const uvData = new System72.Float32Array(this.#uvValues.length > 0 ? vertexCount * 2 : 0);
+    const uvData = new System73.Float32Array(this.#uvValues.length > 0 ? vertexCount * 2 : 0);
     uvData.set(this.#uvValues.slice(0, uvData.length));
-    const uv1Data = new System72.Float32Array(this.#uv1Values.length > 0 ? vertexCount * 2 : 0);
+    const uv1Data = new System73.Float32Array(this.#uv1Values.length > 0 ? vertexCount * 2 : 0);
     uv1Data.set(this.#uv1Values.slice(0, uv1Data.length));
     return {
-      vertexData: new System72.Float32Array(this.#vertices),
-      indexData: new System72.Uint32Array(this.#indices),
-      outlineVertexData: new System72.Float32Array(this.#outlinePositions),
-      outlineIndexData: new System72.Uint32Array(this.#outlineIndices),
-      outlineBaseData: new System72.Float32Array(this.#outlineBasePositions),
-      skinData: new System72.Float32Array(this.#skinValues),
-      outlineSkinData: new System72.Float32Array(this.#outlineSkinValues),
+      vertexData: new System73.Float32Array(this.#vertices),
+      indexData: new System73.Uint32Array(this.#indices),
+      outlineVertexData: new System73.Float32Array(this.#outlinePositions),
+      outlineIndexData: new System73.Uint32Array(this.#outlineIndices),
+      outlineBaseData: new System73.Float32Array(this.#outlineBasePositions),
+      skinData: new System73.Float32Array(this.#skinValues),
+      outlineSkinData: new System73.Float32Array(this.#outlineSkinValues),
       skeleton: null,
       uvData,
       uv1Data,
       materialRanges: this.#materialRanges.map((materialRange) => {
-        return System72.Object.assign({}, materialRange);
+        return System73.Object.assign({}, materialRange);
       })
     };
   }
@@ -47433,7 +48025,7 @@ var MeshBuilder = class {
     const cofactor01 = m12 * m20 - m10 * m22;
     const cofactor02 = m10 * m21 - m11 * m20;
     const determinant = m00 * cofactor00 + m01 * cofactor01 + m02 * cofactor02;
-    if (System72.Math.abs(determinant) < 1e-20) {
+    if (System73.Math.abs(determinant) < 1e-20) {
       return [1, 0, 0, 0, 1, 0, 0, 0, 1];
     }
     const inverseDeterminant = 1 / determinant;
@@ -47565,13 +48157,13 @@ var MeshBuilder = class {
    */
   readOutlineOffsets(worldPositions, worldNormals, outlineWidth) {
     const pointKeys = [];
-    const pointNormals = new System72.Map();
+    const pointNormals = new System73.Map();
     for (let pointIndex = 0; pointIndex < worldPositions.length; pointIndex += 3) {
-      const pointKey = System72.Math.round(worldPositions[pointIndex] * 1e4) + "," + System72.Math.round(worldPositions[pointIndex + 1] * 1e4) + "," + System72.Math.round(worldPositions[pointIndex + 2] * 1e4);
+      const pointKey = System73.Math.round(worldPositions[pointIndex] * 1e4) + "," + System73.Math.round(worldPositions[pointIndex + 1] * 1e4) + "," + System73.Math.round(worldPositions[pointIndex + 2] * 1e4);
       const normalX = worldNormals[pointIndex];
       const normalY = worldNormals[pointIndex + 1];
       const normalZ = worldNormals[pointIndex + 2];
-      const normalKey = System72.Math.round(normalX * 1e3) + "," + System72.Math.round(normalY * 1e3) + "," + System72.Math.round(normalZ * 1e3);
+      const normalKey = System73.Math.round(normalX * 1e3) + "," + System73.Math.round(normalY * 1e3) + "," + System73.Math.round(normalZ * 1e3);
       pointKeys.push(pointKey);
       let entry = pointNormals.get(pointKey);
       if (entry === void 0) {
@@ -47584,7 +48176,7 @@ var MeshBuilder = class {
       entry.normalKeys.push(normalKey);
       entry.normals.push([normalX, normalY, normalZ]);
     }
-    const pointOffsets = new System72.Map();
+    const pointOffsets = new System73.Map();
     for (const [pointKey, entry] of pointNormals) {
       const sum = [0, 0, 0];
       for (const normal of entry.normals) {
@@ -47592,7 +48184,7 @@ var MeshBuilder = class {
         sum[1] += normal[1];
         sum[2] += normal[2];
       }
-      const sumLength = System72.Math.hypot(sum[0], sum[1], sum[2]);
+      const sumLength = System73.Math.hypot(sum[0], sum[1], sum[2]);
       if (sumLength <= 0) {
         pointOffsets.set(pointKey, null);
         continue;
@@ -47601,9 +48193,9 @@ var MeshBuilder = class {
       let minimumCosine = 1;
       for (const normal of entry.normals) {
         const cosine = direction[0] * normal[0] + direction[1] * normal[1] + direction[2] * normal[2];
-        minimumCosine = System72.Math.min(minimumCosine, cosine);
+        minimumCosine = System73.Math.min(minimumCosine, cosine);
       }
-      const distance = outlineWidth / System72.Math.max(minimumCosine, MINIMUM_OUTLINE_MITER_COSINE);
+      const distance = outlineWidth / System73.Math.max(minimumCosine, MINIMUM_OUTLINE_MITER_COSINE);
       pointOffsets.set(pointKey, [direction[0] * distance, direction[1] * distance, direction[2] * distance]);
     }
     const offsets = [];
@@ -47626,19 +48218,19 @@ var MeshBuilder = class {
    * @returns { number } 감싸는 상자 가운데에서 가장 먼 점까지의 거리.
    */
   readBoundingRadius(positions) {
-    const minimum = [System72.Infinity, System72.Infinity, System72.Infinity];
-    const maximum = [-System72.Infinity, -System72.Infinity, -System72.Infinity];
+    const minimum = [System73.Infinity, System73.Infinity, System73.Infinity];
+    const maximum = [-System73.Infinity, -System73.Infinity, -System73.Infinity];
     for (let pointIndex = 0; pointIndex < positions.length; pointIndex += 3) {
       for (let axisIndex = 0; axisIndex < 3; ++axisIndex) {
-        minimum[axisIndex] = System72.Math.min(minimum[axisIndex], positions[pointIndex + axisIndex]);
-        maximum[axisIndex] = System72.Math.max(maximum[axisIndex], positions[pointIndex + axisIndex]);
+        minimum[axisIndex] = System73.Math.min(minimum[axisIndex], positions[pointIndex + axisIndex]);
+        maximum[axisIndex] = System73.Math.max(maximum[axisIndex], positions[pointIndex + axisIndex]);
       }
     }
     const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
     let radius = 0;
     for (let pointIndex = 0; pointIndex < positions.length; pointIndex += 3) {
-      const distance = System72.Math.hypot(positions[pointIndex] - center[0], positions[pointIndex + 1] - center[1], positions[pointIndex + 2] - center[2]);
-      radius = System72.Math.max(radius, distance);
+      const distance = System73.Math.hypot(positions[pointIndex] - center[0], positions[pointIndex + 1] - center[1], positions[pointIndex + 2] - center[2]);
+      radius = System73.Math.max(radius, distance);
     }
     return radius;
   }
@@ -47650,10 +48242,10 @@ var MeshBuilder = class {
    * @returns { number } 세 축 길이 가운데 가장 큰 것.
    */
   readMaximumScale(elements) {
-    const scaleX = System72.Math.hypot(elements[0], elements[1], elements[2]);
-    const scaleY = System72.Math.hypot(elements[4], elements[5], elements[6]);
-    const scaleZ = System72.Math.hypot(elements[8], elements[9], elements[10]);
-    return System72.Math.max(scaleX, scaleY, scaleZ);
+    const scaleX = System73.Math.hypot(elements[0], elements[1], elements[2]);
+    const scaleY = System73.Math.hypot(elements[4], elements[5], elements[6]);
+    const scaleZ = System73.Math.hypot(elements[8], elements[9], elements[10]);
+    return System73.Math.max(scaleX, scaleY, scaleZ);
   }
   //==============================================================================
   // 지어 둔 배열 여럿을 옮겨 한 배열로 잇기. (움직이지 않는 조각을 한 메시로, 돌리거나 키우지 않음)
@@ -47687,22 +48279,22 @@ var MeshBuilder = class {
       outlineFloatCount += arrays.outlineVertexData.length;
       outlineIndexCount += arrays.outlineIndexData.length;
     }
-    const vertexData = new System72.Float32Array(vertexFloatCount);
-    const indexData = new System72.Uint32Array(indexCount);
-    const outlineVertexData = new System72.Float32Array(outlineFloatCount);
-    const outlineBaseData = new System72.Float32Array(outlineFloatCount);
-    const outlineIndexData = new System72.Uint32Array(outlineIndexCount);
+    const vertexData = new System73.Float32Array(vertexFloatCount);
+    const indexData = new System73.Uint32Array(indexCount);
+    const outlineVertexData = new System73.Float32Array(outlineFloatCount);
+    const outlineBaseData = new System73.Float32Array(outlineFloatCount);
+    const outlineIndexData = new System73.Uint32Array(outlineIndexCount);
     const innerOutlineRanges = [];
     const innerBodyRanges = [];
     const materialRanges = [];
     const hasUv = pieces.some((piece) => {
       return piece.arrays.uvData !== void 0 && piece.arrays.uvData !== null && piece.arrays.uvData.length > 0;
     });
-    const uvData = new System72.Float32Array(hasUv ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
+    const uvData = new System73.Float32Array(hasUv ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
     const hasUv1 = pieces.some((piece) => {
       return piece.arrays.uv1Data !== void 0 && piece.arrays.uv1Data !== null && piece.arrays.uv1Data.length > 0;
     });
-    const uv1Data = new System72.Float32Array(hasUv1 ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
+    const uv1Data = new System73.Float32Array(hasUv1 ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
     let vertexOffset = 0;
     let indexOffset = 0;
     let outlineOffset = 0;
@@ -47721,14 +48313,14 @@ var MeshBuilder = class {
         indexData[indexOffset + index] = arrays.indexData[index] + startVertex;
       }
       if (hasUv && arrays.uvData !== void 0 && arrays.uvData !== null && arrays.uvData.length > 0) {
-        uvData.set(arrays.uvData.subarray(0, System72.Math.min(arrays.uvData.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
+        uvData.set(arrays.uvData.subarray(0, System73.Math.min(arrays.uvData.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
       }
       if (hasUv1 && arrays.uv1Data !== void 0 && arrays.uv1Data !== null && arrays.uv1Data.length > 0) {
-        uv1Data.set(arrays.uv1Data.subarray(0, System72.Math.min(arrays.uv1Data.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
+        uv1Data.set(arrays.uv1Data.subarray(0, System73.Math.min(arrays.uv1Data.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
       }
       const pieceMaterialRanges = arrays.materialRanges !== void 0 ? arrays.materialRanges : [];
       for (const range of pieceMaterialRanges) {
-        materialRanges.push(System72.Object.assign({}, range, { indexStart: range.indexStart + indexOffset }));
+        materialRanges.push(System73.Object.assign({}, range, { indexStart: range.indexStart + indexOffset }));
       }
       const startOutlineVertex = outlineOffset / 3;
       const pieceOutlineBaseData = arrays.outlineBaseData !== void 0 && arrays.outlineBaseData.length === arrays.outlineVertexData.length ? arrays.outlineBaseData : arrays.outlineVertexData;
@@ -47762,8 +48354,8 @@ var MeshBuilder = class {
       outlineVertexData,
       outlineIndexData,
       outlineBaseData,
-      skinData: new System72.Float32Array(0),
-      outlineSkinData: new System72.Float32Array(0),
+      skinData: new System73.Float32Array(0),
+      outlineSkinData: new System73.Float32Array(0),
       skeleton: null,
       innerOutlineRanges,
       innerBodyRanges,
@@ -47775,12 +48367,12 @@ var MeshBuilder = class {
 };
 
 // src/graphics3d/toon/toonlightset.js
-var System73 = globalThis;
+var System74 = globalThis;
 var TOON_MAXIMUM_POINT_LIGHTS = 8;
 var TOON_MAXIMUM_BAND_STEPS = 8;
 var nextLightSetId = 1;
 function normalizeDirection(direction) {
-  const length = System73.Math.hypot(direction[0], direction[1], direction[2]);
+  const length = System74.Math.hypot(direction[0], direction[1], direction[2]);
   if (length <= 0) {
     return [0, -1, 0];
   }
@@ -48012,9 +48604,9 @@ var ToonLightSet = class {
    */
   setRimLight(rimColor, rimPower, rimFeather = 1, rimLightMask = 0) {
     this.#rimColor = rimColor.slice();
-    this.#rimPower = System73.Math.max(0, rimPower);
-    this.#rimFeather = System73.Math.max(0, System73.Math.min(1, rimFeather));
-    this.#rimLightMask = System73.Math.max(0, System73.Math.min(1, rimLightMask));
+    this.#rimPower = System74.Math.max(0, rimPower);
+    this.#rimFeather = System74.Math.max(0, System74.Math.min(1, rimFeather));
+    this.#rimLightMask = System74.Math.max(0, System74.Math.min(1, rimLightMask));
     this.markChanged();
   }
   //==============================================================================
@@ -48040,7 +48632,7 @@ var ToonLightSet = class {
    */
   setShadeRimLight(shadeRimColor, shadeRimPower) {
     this.#shadeRimColor = shadeRimColor.slice();
-    this.#shadeRimPower = System73.Math.max(0, shadeRimPower);
+    this.#shadeRimPower = System74.Math.max(0, shadeRimPower);
     this.markChanged();
   }
   //==============================================================================
@@ -48065,7 +48657,7 @@ var ToonLightSet = class {
    * lightSet.setLightColorUsage({ shade: false, outline: false });
    */
   setLightColorUsage(lightColorUsage) {
-    for (const key of System73.Object.keys(this.#lightColorUsage)) {
+    for (const key of System74.Object.keys(this.#lightColorUsage)) {
       if (lightColorUsage[key] !== void 0) {
         this.#lightColorUsage[key] = lightColorUsage[key] === true;
       }
@@ -48079,7 +48671,7 @@ var ToonLightSet = class {
    * @returns { object } { base, shade, highlight, rim, shadeRim, matcap, angelRing, outline }
    */
   getLightColorUsage() {
-    return System73.Object.assign({}, this.#lightColorUsage);
+    return System74.Object.assign({}, this.#lightColorUsage);
   }
   //==============================================================================
   // 빛 세기 막기 설정. (true 면 빛마다 받은 몫을 1 로 막아 하얗게 날지 않게 한다, 기본 true, 유니티 툰 셰이더의 Limit Light Intensity)
@@ -48125,9 +48717,9 @@ var ToonLightSet = class {
    * lightSet.setSpecular(0.4, 32, 1, [1, 0.95, 0.9]);
    */
   setSpecular(specularStrength, specularExponent = 48, specularFeather = 0, specularColor = [1, 1, 1]) {
-    this.#specularStrength = System73.Math.max(0, specularStrength);
-    this.#specularExponent = System73.Math.max(1, specularExponent);
-    this.#specularFeather = System73.Math.max(0, System73.Math.min(1, specularFeather));
+    this.#specularStrength = System74.Math.max(0, specularStrength);
+    this.#specularExponent = System74.Math.max(1, specularExponent);
+    this.#specularFeather = System74.Math.max(0, System74.Math.min(1, specularFeather));
     this.#specularColor = specularColor.slice();
     this.markChanged();
   }
@@ -48157,15 +48749,15 @@ var ToonLightSet = class {
         position: pointLight.position.slice(),
         color: pointLight.color !== void 0 ? pointLight.color.slice() : [1, 1, 1],
         intensity: pointLight.intensity !== void 0 ? pointLight.intensity : 1,
-        range: pointLight.range !== void 0 ? System73.Math.max(0, pointLight.range) : 0,
-        decay: pointLight.decay !== void 0 ? System73.Math.max(0, pointLight.decay) : 2,
-        rangeExponent: pointLight.rangeExponent !== void 0 ? System73.Math.max(1e-4, pointLight.rangeExponent) : 4,
-        wrap: pointLight.wrap !== void 0 ? System73.Math.max(0, pointLight.wrap) : 0,
+        range: pointLight.range !== void 0 ? System74.Math.max(0, pointLight.range) : 0,
+        decay: pointLight.decay !== void 0 ? System74.Math.max(0, pointLight.decay) : 2,
+        rangeExponent: pointLight.rangeExponent !== void 0 ? System74.Math.max(1e-4, pointLight.rangeExponent) : 4,
+        wrap: pointLight.wrap !== void 0 ? System74.Math.max(0, pointLight.wrap) : 0,
         direction: pointLight.direction !== void 0 && pointLight.direction !== null ? normalizeDirection(pointLight.direction) : null,
-        innerConeAngle: pointLight.innerConeAngle !== void 0 ? System73.Math.max(0, pointLight.innerConeAngle) : 0,
-        outerConeAngle: pointLight.outerConeAngle !== void 0 ? System73.Math.max(1e-4, pointLight.outerConeAngle) : System73.Math.PI / 4,
+        innerConeAngle: pointLight.innerConeAngle !== void 0 ? System74.Math.max(0, pointLight.innerConeAngle) : 0,
+        outerConeAngle: pointLight.outerConeAngle !== void 0 ? System74.Math.max(1e-4, pointLight.outerConeAngle) : System74.Math.PI / 4,
         castsShadow: pointLight.castsShadow === true,
-        shadowNear: pointLight.shadowNear !== void 0 ? System73.Math.max(1e-3, pointLight.shadowNear) : 0.05
+        shadowNear: pointLight.shadowNear !== void 0 ? System74.Math.max(1e-3, pointLight.shadowNear) : 0.05
       };
     });
     this.markChanged();
@@ -48186,7 +48778,7 @@ var ToonLightSet = class {
    * @param { number } pointLightLimit - 한도.
    */
   setPointLightLimit(pointLightLimit) {
-    this.#pointLightLimit = System73.Math.max(0, System73.Math.min(TOON_MAXIMUM_POINT_LIGHTS, System73.Math.floor(pointLightLimit)));
+    this.#pointLightLimit = System74.Math.max(0, System74.Math.min(TOON_MAXIMUM_POINT_LIGHTS, System74.Math.floor(pointLightLimit)));
     this.markChanged();
   }
   //==============================================================================
@@ -48196,7 +48788,7 @@ var ToonLightSet = class {
    * @returns { number } 셰이더에 넣을 점광 수.
    */
   getPointLightCount() {
-    return System73.Math.min(this.#pointLights.length, this.#pointLightLimit);
+    return System74.Math.min(this.#pointLights.length, this.#pointLightLimit);
   }
   //==============================================================================
   // 그늘 셋 설정. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 그 경계의 Step, Feather)
@@ -48240,7 +48832,7 @@ var ToonLightSet = class {
    * lightSet.setShadeRamp([0, 0.4, 0.62], [[0.3, 0.3, 0.45], [0.62, 0.6, 0.75], [1, 1, 1]], [0, 0.05, 0.02], true);
    */
   setShadeRamp(positions, colors, feathers, isHalfLambert) {
-    const stopCount = System73.Math.min(positions.length, colors.length, TOON_MAXIMUM_BAND_STEPS);
+    const stopCount = System74.Math.min(positions.length, colors.length, TOON_MAXIMUM_BAND_STEPS);
     if (stopCount < 2) {
       this.#shadePositions = [];
       this.#shadeColors = [];
@@ -48252,7 +48844,7 @@ var ToonLightSet = class {
       });
       this.#shadeFeathers = [];
       for (let stopIndex = 0; stopIndex < stopCount; ++stopIndex) {
-        this.#shadeFeathers.push(feathers[stopIndex] !== void 0 ? System73.Math.max(0, feathers[stopIndex]) : 0);
+        this.#shadeFeathers.push(feathers[stopIndex] !== void 0 ? System74.Math.max(0, feathers[stopIndex]) : 0);
       }
     }
     this.#isShadeHalfLambert = isHalfLambert === true;
@@ -48280,7 +48872,7 @@ var ToonLightSet = class {
    * @param { number } bandCount - 칸 수. (0 이면 부드럽게)
    */
   setBandCount(bandCount) {
-    const count = System73.Math.max(0, System73.Math.min(TOON_MAXIMUM_BAND_STEPS - 1, System73.Math.floor(bandCount)));
+    const count = System74.Math.max(0, System74.Math.min(TOON_MAXIMUM_BAND_STEPS - 1, System74.Math.floor(bandCount)));
     if (count === 0) {
       this.clearShadeRamp();
       return;
@@ -48305,7 +48897,7 @@ var ToonLightSet = class {
    * @param { boolean } isHalfLambert - dot x 0.5 + 0.5 를 문턱에 댈지.
    */
   setBandRamp(thresholds, values, isHalfLambert) {
-    const valueCount = System73.Math.min(values.length, TOON_MAXIMUM_BAND_STEPS);
+    const valueCount = System74.Math.min(values.length, TOON_MAXIMUM_BAND_STEPS);
     const positions = [0];
     const colors = [];
     const feathers = [0];
@@ -48369,7 +48961,7 @@ var ToonLightSet = class {
 };
 
 // src/graphics3d/shadowmap.js
-var System74 = globalThis;
+var System75 = globalThis;
 var SHADOW_ATLAS_MAXIMUM_LIGHTS = 4;
 var CUBE_FACE_FORWARDS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 var CUBE_FACE_UPS = [[0, 1, 0], [0, 1, 0], [0, 0, 1], [0, 0, 1], [0, 1, 0], [0, 1, 0]];
@@ -48484,12 +49076,12 @@ var ShadowMap = class extends Object2 {
     const eyeDistance = (nearDistance + farDistance) * 0.5;
     const eyeOffset = normalizedDirection.multiply(-eyeDistance);
     const eyePosition = focusPosition.add(eyeOffset);
-    const upDirection = System74.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
+    const upDirection = System75.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
     const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
     const worldUnitsPerTexel = extent * 2 / this.getResolution();
     const viewElements = viewMatrix.getElements();
-    viewElements[12] = System74.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    viewElements[13] = System74.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[12] = System75.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[13] = System75.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
     const orthographicMatrix = Matrix4.createOrthographic(-extent, extent, -extent, extent, nearDistance, farDistance);
     const lightViewProjectionMatrix = orthographicMatrix.clone();
     lightViewProjectionMatrix.multiply(viewMatrix);
@@ -48605,7 +49197,7 @@ var ShadowAtlas = class extends Object2 {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#resolution = resolution;
-    this.#tileResolution = System74.Math.max(1, System74.Math.min(tileResolution, resolution));
+    this.#tileResolution = System75.Math.max(1, System75.Math.min(tileResolution, resolution));
     const depthTarget = createDepthTarget(webGL2RenderingContext, resolution);
     this.#framebuffer = depthTarget.framebuffer;
     this.#depthTexture = depthTarget.depthTexture;
@@ -48628,17 +49220,17 @@ var ShadowAtlas = class extends Object2 {
       if (pointLight.castsShadow !== true || this.#lights.length >= SHADOW_ATLAS_MAXIMUM_LIGHTS) {
         continue;
       }
-      const near = pointLight.shadowNear !== void 0 ? System74.Math.max(1e-3, pointLight.shadowNear) : 0.05;
-      const far = System74.Math.max(near + 0.01, pointLight.range !== void 0 && pointLight.range > 0 ? pointLight.range : 30);
+      const near = pointLight.shadowNear !== void 0 ? System75.Math.max(1e-3, pointLight.shadowNear) : 0.05;
+      const far = System75.Math.max(near + 0.01, pointLight.range !== void 0 && pointLight.range > 0 ? pointLight.range : 30);
       const direction = pointLight.direction !== void 0 && pointLight.direction !== null ? normalizeDirection2(pointLight.direction) : null;
       const light = { lightIndex, position: pointLight.position.slice(), forward: [0, 0, 1], up: [0, 1, 0], tangent: 0, near, far, firstTile: tileCount };
       if (direction !== null) {
-        const outerConeAngle = pointLight.outerConeAngle !== void 0 ? pointLight.outerConeAngle : System74.Math.PI / 4;
-        const helper = System74.Math.abs(direction[1]) < 0.99 ? [0, 1, 0] : [1, 0, 0];
+        const outerConeAngle = pointLight.outerConeAngle !== void 0 ? pointLight.outerConeAngle : System75.Math.PI / 4;
+        const helper = System75.Math.abs(direction[1]) < 0.99 ? [0, 1, 0] : [1, 0, 0];
         const along = helper[0] * direction[0] + helper[1] * direction[1] + helper[2] * direction[2];
         light.forward = direction;
         light.up = normalizeDirection2([helper[0] - direction[0] * along, helper[1] - direction[1] * along, helper[2] - direction[2] * along]);
-        light.tangent = System74.Math.tan(System74.Math.min(System74.Math.max(0.01, outerConeAngle) + 0.05, 1.45));
+        light.tangent = System75.Math.tan(System75.Math.min(System75.Math.max(0.01, outerConeAngle) + 0.05, 1.45));
         tileCount += 1;
       } else {
         tileCount += 6;
@@ -48646,11 +49238,11 @@ var ShadowAtlas = class extends Object2 {
       this.#lights.push(light);
     }
     let tileSize = this.#tileResolution;
-    while (tileSize > 1 && tileCount > System74.Math.floor(this.#resolution / tileSize) * System74.Math.floor(this.#resolution / tileSize)) {
-      tileSize = System74.Math.floor(tileSize / 2);
+    while (tileSize > 1 && tileCount > System75.Math.floor(this.#resolution / tileSize) * System75.Math.floor(this.#resolution / tileSize)) {
+      tileSize = System75.Math.floor(tileSize / 2);
     }
     this.#tileSize = tileSize;
-    this.#gridSize = System74.Math.max(1, System74.Math.floor(this.#resolution / tileSize));
+    this.#gridSize = System75.Math.max(1, System75.Math.floor(this.#resolution / tileSize));
     this.#tiles = [];
     for (const light of this.#lights) {
       if (light.tangent > 0) {
@@ -48676,9 +49268,9 @@ var ShadowAtlas = class extends Object2 {
    */
   createTile(position, forward, up, tangent, near, far) {
     const tileIndex = this.#tiles.length;
-    const viewProjectionMatrix = Matrix4.createPerspective(2 * System74.Math.atan(tangent), 1, near, far);
+    const viewProjectionMatrix = Matrix4.createPerspective(2 * System75.Math.atan(tangent), 1, near, far);
     viewProjectionMatrix.multiply(createBasisViewMatrix(position, forward, up));
-    return { viewProjectionMatrix, x: tileIndex % this.#gridSize * this.#tileSize, y: System74.Math.floor(tileIndex / this.#gridSize) * this.#tileSize, size: this.#tileSize };
+    return { viewProjectionMatrix, x: tileIndex % this.#gridSize * this.#tileSize, y: System75.Math.floor(tileIndex / this.#gridSize) * this.#tileSize, size: this.#tileSize };
   }
   //==============================================================================
   // 깊이 패스 시작. (프레임버퍼를 묶고 판 전체를 비운다, 칸마다 beginTile)
@@ -48803,7 +49395,7 @@ var ShadowAtlas = class extends Object2 {
   }
 };
 function normalizeDirection2(direction) {
-  const length = System74.Math.hypot(direction[0], direction[1], direction[2]);
+  const length = System75.Math.hypot(direction[0], direction[1], direction[2]);
   if (length <= 0) {
     return [0, -1, 0];
   }
@@ -48812,12 +49404,12 @@ function normalizeDirection2(direction) {
 __name(normalizeDirection2, "normalizeDirection");
 
 // src/graphics3d/toon/toonmaterial.js
-var System75 = globalThis;
+var System76 = globalThis;
 var TOON_MAXIMUM_INSTANCE_ATTRIBUTES = 3;
 var TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION = 13;
 var TOON_INSTANCE_MATRIX_NAME = "instanceMatrix";
 var TOON_INSTANCE_TINT_NAME = "instanceTint";
-var ToonBlendMode = System75.Object.freeze({
+var ToonBlendMode = System76.Object.freeze({
   alpha: "alpha",
   // 곧은 알파. (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
   premultiplied: "premultiplied",
@@ -48825,13 +49417,13 @@ var ToonBlendMode = System75.Object.freeze({
   additive: "additive"
   // 더하기. (ONE, ONE)
 });
-var ToonMatcapBlend = System75.Object.freeze({
+var ToonMatcapBlend = System76.Object.freeze({
   multiply: "multiply",
   // 색에 곱한다.
   add: "add"
   // 색에 더한다.
 });
-var ToonBufferUsage = System75.Object.freeze({
+var ToonBufferUsage = System76.Object.freeze({
   static: "static",
   // 한 번 올려 오래 쓴다. (STATIC_DRAW)
   dynamic: "dynamic"
@@ -48962,32 +49554,32 @@ var ToonInstanceLayout = class {
     this.#floatCount = 0;
     this.#hasMatrix = false;
     this.#hasTint = false;
-    const names = new System75.Set();
+    const names = new System76.Set();
     let customCount = 0;
     for (const attribute of attributes) {
       const name = attribute.name;
       const size = attribute.size;
       if (typeof name !== "string" || !SHADER_NAME_PATTERN.test(name) || names.has(name)) {
-        throw new System75.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 \uC774\uB984\uC774 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4: ${name}`);
+        throw new System76.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 \uC774\uB984\uC774 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4: ${name}`);
       }
       names.add(name);
       let location = -1;
       if (name === TOON_INSTANCE_MATRIX_NAME) {
         if (size !== 16) {
-          throw new System75.Error("instanceMatrix \uC758 \uD06C\uAE30\uB294 16 \uC785\uB2C8\uB2E4.");
+          throw new System76.Error("instanceMatrix \uC758 \uD06C\uAE30\uB294 16 \uC785\uB2C8\uB2E4.");
         }
         this.#hasMatrix = true;
       } else if (name === TOON_INSTANCE_TINT_NAME) {
         if (size !== 4) {
-          throw new System75.Error("instanceTint \uC758 \uD06C\uAE30\uB294 4 \uC785\uB2C8\uB2E4.");
+          throw new System76.Error("instanceTint \uC758 \uD06C\uAE30\uB294 4 \uC785\uB2C8\uB2E4.");
         }
         this.#hasTint = true;
       } else {
-        if (!System75.Number.isInteger(size) || size < 1 || size > 4) {
-          throw new System75.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 ${name} \uC758 \uD06C\uAE30\uB294 1 ~ 4 \uC785\uB2C8\uB2E4.`);
+        if (!System76.Number.isInteger(size) || size < 1 || size > 4) {
+          throw new System76.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 ${name} \uC758 \uD06C\uAE30\uB294 1 ~ 4 \uC785\uB2C8\uB2E4.`);
         }
         if (customCount >= TOON_MAXIMUM_INSTANCE_ATTRIBUTES) {
-          throw new System75.Error(`\uC0AC\uC6A9\uC790 \uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 ${TOON_MAXIMUM_INSTANCE_ATTRIBUTES} \uAC1C\uAE4C\uC9C0\uC785\uB2C8\uB2E4.`);
+          throw new System76.Error(`\uC0AC\uC6A9\uC790 \uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 ${TOON_MAXIMUM_INSTANCE_ATTRIBUTES} \uAC1C\uAE4C\uC9C0\uC785\uB2C8\uB2E4.`);
         }
         location = TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION + customCount;
         customCount += 1;
@@ -49062,7 +49654,7 @@ var ToonInstanceLayout = class {
 };
 
 // src/graphics3d/toon/toonrenderer.js
-var System76 = globalThis;
+var System77 = globalThis;
 var TOON_MAXIMUM_JOINTS = 96;
 var TOON_INSTANCE_FLOAT_COUNT = 20;
 var LOCAL_SHADOW_TEXTURE_UNIT = 0;
@@ -49075,7 +49667,7 @@ var DECAL_TEXTURE_UNIT = 6;
 var ANGEL_RING_TEXTURE_UNIT = 7;
 var FIRST_MATERIAL_TEXTURE_UNIT = 8;
 var TOON_MAXIMUM_MATERIAL_TEXTURES = 8;
-var TOON_ATTRIBUTE_LOCATIONS = System76.Object.freeze({
+var TOON_ATTRIBUTE_LOCATIONS = System77.Object.freeze({
   vertexPosition: 0,
   vertexNormal: 1,
   vertexColor: 2,
@@ -49090,7 +49682,7 @@ var TOON_ATTRIBUTE_LOCATIONS = System76.Object.freeze({
   instanceTint: 11,
   vertexUv: 12
 });
-var ToonProgramKind = System76.Object.freeze({
+var ToonProgramKind = System77.Object.freeze({
   solid: "solid",
   // 몸.
   outline: "outline",
@@ -49675,7 +50267,7 @@ function composeToonProgramSources(material, instanceLayout) {
   const lightChunk = material !== null && material.getLightChunk() !== "" ? material.getLightChunk() : DEFAULT_LIGHT_CHUNK;
   const instanceChunk = instanceLayout !== null ? instanceLayout.readDeclarationSource() : "";
   const vertexHead = VERTEX_HEAD_CHUNK + VERTEX_COMMON_CHUNK + instanceChunk + VERTEX_STRUCT_CHUNK + vertexChunk;
-  const attributeLocationTable = System76.Object.assign({}, TOON_ATTRIBUTE_LOCATIONS);
+  const attributeLocationTable = System77.Object.assign({}, TOON_ATTRIBUTE_LOCATIONS);
   if (instanceLayout !== null) {
     for (const attribute of instanceLayout.getAttributes()) {
       if (attribute.location >= 0) {
@@ -49708,7 +50300,7 @@ function extractFrustumPlanes(matrix) {
   }, "combine");
   const planes = [combine(row3, row0, 1), combine(row3, row0, -1), combine(row3, row1, 1), combine(row3, row1, -1), combine(row3, row2, 1), combine(row3, row2, -1)];
   for (const plane of planes) {
-    const length = System76.Math.hypot(plane[0], plane[1], plane[2]);
+    const length = System77.Math.hypot(plane[0], plane[1], plane[2]);
     if (length > 0) {
       plane[0] /= length;
       plane[1] /= length;
@@ -49737,7 +50329,7 @@ function readFrameCamera(elements) {
   const row3 = readRow(3);
   const isMirrored = readDeterminant(row0, row1, row2) > 0;
   let forward = [row0[1] * row1[2] - row0[2] * row1[1], row0[2] * row1[0] - row0[0] * row1[2], row0[0] * row1[1] - row0[1] * row1[0]];
-  const forwardLength = System76.Math.hypot(forward[0], forward[1], forward[2]);
+  const forwardLength = System77.Math.hypot(forward[0], forward[1], forward[2]);
   if (forwardLength > 0) {
     forward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
   }
@@ -49745,7 +50337,7 @@ function readFrameCamera(elements) {
     forward = [-forward[0], -forward[1], -forward[2]];
   }
   const determinant = readDeterminant(row0, row1, row3);
-  if (System76.Math.abs(determinant) < 1e-12) {
+  if (System77.Math.abs(determinant) < 1e-12) {
     return { position: [0, 0, 0, 0], forward, isMirrored };
   }
   const constant = [-row0[3], -row1[3], -row3[3]];
@@ -49759,7 +50351,7 @@ function readViewRotation(elements, forward) {
   const rowX = [elements[0], elements[4], elements[8]];
   const along = rowX[0] * forward[0] + rowX[1] * forward[1] + rowX[2] * forward[2];
   let right = [rowX[0] - forward[0] * along, rowX[1] - forward[1] * along, rowX[2] - forward[2] * along];
-  const rightLength = System76.Math.hypot(right[0], right[1], right[2]);
+  const rightLength = System77.Math.hypot(right[0], right[1], right[2]);
   right = rightLength > 1e-6 ? [right[0] / rightLength, right[1] / rightLength, right[2] / rightLength] : [1, 0, 0];
   const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
   return [right[0], up[0], -forward[0], right[1], up[1], -forward[1], right[2], up[2], -forward[2]];
@@ -49770,13 +50362,13 @@ function readCameraRoll(viewRotationElements, isMirrored) {
   const forward = [-viewRotationElements[2], -viewRotationElements[5], -viewRotationElements[8]];
   const axisSign = isMirrored ? -1 : 1;
   const rightAxis = [-forward[2] * axisSign, 0, forward[0] * axisSign];
-  const axisLength = System76.Math.hypot(rightAxis[0], rightAxis[1], rightAxis[2]);
-  const rightLength = System76.Math.hypot(right[0], right[1], right[2]);
+  const axisLength = System77.Math.hypot(rightAxis[0], rightAxis[1], rightAxis[2]);
+  const rightLength = System77.Math.hypot(right[0], right[1], right[2]);
   if (axisLength < 1e-6 || rightLength < 1e-6) {
     return 0;
   }
   const cosine = (rightAxis[0] * right[0] + rightAxis[1] * right[1] + rightAxis[2] * right[2]) / (axisLength * rightLength);
-  const roll = System76.Math.acos(System76.Math.max(-1, System76.Math.min(1, cosine)));
+  const roll = System77.Math.acos(System77.Math.max(-1, System77.Math.min(1, cosine)));
   const direction = right[1] < 0 ? -1 : 1;
   return -(direction * roll);
 }
@@ -49790,7 +50382,7 @@ function readUvData(uvData, uv1Data, vertexCount) {
   if (uv1Data === null) {
     return uvData.length === vertexCount * 2 ? uvData : uvData.subarray(0, vertexCount * 2);
   }
-  const data = new System76.Float32Array(vertexCount * 4);
+  const data = new System77.Float32Array(vertexCount * 4);
   for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
     data[vertexIndex * 4] = uvData[vertexIndex * 2];
     data[vertexIndex * 4 + 1] = uvData[vertexIndex * 2 + 1];
@@ -49801,9 +50393,9 @@ function readUvData(uvData, uv1Data, vertexCount) {
 }
 __name(readUvData, "readUvData");
 function readOutlineVertexData(outlineVertexData, outlineBaseData) {
-  const pointCount = System76.Math.floor(outlineVertexData.length / 3);
+  const pointCount = System77.Math.floor(outlineVertexData.length / 3);
   const hasBase = outlineBaseData !== void 0 && outlineBaseData !== null && outlineBaseData.length === outlineVertexData.length;
-  const data = new System76.Float32Array(pointCount * 6);
+  const data = new System77.Float32Array(pointCount * 6);
   for (let pointIndex = 0; pointIndex < pointCount; ++pointIndex) {
     for (let axis = 0; axis < 3; ++axis) {
       const outlineValue = outlineVertexData[pointIndex * 3 + axis];
@@ -49816,7 +50408,7 @@ function readOutlineVertexData(outlineVertexData, outlineBaseData) {
 }
 __name(readOutlineVertexData, "readOutlineVertexData");
 function createReflectionMatrix(planePoint, planeNormal) {
-  const length = System76.Math.hypot(planeNormal[0], planeNormal[1], planeNormal[2]);
+  const length = System77.Math.hypot(planeNormal[0], planeNormal[1], planeNormal[2]);
   const normalX = length > 0 ? planeNormal[0] / length : 0;
   const normalY = length > 0 ? planeNormal[1] / length : 1;
   const normalZ = length > 0 ? planeNormal[2] / length : 0;
@@ -49839,19 +50431,19 @@ function createReflectionMatrix(planePoint, planeNormal) {
 }
 __name(createReflectionMatrix, "createReflectionMatrix");
 function readMaximumScale(elements) {
-  const scaleX = System76.Math.hypot(elements[0], elements[1], elements[2]);
-  const scaleY = System76.Math.hypot(elements[4], elements[5], elements[6]);
-  const scaleZ = System76.Math.hypot(elements[8], elements[9], elements[10]);
-  return System76.Math.max(scaleX, scaleY, scaleZ);
+  const scaleX = System77.Math.hypot(elements[0], elements[1], elements[2]);
+  const scaleY = System77.Math.hypot(elements[4], elements[5], elements[6]);
+  const scaleZ = System77.Math.hypot(elements[8], elements[9], elements[10]);
+  return System77.Math.max(scaleX, scaleY, scaleZ);
 }
 __name(readMaximumScale, "readMaximumScale");
 function readBoundingSphere(positions, stride) {
-  const minimum = [System76.Infinity, System76.Infinity, System76.Infinity];
-  const maximum = [-System76.Infinity, -System76.Infinity, -System76.Infinity];
+  const minimum = [System77.Infinity, System77.Infinity, System77.Infinity];
+  const maximum = [-System77.Infinity, -System77.Infinity, -System77.Infinity];
   for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
     for (let axis = 0; axis < 3; ++axis) {
-      minimum[axis] = System76.Math.min(minimum[axis], positions[offset + axis]);
-      maximum[axis] = System76.Math.max(maximum[axis], positions[offset + axis]);
+      minimum[axis] = System77.Math.min(minimum[axis], positions[offset + axis]);
+      maximum[axis] = System77.Math.max(maximum[axis], positions[offset + axis]);
     }
   }
   if (minimum[0] > maximum[0]) {
@@ -49860,11 +50452,15 @@ function readBoundingSphere(positions, stride) {
   const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
   let radius = 0;
   for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
-    radius = System76.Math.max(radius, System76.Math.hypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
+    radius = System77.Math.max(radius, System77.Math.hypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
   }
   return { center, radius };
 }
 __name(readBoundingSphere, "readBoundingSphere");
+function isSameNumber(value, other) {
+  return value === other && (value !== 0 || 1 / value === 1 / other);
+}
+__name(isSameNumber, "isSameNumber");
 var ToonRenderer = class {
   static {
     __name(this, "ToonRenderer");
@@ -49977,6 +50573,15 @@ var ToonRenderer = class {
   #localShadowUpValues;
   /** @private @type { Float32Array } */
   #localShadowTileValues;
+  /** @private @type { WebGLStateCache } */
+  #stateCache;
+  // 컨텍스트의 GL 상태 기억. (같은 프로그램, 텍스처, 버텍스 어레이, 감김을 다시 걸지 않을 때 묻는다)
+  /** @private @type { WeakMap<ShaderProgram, Map<string, object>> } */
+  #uniformSlotTable;
+  // 프로그램마다 유니폼 이름별 위치와 마지막으로 올린 값.
+  /** @private @type { number } */
+  #uniformSerial;
+  // 올린 유니폼 값이 아직 맞는 판 번호. (바뀌면 모든 프로그램의 기억한 값을 잊는다)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -49986,13 +50591,16 @@ var ToonRenderer = class {
    */
   constructor(webGL2RenderingContext) {
     this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#stateCache = WebGLStateCache.attach(webGL2RenderingContext);
+    this.#uniformSlotTable = new System77.WeakMap();
+    this.#uniformSerial = 1;
     this.#programSets = /* @__PURE__ */ new Map();
     this.#emptyShadowTexture = this.createEmptyShadowTexture();
-    this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System76.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
+    this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System77.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
     this.#defaultProgramSet = this.createProgramSet(null, null);
     this.#programSets.set("0/0", this.#defaultProgramSet);
     const identityMatrix = Matrix4.createIdentity();
-    this.#viewProjectionElements = new System76.Float32Array(identityMatrix.getElements());
+    this.#viewProjectionElements = new System77.Float32Array(identityMatrix.getElements());
     this.#frustumPlanes = extractFrustumPlanes(identityMatrix);
     this.#cameraPosition = [0, 0, 0, 0];
     this.#cameraForward = [0, 0, -1];
@@ -50004,28 +50612,28 @@ var ToonRenderer = class {
     this.#isShadowPass = false;
     this.#frameSerial = 1;
     this.#savedState = null;
-    this.#instanceData = new System76.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+    this.#instanceData = new System77.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
     this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
     this.#screenRect = null;
     this.#isScissorApplied = false;
-    this.#pointPositionValues = new System76.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
-    this.#pointColorValues = new System76.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
-    this.#pointShapeValues = new System76.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
-    this.#pointSpotValues = new System76.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
-    this.#pointConeValues = new System76.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 2);
-    this.#shadePositionValues = new System76.Float32Array(TOON_MAXIMUM_BAND_STEPS);
-    this.#shadeFeatherValues = new System76.Float32Array(TOON_MAXIMUM_BAND_STEPS);
-    this.#shadeColorValues = new System76.Float32Array(TOON_MAXIMUM_BAND_STEPS * 3);
-    this.#viewRotationElements = new System76.Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    this.#pointPositionValues = new System77.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
+    this.#pointColorValues = new System77.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
+    this.#pointShapeValues = new System77.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
+    this.#pointSpotValues = new System77.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
+    this.#pointConeValues = new System77.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 2);
+    this.#shadePositionValues = new System77.Float32Array(TOON_MAXIMUM_BAND_STEPS);
+    this.#shadeFeatherValues = new System77.Float32Array(TOON_MAXIMUM_BAND_STEPS);
+    this.#shadeColorValues = new System77.Float32Array(TOON_MAXIMUM_BAND_STEPS * 3);
+    this.#viewRotationElements = new System77.Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
     this.#cameraRoll = 0;
     this.#outlineDistanceScale = [0, 0.5, 4];
     this.#outlineFadeDistance = [0, 0];
     this.#localShadowInput = null;
-    this.#pointShadowSlotValues = new System76.Float32Array(TOON_MAXIMUM_POINT_LIGHTS);
-    this.#localShadowPositionValues = new System76.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-    this.#localShadowForwardValues = new System76.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-    this.#localShadowUpValues = new System76.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-    this.#localShadowTileValues = new System76.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS);
+    this.#pointShadowSlotValues = new System77.Float32Array(TOON_MAXIMUM_POINT_LIGHTS);
+    this.#localShadowPositionValues = new System77.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
+    this.#localShadowForwardValues = new System77.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
+    this.#localShadowUpValues = new System77.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
+    this.#localShadowTileValues = new System77.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS);
   }
   //==============================================================================
   // 셰이더 소스 반환. (ShaderWarmer 로 미리 링크할 때, 머티리얼과 인스턴스 꼴이 없으면 기본 프로그램)
@@ -50114,7 +50722,7 @@ var ToonRenderer = class {
       programSet = this.createProgramSet(material, instanceLayout);
     } catch (error) {
       const name = material !== null && material.getName() !== "" ? material.getName() : key;
-      System76.console.error(`ToonRenderer: \uBA38\uD2F0\uB9AC\uC5BC ${name} \uC758 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.`, error);
+      System77.console.error(`ToonRenderer: \uBA38\uD2F0\uB9AC\uC5BC ${name} \uC758 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.`, error);
     }
     this.#programSets.set(key, programSet);
     return programSet;
@@ -50160,7 +50768,7 @@ var ToonRenderer = class {
    */
   deleteMaterial(material) {
     const prefix = `${material.getId()}/`;
-    for (const [key, programSet] of System76.Array.from(this.#programSets.entries())) {
+    for (const [key, programSet] of System77.Array.from(this.#programSets.entries())) {
       if (!key.startsWith(prefix)) {
         continue;
       }
@@ -50318,8 +50926,8 @@ var ToonRenderer = class {
     webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL, false);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + BASE_COLOR_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-    if (System76.ArrayBuffer.isView(source.data) && typeof source.width === "number" && typeof source.height === "number") {
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, source.width, source.height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System76.Uint8Array(source.data.buffer, source.data.byteOffset, source.data.byteLength));
+    if (System77.ArrayBuffer.isView(source.data) && typeof source.width === "number" && typeof source.height === "number") {
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, source.width, source.height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System77.Uint8Array(source.data.buffer, source.data.byteOffset, source.data.byteLength));
     } else {
       webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, source);
     }
@@ -50377,12 +50985,12 @@ var ToonRenderer = class {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const buffers = [];
     const isSkinned = arrays.skinData !== void 0 && arrays.skinData !== null && arrays.skinData.length > 0;
-    const vertexCount = System76.Math.floor(arrays.vertexData.length / VERTEX_FLOAT_COUNT);
+    const vertexCount = System77.Math.floor(arrays.vertexData.length / VERTEX_FLOAT_COUNT);
     const hasUv = arrays.uvData !== void 0 && arrays.uvData !== null && vertexCount > 0 && arrays.uvData.length >= vertexCount * 2;
     const hasSecondUv = hasUv && arrays.uv1Data !== void 0 && arrays.uv1Data !== null && arrays.uv1Data.length >= vertexCount * 2;
     const boundingSphere = readBoundingSphere(arrays.vertexData, VERTEX_FLOAT_COUNT);
     const boundingRadius = isSkinned ? boundingSphere.radius * 1.5 : boundingSphere.radius;
-    const defaultInstance = new System76.Float32Array(TOON_INSTANCE_FLOAT_COUNT);
+    const defaultInstance = new System77.Float32Array(TOON_INSTANCE_FLOAT_COUNT);
     defaultInstance.set(Matrix4.createIdentity().getElements(), 0);
     defaultInstance.set([1, 1, 1, 1], 16);
     const instanceBuffer = this.createArrayBuffer(defaultInstance, webGL2RenderingContext.DYNAMIC_DRAW);
@@ -50630,7 +51238,7 @@ var ToonRenderer = class {
     const texture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + SHADOW_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System76.Uint32Array([4294967295]));
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System77.Uint32Array([4294967295]));
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
@@ -50718,6 +51326,7 @@ var ToonRenderer = class {
   restoreState(isFramebufferRestored) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const savedState = this.#savedState;
+    this.forgetAllUniformValues();
     webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
     webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
     webGL2RenderingContext.colorMask(true, true, true, true);
@@ -50762,6 +51371,7 @@ var ToonRenderer = class {
   //==============================================================================
   applyFrameState() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    this.forgetAllUniformValues();
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
     webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -50868,7 +51478,7 @@ var ToonRenderer = class {
    * renderer.clearScreenRect();
    */
   setScreenRect(x, y, width, height) {
-    this.#screenRect = { x, y, width: System76.Math.max(0, width), height: System76.Math.max(0, height) };
+    this.#screenRect = { x, y, width: System77.Math.max(0, width), height: System77.Math.max(0, height) };
   }
   //==============================================================================
   // 그릴 화면 사각형 풀기. (뷰포트 전체에 그림)
@@ -50896,8 +51506,8 @@ var ToonRenderer = class {
       return;
     }
     const viewport = savedState.viewport;
-    const viewportWidth = System76.Math.max(1, viewport[2]);
-    const viewportHeight = System76.Math.max(1, viewport[3]);
+    const viewportWidth = System77.Math.max(1, viewport[2]);
+    const viewportHeight = System77.Math.max(1, viewport[3]);
     const scaleX = screenRect.width / viewportWidth;
     const scaleY = screenRect.height / viewportHeight;
     const offsetX = (screenRect.x * 2 + screenRect.width) / viewportWidth - 1;
@@ -50909,10 +51519,10 @@ var ToonRenderer = class {
       elements[columnIndex * 4 + 1] = elements[columnIndex * 4 + 1] * scaleY + clipW * offsetY;
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const scissorLeft = System76.Math.floor(screenRect.x);
-    const scissorBottom = System76.Math.floor(viewportHeight - screenRect.y - screenRect.height);
-    const scissorRight = System76.Math.ceil(screenRect.x + screenRect.width);
-    const scissorTop = System76.Math.ceil(viewportHeight - screenRect.y);
+    const scissorLeft = System77.Math.floor(screenRect.x);
+    const scissorBottom = System77.Math.floor(viewportHeight - screenRect.y - screenRect.height);
+    const scissorRight = System77.Math.ceil(screenRect.x + screenRect.width);
+    const scissorTop = System77.Math.ceil(viewportHeight - screenRect.y);
     webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
     webGL2RenderingContext.scissor(viewport[0] + scissorLeft, viewport[1] + scissorBottom, scissorRight - scissorLeft, scissorTop - scissorBottom);
     this.#isScissorApplied = true;
@@ -50962,6 +51572,7 @@ var ToonRenderer = class {
     this.#isShadowPass = true;
     this.#isFrameMirrored = false;
     this.#frameSerial += 1;
+    this.forgetAllUniformValues();
     shadowMap.beginRender();
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -50997,6 +51608,7 @@ var ToonRenderer = class {
     this.#isShadowPass = true;
     this.#isFrameMirrored = false;
     this.#frameSerial += 1;
+    this.forgetAllUniformValues();
     shadowAtlas.beginRender();
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -51107,7 +51719,7 @@ var ToonRenderer = class {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const isCulled = options.isCulled !== false;
     if (this.#instanceData.length < instances.length * TOON_INSTANCE_FLOAT_COUNT) {
-      this.#instanceData = new System76.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
+      this.#instanceData = new System77.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
     }
     const instanceData = this.#instanceData;
     let instanceCount = 0;
@@ -51165,8 +51777,8 @@ var ToonRenderer = class {
     if (mesh === null || instanceCount <= 0) {
       return;
     }
-    const maximumCount = System76.Math.floor(instanceBuffer.floatCount / System76.Math.max(1, instanceBuffer.layout.getFloatCount()));
-    const count = System76.Math.min(instanceCount, maximumCount);
+    const maximumCount = System77.Math.floor(instanceBuffer.floatCount / System77.Math.max(1, instanceBuffer.layout.getFloatCount()));
+    const count = System77.Math.min(instanceCount, maximumCount);
     if (count <= 0) {
       return;
     }
@@ -51185,7 +51797,7 @@ var ToonRenderer = class {
     if (mesh === null || mesh.outlineVertexArray === null || options.hasOutline === false || this.#isShadowPass) {
       return;
     }
-    const outlineOptions = System76.Object.assign({}, options, { isBodyDrawn: false });
+    const outlineOptions = System77.Object.assign({}, options, { isBodyDrawn: false });
     this.drawWithCount(mesh, modelMatrix.getElements(), 0, outlineOptions, null);
   }
   //==============================================================================
@@ -51221,13 +51833,13 @@ var ToonRenderer = class {
     webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("cameraPosition"), cameraPosition[0], cameraPosition[1], cameraPosition[2], cameraPosition[3]);
     webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("cameraForward"), cameraForward[0], cameraForward[1], cameraForward[2]);
     webGL2RenderingContext.uniformMatrix3fv(shaderProgram.getUniformLocation("viewRotation"), false, this.#viewRotationElements);
-    webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("cameraRoll"), System76.Math.cos(this.#cameraRoll), System76.Math.sin(this.#cameraRoll));
+    webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("cameraRoll"), System77.Math.cos(this.#cameraRoll), System77.Math.sin(this.#cameraRoll));
     webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
     const shadowInput = this.#shadowInput;
     if (shadowInput !== null) {
       webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowEnabled"), 1);
       webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowStrength"), shadowInput.strength);
-      webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowTexelSize"), 1 / System76.Math.max(1, shadowInput.resolution));
+      webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowTexelSize"), 1 / System77.Math.max(1, shadowInput.resolution));
       webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("lightViewProjectionMatrix"), false, shadowInput.lightViewProjectionMatrix.getElements());
     } else {
       webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowEnabled"), 0);
@@ -51352,8 +51964,8 @@ var ToonRenderer = class {
       colorValues.set([pointLight.color[0] * pointLight.intensity, pointLight.color[1] * pointLight.intensity, pointLight.color[2] * pointLight.intensity], lightIndex * 3);
       shapeValues.set([pointLight.decay, pointLight.rangeExponent, pointLight.wrap], lightIndex * 3);
       if (pointLight.direction !== null) {
-        const outerCosine = System76.Math.cos(pointLight.outerConeAngle);
-        const coneScale = 1 / System76.Math.max(1e-3, System76.Math.cos(System76.Math.min(pointLight.innerConeAngle, pointLight.outerConeAngle)) - outerCosine);
+        const outerCosine = System77.Math.cos(pointLight.outerConeAngle);
+        const coneScale = 1 / System77.Math.max(1e-3, System77.Math.cos(System77.Math.min(pointLight.innerConeAngle, pointLight.outerConeAngle)) - outerCosine);
         spotValues.set([pointLight.direction[0], pointLight.direction[1], pointLight.direction[2], 1], lightIndex * 4);
         coneValues.set([coneScale, -outerCosine * coneScale], lightIndex * 2);
       }
@@ -51376,14 +51988,13 @@ var ToonRenderer = class {
    * @param { Float32Array | null } jointMatrices - 본 행렬의 수. (뼈대가 아니면 null)
    */
   uploadDrawUniforms(shaderProgram, modelElements, isSkinned, instancedMode, jointMatrices) {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("modelMatrix"), false, modelElements);
-    webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("instanced"), instancedMode);
-    webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
+    this.writeUniformMatrix4(shaderProgram, "modelMatrix", modelElements);
+    this.writeUniformFloats(shaderProgram, "instanced", 1, instancedMode);
+    this.writeUniformFloats(shaderProgram, "skinned", 1, isSkinned ? 1 : 0);
     if (isSkinned) {
-      const jointFloatCount = System76.Math.floor(System76.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
+      const jointFloatCount = System77.Math.floor(System77.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
       const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
-      webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("jointMatrices"), false, jointValues);
+      this.writeUniformMatrix4(shaderProgram, "jointMatrices", jointValues);
     }
   }
   //==============================================================================
@@ -51395,9 +52006,237 @@ var ToonRenderer = class {
    * @private
    */
   bindTextureUnit(unit, texture) {
+    this.bindTexture2D(unit, texture !== void 0 && texture !== null ? texture : this.#whiteTexture);
+  }
+  //==============================================================================
+  // 텍스처 유닛에 2D 텍스처 묶기. (상태 캐시가 이미 묶였다고 기억하면 건너뛰고, 유닛도 다를 때만 고른다)
+  //==============================================================================
+  /**
+   * @param { number } unit - 텍스처 유닛 번호.
+   * @param { WebGLTexture | null } texture - 묶을 텍스처.
+   * @private
+   */
+  bindTexture2D(unit, texture) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + unit);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture !== void 0 && texture !== null ? texture : this.#whiteTexture);
+    const stateCache = this.#stateCache;
+    const textureUnit = webGL2RenderingContext.TEXTURE0 + unit;
+    if (stateCache.isTextureBound(textureUnit, webGL2RenderingContext.TEXTURE_2D, texture)) {
+      return;
+    }
+    if (!stateCache.isActiveTexture(textureUnit)) {
+      webGL2RenderingContext.activeTexture(textureUnit);
+    }
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+  }
+  //==============================================================================
+  // 텍스처 유닛 고르기. (상태 캐시가 이미 같은 유닛이라고 기억하면 GL 에 다시 걸지 않는다)
+  //==============================================================================
+  /**
+   * @param { number } textureUnit - 고를 유닛. (TEXTURE0 + 번호)
+   * @private
+   */
+  applyActiveTexture(textureUnit) {
+    if (!this.#stateCache.isActiveTexture(textureUnit)) {
+      this.getWebGL2RenderingContext().activeTexture(textureUnit);
+    }
+  }
+  //==============================================================================
+  // 앞면 감김 방향 걸기. (상태 캐시가 같은 값이라고 기억하면 건너뛴다)
+  //==============================================================================
+  /**
+   * @param { number } mode - 앞면 감김 방향. (CW, CCW)
+   * @private
+   */
+  applyFrontFace(mode) {
+    if (!this.#stateCache.isFrontFace(mode)) {
+      this.getWebGL2RenderingContext().frontFace(mode);
+    }
+  }
+  //==============================================================================
+  // 가릴 면 걸기. (상태 캐시가 같은 값이라고 기억하면 건너뛴다)
+  //==============================================================================
+  /**
+   * @param { number } mode - 가릴 면. (FRONT, BACK)
+   * @private
+   */
+  applyCullFace(mode) {
+    if (!this.#stateCache.isCullFace(mode)) {
+      this.getWebGL2RenderingContext().cullFace(mode);
+    }
+  }
+  //==============================================================================
+  // 버텍스 어레이 묶기. (상태 캐시가 같은 것이라고 기억하면 건너뛴다)
+  //==============================================================================
+  /**
+   * @param { WebGLVertexArrayObject | null } vertexArray - 묶을 버텍스 어레이.
+   * @private
+   */
+  applyVertexArray(vertexArray) {
+    if (!this.#stateCache.isVertexArrayBound(vertexArray)) {
+      this.getWebGL2RenderingContext().bindVertexArray(vertexArray);
+    }
+  }
+  //==============================================================================
+  // 유니폼 값 기억하며 올리기. (프로그램마다 이름별로 마지막에 올린 값을 기억해 같은 값이면 GL 에 다시 올리지 않는다)
+  // - 유니폼 값은 프로그램에 남으므로 프로그램이 같은 동안 같은 값은 다시 올릴 필요가 없다. (three.js 의 WebGLUniforms 캐시와 같은 꼴)
+  // - 렌더러 밖의 코드가 같은 유니폼을 바꿨을 수 있는 때는 기억을 잊는다:
+  //   프레임과 그림자 판의 시작, applyFrameState(단계 콜백과 화면 공간 바깥선 뒤), 상태 되돌리기, 그 프로그램의 onBeforeDraw 를 부른 뒤.
+  // - 값은 주어진 수 그대로 견준다. (0 과 -0 도 가른다, NaN 은 늘 다시 올린다) 셰이더에서 빠진 유니폼(위치 null)은 올리지 않는다.
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram - 유니폼을 가진 프로그램.
+   * @param { string } uniformName - 유니폼 이름.
+   * @returns { object } 그 유니폼의 칸. ({ location, serial, values, count(배열의 쓴 수) })
+   * @private
+   */
+  readUniformSlot(shaderProgram, uniformName) {
+    let slotTable = this.#uniformSlotTable.get(shaderProgram);
+    if (slotTable === void 0) {
+      slotTable = new System77.Map();
+      this.#uniformSlotTable.set(shaderProgram, slotTable);
+    }
+    let slot = slotTable.get(uniformName);
+    if (slot === void 0) {
+      slot = { location: shaderProgram.getUniformLocation(uniformName), serial: 0, values: null, count: 0 };
+      slotTable.set(uniformName, slot);
+    }
+    return slot;
+  }
+  //==============================================================================
+  // 모든 프로그램의 기억한 유니폼 값 잊기. (다음 그리기가 모두 다시 올린다)
+  //==============================================================================
+  /**
+   * @private
+   */
+  forgetAllUniformValues() {
+    this.#uniformSerial += 1;
+  }
+  //==============================================================================
+  // 한 프로그램의 기억한 유니폼 값 잊기. (onBeforeDraw 뒤)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram - 잊을 프로그램.
+   * @private
+   */
+  forgetUniformValues(shaderProgram) {
+    const slotTable = this.#uniformSlotTable.get(shaderProgram);
+    if (slotTable === void 0) {
+      return;
+    }
+    for (const slot of slotTable.values()) {
+      slot.serial = 0;
+    }
+  }
+  //==============================================================================
+  // float 유니폼 하나 올리기. (uniform1f ~ uniform4f, 같은 값이면 건너뛴다)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram - 지금 쓰는 프로그램.
+   * @param { string } uniformName - 유니폼 이름.
+   * @param { number } componentCount - 성분 수. (1 ~ 4)
+   * @param { number } x - 첫 성분.
+   * @param { number } [y] - 둘째 성분.
+   * @param { number } [z] - 셋째 성분.
+   * @param { number } [w] - 넷째 성분.
+   * @private
+   */
+  writeUniformFloats(shaderProgram, uniformName, componentCount, x, y = 0, z = 0, w = 0) {
+    const slot = this.readUniformSlot(shaderProgram, uniformName);
+    const location = slot.location;
+    if (location === null) {
+      return;
+    }
+    let values = slot.values;
+    if (slot.serial === this.#uniformSerial && isSameNumber(values[0], x) && isSameNumber(values[1], y) && isSameNumber(values[2], z) && isSameNumber(values[3], w)) {
+      return;
+    }
+    if (values === null) {
+      values = new System77.Float64Array(4);
+      slot.values = values;
+    }
+    values[0] = x;
+    values[1] = y;
+    values[2] = z;
+    values[3] = w;
+    slot.serial = this.#uniformSerial;
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    switch (componentCount) {
+      case 1:
+        webGL2RenderingContext.uniform1f(location, x);
+        break;
+      case 2:
+        webGL2RenderingContext.uniform2f(location, x, y);
+        break;
+      case 3:
+        webGL2RenderingContext.uniform3f(location, x, y, z);
+        break;
+      default:
+        webGL2RenderingContext.uniform4f(location, x, y, z, w);
+        break;
+    }
+  }
+  //==============================================================================
+  // int 유니폼 하나 올리기. (uniform1i, 같은 값이면 건너뛴다)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram - 지금 쓰는 프로그램.
+   * @param { string } uniformName - 유니폼 이름.
+   * @param { number } value - 값.
+   * @private
+   */
+  writeUniform1i(shaderProgram, uniformName, value) {
+    const slot = this.readUniformSlot(shaderProgram, uniformName);
+    const location = slot.location;
+    if (location === null) {
+      return;
+    }
+    if (slot.serial === this.#uniformSerial && slot.values[0] === value) {
+      return;
+    }
+    if (slot.values === null) {
+      slot.values = new System77.Float64Array(1);
+    }
+    slot.values[0] = value;
+    slot.serial = this.#uniformSerial;
+    this.getWebGL2RenderingContext().uniform1i(location, value);
+  }
+  //==============================================================================
+  // mat4 유니폼이나 그 배열 올리기. (uniformMatrix4fv, 전치 없음, 같은 값이면 건너뛴다)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram - 지금 쓰는 프로그램.
+   * @param { string } uniformName - 유니폼 이름.
+   * @param { ArrayLike<number> } elements - 행렬의 수. (16 의 배수)
+   * @private
+   */
+  writeUniformMatrix4(shaderProgram, uniformName, elements) {
+    const slot = this.readUniformSlot(shaderProgram, uniformName);
+    const location = slot.location;
+    if (location === null) {
+      return;
+    }
+    const elementCount = elements.length;
+    let values = slot.values;
+    if (slot.serial === this.#uniformSerial && slot.count === elementCount) {
+      let isSame = true;
+      for (let index = 0; index < elementCount; ++index) {
+        if (!isSameNumber(values[index], elements[index])) {
+          isSame = false;
+          break;
+        }
+      }
+      if (isSame) {
+        return;
+      }
+    }
+    if (values === null || values.length < elementCount) {
+      values = new System77.Float32Array(elementCount);
+      slot.values = values;
+    }
+    values.set(elements);
+    slot.count = elementCount;
+    slot.serial = this.#uniformSerial;
+    this.getWebGL2RenderingContext().uniformMatrix4fv(location, false, elements);
   }
   //==============================================================================
   // 그리기 본체. (instanceCount 가 0 이면 보통, 아니면 인스턴스로, instanceBuffer 가 있으면 그 꼴로)
@@ -51432,13 +52271,13 @@ var ToonRenderer = class {
         webGL2RenderingContext.vertexAttrib4f(TOON_ATTRIBUTE_LOCATIONS.instanceTint, 1, 1, 1, 1);
       }
     }
-    const indexStart = System76.Math.max(0, System76.Math.min(mesh.bodyIndexCount, options.indexStart !== void 0 ? options.indexStart : 0));
-    const indexCount = options.indexCount !== void 0 && options.indexCount > 0 ? System76.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
-    const outlineIndexStart = System76.Math.max(0, System76.Math.min(mesh.outlineIndexCount, options.outlineIndexStart !== void 0 ? options.outlineIndexStart : 0));
-    const outlineIndexCount = options.outlineIndexCount !== void 0 && options.outlineIndexCount > 0 ? System76.Math.min(options.outlineIndexCount, mesh.outlineIndexCount - outlineIndexStart) : mesh.outlineIndexCount - outlineIndexStart;
+    const indexStart = System77.Math.max(0, System77.Math.min(mesh.bodyIndexCount, options.indexStart !== void 0 ? options.indexStart : 0));
+    const indexCount = options.indexCount !== void 0 && options.indexCount > 0 ? System77.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
+    const outlineIndexStart = System77.Math.max(0, System77.Math.min(mesh.outlineIndexCount, options.outlineIndexStart !== void 0 ? options.outlineIndexStart : 0));
+    const outlineIndexCount = options.outlineIndexCount !== void 0 && options.outlineIndexCount > 0 ? System77.Math.min(options.outlineIndexCount, mesh.outlineIndexCount - outlineIndexStart) : mesh.outlineIndexCount - outlineIndexStart;
     const isMirroredDraw = options.isMirrored !== void 0 ? options.isMirrored === true : readMatrixDeterminant(modelElements) < 0;
     const isMirrored = isMirroredDraw !== this.#isFrameMirrored;
-    webGL2RenderingContext.frontFace(isMirrored ? webGL2RenderingContext.CW : webGL2RenderingContext.CCW);
+    this.applyFrontFace(isMirrored ? webGL2RenderingContext.CW : webGL2RenderingContext.CCW);
     const onBeforeDraw = typeof options.onBeforeDraw === "function" ? options.onBeforeDraw : null;
     const drawElements = /* @__PURE__ */ __name((start, count) => {
       if (count <= 0) {
@@ -51458,10 +52297,11 @@ var ToonRenderer = class {
       this.uploadDrawUniforms(depthEntry.program, modelElements, isSkinned, instancedMode, jointMatrices);
       if (onBeforeDraw !== null) {
         onBeforeDraw(depthEntry.program, webGL2RenderingContext, ToonProgramKind.depth);
+        this.forgetUniformValues(depthEntry.program);
       }
-      webGL2RenderingContext.bindVertexArray(bodyVertexArray);
+      this.applyVertexArray(bodyVertexArray);
       drawElements(indexStart, indexCount);
-      webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
+      this.applyFrontFace(webGL2RenderingContext.CCW);
       return;
     }
     const tintColor = options.tintColor !== void 0 ? options.tintColor : [1, 1, 1, 1];
@@ -51487,27 +52327,28 @@ var ToonRenderer = class {
       this.uploadFrameUniforms(outlineEntry);
       this.uploadDrawUniforms(outlineProgram, modelElements, isSkinned, instancedMode, jointMatrices);
       const outlineColor = options.outlineColor !== void 0 && options.outlineColor !== null ? options.outlineColor : this.#outlineColor;
-      webGL2RenderingContext.uniform4f(outlineProgram.getUniformLocation("outlineColor"), outlineColor[0], outlineColor[1], outlineColor[2], outlineColor.length > 3 ? outlineColor[3] : 1);
-      webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineWidthScale"), options.outlineWidthScale !== void 0 ? System76.Math.max(0, options.outlineWidthScale) : 1);
-      webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineOffsetZ"), options.outlineOffsetZ !== void 0 ? options.outlineOffsetZ : 0);
+      this.writeUniformFloats(outlineProgram, "outlineColor", 4, outlineColor[0], outlineColor[1], outlineColor[2], outlineColor.length > 3 ? outlineColor[3] : 1);
+      this.writeUniformFloats(outlineProgram, "outlineWidthScale", 1, options.outlineWidthScale !== void 0 ? System77.Math.max(0, options.outlineWidthScale) : 1);
+      this.writeUniformFloats(outlineProgram, "outlineOffsetZ", 1, options.outlineOffsetZ !== void 0 ? options.outlineOffsetZ : 0);
       const outlineLightSet = options.lightSet !== void 0 && options.lightSet !== null ? options.lightSet : this.#lightSet;
       const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? readOutlineLightColor(outlineLightSet.getSunColor()) : [1, 1, 1];
-      webGL2RenderingContext.uniform3f(outlineProgram.getUniformLocation("outlineLightColor"), outlineLightColor[0], outlineLightColor[1], outlineLightColor[2]);
-      webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("alpha"), alpha);
-      webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("premultipliedOutput"), premultipliedOutput);
+      this.writeUniformFloats(outlineProgram, "outlineLightColor", 3, outlineLightColor[0], outlineLightColor[1], outlineLightColor[2]);
+      this.writeUniformFloats(outlineProgram, "alpha", 1, alpha);
+      this.writeUniformFloats(outlineProgram, "premultipliedOutput", 1, premultipliedOutput);
       if (onBeforeDraw !== null) {
         onBeforeDraw(outlineProgram, webGL2RenderingContext, ToonProgramKind.outline);
+        this.forgetUniformValues(outlineProgram);
       }
-      webGL2RenderingContext.cullFace(webGL2RenderingContext.FRONT);
-      webGL2RenderingContext.bindVertexArray(outlineVertexArray);
+      this.applyCullFace(webGL2RenderingContext.FRONT);
+      this.applyVertexArray(outlineVertexArray);
       drawElements(outlineIndexStart, outlineIndexCount);
     }
     if (options.isBodyDrawn === false) {
       if (isTransparent) {
         webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
       }
-      webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
-      webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
+      this.applyCullFace(webGL2RenderingContext.BACK);
+      this.applyFrontFace(webGL2RenderingContext.CCW);
       return;
     }
     const solidEntry = programSet.solid;
@@ -51524,61 +52365,60 @@ var ToonRenderer = class {
     const baseColorTexture = options.baseColorTexture !== void 0 ? options.baseColorTexture : null;
     const emissiveTexture = options.emissiveTexture !== void 0 ? options.emissiveTexture : null;
     const decalTexture = options.decalTexture !== void 0 ? options.decalTexture : null;
-    webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("tintColor"), tintColor[0], tintColor[1], tintColor[2], tintColor[3]);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("tintAmount"), options.tintAmount !== void 0 && options.tintAmount !== null ? System76.Math.max(0, System76.Math.min(1, options.tintAmount)) : -1);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("alpha"), alpha);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("glowScale"), options.glowScale !== void 0 ? options.glowScale : 1);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("colorScale"), options.colorScale !== void 0 ? options.colorScale : 1);
-    webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("emissiveColor"), emissiveColor[0], emissiveColor[1], emissiveColor[2], options.emissiveIntensity !== void 0 ? options.emissiveIntensity : 1);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("softEdge"), options.softEdge !== void 0 ? options.softEdge : 0);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("alphaCutoff"), options.alphaCutoff !== void 0 ? options.alphaCutoff : 0);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("premultipliedOutput"), premultipliedOutput);
-    webGL2RenderingContext.uniform3f(solidProgram.getUniformLocation("textureEnabled"), baseColorTexture !== null ? 1 : 0, emissiveTexture !== null ? 1 : 0, decalTexture !== null ? 1 : 0);
-    webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("uvTransform"), uvTransform[0], uvTransform[1], uvTransform[2], uvTransform[3]);
-    webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("decalUvTransform"), decalUvTransform[0], decalUvTransform[1], decalUvTransform[2], decalUvTransform[3]);
-    webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("decalColor"), decalColor[0], decalColor[1], decalColor[2], options.decalEmission !== void 0 ? options.decalEmission : 0);
+    this.writeUniformFloats(solidProgram, "tintColor", 4, tintColor[0], tintColor[1], tintColor[2], tintColor[3]);
+    this.writeUniformFloats(solidProgram, "tintAmount", 1, options.tintAmount !== void 0 && options.tintAmount !== null ? System77.Math.max(0, System77.Math.min(1, options.tintAmount)) : -1);
+    this.writeUniformFloats(solidProgram, "alpha", 1, alpha);
+    this.writeUniformFloats(solidProgram, "glowScale", 1, options.glowScale !== void 0 ? options.glowScale : 1);
+    this.writeUniformFloats(solidProgram, "colorScale", 1, options.colorScale !== void 0 ? options.colorScale : 1);
+    this.writeUniformFloats(solidProgram, "emissiveColor", 4, emissiveColor[0], emissiveColor[1], emissiveColor[2], options.emissiveIntensity !== void 0 ? options.emissiveIntensity : 1);
+    this.writeUniformFloats(solidProgram, "softEdge", 1, options.softEdge !== void 0 ? options.softEdge : 0);
+    this.writeUniformFloats(solidProgram, "alphaCutoff", 1, options.alphaCutoff !== void 0 ? options.alphaCutoff : 0);
+    this.writeUniformFloats(solidProgram, "premultipliedOutput", 1, premultipliedOutput);
+    this.writeUniformFloats(solidProgram, "textureEnabled", 3, baseColorTexture !== null ? 1 : 0, emissiveTexture !== null ? 1 : 0, decalTexture !== null ? 1 : 0);
+    this.writeUniformFloats(solidProgram, "uvTransform", 4, uvTransform[0], uvTransform[1], uvTransform[2], uvTransform[3]);
+    this.writeUniformFloats(solidProgram, "decalUvTransform", 4, decalUvTransform[0], decalUvTransform[1], decalUvTransform[2], decalUvTransform[3]);
+    this.writeUniformFloats(solidProgram, "decalColor", 4, decalColor[0], decalColor[1], decalColor[2], options.decalEmission !== void 0 ? options.decalEmission : 0);
     const matcapTexture = options.matcapTexture !== void 0 ? options.matcapTexture : null;
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("receivesShadow"), options.receivesShadow !== false ? 1 : 0);
-    webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("shadeOffset"), options.shadeOffset !== void 0 ? options.shadeOffset : 0);
-    webGL2RenderingContext.uniform2f(solidProgram.getUniformLocation("highlightScale"), options.specularScale !== void 0 ? System76.Math.max(0, options.specularScale) : 1, options.rimScale !== void 0 ? System76.Math.max(0, options.rimScale) : 1);
-    webGL2RenderingContext.uniform3f(solidProgram.getUniformLocation("matcapSettings"), matcapTexture !== null ? 1 : 0, options.matcapStrength !== void 0 ? options.matcapStrength : 1, options.matcapBlend === ToonMatcapBlend.add ? 1 : 0);
+    this.writeUniformFloats(solidProgram, "receivesShadow", 1, options.receivesShadow !== false ? 1 : 0);
+    this.writeUniformFloats(solidProgram, "shadeOffset", 1, options.shadeOffset !== void 0 ? options.shadeOffset : 0);
+    this.writeUniformFloats(solidProgram, "highlightScale", 2, options.specularScale !== void 0 ? System77.Math.max(0, options.specularScale) : 1, options.rimScale !== void 0 ? System77.Math.max(0, options.rimScale) : 1);
+    this.writeUniformFloats(solidProgram, "matcapSettings", 3, matcapTexture !== null ? 1 : 0, options.matcapStrength !== void 0 ? options.matcapStrength : 1, options.matcapBlend === ToonMatcapBlend.add ? 1 : 0);
     const angelRingTexture = options.angelRingTexture !== void 0 ? options.angelRingTexture : null;
     const angelRingColor = options.angelRingColor !== void 0 ? options.angelRingColor : [1, 1, 1];
-    webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("angelRingSettings"), angelRingTexture !== null ? 1 : 0, options.angelRingOffsetU !== void 0 ? options.angelRingOffsetU : 0, options.angelRingOffsetV !== void 0 ? options.angelRingOffsetV : 0.3, options.isAngelRingAlpha === true ? 1 : 0);
-    webGL2RenderingContext.uniform3f(solidProgram.getUniformLocation("angelRingColor"), angelRingColor[0], angelRingColor[1], angelRingColor[2]);
+    this.writeUniformFloats(solidProgram, "angelRingSettings", 4, angelRingTexture !== null ? 1 : 0, options.angelRingOffsetU !== void 0 ? options.angelRingOffsetU : 0, options.angelRingOffsetV !== void 0 ? options.angelRingOffsetV : 0.3, options.isAngelRingAlpha === true ? 1 : 0);
+    this.writeUniformFloats(solidProgram, "angelRingColor", 3, angelRingColor[0], angelRingColor[1], angelRingColor[2]);
     const shadowInput = this.#shadowInput;
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + SHADOW_TEXTURE_UNIT);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, shadowInput !== null ? shadowInput.depthTexture : this.#emptyShadowTexture);
+    this.bindTexture2D(SHADOW_TEXTURE_UNIT, shadowInput !== null ? shadowInput.depthTexture : this.#emptyShadowTexture);
     this.bindTextureUnit(BASE_COLOR_TEXTURE_UNIT, baseColorTexture);
     this.bindTextureUnit(EMISSIVE_TEXTURE_UNIT, emissiveTexture);
     this.bindTextureUnit(DECAL_TEXTURE_UNIT, decalTexture);
     this.bindTextureUnit(RAMP_TEXTURE_UNIT, lightSet.getRampTexture());
     this.bindTextureUnit(MATCAP_TEXTURE_UNIT, matcapTexture);
     this.bindTextureUnit(ANGEL_RING_TEXTURE_UNIT, angelRingTexture);
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LOCAL_SHADOW_TEXTURE_UNIT);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#localShadowInput !== null ? this.#localShadowInput.depthTexture : this.#emptyShadowTexture);
+    this.bindTexture2D(LOCAL_SHADOW_TEXTURE_UNIT, this.#localShadowInput !== null ? this.#localShadowInput.depthTexture : this.#emptyShadowTexture);
     if (options.textures !== void 0 && options.textures !== null) {
       let unit = FIRST_MATERIAL_TEXTURE_UNIT;
-      for (const [uniformName, texture] of System76.Object.entries(options.textures)) {
+      for (const [uniformName, texture] of System77.Object.entries(options.textures)) {
         if (unit >= FIRST_MATERIAL_TEXTURE_UNIT + TOON_MAXIMUM_MATERIAL_TEXTURES) {
           break;
         }
         this.bindTextureUnit(unit, texture);
-        webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation(uniformName), unit);
+        this.writeUniform1i(solidProgram, uniformName, unit);
         unit += 1;
       }
     }
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
     if (onBeforeDraw !== null) {
       onBeforeDraw(solidProgram, webGL2RenderingContext, ToonProgramKind.solid);
+      this.forgetUniformValues(solidProgram);
     }
-    webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
-    webGL2RenderingContext.bindVertexArray(bodyVertexArray);
+    this.applyCullFace(webGL2RenderingContext.BACK);
+    this.applyVertexArray(bodyVertexArray);
     drawElements(indexStart, indexCount);
     if (isTransparent) {
       webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     }
-    webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
+    this.applyFrontFace(webGL2RenderingContext.CCW);
   }
   //==============================================================================
   // 빛 설정. (해가 비추는 방향, 해의 색, 하늘색, 땅색, 모두 선형 색 0 ~, HDR 이면 1 을 넘어도 된다, 기본 빛 묶음)
@@ -51796,7 +52636,7 @@ var ToonRenderer = class {
    * renderer.setOutlineDistanceScale(6, 0.4, 3);
    */
   setOutlineDistanceScale(referenceDistance, minimumScale = 0.5, maximumScale = 4) {
-    this.#outlineDistanceScale = [System76.Math.max(0, referenceDistance), System76.Math.max(0, minimumScale), System76.Math.max(System76.Math.max(0, minimumScale), maximumScale)];
+    this.#outlineDistanceScale = [System77.Math.max(0, referenceDistance), System77.Math.max(0, minimumScale), System77.Math.max(System77.Math.max(0, minimumScale), maximumScale)];
     this.#frameSerial += 1;
   }
   //==============================================================================
@@ -51812,7 +52652,7 @@ var ToonRenderer = class {
    * renderer.setOutlineFadeDistance(8, 20);
    */
   setOutlineFadeDistance(nearDistance, farDistance) {
-    this.#outlineFadeDistance = [System76.Math.max(0, nearDistance), System76.Math.max(0, farDistance)];
+    this.#outlineFadeDistance = [System77.Math.max(0, nearDistance), System77.Math.max(0, farDistance)];
     this.#frameSerial += 1;
   }
   //==============================================================================
@@ -51847,7 +52687,7 @@ var ToonRenderer = class {
       return;
     }
     const resolution = shadowAtlas.getResolution();
-    this.#localShadowInput = { depthTexture: shadowAtlas.getDepthTexture(), lights: shadowAtlas.getLights(), gridSize: shadowAtlas.getGridSize(), tileSize: shadowAtlas.getTileSize() / resolution, texelSize: 1 / resolution, strength: System76.Math.max(0, System76.Math.min(1, strength)) };
+    this.#localShadowInput = { depthTexture: shadowAtlas.getDepthTexture(), lights: shadowAtlas.getLights(), gridSize: shadowAtlas.getGridSize(), tileSize: shadowAtlas.getTileSize() / resolution, texelSize: 1 / resolution, strength: System77.Math.max(0, System77.Math.min(1, strength)) };
   }
   //==============================================================================
   // 빛 색 쓰기 설정. (ToonLightSet.setLightColorUsage)
@@ -51992,7 +52832,7 @@ var ToonRenderer = class {
 };
 
 // src/graphics3d/rendertarget.js
-var System77 = globalThis;
+var System78 = globalThis;
 var RenderTarget = class extends Object2 {
   static {
     __name(this, "RenderTarget");
@@ -52074,7 +52914,7 @@ var RenderTarget = class extends Object2 {
     this.#colorAttachmentCount = options && options.colorAttachmentCount ? options.colorAttachmentCount : 1;
     this.#useFloatColor = options ? options.useFloatColor === true : false;
     this.#useDepthTexture = options ? options.useDepthTexture === true : false;
-    this.#requestedSampleCount = options && options.sampleCount ? System77.Math.max(0, System77.Math.floor(options.sampleCount)) : 0;
+    this.#requestedSampleCount = options && options.sampleCount ? System78.Math.max(0, System78.Math.floor(options.sampleCount)) : 0;
     this.#sampleCount = 0;
     this.#depthBits = options && options.depthBits === 24 ? 24 : 16;
     this.#multisampleFramebuffer = null;
@@ -52204,7 +53044,7 @@ var RenderTarget = class extends Object2 {
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const maximumSampleCount = webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_SAMPLES);
-    let sampleCount = System77.Math.min(requestedSampleCount, maximumSampleCount);
+    let sampleCount = System78.Math.min(requestedSampleCount, maximumSampleCount);
     for (const internalFormat of internalFormatList) {
       const supportedSampleCountList = webGL2RenderingContext.getInternalformatParameter(webGL2RenderingContext.RENDERBUFFER, internalFormat, webGL2RenderingContext.SAMPLES);
       let bestSampleCount = 0;
@@ -52220,14 +53060,40 @@ var RenderTarget = class extends Object2 {
     return sampleCount >= 2 ? sampleCount : 0;
   }
   //==============================================================================
-  // 멀티샘플을 텍스처로 풀기. (멀티샘플이 아니면 아무것도 하지 않음, 컬러 어태치먼트마다와 깊이 텍스처, 묶여 있던 프레임버퍼로 돌림)
+  // 멀티샘플을 텍스처로 풀기. (컬러 어태치먼트마다와 깊이 텍스처, 묶여 있던 프레임버퍼로 돌림)
+  // - 그리기를 끝낸 판의 다시 읽지 않는 첨부를 버린다. (멀티샘플이면 멀티샘플 색과 깊이, 아니면 텍스처가 아닌 깊이 렌더버퍼)
+  //   유니티, 언리얼이 판 끝에 저장하지 않는 첨부(store action 을 버림으로)와 같다. 모바일 타일 GPU 가 그 첨부를 메모리에 쓰지 않는다.
+  //   버린 첨부의 값은 정해지지 않으므로 다음에 그릴 때는 비우고 그린다. (데스크탑 GPU 에서는 거의 차이가 없다)
   //==============================================================================
-  resolve() {
+  /**
+   * @param { boolean } isAttachmentKept true 면 버리지 않고 남긴다. (풀고 나서 같은 판에 이어 그릴 때, 기본 false)
+   * @example <caption>풀고 나서 같은 판에 이어 그리기</caption>
+   * import { RenderTarget } from "./build/vanilla.js";
+   *
+   * const canvas = document.createElement("canvas");
+   * const webGL2RenderingContext = canvas.getContext("webgl2");
+   * const renderTarget = new RenderTarget(webGL2RenderingContext, 128, 128, true, { sampleCount: 4 });
+   * renderTarget.bind();
+   * webGL2RenderingContext.clearColor(0.1, 0.2, 0.3, 1.0);
+   * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+   * renderTarget.resolve(true);
+   * renderTarget.bind();
+   * renderTarget.resolve();
+   * webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+   * console.log(renderTarget.getSampleCount());
+   */
+  resolve(isAttachmentKept = false) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const multisampleFramebuffer = this.#multisampleFramebuffer;
     if (multisampleFramebuffer === null) {
+      if (!isAttachmentKept && this.#depthRenderbuffer !== null) {
+        const previousFramebuffer2 = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.getFramebuffer());
+        webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_ATTACHMENT]);
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer2);
+      }
       return;
     }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
     const width = this.getWidth();
     const height = this.getHeight();
@@ -52256,6 +53122,16 @@ var RenderTarget = class extends Object2 {
     const depthTexture = this.getDepthTexture();
     if (depthTexture !== null) {
       webGL2RenderingContext.blitFramebuffer(0, 0, width, height, 0, 0, width, height, webGL2RenderingContext.DEPTH_BUFFER_BIT, webGL2RenderingContext.NEAREST);
+    }
+    if (!isAttachmentKept) {
+      const invalidatedAttachmentList = [];
+      for (let attachmentIndex = 0; attachmentIndex < colorAttachmentCount; ++attachmentIndex) {
+        invalidatedAttachmentList.push(webGL2RenderingContext.COLOR_ATTACHMENT0 + attachmentIndex);
+      }
+      if (this.#multisampleDepthRenderbuffer !== null) {
+        invalidatedAttachmentList.push(webGL2RenderingContext.DEPTH_ATTACHMENT);
+      }
+      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, invalidatedAttachmentList);
     }
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
   }
@@ -52430,7 +53306,7 @@ var RenderTarget = class extends Object2 {
 };
 
 // src/graphics3d/toon/toonview3d.js
-var System78 = globalThis;
+var System79 = globalThis;
 var ToonView3D = class extends Component {
   static {
     __name(this, "ToonView3D");
@@ -52499,11 +53375,11 @@ var ToonView3D = class extends Component {
    * const renderScale = view.getRenderScale();
    */
   setRenderScale(renderScale) {
-    if (typeof renderScale !== "number" || !System78.Number.isFinite(renderScale)) {
+    if (typeof renderScale !== "number" || !System79.Number.isFinite(renderScale)) {
       this.#renderScale = 1;
       return;
     }
-    this.#renderScale = System78.Math.max(0.05, System78.Math.min(4, renderScale));
+    this.#renderScale = System79.Math.max(0.05, System79.Math.min(4, renderScale));
   }
   //==============================================================================
   // 렌더 스케일 반환.
@@ -52661,7 +53537,7 @@ var ToonView3D = class extends Component {
       const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
       this.#renderer = new ToonRenderer(webGL2RenderingContext);
     } catch (error) {
-      System78.console.error("[ToonView3D] \uD230 \uB80C\uB354\uB7EC\uB97C \uC9D3\uC9C0 \uBABB\uD574 \uB300\uCCB4 \uADF8\uB9AC\uAE30\uB85C \uAC11\uB2C8\uB2E4.", error);
+      System79.console.error("[ToonView3D] \uD230 \uB80C\uB354\uB7EC\uB97C \uC9D3\uC9C0 \uBABB\uD574 \uB300\uCCB4 \uADF8\uB9AC\uAE30\uB85C \uAC11\uB2C8\uB2E4.", error);
       this.#isRendererFailed = true;
       this.#renderer = null;
     }
@@ -52679,19 +53555,19 @@ var ToonView3D = class extends Component {
     const transformMatrix = graphic.getTransformMatrix();
     const cornerXList = [0, contentSize.x, 0, contentSize.x];
     const cornerYList = [0, 0, contentSize.y, contentSize.y];
-    let minimumX = System78.Infinity;
-    let minimumY = System78.Infinity;
-    let maximumX = -System78.Infinity;
-    let maximumY = -System78.Infinity;
+    let minimumX = System79.Infinity;
+    let minimumY = System79.Infinity;
+    let maximumX = -System79.Infinity;
+    let maximumY = -System79.Infinity;
     for (let cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
       const cornerX = cornerXList[cornerIndex];
       const cornerY = cornerYList[cornerIndex];
       const screenX = transformMatrix.a * cornerX + transformMatrix.c * cornerY + transformMatrix.e;
       const screenY = transformMatrix.b * cornerX + transformMatrix.d * cornerY + transformMatrix.f;
-      minimumX = System78.Math.min(minimumX, screenX);
-      minimumY = System78.Math.min(minimumY, screenY);
-      maximumX = System78.Math.max(maximumX, screenX);
-      maximumY = System78.Math.max(maximumY, screenY);
+      minimumX = System79.Math.min(minimumX, screenX);
+      minimumY = System79.Math.min(minimumY, screenY);
+      maximumX = System79.Math.max(maximumX, screenX);
+      maximumY = System79.Math.max(maximumY, screenY);
     }
     const screenRect = this.#screenRect;
     screenRect.x = minimumX;
@@ -52765,11 +53641,11 @@ var ToonView3D = class extends Component {
     outputScreenRect.width = width;
     outputScreenRect.height = height;
     outputScreenRect.outputFramebuffer = graphic.getCurrentFramebuffer();
-    const outputWidth = System78.Math.max(1, System78.Math.round(width));
-    const outputHeight = System78.Math.max(1, System78.Math.round(height));
+    const outputWidth = System79.Math.max(1, System79.Math.round(width));
+    const outputHeight = System79.Math.max(1, System79.Math.round(height));
     const outputViewport = outputScreenRect.outputViewport;
-    outputViewport[0] = viewport.position.x + System78.Math.round(x);
-    outputViewport[1] = viewport.position.y + viewport.height - System78.Math.round(y) - outputHeight;
+    outputViewport[0] = viewport.position.x + System79.Math.round(x);
+    outputViewport[1] = viewport.position.y + viewport.height - System79.Math.round(y) - outputHeight;
     outputViewport[2] = outputWidth;
     outputViewport[3] = outputHeight;
   }
@@ -52791,7 +53667,7 @@ var ToonView3D = class extends Component {
         const sampleCount = contextAttributes && contextAttributes.antialias ? 4 : 0;
         target = new RenderTarget(webGL2RenderingContext, width, height, true, { sampleCount, depthBits: 24 });
       } catch (error) {
-        System78.console.error("[ToonView3D] \uB80C\uB354 \uC2A4\uCF00\uC77C \uD310\uC744 \uC9D3\uC9C0 \uBABB\uD574 \uD654\uBA74\uC5D0 \uBC14\uB85C \uADF8\uB9BD\uB2C8\uB2E4.", error);
+        System79.console.error("[ToonView3D] \uB80C\uB354 \uC2A4\uCF00\uC77C \uD310\uC744 \uC9D3\uC9C0 \uBABB\uD574 \uD654\uBA74\uC5D0 \uBC14\uB85C \uADF8\uB9BD\uB2C8\uB2E4.", error);
         this.#renderScale = 1;
         return null;
       }
@@ -52816,8 +53692,8 @@ var ToonView3D = class extends Component {
     const screenRect = this.#screenRect;
     const camera = this.#camera;
     const renderScale = this.#renderScale;
-    const targetWidth = System78.Math.max(1, System78.Math.round(screenRect.width * renderScale));
-    const targetHeight = System78.Math.max(1, System78.Math.round(screenRect.height * renderScale));
+    const targetWidth = System79.Math.max(1, System79.Math.round(screenRect.width * renderScale));
+    const targetHeight = System79.Math.max(1, System79.Math.round(screenRect.height * renderScale));
     const outputScreenRect = this.#outputScreenRect;
     let colorTexture = null;
     graphic.runExternalPass((webGL2RenderingContext) => {
@@ -52997,7 +53873,7 @@ var Visual = class extends Component {
 };
 
 // src/ui/uichart.js
-var System79 = globalThis;
+var System80 = globalThis;
 var UILineChart = class extends Component {
   static {
     __name(this, "UILineChart");
@@ -53096,8 +53972,8 @@ var UILineChart = class extends Component {
       let autoLow = this.#valueList[0];
       let autoHigh = this.#valueList[0];
       for (const value of this.#valueList) {
-        autoLow = System79.Math.min(autoLow, value);
-        autoHigh = System79.Math.max(autoHigh, value);
+        autoLow = System80.Math.min(autoLow, value);
+        autoHigh = System80.Math.max(autoHigh, value);
       }
       if (lowValue === null) {
         lowValue = autoLow;
@@ -53106,7 +53982,7 @@ var UILineChart = class extends Component {
         highValue = autoHigh;
       }
     }
-    const valueRange = System79.Math.max(highValue - lowValue, 1e-4);
+    const valueRange = System80.Math.max(highValue - lowValue, 1e-4);
     const points = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const ratio = sampleIndex / (this.#maxSampleCount - 1);
@@ -53133,7 +54009,7 @@ var UILineChart = class extends Component {
    * console.log(valueList.join(", "));
    */
   setMaxSampleCount(maxSampleCount) {
-    this.#maxSampleCount = System79.Math.max(2, maxSampleCount);
+    this.#maxSampleCount = System80.Math.max(2, maxSampleCount);
     const excessCount = this.#valueList.length - this.#maxSampleCount;
     if (excessCount > 0) {
       this.#valueList.splice(0, excessCount);
@@ -53278,14 +54154,14 @@ var UIBarChart = class extends Component {
     if (highValue === null) {
       highValue = 1e-4;
       for (const value of this.#valueList) {
-        highValue = System79.Math.max(highValue, value);
+        highValue = System80.Math.max(highValue, value);
       }
     }
     const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
     const barRects = [];
     for (let barIndex = 0; barIndex < barCount; ++barIndex) {
-      const valueRatio = System79.Math.max(0, System79.Math.min(1, this.#valueList[barIndex] / highValue));
-      const barHeight = System79.Math.max(1, valueRatio * height);
+      const valueRatio = System80.Math.max(0, System80.Math.min(1, this.#valueList[barIndex] / highValue));
+      const barHeight = System80.Math.max(1, valueRatio * height);
       const barX = barIndex * (barWidth + this.#barGap);
       barRects.push(Rect.create(barX, height - barHeight, barWidth, barHeight));
     }
@@ -53348,7 +54224,7 @@ var UIBarChart = class extends Component {
 };
 
 // src/ui/uidraggable.js
-var System80 = globalThis;
+var System81 = globalThis;
 var UIDraggable = class extends UIControl {
   static {
     __name(this, "UIDraggable");
@@ -53493,7 +54369,7 @@ var UIDraggable = class extends UIControl {
     }
     const node = this.getNode();
     const localPosition = node.getLocalPosition();
-    const blend = System80.Math.min(this.#snapBackSpeed * timeDelta, 1);
+    const blend = System81.Math.min(this.#snapBackSpeed * timeDelta, 1);
     const nextX = localPosition.x + (this.#homePosition.x - localPosition.x) * blend;
     const nextY = localPosition.y + (this.#homePosition.y - localPosition.y) * blend;
     node.setLocalPosition(Vector2.create(nextX, nextY));
@@ -53599,7 +54475,7 @@ var UIDraggable = class extends UIControl {
 };
 
 // src/ui/uilistview.js
-var System81 = globalThis;
+var System82 = globalThis;
 var UIListView = class extends Component {
   static {
     __name(this, "UIListView");
@@ -53660,7 +54536,7 @@ var UIListView = class extends Component {
     this.#reachEndEvent = null;
     this.#reachEndThreshold = 120;
     this.#isReachEndArmed = true;
-    this.#activeItemMap = new System81.Map();
+    this.#activeItemMap = new System82.Map();
     this.#freeItemList = [];
   }
   //==============================================================================
@@ -53731,7 +54607,7 @@ var UIListView = class extends Component {
    */
   setItemCount(itemCount) {
     const previousItemCount = this.#itemCount;
-    this.#itemCount = System81.Math.max(0, itemCount);
+    this.#itemCount = System82.Math.max(0, itemCount);
     if (this.#itemCount > previousItemCount) {
       this.#isReachEndArmed = true;
     }
@@ -53773,10 +54649,10 @@ var UIListView = class extends Component {
     if (pitch <= 0) {
       return;
     }
-    let firstIndex = System81.Math.floor(scrolled / pitch) - this.#bufferItemCount;
-    let lastIndex = System81.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
-    firstIndex = System81.Math.max(0, firstIndex);
-    lastIndex = System81.Math.min(this.#itemCount - 1, lastIndex);
+    let firstIndex = System82.Math.floor(scrolled / pitch) - this.#bufferItemCount;
+    let lastIndex = System82.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
+    firstIndex = System82.Math.max(0, firstIndex);
+    lastIndex = System82.Math.min(this.#itemCount - 1, lastIndex);
     for (const [itemIndex, itemNode] of [...this.#activeItemMap]) {
       if (itemIndex < firstIndex || itemIndex > lastIndex) {
         itemNode.setActive(false);
@@ -53981,7 +54857,7 @@ var UIListView = class extends Component {
   //==============================================================================
   /** @param { number } bufferItemCount 보이는 범위 앞뒤로 더 만들어 둘 항목 수. (0 보다 작으면 0, 기본 1) */
   setBufferItemCount(bufferItemCount) {
-    this.#bufferItemCount = System81.Math.max(0, bufferItemCount);
+    this.#bufferItemCount = System82.Math.max(0, bufferItemCount);
   }
   //==============================================================================
   // 조회 메서드 목록.
@@ -54024,7 +54900,7 @@ var UIListView = class extends Component {
 };
 
 // src/ui/uisnapscrollview.js
-var System82 = globalThis;
+var System83 = globalThis;
 var UISnapScrollView = class extends UIScrollView {
   static {
     __name(this, "UISnapScrollView");
@@ -54209,8 +55085,8 @@ var UISnapScrollView = class extends UIScrollView {
     const snapOffsets = this.computeSnapOffsets();
     const snapCurrentIndex = this.getSnapCurrentIndex();
     const maxIndex = children.length - 1;
-    const prevIndex = System82.Math.max(0, snapCurrentIndex - 1);
-    const nextIndex = System82.Math.min(maxIndex, snapCurrentIndex + 1);
+    const prevIndex = System83.Math.max(0, snapCurrentIndex - 1);
+    const nextIndex = System83.Math.min(maxIndex, snapCurrentIndex + 1);
     const isHorizontal = this.isHorizontal();
     const currentOffset = this.getScrollOffset();
     if (isHorizontal) {
@@ -54284,9 +55160,9 @@ var UISnapScrollView = class extends UIScrollView {
     const currentAxisOffset = isHorizontal ? currentOffset.x : currentOffset.y;
     if (this.getSnapToNearest()) {
       let nearestIndex = 0;
-      let nearestDistance = System82.Math.abs(snapOffsets[0] - currentAxisOffset);
+      let nearestDistance = System83.Math.abs(snapOffsets[0] - currentAxisOffset);
       for (let snapOffsetIndex = 1; snapOffsetIndex < snapOffsets.length; ++snapOffsetIndex) {
-        const distance = System82.Math.abs(snapOffsets[snapOffsetIndex] - currentAxisOffset);
+        const distance = System83.Math.abs(snapOffsets[snapOffsetIndex] - currentAxisOffset);
         if (distance < nearestDistance) {
           nearestDistance = distance;
           nearestIndex = snapOffsetIndex;
@@ -54300,7 +55176,7 @@ var UISnapScrollView = class extends UIScrollView {
     const dragAmount = currentAxisOffset - currentSnapOffset;
     const dragVelocity = this.getDragVelocity();
     const velocityThreshold = this.getVelocityThreshold();
-    const isFling = System82.Math.abs(dragVelocity) >= velocityThreshold && dragVelocity !== 0;
+    const isFling = System83.Math.abs(dragVelocity) >= velocityThreshold && dragVelocity !== 0;
     let direction;
     if (isFling) {
       direction = dragVelocity < 0 ? 1 : -1;
@@ -54314,7 +55190,7 @@ var UISnapScrollView = class extends UIScrollView {
       const candidateChildContentSize = candidateChild.getContentSize();
       const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
       const pageChangeThreshold = this.getPageChangeThreshold();
-      if (isFling || System82.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+      if (isFling || System83.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
         targetIndex = candidateIndex;
       } else {
         targetIndex = snapCurrentIndex;
@@ -54421,7 +55297,7 @@ var UISnapScrollView = class extends UIScrollView {
     const startOffsetY = currentOffset.y;
     this.#snapTween = new Tween({ x: startOffsetX, y: startOffsetY });
     this.#snapTween.to({ x: targetOffsetX, y: targetOffsetY }, 0.3);
-    this.#snapTween.easing(Tween.easingFunction.cubic.out);
+    this.#snapTween.easing(Tween.easingFunction.cubic.easeOut);
     this.#snapTween.setUpdate((values) => {
       this.setScrollOffset(Vector2.create(values.x, values.y));
     });
@@ -54442,7 +55318,7 @@ var UISnapScrollView = class extends UIScrollView {
 };
 
 // src/ui/uiconfirmwindow.js
-var System83 = globalThis;
+var System84 = globalThis;
 var CONFIRM_PADDING = 24;
 var CONFIRM_ROW_GAP = 16;
 var CONFIRM_TITLE_HEIGHT = 32;
@@ -54742,7 +55618,7 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
     this.#messageLabel.setWordWrapWidth(textWidth);
     const messageText = this.#messageNode.getComponent(Text);
     const wrappedSize = messageText.measureWrappedSize();
-    return System83.Math.ceil(wrappedSize.height);
+    return System84.Math.ceil(wrappedSize.height);
   }
   //==============================================================================
   // 내용 놓기. (제목 → 글 스크롤 칸 → 두 단추, 판의 세로를 돌려준다)
@@ -54753,7 +55629,7 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
    * @returns { number } 판의 세로. (UI 층 단위, 여백, 제목, 글 칸, 단추 줄을 더한 값)
    */
   layoutContent(panelWidth) {
-    const innerWidth = System83.Math.max(1, panelWidth - CONFIRM_PADDING * 2);
+    const innerWidth = System84.Math.max(1, panelWidth - CONFIRM_PADDING * 2);
     let top = CONFIRM_PADDING;
     if (this.#titleNode.isActive()) {
       this.#titleNode.setLocalPosition(Vector2.create(CONFIRM_PADDING, top));
@@ -54763,9 +55639,9 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
     const buttonsHeight = CONFIRM_ROW_GAP + CONFIRM_BUTTON_HEIGHT + CONFIRM_PADDING;
     const viewHeight = this.getViewHeight();
     const margin = this.getMargin();
-    const availableHeight = System83.Math.max(CONFIRM_MINIMUM_MESSAGE_HEIGHT, viewHeight - margin * 2 - top - buttonsHeight);
-    const messageHeight = System83.Math.max(1, this.measureMessageHeight(innerWidth));
-    const scrollHeight = System83.Math.min(messageHeight, availableHeight);
+    const availableHeight = System84.Math.max(CONFIRM_MINIMUM_MESSAGE_HEIGHT, viewHeight - margin * 2 - top - buttonsHeight);
+    const messageHeight = System84.Math.max(1, this.measureMessageHeight(innerWidth));
+    const scrollHeight = System84.Math.min(messageHeight, availableHeight);
     this.#messageNode.setLocalPosition(Vector2.create(0, 0));
     this.#messageNode.setContentSize(Vector2.create(innerWidth, messageHeight));
     this.#messageScrollNode.setLocalPosition(Vector2.create(CONFIRM_PADDING, top));
@@ -54773,7 +55649,7 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
     this.#messageScrollView.setScrollContentSize(Vector2.create(innerWidth, messageHeight));
     this.#messageScrollView.setScrollOffset(Vector2.zero());
     top += scrollHeight + CONFIRM_ROW_GAP;
-    const buttonWidth = System83.Math.max(1, (innerWidth - CONFIRM_BUTTON_GAP) * 0.5);
+    const buttonWidth = System84.Math.max(1, (innerWidth - CONFIRM_BUTTON_GAP) * 0.5);
     const leftButtonLeft = CONFIRM_PADDING;
     const rightButtonLeft = CONFIRM_PADDING + buttonWidth + CONFIRM_BUTTON_GAP;
     const cancelLeft = this.isRightToLeft() ? rightButtonLeft : leftButtonLeft;
@@ -54788,7 +55664,7 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
 };
 
 // src/ui/uicontextmenu.js
-var System84 = globalThis;
+var System85 = globalThis;
 var UIContextMenu = class extends WorldNode {
   static {
     __name(this, "UIContextMenu");
@@ -54906,8 +55782,8 @@ var UIContextMenu = class extends WorldNode {
     }
     this.setContentSize(Vector2.create(areaWidth, areaHeight));
     this.#overlayNode.setContentSize(Vector2.create(areaWidth, areaHeight));
-    const menuX = System84.Math.min(position.x, areaWidth - this.#menuWidth - 4);
-    const menuY = System84.Math.min(position.y, areaHeight - panelHeight - 4);
+    const menuX = System85.Math.min(position.x, areaWidth - this.#menuWidth - 4);
+    const menuY = System85.Math.min(position.y, areaHeight - panelHeight - 4);
     this.#panelNode.setLocalPosition(Vector2.create(menuX, menuY));
     this.setActive(true);
   }
@@ -55257,7 +56133,7 @@ var UIDialog = class extends WorldNode {
 };
 
 // src/ui/uidropdown.js
-var System85 = globalThis;
+var System86 = globalThis;
 var UIDropdown = class extends WorldNode {
   static {
     __name(this, "UIDropdown");
@@ -55356,7 +56232,7 @@ var UIDropdown = class extends WorldNode {
    */
   setOptionList(optionList) {
     this.#optionList = optionList.slice();
-    this.#selectedIndex = System85.Math.min(this.#selectedIndex, System85.Math.max(0, this.#optionList.length - 1));
+    this.#selectedIndex = System86.Math.min(this.#selectedIndex, System86.Math.max(0, this.#optionList.length - 1));
     const childList = this.#popupNode.getChildren().slice();
     for (const childNode of childList) {
       this.#popupNode.removeChild(childNode);
@@ -55534,7 +56410,7 @@ var UIDropdown = class extends WorldNode {
   //==============================================================================
   /** @param { number } selectedIndex 선택 순서. (0 ~ 선택지 수 - 1 로 자른다) */
   setSelectedIndex(selectedIndex) {
-    this.#selectedIndex = System85.Math.max(0, System85.Math.min(selectedIndex, this.#optionList.length - 1));
+    this.#selectedIndex = System86.Math.max(0, System86.Math.min(selectedIndex, this.#optionList.length - 1));
     this.refreshHeader();
     this.refreshHighlight();
   }
@@ -55599,7 +56475,7 @@ var UIDropdown = class extends WorldNode {
 };
 
 // src/ui/uispinner.js
-var System86 = globalThis;
+var System87 = globalThis;
 var UISpinner = class extends WorldNode {
   static {
     __name(this, "UISpinner");
@@ -55640,15 +56516,15 @@ var UISpinner = class extends WorldNode {
     this.setContentSize(Vector2.create((radius + dotRadius) * 2, (radius + dotRadius) * 2));
     const center = radius + dotRadius;
     for (let dotIndex = 0; dotIndex < this.#dotCount; ++dotIndex) {
-      const angle = dotIndex / this.#dotCount * System86.Math.PI * 2;
+      const angle = dotIndex / this.#dotCount * System87.Math.PI * 2;
       const dotNode = new WorldNode();
       dotNode.setName("SpinnerDot" + dotIndex);
       dotNode.setPivot(Pivot.middleCenter.clone());
       dotNode.setAnchor(Pivot.topLeft.clone());
       dotNode.setContentSize(Vector2.create(dotRadius * 2, dotRadius * 2));
       dotNode.setLocalPosition(Vector2.create(
-        center + System86.Math.cos(angle) * radius,
-        center + System86.Math.sin(angle) * radius
+        center + System87.Math.cos(angle) * radius,
+        center + System87.Math.sin(angle) * radius
       ));
       const paint = dotNode.addComponent(Paint);
       paint.setColor(this.#dotColor.clone());
@@ -55746,7 +56622,7 @@ var UISpinner = class extends WorldNode {
 };
 
 // src/ui/uitoast.js
-var System87 = globalThis;
+var System88 = globalThis;
 var UIToast = class extends WorldNode {
   static {
     __name(this, "UIToast");
@@ -55849,7 +56725,7 @@ var UIToast = class extends WorldNode {
     }
     this.#phaseSeconds += timeDelta;
     if (this.#phase === "enter") {
-      const ratio = System87.Math.min(1, this.#phaseSeconds / 0.24);
+      const ratio = System88.Math.min(1, this.#phaseSeconds / 0.24);
       const eased = 1 - (1 - ratio) * (1 - ratio);
       this.setLocalOpacity(eased);
       this.updatePosition(eased);
@@ -55863,7 +56739,7 @@ var UIToast = class extends WorldNode {
         this.#phaseSeconds = 0;
       }
     } else if (this.#phase === "exit") {
-      const ratio = System87.Math.min(1, this.#phaseSeconds / 0.2);
+      const ratio = System88.Math.min(1, this.#phaseSeconds / 0.2);
       this.setLocalOpacity(1 - ratio);
       this.updatePosition(1 + ratio * 0.4);
       if (ratio >= 1) {
@@ -55931,13 +56807,13 @@ var UIToast = class extends WorldNode {
 };
 
 // src/ui/uidocument.js
-var System88 = globalThis;
+var System89 = globalThis;
 var UIDOCUMENT_VERSION = 1;
 var NODE_TYPE_TABLE = {
   WorldNode
 };
 var NODE_REFERENCE_KEY = "$nodeRef";
-var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System88.Set([
+var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System89.Set([
   "Parent",
   "Node",
   "Owner",
@@ -55977,10 +56853,10 @@ var deserializeRootNode = null;
 var pendingNodeReferenceList = [];
 function collectReflectedProperties(targetObject) {
   const propertyList = [];
-  const visitedNameSet = new System88.Set();
-  let prototypeObject = System88.Object.getPrototypeOf(targetObject);
-  while (prototypeObject && prototypeObject !== System88.Object.prototype) {
-    for (const memberName of System88.Object.getOwnPropertyNames(prototypeObject)) {
+  const visitedNameSet = new System89.Set();
+  let prototypeObject = System89.Object.getPrototypeOf(targetObject);
+  while (prototypeObject && prototypeObject !== System89.Object.prototype) {
+    for (const memberName of System89.Object.getOwnPropertyNames(prototypeObject)) {
       let baseName = "";
       if (memberName.indexOf("get") === 0) {
         baseName = memberName.substring(3);
@@ -56002,13 +56878,13 @@ function collectReflectedProperties(targetObject) {
       visitedNameSet.add(baseName);
       propertyList.push({ name: baseName, getterName: memberName, setterName: "set" + baseName });
     }
-    prototypeObject = System88.Object.getPrototypeOf(prototypeObject);
+    prototypeObject = System89.Object.getPrototypeOf(prototypeObject);
   }
   return propertyList;
 }
 __name(collectReflectedProperties, "collectReflectedProperties");
 function findRegisteredTypeName(typeTable, targetType) {
-  for (const typeName of System88.Object.keys(typeTable)) {
+  for (const typeName of System89.Object.keys(typeTable)) {
     if (typeTable[typeName] === targetType) {
       return typeName;
     }
@@ -56102,7 +56978,7 @@ var COMPONENT_PROPERTY_TABLE = {
           component.setImage(resolvedImage);
         }
       }
-      if (System88.Array.isArray(data.nineSlice) && data.nineSlice.length === 4) {
+      if (System89.Array.isArray(data.nineSlice) && data.nineSlice.length === 4) {
         const nineSliceLeft = data.nineSlice[0];
         const nineSliceTop = data.nineSlice[1];
         const nineSliceRight = data.nineSlice[2] - nineSliceLeft;
@@ -56247,7 +57123,7 @@ var COMPONENT_PROPERTY_TABLE = {
     // 그림 경로 뒤에 반사 저장 꼴. (그림 원본은 문서에 담지 않고 Sprite 처럼 경로만 적는다)
     save(component) {
       const componentData = { imagePath: component.getImagePath() };
-      System88.Object.assign(componentData, UIDocument.saveByReflection(component));
+      System89.Object.assign(componentData, UIDocument.saveByReflection(component));
       return componentData;
     },
     load(component, data) {
@@ -56374,7 +57250,7 @@ var UIDocument = class _UIDocument extends Object2 {
     };
     const componentList = node.getAllComponents();
     const generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(componentList);
-    const widgetContentNodeSet = new System88.Set();
+    const widgetContentNodeSet = new System89.Set();
     for (const component of componentList) {
       const componentTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, component.constructor);
       const propertyHandler = COMPONENT_PROPERTY_TABLE[componentTypeName];
@@ -56415,7 +57291,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { Set<string> } UIView 계열이 require 로 함께 붙이는 컴포넌트의 문서 이름 모음. (등록한 이름, 등록하지 않았으면 클래스 이름)
    */
   static collectGeneratedComponentTypes(componentList) {
-    const generatedTypeSet = new System88.Set();
+    const generatedTypeSet = new System89.Set();
     for (const component of componentList) {
       if (!(component instanceof UIView)) {
         continue;
@@ -56442,7 +57318,7 @@ var UIDocument = class _UIDocument extends Object2 {
     let nodeType = NODE_TYPE_TABLE[nodeData.type];
     if (!nodeType) {
       if (nodeData.type !== void 0) {
-        System88.console.warn(`UIDocument: unregistered node type "${nodeData.type}" is read as WorldNode. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
+        System89.console.warn(`UIDocument: unregistered node type "${nodeData.type}" is read as WorldNode. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
       }
       nodeType = WorldNode;
     }
@@ -56493,7 +57369,7 @@ var UIDocument = class _UIDocument extends Object2 {
     const currentComponentList = node.getAllComponents().slice();
     let generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(currentComponentList);
     const existingComponentList = [];
-    const widgetContentNodeSet = new System88.Set();
+    const widgetContentNodeSet = new System89.Set();
     let widgetComponent = null;
     for (const component of currentComponentList) {
       const componentTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, component.constructor);
@@ -56519,7 +57395,7 @@ var UIDocument = class _UIDocument extends Object2 {
       } else {
         const componentType = COMPONENT_TYPE_TABLE[componentData.type];
         if (!componentType) {
-          System88.console.warn(`UIDocument: unregistered component type "${componentData.type}" is skipped. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
+          System89.console.warn(`UIDocument: unregistered component type "${componentData.type}" is skipped. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
           continue;
         }
         const previousComponentCount = node.getAllComponents().length;
@@ -56617,7 +57493,7 @@ var UIDocument = class _UIDocument extends Object2 {
       root: _UIDocument.serializeNode(rootNode)
     };
     deserializeRootNode = null;
-    const jsonText = isPretty ? System88.JSON.stringify(documentData, null, "	") : System88.JSON.stringify(documentData);
+    const jsonText = isPretty ? System89.JSON.stringify(documentData, null, "	") : System89.JSON.stringify(documentData);
     return jsonText;
   }
   //==============================================================================
@@ -56628,7 +57504,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { WorldNode } 되살린 뿌리 노드. (노드 참조까지 이은 것)
    */
   static fromJsonText(jsonText) {
-    const documentData = System88.JSON.parse(jsonText);
+    const documentData = System89.JSON.parse(jsonText);
     if (!documentData || !documentData.root) {
       throw new Error("UIDocument: invalid document.");
     }
@@ -56650,7 +57526,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { string[] } 문서가 다루는 컴포넌트 이름 목록. (registerComponentType 으로 더한 것 포함)
    */
   static getComponentTypeNames() {
-    const typeNames = System88.Object.keys(COMPONENT_TYPE_TABLE);
+    const typeNames = System89.Object.keys(COMPONENT_TYPE_TABLE);
     return typeNames;
   }
   //==============================================================================
@@ -56706,7 +57582,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @param { object } componentData 컴포넌트 데이터. ({ $nodeRef } 값을 찾아 트리를 다 만든 뒤 이을 목록에 넣는다)
    */
   static loadNodeReferences(component, componentData) {
-    for (const propertyName of System88.Object.keys(componentData)) {
+    for (const propertyName of System89.Object.keys(componentData)) {
       const storedValue = componentData[propertyName];
       if (!storedValue || typeof storedValue !== "object" || storedValue[NODE_REFERENCE_KEY] === void 0) {
         continue;
@@ -56914,12 +57790,12 @@ var UIDocument = class _UIDocument extends Object2 {
       ["UIWindowLayer", UIWindowLayer]
     ];
     for (const [typeName, componentType] of editorComponentTypeList) {
-      if (!System88.Object.hasOwn(COMPONENT_TYPE_TABLE, typeName)) {
+      if (!System89.Object.hasOwn(COMPONENT_TYPE_TABLE, typeName)) {
         COMPONENT_TYPE_TABLE[typeName] = componentType;
       }
     }
     for (const [typeName, nodeType] of editorNodeTypeList) {
-      if (!System88.Object.hasOwn(NODE_TYPE_TABLE, typeName)) {
+      if (!System89.Object.hasOwn(NODE_TYPE_TABLE, typeName)) {
         NODE_TYPE_TABLE[typeName] = nodeType;
       }
     }
@@ -56986,7 +57862,7 @@ var UIDocument = class _UIDocument extends Object2 {
         continue;
       }
       const isCurrentEmpty = currentValue === null || currentValue === void 0;
-      if (System88.Array.isArray(storedValue)) {
+      if (System89.Array.isArray(storedValue)) {
         if ((currentValue instanceof Color || isCurrentEmpty) && storedValue.length === 4) {
           component[property.setterName](arrayToColor(storedValue));
         } else if ((currentValue instanceof Vector2 || isCurrentEmpty) && storedValue.length === 2) {
@@ -57003,7 +57879,7 @@ var UIDocument = class _UIDocument extends Object2 {
 };
 
 // src/resource/animationclip.js
-var System89 = globalThis;
+var System90 = globalThis;
 var AnimationClip = class _AnimationClip extends Object2 {
   static {
     __name(this, "AnimationClip");
@@ -57047,7 +57923,7 @@ var AnimationClip = class _AnimationClip extends Object2 {
     const frameRects = [];
     for (const frameId of frameIds) {
       let frameData = null;
-      if (System89.Array.isArray(atlasJson)) {
+      if (System90.Array.isArray(atlasJson)) {
         frameData = atlasJson[frameId];
       } else if (atlasJson && atlasJson.frames) {
         frameData = atlasJson.frames[frameId];
@@ -57141,7 +58017,7 @@ var AnimationClip = class _AnimationClip extends Object2 {
 };
 
 // src/resource/blobasset.js
-var System90 = globalThis;
+var System91 = globalThis;
 var BlobAsset = class extends Asset {
   static {
     __name(this, "BlobAsset");
@@ -57173,10 +58049,10 @@ var BlobAsset = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    const response = await System90.fetch(assetPath);
+    const response = await System91.fetch(assetPath);
     if (!response.ok) {
       console.error(`Error loading blob: ${assetPath}`);
-      throw new System90.Error(`HTTP ${response.status}`);
+      throw new System91.Error(`HTTP ${response.status}`);
     }
     this.#blob = await response.blob();
     this.setLoaded(true);
@@ -57190,7 +58066,7 @@ var BlobAsset = class extends Asset {
    */
   loadFromBytes(assetPath, bytes) {
     this.setAssetPath(assetPath);
-    this.#blob = bytes instanceof System90.Blob ? bytes : new System90.Blob([bytes]);
+    this.#blob = bytes instanceof System91.Blob ? bytes : new System91.Blob([bytes]);
     this.setLoaded(true);
   }
   //==============================================================================
@@ -57205,7 +58081,7 @@ var BlobAsset = class extends Asset {
 };
 
 // src/resource/textasset.js
-var System91 = globalThis;
+var System92 = globalThis;
 var TextAsset = class extends Asset {
   static {
     __name(this, "TextAsset");
@@ -57255,13 +58131,13 @@ var TextAsset = class extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System91.Promise.resolve();
+      return System92.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System91.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : void 0);
+      const response = await System92.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : void 0);
       if (!response.ok) {
-        throw new System91.Error(`HTTP ${response.status}`);
+        throw new System92.Error(`HTTP ${response.status}`);
       }
       this.text = await response.text();
       this.setLoaded(true);
@@ -57279,7 +58155,7 @@ var TextAsset = class extends Asset {
    */
   loadFromBytes(assetPath, bytes) {
     this.setAssetPath(assetPath);
-    const textDecoder = new System91.TextDecoder("utf-8");
+    const textDecoder = new System92.TextDecoder("utf-8");
     this.text = textDecoder.decode(bytes);
     this.setLoaded(true);
   }
@@ -57296,7 +58172,7 @@ var TextAsset = class extends Asset {
 };
 
 // src/resource/jsonasset.js
-var System92 = globalThis;
+var System93 = globalThis;
 var JsonAsset = class extends TextAsset {
   static {
     __name(this, "JsonAsset");
@@ -57326,7 +58202,7 @@ var JsonAsset = class extends TextAsset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System92.Promise.resolve();
+      return System93.Promise.resolve();
     }
     try {
       await super.load(assetPath);
@@ -57371,7 +58247,7 @@ var JsonAsset = class extends TextAsset {
 };
 
 // src/resource/visualasset.js
-var System93 = globalThis;
+var System94 = globalThis;
 var VisualAsset = class _VisualAsset extends Asset {
   static {
     __name(this, "VisualAsset");
@@ -57400,13 +58276,13 @@ var VisualAsset = class _VisualAsset extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System93.Promise.resolve();
+      return System94.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System93.fetch(assetPath);
+      const response = await System94.fetch(assetPath);
       if (!response.ok) {
-        throw new System93.Error(`HTTP ${response.status}`);
+        throw new System94.Error(`HTTP ${response.status}`);
       }
       const documentText = await response.text();
       const visual = _VisualAsset.createVisualFromText(documentText);
@@ -57443,10 +58319,10 @@ var VisualAsset = class _VisualAsset extends Asset {
    * console.log(iconNode.getName());
    */
   static createVisualFromText(documentText) {
-    const documentData = System93.JSON.parse(documentText);
-    const isDocumentObject = documentData !== null && typeof documentData === "object" && !System93.Array.isArray(documentData);
-    if (!isDocumentObject || documentData.root === null || typeof documentData.root !== "object" || System93.Array.isArray(documentData.root)) {
-      throw new System93.Error("VisualAsset: invalid document.");
+    const documentData = System94.JSON.parse(documentText);
+    const isDocumentObject = documentData !== null && typeof documentData === "object" && !System94.Array.isArray(documentData);
+    if (!isDocumentObject || documentData.root === null || typeof documentData.root !== "object" || System94.Array.isArray(documentData.root)) {
+      throw new System94.Error("VisualAsset: invalid document.");
     }
     const visual = new Visual();
     visual.setDocumentText(documentText);
@@ -57974,7 +58850,7 @@ var VirtualPad = class extends Object2 {
 };
 
 // src/misc/nodelayout.js
-var System94 = globalThis;
+var System95 = globalThis;
 var NodeLayout = class _NodeLayout extends Object2 {
   static {
     __name(this, "NodeLayout");
@@ -58033,14 +58909,14 @@ var NodeLayout = class _NodeLayout extends Object2 {
       return;
     }
     const angleStepRadian = options.angleStepRadian !== void 0 ? options.angleStepRadian : 0.12;
-    const baseAngleRadian = options.baseAngleRadian !== void 0 ? options.baseAngleRadian : -System94.Math.PI / 2;
+    const baseAngleRadian = options.baseAngleRadian !== void 0 ? options.baseAngleRadian : -System95.Math.PI / 2;
     const rotateNodes = options.rotateNodes !== void 0 ? options.rotateNodes : true;
     const middleIndex = (count - 1) / 2;
     for (let index = 0; index < count; ++index) {
       const node = nodeList[index];
       const angleRadian = baseAngleRadian + (index - middleIndex) * angleStepRadian;
-      const positionX = options.centerX + System94.Math.cos(angleRadian) * options.radius;
-      const positionY = options.centerY + System94.Math.sin(angleRadian) * options.radius;
+      const positionX = options.centerX + System95.Math.cos(angleRadian) * options.radius;
+      const positionY = options.centerY + System95.Math.sin(angleRadian) * options.radius;
       node.setLocalPosition(Vector2.create(positionX, positionY));
       if (rotateNodes) {
         const rotationDegree = radianToDegree(angleRadian - baseAngleRadian);
@@ -58773,7 +59649,7 @@ var Stack = class extends Object2 {
 };
 
 // src/base/collection/set.js
-var System95 = globalThis;
+var System96 = globalThis;
 var Set2 = class _Set extends Object2 {
   static {
     __name(this, "Set");
@@ -58791,7 +59667,7 @@ var Set2 = class _Set extends Object2 {
    */
   constructor() {
     super();
-    this.#items = new System95.Set();
+    this.#items = new System96.Set();
   }
   //==============================================================================
   // 데이터 추가.
@@ -58919,8 +59795,8 @@ var Set2 = class _Set extends Object2 {
 };
 
 // src/animation/animator.js
-var System96 = globalThis;
-var AnimationConditionMode = System96.Object.freeze({
+var System97 = globalThis;
+var AnimationConditionMode = System97.Object.freeze({
   if: "if",
   // 참 거짓 매개변수가 참이거나 트리거가 걸려 있다.
   ifNot: "ifNot",
@@ -59073,11 +59949,11 @@ var AnimationState = class extends Object2 {
     const normalizedTime = time / duration;
     let cycleTime = 0;
     if (this.isLoop()) {
-      cycleTime = normalizedTime - System96.Math.floor(normalizedTime);
+      cycleTime = normalizedTime - System97.Math.floor(normalizedTime);
     } else {
-      cycleTime = System96.Math.min(System96.Math.max(normalizedTime, 0), 1);
+      cycleTime = System97.Math.min(System97.Math.max(normalizedTime, 0), 1);
     }
-    return System96.Math.min(System96.Math.floor(cycleTime * frameCount), frameCount - 1);
+    return System97.Math.min(System97.Math.floor(cycleTime * frameCount), frameCount - 1);
   }
 };
 var AnimationTransition = class extends Object2 {
@@ -59260,7 +60136,7 @@ var AnimationTransition = class extends Object2 {
     let crossingTime = exitTime;
     const isLoop = state.isLoop();
     if (isLoop && exitTime < 1) {
-      crossingTime = exitTime + System96.Math.max(0, System96.Math.ceil(previousNormalizedTime - exitTime));
+      crossingTime = exitTime + System97.Math.max(0, System97.Math.ceil(previousNormalizedTime - exitTime));
     }
     return previousNormalizedTime <= crossingTime && crossingTime < currentNormalizedTime;
   }
@@ -59365,7 +60241,7 @@ var Animator = class extends Object2 {
   play(stateIndex) {
     const states = this.getStates();
     const stateCount = states.getCount();
-    if (!System96.Number.isInteger(stateIndex) || stateIndex < 0 || stateIndex >= stateCount) {
+    if (!System97.Number.isInteger(stateIndex) || stateIndex < 0 || stateIndex >= stateCount) {
       return;
     }
     this.#currentStateIndex = stateIndex;
@@ -59438,7 +60314,7 @@ var Animator = class extends Object2 {
   startTransition(transitionIndex) {
     const transitions = this.getTransitions();
     const transitionCount = transitions.getCount();
-    if (!System96.Number.isInteger(transitionIndex) || transitionIndex < 0 || transitionIndex >= transitionCount) {
+    if (!System97.Number.isInteger(transitionIndex) || transitionIndex < 0 || transitionIndex >= transitionCount) {
       return;
     }
     const transition = transitions.getAt(transitionIndex);
@@ -59537,7 +60413,7 @@ var Animator = class extends Object2 {
    * @param { number } value 값. (소수점 아래는 버린다, 같은 이름이 있으면 종류째 바꾼다)
    */
   setInteger(name, value) {
-    this.#parameters.add(name, { type: "int", value: System96.Math.trunc(value) });
+    this.#parameters.add(name, { type: "int", value: System97.Math.trunc(value) });
   }
   //==============================================================================
   // 정수 매개변수 반환.
@@ -59775,7 +60651,7 @@ var Animator = class extends Object2 {
     if (nextStateIndex === null || this.#transitionDuration <= 0) {
       return 0;
     }
-    return System96.Math.min(System96.Math.max(this.#transitionElapsed / this.#transitionDuration, 0), 1);
+    return System97.Math.min(System97.Math.max(this.#transitionElapsed / this.#transitionDuration, 0), 1);
   }
 };
 
@@ -59960,7 +60836,7 @@ var Action = class extends Object2 {
    * 	target.count += 1;
    * });
    * const action = new Action();
-   * action.loop((target) => {
+   * action.repeatWhile((target) => {
    * 	return target.count < 3;
    * }, incrementAction);
    * action.start(counter);
@@ -59969,7 +60845,7 @@ var Action = class extends Object2 {
    * }
    * console.log(counter.count, action.isDone());
    */
-  loop(conditionFn, innerAction) {
+  repeatWhile(conditionFn, innerAction) {
     this.#steps.push({ type: "loop", conditionFn, innerAction });
     return this;
   }
@@ -60329,9 +61205,9 @@ var FullscreenPass = class extends Object2 {
     this.#vertexArray = webGL2RenderingContext.createVertexArray();
   }
   //==============================================================================
-  // 패스 사용 시작. (프로그램 + 빈 버텍스 어레이 바인드)
+  // 패스 사용 시작. (프로그램 + 빈 버텍스 어레이 바인드, 러스트 판 use_program 과 같다)
   //==============================================================================
-  use() {
+  useProgram() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const shaderProgram = this.getShaderProgram();
     shaderProgram.use();
@@ -60396,7 +61272,7 @@ var FullscreenPass = class extends Object2 {
 };
 
 // src/graphics3d/bloomeffect.js
-var System97 = globalThis;
+var System98 = globalThis;
 var BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -60476,8 +61352,8 @@ var BloomEffect = class extends Object2 {
    * @param { number } sceneHeight 씬 세로 크기. (픽셀, 내부 판은 그 반이고 최소 1)
    */
   resize(sceneWidth, sceneHeight) {
-    const halfWidth = System97.Math.max(1, sceneWidth >> 1);
-    const halfHeight = System97.Math.max(1, sceneHeight >> 1);
+    const halfWidth = System98.Math.max(1, sceneWidth >> 1);
+    const halfHeight = System98.Math.max(1, sceneHeight >> 1);
     this.#pingRenderTarget.resize(halfWidth, halfHeight);
     this.#pongRenderTarget.resize(halfWidth, halfHeight);
   }
@@ -60497,7 +61373,7 @@ var BloomEffect = class extends Object2 {
     const pongRenderTarget = this.getPongRenderTarget();
     pingRenderTarget.bind();
     const brightPass = this.getBrightPass();
-    brightPass.use();
+    brightPass.useProgram();
     const brightSceneTextureLocation = brightPass.getUniformLocation("sceneTexture");
     webGL2RenderingContext.uniform1i(brightSceneTextureLocation, 0);
     const brightThresholdRangeLocation = brightPass.getUniformLocation("thresholdRange");
@@ -60505,7 +61381,7 @@ var BloomEffect = class extends Object2 {
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);
     brightPass.draw();
     const blurPass = this.getBlurPass();
-    blurPass.use();
+    blurPass.useProgram();
     const blurSourceTextureLocation = blurPass.getUniformLocation("sourceTexture");
     webGL2RenderingContext.uniform1i(blurSourceTextureLocation, 0);
     const blurDirectionLocation = blurPass.getUniformLocation("blurDirection");
@@ -60569,8 +61445,8 @@ var BloomEffect = class extends Object2 {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const pingRenderTarget = this.getPingRenderTarget();
     const pongRenderTarget = this.getPongRenderTarget();
-    const width = System97.Math.max(1, pingRenderTarget.getWidth());
-    const height = System97.Math.max(1, pingRenderTarget.getHeight());
+    const width = System98.Math.max(1, pingRenderTarget.getWidth());
+    const height = System98.Math.max(1, pingRenderTarget.getHeight());
     pingRenderTarget.destroy();
     pongRenderTarget.destroy();
     this.#pingRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, false, { useFloatColor });
@@ -60655,11 +61531,11 @@ var BloomEffect = class extends Object2 {
 };
 
 // src/graphics3d/fbxloader.js
-var System98 = globalThis;
+var System99 = globalThis;
 var FBX_TIME_UNIT = 46186158e3;
 function readExactInteger(bigValue) {
-  if (bigValue <= System98.BigInt(System98.Number.MAX_SAFE_INTEGER) && bigValue >= System98.BigInt(System98.Number.MIN_SAFE_INTEGER)) {
-    return System98.Number(bigValue);
+  if (bigValue <= System99.BigInt(System99.Number.MAX_SAFE_INTEGER) && bigValue >= System99.BigInt(System99.Number.MIN_SAFE_INTEGER)) {
+    return System99.Number(bigValue);
   }
   return bigValue;
 }
@@ -60710,7 +61586,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     super();
     this.#dataView = null;
     this.#fileBytes = null;
-    this.#textDecoder = new System98.TextDecoder();
+    this.#textDecoder = new System99.TextDecoder();
     this.#readCursor = 0;
     this.#useWideOffsets = false;
   }
@@ -60722,7 +61598,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object> }
    */
   static async loadFromUrl(url) {
-    const response = await System98.fetch(url);
+    const response = await System99.fetch(url);
     if (!response.ok) {
       throw new Error(`FbxLoader load failed: ${url}`);
     }
@@ -60751,8 +61627,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object[]> } { name, properties, children } 의 배열.
    */
   async parseNodeRecords(arrayBuffer) {
-    this.#fileBytes = new System98.Uint8Array(arrayBuffer);
-    this.#dataView = new System98.DataView(arrayBuffer);
+    this.#fileBytes = new System99.Uint8Array(arrayBuffer);
+    this.#dataView = new System99.DataView(arrayBuffer);
     const magicText = this.#textDecoder.decode(this.#fileBytes.subarray(0, 20));
     if (!magicText.startsWith("Kaydara FBX Binary")) {
       throw new Error("FbxLoader: not a binary FBX file.");
@@ -60778,7 +61654,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { number }
    */
   static readVersion(arrayBuffer) {
-    const dataView = new System98.DataView(arrayBuffer);
+    const dataView = new System99.DataView(arrayBuffer);
     return dataView.getUint32(23, true);
   }
   //==============================================================================
@@ -60790,7 +61666,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
   readOffsetValue() {
     const dataView = this.getDataView();
     if (this.#useWideOffsets) {
-      const value2 = System98.Number(dataView.getBigUint64(this.#readCursor, true));
+      const value2 = System99.Number(dataView.getBigUint64(this.#readCursor, true));
       this.#readCursor += 8;
       return value2;
     }
@@ -60859,8 +61735,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
       sourceBytes = fileBytes.subarray(this.#readCursor, this.#readCursor + rawByteLength);
       this.#readCursor += rawByteLength;
     }
-    const elementView = new System98.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
-    const resultArray = new System98.Array(arrayLength);
+    const elementView = new System99.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
+    const resultArray = new System99.Array(arrayLength);
     for (let elementIndex = 0; elementIndex < arrayLength; ++elementIndex) {
       resultArray[elementIndex] = readElement(elementView, elementIndex * elementByteSize);
     }
@@ -60874,12 +61750,12 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<Uint8Array> }
    */
   async inflate(compressedBytes) {
-    const decompressionStream = new System98.DecompressionStream("deflate");
-    const sourceResponse = new System98.Response(compressedBytes);
+    const decompressionStream = new System99.DecompressionStream("deflate");
+    const sourceResponse = new System99.Response(compressedBytes);
     const decompressedStream = sourceResponse.body.pipeThrough(decompressionStream);
-    const decompressedResponse = new System98.Response(decompressedStream);
+    const decompressedResponse = new System99.Response(decompressedStream);
     const decompressedArrayBuffer = await decompressedResponse.arrayBuffer();
-    const decompressedBytes = new System98.Uint8Array(decompressedArrayBuffer);
+    const decompressedBytes = new System99.Uint8Array(decompressedArrayBuffer);
     return decompressedBytes;
   }
   //==============================================================================
@@ -60892,7 +61768,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const dataView = this.getDataView();
     const fileBytes = this.getFileBytes();
     const textDecoder = this.getTextDecoder();
-    const typeCode = System98.String.fromCharCode(dataView.getUint8(this.#readCursor));
+    const typeCode = System99.String.fromCharCode(dataView.getUint8(this.#readCursor));
     this.#readCursor += 1;
     switch (typeCode) {
       case "Y": {
@@ -60934,7 +61810,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "l": {
-        const value = await this.readArrayProperty(8, (view, offset) => System98.Number(view.getBigInt64(offset, true)));
+        const value = await this.readArrayProperty(8, (view, offset) => System99.Number(view.getBigInt64(offset, true)));
         return { type: typeCode, value };
       }
       case "i": {
@@ -60996,7 +61872,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         propertyConnectionList.push({ sourceId, destinationId, propertyName });
       }
     }
-    const objectById = new System98.Map();
+    const objectById = new System99.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       objectById.set(objectId, objectNode);
@@ -61030,7 +61906,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretGeometries(objectsNode) {
-    const geometryById = new System98.Map();
+    const geometryById = new System99.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Geometry") {
         continue;
@@ -61093,11 +61969,11 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const uvReader = this.buildLayerReader(geometryNode, "LayerElementUV", "UV", 2);
     const materialLayer = this.buildMaterialLayer(geometryNode);
     const triangleCount = cornerVertexIndices.length / 3;
-    const outputPositions = new System98.Float32Array(cornerVertexIndices.length * 3);
-    const outputNormals = new System98.Float32Array(cornerVertexIndices.length * 3);
-    const outputTextureCoordinates = new System98.Float32Array(cornerVertexIndices.length * 2);
-    const outputOriginalVertexIndices = new System98.Int32Array(cornerVertexIndices.length);
-    const materialIndexPerTriangle = new System98.Int32Array(triangleCount);
+    const outputPositions = new System99.Float32Array(cornerVertexIndices.length * 3);
+    const outputNormals = new System99.Float32Array(cornerVertexIndices.length * 3);
+    const outputTextureCoordinates = new System99.Float32Array(cornerVertexIndices.length * 2);
+    const outputOriginalVertexIndices = new System99.Int32Array(cornerVertexIndices.length);
+    const materialIndexPerTriangle = new System99.Int32Array(triangleCount);
     for (let cornerIndex = 0; cornerIndex < cornerVertexIndices.length; ++cornerIndex) {
       const originalVertexIndex = cornerVertexIndices[cornerIndex];
       const polygonVertexPosition = cornerPolygonVertexPositions[cornerIndex];
@@ -61141,7 +62017,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const layerNode = geometryNode.children.find((child) => child.name === layerElementName);
     if (!layerNode) {
       return () => {
-        const zeroVector = new System98.Array(componentCount).fill(0);
+        const zeroVector = new System99.Array(componentCount).fill(0);
         return zeroVector;
       };
     }
@@ -61155,7 +62031,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const indexArray = indexNode && indexNode.properties.length > 0 ? indexNode.properties[0].value : null;
     if (dataArray === null) {
       return () => {
-        const zeroVector = new System98.Array(componentCount).fill(0);
+        const zeroVector = new System99.Array(componentCount).fill(0);
         return zeroVector;
       };
     }
@@ -61172,7 +62048,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       if (referenceType === "IndexToDirect" && indexArray) {
         dataIndex = mappedIndex < indexArray.length ? indexArray[mappedIndex] : -1;
       }
-      const componentValues = new System98.Array(componentCount);
+      const componentValues = new System99.Array(componentCount);
       for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
         const value = dataIndex >= 0 ? dataArray[dataIndex * componentCount + componentIndex] : void 0;
         componentValues[componentIndex] = value !== void 0 ? value : 0;
@@ -61225,8 +62101,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object }
    */
   interpretSkins(objectsNode, objectConnectionList) {
-    const skinDeformerById = new System98.Map();
-    const clusterById = new System98.Map();
+    const skinDeformerById = new System99.Map();
+    const clusterById = new System99.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Deformer") {
         continue;
@@ -61270,7 +62146,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretVideos(objectsNode) {
-    const videoById = new System98.Map();
+    const videoById = new System99.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Video") {
         continue;
@@ -61284,7 +62160,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       };
       videoById.set(videoId, video);
     }
-    const contentByFileName = new System98.Map();
+    const contentByFileName = new System99.Map();
     for (const video of videoById.values()) {
       if (!video.contentBytes || video.contentBytes.length === 0) {
         continue;
@@ -61328,7 +62204,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretTextures(objectsNode, objectConnectionList) {
-    const textureById = new System98.Map();
+    const textureById = new System99.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Texture") {
         continue;
@@ -61359,7 +62235,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretMaterials(objectsNode, propertyConnectionList, textureById) {
-    const materialById = new System98.Map();
+    const materialById = new System99.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Material") {
         continue;
@@ -61426,7 +62302,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    */
   interpretModels(objectsNode, objectConnectionList, geometryById, skinDeformerById, materialById) {
     const nodeList = [];
-    const nodeIdToIndex = new System98.Map();
+    const nodeIdToIndex = new System99.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Model") {
         continue;
@@ -61511,10 +62387,10 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object[] }
    */
   interpretAnimations(objectsNode, objectConnectionList, propertyConnectionList, nodeIdToIndex) {
-    const curveById = new System98.Map();
-    const curveNodeById = new System98.Map();
+    const curveById = new System99.Map();
+    const curveNodeById = new System99.Map();
     const layerIds = [];
-    const stackById = new System98.Map();
+    const stackById = new System99.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       if (objectNode.name === "AnimationCurve") {
@@ -61543,7 +62419,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         curveNode.targetProperty = connection.propertyName;
       }
     }
-    const layerIdByCurveNodeId = new System98.Map();
+    const layerIdByCurveNodeId = new System99.Map();
     for (const connection of objectConnectionList) {
       if (layerIds.includes(connection.sourceId) && stackById.has(connection.destinationId)) {
         const stack = stackById.get(connection.destinationId);
@@ -61567,7 +62443,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         const channelResult = this.buildAnimationChannel(curveNode, curveById, nodeIdToIndex);
         if (channelResult) {
           channelList.push(channelResult.channel);
-          duration = System98.Math.max(duration, channelResult.duration);
+          duration = System99.Math.max(duration, channelResult.duration);
         }
       }
       animationList.push({ name: stack.name, duration, channels: channelList });
@@ -61596,7 +62472,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       return null;
     }
     const channelNames = ["X", "Y", "Z"];
-    const timeSet = new System98.Set();
+    const timeSet = new System99.Set();
     for (const channelName of channelNames) {
       const curveId = curveNode.curveByChannel[channelName];
       if (curveId === void 0) {
@@ -61607,13 +62483,13 @@ var FbxLoader = class _FbxLoader extends Object2 {
         timeSet.add(keyTime);
       }
     }
-    const sortedTimes = System98.Array.from(timeSet).sort((left, right) => left - right);
+    const sortedTimes = System99.Array.from(timeSet).sort((left, right) => left - right);
     if (sortedTimes.length === 0) {
       return null;
     }
     const componentCount = path === "rotation" ? 3 : 3;
-    const times = new System98.Float32Array(sortedTimes.length);
-    const values = new System98.Float32Array(sortedTimes.length * componentCount);
+    const times = new System99.Float32Array(sortedTimes.length);
+    const values = new System99.Float32Array(sortedTimes.length * componentCount);
     for (let timeIndex = 0; timeIndex < sortedTimes.length; ++timeIndex) {
       times[timeIndex] = sortedTimes[timeIndex] / FBX_TIME_UNIT;
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -61696,7 +62572,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
 };
 
 // src/graphics3d/material.js
-var System99 = globalThis;
+var System100 = globalThis;
 var TEXTURE_UNIT_BASECOLOR = 0;
 var TEXTURE_UNIT_NORMAL = 2;
 var TEXTURE_UNIT_METALLICROUGHNESS = 3;
@@ -61707,15 +62583,15 @@ var TEXTURE_UNIT_SPECULAR = 7;
 var TEXTURE_UNIT_OPACITY = 8;
 function computeMipmapByteCount(width, height) {
   let byteCount = 0;
-  let levelWidth = System99.Math.max(1, width);
-  let levelHeight = System99.Math.max(1, height);
+  let levelWidth = System100.Math.max(1, width);
+  let levelHeight = System100.Math.max(1, height);
   while (true) {
     byteCount += levelWidth * levelHeight * 4;
     if (levelWidth === 1 && levelHeight === 1) {
       break;
     }
-    levelWidth = System99.Math.max(1, System99.Math.floor(levelWidth / 2));
-    levelHeight = System99.Math.max(1, System99.Math.floor(levelHeight / 2));
+    levelWidth = System100.Math.max(1, System100.Math.floor(levelWidth / 2));
+    levelHeight = System100.Math.max(1, System100.Math.floor(levelHeight / 2));
   }
   return byteCount;
 }
@@ -61781,7 +62657,7 @@ var Material = class _Material extends Object2 {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#shaderProgram = shaderProgram;
-    this.#extraTextureBindings = new System99.Map();
+    this.#extraTextureBindings = new System100.Map();
     this.#subsurfaceFactor = 1;
     this.#baseColorFactor = [1, 1, 1];
     this.#metallicFactor = 1;
@@ -61890,19 +62766,19 @@ var Material = class _Material extends Object2 {
     if (!hasBytes && !hasSource) {
       const fallbackTexture = webGL2RenderingContext.createTexture();
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, fallbackTexture);
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System99.Uint8Array(fallbackColor));
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System100.Uint8Array(fallbackColor));
       return { glTexture: fallbackTexture, byteCount: 4 };
     }
     let imageSource = imageDescription.source;
     if (!hasSource) {
       const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
-      imageSource = new System99.Blob([imageDescription.bytes], blobOptions);
+      imageSource = new System100.Blob([imageDescription.bytes], blobOptions);
     }
     const bitmapOptions = { premultiplyAlpha: "none", colorSpaceConversion: "none" };
     if (imageDescription.flipY) {
       bitmapOptions.imageOrientation = "flipY";
     }
-    const imageBitmap = await System99.createImageBitmap(imageSource, bitmapOptions);
+    const imageBitmap = await System100.createImageBitmap(imageSource, bitmapOptions);
     const glTexture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
     const internalFormat = imageDescription.isColorData ? webGL2RenderingContext.SRGB8_ALPHA8 : webGL2RenderingContext.RGBA8;
@@ -61916,7 +62792,7 @@ var Material = class _Material extends Object2 {
       const anisotropicExtension = webGL2RenderingContext.getExtension("EXT_texture_filter_anisotropic");
       if (anisotropicExtension) {
         const maximumAnisotropy = webGL2RenderingContext.getParameter(anisotropicExtension.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-        const anisotropy = System99.Math.min(imageDescription.anisotropy, maximumAnisotropy);
+        const anisotropy = System100.Math.min(imageDescription.anisotropy, maximumAnisotropy);
         webGL2RenderingContext.texParameterf(webGL2RenderingContext.TEXTURE_2D, anisotropicExtension.TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
       }
     }
@@ -61932,13 +62808,13 @@ var Material = class _Material extends Object2 {
    * @returns { Promise<object> } 이미지 서술. (응답이 실패면 오류를 던진다)
    */
   static async loadImageDescription(url, options = null) {
-    const response = await System99.fetch(url);
+    const response = await System100.fetch(url);
     if (!response.ok) {
       throw new Error(`Material image load failed: ${url}`);
     }
     const arrayBuffer = await response.arrayBuffer();
     const contentType = response.headers.get("content-type");
-    const imageDescription = _Material.createImageDescription(new System99.Uint8Array(arrayBuffer), contentType ? contentType : null, options);
+    const imageDescription = _Material.createImageDescription(new System100.Uint8Array(arrayBuffer), contentType ? contentType : null, options);
     return imageDescription;
   }
   //==============================================================================
@@ -62133,7 +63009,7 @@ var Material = class _Material extends Object2 {
     material.#emissiveTexture = this.#emissiveTexture;
     material.#specularTexture = this.#specularTexture;
     material.#opacityTexture = this.#opacityTexture;
-    material.#extraTextureBindings = new System99.Map(this.#extraTextureBindings);
+    material.#extraTextureBindings = new System100.Map(this.#extraTextureBindings);
     material.#ownsTextures = false;
     material.#textureByteCount = 0;
     return material;
@@ -62239,8 +63115,8 @@ var Material = class _Material extends Object2 {
 };
 
 // src/graphics3d/skinnedmodelasset.js
-var System100 = globalThis;
-var assetCacheTable = new System100.Map();
+var System101 = globalThis;
+var assetCacheTable = new System101.Map();
 var SkinnedModelAsset = class _SkinnedModelAsset extends Object2 {
   static {
     __name(this, "SkinnedModelAsset");
@@ -62390,7 +63266,7 @@ var SkinnedModelAsset = class _SkinnedModelAsset extends Object2 {
     const shaderProgram = asset.getShaderProgram();
     let assetTable = assetCacheTable.get(shaderProgram);
     if (!assetTable) {
-      assetTable = new System100.Map();
+      assetTable = new System101.Map();
       assetCacheTable.set(shaderProgram, assetTable);
     }
     const previousAsset = assetTable.get(normalizedKey);
@@ -62624,14 +63500,14 @@ var SkinnedModelAsset = class _SkinnedModelAsset extends Object2 {
 };
 
 // src/graphics3d/skinnedmodel.js
-var System101 = globalThis;
+var System102 = globalThis;
 var GLB_CHUNKTYPE_JSON = 1313821514;
 var GLB_CHUNKTYPE_BINARY = 5130562;
 var COMPONENT_ARRAY_TABLE = {
-  5121: System101.Uint8Array,
-  5123: System101.Uint16Array,
-  5125: System101.Uint32Array,
-  5126: System101.Float32Array
+  5121: System102.Uint8Array,
+  5123: System102.Uint16Array,
+  5125: System102.Uint32Array,
+  5126: System102.Float32Array
 };
 var TYPE_COMPONENT_COUNT_TABLE = {
   SCALAR: 1,
@@ -62641,9 +63517,9 @@ var TYPE_COMPONENT_COUNT_TABLE = {
   MAT4: 16
 };
 var MORPH_TEXTURE_WIDTH = 2048;
-var ANIMATION_PATH_SET = new System101.Set(["translation", "rotation", "scale", "weights"]);
+var ANIMATION_PATH_SET = new System102.Set(["translation", "rotation", "scale", "weights"]);
 var MORPH_TARGET_MAXIMUM = 96;
-var pendingAssetLoadTable = new System101.Map();
+var pendingAssetLoadTable = new System102.Map();
 function createInstanceNode(templateNode) {
   return {
     ...templateNode,
@@ -62656,7 +63532,7 @@ __name(createInstanceNode, "createInstanceNode");
 function createInstanceSkin(templateSkin) {
   return {
     ...templateSkin,
-    jointMatrixArray: new System101.Float32Array(templateSkin.jointMatrixArray.length)
+    jointMatrixArray: new System102.Float32Array(templateSkin.jointMatrixArray.length)
   };
 }
 __name(createInstanceSkin, "createInstanceSkin");
@@ -62666,14 +63542,14 @@ function createInstanceDrawable(templateDrawable) {
     wireframeIndexBuffer: null,
     wireframeIndexCount: 0,
     wireframeIndexComponentType: 0,
-    morphWeights: new System101.Float32Array(templateDrawable.morphWeights),
+    morphWeights: new System102.Float32Array(templateDrawable.morphWeights),
     isMorphTextureShared: templateDrawable.morphTexture !== null,
     isMorphDirty: false
   };
 }
 __name(createInstanceDrawable, "createInstanceDrawable");
 function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
-  const degreeToRadian2 = System101.Math.PI / 180;
+  const degreeToRadian2 = System102.Math.PI / 180;
   const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
   const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian2, 0);
   const rotationZ = Quaternion.createFromEuler(0, 0, zDegree * degreeToRadian2);
@@ -62693,7 +63569,7 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
       const sourceFbxNode = sceneData.nodeList[fbxChannel.nodeIndex];
       const preRotationQuaternion = createQuaternionFromFbxEuler(sourceFbxNode.preRotationDegrees[0], sourceFbxNode.preRotationDegrees[1], sourceFbxNode.preRotationDegrees[2]);
       const keyCount = fbxChannel.times.length;
-      const quaternionValues = new System101.Float32Array(keyCount * 4);
+      const quaternionValues = new System102.Float32Array(keyCount * 4);
       for (let keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
         const eulerQuaternion = createQuaternionFromFbxEuler(fbxChannel.values[keyIndex * 3], fbxChannel.values[keyIndex * 3 + 1], fbxChannel.values[keyIndex * 3 + 2]);
         const rotationQuaternion = preRotationQuaternion.multiply(eulerQuaternion);
@@ -62827,7 +63703,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     this.#fadeDuration = 0;
     this.#fadeElapsed = 0;
     this.#timeScale = 1;
-    this.#jointRotationOffsets = new System101.Map();
+    this.#jointRotationOffsets = new System102.Map();
     this.#asset = null;
     this.#instanceMaterialList = [];
   }
@@ -62866,7 +63742,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
     const model = await _SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, async () => {
-      const response = await System101.fetch(url);
+      const response = await System102.fetch(url);
       if (!response.ok) {
         throw new Error(`SkinnedModel load failed: ${url}`);
       }
@@ -62888,7 +63764,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     }
     let pendingTable = pendingAssetLoadTable.get(shaderProgram);
     if (!pendingTable) {
-      pendingTable = new System101.Map();
+      pendingTable = new System102.Map();
       pendingAssetLoadTable.set(shaderProgram, pendingTable);
     }
     const pendingPromise = pendingTable.get(assetKey);
@@ -63053,7 +63929,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { { json: object, binaryBuffer: ArrayBuffer } } JSON 청크를 읽은 객체와 BIN 청크 바이트. (머리가 GLB 가 아니거나 청크가 깨졌거나 JSON, BIN 가운데 하나라도 없으면 오류를 던진다)
    */
   static readGlbChunks(arrayBuffer) {
-    const dataView = new System101.DataView(arrayBuffer);
+    const dataView = new System102.DataView(arrayBuffer);
     if (arrayBuffer.byteLength < 12 || dataView.getUint32(0, true) !== 1179937895) {
       throw new Error("SkinnedModel: not a GLB file.");
     }
@@ -63071,9 +63947,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         throw new Error("SkinnedModel: invalid GLB chunks.");
       }
       if (chunkType === GLB_CHUNKTYPE_JSON) {
-        const jsonBytes = new System101.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-        const jsonText = new System101.TextDecoder().decode(jsonBytes);
-        json = System101.JSON.parse(jsonText);
+        const jsonBytes = new System102.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+        const jsonText = new System102.TextDecoder().decode(jsonBytes);
+        json = System102.JSON.parse(jsonText);
       } else if (chunkType === GLB_CHUNKTYPE_BINARY) {
         binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
       }
@@ -63147,7 +64023,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices: skin.joints.slice(),
         inverseBindMatrices,
-        jointMatrixArray: new System101.Float32Array(skin.joints.length * 16)
+        jointMatrixArray: new System102.Float32Array(skin.joints.length * 16)
       };
     });
     function createImageDescription(textureInfo) {
@@ -63160,7 +64036,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         return null;
       }
       const bufferView = json.bufferViews[image.bufferView];
-      const imageBytes = new System101.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
+      const imageBytes = new System102.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
       return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
     }
     __name(createImageDescription, "createImageDescription");
@@ -63196,7 +64072,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         this.#skinList.push({
           jointNodeIndices: [nodeIndex],
           inverseBindMatrices: [Matrix4.createIdentity()],
-          jointMatrixArray: new System101.Float32Array(16)
+          jointMatrixArray: new System102.Float32Array(16)
         });
         node.skinIndex = this.#skinList.length - 1;
       }
@@ -63204,23 +64080,23 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const nodeValue = json.nodes[nodeIndex];
       const baseMorphWeights = nodeValue.weights ? nodeValue.weights : mesh.weights ? mesh.weights : [];
       for (const primitive of mesh.primitives) {
-        const positions = new System101.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.POSITION));
+        const positions = new System102.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.POSITION));
         const vertexCount = positions.length / 3;
-        const normals = primitive.attributes.NORMAL !== void 0 ? new System101.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.NORMAL)) : null;
-        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System101.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.TEXCOORD_0)) : null;
+        const normals = primitive.attributes.NORMAL !== void 0 ? new System102.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.NORMAL)) : null;
+        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System102.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.TEXCOORD_0)) : null;
         let joints = null;
         let weights = null;
         if (isStaticMesh) {
-          joints = new System101.Uint16Array(vertexCount * 4);
-          weights = new System101.Float32Array(vertexCount * 4);
+          joints = new System102.Uint16Array(vertexCount * 4);
+          weights = new System102.Float32Array(vertexCount * 4);
           for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
             weights[vertexIndex * 4] = 1;
           }
         } else {
-          joints = new System101.Uint16Array(readAccessorArray(json, binaryBuffer, primitive.attributes.JOINTS_0));
+          joints = new System102.Uint16Array(readAccessorArray(json, binaryBuffer, primitive.attributes.JOINTS_0));
           const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
           const weightSource = readAccessorArray(json, binaryBuffer, primitive.attributes.WEIGHTS_0);
-          weights = new System101.Float32Array(weightSource.length);
+          weights = new System102.Float32Array(weightSource.length);
           if (weightAccessor.componentType === 5126) {
             weights.set(weightSource);
           } else {
@@ -63233,7 +64109,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         let indices = null;
         if (primitive.indices !== void 0) {
           const indexSource = readAccessorArray(json, binaryBuffer, primitive.indices);
-          indices = indexSource instanceof System101.Uint8Array ? new System101.Uint16Array(indexSource) : indexSource;
+          indices = indexSource instanceof System102.Uint8Array ? new System102.Uint16Array(indexSource) : indexSource;
         }
         const morphTargets = [];
         const primitiveTargets = primitive.targets ? primitive.targets : [];
@@ -63242,12 +64118,12 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           if (target.POSITION === void 0) {
             continue;
           }
-          const positionDeltas = new System101.Float32Array(readAccessorArray(json, binaryBuffer, target.POSITION));
-          const normalDeltas = target.NORMAL !== void 0 ? new System101.Float32Array(readAccessorArray(json, binaryBuffer, target.NORMAL)) : null;
+          const positionDeltas = new System102.Float32Array(readAccessorArray(json, binaryBuffer, target.POSITION));
+          const normalDeltas = target.NORMAL !== void 0 ? new System102.Float32Array(readAccessorArray(json, binaryBuffer, target.NORMAL)) : null;
           const targetName = targetNameList[targetIndex] !== void 0 ? targetNameList[targetIndex] : `target${targetIndex}`;
           morphTargets.push({ name: targetName, positionDeltas, normalDeltas });
         }
-        const morphWeights = new System101.Float32Array(morphTargets.length);
+        const morphWeights = new System102.Float32Array(morphTargets.length);
         for (let weightIndex = 0; weightIndex < morphTargets.length; ++weightIndex) {
           morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== void 0 ? baseMorphWeights[weightIndex] : 0;
         }
@@ -63277,7 +64153,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         const times = readAccessorArray(json, binaryBuffer, sampler.input);
         const values = readAccessorArray(json, binaryBuffer, sampler.output);
         if (times.length > 0) {
-          duration = System101.Math.max(duration, times[times.length - 1]);
+          duration = System102.Math.max(duration, times[times.length - 1]);
         }
         const target = channel.target || {};
         if (target.node === void 0 || !ANIMATION_PATH_SET.has(target.path)) {
@@ -63336,7 +64212,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       };
     });
     this.#rootNodeIndices = sceneData.rootNodeIndices.slice();
-    const skinIdList = System101.Array.from(sceneData.skinDeformerById.keys());
+    const skinIdList = System102.Array.from(sceneData.skinDeformerById.keys());
     this.#skinList = skinIdList.map((skinId) => {
       const skinDeformer = sceneData.skinDeformerById.get(skinId);
       const jointNodeIndices = [];
@@ -63360,7 +64236,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices,
         inverseBindMatrices,
-        jointMatrixArray: new System101.Float32Array(jointNodeIndices.length * 16)
+        jointMatrixArray: new System102.Float32Array(jointNodeIndices.length * 16)
       };
     });
     function createFbxImageDescription(textureId) {
@@ -63378,7 +64254,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return { bytes: video.contentBytes, mimeType: null, flipY: true };
     }
     __name(createFbxImageDescription, "createFbxImageDescription");
-    const materialIdList = System101.Array.from(sceneData.materialById.keys());
+    const materialIdList = System102.Array.from(sceneData.materialById.keys());
     const materialDescriptionList = materialIdList.map((materialId) => {
       const fbxMaterial = sceneData.materialById.get(materialId);
       const description = Material.createDefaultDescription();
@@ -63406,7 +64282,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       if (!geometry) {
         continue;
       }
-      const influencesPerVertex = new System101.Array(geometry.originalVertexCount);
+      const influencesPerVertex = new System102.Array(geometry.originalVertexCount);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         influencesPerVertex[vertexIndex] = [];
       }
@@ -63423,13 +64299,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           }
         }
       }
-      const vertexJointArray = new System101.Uint16Array(geometry.originalVertexCount * 4);
-      const vertexWeightArray = new System101.Float32Array(geometry.originalVertexCount * 4);
+      const vertexJointArray = new System102.Uint16Array(geometry.originalVertexCount * 4);
+      const vertexWeightArray = new System102.Float32Array(geometry.originalVertexCount * 4);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         const influenceList = influencesPerVertex[vertexIndex];
         influenceList.sort((left, right) => right.weight - left.weight);
         let weightSum = 0;
-        const usedCount = System101.Math.min(4, influenceList.length);
+        const usedCount = System102.Math.min(4, influenceList.length);
         for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
           weightSum += influenceList[slotIndex].weight;
         }
@@ -63442,8 +64318,8 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
       }
       const cornerCount = geometry.cornerCount;
-      const cornerJointArray = new System101.Uint16Array(cornerCount * 4);
-      const cornerWeightArray = new System101.Float32Array(cornerCount * 4);
+      const cornerJointArray = new System102.Uint16Array(cornerCount * 4);
+      const cornerWeightArray = new System102.Float32Array(cornerCount * 4);
       for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
         const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
         if (originalVertexIndex < 0 || originalVertexIndex >= geometry.originalVertexCount) {
@@ -63479,7 +64355,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           materialName: materialIndex !== -1 ? sceneData.materialById.get(materialId).name : "",
           nodeIndex,
           morphTargets: [],
-          morphWeights: new System101.Float32Array(0)
+          morphWeights: new System102.Float32Array(0)
         });
       }
     }
@@ -63515,12 +64391,12 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   static splitFbxCornersByMaterial(materialIndexPerTriangle, cornerArrays) {
     const triangleCount = materialIndexPerTriangle.length;
-    const triangleCountByMaterial = new System101.Map();
+    const triangleCountByMaterial = new System102.Map();
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const localMaterialIndex = materialIndexPerTriangle[triangleIndex];
       triangleCountByMaterial.set(localMaterialIndex, (triangleCountByMaterial.get(localMaterialIndex) || 0) + 1);
     }
-    const localMaterialIndexList = System101.Array.from(triangleCountByMaterial.keys()).sort((left, right) => left - right);
+    const localMaterialIndexList = System102.Array.from(triangleCountByMaterial.keys()).sort((left, right) => left - right);
     if (localMaterialIndexList.length <= 1) {
       return [{ localMaterialIndex: localMaterialIndexList.length === 1 ? localMaterialIndexList[0] : 0, ...cornerArrays }];
     }
@@ -63528,7 +64404,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     return localMaterialIndexList.map((localMaterialIndex) => {
       const subCornerCount = triangleCountByMaterial.get(localMaterialIndex) * 3;
       const subMesh = { localMaterialIndex };
-      for (const arrayName of System101.Object.keys(componentCountByName)) {
+      for (const arrayName of System102.Object.keys(componentCountByName)) {
         const componentCount = componentCountByName[arrayName];
         const sourceArray = cornerArrays[arrayName];
         const targetArray = new sourceArray.constructor(subCornerCount * componentCount);
@@ -63582,7 +64458,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation = false) {
     const nodeList = this.getNodeList();
-    const nodeIndexByName = new System101.Map();
+    const nodeIndexByName = new System102.Map();
     for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
       nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
     }
@@ -63665,7 +64541,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
         indexCount = meshDescription.indices.length;
-        indexComponentType = meshDescription.indices instanceof System101.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+        indexComponentType = meshDescription.indices instanceof System102.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
         bufferByteCount += meshDescription.indices.byteLength;
       }
       webGL2RenderingContext.bindVertexArray(null);
@@ -63689,7 +64565,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         nodeIndex: meshDescription.nodeIndex !== void 0 ? meshDescription.nodeIndex : -1,
         meshDescription,
         morphTargetList,
-        morphWeights: meshDescription.morphWeights ? new System101.Float32Array(meshDescription.morphWeights) : new System101.Float32Array(0),
+        morphWeights: meshDescription.morphWeights ? new System102.Float32Array(meshDescription.morphWeights) : new System102.Float32Array(0),
         morphTexture: null,
         morphRowsPerTarget: 0,
         morphTextureWidth: 0,
@@ -63733,7 +64609,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     const vertexCount = drawable.vertexCount;
     const edgeList = _SkinnedModel.buildWireframeEdgeList(drawable.meshDescription.indices, vertexCount);
     const useUnsignedInt = vertexCount > 65535;
-    const wireframeIndices = useUnsignedInt ? new System101.Uint32Array(edgeList) : new System101.Uint16Array(edgeList);
+    const wireframeIndices = useUnsignedInt ? new System102.Uint32Array(edgeList) : new System102.Uint16Array(edgeList);
     const wireframeIndexBuffer = webGL2RenderingContext.createBuffer();
     webGL2RenderingContext.bindVertexArray(null);
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndexBuffer);
@@ -63754,14 +64630,14 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   static buildWireframeEdgeList(triangleIndices, vertexCount) {
     const edgeList = [];
     if (triangleIndices) {
-      const edgeKeySet = new System101.Set();
+      const edgeKeySet = new System102.Set();
       const triangleCount = triangleIndices.length / 3;
       for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
         for (let cornerIndex = 0; cornerIndex < 3; ++cornerIndex) {
           const indexA = triangleIndices[triangleIndex * 3 + cornerIndex];
           const indexB = triangleIndices[triangleIndex * 3 + (cornerIndex + 1) % 3];
-          const minimumIndex = System101.Math.min(indexA, indexB);
-          const maximumIndex = System101.Math.max(indexA, indexB);
+          const minimumIndex = System102.Math.min(indexA, indexB);
+          const maximumIndex = System102.Math.max(indexA, indexB);
           const edgeKey = minimumIndex * vertexCount + maximumIndex;
           if (edgeKeySet.has(edgeKey)) {
             continue;
@@ -63829,10 +64705,10 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   static buildMorphTexelData(morphTargetList, vertexCount) {
     const targetCount = morphTargetList.length;
-    const textureWidth = System101.Math.max(1, System101.Math.min(vertexCount, MORPH_TEXTURE_WIDTH));
-    const rowsPerTarget = System101.Math.ceil(vertexCount / textureWidth);
+    const textureWidth = System102.Math.max(1, System102.Math.min(vertexCount, MORPH_TEXTURE_WIDTH));
+    const rowsPerTarget = System102.Math.ceil(vertexCount / textureWidth);
     const textureHeight = rowsPerTarget * 2 * targetCount;
-    const texelData = new System101.Float32Array(textureWidth * textureHeight * 4);
+    const texelData = new System102.Float32Array(textureWidth * textureHeight * 4);
     for (let targetIndex = 0; targetIndex < targetCount; ++targetIndex) {
       const morphTarget = morphTargetList[targetIndex];
       const positionBlockOffset = targetIndex * 2 * rowsPerTarget * textureWidth;
@@ -63891,7 +64767,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       throw new Error(`SkinnedModel: morph target "${targetName}" delta count mismatch.`);
     }
     drawable.morphTargetList = drawable.morphTargetList.concat([{ name: targetName, positionDeltas, normalDeltas }]);
-    const morphWeights = new System101.Float32Array(drawable.morphTargetList.length);
+    const morphWeights = new System102.Float32Array(drawable.morphTargetList.length);
     morphWeights.set(drawable.morphWeights);
     drawable.morphWeights = morphWeights;
     drawable.isMorphDirty = true;
@@ -63999,7 +64875,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Float32Array } 정점마다 면 노멀을 더해 정규화한 노멀 배열. (positions 와 같은 길이)
    */
   generateSmoothNormals(positions, indices) {
-    const normals = new System101.Float32Array(positions.length);
+    const normals = new System102.Float32Array(positions.length);
     const triangleCount = indices ? indices.length / 3 : positions.length / 9;
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const indexA = (indices ? indices[triangleIndex * 3] : triangleIndex * 3) * 3;
@@ -64025,7 +64901,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       normals[indexC + 2] += faceNormalZ;
     }
     for (let vertexIndex = 0; vertexIndex < normals.length; vertexIndex += 3) {
-      const normalLength = System101.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
+      const normalLength = System102.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
       if (normalLength > 0) {
         normals[vertexIndex] /= normalLength;
         normals[vertexIndex + 1] /= normalLength;
@@ -64148,9 +65024,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         channel.cursor += 1;
       }
       const frameIndex = channel.cursor;
-      const nextIndex = System101.Math.min(frameIndex + 1, keyCount - 1);
+      const nextIndex = System102.Math.min(frameIndex + 1, keyCount - 1);
       const spanDuration = times[nextIndex] - times[frameIndex];
-      const factor = spanDuration > 0 ? System101.Math.max(0, System101.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
+      const factor = spanDuration > 0 ? System102.Math.max(0, System102.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
       if (channel.path === "rotation") {
         const baseOffset = frameIndex * 4;
         const nextOffset = nextIndex * 4;
@@ -64221,7 +65097,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     if (currentAnimation) {
       if (this.#previousAnimation) {
         this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
-        const blendWeight = System101.Math.min(this.#fadeElapsed / System101.Math.max(this.#fadeDuration, 1e-4), 1);
+        const blendWeight = System102.Math.min(this.#fadeElapsed / System102.Math.max(this.#fadeDuration, 1e-4), 1);
         this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
       } else {
         this.sampleAnimation(currentAnimation, this.#currentTime, 1);
@@ -64421,7 +65297,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
 };
 
 // src/graphics3d/skinnedmodelrenderer.js
-var System102 = globalThis;
+var System103 = globalThis;
 var MORPH_TEXTURE_UNIT = 15;
 var MORPH_GLSL = `
 uniform sampler2D morphTexture;
@@ -64756,7 +65632,7 @@ var SkinnedModelRenderer = class extends Object2 {
     const texture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System102.Uint32Array([4294967295]));
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System103.Uint32Array([4294967295]));
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
@@ -65067,23 +65943,23 @@ __export(glbmeshreader_exports, {
   readGlbNodeInfos: () => readGlbNodeInfos,
   writeSkinPose: () => writeSkinPose
 });
-var System103 = globalThis;
+var System104 = globalThis;
 var GLB_MAGIC = 1179937895;
 var CHUNK_TYPE_JSON = 1313821514;
 var CHUNK_TYPE_BINARY = 5130562;
-var COMPONENT_ARRAYS = System103.Object.freeze({
-  5120: System103.Int8Array,
-  5121: System103.Uint8Array,
-  5122: System103.Int16Array,
-  5123: System103.Uint16Array,
-  5125: System103.Uint32Array,
-  5126: System103.Float32Array
+var COMPONENT_ARRAYS = System104.Object.freeze({
+  5120: System104.Int8Array,
+  5121: System104.Uint8Array,
+  5122: System104.Int16Array,
+  5123: System104.Uint16Array,
+  5125: System104.Uint32Array,
+  5126: System104.Float32Array
 });
-var NORMALIZED_DIVISORS = System103.Object.freeze({
+var NORMALIZED_DIVISORS = System104.Object.freeze({
   5121: 255,
   5123: 65535
 });
-var TYPE_COMPONENT_COUNTS = System103.Object.freeze({
+var TYPE_COMPONENT_COUNTS = System104.Object.freeze({
   SCALAR: 1,
   VEC2: 2,
   VEC3: 3,
@@ -65118,7 +65994,7 @@ function readWeightAccessor(json, binaryBuffer, accessorIndex) {
   if (divisor === void 0) {
     return values;
   }
-  return System103.Float32Array.from(values, (value) => {
+  return System104.Float32Array.from(values, (value) => {
     return value / divisor;
   });
 }
@@ -65132,7 +66008,7 @@ function createTransformMatrix(translation, rotation, scale) {
 }
 __name(createTransformMatrix, "createTransformMatrix");
 function readNodeMatrix(node) {
-  if (System103.Array.isArray(node.matrix)) {
+  if (System104.Array.isArray(node.matrix)) {
     const matrix = Matrix4.createIdentity();
     const elements = matrix.getElements();
     elements.set(node.matrix);
@@ -65155,7 +66031,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
   if (primitive.indices !== void 0) {
     indices = readAccessor(json, binaryBuffer, primitive.indices);
   } else {
-    indices = System103.Array.from({ length: positions.length / 3 }, (value, index) => {
+    indices = System104.Array.from({ length: positions.length / 3 }, (value, index) => {
       return index;
     });
   }
@@ -65181,18 +66057,18 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
   const pbrMetallicRoughness = material.pbrMetallicRoughness !== void 0 ? material.pbrMetallicRoughness : {};
   const baseColor = pbrMetallicRoughness.baseColorFactor !== void 0 ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
   const color = [0, 1, 2].map((channelIndex) => {
-    return System103.Math.pow(System103.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
+    return System104.Math.pow(System104.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
   });
   let glow = 0;
   const emissiveImage = readTextureImage(json, material.emissiveTexture);
-  if (System103.Array.isArray(material.emissiveFactor) && emissiveImage < 0) {
-    const emissiveMaximum = System103.Math.max(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]);
-    const baseMaximum = System103.Math.max(baseColor[0], baseColor[1], baseColor[2], 1e-3);
+  if (System104.Array.isArray(material.emissiveFactor) && emissiveImage < 0) {
+    const emissiveMaximum = System104.Math.max(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]);
+    const baseMaximum = System104.Math.max(baseColor[0], baseColor[1], baseColor[2], 1e-3);
     glow = emissiveMaximum / baseMaximum;
   }
   const indexStart = builder.getIndexCount();
   builder.addTriangles(positions, normals, indices, partMatrix, color, glow, extras.basic === true, joints, weights, uvs, uvs1);
-  const emissiveFactor = System103.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
+  const emissiveFactor = System104.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
   builder.addMaterialRange({
     name: typeof material.name === "string" ? material.name : "",
     materialIndex: primitive.material !== void 0 ? primitive.material : -1,
@@ -65289,11 +66165,11 @@ function readNodeNames(json) {
   const nodeNames = json.nodes.map((node) => {
     return typeof node.name === "string" ? node.name : "";
   });
-  return new System103.Set(nodeNames);
+  return new System104.Set(nodeNames);
 }
 __name(readNodeNames, "readNodeNames");
 function readSkeleton(json, binaryBuffer) {
-  if (!System103.Array.isArray(json.skins) || json.skins.length === 0) {
+  if (!System104.Array.isArray(json.skins) || json.skins.length === 0) {
     return null;
   }
   const skin = json.skins[0];
@@ -65301,7 +66177,7 @@ function readSkeleton(json, binaryBuffer) {
     return -1;
   });
   json.nodes.forEach((node, nodeIndex) => {
-    if (System103.Array.isArray(node.children)) {
+    if (System104.Array.isArray(node.children)) {
       for (const childIndex of node.children) {
         parentIndices[childIndex] = nodeIndex;
       }
@@ -65314,21 +66190,21 @@ function readSkeleton(json, binaryBuffer) {
       translation: node.translation !== void 0 ? node.translation : [0, 0, 0],
       rotation: node.rotation !== void 0 ? node.rotation : [0, 0, 0, 1],
       scale: node.scale !== void 0 ? node.scale : [1, 1, 1],
-      matrix: System103.Array.isArray(node.matrix) ? node.matrix : null
+      matrix: System104.Array.isArray(node.matrix) ? node.matrix : null
     };
   });
   let inverseBindMatrices = null;
   if (skin.inverseBindMatrices !== void 0) {
-    inverseBindMatrices = System103.Float32Array.from(readAccessor(json, binaryBuffer, skin.inverseBindMatrices));
+    inverseBindMatrices = System104.Float32Array.from(readAccessor(json, binaryBuffer, skin.inverseBindMatrices));
   } else {
-    inverseBindMatrices = new System103.Float32Array(skin.joints.length * 16);
+    inverseBindMatrices = new System104.Float32Array(skin.joints.length * 16);
     for (let jointIndex = 0; jointIndex < skin.joints.length; ++jointIndex) {
       const identityElements = Matrix4.createIdentity().getElements();
       inverseBindMatrices.set(identityElements, jointIndex * 16);
     }
   }
   const animations = {};
-  const sourceAnimations = System103.Array.isArray(json.animations) ? json.animations : [];
+  const sourceAnimations = System104.Array.isArray(json.animations) ? json.animations : [];
   for (const animation of sourceAnimations) {
     const channels = [];
     let duration = 0;
@@ -65336,7 +66212,7 @@ function readSkeleton(json, binaryBuffer) {
       const sampler = animation.samplers[channel.sampler];
       const times = readAccessor(json, binaryBuffer, sampler.input);
       const values = readAccessor(json, binaryBuffer, sampler.output);
-      duration = System103.Math.max(duration, times[times.length - 1]);
+      duration = System104.Math.max(duration, times[times.length - 1]);
       channels.push({ nodeIndex: channel.target.node, path: channel.target.path, times, values, isStep: sampler.interpolation === "STEP" });
     }
     const extras = animation.extras !== void 0 && animation.extras !== null ? animation.extras : {};
@@ -65346,9 +66222,9 @@ function readSkeleton(json, binaryBuffer) {
 }
 __name(readSkeleton, "readSkeleton");
 function readGlbChunks(arrayBuffer) {
-  const dataView = new System103.DataView(arrayBuffer);
+  const dataView = new System104.DataView(arrayBuffer);
   if (dataView.getUint32(0, true) !== GLB_MAGIC) {
-    throw new System103.Error("GLB \uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
+    throw new System104.Error("GLB \uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
   }
   let json = null;
   let binaryBuffer = null;
@@ -65358,16 +66234,16 @@ function readGlbChunks(arrayBuffer) {
     const chunkType = dataView.getUint32(chunkOffset + 4, true);
     const chunkStart = chunkOffset + 8;
     if (chunkType === CHUNK_TYPE_JSON) {
-      const jsonBytes = new System103.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-      const jsonText = new System103.TextDecoder().decode(jsonBytes);
-      json = System103.JSON.parse(jsonText);
+      const jsonBytes = new System104.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+      const jsonText = new System104.TextDecoder().decode(jsonBytes);
+      json = System104.JSON.parse(jsonText);
     } else if (chunkType === CHUNK_TYPE_BINARY) {
       binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
     }
     chunkOffset = chunkStart + chunkLength;
   }
   if (json === null || binaryBuffer === null) {
-    throw new System103.Error("GLB \uC758 \uB369\uC5B4\uB9AC\uAC00 \uBAA8\uC790\uB78D\uB2C8\uB2E4.");
+    throw new System104.Error("GLB \uC758 \uB369\uC5B4\uB9AC\uAC00 \uBAA8\uC790\uB78D\uB2C8\uB2E4.");
   }
   return { json, binaryBuffer };
 }
@@ -65385,7 +66261,7 @@ function visitMeshNodes(json, visitEvent) {
     if (node.mesh !== void 0) {
       visitEvent(node, matrix);
     }
-    if (System103.Array.isArray(node.children)) {
+    if (System104.Array.isArray(node.children)) {
       for (const childIndex of node.children) {
         visit(childIndex, matrix);
       }
@@ -65452,22 +66328,22 @@ __name(readGlbArrays, "readGlbArrays");
 function readGlbImages(arrayBuffer) {
   const chunks = readGlbChunks(arrayBuffer);
   const json = chunks.json;
-  const images = System103.Array.isArray(json.images) ? json.images : [];
+  const images = System104.Array.isArray(json.images) ? json.images : [];
   return images.map((image) => {
     const name = typeof image.name === "string" ? image.name : "";
     const mimeType = typeof image.mimeType === "string" ? image.mimeType : "";
     if (typeof image.bufferView !== "number") {
-      return { name, mimeType, data: new System103.Uint8Array(0) };
+      return { name, mimeType, data: new System104.Uint8Array(0) };
     }
     const bufferView = json.bufferViews[image.bufferView];
     const byteOffset = bufferView.byteOffset !== void 0 ? bufferView.byteOffset : 0;
-    return { name, mimeType, data: new System103.Uint8Array(chunks.binaryBuffer.slice(byteOffset, byteOffset + bufferView.byteLength)) };
+    return { name, mimeType, data: new System104.Uint8Array(chunks.binaryBuffer.slice(byteOffset, byteOffset + bufferView.byteLength)) };
   });
 }
 __name(readGlbImages, "readGlbImages");
 function decodeGlbImage(image) {
-  const blob = new System103.Blob([image.data], { type: image.mimeType });
-  return System103.createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  const blob = new System104.Blob([image.data], { type: image.mimeType });
+  return System104.createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
 }
 __name(decodeGlbImage, "decodeGlbImage");
 function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
@@ -65495,7 +66371,7 @@ function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
         const pbrMetallicRoughness = material.pbrMetallicRoughness !== void 0 ? material.pbrMetallicRoughness : {};
         const baseColor = pbrMetallicRoughness.baseColorFactor !== void 0 ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
         const previousAlpha = partAlphas[partName] !== void 0 ? partAlphas[partName] : 1;
-        partAlphas[partName] = System103.Math.min(previousAlpha, baseColor[3]);
+        partAlphas[partName] = System104.Math.min(previousAlpha, baseColor[3]);
       }
     }
     if (!isOutlineRebuilt) {
@@ -65507,7 +66383,7 @@ function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
     }
   });
   const partArrays = {};
-  for (const [partName, builder] of System103.Object.entries(builders)) {
+  for (const [partName, builder] of System104.Object.entries(builders)) {
     const arrays = builder.readArrays();
     arrays.extras = partExtras[partName] !== void 0 ? partExtras[partName] : {};
     arrays.alpha = partAlphas[partName] !== void 0 ? partAlphas[partName] : 1;
@@ -65526,9 +66402,9 @@ function readGlbNodeInfos(arrayBuffer) {
     if (nodeName.endsWith(OUTLINE_NODE_SUFFIX)) {
       return;
     }
-    const minimum = [System103.Infinity, System103.Infinity, System103.Infinity];
-    const maximum = [-System103.Infinity, -System103.Infinity, -System103.Infinity];
-    const jointWeights = new System103.Map();
+    const minimum = [System104.Infinity, System104.Infinity, System104.Infinity];
+    const maximum = [-System104.Infinity, -System104.Infinity, -System104.Infinity];
+    const jointWeights = new System104.Map();
     for (const primitive of json.meshes[node.mesh].primitives) {
       const attributes = primitive.attributes;
       if (attributes.POSITION === void 0) {
@@ -65548,8 +66424,8 @@ function readGlbNodeInfos(arrayBuffer) {
           point = [transformedPoint.x, transformedPoint.y, transformedPoint.z];
         }
         for (let axis = 0; axis < 3; ++axis) {
-          minimum[axis] = System103.Math.min(minimum[axis], point[axis]);
-          maximum[axis] = System103.Math.max(maximum[axis], point[axis]);
+          minimum[axis] = System104.Math.min(minimum[axis], point[axis]);
+          maximum[axis] = System104.Math.max(maximum[axis], point[axis]);
         }
       }
       if (isSkinned) {
@@ -65585,11 +66461,11 @@ function sampleChannel(channel, time) {
   const componentCount = channel.path === "rotation" ? 4 : 3;
   const values = channel.values;
   if (time <= times[0] || times.length === 1) {
-    return System103.Array.from(values.slice(0, componentCount));
+    return System104.Array.from(values.slice(0, componentCount));
   }
   const lastIndex = times.length - 1;
   if (time >= times[lastIndex]) {
-    return System103.Array.from(values.slice(lastIndex * componentCount, lastIndex * componentCount + componentCount));
+    return System104.Array.from(values.slice(lastIndex * componentCount, lastIndex * componentCount + componentCount));
   }
   let keyIndex = 0;
   while (keyIndex < lastIndex - 1 && times[keyIndex + 1] <= time) {
@@ -65598,7 +66474,7 @@ function sampleChannel(channel, time) {
   const startOffset = keyIndex * componentCount;
   const endOffset = startOffset + componentCount;
   if (channel.isStep) {
-    return System103.Array.from(values.slice(startOffset, endOffset));
+    return System104.Array.from(values.slice(startOffset, endOffset));
   }
   const ratio = (time - times[keyIndex]) / (times[keyIndex + 1] - times[keyIndex]);
   const result = [];
@@ -65616,7 +66492,7 @@ function sampleChannel(channel, time) {
     result.push(startValue + (endValue - startValue) * ratio);
   }
   if (componentCount === 4) {
-    const length = System103.Math.hypot(result[0], result[1], result[2], result[3]);
+    const length = System104.Math.hypot(result[0], result[1], result[2], result[3]);
     if (length > 0) {
       return result.map((value) => {
         return value / length;
@@ -65635,7 +66511,7 @@ function readAnimationLocals(skeleton, animationName, time, swingScales = null) 
     const isOnce = animation.extras.loop === LOOP_ONCE;
     let localTime = 0;
     if (animation.duration > 0) {
-      localTime = isOnce ? System103.Math.max(0, System103.Math.min(animation.duration, time)) : time % animation.duration;
+      localTime = isOnce ? System104.Math.max(0, System104.Math.min(animation.duration, time)) : time % animation.duration;
     }
     for (const channel of animation.channels) {
       const local = locals[channel.nodeIndex];
@@ -65669,9 +66545,9 @@ function mixRotation(rotation, otherRotation, ratio) {
   const mixed = rotation.map((value, componentIndex) => {
     return value + (otherRotation[componentIndex] * sign - value) * ratio;
   });
-  const length = System103.Math.hypot(mixed[0], mixed[1], mixed[2], mixed[3]);
+  const length = System104.Math.hypot(mixed[0], mixed[1], mixed[2], mixed[3]);
   if (length <= 0) {
-    return System103.Array.from(rotation);
+    return System104.Array.from(rotation);
   }
   return mixed.map((value) => {
     return value / length;
@@ -65696,8 +66572,8 @@ function readAnimationSwing(skeleton, animationName, nodeIndex) {
       for (let componentIndex = 0; componentIndex < 4; ++componentIndex) {
         dot += values[offset + componentIndex] * restRotation[componentIndex];
       }
-      const angle = 2 * System103.Math.acos(System103.Math.min(1, System103.Math.abs(dot)));
-      largestAngle = System103.Math.max(largestAngle, angle);
+      const angle = 2 * System104.Math.acos(System104.Math.min(1, System104.Math.abs(dot)));
+      largestAngle = System104.Math.max(largestAngle, angle);
     }
   }
   return largestAngle;
@@ -65724,7 +66600,7 @@ function mixLocals(locals, otherLocals, ratio) {
     const rotation = local.rotation.map((value, componentIndex) => {
       return value + (other.rotation[componentIndex] * sign - value) * ratio;
     });
-    const length = System103.Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
+    const length = System104.Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
     if (length > 0) {
       local.rotation = rotation.map((value) => {
         return value / length;
@@ -65737,7 +66613,7 @@ function writeSkinPose(skeleton, animationName, time, target, blend = null, swin
   const locals = readAnimationLocals(skeleton, animationName, time, swingScales);
   if (blend !== null && blend.weight > 0) {
     const blendLocals = readAnimationLocals(skeleton, blend.animationName, blend.time, swingScales);
-    mixLocals(locals, blendLocals, System103.Math.min(1, blend.weight));
+    mixLocals(locals, blendLocals, System104.Math.min(1, blend.weight));
   }
   const globals = [];
   const readGlobal = /* @__PURE__ */ __name((nodeIndex) => {
@@ -65775,7 +66651,7 @@ function writeSkinPose(skeleton, animationName, time, target, blend = null, swin
 __name(writeSkinPose, "writeSkinPose");
 
 // src/graphics3d/multilevelbloomeffect.js
-var System104 = globalThis;
+var System105 = globalThis;
 var EXTRACT_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -65873,7 +66749,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     this.#downsamplePass = new FullscreenPass(webGL2RenderingContext, DOWNSAMPLE_FRAGMENTSHADER_SOURCE);
     this.#upsamplePass = new FullscreenPass(webGL2RenderingContext, UPSAMPLE_FRAGMENTSHADER_SOURCE);
     this.#levelRenderTargetList = [];
-    this.#levelCount = System104.Math.max(1, System104.Math.floor(levelCount));
+    this.#levelCount = System105.Math.max(1, System105.Math.floor(levelCount));
     this.#useFloatColor = useFloatColor;
     this.#threshold = 1;
     this.#knee = 0.25;
@@ -65891,8 +66767,8 @@ var MultiLevelBloomEffect = class extends Object2 {
     let levelWidth = this.#sceneWidth;
     let levelHeight = this.#sceneHeight;
     for (let levelIndex = 0; levelIndex < this.#levelCount; ++levelIndex) {
-      levelWidth = System104.Math.max(1, System104.Math.floor(levelWidth / 2));
-      levelHeight = System104.Math.max(1, System104.Math.floor(levelHeight / 2));
+      levelWidth = System105.Math.max(1, System105.Math.floor(levelWidth / 2));
+      levelHeight = System105.Math.max(1, System105.Math.floor(levelHeight / 2));
       levelRenderTargetList.push(new RenderTarget(webGL2RenderingContext, levelWidth, levelHeight, false, { useFloatColor: this.#useFloatColor }));
     }
     this.#levelRenderTargetList = levelRenderTargetList;
@@ -65914,8 +66790,8 @@ var MultiLevelBloomEffect = class extends Object2 {
    * @param { number } sceneHeight 씬 세로 크기. (픽셀, 1 밑은 1, 첫 단은 그 반)
    */
   resize(sceneWidth, sceneHeight) {
-    const safeWidth = System104.Math.max(1, sceneWidth);
-    const safeHeight = System104.Math.max(1, sceneHeight);
+    const safeWidth = System105.Math.max(1, sceneWidth);
+    const safeHeight = System105.Math.max(1, sceneHeight);
     if (safeWidth === this.#sceneWidth && safeHeight === this.#sceneHeight) {
       return;
     }
@@ -65930,7 +66806,7 @@ var MultiLevelBloomEffect = class extends Object2 {
    * @param { number } levelCount 단 수. (소수는 버리고 1 밑은 1)
    */
   setLevelCount(levelCount) {
-    const safeLevelCount = System104.Math.max(1, System104.Math.floor(levelCount));
+    const safeLevelCount = System105.Math.max(1, System105.Math.floor(levelCount));
     if (safeLevelCount === this.#levelCount) {
       return;
     }
@@ -65963,8 +66839,8 @@ var MultiLevelBloomEffect = class extends Object2 {
    * @param { number } knee 문턱 둘레의 부드러운 폭. (0 밑은 0, 기본 0.25)
    */
   setThreshold(threshold, knee) {
-    this.#threshold = System104.Math.max(0, threshold);
-    this.#knee = System104.Math.max(0, knee);
+    this.#threshold = System105.Math.max(0, threshold);
+    this.#knee = System105.Math.max(0, knee);
   }
   //==============================================================================
   // 블룸 렌더링. (호출 후 결과는 getResultTexture())
@@ -65985,7 +66861,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     const extractPass = this.#extractPass;
     const firstRenderTarget = levelRenderTargetList[0];
     firstRenderTarget.bind();
-    extractPass.use();
+    extractPass.useProgram();
     webGL2RenderingContext.uniform1i(extractPass.getUniformLocation("sourceTexture"), 0);
     webGL2RenderingContext.uniform2f(extractPass.getUniformLocation("sourceTexel"), 1 / this.#sceneWidth, 1 / this.#sceneHeight);
     webGL2RenderingContext.uniform1f(extractPass.getUniformLocation("threshold"), this.#threshold);
@@ -65993,7 +66869,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);
     extractPass.draw();
     const downsamplePass = this.#downsamplePass;
-    downsamplePass.use();
+    downsamplePass.useProgram();
     webGL2RenderingContext.uniform1i(downsamplePass.getUniformLocation("sourceTexture"), 0);
     const downsampleTexelLocation = downsamplePass.getUniformLocation("sourceTexel");
     for (let levelIndex = 1; levelIndex < levelCount; ++levelIndex) {
@@ -66010,7 +66886,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     const blendSourceAlpha = webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_SRC_ALPHA);
     const blendDestinationAlpha = webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_DST_ALPHA);
     const upsamplePass = this.#upsamplePass;
-    upsamplePass.use();
+    upsamplePass.useProgram();
     webGL2RenderingContext.uniform1i(upsamplePass.getUniformLocation("sourceTexture"), 0);
     const upsampleTexelLocation = upsamplePass.getUniformLocation("sourceTexel");
     webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
@@ -66065,7 +66941,7 @@ var MultiLevelBloomEffect = class extends Object2 {
 };
 
 // src/graphics3d/toon/toonpostprocess.js
-var System105 = globalThis;
+var System106 = globalThis;
 var COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -66198,12 +67074,12 @@ var ToonPostProcess = class _ToonPostProcess {
     this.#requestedSampleCount = options !== null && options.sampleCount ? options.sampleCount : 0;
     this.#depthBits = options !== null && options.depthBits === 24 ? 24 : 16;
     this.#useDepthTexture = options !== null && options.useDepthTexture === true;
-    this.#outputWidth = System105.Math.max(1, width);
-    this.#outputHeight = System105.Math.max(1, height);
+    this.#outputWidth = System106.Math.max(1, width);
+    this.#outputHeight = System106.Math.max(1, height);
     this.#resolutionScale = 1;
     this.#sceneRenderTarget = this.createSceneRenderTarget();
     this.#bloomEffect = new BloomEffect(webGL2RenderingContext);
-    this.#bloomEffect.resize(System105.Math.max(1, width), System105.Math.max(1, height));
+    this.#bloomEffect.resize(System106.Math.max(1, width), System106.Math.max(1, height));
     this.#bloomEffect.setThreshold(0.9, 1.6);
     this.#multiLevelBloomEffect = null;
     this.#compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENT_SHADER);
@@ -66277,7 +67153,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @returns { number } 씬 판의 너비. (픽셀)
    */
   readSceneWidth() {
-    return System105.Math.max(1, System105.Math.round(this.#outputWidth * this.#resolutionScale));
+    return System106.Math.max(1, System106.Math.round(this.#outputWidth * this.#resolutionScale));
   }
   //==============================================================================
   // 씬 판의 높이. (출력 높이 x 해상도 배율, 1 이상)
@@ -66286,7 +67162,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @returns { number } 씬 판의 높이. (픽셀)
    */
   readSceneHeight() {
-    return System105.Math.max(1, System105.Math.round(this.#outputHeight * this.#resolutionScale));
+    return System106.Math.max(1, System106.Math.round(this.#outputHeight * this.#resolutionScale));
   }
   //==============================================================================
   // 크기 바꾸기. (출력 크기, 씬 판은 해상도 배율을 곱함, 같으면 그대로)
@@ -66304,8 +67180,8 @@ var ToonPostProcess = class _ToonPostProcess {
    * postProcess.resize(canvas.width, canvas.height);
    */
   resize(width, height) {
-    this.#outputWidth = System105.Math.max(1, width);
-    this.#outputHeight = System105.Math.max(1, height);
+    this.#outputWidth = System106.Math.max(1, width);
+    this.#outputHeight = System106.Math.max(1, height);
     const sceneRenderTarget = this.#sceneRenderTarget;
     const sceneWidth = this.readSceneWidth();
     const sceneHeight = this.readSceneHeight();
@@ -66332,7 +67208,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * const sceneWidth = postProcess.getSceneRenderTarget().getWidth();
    */
   setResolutionScale(resolutionScale) {
-    this.#resolutionScale = System105.Math.max(0.05, System105.Math.min(4, resolutionScale));
+    this.#resolutionScale = System106.Math.max(0.05, System106.Math.min(4, resolutionScale));
     this.resize(this.#outputWidth, this.#outputHeight);
   }
   //==============================================================================
@@ -66357,7 +67233,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * const isMultisampled = sampleCount >= 2;
    */
   setSampleCount(sampleCount) {
-    const safeSampleCount = System105.Math.max(0, System105.Math.floor(sampleCount));
+    const safeSampleCount = System106.Math.max(0, System106.Math.floor(sampleCount));
     if (safeSampleCount === this.#requestedSampleCount) {
       return;
     }
@@ -66435,7 +67311,7 @@ var ToonPostProcess = class _ToonPostProcess {
     webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     const compositePass = this.#compositePass;
-    compositePass.use();
+    compositePass.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneTexture);
     webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
@@ -66482,7 +67358,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @param { number } exposure - 노출 배. (0 이상, 1 이 기본)
    */
   setExposure(exposure) {
-    this.#exposure = System105.Math.max(0, exposure);
+    this.#exposure = System106.Math.max(0, exposure);
   }
   //==============================================================================
   // 블룸 설정. (켜기, 세기, 밝은 곳을 뽑는 문턱의 시작과 끝, 문턱은 기본 9 탭 블룸에만 쓴다)
@@ -66501,7 +67377,7 @@ var ToonPostProcess = class _ToonPostProcess {
    */
   setBloom(isBloomEnabled, bloomStrength, thresholdStart, thresholdEnd) {
     this.#isBloomEnabled = isBloomEnabled;
-    this.#bloomStrength = System105.Math.max(0, bloomStrength);
+    this.#bloomStrength = System106.Math.max(0, bloomStrength);
     this.#bloomEffect.setThreshold(thresholdStart, thresholdEnd);
   }
   //==============================================================================
@@ -66520,9 +67396,9 @@ var ToonPostProcess = class _ToonPostProcess {
    * postProcess.setBloomLevels(0, 1, 0.3);
    */
   setBloomLevels(levelCount, threshold, knee) {
-    this.#bloomThreshold = System105.Math.max(0, threshold);
-    this.#bloomKnee = System105.Math.max(0, knee);
-    const safeLevelCount = System105.Math.max(0, System105.Math.floor(levelCount));
+    this.#bloomThreshold = System106.Math.max(0, threshold);
+    this.#bloomKnee = System106.Math.max(0, knee);
+    const safeLevelCount = System106.Math.max(0, System106.Math.floor(levelCount));
     let multiLevelBloomEffect = this.#multiLevelBloomEffect;
     if (safeLevelCount === 0) {
       if (multiLevelBloomEffect !== null) {
@@ -66565,7 +67441,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @param { number } brightness - 밝기 배. (0 이상, 1 이 그대로)
    */
   setBrightness(brightness) {
-    this.#brightness = System105.Math.max(0, brightness);
+    this.#brightness = System106.Math.max(0, brightness);
   }
   //==============================================================================
   // 밝힌 자리 설정. (그 자리에서 수평 거리 innerRadius 안은 밝기 1, outerRadius 밖은 setBrightness 의 밝기, 사이는 부드럽게)
@@ -66588,12 +67464,12 @@ var ToonPostProcess = class _ToonPostProcess {
    * postProcess.setLitArea([0, 0, 0], 2, 4, camera.getInverseViewProjectionMatrix());
    */
   setLitArea(center, innerRadius, outerRadius, inverseViewProjectionMatrix) {
-    const safeOuterRadius = System105.Math.max(1e-4, outerRadius);
+    const safeOuterRadius = System106.Math.max(1e-4, outerRadius);
     this.#litArea = {
       center: [center[0], center[1], center[2]],
-      innerRadius: System105.Math.max(0, System105.Math.min(innerRadius, safeOuterRadius)),
+      innerRadius: System106.Math.max(0, System106.Math.min(innerRadius, safeOuterRadius)),
       outerRadius: safeOuterRadius,
-      inverseViewProjectionElements: System105.Float32Array.from(inverseViewProjectionMatrix.getElements())
+      inverseViewProjectionElements: System106.Float32Array.from(inverseViewProjectionMatrix.getElements())
     };
   }
   //==============================================================================
@@ -66624,12 +67500,12 @@ var ToonPostProcess = class _ToonPostProcess {
   setColorGrade(saturation, contrast, toneColor, toneAmount, hazeColor, hazeAmount) {
     const toneLuminance = toneColor[0] * 0.2126 + toneColor[1] * 0.7152 + toneColor[2] * 0.0722;
     const toneScale = toneLuminance > 0 ? 1 / toneLuminance : 1;
-    this.#saturation = System105.Math.max(0, saturation);
-    this.#contrast = System105.Math.max(0, contrast);
+    this.#saturation = System106.Math.max(0, saturation);
+    this.#contrast = System106.Math.max(0, contrast);
     this.#toneColor = [toneColor[0] * toneScale, toneColor[1] * toneScale, toneColor[2] * toneScale];
-    this.#toneAmount = System105.Math.max(0, System105.Math.min(1, toneAmount));
+    this.#toneAmount = System106.Math.max(0, System106.Math.min(1, toneAmount));
     this.#hazeColor = [hazeColor[0], hazeColor[1], hazeColor[2]];
-    this.#hazeAmount = System105.Math.max(0, System105.Math.min(1, hazeAmount));
+    this.#hazeAmount = System106.Math.max(0, System106.Math.min(1, hazeAmount));
   }
   //==============================================================================
   // 가장자리 어둡게 설정. (0 이 없음, 1 이면 구석이 까맣게)
@@ -66638,7 +67514,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @param { number } vignetteStrength - 가장자리를 어둡게 하는 세기. (0 이 없음, 1 이면 구석이 까맣게)
    */
   setVignette(vignetteStrength) {
-    this.#vignetteStrength = System105.Math.max(0, vignetteStrength);
+    this.#vignetteStrength = System106.Math.max(0, vignetteStrength);
   }
   //==============================================================================
   // 씬 렌더 타겟 반환. (다른 후처리를 끼울 때)
@@ -66672,7 +67548,7 @@ var ToonPostProcess = class _ToonPostProcess {
 };
 
 // src/graphics3d/humanskinrenderer.js
-var System106 = globalThis;
+var System107 = globalThis;
 var SKIN_SHADING_SKIN = 0;
 var SKIN_SHADING_EYE = 1;
 var SKIN_SHADING_HAIR = 2;
@@ -67398,7 +68274,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   constructor(webGL2RenderingContext) {
     super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE, SKIN_VERTEXSHADER_SOURCE);
     this.#cutoutDepthShaderProgram = new ShaderProgram(webGL2RenderingContext, CUTOUT_DEPTH_VERTEXSHADER_SOURCE.trim(), CUTOUT_DEPTH_FRAGMENTSHADER_SOURCE.trim());
-    this.#materialShadingModes = new System106.Map();
+    this.#materialShadingModes = new System107.Map();
     this.#shadowMapTexture = null;
     this.#lightViewProjectionElements = null;
     this.#shadowStrength = 0;
@@ -67407,8 +68283,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#shadowSampleCount = 12;
     this.#hairSway = [0, 0, 1.5];
     this.#useHairFringe = true;
-    this.#lightDirections = new System106.Float32Array(9);
-    this.#lightColors = new System106.Float32Array(9);
+    this.#lightDirections = new System107.Float32Array(9);
+    this.#lightColors = new System107.Float32Array(9);
     this.#ambientSkyColor = [0.34, 0.36, 0.42];
     this.#ambientHorizonColor = [0.16, 0.15, 0.16];
     this.#ambientGroundColor = [0.05, 0.04, 0.045];
@@ -67423,7 +68299,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#microTiling = 0;
     this.#microStrength = 0;
     this.#useWrinkleMaps = false;
-    this.#wrinkleChannelWeights = new System106.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
+    this.#wrinkleChannelWeights = new System107.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
     this.#wrinkleTileMask = 0;
     this.#wrinkleNormalStrength = 1;
     this.#wrinkleColorStrength = 1;
@@ -67725,7 +68601,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { number } shadowSampleCount 표본 수. (소수는 버리고 1 ~ 24 로 자른다, 기본 12)
    */
   setShadowSampleCount(shadowSampleCount) {
-    this.#shadowSampleCount = System106.Math.max(1, System106.Math.min(SHADOW_SAMPLE_COUNT, System106.Math.floor(shadowSampleCount)));
+    this.#shadowSampleCount = System107.Math.max(1, System107.Math.min(SHADOW_SAMPLE_COUNT, System107.Math.floor(shadowSampleCount)));
   }
   //==============================================================================
   // 머리카락 흔들림 설정. (진폭 m / 시간 초 / 주파수, 진폭 0 이면 없음)
@@ -67782,7 +68658,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { number } intensity 세기. (색에 곱한다)
    */
   setLight(lightIndex, directionX, directionY, directionZ, red, green, blue, intensity) {
-    const directionLength = System106.Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
+    const directionLength = System107.Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
     const safeLength = directionLength > 0 ? directionLength : 1;
     this.#lightDirections[lightIndex * 3] = directionX / safeLength;
     this.#lightDirections[lightIndex * 3 + 1] = directionY / safeLength;
@@ -67960,7 +68836,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { number } eyeClosure 감긴 정도. (0 ~ 1 로 자른다, 0 뜬 눈, 1 감은 눈)
    */
   setEyeClosure(eyeClosure) {
-    this.#eyeClosure = System106.Math.max(0, System106.Math.min(1, eyeClosure));
+    this.#eyeClosure = System107.Math.max(0, System107.Math.min(1, eyeClosure));
   }
   //==============================================================================
   // 머리카락 파라미터 설정. (1차 / 2차 로브 시프트, 지수, 강도, 투과 강도, 뿌리 차폐)
@@ -67989,7 +68865,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
 };
 
 // src/graphics3d/ambientocclusioneffect.js
-var System107 = globalThis;
+var System108 = globalThis;
 var SAMPLE_COUNT = 16;
 var OCCLUSION_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -68135,7 +69011,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     this.#intensity = 1;
     this.#bias = 2e-3;
     this.#scale = 0.5;
-    this.#sampleKernel = new System107.Float32Array(SAMPLE_COUNT * 3);
+    this.#sampleKernel = new System108.Float32Array(SAMPLE_COUNT * 3);
     this.computeKernel();
   }
   //==============================================================================
@@ -68151,16 +69027,16 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
    * @returns { Float32Array } 표본마다 x, y, z.
    */
   static buildSampleKernel() {
-    const sampleKernel = new System107.Float32Array(SAMPLE_COUNT * 3);
+    const sampleKernel = new System108.Float32Array(SAMPLE_COUNT * 3);
     for (let sampleIndex = 0; sampleIndex < SAMPLE_COUNT; ++sampleIndex) {
       const goldenAngle = 2.39996323;
       const angle = sampleIndex * goldenAngle;
       const height = (sampleIndex + 0.5) / SAMPLE_COUNT;
-      const ring = System107.Math.sqrt(1 - height * height);
+      const ring = System108.Math.sqrt(1 - height * height);
       let scale = (sampleIndex + 1) / SAMPLE_COUNT;
       scale = 0.15 + 0.85 * scale * scale;
-      sampleKernel[sampleIndex * 3] = System107.Math.cos(angle) * ring * scale;
-      sampleKernel[sampleIndex * 3 + 1] = System107.Math.sin(angle) * ring * scale;
+      sampleKernel[sampleIndex * 3] = System108.Math.cos(angle) * ring * scale;
+      sampleKernel[sampleIndex * 3 + 1] = System108.Math.sin(angle) * ring * scale;
       sampleKernel[sampleIndex * 3 + 2] = height * scale;
     }
     return sampleKernel;
@@ -68174,8 +69050,8 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
    */
   resize(width, height) {
     const scale = this.getScale();
-    const scaledWidth = System107.Math.max(1, System107.Math.floor(width * scale));
-    const scaledHeight = System107.Math.max(1, System107.Math.floor(height * scale));
+    const scaledWidth = System108.Math.max(1, System108.Math.floor(width * scale));
+    const scaledHeight = System108.Math.max(1, System108.Math.floor(height * scale));
     this.#occlusionRenderTarget.resize(scaledWidth, scaledHeight);
     this.#pingRenderTarget.resize(scaledWidth, scaledHeight);
     this.#pongRenderTarget.resize(scaledWidth, scaledHeight);
@@ -68198,12 +69074,12 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     const occlusionPass = this.getOcclusionPass();
-    occlusionPass.use();
+    occlusionPass.useProgram();
     const depthTextureLocation = occlusionPass.getUniformLocation("depthTexture");
     webGL2RenderingContext.uniform1i(depthTextureLocation, 0);
     const normalTextureLocation = occlusionPass.getUniformLocation("normalTexture");
     webGL2RenderingContext.uniform1i(normalTextureLocation, 2);
-    const viewRotation = new System107.Float32Array([
+    const viewRotation = new System108.Float32Array([
       viewMatrixElements[0],
       viewMatrixElements[1],
       viewMatrixElements[2],
@@ -68218,7 +69094,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     webGL2RenderingContext.uniformMatrix3fv(viewRotationLocation, false, viewRotation);
     const depthRangeLocation = occlusionPass.getUniformLocation("depthRange");
     webGL2RenderingContext.uniform2f(depthRangeLocation, nearDistance, farDistance);
-    const tangentHalfFieldOfView = System107.Math.tan(fieldOfViewRadian * 0.5);
+    const tangentHalfFieldOfView = System108.Math.tan(fieldOfViewRadian * 0.5);
     const projectionScaleLocation = occlusionPass.getUniformLocation("projectionScale");
     webGL2RenderingContext.uniform2f(projectionScaleLocation, tangentHalfFieldOfView * aspectRatio, tangentHalfFieldOfView);
     const sampleKernelLocation = occlusionPass.getUniformLocation("sampleKernel[0]");
@@ -68237,7 +69113,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     occlusionRenderTarget.bind();
     occlusionPass.draw();
     const blurPass = this.getBlurPass();
-    blurPass.use();
+    blurPass.useProgram();
     const sourceTextureLocation = blurPass.getUniformLocation("sourceTexture");
     webGL2RenderingContext.uniform1i(sourceTextureLocation, 0);
     const texelSizeLocation = blurPass.getUniformLocation("texelSize");
@@ -68400,7 +69276,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
 };
 
 // src/graphics3d/subsurfacescatteringeffect.js
-var System108 = globalThis;
+var System109 = globalThis;
 var KERNEL_SAMPLE_COUNT = 17;
 var KERNEL_RANGE = 3;
 var SCATTER_FRAGMENTSHADER_SOURCE = `#version 300 es
@@ -68494,7 +69370,7 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     this.#scatterWidth = 0.2;
     this.#falloffColor = [1, 0.37, 0.3];
     this.#strengthColor = [0.48, 0.41, 0.28];
-    this.#kernel = new System108.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+    this.#kernel = new System109.Float32Array(KERNEL_SAMPLE_COUNT * 4);
     this.computeKernel();
   }
   //==============================================================================
@@ -68520,10 +69396,10 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
    */
   static buildKernel(falloffColor, strengthColor) {
     const sampleCount = KERNEL_SAMPLE_COUNT;
-    const kernel = new System108.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+    const kernel = new System109.Float32Array(KERNEL_SAMPLE_COUNT * 4);
     function evaluateGaussian(variance, distance, channelIndex) {
       const scaledDistance = distance / (1e-3 + falloffColor[channelIndex]);
-      return System108.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System108.Math.PI * variance);
+      return System109.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System109.Math.PI * variance);
     }
     __name(evaluateGaussian, "evaluateGaussian");
     function evaluateProfile(distance, channelIndex) {
@@ -68535,13 +69411,13 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const linearOffset = -KERNEL_RANGE + sampleIndex * step;
       const sign = linearOffset < 0 ? -1 : 1;
-      const normalizedOffset = System108.Math.abs(linearOffset) / KERNEL_RANGE;
+      const normalizedOffset = System109.Math.abs(linearOffset) / KERNEL_RANGE;
       offsets.push(KERNEL_RANGE * sign * normalizedOffset * normalizedOffset);
     }
     const weights = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-      const leftWidth = sampleIndex > 0 ? System108.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
-      const rightWidth = sampleIndex < sampleCount - 1 ? System108.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
+      const leftWidth = sampleIndex > 0 ? System109.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
+      const rightWidth = sampleIndex < sampleCount - 1 ? System109.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
       const area = (leftWidth + rightWidth) * 0.5;
       const weight = [];
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -68603,7 +69479,7 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     const scatterPass = this.getScatterPass();
-    scatterPass.use();
+    scatterPass.useProgram();
     const sourceTextureLocation = scatterPass.getUniformLocation("sourceTexture");
     webGL2RenderingContext.uniform1i(sourceTextureLocation, 0);
     const depthTextureLocation = scatterPass.getUniformLocation("depthTexture");
@@ -68613,7 +69489,7 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     const scatterWidthLocation = scatterPass.getUniformLocation("scatterWidth");
     webGL2RenderingContext.uniform1f(scatterWidthLocation, this.getScatterWidth());
     const distanceToProjectionWindowLocation = scatterPass.getUniformLocation("distanceToProjectionWindow");
-    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System108.Math.tan(fieldOfViewRadian * 0.5));
+    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System109.Math.tan(fieldOfViewRadian * 0.5));
     const aspectRatioLocation = scatterPass.getUniformLocation("aspectRatio");
     webGL2RenderingContext.uniform1f(aspectRatioLocation, aspectRatio);
     const depthRangeLocation = scatterPass.getUniformLocation("depthRange");
@@ -68857,7 +69733,7 @@ var Camera = class extends Object2 {
 };
 
 // src/base/timer.js
-var System109 = globalThis;
+var System110 = globalThis;
 var Cooldown = class extends Object2 {
   static {
     __name(this, "Cooldown");
@@ -68878,7 +69754,7 @@ var Cooldown = class extends Object2 {
    */
   constructor(duration = 1) {
     super();
-    this.#duration = System109.Math.max(0, duration);
+    this.#duration = System110.Math.max(0, duration);
     this.#remainSeconds = 0;
   }
   //==============================================================================
@@ -68889,7 +69765,7 @@ var Cooldown = class extends Object2 {
    */
   tick(timeDelta) {
     if (this.#remainSeconds > 0) {
-      this.#remainSeconds = System109.Math.max(0, this.#remainSeconds - timeDelta);
+      this.#remainSeconds = System110.Math.max(0, this.#remainSeconds - timeDelta);
     }
   }
   //==============================================================================
@@ -68902,27 +69778,17 @@ var Cooldown = class extends Object2 {
     return this.#remainSeconds <= 0;
   }
   //==============================================================================
-  // 발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환)
-  //==============================================================================
-  /**
-   * @returns { boolean } 발동했으면 참. (쿨다운 중이면 거짓, 남은 시간은 그대로)
-   */
-  use() {
-    if (!this.isReady()) {
-      return false;
-    }
-    this.#remainSeconds = this.#duration;
-    return true;
-  }
-  //==============================================================================
-  // 발동. (use 와 같다, use 를 이름으로 쓸 수 없는 언어와 같은 코드로 쓰려고 둔다)
+  // 발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환, 러스트 판 activate 와 같다)
   //==============================================================================
   /**
    * @returns { boolean } 발동했으면 참. (쿨다운 중이면 거짓, 남은 시간은 그대로)
    */
   activate() {
-    const isActivated = this.use();
-    return isActivated;
+    if (!this.isReady()) {
+      return false;
+    }
+    this.#remainSeconds = this.#duration;
+    return true;
   }
   //==============================================================================
   // 곧바로 준비 상태로 되돌리기.
@@ -68937,7 +69803,7 @@ var Cooldown = class extends Object2 {
    * @param { number } duration 쿨다운 시간. (초, 0 보다 작으면 0, 진행 중인 남은 시간은 바꾸지 않는다)
    */
   setDuration(duration) {
-    this.#duration = System109.Math.max(0, duration);
+    this.#duration = System110.Math.max(0, duration);
   }
   //==============================================================================
   // 쿨다운 시간 반환.
@@ -68995,7 +69861,7 @@ var RepeatTimer = class extends Object2 {
    */
   constructor(interval = 1, elapsedEvent = null) {
     super();
-    this.#interval = System109.Math.max(1e-6, interval);
+    this.#interval = System110.Math.max(1e-6, interval);
     this.#elapsedSeconds = 0;
     this.#elapsedEvent = elapsedEvent;
     this.#isRunning = true;
@@ -69044,7 +69910,7 @@ var RepeatTimer = class extends Object2 {
    * @param { number } interval 간격. (초, 0.000001 보다 작으면 0.000001)
    */
   setInterval(interval) {
-    this.#interval = System109.Math.max(1e-6, interval);
+    this.#interval = System110.Math.max(1e-6, interval);
   }
   //==============================================================================
   // 간격 반환.
@@ -69076,7 +69942,7 @@ var RepeatTimer = class extends Object2 {
 };
 
 // src/base/objectpool.js
-var System110 = globalThis;
+var System111 = globalThis;
 var ObjectPool = class extends Object2 {
   static {
     __name(this, "ObjectPool");
@@ -69109,7 +69975,7 @@ var ObjectPool = class extends Object2 {
     this.#createHandler = createHandler;
     this.#resetHandler = resetHandler;
     this.#freeList = [];
-    this.#freeSet = new System110.Set();
+    this.#freeSet = new System111.Set();
     this.#totalCount = 0;
     for (let index = 0; index < preloadCount; ++index) {
       const instance = this.#createHandler();
@@ -69180,7 +70046,7 @@ var ObjectPool = class extends Object2 {
 };
 
 // src/base/fsm.js
-var System111 = globalThis;
+var System112 = globalThis;
 var FiniteStateMachine = class extends Object2 {
   static {
     __name(this, "FiniteStateMachine");
@@ -69206,7 +70072,7 @@ var FiniteStateMachine = class extends Object2 {
    */
   constructor() {
     super();
-    this.#stateTable = new System111.Map();
+    this.#stateTable = new System112.Map();
     this.#stateName = null;
     this.#stateSeconds = 0;
     this.#transitionGuard = null;
@@ -69355,7 +70221,7 @@ __export(format_exports, {
   formatNumberWithUnit: () => formatNumberWithUnit,
   formatPaddedNumber: () => formatPaddedNumber
 });
-var System112 = globalThis;
+var System113 = globalThis;
 var COMPACT_UNIT_LIST = [
   { divisor: 1e3, suffix: "K" },
   { divisor: 1e6, suffix: "M" },
@@ -69370,7 +70236,7 @@ function formatNumberWithUnit(value, unitSuffix, locale = "ko-KR") {
 }
 __name(formatNumberWithUnit, "formatNumberWithUnit");
 function formatCompactNumber(value, fractionDigits = 1) {
-  const absoluteValue = System112.Math.abs(value);
+  const absoluteValue = System113.Math.abs(value);
   const sign = value < 0 ? "-" : "";
   let unitIndex = -1;
   for (let candidateIndex = COMPACT_UNIT_LIST.length - 1; candidateIndex >= 0; --candidateIndex) {
@@ -69383,7 +70249,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
     return sign + String(absoluteValue);
   }
   let compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
-  if (System112.Number.parseFloat(compactText) >= 1e3 && unitIndex < COMPACT_UNIT_LIST.length - 1) {
+  if (System113.Number.parseFloat(compactText) >= 1e3 && unitIndex < COMPACT_UNIT_LIST.length - 1) {
     ++unitIndex;
     compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
   }
@@ -69391,7 +70257,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
 }
 __name(formatCompactNumber, "formatCompactNumber");
 function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = Infinity) {
-  const clampedValue = System112.Math.min(maxValue, System112.Math.max(minValue, value));
+  const clampedValue = System113.Math.min(maxValue, System113.Math.max(minValue, value));
   if (clampedValue < 0) {
     const digitText = String(-clampedValue).padStart(digitCount - 1, "0");
     return "-" + digitText;
@@ -69400,8 +70266,8 @@ function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = 
 }
 __name(formatPaddedNumber, "formatPaddedNumber");
 function formatMinutesSeconds(totalSeconds) {
-  const flooredSeconds = System112.Math.max(0, System112.Math.floor(totalSeconds));
-  const minutes = System112.Math.floor(flooredSeconds / 60);
+  const flooredSeconds = System113.Math.max(0, System113.Math.floor(totalSeconds));
+  const minutes = System113.Math.floor(flooredSeconds / 60);
   const seconds2 = flooredSeconds % 60;
   return minutes + ":" + String(seconds2).padStart(2, "0");
 }
@@ -69422,7 +70288,7 @@ function trimTrailingZero(numberText) {
 __name(trimTrailingZero, "trimTrailingZero");
 
 // src/misc/persistedstore.js
-var System113 = globalThis;
+var System114 = globalThis;
 var PersistedStore = class extends Object2 {
   static {
     __name(this, "PersistedStore");
@@ -69462,8 +70328,8 @@ var PersistedStore = class extends Object2 {
     this.#defaultState = defaultState;
     this.#storageBackend = null;
     this.#state = this.readFromStorage();
-    this.#subscriberSet = new System113.Set();
-    this.#subscriberBySubscription = new System113.Map();
+    this.#subscriberSet = new System114.Set();
+    this.#subscriberBySubscription = new System114.Map();
   }
   //==============================================================================
   // 상태 반환. (복사본이 아니므로 직접 고치지 말고 set() 을 쓴다)
@@ -69481,7 +70347,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } partialState 바꿀 키와 값만 담은 객체.
    */
   set(partialState) {
-    this.#state = System113.Object.assign({}, this.#state, partialState);
+    this.#state = System114.Object.assign({}, this.#state, partialState);
     this.writeToStorage();
     this.notify();
   }
@@ -69492,7 +70358,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } nextState 새 상태. (얕게 복사해 쓴다)
    */
   replace(nextState) {
-    this.#state = System113.Object.assign({}, nextState);
+    this.#state = System114.Object.assign({}, nextState);
     this.writeToStorage();
     this.notify();
   }
@@ -69547,16 +70413,16 @@ var PersistedStore = class extends Object2 {
   readFromStorage() {
     const storedText = this.readStoredText();
     if (storedText.length === 0) {
-      return System113.Object.assign({}, this.#defaultState);
+      return System114.Object.assign({}, this.#defaultState);
     }
     try {
-      const parsed = System113.JSON.parse(storedText);
+      const parsed = System114.JSON.parse(storedText);
       if (!parsed || parsed.version !== this.#version || typeof parsed.state !== "object" || parsed.state === null) {
-        return System113.Object.assign({}, this.#defaultState);
+        return System114.Object.assign({}, this.#defaultState);
       }
-      return System113.Object.assign({}, this.#defaultState, parsed.state);
+      return System114.Object.assign({}, this.#defaultState, parsed.state);
     } catch (parseError) {
-      return System113.Object.assign({}, this.#defaultState);
+      return System114.Object.assign({}, this.#defaultState);
     }
   }
   //==============================================================================
@@ -69564,7 +70430,7 @@ var PersistedStore = class extends Object2 {
   //==============================================================================
   writeToStorage() {
     const payload = { version: this.#version, state: this.#state };
-    const payloadText = System113.JSON.stringify(payload);
+    const payloadText = System114.JSON.stringify(payload);
     const storageBackend = this.getStorageBackend();
     if (storageBackend === null) {
       LocalStorage.setString(this.#storageKey, payloadText);
@@ -69645,7 +70511,7 @@ var PersistedStore = class extends Object2 {
 };
 
 // src/misc/localization.js
-var System114 = globalThis;
+var System115 = globalThis;
 var DEFAULT_RIGHT_TO_LEFT_LANGUAGES = ["ar", "fa", "he", "ur", "ps", "yi", "dv"];
 var FIRST_STRONG_ISOLATE = "\u2068";
 var POP_DIRECTIONAL_ISOLATE = "\u2069";
@@ -69656,16 +70522,16 @@ var Localization = class _Localization extends Object2 {
     __name(this, "Localization");
   }
   /** @private @type { Map } */
-  static #tableByLanguage = new System114.Map();
+  static #tableByLanguage = new System115.Map();
   /** @private @type { string } */
   static #languageCode = "ko";
   /** @private @type { string } */
   static #fallbackLanguageCode = "ko";
   /** @private @type { Map<string, string> } */
-  static #aliasToLanguage = new System114.Map();
+  static #aliasToLanguage = new System115.Map();
   // 별칭 → 언어 코드.
   /** @private @type { Set<string> } */
-  static #rightToLeftLanguages = new System114.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
+  static #rightToLeftLanguages = new System115.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
   // 오른쪽에서 왼쪽으로 쓰는 언어의 첫 조각.
   //==============================================================================
   // 브라우저 언어 감지. (정적)
@@ -69678,7 +70544,7 @@ var Localization = class _Localization extends Object2 {
    * @returns { string } 고른 언어 코드. (찾았으면 소문자, 없으면 기본 코드 그대로)
    */
   static detectLanguage(supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const navigatorObject = System114.navigator;
+    const navigatorObject = System115.navigator;
     const candidateList = [];
     if (navigatorObject) {
       if (navigatorObject.languages) {
@@ -69709,7 +70575,7 @@ var Localization = class _Localization extends Object2 {
    * console.log(languageCode);
    */
   static selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const supportedSet = new System114.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
+    const supportedSet = new System115.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
     const aliasToLanguage = _Localization.#aliasToLanguage;
     for (const languageTag of candidateList) {
       const loweredTag = languageTag.toLowerCase().split("_").join("-");
@@ -69841,11 +70707,11 @@ var Localization = class _Localization extends Object2 {
     return text.replace(JOINED_PLACEHOLDER_PATTERN, (joinedText) => {
       let isFilled = false;
       const valueText = joinedText.replace(PLACEHOLDER_PATTERN, (matched, name) => {
-        if (!System114.Object.prototype.hasOwnProperty.call(values, name)) {
+        if (!System115.Object.prototype.hasOwnProperty.call(values, name)) {
           return matched;
         }
         isFilled = true;
-        return System114.String(values[name]);
+        return System115.String(values[name]);
       });
       if (!isFilled) {
         return joinedText;
@@ -69872,12 +70738,12 @@ var Localization = class _Localization extends Object2 {
    */
   static setTableFromJson(languageCode, tableJson) {
     const table = {};
-    if (tableJson !== null && typeof tableJson === "object" && !System114.Array.isArray(tableJson)) {
-      for (const key of System114.Object.keys(tableJson)) {
+    if (tableJson !== null && typeof tableJson === "object" && !System115.Array.isArray(tableJson)) {
+      for (const key of System115.Object.keys(tableJson)) {
         const value = tableJson[key];
         if (typeof value === "string") {
           table[key] = value;
-        } else if (System114.Array.isArray(value)) {
+        } else if (System115.Array.isArray(value)) {
           table[key] = value.filter((item) => typeof item === "string");
         }
       }
@@ -69940,7 +70806,7 @@ var Localization = class _Localization extends Object2 {
    */
   static textList(key) {
     const resolvedValue = _Localization.lookup(key);
-    if (System114.Array.isArray(resolvedValue)) {
+    if (System115.Array.isArray(resolvedValue)) {
       return resolvedValue;
     }
     if (typeof resolvedValue === "string") {
@@ -69975,7 +70841,7 @@ var Localization = class _Localization extends Object2 {
 };
 
 // src/misc/pathfinder.js
-var System115 = globalThis;
+var System116 = globalThis;
 var PathFinder = class extends Object2 {
   static {
     __name(this, "PathFinder");
@@ -70008,11 +70874,11 @@ var PathFinder = class extends Object2 {
     const toIndex = /* @__PURE__ */ __name((column, row) => {
       return row * columnCount + column;
     }, "toIndex");
-    const costFromStart = new System115.Float64Array(cellCount).fill(System115.Number.POSITIVE_INFINITY);
-    const cameFrom = new System115.Int32Array(cellCount).fill(-1);
-    const isClosed = new System115.Uint8Array(cellCount);
+    const costFromStart = new System116.Float64Array(cellCount).fill(System116.Number.POSITIVE_INFINITY);
+    const cameFrom = new System116.Int32Array(cellCount).fill(-1);
+    const isClosed = new System116.Uint8Array(cellCount);
     const heuristic = /* @__PURE__ */ __name((column, row) => {
-      return System115.Math.abs(column - goal.column) + System115.Math.abs(row - goal.row);
+      return System116.Math.abs(column - goal.column) + System116.Math.abs(row - goal.row);
     }, "heuristic");
     const heapScores = [];
     const heapIndices = [];
@@ -70077,7 +70943,7 @@ var PathFinder = class extends Object2 {
         const path = [];
         let traceIndex = goalIndex;
         while (traceIndex !== startIndex) {
-          path.push({ column: traceIndex % columnCount, row: System115.Math.floor(traceIndex / columnCount) });
+          path.push({ column: traceIndex % columnCount, row: System116.Math.floor(traceIndex / columnCount) });
           traceIndex = cameFrom[traceIndex];
         }
         path.reverse();
@@ -70088,7 +70954,7 @@ var PathFinder = class extends Object2 {
       }
       isClosed[currentIndex] = 1;
       const currentColumn = currentIndex % columnCount;
-      const currentRow = System115.Math.floor(currentIndex / columnCount);
+      const currentRow = System116.Math.floor(currentIndex / columnCount);
       for (const offset of neighborOffsets) {
         const nextColumn = currentColumn + offset[0];
         const nextRow = currentRow + offset[1];
@@ -70115,7 +70981,7 @@ var PathFinder = class extends Object2 {
 };
 
 // src/misc/grid.js
-var System116 = globalThis;
+var System117 = globalThis;
 var Grid = class _Grid extends Object2 {
   static {
     __name(this, "Grid");
@@ -70139,7 +71005,7 @@ var Grid = class _Grid extends Object2 {
     if (!isPassableHandler(start.column, start.row)) {
       return visitedList;
     }
-    const isVisited = new System116.Uint8Array(columnCount * rowCount);
+    const isVisited = new System117.Uint8Array(columnCount * rowCount);
     const pendingStack = [start.column, start.row];
     isVisited[start.row * columnCount + start.column] = 1;
     while (pendingStack.length > 0) {
@@ -70213,10 +71079,10 @@ var Grid = class _Grid extends Object2 {
    * console.log(Grid.testRectOverlap(freeRect, 32, isBlocked));
    */
   static testRectOverlap(worldRect, tileSize, isBlockedHandler) {
-    const startColumn = System116.Math.floor(worldRect.position.x / tileSize);
-    const endColumn = System116.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
-    const startRow = System116.Math.floor(worldRect.position.y / tileSize);
-    const endRow = System116.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
+    const startColumn = System117.Math.floor(worldRect.position.x / tileSize);
+    const endColumn = System117.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
+    const startRow = System117.Math.floor(worldRect.position.y / tileSize);
+    const endRow = System117.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
     for (let row = startRow; row <= endRow; ++row) {
       for (let column = startColumn; column <= endColumn; ++column) {
         if (isBlockedHandler(column, row)) {
@@ -70236,7 +71102,7 @@ var Grid = class _Grid extends Object2 {
    * @returns { object } { column, row }
    */
   static toCell(worldX, worldY, tileSize) {
-    return { column: System116.Math.floor(worldX / tileSize), row: System116.Math.floor(worldY / tileSize) };
+    return { column: System117.Math.floor(worldX / tileSize), row: System117.Math.floor(worldY / tileSize) };
   }
   //==============================================================================
   // 타일 좌표 → 타일 중심 월드 좌표. (정적)
@@ -70253,7 +71119,7 @@ var Grid = class _Grid extends Object2 {
 };
 
 // src/misc/collision2d.js
-var System117 = globalThis;
+var System118 = globalThis;
 var Collision2D = class extends Object2 {
   static {
     __name(this, "Collision2D");
@@ -70306,7 +71172,7 @@ var Collision2D = class extends Object2 {
     if (distanceSquared >= radiusSum * radiusSum) {
       return null;
     }
-    const distance = System117.Math.sqrt(distanceSquared);
+    const distance = System118.Math.sqrt(distanceSquared);
     let directionX = 1;
     let directionY = 0;
     if (distance > 1e-6) {
@@ -70409,7 +71275,7 @@ var Collision2D = class extends Object2 {
 };
 
 // src/misc/steering2d.js
-var System118 = globalThis;
+var System119 = globalThis;
 var Steering2D = class extends Object2 {
   static {
     __name(this, "Steering2D");
@@ -70426,7 +71292,7 @@ var Steering2D = class extends Object2 {
   static seek(position, targetPosition, speed) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System118.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System119.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.zero();
     }
@@ -70463,7 +71329,7 @@ var Steering2D = class extends Object2 {
   static orbitAtRange(position, targetPosition, preferredRange, speed, elapsedSeconds, strafeRate = 1.7) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System118.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System119.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.create(speed, 0);
     }
@@ -70471,11 +71337,11 @@ var Steering2D = class extends Object2 {
     const forwardY = differenceY / distance;
     const sideX = -forwardY;
     const sideY = forwardX;
-    const rangeError = System118.Math.max(-1, System118.Math.min(1, (distance - preferredRange) / preferredRange));
-    const strafeAmount = System118.Math.sin(elapsedSeconds * strafeRate);
+    const rangeError = System119.Math.max(-1, System119.Math.min(1, (distance - preferredRange) / preferredRange));
+    const strafeAmount = System119.Math.sin(elapsedSeconds * strafeRate);
     const desiredX = forwardX * rangeError + sideX * strafeAmount;
     const desiredY = forwardY * rangeError + sideY * strafeAmount;
-    const desiredLength = System118.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+    const desiredLength = System119.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
     if (desiredLength < 1e-6) {
       return Vector2.zero();
     }
@@ -70484,7 +71350,7 @@ var Steering2D = class extends Object2 {
 };
 
 // src/misc/pointergesture.js
-var System119 = globalThis;
+var System120 = globalThis;
 var PointerGesture = class extends Object2 {
   static {
     __name(this, "PointerGesture");
@@ -70561,7 +71427,7 @@ var PointerGesture = class extends Object2 {
    * @param { number } x 포인터 X 좌표.
    * @param { number } y 포인터 Y 좌표.
    */
-  move(x, y) {
+  movePointer(x, y) {
     if (!this.#isPressed) {
       return;
     }
@@ -70640,7 +71506,7 @@ var PointerGesture = class extends Object2 {
     if (!this.#isPressed || this.#isDragging || this.#longPressSeconds <= 0) {
       return 0;
     }
-    return System119.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
+    return System120.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
   }
   //==============================================================================
   // 상태 조회.
@@ -70705,7 +71571,7 @@ var PointerGesture = class extends Object2 {
 };
 
 // src/misc/frameprobe.js
-var System120 = globalThis;
+var System121 = globalThis;
 var FrameProbe = class {
   static {
     __name(this, "FrameProbe");
@@ -70854,8 +71720,8 @@ var FrameProbe = class {
    * @param { number } probeSeconds 재는 초. (음수면 0, 처음은 4)
    */
   setSeconds(warmupSeconds, probeSeconds) {
-    this.#warmupSeconds = System120.Math.max(0, warmupSeconds);
-    this.#probeSeconds = System120.Math.max(0, probeSeconds);
+    this.#warmupSeconds = System121.Math.max(0, warmupSeconds);
+    this.#probeSeconds = System121.Math.max(0, probeSeconds);
   }
   //==============================================================================
   // 기다리는 초 반환.
@@ -70925,7 +71791,7 @@ var FrameProbe = class {
 };
 
 // src/misc/cameragestures.js
-var System121 = globalThis;
+var System122 = globalThis;
 var MOUSE_MIDDLE_BUTTON = 1;
 var MOUSE_RIGHT_BUTTON = 2;
 var CameraGestures = class {
@@ -71047,12 +71913,12 @@ var CameraGestures = class {
     this.#isLastWheelCtrl = false;
     this.#isTouchInput = this.isCoarsePointer();
     this.#compatibilityMouseMilliseconds = 800;
-    this.#twistStartRadians = 15 * System121.Math.PI / 180;
-    this.#tiltPerHalfHeightRadians = 35 * System121.Math.PI / 180;
+    this.#twistStartRadians = 15 * System122.Math.PI / 180;
+    this.#tiltPerHalfHeightRadians = 35 * System122.Math.PI / 180;
     this.#rightClickDistance = 8;
     this.#lastTouchTime = -this.#compatibilityMouseMilliseconds;
     this.#listeners = [];
-    const engine = System121.vanillaEngine;
+    const engine = System122.vanillaEngine;
     if (!engine) {
       return;
     }
@@ -71064,10 +71930,10 @@ var CameraGestures = class {
     this.addListener(canvas, "mousedown", (mouseEvent) => {
       this.handleMouseDown(mouseEvent);
     }, false);
-    this.addListener(System121.window, "mousemove", (mouseEvent) => {
+    this.addListener(System122.window, "mousemove", (mouseEvent) => {
       this.handleMouseMove(mouseEvent);
     }, false);
-    this.addListener(System121.window, "mouseup", (mouseEvent) => {
+    this.addListener(System122.window, "mouseup", (mouseEvent) => {
       this.handleMouseUp(mouseEvent);
     }, false);
     this.addListener(canvas, "wheel", (wheelEvent) => {
@@ -71134,10 +72000,10 @@ var CameraGestures = class {
    * @returns { boolean } 손가락이 주된 입력인 기기면 참. (matchMedia 가 없으면 거짓)
    */
   isCoarsePointer() {
-    if (typeof System121.matchMedia !== "function") {
+    if (typeof System122.matchMedia !== "function") {
       return false;
     }
-    const mediaQueryList = System121.matchMedia("(pointer: coarse)");
+    const mediaQueryList = System122.matchMedia("(pointer: coarse)");
     return mediaQueryList.matches;
   }
   //==============================================================================
@@ -71232,7 +72098,7 @@ var CameraGestures = class {
    * @returns { number } CSS 픽셀 하나의 뷰 단위 크기. (엔진이 없으면 1)
    */
   readUnitsPerCssPixel() {
-    const engine = System121.vanillaEngine;
+    const engine = System122.vanillaEngine;
     if (!engine) {
       return 1;
     }
@@ -71252,7 +72118,7 @@ var CameraGestures = class {
    * @returns { Vector2 | null } 뷰 좌표. (엔진이나 캔버스가 없으면 null)
    */
   readViewPosition(clientX, clientY) {
-    const engine = System121.vanillaEngine;
+    const engine = System122.vanillaEngine;
     const canvas = this.#canvas;
     if (!engine || canvas === null) {
       return null;
@@ -71269,7 +72135,7 @@ var CameraGestures = class {
    * @returns { boolean } 마지막 손가락 사건 뒤 무시하는 시간 안이면 참.
    */
   isCompatibilityMouse() {
-    const now = System121.performance.now();
+    const now = System122.performance.now();
     return now - this.#lastTouchTime < this.#compatibilityMouseMilliseconds;
   }
   //==============================================================================
@@ -71325,14 +72191,14 @@ var CameraGestures = class {
     this.#lastMouseX = mouseEvent.clientX;
     this.#lastMouseY = mouseEvent.clientY;
     if (this.#isRightButtonDown) {
-      const pressDistance = System121.Math.hypot(mouseEvent.clientX - this.#rightPressX, mouseEvent.clientY - this.#rightPressY);
+      const pressDistance = System122.Math.hypot(mouseEvent.clientX - this.#rightPressX, mouseEvent.clientY - this.#rightPressY);
       if (pressDistance > this.#rightClickDistance) {
         this.#isRightDragged = true;
       }
       const canvas = this.#canvas;
-      const canvasWidth = canvas !== null ? System121.Math.max(1, canvas.clientWidth) : 1e3;
-      const canvasHeight = canvas !== null ? System121.Math.max(1, canvas.clientHeight) : 1e3;
-      this.#rotation += deltaX / canvasWidth * System121.Math.PI * 2;
+      const canvasWidth = canvas !== null ? System122.Math.max(1, canvas.clientWidth) : 1e3;
+      const canvasHeight = canvas !== null ? System122.Math.max(1, canvas.clientHeight) : 1e3;
+      this.#rotation += deltaX / canvasWidth * System122.Math.PI * 2;
       this.#tilt -= deltaY / (canvasHeight * 0.5) * this.#tiltPerHalfHeightRadians;
     }
     if (this.#isMiddleButtonDown) {
@@ -71375,7 +72241,7 @@ var CameraGestures = class {
    */
   handleTouchChange(touchEvent) {
     this.#isTouchInput = true;
-    this.#lastTouchTime = System121.performance.now();
+    this.#lastTouchTime = System122.performance.now();
     const touches = touchEvent.touches;
     if (touches.length >= 2) {
       if (!this.#isMultiTouch) {
@@ -71402,8 +72268,8 @@ var CameraGestures = class {
     const secondTouch = touches[1];
     this.#lastTouchCenterX = (firstTouch.clientX + secondTouch.clientX) * 0.5;
     this.#lastTouchCenterY = (firstTouch.clientY + secondTouch.clientY) * 0.5;
-    this.#lastTouchAngle = System121.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
-    this.#lastTouchDistance = System121.Math.max(1, System121.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
+    this.#lastTouchAngle = System122.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
+    this.#lastTouchDistance = System122.Math.max(1, System122.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
   }
   //==============================================================================
   // 두 손가락이 움직임. (가운데가 움직인 만큼 밀고, 거리가 바뀐 만큼 키우고, 문턱을 넘게 비틀면 돌립다)
@@ -71412,7 +72278,7 @@ var CameraGestures = class {
    * @param { TouchEvent } touchEvent 브라우저 손가락 사건.
    */
   handleTouchMove(touchEvent) {
-    this.#lastTouchTime = System121.performance.now();
+    this.#lastTouchTime = System122.performance.now();
     const touches = touchEvent.touches;
     if (!this.#isMultiTouch || touches.length < 2) {
       return;
@@ -71421,25 +72287,25 @@ var CameraGestures = class {
     const secondTouch = touches[1];
     const centerX = (firstTouch.clientX + secondTouch.clientX) * 0.5;
     const centerY = (firstTouch.clientY + secondTouch.clientY) * 0.5;
-    const angle = System121.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
-    const distance = System121.Math.max(1, System121.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
+    const angle = System122.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
+    const distance = System122.Math.max(1, System122.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
     const unitsPerCssPixel = this.readUnitsPerCssPixel();
     this.#panX += (centerX - this.#lastTouchCenterX) * unitsPerCssPixel;
     this.#panY += (centerY - this.#lastTouchCenterY) * unitsPerCssPixel;
     this.#zoom *= distance / this.#lastTouchDistance;
     this.#zoomAnchor = this.readViewPosition(centerX, centerY);
     let angleDelta = angle - this.#lastTouchAngle;
-    while (angleDelta > System121.Math.PI) {
-      angleDelta -= System121.Math.PI * 2;
+    while (angleDelta > System122.Math.PI) {
+      angleDelta -= System122.Math.PI * 2;
     }
-    while (angleDelta < -System121.Math.PI) {
-      angleDelta += System121.Math.PI * 2;
+    while (angleDelta < -System122.Math.PI) {
+      angleDelta += System122.Math.PI * 2;
     }
     if (this.#isTwisting) {
       this.#rotation += angleDelta;
     } else {
       this.#twistSum += angleDelta;
-      if (System121.Math.abs(this.#twistSum) > this.#twistStartRadians) {
+      if (System122.Math.abs(this.#twistSum) > this.#twistStartRadians) {
         this.#isTwisting = true;
       }
     }
@@ -71503,7 +72369,7 @@ __export(languagepack_exports, {
   setPreferredLanguageTag: () => setPreferredLanguageTag,
   translate: () => translate
 });
-var System122 = globalThis;
+var System123 = globalThis;
 var languageListPath = "./assets/localization/languages.json";
 var documentTitleKey = "game.title";
 var preferredLanguageTag = "";
@@ -71543,7 +72409,7 @@ async function loadLanguageList() {
 __name(loadLanguageList, "loadLanguageList");
 function normalizeTextList(values) {
   const textList = [];
-  if (!System122.Array.isArray(values)) {
+  if (!System123.Array.isArray(values)) {
     return textList;
   }
   for (const value of values) {
@@ -71614,7 +72480,7 @@ function resolveDeviceLanguageCode() {
   if (preferredLanguageTag !== "") {
     languageTags.push(preferredLanguageTag);
   }
-  const navigator = System122.navigator;
+  const navigator = System123.navigator;
   if (navigator) {
     if (navigator.languages) {
       for (const languageTag of navigator.languages) {
@@ -71669,7 +72535,7 @@ async function loadLanguage(languageCode) {
     return;
   }
   const fallbackLanguage = findLanguage(fallbackLanguageCode);
-  const isFallbackLoaded = fallbackLanguage !== null && System122.Object.keys(fallbackTexts).length > 0;
+  const isFallbackLoaded = fallbackLanguage !== null && System123.Object.keys(fallbackTexts).length > 0;
   if (fallbackLanguage !== null && !isFallbackLoaded) {
     fallbackTexts = await readLanguageTexts(fallbackLanguage);
   }
@@ -71679,16 +72545,16 @@ async function loadLanguage(languageCode) {
 }
 __name(loadLanguage, "loadLanguage");
 function applyDocumentLanguage(language) {
-  if (typeof System122.document === "undefined") {
+  if (typeof System123.document === "undefined") {
     return;
   }
-  System122.document.documentElement.lang = language.code;
+  System123.document.documentElement.lang = language.code;
   if (documentTitleKey === "") {
     return;
   }
   const documentTitle = translate(documentTitleKey);
   if (documentTitle !== documentTitleKey) {
-    System122.document.title = documentTitle;
+    System123.document.title = documentTitle;
   }
 }
 __name(applyDocumentLanguage, "applyDocumentLanguage");
@@ -71775,11 +72641,11 @@ function formatText(key, values) {
   return text.replace(JOINED_PLACEHOLDER_PATTERN2, (joinedText) => {
     let isFilled = false;
     const valueText = joinedText.replace(PLACEHOLDER_PATTERN2, (matched, name) => {
-      if (!System122.Object.prototype.hasOwnProperty.call(values, name)) {
+      if (!System123.Object.prototype.hasOwnProperty.call(values, name)) {
         return matched;
       }
       isFilled = true;
-      return System122.String(values[name]);
+      return System123.String(values[name]);
     });
     if (!isFilled) {
       return joinedText;
@@ -71789,16 +72655,16 @@ function formatText(key, values) {
 }
 __name(formatText, "formatText");
 function readAllTexts() {
-  const texts = System122.Object.values(currentTexts);
+  const texts = System123.Object.values(currentTexts);
   return texts.join("");
 }
 __name(readAllTexts, "readAllTexts");
 function setLanguageList(data) {
-  if (data === null || typeof data !== "object" || !System122.Array.isArray(data.languages)) {
+  if (data === null || typeof data !== "object" || !System123.Array.isArray(data.languages)) {
     return false;
   }
   const languageEntries = normalizeLanguageEntries(data.languages);
-  languageList = System122.Object.assign({}, data, { languages: languageEntries });
+  languageList = System123.Object.assign({}, data, { languages: languageEntries });
   return true;
 }
 __name(setLanguageList, "setLanguageList");
@@ -71839,7 +72705,7 @@ __export(uifont_exports, {
   readUiFontFamily: () => readUiFontFamily,
   requestUiFontText: () => requestUiFontText
 });
-var System123 = globalThis;
+var System124 = globalThis;
 var uiFontFamily = "GameUI";
 var fontManifestPath = "./assets/fonts/fonts.json";
 var fontDirectoryPath = "./assets/fonts/";
@@ -71852,7 +72718,7 @@ var fontIndex = null;
 var currentFontGroup = primaryFontGroup;
 var isRemainingGroupsRequested = false;
 var representativeFontFace = null;
-var requestedCharacters = new System123.Set();
+var requestedCharacters = new System124.Set();
 function parseUnicodeRange2(unicodeRange) {
   const ranges = [];
   for (const rangeText of unicodeRange.split(",")) {
@@ -71862,14 +72728,14 @@ function parseUnicodeRange2(unicodeRange) {
     }
     const startText = rangeMatch[1].replace(/\?/g, "0");
     const endText = rangeMatch[2] !== void 0 ? rangeMatch[2] : rangeMatch[1].replace(/\?/g, "F");
-    ranges.push([System123.parseInt(startText, 16), System123.parseInt(endText, 16)]);
+    ranges.push([System124.parseInt(startText, 16), System124.parseInt(endText, 16)]);
   }
   return ranges;
 }
 __name(parseUnicodeRange2, "parseUnicodeRange");
 function readTargetWeights(weightDescriptor) {
   const weightValues = weightDescriptor.trim().split(/\s+/).map((weightText) => {
-    return System123.Number(weightText);
+    return System124.Number(weightText);
   });
   if (weightValues.length >= 2) {
     return uiFontWeights.filter((targetWeight) => {
@@ -71878,7 +72744,7 @@ function readTargetWeights(weightDescriptor) {
   }
   let nearestWeight = uiFontWeights[0];
   for (const targetWeight of uiFontWeights) {
-    if (System123.Math.abs(targetWeight - weightValues[0]) < System123.Math.abs(nearestWeight - weightValues[0])) {
+    if (System124.Math.abs(targetWeight - weightValues[0]) < System124.Math.abs(nearestWeight - weightValues[0])) {
       nearestWeight = targetWeight;
     }
   }
@@ -71903,7 +72769,7 @@ function findDrawingFontFace(codePoint, targetWeight) {
 }
 __name(findDrawingFontFace, "findDrawingFontFace");
 function clearTextCache() {
-  const engine = System123.vanillaEngine;
+  const engine = System124.vanillaEngine;
   if (!engine) {
     return;
   }
@@ -71920,19 +72786,19 @@ async function loadUiFont(fontGroup, text) {
   if (!isIndexLoaded) {
     return;
   }
-  await System123.Promise.all([loadFontGroup(fontGroup), loadFontGroup(primaryFontGroup)]);
+  await System124.Promise.all([loadFontGroup(fontGroup), loadFontGroup(primaryFontGroup)]);
   if (fontGroups.length === 0) {
     return;
   }
   applyUiFontGroup(fontGroup);
   const textLoad = loadUiFontText(text);
-  const waitLimit = new System123.Promise((resolve) => {
-    System123.setTimeout(resolve, uiFontWaitMilliseconds);
+  const waitLimit = new System124.Promise((resolve) => {
+    System124.setTimeout(resolve, uiFontWaitMilliseconds);
   });
-  await System123.Promise.race([textLoad, waitLimit]);
+  await System124.Promise.race([textLoad, waitLimit]);
   if (!isRemainingGroupsRequested) {
     isRemainingGroupsRequested = true;
-    System123.setTimeout(() => {
+    System124.setTimeout(() => {
       loadRemainingFontGroups();
     }, remainingGroupsDelayMilliseconds);
   }
@@ -71950,7 +72816,7 @@ async function loadFontIndex() {
     return false;
   }
   const manifest = jsonAsset.data;
-  if (manifest === null || !System123.Array.isArray(manifest.fonts)) {
+  if (manifest === null || !System124.Array.isArray(manifest.fonts)) {
     console.warn("[uifont] \uAE00\uAF34\uC758 \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
     return false;
   }
@@ -71982,7 +72848,7 @@ async function loadFontGroup(group) {
     return;
   }
   const font = jsonAsset.data;
-  if (font === null || !System123.Array.isArray(font.faces)) {
+  if (font === null || !System124.Array.isArray(font.faces)) {
     console.warn("[uifont] \uAE00\uAF34 \uBB36\uC74C\uC758 \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: " + group);
     return;
   }
@@ -71997,8 +72863,8 @@ async function loadFontGroup(group) {
     const ranges = parseUnicodeRange2(face.unicodeRange);
     const targetWeights = readTargetWeights(face.weight);
     for (const targetWeight of targetWeights) {
-      const descriptors = { weight: System123.String(targetWeight), style: face.style, unicodeRange: face.unicodeRange, display: "swap" };
-      const fontFace = new System123.FontFace(uiFontFamily, "url(" + fontDirectoryPath + face.file + ")", descriptors);
+      const descriptors = { weight: System124.String(targetWeight), style: face.style, unicodeRange: face.unicodeRange, display: "swap" };
+      const fontFace = new System124.FontFace(uiFontFamily, "url(" + fontDirectoryPath + face.file + ")", descriptors);
       faces.push({ fontFace, weight: targetWeight, ranges });
     }
   }
@@ -72013,12 +72879,12 @@ async function loadRemainingFontGroups() {
     return loadFontGroup(indexEntry.group);
   });
   try {
-    await System123.Promise.all(groupLoads);
+    await System124.Promise.all(groupLoads);
   } catch (error) {
     console.warn("[uifont] \uB098\uBA38\uC9C0 \uAE00\uAF34 \uBB36\uC74C\uC744 \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
   }
   applyUiFontGroup(currentFontGroup);
-  const requestedText = System123.Array.from(requestedCharacters).join("");
+  const requestedText = System124.Array.from(requestedCharacters).join("");
   loadUiFontText(requestedText);
 }
 __name(loadRemainingFontGroups, "loadRemainingFontGroups");
@@ -72043,7 +72909,7 @@ function applyUiFontGroup(fontGroup) {
       orderedGroups.push(fontGroupEntry);
     }
   }
-  const fontFaceSet = System123.document.fonts;
+  const fontFaceSet = System124.document.fonts;
   for (const fontGroupEntry of fontGroups) {
     for (const face of fontGroupEntry.faces) {
       fontFaceSet.delete(face.fontFace);
@@ -72064,7 +72930,7 @@ async function loadUiFontText(text) {
   if (fontGroups.length === 0 || typeof text !== "string" || text === "") {
     return;
   }
-  const fontFacesToLoad = new System123.Set();
+  const fontFacesToLoad = new System124.Set();
   for (const character of text) {
     requestedCharacters.add(character);
     const codePoint = character.codePointAt(0);
@@ -72078,11 +72944,11 @@ async function loadUiFontText(text) {
   if (fontFacesToLoad.size === 0) {
     return;
   }
-  const loads = System123.Array.from(fontFacesToLoad).map((fontFace) => {
+  const loads = System124.Array.from(fontFacesToLoad).map((fontFace) => {
     return fontFace.load();
   });
   try {
-    await System123.Promise.all(loads);
+    await System124.Promise.all(loads);
   } catch (error) {
     console.warn("[uifont] \uAE00\uAF34\uC758 \uC870\uAC01\uC744 \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
   }
@@ -72143,7 +73009,7 @@ function readUiFontFamily() {
 __name(readUiFontFamily, "readUiFontFamily");
 
 // src/misc/focusnavigator.js
-var System124 = globalThis;
+var System125 = globalThis;
 var FocusNavigator = class extends Object2 {
   static {
     __name(this, "FocusNavigator");
@@ -72240,7 +73106,7 @@ var FocusNavigator = class extends Object2 {
     const currentCenterX = currentItem.rect.position.x + currentItem.rect.size.x * 0.5;
     const currentCenterY = currentItem.rect.position.y + currentItem.rect.size.y * 0.5;
     let bestItem = null;
-    let bestScore = System124.Number.POSITIVE_INFINITY;
+    let bestScore = System125.Number.POSITIVE_INFINITY;
     for (const item of this.#itemList) {
       if (item.id === this.#focusedId) {
         continue;
@@ -72253,7 +73119,7 @@ var FocusNavigator = class extends Object2 {
       if (forwardDistance <= 0) {
         continue;
       }
-      const crossDistance = System124.Math.abs(deltaX * directionY) + System124.Math.abs(deltaY * directionX);
+      const crossDistance = System125.Math.abs(deltaX * directionY) + System125.Math.abs(deltaY * directionX);
       const score = forwardDistance + crossDistance * this.#crossAxisPenalty;
       if (score < bestScore) {
         bestScore = score;
@@ -72269,7 +73135,7 @@ var FocusNavigator = class extends Object2 {
 };
 
 // src/misc/shaker.js
-var System125 = globalThis;
+var System126 = globalThis;
 var Shaker = class extends Object2 {
   static {
     __name(this, "Shaker");
@@ -72307,7 +73173,7 @@ var Shaker = class extends Object2 {
    * @param { number } strength 최대 오프셋. (픽셀)
    */
   addShake(strength) {
-    this.#strength = System125.Math.max(this.#strength, strength);
+    this.#strength = System126.Math.max(this.#strength, strength);
   }
   //==============================================================================
   // 갱신.
@@ -72318,7 +73184,7 @@ var Shaker = class extends Object2 {
   tick(timeDelta) {
     this.#elapsedSeconds += timeDelta;
     if (this.#strength > 0) {
-      this.#strength *= System125.Math.exp(-this.#decayRate * timeDelta);
+      this.#strength *= System126.Math.exp(-this.#decayRate * timeDelta);
       if (this.#strength < 0.05) {
         this.#strength = 0;
       }
@@ -72336,8 +73202,8 @@ var Shaker = class extends Object2 {
       return Vector2.zero();
     }
     const time = this.#elapsedSeconds;
-    const offsetX = System125.Math.sin(time * this.#frequency) * this.#strength;
-    const offsetY = System125.Math.cos(time * this.#frequency * 1.37) * this.#strength;
+    const offsetX = System126.Math.sin(time * this.#frequency) * this.#strength;
+    const offsetY = System126.Math.cos(time * this.#frequency * 1.37) * this.#strength;
     return Vector2.create(offsetX, offsetY);
   }
   //==============================================================================
@@ -72376,7 +73242,7 @@ var Shaker = class extends Object2 {
 };
 
 // src/misc/camera2d.js
-var System126 = globalThis;
+var System127 = globalThis;
 var Camera2D = class extends Object2 {
   static {
     __name(this, "Camera2D");
@@ -72435,18 +73301,18 @@ var Camera2D = class extends Object2 {
         this.#position.x + this.#velocity.x * timeDelta,
         this.#position.y + this.#velocity.y * timeDelta
       );
-      const damping = System126.Math.exp(-this.#inertiaDamping * timeDelta);
+      const damping = System127.Math.exp(-this.#inertiaDamping * timeDelta);
       this.#velocity = Vector2.create(this.#velocity.x * damping, this.#velocity.y * damping);
-      if (System126.Math.abs(this.#velocity.x) < 1 && System126.Math.abs(this.#velocity.y) < 1) {
+      if (System127.Math.abs(this.#velocity.x) < 1 && System127.Math.abs(this.#velocity.y) < 1) {
         this.#velocity = Vector2.zero();
       }
     }
     if (this.#tweenState) {
       const tween = this.#tweenState;
       tween.elapsedSeconds += timeDelta;
-      const linearRatio = System126.Math.min(1, tween.elapsedSeconds / tween.duration);
-      const easedRatio = 1 - System126.Math.pow(1 - linearRatio, 3);
-      this.#zoom = tween.fromZoom * System126.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
+      const linearRatio = System127.Math.min(1, tween.elapsedSeconds / tween.duration);
+      const easedRatio = 1 - System127.Math.pow(1 - linearRatio, 3);
+      this.#zoom = tween.fromZoom * System127.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
       this.#position = Vector2.create(
         lerp(tween.fromPosition.x, tween.toPosition.x, easedRatio),
         lerp(tween.fromPosition.y, tween.toPosition.y, easedRatio)
@@ -72530,8 +73396,8 @@ var Camera2D = class extends Object2 {
    */
   convertScreenDeltaToWorld(screenDeltaX, screenDeltaY) {
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System126.Math.cos(radian);
-    const sine = System126.Math.sin(radian);
+    const cosine = System127.Math.cos(radian);
+    const sine = System127.Math.sin(radian);
     const unrotatedX = screenDeltaX * cosine + screenDeltaY * sine;
     const unrotatedY = -screenDeltaX * sine + screenDeltaY * cosine;
     return Vector2.create(unrotatedX / this.#zoom, unrotatedY / this.#zoom);
@@ -72593,7 +73459,7 @@ var Camera2D = class extends Object2 {
       toPosition: Vector2.create(targetPosition.x, targetPosition.y),
       fromZoom: this.#zoom,
       toZoom: clamp(targetZoom, this.#minZoom, this.#maxZoom),
-      duration: System126.Math.max(1e-4, duration),
+      duration: System127.Math.max(1e-4, duration),
       elapsedSeconds: 0
     };
   }
@@ -72650,8 +73516,8 @@ var Camera2D = class extends Object2 {
    */
   worldToScreen(worldPosition) {
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System126.Math.cos(radian);
-    const sine = System126.Math.sin(radian);
+    const cosine = System127.Math.cos(radian);
+    const sine = System127.Math.sin(radian);
     const scaledX = (worldPosition.x - this.#position.x) * this.#zoom;
     const scaledY = (worldPosition.y - this.#position.y) * this.#zoom;
     return Vector2.create(
@@ -72669,8 +73535,8 @@ var Camera2D = class extends Object2 {
     const halfViewWidth = this.#viewSize.x * 0.5 / this.#zoom;
     const halfViewHeight = this.#viewSize.y * 0.5 / this.#zoom;
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System126.Math.abs(System126.Math.cos(radian));
-    const sine = System126.Math.abs(System126.Math.sin(radian));
+    const cosine = System127.Math.abs(System127.Math.cos(radian));
+    const sine = System127.Math.abs(System127.Math.sin(radian));
     return Vector2.create(halfViewWidth * cosine + halfViewHeight * sine, halfViewWidth * sine + halfViewHeight * cosine);
   }
   //==============================================================================
@@ -72806,7 +73672,7 @@ var Camera2D = class extends Object2 {
 };
 
 // src/misc/typewriter.js
-var System127 = globalThis;
+var System128 = globalThis;
 var Typewriter = class extends Object2 {
   static {
     __name(this, "Typewriter");
@@ -72884,9 +73750,9 @@ var Typewriter = class extends Object2 {
       return;
     }
     const speed = this.#charactersPerSecond * (this.#isFastForward ? this.#fastForwardMultiplier : 1);
-    const previousWholeCount = System127.Math.floor(this.#revealedCount);
-    this.#revealedCount = System127.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
-    const currentWholeCount = System127.Math.floor(this.#revealedCount);
+    const previousWholeCount = System128.Math.floor(this.#revealedCount);
+    this.#revealedCount = System128.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
+    const currentWholeCount = System128.Math.floor(this.#revealedCount);
     if (currentWholeCount !== previousWholeCount) {
       this.#target.setVisibleCharacterCount(currentWholeCount);
       if (this.#characterRevealedEvent) {
@@ -72995,7 +73861,7 @@ var Typewriter = class extends Object2 {
 };
 
 // src/misc/dialogue.js
-var System128 = globalThis;
+var System129 = globalThis;
 var DialogueRunner = class extends Object2 {
   static {
     __name(this, "DialogueRunner");
@@ -73017,7 +73883,7 @@ var DialogueRunner = class extends Object2 {
   constructor() {
     super();
     this.#entryList = [];
-    this.#labelTable = new System128.Map();
+    this.#labelTable = new System129.Map();
     this.#cursor = 0;
     this.#isFinished = true;
   }
@@ -73219,7 +74085,7 @@ var DialogueScriptParser = class extends Object2 {
 };
 
 // src/misc/beepplayer.js
-var System129 = globalThis;
+var System130 = globalThis;
 var BeepPlayer = class extends Object2 {
   static {
     __name(this, "BeepPlayer");
@@ -73268,16 +74134,16 @@ var BeepPlayer = class extends Object2 {
     }
     const startTime = audioContext.currentTime + delaySeconds;
     const endTime = startTime + durationSeconds;
-    const attackSeconds = System129.Math.min(5e-3, durationSeconds * 0.25);
-    const releaseSeconds = System129.Math.min(0.02, durationSeconds * 0.5);
-    const peakVolume = System129.Math.max(1e-4, this.#volume * volumeScale);
+    const attackSeconds = System130.Math.min(5e-3, durationSeconds * 0.25);
+    const releaseSeconds = System130.Math.min(0.02, durationSeconds * 0.5);
+    const peakVolume = System130.Math.max(1e-4, this.#volume * volumeScale);
     const oscillatorNode = audioContext.createOscillator();
     oscillatorNode.type = waveform;
     oscillatorNode.frequency.setValueAtTime(frequency, startTime);
     const gainNode = audioContext.createGain();
     gainNode.gain.setValueAtTime(1e-4, startTime);
     gainNode.gain.linearRampToValueAtTime(peakVolume, startTime + attackSeconds);
-    gainNode.gain.setValueAtTime(peakVolume, System129.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
+    gainNode.gain.setValueAtTime(peakVolume, System130.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
     gainNode.gain.exponentialRampToValueAtTime(1e-4, endTime);
     oscillatorNode.connect(gainNode);
     gainNode.connect(audioContext.destination);
@@ -73396,7 +74262,7 @@ var BeepPlayer = class extends Object2 {
    * @param { number } volume 0 ~ 1.
    */
   setVolume(volume) {
-    this.#volume = System129.Math.max(0, System129.Math.min(1, volume));
+    this.#volume = System130.Math.max(0, System130.Math.min(1, volume));
   }
   //==============================================================================
   // 기본 음량 반환.
@@ -73428,7 +74294,7 @@ var BeepPlayer = class extends Object2 {
 };
 
 // src/core/soundeffectpool.js
-var System130 = globalThis;
+var System131 = globalThis;
 var SoundEffectPool = class extends Object2 {
   static {
     __name(this, "SoundEffectPool");
@@ -73525,7 +74391,7 @@ var SoundEffectPool = class extends Object2 {
    * @param { number } volume 풀 전체의 음량. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
    */
   setVolume(volume) {
-    this.#volume = System130.Number.isFinite(volume) ? System130.Math.max(0, System130.Math.min(1, volume)) : 1;
+    this.#volume = System131.Number.isFinite(volume) ? System131.Math.max(0, System131.Math.min(1, volume)) : 1;
     for (let index = 0; index < this.#playerList.length; ++index) {
       this.#playerList[index].setVolume(this.#playerVolumeList[index] * this.#volume);
     }
@@ -73560,7 +74426,7 @@ var SoundEffectPool = class extends Object2 {
 };
 
 // src/core/soundsystem.js
-var System131 = globalThis;
+var System132 = globalThis;
 var EFFECT_VOICE_COUNT = 12;
 var CONTEXT_RESUME_RETRY_INTERVAL = 0.5;
 var VOLUME_SMOOTHING_SECONDS = 0.05;
@@ -73661,11 +74527,11 @@ var SoundSystem = class {
     this.#externalMuteProvider = null;
     this.#autoplayAllowedProvider = null;
     this.#audioManager = audioManager;
-    this.#soundById = new System131.Map();
-    this.#assetsById = new System131.Map();
+    this.#soundById = new System132.Map();
+    this.#assetsById = new System132.Map();
     this.addSounds(soundTable);
-    this.#lastPlayTimeById = new System131.Map();
-    this.#lastVariantById = new System131.Map();
+    this.#lastPlayTimeById = new System132.Map();
+    this.#lastVariantById = new System132.Map();
     this.#musicBus = null;
     this.#effectBus = null;
     this.#voices = [];
@@ -73673,21 +74539,21 @@ var SoundSystem = class {
     this.#musicFadeSeconds = 0;
     this.#isMusicResumed = false;
     this.#playingMusic = null;
-    this.#musicPositions = new System131.Map();
+    this.#musicPositions = new System132.Map();
     this.#musicVolume = 1;
     this.#musicScale = 1;
     this.#soundEffectVolume = 1;
     this.#isUserMuted = false;
-    this.#isPageHidden = System131.document.visibilityState === "hidden";
+    this.#isPageHidden = System132.document.visibilityState === "hidden";
     this.#isMuted = false;
     this.#isContextPaused = false;
-    const coarsePointerQuery = typeof System131.window.matchMedia === "function" ? System131.window.matchMedia("(pointer: coarse)") : null;
+    const coarsePointerQuery = typeof System132.window.matchMedia === "function" ? System132.window.matchMedia("(pointer: coarse)") : null;
     this.#isBlurMuteEnabled = coarsePointerQuery !== null && coarsePointerQuery.matches;
     this.#isWindowBlurred = false;
     this.#isAutoplayTried = false;
-    this.#lastContextResumeTime = System131.Number.NEGATIVE_INFINITY;
-    System131.document.addEventListener("visibilitychange", () => {
-      this.#isPageHidden = System131.document.visibilityState === "hidden";
+    this.#lastContextResumeTime = System132.Number.NEGATIVE_INFINITY;
+    System132.document.addEventListener("visibilitychange", () => {
+      this.#isPageHidden = System132.document.visibilityState === "hidden";
       const isPageHidden = this.isPageHidden();
       if (!isPageHidden) {
         this.#isWindowBlurred = false;
@@ -73695,7 +74561,7 @@ var SoundSystem = class {
       this.applyMute();
       this.applyContextPause();
     });
-    System131.window.addEventListener("blur", () => {
+    System132.window.addEventListener("blur", () => {
       if (!this.isBlurMuteEnabled()) {
         return;
       }
@@ -73711,8 +74577,8 @@ var SoundSystem = class {
       this.applyMute();
       this.applyContextPause();
     }, "clearWindowBlurred");
-    System131.window.addEventListener("focus", clearWindowBlurred);
-    System131.window.addEventListener("pointerdown", clearWindowBlurred);
+    System132.window.addEventListener("focus", clearWindowBlurred);
+    System132.window.addEventListener("pointerdown", clearWindowBlurred);
   }
   //==============================================================================
   // 소리 표의 줄 더하기. (같은 id 는 바꿈, 받기는 loadSounds 가 함)
@@ -73967,7 +74833,7 @@ var SoundSystem = class {
     const effectLoads = effectRows.map((soundRow) => {
       return this.loadSound(soundRow);
     });
-    await System131.Promise.all(effectLoads);
+    await System132.Promise.all(effectLoads);
     for (const musicRow of musicRows) {
       await this.loadSound(musicRow);
     }
@@ -73994,7 +74860,7 @@ var SoundSystem = class {
         console.warn("[sound] \uC18C\uB9AC\uB97C \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. " + path, error);
       }
     });
-    await System131.Promise.all(loads);
+    await System132.Promise.all(loads);
   }
   //==============================================================================
   // 설정의 음악 크기. (0 ~ 1)
@@ -74052,7 +74918,7 @@ var SoundSystem = class {
       return;
     }
     this.#musicId = soundId;
-    this.#musicFadeSeconds = System131.Math.max(0, fadeSeconds);
+    this.#musicFadeSeconds = System132.Math.max(0, fadeSeconds);
     this.#isMusicResumed = isResumed;
     this.update();
   }
@@ -74079,8 +74945,8 @@ var SoundSystem = class {
     if (effectVolume <= 1e-3) {
       return;
     }
-    const now = System131.performance.now() / 1e3;
-    const lastPlayTime = this.#lastPlayTimeById.has(soundId) ? this.#lastPlayTimeById.get(soundId) : System131.Number.NEGATIVE_INFINITY;
+    const now = System132.performance.now() / 1e3;
+    const lastPlayTime = this.#lastPlayTimeById.has(soundId) ? this.#lastPlayTimeById.get(soundId) : System132.Number.NEGATIVE_INFINITY;
     const minimumInterval = typeof soundRow.minimumInterval === "number" ? soundRow.minimumInterval : 0;
     if (now - lastPlayTime < minimumInterval) {
       return;
@@ -74102,12 +74968,12 @@ var SoundSystem = class {
     source.buffer = audioBuffer;
     const pitchVariation = typeof soundRow.pitchVariation === "number" ? soundRow.pitchVariation : 0;
     if (pitchVariation > 0) {
-      source.playbackRate.value = 1 + (System131.Math.random() * 2 - 1) * pitchVariation;
+      source.playbackRate.value = 1 + (System132.Math.random() * 2 - 1) * pitchVariation;
     }
     const gainNode = audioContext.createGain();
     gainNode.gain.value = effectVolume;
     source.connect(gainNode);
-    const clampedPan = System131.Math.max(-MAXIMUM_PAN, System131.Math.min(MAXIMUM_PAN, pan));
+    const clampedPan = System132.Math.max(-MAXIMUM_PAN, System132.Math.min(MAXIMUM_PAN, pan));
     if (clampedPan !== 0 && typeof audioContext.createStereoPanner === "function") {
       const pannerNode = audioContext.createStereoPanner();
       pannerNode.pan.value = clampedPan;
@@ -74127,7 +74993,7 @@ var SoundSystem = class {
     source.start(0);
     const playSeconds = typeof soundRow.playSeconds === "number" ? soundRow.playSeconds : 0;
     if (playSeconds > 0) {
-      const fadeOutSeconds = typeof soundRow.fadeOutSeconds === "number" ? System131.Math.max(0, soundRow.fadeOutSeconds) : 0;
+      const fadeOutSeconds = typeof soundRow.fadeOutSeconds === "number" ? System132.Math.max(0, soundRow.fadeOutSeconds) : 0;
       const fadeStartTime = audioContext.currentTime + playSeconds;
       gainNode.gain.setValueAtTime(effectVolume, fadeStartTime);
       gainNode.gain.linearRampToValueAtTime(0, fadeStartTime + fadeOutSeconds);
@@ -74156,7 +75022,7 @@ var SoundSystem = class {
     const candidates = loadedIndices.length > 1 ? loadedIndices.filter((assetIndex) => {
       return assetIndex !== lastIndex;
     }) : loadedIndices;
-    const pickedIndex = candidates[System131.Math.floor(System131.Math.random() * candidates.length)];
+    const pickedIndex = candidates[System132.Math.floor(System132.Math.random() * candidates.length)];
     this.#lastVariantById.set(soundId, pickedIndex);
     return assets[pickedIndex];
   }
@@ -74171,7 +75037,7 @@ var SoundSystem = class {
     const matchingVoices = this.#voices.filter((voice) => {
       return soundId === "" || voice.soundId === soundId;
     });
-    const removeCount = matchingVoices.length - System131.Math.max(0, keepCount);
+    const removeCount = matchingVoices.length - System132.Math.max(0, keepCount);
     for (let voiceIndex = 0; voiceIndex < removeCount; ++voiceIndex) {
       this.stopVoice(matchingVoices[voiceIndex]);
     }
@@ -74208,7 +75074,7 @@ var SoundSystem = class {
       return;
     }
     const audioContext = this.getAudioManager().getAudioContext();
-    const clampedFadeSeconds = System131.Math.max(0, fadeSeconds);
+    const clampedFadeSeconds = System132.Math.max(0, fadeSeconds);
     for (const voice of matchingVoices) {
       if (clampedFadeSeconds <= 0 || audioContext === null || audioContext === void 0) {
         this.stopVoice(voice);
@@ -74273,7 +75139,7 @@ var SoundSystem = class {
     if (audioContext === null || isContextPaused || audioContext.state === "running") {
       return;
     }
-    const now = System131.performance.now() / 1e3;
+    const now = System132.performance.now() / 1e3;
     const lastContextResumeTime = this.getLastContextResumeTime();
     if (now - lastContextResumeTime < CONTEXT_RESUME_RETRY_INTERVAL) {
       return;
@@ -74461,7 +75327,7 @@ var SoundSystem = class {
   }
 };
 function readSoundPaths(soundRow) {
-  if (System131.Array.isArray(soundRow.paths)) {
+  if (System132.Array.isArray(soundRow.paths)) {
     return soundRow.paths;
   }
   if (typeof soundRow.path === "string") {
@@ -74471,10 +75337,10 @@ function readSoundPaths(soundRow) {
 }
 __name(readSoundPaths, "readSoundPaths");
 function clampVolume(volume) {
-  if (typeof volume !== "number" || !System131.Number.isFinite(volume)) {
+  if (typeof volume !== "number" || !System132.Number.isFinite(volume)) {
     return 0;
   }
-  return System131.Math.max(0, System131.Math.min(1, volume));
+  return System132.Math.max(0, System132.Math.min(1, volume));
 }
 __name(clampVolume, "clampVolume");
 function readSoundRowVolume(soundRow) {
@@ -74494,7 +75360,7 @@ function readSoundSystem() {
 __name(readSoundSystem, "readSoundSystem");
 
 // src/effect/screeneffect.js
-var System132 = globalThis;
+var System133 = globalThis;
 var ScreenEffectType = {
   // --- 형태 왜곡 ---
   lensDistortion: "lensDistortion",
@@ -75408,8 +76274,8 @@ var ScreenEffect = class extends Object2 {
   constructor() {
     super();
     this.#webGL2RenderingContext = null;
-    this.#passTable = new System132.Map();
-    this.#effectTable = new System132.Map();
+    this.#passTable = new System133.Map();
+    this.#effectTable = new System133.Map();
     this.#sceneTarget = null;
     this.#pingTarget = null;
     this.#pongTarget = null;
@@ -75446,7 +76312,7 @@ var ScreenEffect = class extends Object2 {
    * @param { number } cornerRadius - 둥근 모서리 반지름(픽셀). 0 이면 사각형.
    */
   setRegion(x, y, width, height, cornerRadius = 0) {
-    this.#region = { x, y, width, height, cornerRadius: System132.Math.max(0, cornerRadius) };
+    this.#region = { x, y, width, height, cornerRadius: System133.Math.max(0, cornerRadius) };
   }
   //==============================================================================
   // 적용 영역 해제. (화면 전체)
@@ -75507,10 +76373,10 @@ var ScreenEffect = class extends Object2 {
     let regionHeight = bufferHeight;
     let cornerRadius = 0;
     if (this.#region) {
-      regionX = System132.Math.max(0, System132.Math.round(this.#region.x));
-      regionY = System132.Math.max(0, System132.Math.round(this.#region.y));
-      regionWidth = System132.Math.min(bufferWidth - regionX, System132.Math.round(this.#region.width));
-      regionHeight = System132.Math.min(bufferHeight - regionY, System132.Math.round(this.#region.height));
+      regionX = System133.Math.max(0, System133.Math.round(this.#region.x));
+      regionY = System133.Math.max(0, System133.Math.round(this.#region.y));
+      regionWidth = System133.Math.min(bufferWidth - regionX, System133.Math.round(this.#region.width));
+      regionHeight = System133.Math.min(bufferHeight - regionY, System133.Math.round(this.#region.height));
       cornerRadius = this.#region.cornerRadius;
     }
     if (regionWidth <= 0 || regionHeight <= 0) {
@@ -75605,7 +76471,7 @@ var ScreenEffect = class extends Object2 {
       const isHalfTarget = step.target === "halfA" || step.target === "halfB";
       const passWidth = isHalfTarget ? this.#halfTargetA.width : width;
       const passHeight = isHalfTarget ? this.#halfTargetA.height : height;
-      pass.use();
+      pass.useProgram();
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
       webGL2RenderingContext.uniform1i(pass.getUniformLocation("sourceTexture"), 0);
@@ -75669,8 +76535,8 @@ var ScreenEffect = class extends Object2 {
     destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
     destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
     destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
-    const halfWidth = System132.Math.max(1, System132.Math.round(width / 2));
-    const halfHeight = System132.Math.max(1, System132.Math.round(height / 2));
+    const halfWidth = System133.Math.max(1, System133.Math.round(width / 2));
+    const halfHeight = System133.Math.max(1, System133.Math.round(height / 2));
     this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, false, true);
     this.#pingTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
     this.#pongTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
@@ -75855,7 +76721,7 @@ var ScreenEffect = class extends Object2 {
       return;
     }
     if (memberName === "") {
-      const strength = System132.Number(value);
+      const strength = System133.Number(value);
       effectState.strength = strength;
       effectState.isEnabled = strength > 0;
       return;
@@ -75868,7 +76734,7 @@ var ScreenEffect = class extends Object2 {
       effectState.isEnabled = value === true || value === "true";
       return;
     }
-    this.setParameter(effectType, memberName, System132.Number(value));
+    this.setParameter(effectType, memberName, System133.Number(value));
   }
   //==============================================================================
   // 시간 반환.
@@ -75929,7 +76795,8 @@ var ScreenEffect = class extends Object2 {
 };
 
 // src/animation/timeline.js
-var System133 = globalThis;
+var System134 = globalThis;
+var TIMELINE_EASING_DIRECTION_FUNCTION_NAMES = { in: "easeIn", out: "easeOut", inOut: "easeInOut" };
 var TIMELINE_EASING_NAMES = (() => {
   const nameList = ["linear", "step", "bezier"];
   for (const familyName of ["quadratic", "cubic", "quartic", "quintic", "sinusoidal", "exponential", "circular", "elastic", "back", "bounce"]) {
@@ -75940,8 +76807,8 @@ var TIMELINE_EASING_NAMES = (() => {
   return nameList;
 })();
 function createBezierEasing(x1, y1, x2, y2) {
-  const clampedX1 = System133.Math.max(0, System133.Math.min(1, x1));
-  const clampedX2 = System133.Math.max(0, System133.Math.min(1, x2));
+  const clampedX1 = System134.Math.max(0, System134.Math.min(1, x1));
+  const clampedX2 = System134.Math.max(0, System134.Math.min(1, x2));
   const sampleCurve = /* @__PURE__ */ __name((t, p1, p2) => {
     const oneMinus = 1 - t;
     return 3 * oneMinus * oneMinus * t * p1 + 3 * oneMinus * t * t * p2 + t * t * t;
@@ -75960,15 +76827,15 @@ function createBezierEasing(x1, y1, x2, y2) {
     let t = progress;
     for (let iteration = 0; iteration < 8; ++iteration) {
       const error = sampleCurve(t, clampedX1, clampedX2) - progress;
-      if (System133.Math.abs(error) < 1e-5) {
+      if (System134.Math.abs(error) < 1e-5) {
         break;
       }
       const derivative = sampleDerivative(t, clampedX1, clampedX2);
-      if (System133.Math.abs(derivative) < 1e-6) {
+      if (System134.Math.abs(derivative) < 1e-6) {
         break;
       }
       t -= error / derivative;
-      t = System133.Math.max(0, System133.Math.min(1, t));
+      t = System134.Math.max(0, System134.Math.min(1, t));
     }
     return sampleCurve(t, y1, y2);
   };
@@ -75982,7 +76849,7 @@ function resolveTimelineEasing(easingName, curve = null) {
     return (progress) => 0;
   }
   if (easingName === "bezier") {
-    const controlPoints = System133.Array.isArray(curve) && curve.length >= 4 ? curve : [0.42, 0, 0.58, 1];
+    const controlPoints = System134.Array.isArray(curve) && curve.length >= 4 ? curve : [0.42, 0, 0.58, 1];
     return createBezierEasing(controlPoints[0], controlPoints[1], controlPoints[2], controlPoints[3]);
   }
   const separatorIndex = easingName.indexOf(".");
@@ -75992,28 +76859,29 @@ function resolveTimelineEasing(easingName, curve = null) {
   const familyName = easingName.substring(0, separatorIndex);
   const directionName = easingName.substring(separatorIndex + 1);
   const family = Tween.easingFunction[familyName];
-  if (!family || typeof family[directionName] !== "function") {
+  const functionName = TIMELINE_EASING_DIRECTION_FUNCTION_NAMES[directionName];
+  if (!family || !functionName || typeof family[functionName] !== "function") {
     return Tween.easingFunction.linear;
   }
-  return family[directionName];
+  return family[functionName];
 }
 __name(resolveTimelineEasing, "resolveTimelineEasing");
 function parseTimelineColor(hexText) {
   const text = typeof hexText === "string" && hexText.startsWith("#") ? hexText.substring(1) : "ffffff";
-  const red = System133.parseInt(text.substring(0, 2), 16) / 255;
-  const green = System133.parseInt(text.substring(2, 4), 16) / 255;
-  const blue = System133.parseInt(text.substring(4, 6), 16) / 255;
-  const alpha = text.length >= 8 ? System133.parseInt(text.substring(6, 8), 16) / 255 : 1;
+  const red = System134.parseInt(text.substring(0, 2), 16) / 255;
+  const green = System134.parseInt(text.substring(2, 4), 16) / 255;
+  const blue = System134.parseInt(text.substring(4, 6), 16) / 255;
+  const alpha = text.length >= 8 ? System134.parseInt(text.substring(6, 8), 16) / 255 : 1;
   return [
-    System133.Number.isFinite(red) ? red : 1,
-    System133.Number.isFinite(green) ? green : 1,
-    System133.Number.isFinite(blue) ? blue : 1,
-    System133.Number.isFinite(alpha) ? alpha : 1
+    System134.Number.isFinite(red) ? red : 1,
+    System134.Number.isFinite(green) ? green : 1,
+    System134.Number.isFinite(blue) ? blue : 1,
+    System134.Number.isFinite(alpha) ? alpha : 1
   ];
 }
 __name(parseTimelineColor, "parseTimelineColor");
 function composeTimelineColor(channels) {
-  const toByte = /* @__PURE__ */ __name((value) => System133.Math.round(System133.Math.max(0, System133.Math.min(1, value)) * 255).toString(16).padStart(2, "0"), "toByte");
+  const toByte = /* @__PURE__ */ __name((value) => System134.Math.round(System134.Math.max(0, System134.Math.min(1, value)) * 255).toString(16).padStart(2, "0"), "toByte");
   return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]) + toByte(channels[3] === void 0 ? 1 : channels[3]);
 }
 __name(composeTimelineColor, "composeTimelineColor");
@@ -76063,7 +76931,7 @@ var TIMELINE_PROPERTY_DEFINITIONS = {
     node.setLocalRotation(value);
   }, "apply") },
   opacity: { kind: "number", label: "Opacity", apply: /* @__PURE__ */ __name((node, value) => {
-    node.setLocalOpacity(System133.Math.max(0, System133.Math.min(1, value)));
+    node.setLocalOpacity(System134.Math.max(0, System134.Math.min(1, value)));
   }, "apply") },
   visible: { kind: "boolean", label: "Visible", apply: /* @__PURE__ */ __name((node, value) => {
     node.setActive(value === true || value === "true");
@@ -76080,25 +76948,25 @@ var TIMELINE_PROPERTY_DEFINITIONS = {
   number: { kind: "number", label: "Number", apply: /* @__PURE__ */ __name((node, value) => {
     const textComponent = node.getComponent(Text);
     if (textComponent) {
-      textComponent.setText(String(System133.Math.round(value)));
+      textComponent.setText(String(System134.Math.round(value)));
     }
   }, "apply") },
   fontSize: { kind: "number", label: "Font Size", apply: /* @__PURE__ */ __name((node, value) => {
     const textComponent = node.getComponent(Text);
     if (textComponent) {
-      textComponent.setFontSize(System133.Math.round(value));
+      textComponent.setFontSize(System134.Math.round(value));
     }
   }, "apply") },
   visibleCharacters: { kind: "number", label: "Visible Characters", apply: /* @__PURE__ */ __name((node, value) => {
     const textComponent = node.getComponent(Text);
     if (textComponent) {
-      textComponent.setVisibleCharacterCount(System133.Math.round(value));
+      textComponent.setVisibleCharacterCount(System134.Math.round(value));
     }
   }, "apply") },
   frame: { kind: "number", label: "Frame", apply: /* @__PURE__ */ __name((node, value) => {
     const sprite = node.getComponent(ShaderSprite);
     if (sprite) {
-      applySpriteFrame(sprite, System133.Math.round(value));
+      applySpriteFrame(sprite, System134.Math.round(value));
     }
   }, "apply") },
   effect: { kind: "number", label: "Effect Progress", apply: /* @__PURE__ */ __name((node, value) => {
@@ -76109,8 +76977,8 @@ var TIMELINE_PROPERTY_DEFINITIONS = {
   }, "apply") },
   event: { kind: "string", label: "Event", apply: null }
 };
-var spriteFrameGridTable = new System133.WeakMap();
-var soundPlayerTable = new System133.WeakMap();
+var spriteFrameGridTable = new System134.WeakMap();
+var soundPlayerTable = new System134.WeakMap();
 var timelineAudioManager = null;
 function applySpriteFrame(sprite, frameIndex) {
   const image = sprite.getImage();
@@ -76125,7 +76993,7 @@ function applySpriteFrame(sprite, frameIndex) {
   const frameWidth = image.width / gridColumns;
   const frameHeight = image.height / gridRows;
   const column = wrappedIndex % gridColumns;
-  const row = System133.Math.floor(wrappedIndex / gridColumns);
+  const row = System134.Math.floor(wrappedIndex / gridColumns);
   sprite.setImageRect(Rect.create(column * frameWidth, row * frameHeight, frameWidth, frameHeight));
 }
 __name(applySpriteFrame, "applySpriteFrame");
@@ -76227,7 +77095,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#description = null;
     this.#compiledTracks = [];
     this.#compiledMarkers = [];
-    this.#targetTable = new System133.Map();
+    this.#targetTable = new System134.Map();
     this.#targetResolver = null;
     this.#eventHandler = null;
     this.#markerHandler = null;
@@ -76237,7 +77105,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#isPlaying = false;
     this.#isDirty = true;
     this.#particleSystems = [];
-    this.#particleFreeRunSet = new System133.Set();
+    this.#particleFreeRunSet = new System134.Set();
     this.setDescription(description ? description : _Timeline.createEmptyDescription());
   }
   //==============================================================================
@@ -76265,9 +77133,9 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { Promise<Timeline> } 읽은 문서로 만든 타임라인. (실패 응답(404 등)이나 JSON 이 아니면 거부된다)
    */
   static async loadFromUrl(url) {
-    const response = await System133.fetch(url);
+    const response = await System134.fetch(url);
     if (!response.ok) {
-      throw new System133.Error(`Timeline: HTTP ${response.status}: ${url}`);
+      throw new System134.Error(`Timeline: HTTP ${response.status}: ${url}`);
     }
     const description = await response.json();
     return new _Timeline(description);
@@ -76280,7 +77148,7 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { Timeline } 만든 타임라인.
    */
   static loadFromText(text) {
-    const description = System133.JSON.parse(text);
+    const description = System134.JSON.parse(text);
     return new _Timeline(description);
   }
   //==============================================================================
@@ -76302,7 +77170,7 @@ var Timeline = class _Timeline extends Object2 {
     if (!isLoaded || !jsonAsset.data) {
       return null;
     }
-    const description = System133.structuredClone(jsonAsset.data);
+    const description = System134.structuredClone(jsonAsset.data);
     return new _Timeline(description);
   }
   //==============================================================================
@@ -76316,13 +77184,13 @@ var Timeline = class _Timeline extends Object2 {
     if (!this.#description.stage) {
       this.#description.stage = { width: 960, height: 540, backgroundColor: "#101114ff", nodes: [] };
     }
-    if (!System133.Array.isArray(this.#description.stage.nodes)) {
+    if (!System134.Array.isArray(this.#description.stage.nodes)) {
       this.#description.stage.nodes = [];
     }
-    if (!System133.Array.isArray(this.#description.tracks)) {
+    if (!System134.Array.isArray(this.#description.tracks)) {
       this.#description.tracks = [];
     }
-    if (!System133.Array.isArray(this.#description.markers)) {
+    if (!System134.Array.isArray(this.#description.markers)) {
       this.#description.markers = [];
     }
     this.invalidate();
@@ -76349,7 +77217,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#compiledTracks = [];
     for (const track of this.#description.tracks) {
       const definition = TIMELINE_PROPERTY_DEFINITIONS[track.property];
-      const keys = System133.Array.isArray(track.keys) ? track.keys.slice() : [];
+      const keys = System134.Array.isArray(track.keys) ? track.keys.slice() : [];
       keys.sort((left, right) => left.time - right.time);
       const target = this.resolveTarget(track.target);
       const kind = definition ? definition.kind : typeof (keys.length > 0 ? keys[0].value : 0) === "number" ? "number" : "string";
@@ -76365,8 +77233,8 @@ var Timeline = class _Timeline extends Object2 {
   //==============================================================================
   collectParticleSystems() {
     this.#particleSystems = [];
-    this.#particleFreeRunSet = new System133.Set();
-    const eventTargetSet = new System133.Set();
+    this.#particleFreeRunSet = new System134.Set();
+    const eventTargetSet = new System134.Set();
     for (const compiledTrack of this.#compiledTracks) {
       if (compiledTrack.track.property === "event" && compiledTrack.target) {
         eventTargetSet.add(compiledTrack.target);
@@ -76439,11 +77307,11 @@ var Timeline = class _Timeline extends Object2 {
       }
     }
     eventList.sort((left, right) => left.time - right.time);
-    const stepSeconds = System133.Math.max(1 / 60, time / 600);
+    const stepSeconds = System134.Math.max(1 / 60, time / 600);
     let currentTime = 0;
     const advanceTo = /* @__PURE__ */ __name((targetTime) => {
       while (currentTime < targetTime - 1e-6) {
-        const stepDelta = System133.Math.min(stepSeconds, targetTime - currentTime);
+        const stepDelta = System134.Math.min(stepSeconds, targetTime - currentTime);
         this.simulateParticles(stepDelta);
         currentTime += stepDelta;
       }
@@ -76555,7 +77423,7 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { System.Map } 이름 → 노드
    */
   buildStage(parentNode, imageResolver2 = null) {
-    const nodeTable = new System133.Map();
+    const nodeTable = new System134.Map();
     const nodeDescriptions = this.#description.stage.nodes;
     const createdList = [];
     for (const nodeDescription of nodeDescriptions) {
@@ -76604,7 +77472,7 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { WorldNode } 서술의 이름을 단 새 노드.
    */
   static createStageNode(nodeDescription, imageResolver2 = null) {
-    const description = System133.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    const description = System134.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
     const node = new WorldNode();
     node.setName(description.name);
     _Timeline.applyStageNodeDescription(node, description, imageResolver2);
@@ -76619,7 +77487,7 @@ var Timeline = class _Timeline extends Object2 {
    * @param { Function | null } imageResolver 이미지 이름을 받아 그림을 돌려주는 함수. (없거나 null 을 돌려주면 data: 주소만 스스로 읽는다)
    */
   static applyStageNodeDescription(node, nodeDescription, imageResolver2 = null) {
-    const description = System133.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    const description = System134.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
     node.setPivot(Vector2.create(description.pivotX, description.pivotY));
     node.setAnchor(Pivot.topLeft.clone());
     node.setContentSize(Vector2.create(description.width, description.height));
@@ -76634,13 +77502,13 @@ var Timeline = class _Timeline extends Object2 {
       paintComponent.setRoundSize(description.roundSize);
     } else if (description.type === "sprite") {
       const sprite = node.getOrAddComponent(ShaderSprite);
-      spriteFrameGridTable.set(sprite, { columns: System133.Math.max(1, description.frameColumns), rows: System133.Math.max(1, description.frameRows) });
+      spriteFrameGridTable.set(sprite, { columns: System134.Math.max(1, description.frameColumns), rows: System134.Math.max(1, description.frameRows) });
       let image = null;
       if (description.image && imageResolver2) {
         image = imageResolver2(description.image);
       }
       if (!image && description.image && description.image.startsWith("data:")) {
-        image = new System133.Image();
+        image = new System134.Image();
         image.onload = () => {
           applySpriteFrame(sprite, description.frame);
         };
@@ -76754,7 +77622,7 @@ var Timeline = class _Timeline extends Object2 {
    * @param { number } time 옮길 시간. (초, 0 ~ 길이로 자른다)
    */
   seek(time) {
-    this.#time = System133.Math.max(0, System133.Math.min(this.getDuration(), time));
+    this.#time = System134.Math.max(0, System134.Math.min(this.getDuration(), time));
     this.evaluate(this.#time);
     this.resimulateParticles(this.#time);
   }
@@ -76900,8 +77768,8 @@ var Timeline = class _Timeline extends Object2 {
           particleSystem.stop(true);
         } else if (eventName.startsWith("emit")) {
           const separatorIndex = eventName.indexOf(":");
-          const emitCount = separatorIndex >= 0 ? System133.Number(eventName.substring(separatorIndex + 1)) : 30;
-          particleSystem.emit(System133.Number.isFinite(emitCount) ? emitCount : 30);
+          const emitCount = separatorIndex >= 0 ? System134.Number(eventName.substring(separatorIndex + 1)) : 30;
+          particleSystem.emit(System134.Number.isFinite(emitCount) ? emitCount : 30);
         }
       }
     }
@@ -76970,7 +77838,7 @@ var Timeline = class _Timeline extends Object2 {
     }
     const easingFunction = resolveTimelineEasing(fromKey.easing, fromKey.curve);
     const progress = (time - fromKey.time) / segmentDuration;
-    const easedProgress = easingFunction(System133.Math.max(0, System133.Math.min(1, progress)));
+    const easedProgress = easingFunction(System134.Math.max(0, System134.Math.min(1, progress)));
     return interpolateValue(kind, fromKey.value, toKey.value, easedProgress);
   }
   //==============================================================================
@@ -77048,8 +77916,8 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { number } 길이. (초, 문서 값이 양수가 아니면 0)
    */
   getDuration() {
-    const duration = System133.Number(this.#description.duration);
-    return System133.Number.isFinite(duration) && duration > 0 ? duration : 0;
+    const duration = System134.Number(this.#description.duration);
+    return System134.Number.isFinite(duration) && duration > 0 ? duration : 0;
   }
   //==============================================================================
   // 초당 프레임 반환.
@@ -77058,8 +77926,8 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { number } 초당 프레임. (문서 값이 양수가 아니면 30)
    */
   getFrameRate() {
-    const frameRate = System133.Number(this.#description.frameRate);
-    return System133.Number.isFinite(frameRate) && frameRate > 0 ? frameRate : 30;
+    const frameRate = System134.Number(this.#description.frameRate);
+    return System134.Number.isFinite(frameRate) && frameRate > 0 ? frameRate : 30;
   }
   //==============================================================================
   // 이벤트 핸들러 설정. ((대상 이름, 이벤트 이름, 키, 타임라인))
@@ -77091,15 +77959,15 @@ var Timeline = class _Timeline extends Object2 {
 };
 
 // src/graphics3d/toon/toonscreenoutline.js
-var System134 = globalThis;
-var ToonOutlineWidthUnit = System134.Object.freeze({
+var System135 = globalThis;
+var ToonOutlineWidthUnit = System135.Object.freeze({
   world: "world",
   // 월드 길이. (멀수록 가늘어진다)
   pixel: "pixel"
   // 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)
 });
 var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
-var IDENTITY_ELEMENTS = new System134.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+var IDENTITY_ELEMENTS = new System135.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 var LINE_TEXTURE_UNIT = 5;
 var DEPTH_TEXTURE_UNIT = 6;
 var LINE_VERTEX_SHADER = `#version 300 es
@@ -77415,7 +78283,7 @@ void main() {
 }
 `;
 function readJumpFloodSteps(reach) {
-  const distance = System134.Math.max(1, System134.Math.ceil(reach));
+  const distance = System135.Math.max(1, System135.Math.ceil(reach));
   let step = 1;
   while (step * 2 - 1 < distance) {
     step *= 2;
@@ -77423,7 +78291,7 @@ function readJumpFloodSteps(reach) {
   const steps = [];
   while (step >= 1) {
     steps.push(step);
-    step = System134.Math.floor(step / 2);
+    step = System135.Math.floor(step / 2);
   }
   return steps;
 }
@@ -77515,14 +78383,14 @@ var ToonScreenOutline = class {
     this.#widthUnit = ToonOutlineWidthUnit.pixel;
     this.#focusDistance = 0;
     this.#depthThreshold = 0.05;
-    this.#creaseCosine = System134.Math.cos(System134.Math.PI / 3);
+    this.#creaseCosine = System135.Math.cos(System135.Math.PI / 3);
     this.#creaseWidth = 1;
     this.#creaseOpacity = 1;
     this.#resolutionScale = 1;
     this.#isHdrOutput = false;
     this.#frame = null;
     this.#savedState = null;
-    this.#instanceData = new System134.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+    this.#instanceData = new System135.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
     this.#drawnDistanceSum = 0;
     this.#drawnDistanceCount = 0;
     this.#lineWidths = [2, 1];
@@ -77565,7 +78433,7 @@ var ToonScreenOutline = class {
    * @param { string } [unit] - ToonOutlineWidthUnit. (기본 pixel)
    */
   setWidth(width, unit = ToonOutlineWidthUnit.pixel) {
-    this.#width = System134.Math.max(0, width);
+    this.#width = System135.Math.max(0, width);
     this.#widthUnit = unit;
   }
   //==============================================================================
@@ -77581,9 +78449,9 @@ var ToonScreenOutline = class {
    * outline.setCrease(75, 1.5, 0.6);
    */
   setCrease(angleDegrees, width = 1, opacity = 1) {
-    this.#creaseCosine = System134.Math.cos(System134.Math.min(180, System134.Math.max(0, angleDegrees)) * System134.Math.PI / 180);
-    this.#creaseWidth = System134.Math.max(0, width);
-    this.#creaseOpacity = System134.Math.max(0, System134.Math.min(1, opacity));
+    this.#creaseCosine = System135.Math.cos(System135.Math.min(180, System135.Math.max(0, angleDegrees)) * System135.Math.PI / 180);
+    this.#creaseWidth = System135.Math.max(0, width);
+    this.#creaseOpacity = System135.Math.max(0, System135.Math.min(1, opacity));
   }
   //==============================================================================
   // 초점 거리 설정. (원근 카메라에서 월드 굵기를 픽셀로 셀 거리, 보통 카메라에서 보는 점까지, 0 이면 그린 모형들의 평균 거리)
@@ -77592,7 +78460,7 @@ var ToonScreenOutline = class {
    * @param { number } focusDistance - 카메라에서의 거리. (월드 길이)
    */
   setFocusDistance(focusDistance) {
-    this.#focusDistance = System134.Math.max(0, focusDistance);
+    this.#focusDistance = System135.Math.max(0, focusDistance);
   }
   //==============================================================================
   // 깊이 문턱 설정. (같은 번호의 이웃 화소가 서로의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)
@@ -77602,7 +78470,7 @@ var ToonScreenOutline = class {
    * @param { number } depthThreshold - 접평면 거리 문턱. (월드 길이)
    */
   setDepthThreshold(depthThreshold) {
-    this.#depthThreshold = System134.Math.max(0, depthThreshold);
+    this.#depthThreshold = System135.Math.max(0, depthThreshold);
   }
   //==============================================================================
   // 넓히기 판의 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춘다)
@@ -77613,7 +78481,7 @@ var ToonScreenOutline = class {
    * @param { number } resolutionScale - 0.25 ~ 1.
    */
   setResolutionScale(resolutionScale) {
-    this.#resolutionScale = System134.Math.max(0.25, System134.Math.min(1, resolutionScale));
+    this.#resolutionScale = System135.Math.max(0.25, System135.Math.min(1, resolutionScale));
   }
   //==============================================================================
   // HDR 출력 설정. (true 면 선 색을 선형으로 바꿔 섞는다, ToonRenderer.setHdrOutput 과 맞춘다)
@@ -77658,18 +78526,18 @@ var ToonScreenOutline = class {
     const viewProjectionMatrix = projectionMatrix.clone();
     viewProjectionMatrix.multiply(viewMatrix);
     this.#frame = {
-      viewProjectionElements: new System134.Float32Array(viewProjectionMatrix.getElements()),
-      viewElements: new System134.Float32Array(viewElements),
-      projectionElements: new System134.Float32Array(projectionElements),
+      viewProjectionElements: new System135.Float32Array(viewProjectionMatrix.getElements()),
+      viewElements: new System135.Float32Array(viewElements),
+      projectionElements: new System135.Float32Array(projectionElements),
       frustumPlanes: extractFrustumPlanes(viewProjectionMatrix),
-      isPerspective: System134.Math.abs(projectionElements[11]) > 0.5,
+      isPerspective: System135.Math.abs(projectionElements[11]) > 0.5,
       viewport: [viewport[0], viewport[1], viewport[2], viewport[3]]
     };
     this.#drawnDistanceSum = 0;
     this.#drawnDistanceCount = 0;
-    const width = System134.Math.max(1, viewport[2]);
-    const height = System134.Math.max(1, viewport[3]);
-    const lineTarget = this.readLineTarget(width, height, System134.Math.max(1, System134.Math.ceil(width * this.#resolutionScale)), System134.Math.max(1, System134.Math.ceil(height * this.#resolutionScale)));
+    const width = System135.Math.max(1, viewport[2]);
+    const height = System135.Math.max(1, viewport[3]);
+    const lineTarget = this.readLineTarget(width, height, System135.Math.max(1, System135.Math.ceil(width * this.#resolutionScale)), System135.Math.max(1, System135.Math.ceil(height * this.#resolutionScale)));
     if (lineTarget === null) {
       return false;
     }
@@ -77760,7 +78628,7 @@ var ToonScreenOutline = class {
     }
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     if (this.#instanceData.length < instances.length * TOON_INSTANCE_FLOAT_COUNT) {
-      this.#instanceData = new System134.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
+      this.#instanceData = new System135.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
     }
     const instanceData = this.#instanceData;
     const isCulled = options.isCulled !== false;
@@ -77808,15 +78676,15 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanced"), instanceCount > 0 ? 1 : 0);
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), isInstanceLineId ? 1 : 0);
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
-    webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System134.Math.max(0, System134.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
+    webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System135.Math.max(0, System135.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
     if (isSkinned) {
-      const jointFloatCount = System134.Math.floor(System134.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
+      const jointFloatCount = System135.Math.floor(System135.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
       const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
       webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("jointMatrices"), false, jointValues);
     }
-    const indexStart = options.indexStart !== void 0 ? System134.Math.max(0, options.indexStart) : 0;
-    const indexCount = options.indexCount !== void 0 ? System134.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
+    const indexStart = options.indexStart !== void 0 ? System135.Math.max(0, options.indexStart) : 0;
+    const indexCount = options.indexCount !== void 0 ? System135.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
     if (indexCount <= 0) {
       return;
     }
@@ -77886,7 +78754,7 @@ var ToonScreenOutline = class {
     jumpFloodProgram.use();
     webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform2f(jumpFloodProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
-    const reach = (System134.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System134.Math.min(pointScaleX, pointScaleY) + 1.5;
+    const reach = (System135.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System135.Math.min(pointScaleX, pointScaleY) + 1.5;
     let seedIndex = 0;
     for (const stepSize of readJumpFloodSteps(reach)) {
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[1 - seedIndex]);
@@ -77929,7 +78797,7 @@ var ToonScreenOutline = class {
     const color = this.#color;
     const lineWidths = this.#lineWidths;
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System134.Math.max(1, viewport[2]), System134.Math.max(1, viewport[3]));
+    webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System135.Math.max(1, viewport[2]), System135.Math.max(1, viewport[3]));
     webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
     webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
     webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
@@ -77953,15 +78821,15 @@ var ToonScreenOutline = class {
     const frame = this.#frame;
     let pixelsPerUnit = 1;
     if (this.#widthUnit === ToonOutlineWidthUnit.world) {
-      pixelsPerUnit = frame.viewport[3] * 0.5 * System134.Math.abs(frame.projectionElements[5]);
+      pixelsPerUnit = frame.viewport[3] * 0.5 * System135.Math.abs(frame.projectionElements[5]);
       if (frame.isPerspective) {
         const averageDistance = this.#drawnDistanceCount > 0 ? this.#drawnDistanceSum / this.#drawnDistanceCount : 1;
         const focusDistance = this.#focusDistance > 0 ? this.#focusDistance : averageDistance;
-        pixelsPerUnit /= System134.Math.max(1e-3, focusDistance);
+        pixelsPerUnit /= System135.Math.max(1e-3, focusDistance);
       }
     }
     const toPixels = /* @__PURE__ */ __name((width) => {
-      return width > 0 ? System134.Math.max(1, width * pixelsPerUnit) : 0;
+      return width > 0 ? System135.Math.max(1, width * pixelsPerUnit) : 0;
     }, "toPixels");
     return [toPixels(this.#width), toPixels(this.#creaseWidth)];
   }
@@ -77997,10 +78865,10 @@ var ToonScreenOutline = class {
     const centerX = modelElements[0] * center[0] + modelElements[4] * center[1] + modelElements[8] * center[2] + modelElements[12];
     const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
     const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
-    const scaleX = System134.Math.hypot(modelElements[0], modelElements[1], modelElements[2]);
-    const scaleY = System134.Math.hypot(modelElements[4], modelElements[5], modelElements[6]);
-    const scaleZ = System134.Math.hypot(modelElements[8], modelElements[9], modelElements[10]);
-    const radius = mesh.boundingRadius * System134.Math.max(scaleX, scaleY, scaleZ);
+    const scaleX = System135.Math.hypot(modelElements[0], modelElements[1], modelElements[2]);
+    const scaleY = System135.Math.hypot(modelElements[4], modelElements[5], modelElements[6]);
+    const scaleZ = System135.Math.hypot(modelElements[8], modelElements[9], modelElements[10]);
+    const radius = mesh.boundingRadius * System135.Math.max(scaleX, scaleY, scaleZ);
     for (const plane of this.#frame.frustumPlanes) {
       if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
         return false;
@@ -78172,8 +79040,23 @@ var ToonScreenOutline = class {
 };
 
 // src/graphics3d/toon/toondrawqueue.js
-var System135 = globalThis;
-var ToonDrawStage = System135.Object.freeze({
+var System136 = globalThis;
+var sortIdTable = new System136.WeakMap();
+var nextSortId = 1;
+function readSortId(value) {
+  if (value === void 0 || value === null || typeof value !== "object") {
+    return 0;
+  }
+  let sortId = sortIdTable.get(value);
+  if (sortId === void 0) {
+    sortId = nextSortId;
+    nextSortId += 1;
+    sortIdTable.set(value, sortId);
+  }
+  return sortId;
+}
+__name(readSortId, "readSortId");
+var ToonDrawStage = System136.Object.freeze({
   beforeOpaque: "beforeOpaque",
   // 불투명한 몸 앞.
   afterOpaque: "afterOpaque",
@@ -78199,6 +79082,9 @@ var ToonDrawQueue = class {
   /** @private @type { object | null } */
   #screenOutline;
   // ToonScreenOutline. (없으면 null)
+  /** @private @type { Array<object> | null } */
+  #opaqueItemList;
+  // 정렬한 불투명한 것. (담거나 비우면 null, 처음 그릴 때 만든다)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -78206,6 +79092,7 @@ var ToonDrawQueue = class {
     this.#itemList = [];
     this.#passList = [];
     this.#screenOutline = null;
+    this.#opaqueItemList = null;
   }
   //==============================================================================
   // 비우기. (프레임마다 담기 전에, 단계 콜백도 비운다, 화면 공간 바깥선은 그대로)
@@ -78213,6 +79100,7 @@ var ToonDrawQueue = class {
   clear() {
     this.#itemList.length = 0;
     this.#passList.length = 0;
+    this.#opaqueItemList = null;
   }
   //==============================================================================
   // 담은 수 반환.
@@ -78272,6 +79160,7 @@ var ToonDrawQueue = class {
     }
     const center = mesh.boundingCenter;
     const depthPosition = modelMatrix.transformPoint(center[0], center[1], center[2]);
+    this.#opaqueItemList = null;
     this.#itemList.push({ mesh, modelMatrix, instances: null, options, isTransparent: this.isTransparentOptions(options), depthPosition, depth: 0 });
   }
   //==============================================================================
@@ -78296,6 +79185,7 @@ var ToonDrawQueue = class {
     depthPosition.x /= instances.length;
     depthPosition.y /= instances.length;
     depthPosition.z /= instances.length;
+    this.#opaqueItemList = null;
     this.#itemList.push({ mesh, modelMatrix: null, instances, options, isTransparent: this.isTransparentOptions(options), depthPosition, depth: 0 });
   }
   //==============================================================================
@@ -78320,8 +79210,8 @@ var ToonDrawQueue = class {
    */
   drawShadows(renderer, shadowMap) {
     renderer.beginShadowPass(shadowMap);
-    for (const item of this.#itemList) {
-      if (item.isTransparent || item.options.castsShadow === false) {
+    for (const item of this.readOpaqueItemList()) {
+      if (item.options.castsShadow === false) {
         continue;
       }
       this.drawItem(renderer, item, item.options);
@@ -78358,8 +79248,8 @@ var ToonDrawQueue = class {
     renderer.beginShadowAtlasPass(shadowAtlas);
     for (let tileIndex = 0; tileIndex < shadowAtlas.getTileCount(); ++tileIndex) {
       renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-      for (const item of this.#itemList) {
-        if (item.isTransparent || item.options.castsShadow === false) {
+      for (const item of this.readOpaqueItemList()) {
+        if (item.options.castsShadow === false) {
           continue;
         }
         this.drawItem(renderer, item, item.options);
@@ -78416,9 +79306,9 @@ var ToonDrawQueue = class {
     const screenRect = renderer.getScreenRect();
     const viewport = webGL2RenderingContext.getParameter(webGL2RenderingContext.VIEWPORT);
     if (screenRect !== null) {
-      const left = System135.Math.floor(screenRect.x);
-      const bottom = System135.Math.floor(viewport[3] - screenRect.y - screenRect.height);
-      webGL2RenderingContext.viewport(viewport[0] + left, viewport[1] + bottom, System135.Math.max(1, System135.Math.round(screenRect.width)), System135.Math.max(1, System135.Math.round(screenRect.height)));
+      const left = System136.Math.floor(screenRect.x);
+      const bottom = System136.Math.floor(viewport[3] - screenRect.y - screenRect.height);
+      webGL2RenderingContext.viewport(viewport[0] + left, viewport[1] + bottom, System136.Math.max(1, System136.Math.round(screenRect.width)), System136.Math.max(1, System136.Math.round(screenRect.height)));
     }
     if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
       let itemIndex = 0;
@@ -78470,10 +79360,7 @@ var ToonDrawQueue = class {
     const webGL2RenderingContext = renderer.getWebGL2RenderingContext();
     this.runPasses(renderer, ToonDrawStage.beforeOpaque);
     const outlineItemList = [];
-    for (const item of itemList) {
-      if (item.isTransparent) {
-        continue;
-      }
+    for (const item of this.readOpaqueItemList()) {
       if (item.instances !== null) {
         this.drawItem(renderer, item, item.options);
         continue;
@@ -78482,7 +79369,7 @@ var ToonDrawQueue = class {
         this.drawItem(renderer, item, item.options);
         continue;
       }
-      const bodyOptions = System135.Object.assign({}, item.options, { hasOutline: false });
+      const bodyOptions = System136.Object.assign({}, item.options, { hasOutline: false });
       this.drawItem(renderer, item, bodyOptions);
       if (item.options.hasOutline !== false && item.mesh.outlineVertexArray !== null) {
         outlineItemList.push(item);
@@ -78544,6 +79431,32 @@ var ToonDrawQueue = class {
     this.runPasses(renderer, ToonDrawStage.afterTransparent);
   }
   //==============================================================================
+  // 정렬한 불투명한 것 읽기. (재질, 모형, 바탕색 텍스처의 차례, 같으면 담은 차례, 담은 것이 그대로면 앞서 만든 것을 쓴다)
+  //==============================================================================
+  /**
+   * @returns { Array<object> } 불투명한 것의 목록. (고치지 않는다)
+   * @private
+   */
+  readOpaqueItemList() {
+    if (this.#opaqueItemList !== null) {
+      return this.#opaqueItemList;
+    }
+    const keyList = [];
+    for (const item of this.#itemList) {
+      if (item.isTransparent) {
+        continue;
+      }
+      keyList.push({ item, order: keyList.length, materialId: readSortId(item.options.material), meshId: readSortId(item.mesh), textureId: readSortId(item.options.baseColorTexture) });
+    }
+    keyList.sort((key, other) => {
+      return key.materialId - other.materialId || key.meshId - other.meshId || key.textureId - other.textureId || key.order - other.order;
+    });
+    this.#opaqueItemList = keyList.map((key) => {
+      return key.item;
+    });
+    return this.#opaqueItemList;
+  }
+  //==============================================================================
   // 하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced)
   //==============================================================================
   /**
@@ -78561,8 +79474,8 @@ var ToonDrawQueue = class {
 };
 
 // src/misc/graphicsqualitygovernor.js
-var System136 = globalThis;
-var GraphicsQuality = System136.Object.freeze({
+var System137 = globalThis;
+var GraphicsQuality = System137.Object.freeze({
   auto: "auto",
   // 자동. (프레임 재기로 정한다)
   high: "high",
@@ -78662,7 +79575,7 @@ var GraphicsQualityGovernor = class {
    * console.log(governor.getLiteOverride(), governor.isLite());
    */
   applySearchText(searchText, liteKey = "light") {
-    const searchParameters = new System136.URLSearchParams(searchText);
+    const searchParameters = new System137.URLSearchParams(searchText);
     if (!searchParameters.has(liteKey)) {
       return;
     }
@@ -78744,8 +79657,8 @@ var GraphicsQualityGovernor = class {
    * @param { number } liteMaxRenderPixelRatio 가벼운 길의 렌더 배율 상한. (0 이면 제한 없음, 음수면 0)
    */
   setRenderPixelRatioLimits(normalMaxRenderPixelRatio, liteMaxRenderPixelRatio) {
-    this.#normalMaxRenderPixelRatio = System136.Math.max(0, normalMaxRenderPixelRatio);
-    this.#liteMaxRenderPixelRatio = System136.Math.max(0, liteMaxRenderPixelRatio);
+    this.#normalMaxRenderPixelRatio = System137.Math.max(0, normalMaxRenderPixelRatio);
+    this.#liteMaxRenderPixelRatio = System137.Math.max(0, liteMaxRenderPixelRatio);
   }
   //==============================================================================
   // 지금 길의 렌더 배율 상한.
@@ -78797,7 +79710,7 @@ var GraphicsQualityGovernor = class {
 };
 
 // src/misc/fixedstepper.js
-var System137 = globalThis;
+var System138 = globalThis;
 var FixedStepper = class extends Object2 {
   static {
     __name(this, "FixedStepper");
@@ -78837,7 +79750,7 @@ var FixedStepper = class extends Object2 {
    * @param { number } stepSeconds 한 걸음의 시간. (초)
    */
   setStepSeconds(stepSeconds) {
-    if (typeof stepSeconds !== "number" || !System137.Number.isFinite(stepSeconds) || stepSeconds <= 0) {
+    if (typeof stepSeconds !== "number" || !System138.Number.isFinite(stepSeconds) || stepSeconds <= 0) {
       return;
     }
     this.#stepSeconds = stepSeconds;
@@ -78858,10 +79771,10 @@ var FixedStepper = class extends Object2 {
    * @param { number } maximumStepsPerFrame 한 프레임에 도는 걸음의 상한.
    */
   setMaximumStepsPerFrame(maximumStepsPerFrame) {
-    if (typeof maximumStepsPerFrame !== "number" || !System137.Number.isFinite(maximumStepsPerFrame)) {
+    if (typeof maximumStepsPerFrame !== "number" || !System138.Number.isFinite(maximumStepsPerFrame)) {
       return;
     }
-    this.#maximumStepsPerFrame = System137.Math.max(1, System137.Math.floor(maximumStepsPerFrame));
+    this.#maximumStepsPerFrame = System138.Math.max(1, System138.Math.floor(maximumStepsPerFrame));
   }
   //==============================================================================
   // 한 프레임에 도는 걸음의 상한 반환.
@@ -78905,7 +79818,7 @@ var FixedStepper = class extends Object2 {
   advance(timeDelta, stepFunction) {
     const stepSeconds = this.getStepSeconds();
     const maximumStepsPerFrame = this.getMaximumStepsPerFrame();
-    const isValidTimeDelta = typeof timeDelta === "number" && System137.Number.isFinite(timeDelta) && timeDelta > 0;
+    const isValidTimeDelta = typeof timeDelta === "number" && System138.Number.isFinite(timeDelta) && timeDelta > 0;
     if (isValidTimeDelta) {
       this.#accumulatedSeconds += timeDelta;
     }
@@ -78935,7 +79848,7 @@ var FixedStepper = class extends Object2 {
   getAlpha() {
     const stepSeconds = this.getStepSeconds();
     const alpha = this.#accumulatedSeconds / stepSeconds;
-    return System137.Math.max(0, System137.Math.min(1, alpha));
+    return System138.Math.max(0, System138.Math.min(1, alpha));
   }
   //==============================================================================
   // 지난 advance 에서 돈 걸음 수.
@@ -78956,7 +79869,7 @@ var FixedStepper = class extends Object2 {
 };
 
 // src/resource/assetloader.js
-var System138 = globalThis;
+var System139 = globalThis;
 var DEFAULT_CONCURRENCY = 6;
 var AssetLoader = class extends Object2 {
   static {
@@ -79017,10 +79930,10 @@ var AssetLoader = class extends Object2 {
    * @param { number } concurrency 동시에 받는 수. (유한한 숫자가 아니면 무시한다)
    */
   setConcurrency(concurrency) {
-    if (typeof concurrency !== "number" || !System138.Number.isFinite(concurrency)) {
+    if (typeof concurrency !== "number" || !System139.Number.isFinite(concurrency)) {
       return;
     }
-    this.#concurrency = System138.Math.max(1, System138.Math.floor(concurrency));
+    this.#concurrency = System139.Math.max(1, System139.Math.floor(concurrency));
   }
   //==============================================================================
   // 동시에 받는 수 반환.
@@ -79186,7 +80099,7 @@ var AssetLoader = class extends Object2 {
     while (this.#workerPromiseList.length > 0) {
       const workerPromiseList = this.#workerPromiseList;
       this.#workerPromiseList = [];
-      await System138.Promise.all(workerPromiseList);
+      await System139.Promise.all(workerPromiseList);
     }
     this.#loadPromise = null;
     this.notifyProgress();
@@ -79207,7 +80120,7 @@ var AssetLoader = class extends Object2 {
   startWorkers() {
     const concurrency = this.getConcurrency();
     const unclaimedCount = this.#entryList.length - this.#nextEntryIndex;
-    const workerCount = System138.Math.min(concurrency - this.#activeWorkerCount, unclaimedCount);
+    const workerCount = System139.Math.min(concurrency - this.#activeWorkerCount, unclaimedCount);
     for (let workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
       this.#activeWorkerCount += 1;
       const workerPromise = this.runWorker();
@@ -79229,10 +80142,10 @@ var AssetLoader = class extends Object2 {
       try {
         await entry.loadFunction();
         if (entry.asset !== null && typeof entry.asset.isLoaded === "function" && !entry.asset.isLoaded()) {
-          loadError = new System138.Error(`Not loaded: ${entry.path}`);
+          loadError = new System139.Error(`Not loaded: ${entry.path}`);
         }
       } catch (error) {
-        loadError = error === void 0 || error === null ? new System138.Error(`Load fail: ${entry.path}`) : error;
+        loadError = error === void 0 || error === null ? new System139.Error(`Load fail: ${entry.path}`) : error;
       }
       entry.isFinished = true;
       this.#finishedCount += 1;
@@ -79362,7 +80275,7 @@ var AssetLoader = class extends Object2 {
 };
 
 // src/misc/buildinfo.js
-var System139 = globalThis;
+var System140 = globalThis;
 var DEFAULT_META_NAME = "build-version";
 var DEFAULT_VERSION_JSON_PATH = "./version.json";
 var BuildInfo = class _BuildInfo extends Object2 {
@@ -79437,7 +80350,7 @@ var BuildInfo = class _BuildInfo extends Object2 {
     const versionJsonPath = this.#versionJsonPath;
     if (versionJsonPath !== "") {
       try {
-        const response = await System139.fetch(versionJsonPath, { cache: "no-cache" });
+        const response = await System140.fetch(versionJsonPath, { cache: "no-cache" });
         if (response.ok) {
           const versionData = await response.json();
           if (versionData !== null && typeof versionData === "object") {
@@ -79460,7 +80373,7 @@ var BuildInfo = class _BuildInfo extends Object2 {
    * @returns { string } meta 의 content 를 앞뒤 공백을 떼어 돌려준 글. 없으면 빈 글.
    */
   readMetaText() {
-    const document2 = System139.document;
+    const document2 = System140.document;
     if (document2 === null || document2 === void 0) {
       return "";
     }
@@ -79544,12 +80457,12 @@ var BuildInfo = class _BuildInfo extends Object2 {
 };
 
 // src/graphics3d/toon/toonvfx.js
-var System140 = globalThis;
+var System141 = globalThis;
 var ATLAS_WIDTH = 1024;
 var ATLAS_HEIGHT = 512;
 var ATLAS_SLOT_SIZE = 128;
 var SMOKE_FRAME_COUNT = 16;
-var ToonVfxSlot = System140.Object.freeze({
+var ToonVfxSlot = System141.Object.freeze({
   soft: 0,
   // 부드러운 알갱이.
   streak: 1,
@@ -79570,7 +80483,7 @@ var ToonVfxSlot = System140.Object.freeze({
   // 넓은 둘레 빛.
 });
 var TOON_VFX_MAXIMUM_RAMPS = 8;
-var ToonVfxLook = System140.Object.freeze({
+var ToonVfxLook = System141.Object.freeze({
   soft: 0,
   // 부드러운 알갱이. (더하는 빛)
   streak: 1,
@@ -79586,7 +80499,7 @@ var ToonVfxLook = System140.Object.freeze({
   grit: 6
   // 빛을 내지 않는 돌과 흙 알갱이. (덮기)
 });
-var ToonVfxShape = System140.Object.freeze({
+var ToonVfxShape = System141.Object.freeze({
   point: "point",
   // 한 점에서 모든 쪽으로.
   sphere: "sphere",
@@ -79600,7 +80513,7 @@ var ToonVfxShape = System140.Object.freeze({
   line: "line"
   // direction 쪽으로 length 까지의 선 위(둘레 radius 안)에서 direction 쪽으로.
 });
-var ToonVfxDecalMode = System140.Object.freeze({
+var ToonVfxDecalMode = System141.Object.freeze({
   scorch: 0,
   // 알파로 어둡게 덮고 빨간 채널의 금에서 열기가 식는다.
   glow: 1,
@@ -79626,13 +80539,13 @@ var LIGHTNING_POINT_COUNT = 22;
 var DEFAULT_GLINT_CAPACITY = 96;
 var LOOK_COUNT = 7;
 var DEFAULT_BLOB_SHADOW_ALPHA = 0.45;
-var DEFAULT_RIM_COLOR = System140.Object.freeze([0.05, 0.05, 0.08]);
+var DEFAULT_RIM_COLOR = System141.Object.freeze([0.05, 0.05, 0.08]);
 var SHAKE_UNIT_SCALE = 100;
 var LIGHTNING_FADE_SECONDS = 0.1;
 var DECAL_LIFT = 0.014;
 var GROUND_GLOW_LIFT = 0.02;
 var VFX_TEXTURE_UNIT = 4;
-var PARTICLE_ATTRIBUTE_LOCATIONS = System140.Object.freeze({
+var PARTICLE_ATTRIBUTE_LOCATIONS = System141.Object.freeze({
   vertexCorner: 0,
   particleStart: 1,
   particleVelocity: 2,
@@ -79642,10 +80555,10 @@ var PARTICLE_ATTRIBUTE_LOCATIONS = System140.Object.freeze({
   particleExtra: 6,
   particleShape: 7
 });
-var SPHERE_ATTRIBUTE_LOCATIONS = System140.Object.freeze({ vertexPosition: 0 });
-var GRID_ATTRIBUTE_LOCATIONS = System140.Object.freeze({ vertexGrid: 0 });
-var CORNER_ATTRIBUTE_LOCATIONS = System140.Object.freeze({ vertexCorner: 0 });
-var RIBBON_ATTRIBUTE_LOCATIONS = System140.Object.freeze({ vertexPosition: 0, vertexRibbon: 1 });
+var SPHERE_ATTRIBUTE_LOCATIONS = System141.Object.freeze({ vertexPosition: 0 });
+var GRID_ATTRIBUTE_LOCATIONS = System141.Object.freeze({ vertexGrid: 0 });
+var CORNER_ATTRIBUTE_LOCATIONS = System141.Object.freeze({ vertexCorner: 0 });
+var RIBBON_ATTRIBUTE_LOCATIONS = System141.Object.freeze({ vertexPosition: 0, vertexRibbon: 1 });
 var NOISE_SHADER_CHUNK = `
 // \uC810 \uD574\uC2DC. \uC138 float \uC758 \uBE44\uD2B8\uB97C MurmurHash3 \uC758 fmix32 \uB9C8\uBB34\uB9AC(Austin Appleby, \uACF5\uAC1C \uB3C4\uBA54\uC778)\uB85C \uC11E\uC5B4 [0, 1) \uB85C \uB0B8\uB2E4.
 highp uint hashMix32(highp uint value) {
@@ -80230,7 +81143,7 @@ void main() {
 var DEFAULT_RAMPS = [["#ffffff", "#d8d8d8", "#a0a0a0", "#686868", "#343434", "#101010"]];
 function createNoiseGrid(seed) {
   const seededRandom = new SeededRandom(seed);
-  const grid = new System140.Float32Array(256 * 256);
+  const grid = new System141.Float32Array(256 * 256);
   for (let valueIndex = 0; valueIndex < grid.length; ++valueIndex) {
     grid[valueIndex] = seededRandom.nextValue();
   }
@@ -80238,8 +81151,8 @@ function createNoiseGrid(seed) {
 }
 __name(createNoiseGrid, "createNoiseGrid");
 function readGridNoise(grid, x, y, periodX, periodY) {
-  const column = System140.Math.floor(x);
-  const row = System140.Math.floor(y);
+  const column = System141.Math.floor(x);
+  const row = System141.Math.floor(y);
   const offsetX = x - column;
   const offsetY = y - row;
   const weightX = offsetX * offsetX * (3 - 2 * offsetX);
@@ -80272,7 +81185,7 @@ function readGridFbm(grid, x, y, periodX, periodY, octaveCount) {
 }
 __name(readGridFbm, "readGridFbm");
 function clampUnit(value) {
-  return System140.Math.min(1, System140.Math.max(0, value));
+  return System141.Math.min(1, System141.Math.max(0, value));
 }
 __name(clampUnit, "clampUnit");
 function smoothStep(edgeStart, edgeEnd, value) {
@@ -80284,7 +81197,7 @@ function readRampColor(color) {
   if (typeof color !== "string") {
     return [color[0], color[1], color[2]];
   }
-  const value = System140.parseInt(color.slice(1), 16);
+  const value = System141.parseInt(color.slice(1), 16);
   return [(value >> 16 & 255) / 255, (value >> 8 & 255) / 255, (value & 255) / 255];
 }
 __name(readRampColor, "readRampColor");
@@ -80300,16 +81213,16 @@ function paintCell(pixels, originX, originY, painter) {
       texel[3] = 0;
       painter(u, v, texel);
       const offset = ((originY + pixelY) * ATLAS_WIDTH + originX + pixelX) * 4;
-      pixels[offset] = System140.Math.round(clampUnit(texel[0]) * 255);
-      pixels[offset + 1] = System140.Math.round(clampUnit(texel[1]) * 255);
-      pixels[offset + 2] = System140.Math.round(clampUnit(texel[2]) * 255);
-      pixels[offset + 3] = System140.Math.round(clampUnit(texel[3]) * 255);
+      pixels[offset] = System141.Math.round(clampUnit(texel[0]) * 255);
+      pixels[offset + 1] = System141.Math.round(clampUnit(texel[1]) * 255);
+      pixels[offset + 2] = System141.Math.round(clampUnit(texel[2]) * 255);
+      pixels[offset + 3] = System141.Math.round(clampUnit(texel[3]) * 255);
     }
   }
 }
 __name(paintCell, "paintCell");
 function paintSlot(pixels, slot, painter) {
-  paintCell(pixels, ATLAS_WIDTH / 2 + slot % 4 * ATLAS_SLOT_SIZE, System140.Math.floor(slot / 4) * ATLAS_SLOT_SIZE, painter);
+  paintCell(pixels, ATLAS_WIDTH / 2 + slot % 4 * ATLAS_SLOT_SIZE, System141.Math.floor(slot / 4) * ATLAS_SLOT_SIZE, painter);
 }
 __name(paintSlot, "paintSlot");
 function paintRamps(pixels, ramps) {
@@ -80317,7 +81230,7 @@ function paintRamps(pixels, ramps) {
     return stops.map(readRampColor);
   });
   paintSlot(pixels, ToonVfxSlot.ramps, (u, v, color) => {
-    const rowIndex = System140.Math.min(rampColors.length - 1, System140.Math.floor(v * TOON_VFX_MAXIMUM_RAMPS));
+    const rowIndex = System141.Math.min(rampColors.length - 1, System141.Math.floor(v * TOON_VFX_MAXIMUM_RAMPS));
     const stops = rampColors[rowIndex];
     if (stops.length === 1) {
       color[0] = stops[0][0];
@@ -80327,7 +81240,7 @@ function paintRamps(pixels, ramps) {
       return;
     }
     const position = u * (stops.length - 1);
-    const stopIndex = System140.Math.min(stops.length - 2, System140.Math.floor(position));
+    const stopIndex = System141.Math.min(stops.length - 2, System141.Math.floor(position));
     const blend = position - stopIndex;
     for (let channel = 0; channel < 3; ++channel) {
       color[channel] = stops[stopIndex][channel] + (stops[stopIndex + 1][channel] - stops[stopIndex][channel]) * blend;
@@ -80337,21 +81250,21 @@ function paintRamps(pixels, ramps) {
 }
 __name(paintRamps, "paintRamps");
 function createAtlasPixels() {
-  const pixels = new System140.Uint8Array(ATLAS_WIDTH * ATLAS_HEIGHT * 4);
+  const pixels = new System141.Uint8Array(ATLAS_WIDTH * ATLAS_HEIGHT * 4);
   const grid = createNoiseGrid(4164);
   for (let frame = 0; frame < SMOKE_FRAME_COUNT; ++frame) {
     const progress = frame / (SMOKE_FRAME_COUNT - 1);
     const swirl = progress * 1.1;
-    const swirlCosine = System140.Math.cos(swirl);
-    const swirlSine = System140.Math.sin(swirl);
-    paintCell(pixels, frame % 4 * ATLAS_SLOT_SIZE, System140.Math.floor(frame / 4) * ATLAS_SLOT_SIZE, (u, v, color) => {
+    const swirlCosine = System141.Math.cos(swirl);
+    const swirlSine = System141.Math.sin(swirl);
+    paintCell(pixels, frame % 4 * ATLAS_SLOT_SIZE, System141.Math.floor(frame / 4) * ATLAS_SLOT_SIZE, (u, v, color) => {
       const centerX = u * 2 - 1;
       const centerY = v * 2 - 1;
       const turnedX = centerX * swirlCosine - centerY * swirlSine;
       const turnedY = centerX * swirlSine + centerY * swirlCosine;
       const warp = readGridFbm(grid, turnedX * 1.7 + 40, turnedY * 1.7 + 40, 256, 256, 3);
       const density = readGridFbm(grid, turnedX * 2.2 + warp * 1.4 + 90, turnedY * 2.2 - progress * 1.3 + 90, 256, 256, 4);
-      const distance = System140.Math.hypot(centerX, centerY);
+      const distance = System141.Math.hypot(centerX, centerY);
       const radius = 0.55 + 0.33 * progress;
       const shape = 1 - smoothStep(radius * 0.45, radius, distance + (density - 0.5) * 0.55);
       const shade = 0.55 + 0.4 * v + (density - 0.5) * 0.35;
@@ -80362,29 +81275,29 @@ function createAtlasPixels() {
     });
   }
   paintSlot(pixels, ToonVfxSlot.soft, (u, v, color) => {
-    const distance = System140.Math.hypot(u * 2 - 1, v * 2 - 1);
-    color[3] = System140.Math.pow(System140.Math.max(0, 1 - distance), 2.2) + System140.Math.exp(-distance * distance * 30) * 0.4;
+    const distance = System141.Math.hypot(u * 2 - 1, v * 2 - 1);
+    color[3] = System141.Math.pow(System141.Math.max(0, 1 - distance), 2.2) + System141.Math.exp(-distance * distance * 30) * 0.4;
   });
   paintSlot(pixels, ToonVfxSlot.streak, (u, v, color) => {
     const across = u * 2 - 1;
     const width = 0.16 * (0.3 + 0.7 * v);
-    const body = System140.Math.exp(-(across / width) * (across / width)) * System140.Math.pow(v, 1.6) * (1 - smoothStep(0.92, 1, v));
-    const head = System140.Math.exp(-(across * across * 40 + (v - 0.84) * (v - 0.84) * 60));
+    const body = System141.Math.exp(-(across / width) * (across / width)) * System141.Math.pow(v, 1.6) * (1 - smoothStep(0.92, 1, v));
+    const head = System141.Math.exp(-(across * across * 40 + (v - 0.84) * (v - 0.84) * 60));
     color[3] = body + head * 0.8;
   });
   paintSlot(pixels, ToonVfxSlot.star, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System140.Math.hypot(centerX, centerY);
-    const angle = System140.Math.atan2(centerY, centerX);
-    const longRays = System140.Math.pow(System140.Math.abs(System140.Math.cos(angle * 2)), 60) * System140.Math.pow(System140.Math.max(0, 1 - distance), 1.4);
-    const shortRays = System140.Math.pow(System140.Math.abs(System140.Math.sin(angle * 2)), 90) * System140.Math.pow(System140.Math.max(0, 1 - distance * 1.5), 1.4) * 0.6;
-    const glow = System140.Math.exp(-distance * distance * 16) * 0.7 + System140.Math.exp(-distance * distance * 140) * 0.6;
+    const distance = System141.Math.hypot(centerX, centerY);
+    const angle = System141.Math.atan2(centerY, centerX);
+    const longRays = System141.Math.pow(System141.Math.abs(System141.Math.cos(angle * 2)), 60) * System141.Math.pow(System141.Math.max(0, 1 - distance), 1.4);
+    const shortRays = System141.Math.pow(System141.Math.abs(System141.Math.sin(angle * 2)), 90) * System141.Math.pow(System141.Math.max(0, 1 - distance * 1.5), 1.4) * 0.6;
+    const glow = System141.Math.exp(-distance * distance * 16) * 0.7 + System141.Math.exp(-distance * distance * 140) * 0.6;
     color[3] = longRays + shortRays + glow;
   });
   paintSlot(pixels, ToonVfxSlot.shockBand, (u, v, color) => {
     const torn = readGridFbm(grid, u * 12, v * 3 + 7, 12, 256, 4);
-    const lead = System140.Math.exp(-((v - 0.8) / 0.07) * ((v - 0.8) / 0.07));
+    const lead = System141.Math.exp(-((v - 0.8) / 0.07) * ((v - 0.8) / 0.07));
     const trail = v < 0.8 ? v / 0.8 * (v / 0.8) * 0.5 : 0;
     const outerCut = 1 - smoothStep(0.84 + (torn - 0.5) * 0.12, 0.96, v);
     color[3] = (lead + trail) * (0.45 + 0.75 * torn) * outerCut * smoothStep(0, 0.15, v);
@@ -80401,14 +81314,14 @@ function createAtlasPixels() {
   paintSlot(pixels, ToonVfxSlot.scorch, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System140.Math.hypot(centerX, centerY);
+    const distance = System141.Math.hypot(centerX, centerY);
     const edgeNoise = readGridFbm(grid, centerX * 3 + 20, centerY * 3 + 20, 256, 256, 4);
     const threshold = 0.78 + (edgeNoise - 0.5) * 0.45;
     const grain = readGridFbm(grid, centerX * 9 + 50, centerY * 9 + 50, 256, 256, 3);
     const darkness = (1 - smoothStep(threshold - 0.32, threshold, distance)) * (0.7 + 0.3 * grain);
-    const ridge = 1 - System140.Math.abs(2 * readGridFbm(grid, centerX * 4.5 + 11, centerY * 4.5 + 3, 256, 256, 4) - 1);
+    const ridge = 1 - System141.Math.abs(2 * readGridFbm(grid, centerX * 4.5 + 11, centerY * 4.5 + 3, 256, 256, 4) - 1);
     const crack = smoothStep(0.82, 0.95, ridge) * (1 - smoothStep(0.2, threshold, distance));
-    color[0] = crack + System140.Math.exp(-distance * distance * 7) * 0.8;
+    color[0] = crack + System141.Math.exp(-distance * distance * 7) * 0.8;
     color[1] = 0;
     color[2] = 0;
     color[3] = darkness * 0.9;
@@ -80416,17 +81329,17 @@ function createAtlasPixels() {
   paintSlot(pixels, ToonVfxSlot.dent, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System140.Math.hypot(centerX, centerY) + (readGridFbm(grid, centerX * 4 + 70, centerY * 4 + 70, 256, 256, 3) - 0.5) * 0.12;
-    const rim = System140.Math.exp(-((distance - 0.72) / 0.07) * ((distance - 0.72) / 0.07));
+    const distance = System141.Math.hypot(centerX, centerY) + (readGridFbm(grid, centerX * 4 + 70, centerY * 4 + 70, 256, 256, 3) - 0.5) * 0.12;
+    const rim = System141.Math.exp(-((distance - 0.72) / 0.07) * ((distance - 0.72) / 0.07));
     const inner = (1 - smoothStep(0.3, 0.76, distance)) * 0.55;
-    color[0] = rim * 0.8 + System140.Math.exp(-distance * distance * 10) * 0.5;
+    color[0] = rim * 0.8 + System141.Math.exp(-distance * distance * 10) * 0.5;
     color[1] = 0;
     color[2] = 0;
     color[3] = inner + rim * 0.3;
   });
   paintSlot(pixels, ToonVfxSlot.glow, (u, v, color) => {
-    const distance = System140.Math.hypot(u * 2 - 1, v * 2 - 1);
-    color[3] = System140.Math.exp(-distance * distance * 4.5) * (1 - smoothStep(0.85, 1, distance));
+    const distance = System141.Math.hypot(u * 2 - 1, v * 2 - 1);
+    color[3] = System141.Math.exp(-distance * distance * 4.5) * (1 - smoothStep(0.85, 1, distance));
   });
   return pixels;
 }
@@ -80437,10 +81350,10 @@ function createSphereArrays() {
   const positions = [];
   const indices = [];
   for (let downIndex = 0; downIndex <= downCount; ++downIndex) {
-    const polar = downIndex / downCount * System140.Math.PI;
+    const polar = downIndex / downCount * System141.Math.PI;
     for (let aroundIndex = 0; aroundIndex <= aroundCount; ++aroundIndex) {
-      const azimuth = aroundIndex / aroundCount * System140.Math.PI * 2;
-      positions.push(System140.Math.sin(polar) * System140.Math.cos(azimuth), System140.Math.cos(polar), System140.Math.sin(polar) * System140.Math.sin(azimuth));
+      const azimuth = aroundIndex / aroundCount * System141.Math.PI * 2;
+      positions.push(System141.Math.sin(polar) * System141.Math.cos(azimuth), System141.Math.cos(polar), System141.Math.sin(polar) * System141.Math.sin(azimuth));
     }
   }
   for (let downIndex = 0; downIndex < downCount; ++downIndex) {
@@ -80450,7 +81363,7 @@ function createSphereArrays() {
       indices.push(first, second, first + 1, second, second + 1, first + 1);
     }
   }
-  return { positions: new System140.Float32Array(positions), indices: new System140.Uint16Array(indices) };
+  return { positions: new System141.Float32Array(positions), indices: new System141.Uint16Array(indices) };
 }
 __name(createSphereArrays, "createSphereArrays");
 function createGridArrays(segments) {
@@ -80470,7 +81383,7 @@ function createGridArrays(segments) {
       indices.push(first, second, first + 1, second, second + 1, first + 1);
     }
   }
-  return { positions: new System140.Float32Array(positions), indices: new System140.Uint16Array(indices) };
+  return { positions: new System141.Float32Array(positions), indices: new System141.Uint16Array(indices) };
 }
 __name(createGridArrays, "createGridArrays");
 function readRangeValue(range, seededRandom) {
@@ -80481,18 +81394,18 @@ function readRangeValue(range, seededRandom) {
 }
 __name(readRangeValue, "readRangeValue");
 function readAxisSides(axis) {
-  const axisLength = System140.Math.hypot(axis[0], axis[1], axis[2]);
+  const axisLength = System141.Math.hypot(axis[0], axis[1], axis[2]);
   if (axisLength < 1e-6) {
     return [[1, 0, 0], [0, 0, 1]];
   }
   const axisX = axis[0] / axisLength;
   const axisY = axis[1] / axisLength;
   const axisZ = axis[2] / axisLength;
-  const helper = System140.Math.abs(axisY) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const helper = System141.Math.abs(axisY) < 0.9 ? [0, 1, 0] : [1, 0, 0];
   let sideX = axisY * helper[2] - axisZ * helper[1];
   let sideY = axisZ * helper[0] - axisX * helper[2];
   let sideZ = axisX * helper[1] - axisY * helper[0];
-  const sideLength = System140.Math.hypot(sideX, sideY, sideZ);
+  const sideLength = System141.Math.hypot(sideX, sideY, sideZ);
   sideX /= sideLength;
   sideY /= sideLength;
   sideZ /= sideLength;
@@ -80658,9 +81571,9 @@ var ToonVfx = class {
     this.#rimColor = [DEFAULT_RIM_COLOR[0], DEFAULT_RIM_COLOR[1], DEFAULT_RIM_COLOR[2]];
     this.#buffers = [];
     this.#countRatio = 1;
-    const cornerData = new System140.Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-    this.#particleCapacity = System140.Math.max(1, System140.Math.floor(particleCapacity));
-    this.#particleData = new System140.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
+    const cornerData = new System141.Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    this.#particleCapacity = System141.Math.max(1, System141.Math.floor(particleCapacity));
+    this.#particleData = new System141.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
     this.#particleWriteIndex = 0;
     this.#particleUsedCount = 0;
     this.#isParticleDirty = false;
@@ -80668,12 +81581,12 @@ var ToonVfx = class {
     this.#particleBuffer = this.createBuffer();
     this.#particleVertexArray = this.createParticleVertexArray(cornerData, this.#particleBuffer);
     this.#glintCapacity = DEFAULT_GLINT_CAPACITY;
-    this.#glintData = new System140.Float32Array(DEFAULT_GLINT_CAPACITY * PARTICLE_FLOAT_COUNT);
-    this.#lookGains = new System140.Float32Array(LOOK_COUNT).fill(1);
-    this.#usedEventKeys = new System140.Set();
+    this.#glintData = new System141.Float32Array(DEFAULT_GLINT_CAPACITY * PARTICLE_FLOAT_COUNT);
+    this.#lookGains = new System141.Float32Array(LOOK_COUNT).fill(1);
+    this.#usedEventKeys = new System141.Set();
     this.#glintBuffer = this.createBuffer();
     this.#glintVertexArray = this.createParticleVertexArray(cornerData, this.#glintBuffer);
-    this.#ribbonData = new System140.Float32Array(RIBBON_FLOAT_COUNT * 256);
+    this.#ribbonData = new System141.Float32Array(RIBBON_FLOAT_COUNT * 256);
     this.#ribbonVertexArray = webGL2RenderingContext.createVertexArray();
     webGL2RenderingContext.bindVertexArray(this.#ribbonVertexArray);
     this.#ribbonBuffer = this.createBuffer();
@@ -80880,8 +81793,8 @@ var ToonVfx = class {
    * @param { number } particleCapacity - 한꺼번에 떠 있는 파티클의 상한. (1 이상)
    */
   setParticleCapacity(particleCapacity) {
-    this.#particleCapacity = System140.Math.max(1, System140.Math.floor(particleCapacity));
-    this.#particleData = new System140.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
+    this.#particleCapacity = System141.Math.max(1, System141.Math.floor(particleCapacity));
+    this.#particleData = new System141.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
     this.#particleWriteIndex = 0;
     this.#particleUsedCount = 0;
     this.#particleLiveUntil = this.#time;
@@ -80903,7 +81816,7 @@ var ToonVfx = class {
    * @param { number } countRatio - 내는 파티클 수에 곱하는 몫. (0 ~ 1)
    */
   setCountRatio(countRatio) {
-    this.#countRatio = System140.Math.max(0, System140.Math.min(1, countRatio));
+    this.#countRatio = System141.Math.max(0, System141.Math.min(1, countRatio));
   }
   //==============================================================================
   // 내는 파티클 수의 몫 반환.
@@ -80921,8 +81834,8 @@ var ToonVfx = class {
    * @param { number } glintCapacity - 프레임마다 넘기는 빛 점의 상한. (1 이상)
    */
   setGlintCapacity(glintCapacity) {
-    this.#glintCapacity = System140.Math.max(1, System140.Math.floor(glintCapacity));
-    this.#glintData = new System140.Float32Array(this.#glintCapacity * PARTICLE_FLOAT_COUNT);
+    this.#glintCapacity = System141.Math.max(1, System141.Math.floor(glintCapacity));
+    this.#glintData = new System141.Float32Array(this.#glintCapacity * PARTICLE_FLOAT_COUNT);
     this.#queuedGlintCount = 0;
   }
   //==============================================================================
@@ -80952,7 +81865,7 @@ var ToonVfx = class {
     if (look < 0 || look >= LOOK_COUNT) {
       return;
     }
-    this.#lookGains[look] = System140.Math.max(0, gain);
+    this.#lookGains[look] = System141.Math.max(0, gain);
   }
   //==============================================================================
   // 꼴마다 밝기 배 반환.
@@ -81138,7 +82051,7 @@ var ToonVfx = class {
     if (this.#countRatio >= 1) {
       return count;
     }
-    return System140.Math.max(1, System140.Math.round(count * this.#countRatio));
+    return System141.Math.max(1, System141.Math.round(count * this.#countRatio));
   }
   //==============================================================================
   // 파티클 내기.
@@ -81185,8 +82098,8 @@ var ToonVfx = class {
       floor2 = this.readFloorHeight(position[0], position[2]);
     }
     const direction = options.direction !== void 0 ? options.direction : [0, 1, 0];
-    const spread = options.spread !== void 0 ? options.spread : System140.Math.PI;
-    const directionLength = System140.Math.max(1e-4, System140.Math.hypot(direction[0], direction[1], direction[2]));
+    const spread = options.spread !== void 0 ? options.spread : System141.Math.PI;
+    const directionLength = System141.Math.max(1e-4, System141.Math.hypot(direction[0], direction[1], direction[2]));
     const axisX = direction[0] / directionLength;
     const axisY = direction[1] / directionLength;
     const axisZ = direction[2] / directionLength;
@@ -81200,35 +82113,35 @@ var ToonVfx = class {
       let headingZ = 0;
       switch (shape) {
         case ToonVfxShape.ring: {
-          const angle = (particleIndex + random2() * 0.8) / count * System140.Math.PI * 2;
-          offsetX = System140.Math.cos(angle) * radius;
-          offsetZ = System140.Math.sin(angle) * radius;
-          headingX = System140.Math.cos(angle);
+          const angle = (particleIndex + random2() * 0.8) / count * System141.Math.PI * 2;
+          offsetX = System141.Math.cos(angle) * radius;
+          offsetZ = System141.Math.sin(angle) * radius;
+          headingX = System141.Math.cos(angle);
           headingY = 0;
-          headingZ = System140.Math.sin(angle);
+          headingZ = System141.Math.sin(angle);
           break;
         }
         case ToonVfxShape.disc: {
-          const angle = random2() * System140.Math.PI * 2;
-          const reach = System140.Math.sqrt(random2()) * radius;
-          offsetX = System140.Math.cos(angle) * reach;
-          offsetZ = System140.Math.sin(angle) * reach;
-          headingX = System140.Math.cos(angle);
+          const angle = random2() * System141.Math.PI * 2;
+          const reach = System141.Math.sqrt(random2()) * radius;
+          offsetX = System141.Math.cos(angle) * reach;
+          offsetZ = System141.Math.sin(angle) * reach;
+          headingX = System141.Math.cos(angle);
           headingY = 0;
-          headingZ = System140.Math.sin(angle);
+          headingZ = System141.Math.sin(angle);
           break;
         }
         case ToonVfxShape.cone: {
           const tilt = random2() * spread;
-          const turn = random2() * System140.Math.PI * 2;
-          const tiltSine = System140.Math.sin(tilt);
-          const tiltCosine = System140.Math.cos(tilt);
-          const turnCosine = System140.Math.cos(turn);
-          const turnSine = System140.Math.sin(turn);
+          const turn = random2() * System141.Math.PI * 2;
+          const tiltSine = System141.Math.sin(tilt);
+          const tiltCosine = System141.Math.cos(tilt);
+          const turnCosine = System141.Math.cos(turn);
+          const turnSine = System141.Math.sin(turn);
           headingX = axisX * tiltCosine + (sides[0][0] * turnCosine + sides[1][0] * turnSine) * tiltSine;
           headingY = axisY * tiltCosine + (sides[0][1] * turnCosine + sides[1][1] * turnSine) * tiltSine;
           headingZ = axisZ * tiltCosine + (sides[0][2] * turnCosine + sides[1][2] * turnSine) * tiltSine;
-          const reach = System140.Math.sqrt(random2()) * radius;
+          const reach = System141.Math.sqrt(random2()) * radius;
           offsetX = (sides[0][0] * turnCosine + sides[1][0] * turnSine) * reach;
           offsetY = (sides[0][1] * turnCosine + sides[1][1] * turnSine) * reach;
           offsetZ = (sides[0][2] * turnCosine + sides[1][2] * turnSine) * reach;
@@ -81236,24 +82149,24 @@ var ToonVfx = class {
         }
         case ToonVfxShape.line: {
           const along = random2() * (options.length !== void 0 ? options.length : 1);
-          const turn = random2() * System140.Math.PI * 2;
-          const reach = System140.Math.sqrt(random2()) * radius;
+          const turn = random2() * System141.Math.PI * 2;
+          const reach = System141.Math.sqrt(random2()) * radius;
           headingX = axisX;
           headingY = axisY;
           headingZ = axisZ;
-          offsetX = axisX * along + (sides[0][0] * System140.Math.cos(turn) + sides[1][0] * System140.Math.sin(turn)) * reach;
-          offsetY = axisY * along + (sides[0][1] * System140.Math.cos(turn) + sides[1][1] * System140.Math.sin(turn)) * reach;
-          offsetZ = axisZ * along + (sides[0][2] * System140.Math.cos(turn) + sides[1][2] * System140.Math.sin(turn)) * reach;
+          offsetX = axisX * along + (sides[0][0] * System141.Math.cos(turn) + sides[1][0] * System141.Math.sin(turn)) * reach;
+          offsetY = axisY * along + (sides[0][1] * System141.Math.cos(turn) + sides[1][1] * System141.Math.sin(turn)) * reach;
+          offsetZ = axisZ * along + (sides[0][2] * System141.Math.cos(turn) + sides[1][2] * System141.Math.sin(turn)) * reach;
           break;
         }
         default: {
           const heightRatio = random2() * 2 - 1;
-          const angle = random2() * System140.Math.PI * 2;
-          const ringRatio = System140.Math.sqrt(1 - heightRatio * heightRatio);
-          headingX = System140.Math.cos(angle) * ringRatio;
+          const angle = random2() * System141.Math.PI * 2;
+          const ringRatio = System141.Math.sqrt(1 - heightRatio * heightRatio);
+          headingX = System141.Math.cos(angle) * ringRatio;
           headingY = heightRatio;
-          headingZ = System140.Math.sin(angle) * ringRatio;
-          const reach = System140.Math.cbrt(random2()) * radius;
+          headingZ = System141.Math.sin(angle) * ringRatio;
+          const reach = System141.Math.cbrt(random2()) * radius;
           offsetX = headingX * reach;
           offsetY = headingY * reach;
           offsetZ = headingZ * reach;
@@ -81262,13 +82175,13 @@ var ToonVfx = class {
       }
       if (options.isUpward === true && headingY < 0) {
         headingY = -headingY;
-        offsetY = System140.Math.abs(offsetY);
+        offsetY = System141.Math.abs(offsetY);
       }
       const speed = readRangeValue(options.speed !== void 0 ? options.speed : 1, seededRandom);
       const rise = readRangeValue(options.rise !== void 0 ? options.rise : 0, seededRandom);
       const size = readRangeValue(options.size !== void 0 ? options.size : 0.2, seededRandom);
       const sizeEnd = size * readRangeValue(options.sizeEnd !== void 0 ? options.sizeEnd : 1, seededRandom);
-      const life = System140.Math.max(1e-3, readRangeValue(options.life !== void 0 ? options.life : 1, seededRandom));
+      const life = System141.Math.max(1e-3, readRangeValue(options.life !== void 0 ? options.life : 1, seededRandom));
       const delay = readRangeValue(options.delay !== void 0 ? options.delay : 0, seededRandom);
       const spin = readRangeValue(options.spin !== void 0 ? options.spin : 0, seededRandom);
       let velocityX = headingX * speed;
@@ -81314,8 +82227,8 @@ var ToonVfx = class {
       offset += 4;
     }
     this.#particleWriteIndex = (this.#particleWriteIndex + 1) % this.#particleCapacity;
-    this.#particleUsedCount = System140.Math.min(this.#particleCapacity, this.#particleUsedCount + 1);
-    this.#particleLiveUntil = System140.Math.max(this.#particleLiveUntil, start[3] + velocity[3]);
+    this.#particleUsedCount = System141.Math.min(this.#particleCapacity, this.#particleUsedCount + 1);
+    this.#particleLiveUntil = System141.Math.max(this.#particleLiveUntil, start[3] + velocity[3]);
     this.#isParticleDirty = true;
   }
   //==============================================================================
@@ -81345,7 +82258,7 @@ var ToonVfx = class {
       ramp: options.ramp !== void 0 ? options.ramp : 0,
       smokeColor: options.smokeColor !== void 0 ? options.smokeColor : [0.16, 0.14, 0.13],
       rise: options.rise !== void 0 ? options.rise : 0.6,
-      growSeconds: System140.Math.max(1e-3, options.growSeconds !== void 0 ? options.growSeconds : 0.3),
+      growSeconds: System141.Math.max(1e-3, options.growSeconds !== void 0 ? options.growSeconds : 0.3),
       boil: options.boil !== void 0 ? options.boil : 0.32,
       rim: options.rim !== void 0 ? options.rim : 0,
       seed: this.#seededRandom.nextValue() * 40,
@@ -81406,7 +82319,7 @@ var ToonVfx = class {
       return;
     }
     const seededRandom = this.#seededRandom;
-    const decal = this.createDecal(options, seededRandom.nextValue() * System140.Math.PI * 2, seededRandom.nextValue() * 40);
+    const decal = this.createDecal(options, seededRandom.nextValue() * System141.Math.PI * 2, seededRandom.nextValue() * 40);
     decal.age = age;
     this.#decals.push(decal);
   }
@@ -81527,7 +82440,7 @@ var ToonVfx = class {
    * vfx.draw(viewMatrix, projectionMatrix);
    */
   queueBeam(options) {
-    const beam = options.alpha !== void 0 ? options : System140.Object.assign({}, options, { alpha: 1 });
+    const beam = options.alpha !== void 0 ? options : System141.Object.assign({}, options, { alpha: 1 });
     if (!(beam.radius > 0) || !(beam.alpha > 0)) {
       return;
     }
@@ -81548,7 +82461,7 @@ var ToonVfx = class {
    * vfx.queueRibbon({ points: trailPoints, width: 0.1, color: [1, 0.9, 0.6], alpha: 0.8, grainRepeat: 2, flow: vfx.getTime() * 4 });
    */
   queueRibbon(options) {
-    const ribbon = options.alpha !== void 0 ? options : System140.Object.assign({}, options, { alpha: 1 });
+    const ribbon = options.alpha !== void 0 ? options : System141.Object.assign({}, options, { alpha: 1 });
     if (ribbon.points.length < 2 || !(ribbon.width > 0) || !(ribbon.alpha > 0)) {
       return;
     }
@@ -81573,22 +82486,22 @@ var ToonVfx = class {
     const turns = options.turns !== void 0 ? options.turns : 1;
     const axis = [options.end[0] - start[0], options.end[1] - start[1], options.end[2] - start[2]];
     const sides = readAxisSides(axis);
-    const kinkStep = System140.Math.floor(time / LIGHTNING_KINK_SECONDS);
+    const kinkStep = System141.Math.floor(time / LIGHTNING_KINK_SECONDS);
     const seededRandom = new SeededRandom(1);
     for (let boltIndex = 0; boltIndex < count; ++boltIndex) {
-      seededRandom.setSeed(System140.Math.floor(seed * 7919) + kinkStep * 131 + boltIndex * 977 >>> 0);
+      seededRandom.setSeed(System141.Math.floor(seed * 7919) + kinkStep * 131 + boltIndex * 977 >>> 0);
       const random2 = /* @__PURE__ */ __name(() => {
         return seededRandom.nextValue();
       }, "random");
-      const phase = boltIndex / count * System140.Math.PI * 2 + random2() * 0.8;
+      const phase = boltIndex / count * System141.Math.PI * 2 + random2() * 0.8;
       const boltTurns = turns * (0.8 + random2() * 0.4) * (random2() < 0.5 ? -1 : 1);
       const points = [];
       for (let pointIndex = 0; pointIndex < LIGHTNING_POINT_COUNT; ++pointIndex) {
         const along = pointIndex / (LIGHTNING_POINT_COUNT - 1);
-        const angle = phase + along * boltTurns * System140.Math.PI * 2 + (random2() - 0.5) * 0.5;
+        const angle = phase + along * boltTurns * System141.Math.PI * 2 + (random2() - 0.5) * 0.5;
         const reach = options.radius * (0.75 + random2() * 0.5);
-        const cosine = System140.Math.cos(angle) * reach;
-        const sine = System140.Math.sin(angle) * reach;
+        const cosine = System141.Math.cos(angle) * reach;
+        const sine = System141.Math.sin(angle) * reach;
         points.push([
           start[0] + axis[0] * along + sides[0][0] * cosine + sides[1][0] * sine,
           start[1] + axis[1] * along + sides[0][1] * cosine + sides[1][1] * sine,
@@ -81625,7 +82538,7 @@ var ToonVfx = class {
       [0, 0, size, size],
       [color[0], color[1], color[2], options.ramp !== void 0 ? options.ramp : -1],
       [options.look !== void 0 ? options.look : ToonVfxLook.soft, 0, 0, NO_FLOOR],
-      [options.brightness !== void 0 ? options.brightness : 1, options.alpha !== void 0 ? options.alpha : 1, angle / (System140.Math.PI * 2), 0],
+      [options.brightness !== void 0 ? options.brightness : 1, options.alpha !== void 0 ? options.alpha : 1, angle / (System141.Math.PI * 2), 0],
       [1, options.rim !== void 0 ? options.rim : 0, 0, 0]
     ];
     const glintData = this.#glintData;
@@ -81660,7 +82573,7 @@ var ToonVfx = class {
     if (!this.registerEventKey(options.key)) {
       return;
     }
-    const lightning = System140.Object.assign({ radius: 0.05, count: 1, width: 0.05, turns: 1, color: [1, 1, 1], ramp: -1, alpha: 1, brightness: 1, glow: null, rim: 0 }, options);
+    const lightning = System141.Object.assign({ radius: 0.05, count: 1, width: 0.05, turns: 1, color: [1, 1, 1], ramp: -1, alpha: 1, brightness: 1, glow: null, rim: 0 }, options);
     lightning.life = options.life !== void 0 ? options.life : 0.5;
     lightning.age = options.age !== void 0 ? options.age : 0;
     lightning.seed = options.seed !== void 0 ? options.seed : this.#seededRandom.nextValue() * 1e3;
@@ -81749,7 +82662,7 @@ var ToonVfx = class {
       if (lightning.age < 0) {
         continue;
       }
-      const fade = System140.Math.min(1, (lightning.life - lightning.age) / LIGHTNING_FADE_SECONDS);
+      const fade = System141.Math.min(1, (lightning.life - lightning.age) / LIGHTNING_FADE_SECONDS);
       this.queueLightning({ start: lightning.start, end: lightning.end, radius: lightning.radius, count: lightning.count, width: lightning.width, turns: lightning.turns, color: lightning.color, ramp: lightning.ramp, alpha: lightning.alpha * fade, brightness: lightning.brightness, time: this.#time, seed: lightning.seed, glow: lightning.glow, rim: lightning.rim });
     }
     const isQueued = this.#queuedDecals.length > 0 || this.#queuedBeams.length > 0 || this.#queuedRibbons.length > 0 || this.#queuedGlintCount > 0;
@@ -81825,7 +82738,7 @@ var ToonVfx = class {
     const viewProjectionMatrix = projectionMatrix.clone();
     viewProjectionMatrix.multiply(viewMatrix);
     const viewDirection = [viewElements[2], viewElements[6], viewElements[10]];
-    const isPerspective = System140.Math.abs(projectionElements[11]) > 0.5;
+    const isPerspective = System141.Math.abs(projectionElements[11]) > 0.5;
     let cameraPoint = [viewDirection[0], viewDirection[1], viewDirection[2], 0];
     if (isPerspective) {
       const translationX = viewElements[12];
@@ -81881,9 +82794,9 @@ var ToonVfx = class {
       if (decal.age < 0) {
         continue;
       }
-      const heat = decal.heatSeconds > 0 ? System140.Math.max(0, 1 - decal.age / decal.heatSeconds) : 0;
-      let fade = System140.Math.min(1, decal.life - decal.age) * decal.alpha;
-      if (decal.flicker > 0 && System140.Math.floor(decal.age / decal.flicker) % 2 === 1) {
+      const heat = decal.heatSeconds > 0 ? System141.Math.max(0, 1 - decal.age / decal.heatSeconds) : 0;
+      let fade = System141.Math.min(1, decal.life - decal.age) * decal.alpha;
+      if (decal.flicker > 0 && System141.Math.floor(decal.age / decal.flicker) % 2 === 1) {
         fade *= 0.3;
       }
       this.drawDecal(decal, fade, heat * heat);
@@ -81904,7 +82817,7 @@ var ToonVfx = class {
   drawDecal(decal, alpha, heat) {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     const decalProgram = this.#decalProgram;
-    const grow = decal.growSeconds > 0 ? 1 - System140.Math.pow(1 - System140.Math.min(1, System140.Math.max(0, decal.age) / decal.growSeconds), 2) : 1;
+    const grow = decal.growSeconds > 0 ? 1 - System141.Math.pow(1 - System141.Math.min(1, System141.Math.max(0, decal.age) / decal.growSeconds), 2) : 1;
     const radius = decal.startRadius + (decal.radius - decal.startRadius) * grow;
     webGL2RenderingContext.uniform4f(decalProgram.getUniformLocation("decalShape"), decal.x, decal.z, radius, decal.angle);
     webGL2RenderingContext.uniform1f(decalProgram.getUniformLocation("decalHeight"), decal.floorHeight + DECAL_LIFT);
@@ -81940,20 +82853,20 @@ var ToonVfx = class {
       if (activeAge < 0) {
         continue;
       }
-      const progress = System140.Math.min(1, activeAge / System140.Math.max(1e-3, band.life - band.delay));
-      const spread = 1 - System140.Math.pow(1 - progress, 3);
+      const progress = System141.Math.min(1, activeAge / System141.Math.max(1e-3, band.life - band.delay));
+      const spread = 1 - System141.Math.pow(1 - progress, 3);
       const radius = band.startRadius + (band.endRadius - band.startRadius) * spread;
-      const width = System140.Math.min(radius, band.width * (1 - 0.45 * progress));
-      const alpha = System140.Math.pow(1 - progress, 1.3);
+      const width = System141.Math.min(radius, band.width * (1 - 0.45 * progress));
+      const alpha = System141.Math.pow(1 - progress, 1.3);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandProgress"), progress);
-      webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRepeat"), System140.Math.max(6, System140.Math.round(band.endRadius * 4)));
+      webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRepeat"), System141.Math.max(6, System141.Math.round(band.endRadius * 4)));
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRamp"), band.ramp);
       webGL2RenderingContext.uniform3f(bandProgram.getUniformLocation("bandColor"), band.color[0], band.color[1], band.color[2]);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandSeed"), band.seed);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandAlpha"), alpha);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRim"), band.rim);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandFlat"), 1);
-      webGL2RenderingContext.uniform4f(bandProgram.getUniformLocation("bandShape"), band.x, band.z, radius, System140.Math.min(radius, width * 2.6));
+      webGL2RenderingContext.uniform4f(bandProgram.getUniformLocation("bandShape"), band.x, band.z, radius, System141.Math.min(radius, width * 2.6));
       webGL2RenderingContext.uniform2f(bandProgram.getUniformLocation("bandLift"), 0, band.floorHeight + GROUND_GLOW_LIFT);
       webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, this.#bandMesh.indexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandFlat"), 0);
@@ -81983,9 +82896,9 @@ var ToonVfx = class {
       if (plume.age < 0) {
         continue;
       }
-      const progress = System140.Math.min(1, plume.age / plume.life);
+      const progress = System141.Math.min(1, plume.age / plume.life);
       const alpha = smoothStep(0, 0.08, progress) * (1 - smoothStep(0.6, 1, progress));
-      const heat = System140.Math.max(0, 1 - progress * 1.4);
+      const heat = System141.Math.max(0, 1 - progress * 1.4);
       webGL2RenderingContext.uniform4f(plumeProgram.getUniformLocation("plumeShape"), plume.x, plume.z, plume.height, plume.capRadius);
       webGL2RenderingContext.uniform4f(plumeProgram.getUniformLocation("plumeMotion"), progress, plume.age, plume.seed, plume.stemRadius);
       webGL2RenderingContext.uniform1f(plumeProgram.getUniformLocation("plumeBase"), plume.floorHeight);
@@ -82017,10 +82930,10 @@ var ToonVfx = class {
       if (fireball.age < 0) {
         continue;
       }
-      const progress = System140.Math.min(1, fireball.age / fireball.life);
-      const grow = 1 - System140.Math.pow(1 - System140.Math.min(1, fireball.age / fireball.growSeconds), 3);
+      const progress = System141.Math.min(1, fireball.age / fireball.life);
+      const grow = 1 - System141.Math.pow(1 - System141.Math.min(1, fireball.age / fireball.growSeconds), 3);
       const radius = fireball.radius * (0.25 + 0.75 * grow) * (1 + 0.25 * progress);
-      const heat = System140.Math.max(0, 1 - System140.Math.pow(progress, 1.4) * 1.25);
+      const heat = System141.Math.max(0, 1 - System141.Math.pow(progress, 1.4) * 1.25);
       const alpha = 1 - smoothStep(0.55, 1, progress);
       webGL2RenderingContext.uniform4f(fireballProgram.getUniformLocation("ballCenter"), fireball.x, fireball.y + fireball.rise * progress, fireball.z, radius);
       webGL2RenderingContext.uniform1f(fireballProgram.getUniformLocation("ballTime"), fireball.age);
@@ -82054,7 +82967,7 @@ var ToonVfx = class {
     for (const beam of this.#queuedBeams) {
       const start = beam.start;
       const axis = [beam.end[0] - start[0], beam.end[1] - start[1], beam.end[2] - start[2]];
-      const beamLength = System140.Math.hypot(axis[0], axis[1], axis[2]);
+      const beamLength = System141.Math.hypot(axis[0], axis[1], axis[2]);
       const sides = readAxisSides(axis);
       webGL2RenderingContext.uniform3f(beamProgram.getUniformLocation("beamStart"), start[0], start[1], start[2]);
       webGL2RenderingContext.uniform3f(beamProgram.getUniformLocation("beamAxis"), axis[0], axis[1], axis[2]);
@@ -82085,7 +82998,7 @@ var ToonVfx = class {
       vertexCount += ribbon.points.length * 2;
     }
     if (this.#ribbonData.length < vertexCount * RIBBON_FLOAT_COUNT) {
-      this.#ribbonData = new System140.Float32Array(vertexCount * RIBBON_FLOAT_COUNT * 2);
+      this.#ribbonData = new System141.Float32Array(vertexCount * RIBBON_FLOAT_COUNT * 2);
     }
     const ribbonData = this.#ribbonData;
     const ribbonLengths = [];
@@ -82097,10 +83010,10 @@ var ToonVfx = class {
       let ribbonLength = 0;
       for (let pointIndex = 0; pointIndex <= lastIndex; ++pointIndex) {
         const point = points[pointIndex];
-        const previous = points[System140.Math.max(0, pointIndex - 1)];
-        const next = points[System140.Math.min(lastIndex, pointIndex + 1)];
+        const previous = points[System141.Math.max(0, pointIndex - 1)];
+        const next = points[System141.Math.min(lastIndex, pointIndex + 1)];
         if (pointIndex > 0) {
-          ribbonLength += System140.Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]);
+          ribbonLength += System141.Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]);
         }
         const tangent = [next[0] - previous[0], next[1] - previous[1], next[2] - previous[2]];
         let towardX = cameraPoint[0];
@@ -82114,7 +83027,7 @@ var ToonVfx = class {
         let sideX = tangent[1] * towardZ - tangent[2] * towardY;
         let sideY = tangent[2] * towardX - tangent[0] * towardZ;
         let sideZ = tangent[0] * towardY - tangent[1] * towardX;
-        const sideLength = System140.Math.max(1e-6, System140.Math.hypot(sideX, sideY, sideZ));
+        const sideLength = System141.Math.max(1e-6, System141.Math.hypot(sideX, sideY, sideZ));
         const along = pointIndex / lastIndex;
         const edge = 2 * along - 1;
         const halfWidth = ribbon.width * 0.5 * (1 - taper * edge * edge);
@@ -82241,7 +83154,7 @@ var ToonVfx = class {
 };
 
 // src/resource/spriteatlas.js
-var System141 = globalThis;
+var System142 = globalThis;
 var searchAtlasList = [];
 function removeExtension(fileName) {
   const dotIndex = fileName.lastIndexOf(".");
@@ -82273,7 +83186,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
   constructor() {
     super();
     this.#pageImages = [];
-    this.#frames = new System141.Map();
+    this.#frames = new System142.Map();
     this.#isLoaded = false;
   }
   //==============================================================================
@@ -82320,14 +83233,14 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
     const frameValues = [];
     if (atlasData !== null && typeof atlasData === "object" && atlasData.images !== void 0) {
       const meta = atlasData.meta !== void 0 ? atlasData.meta : {};
-      if (System141.Array.isArray(meta.pages)) {
+      if (System142.Array.isArray(meta.pages)) {
         for (const page of meta.pages) {
           pagePaths.push(page.imageFileName);
         }
       } else if (typeof meta.imageFileName === "string") {
         pagePaths.push(meta.imageFileName);
       }
-      for (const fileName of System141.Object.keys(atlasData.images)) {
+      for (const fileName of System142.Object.keys(atlasData.images)) {
         const imageData = atlasData.images[fileName];
         const pageIndex = typeof imageData.page === "number" ? imageData.page : 0;
         frameValues.push([fileName, pageIndex, imageData.x, imageData.y, imageData.width, imageData.height]);
@@ -82336,7 +83249,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
       for (const pagePath of atlasData.pagePaths) {
         pagePaths.push(pagePath);
       }
-      for (const frameName of System141.Object.keys(atlasData.frames)) {
+      for (const frameName of System142.Object.keys(atlasData.frames)) {
         const values = atlasData.frames[frameName];
         frameValues.push([frameName, values[0], values[1], values[2], values[3], values[4]]);
       }
@@ -82355,7 +83268,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
       });
       loadPromises.push(loadPromise);
     }
-    await System141.Promise.all(loadPromises);
+    await System142.Promise.all(loadPromises);
     this.#pageImages = pageImages;
     this.#frames.clear();
     for (const values of frameValues) {
@@ -82436,7 +83349,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
    * @returns { string[] } 이름 목록.
    */
   getFrameNames() {
-    return System141.Array.from(this.#frames.keys());
+    return System142.Array.from(this.#frames.keys());
   }
   //==============================================================================
   // 불러왔는지.
@@ -82563,7 +83476,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
 };
 
 // src/misc/indicator.js
-var System142 = globalThis;
+var System143 = globalThis;
 var Indicator = class extends Object2 {
   static {
     __name(this, "Indicator");
@@ -82651,9 +83564,9 @@ var Indicator = class extends Object2 {
     const outerRadius = this.#radius;
     const teethSegments = [];
     for (let i = 0; i < teethCount; i++) {
-      const angle = i / teethCount * System142.Math.PI * 2;
-      const cosA = System142.Math.cos(angle);
-      const sinA = System142.Math.sin(angle);
+      const angle = i / teethCount * System143.Math.PI * 2;
+      const cosA = System143.Math.cos(angle);
+      const sinA = System143.Math.sin(angle);
       const startPosition = Vector2.create(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
       const endPosition = Vector2.create(cosA * outerRadius, sinA * outerRadius);
       teethSegments.push([startPosition, endPosition]);
@@ -82747,7 +83660,7 @@ var Indicator = class extends Object2 {
 };
 
 // src/misc/dynamicfont.js
-var System143 = globalThis;
+var System144 = globalThis;
 var ATLAS_MAX_WIDTH = 1024;
 var ATLAS_PADDING = 2;
 var GlyphInfo = class extends Object2 {
@@ -82919,7 +83832,7 @@ var DynamicFont = class extends Object2 {
   // 든 글자를 모두 다시 굽기. (글꼴, 크기, 자간을 바꾼 뒤 부른다)
   //==============================================================================
   rebuildAtlas() {
-    const document2 = System143.document;
+    const document2 = System144.document;
     const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : SYSTEM_FONT_STRING;
     const fontSize = this.getFontSize();
     const fontString = `${fontSize}px ${fontFamily}`;
@@ -83040,7 +83953,7 @@ var DynamicFont = class extends Object2 {
 };
 
 // import.js
-var System144 = globalThis;
+var System145 = globalThis;
 export {
   Action,
   AmbientOcclusionEffect,
@@ -83186,6 +84099,7 @@ export {
   SceneManager,
   ScreenEffect,
   ScreenEffectType,
+  ScreenFadeHold,
   ScrollBarAxis,
   ScrollMode,
   SeededRandom,
@@ -83215,7 +84129,7 @@ export {
   Stack,
   Steering2D,
   SubsurfaceScatteringEffect,
-  System144 as System,
+  System145 as System,
   TIMELINE_EASING_NAMES,
   TIMELINE_NODE_DEFAULTS,
   TIMELINE_PROPERTY_DEFINITIONS,

@@ -20260,6 +20260,82 @@
 						},
 						{
 							"kind": "method",
+							"name": "prepareImage",
+							"signature": "prepareImage(image)",
+							"params": [
+								{
+									"name": "image",
+									"type": "HTMLImageElement | HTMLCanvasElement | OffscreenCanvas",
+									"description": {
+										"ko": "올릴 그림.",
+										"en": "The image to upload."
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "텍스처가 있으면 true. (null 이거나 아직 읽히지 않은 그림이면 false)",
+									"en": "true if a texture exists. (false if null or the image is not loaded yet)"
+								}
+							},
+							"description": {
+								"ko": "그림을 미리 GPU 에 올리기. (로딩 때 불러, 처음 그리는 프레임에 풀기와 올리기가 몰리지 않게)\n- 지금 이미지 스무딩과 밉맵 설정으로 올린다. (그릴 때 설정이 다르면 그때 거르기만 바꾼다)\n- 이미 올린 그림이면 아무것도 하지 않는다. 아직 읽히지 않은 그림(크기 0)은 올리지 않는다.\n- 코드로 만든 캔버스처럼 ImageAsset 으로 읽지 않은 그림을 씬의 load 에서 올려 둘 때 쓴다.",
+								"en": "Uploads an image to the GPU in advance. (Call it while loading so that decoding and uploading do not pile up on the first drawn frame)\n- Uploads with the current image smoothing and mipmap settings. (If the settings differ when drawing, only the filtering changes then)\n- Does nothing if the image is already uploaded. Does not upload an image that is not loaded yet (size 0).\n- Use it in a scene's load to upload images that were not loaded with ImageAsset, such as canvases made in code."
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "씬을 불러오는 동안 코드로 만든 그림을 올려 두기",
+										"en": "Upload an image made in code while the scene loads"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tasync load(engine) {\n\t\tawait super.load(engine);\n\t\tthis.dotImage = new OffscreenCanvas(32, 32);\n\t\tconst context = this.dotImage.getContext(\"2d\");\n\t\tcontext.fillStyle = \"#ff6600\";\n\t\tcontext.fillRect(0, 0, 32, 32);\n\t\tconst isPrepared = engine.getGraphic().prepareImage(this.dotImage);\n\t\tconsole.log(isPrepared);\n\t}\n\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tgraphic.drawImage(this.dotImage, Vector2.create(304, 164), Vector2.create(32, 32));\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "prepareLoadedImages",
+							"signature": "prepareLoadedImages(timeLimitMilliseconds = System.Infinity)",
+							"params": [
+								{
+									"name": "timeLimitMilliseconds",
+									"type": "number",
+									"description": {
+										"ko": "이번에 쓸 시간 한도. (밀리초, 기본 Infinity 는 모두)",
+										"en": "The time limit to use this time. (Milliseconds, the default Infinity means all)"
+									}
+								}
+							],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "아직 올리지 않고 남은 그림 수. (0 이면 다 올렸다)",
+									"en": "The number of images still left to upload. (0 means all are uploaded)"
+								}
+							},
+							"description": {
+								"ko": "읽었지만 아직 올리지 않은 그림 올리기. (ImageAsset 이 읽은 그림, 읽은 차례로)\n- SceneManager 가 씬의 load 가 끝난 뒤(로딩 화면 동안) 프레임마다 나눠 부른다. 씬이 따로 부를 일은 없다.\n- 시간 한도를 주면 그 시간을 넘긴 뒤에는 멈추고 남은 수를 돌려준다. (한 번에 적어도 하나는 올린다, 유니티의 asyncUploadTimeSlice 와 같다)\n- 미리 푼 그림(ImageBitmap)은 올린 뒤 닫는다. 미리 풀지 않은 꼴의 그림은 그림 요소를 그대로 올린다.",
+								"en": "Uploads images that were loaded but not uploaded yet. (Images loaded by ImageAsset, in loading order)\n- SceneManager calls it split across frames after a scene's load finishes (during the loading screen). A scene does not need to call it.\n- Given a time limit, it stops after exceeding that time and returns the remaining count. (Uploads at least one per call, same as Unity's asyncUploadTimeSlice)\n- A pre-decoded image (ImageBitmap) is closed after uploading. An image of a format that is not pre-decoded is uploaded from the image element as is."
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "그림을 읽은 뒤 바로 올리기",
+										"en": "Upload images right after loading them"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, ImageAsset, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tasync load(engine) {\n\t\tawait super.load(engine);\n\t\tthis.imageAsset = new ImageAsset();\n\t\tawait this.imageAsset.load(\"examples/assets/spritesheet.png\");\n\t\tconst remainingCount = engine.getGraphic().prepareLoadedImages();\n\t\tconsole.log(remainingCount);\n\t}\n\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tgraphic.drawImage(this.imageAsset.getImage(), Vector2.create(170, 30), Vector2.create(300, 300));\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "drawImage",
 							"signature": "drawImage(image, position, contentSize)",
 							"params": [
@@ -21067,6 +21143,56 @@
 								"class": "Graphic",
 								"name": "is_text_pixel_snap_enabled"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "setTextAntialiasEnabled",
+							"signature": "setTextAntialiasEnabled(isTextAntialiasEnabled)",
+							"params": [
+								{
+									"name": "isTextAntialiasEnabled",
+									"type": "boolean",
+									"description": {
+										"ko": "켜면 참.",
+										"en": "True to enable."
+									}
+								}
+							],
+							"description": {
+								"ko": "글자 안티앨리어싱 켬 / 끔. (러스트 Graphic::set_text_antialias_enabled 와 같다)\n\n끄면 구운 글자의 알파를 문턱값 128 로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다. (도트 글꼴용)\n켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다. (기본 켬)",
+								"en": "Turns text antialiasing on or off. (Same as Rust Graphic::set_text_antialias_enabled)\n\nWhen off, baked glyph alpha is split into 0 and 255 at threshold 128 and the texture is sampled with NEAREST. (For pixel fonts)\nIt applies to text baked after the change. Text already baked stays as it is. (On by default)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "도트 글꼴처럼 또렷한 글자",
+										"en": "Crisp text like a pixel font"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tengine.getGraphic().setTextAntialiasEnabled(false);\n\t}\n\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tgraphic.setFillColor(\"#ffffff\");\n\t\tgraphic.setFontString(\"16px sans-serif\");\n\t\tgraphic.setTextAlign(\"left\");\n\t\tgraphic.setTextBaseline(\"top\");\n\t\tgraphic.drawFillText(\"PIXEL 123\", 20, 20);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isTextAntialiasEnabled",
+							"signature": "isTextAntialiasEnabled()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "켜졌으면 참.",
+									"en": "True if on."
+								}
+							},
+							"description": {
+								"ko": "글자 안티앨리어싱이 켜져 있는지.",
+								"en": "Whether text antialiasing is on."
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js"
 						},
 						{
 							"kind": "method",
@@ -23126,10 +23252,73 @@
 			},
 			"classes": [
 				{
+					"name": "ScreenFadeHold",
+					"summary": {
+						"ko": "화면 페이드를 어둡게 붙잡는 손잡이. (러스트 판 ScreenFadeHold 와 같다)\n- fadeScreen 의 onDark 가 돌려주거나 fadeScreenWithHold 의 onDark 가 받는다. release 를 부를 때까지 어둡게 둔다.",
+						"en": "A hold that keeps the screen fade dark. (Same as Rust ScreenFadeHold)\n- Returned by fadeScreen's onDark or received by fadeScreenWithHold's onDark. The screen stays dark until release is called."
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "다 어두워지면 손잡이를 받고, 놓을 때까지 어둡게 두기",
+								"en": "Receive a hold when fully dark and stay dark until it is released"
+							},
+							"code": "import { ScreenFadeHold } from \"./build/vanilla.js\";\n\nconst screenFadeHold = new ScreenFadeHold();\nconsole.log(screenFadeHold.isReleased());\nscreenFadeHold.release();\nconsole.log(screenFadeHold.isReleased());",
+							"language": "javascript"
+						}
+					],
+					"extends": "Object",
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor()",
+							"params": [],
+							"description": {
+								"ko": "생성. (아직 놓지 않음)",
+								"en": "Constructor. (Not released yet)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "release",
+							"signature": "release()",
+							"params": [],
+							"description": {
+								"ko": "놓기. (막이 밝아진다)",
+								"en": "Releases the hold. (The overlay brightens)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "isReleased",
+							"signature": "isReleased()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "release 를 불렀으면 참.",
+									"en": "True if release was called."
+								}
+							},
+							"description": {
+								"ko": "놓았는지.",
+								"en": "Whether it is released."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						}
+					]
+				},
+				{
 					"name": "GameScene",
 					"summary": {
-						"ko": "게임 공통 베이스 씬.\n- 로딩 화면 (중앙 이미지 + 게이지 + 터치 단축).\n  색은 setLoadingColors, 그림 전체는 setLoadingDrawer 로 바꾼다. 게이지는 기본으로 최소 노출 시간의 경과를 보이고,\n  setLoadingProgress 나 trackAssetLoader 로 진행률을 알리면 그 진행률을 부드럽게 따라간다. (LoadingProgress)\n- 개발자 도구 (DEVTools).\n- 터치 입력 라우팅 (TouchRecognizer + DEVTools 캡처 시 무시).\n- 세이프 에어리어 노드 + env(safe-area-inset-*) 계산.\n- viewSize 변화 자동 감지 → layout 재호출.\n- 캔버스 배경 클리어.\n- 화면 페이드 (fadeScreen, 어두운 동안 입력을 막음).\n- UI 누름 판정 (isUserInterfaceAt) 과 UI 가 받지 않은 입력만 놀이로 넘기기 (setPlayInputHandler, 게임 영역 좌표).\n  처리기 대신 모아 두고 꺼내 쓸 수도 있다. (setPlayInputEnabled, takePlayInputs)\n- 세이프 에어리어 인셋을 직접 정할 수 있다. (setSafeAreaInsets, CSS 픽셀. 정하지 않으면 뷰 매니저의 값)\n- 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이를 늘 같게 (setPlayAreaReference).\n\n서브클래스 hook:\n- loadAssets(): super 호출 후 자체 자산을 비동기 로드.\n- layout(): super 호출 후 자체 콘텐츠 레이아웃 갱신.",
-						"en": "Common base scene for games.\n- Loading screen (center image + gauge + tap to skip).\n  Change the colors with setLoadingColors and the whole drawing with setLoadingDrawer. By default the gauge shows the elapsed minimum display time,\n  and once progress is reported with setLoadingProgress or trackAssetLoader it smoothly follows that progress. (LoadingProgress)\n- Developer tools (DEVTools).\n- Touch input routing (TouchRecognizer, ignored while DEVTools captures input).\n- Safe area node + env(safe-area-inset-*) calculation.\n- Detects viewSize changes automatically → calls layout again.\n- Clears the canvas background.\n- Screen fade (fadeScreen, blocks input while dark).\n- UI hit test (isUserInterfaceAt) and passing only the input the UI did not take to play (setPlayInputHandler, play area coordinates).\n  Instead of a handler, input can also be collected and taken out later. (setPlayInputEnabled, takePlayInputs)\n- Safe area insets can be set directly. (setSafeAreaInsets, CSS pixels. If not set, the view manager's values)\n- Keeps the fixed-side length of the play area excluding the safe area constant (setPlayAreaReference).\n\nSubclass hooks:\n- loadAssets(): after calling super, loads its own assets asynchronously.\n- layout(): after calling super, updates its own content layout."
+						"ko": "게임 공통 베이스 씬.\n- 로딩 화면 (중앙 이미지 + 게이지 + 터치 단축).\n  색은 setLoadingColors, 그림 전체는 setLoadingDrawer 로 바꾼다. 게이지는 기본으로 최소 노출 시간의 경과를 보이고,\n  setLoadingProgress 나 trackAssetLoader 로 진행률을 알리면 그 진행률을 부드럽게 따라간다. (LoadingProgress)\n- 개발자 도구 (DevTools).\n- 터치 입력 라우팅 (TouchRecognizer + DevTools 캡처 시 무시).\n- 세이프 에어리어 노드 + env(safe-area-inset-*) 계산.\n- viewSize 변화 자동 감지 → layout 재호출.\n- 캔버스 배경 클리어.\n- 화면 페이드 (fadeScreen, 어두운 동안 입력을 막음).\n- UI 누름 판정 (isUserInterfaceAt) 과 UI 가 받지 않은 입력만 놀이로 넘기기 (setPlayInputHandler, 게임 영역 좌표).\n  처리기 대신 모아 두고 꺼내 쓸 수도 있다. (setPlayInputEnabled, takePlayInputs)\n- 세이프 에어리어 인셋을 직접 정할 수 있다. (setSafeAreaInsets, CSS 픽셀. 정하지 않으면 뷰 매니저의 값)\n- 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이를 늘 같게 (setPlayAreaReference).\n\n서브클래스 hook:\n- loadAssets(): super 호출 후 자체 자산을 비동기 로드.\n- layout(): super 호출 후 자체 콘텐츠 레이아웃 갱신.",
+						"en": "Common base scene for games.\n- Loading screen (center image + gauge + tap to skip).\n  Change the colors with setLoadingColors and the whole drawing with setLoadingDrawer. By default the gauge shows the elapsed minimum display time,\n  and once progress is reported with setLoadingProgress or trackAssetLoader it smoothly follows that progress. (LoadingProgress)\n- Developer tools (DevTools).\n- Touch input routing (TouchRecognizer, ignored while DevTools captures input).\n- Safe area node + env(safe-area-inset-*) calculation.\n- Detects viewSize changes automatically → calls layout again.\n- Clears the canvas background.\n- Screen fade (fadeScreen, blocks input while dark).\n- UI hit test (isUserInterfaceAt) and passing only the input the UI did not take to play (setPlayInputHandler, play area coordinates).\n  Instead of a handler, input can also be collected and taken out later. (setPlayInputEnabled, takePlayInputs)\n- Safe area insets can be set directly. (setSafeAreaInsets, CSS pixels. If not set, the view manager's values)\n- Keeps the fixed-side length of the play area excluding the safe area constant (setPlayAreaReference).\n\nSubclass hooks:\n- loadAssets(): after calling super, loads its own assets asynchronously.\n- layout(): after calling super, updates its own content layout."
 					},
 					"examples": [
 						{
@@ -23458,7 +23647,7 @@
 							"signature": "getDevTools()",
 							"params": [],
 							"returns": {
-								"type": "DEVTools | null",
+								"type": "DevTools | null",
 								"description": {
 									"ko": "개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)",
 									"en": "Developer tools. (null before initialize or when EngineConfiguration.useDevTools is off)"
@@ -23867,8 +24056,8 @@
 								}
 							],
 							"description": {
-								"ko": "갱신.\n- viewSize 변화 감지 → 자동 layout 재호출.\n  (모바일 주소창 표시/숨김으로 100vh 가 동적으로 변하는 경우 등에서\n   resize 이벤트만으로는 누락될 수 있어 매 tick 보정.)\n- DEVTools tick 처리.",
-								"en": "Update.\n- Detects viewSize changes → calls layout again automatically.\n  (Corrected every tick because the resize event alone can miss changes,\n   such as when 100vh changes dynamically as the mobile address bar shows or hides.)\n- Handles the DEVTools tick."
+								"ko": "갱신.\n- viewSize 변화 감지 → 자동 layout 재호출.\n  (모바일 주소창 표시/숨김으로 100vh 가 동적으로 변하는 경우 등에서\n   resize 이벤트만으로는 누락될 수 있어 매 tick 보정.)\n- DevTools tick 처리.",
+								"en": "Update.\n- Detects viewSize changes → calls layout again automatically.\n  (Corrected every tick because the resize event alone can miss changes,\n   such as when 100vh changes dynamically as the mobile address bar shows or hides.)\n- Handles the DevTools tick."
 							},
 							"since": "0.2.1",
 							"source": "src/game/gamescene.js",
@@ -24115,8 +24304,8 @@
 								}
 							],
 							"description": {
-								"ko": "postDraw. 어두워지는 막과 DEVTools 를 화면 위에 그린다.",
-								"en": "postDraw. Draws the fade overlay and DEVTools on top of the screen."
+								"ko": "postDraw. 어두워지는 막과 DevTools 를 화면 위에 그린다.",
+								"en": "postDraw. Draws the fade overlay and DevTools on top of the screen."
 							},
 							"since": "0.2.1",
 							"source": "src/game/gamescene.js",
@@ -24136,8 +24325,8 @@
 									"name": "onDark",
 									"type": "Function | null",
 									"description": {
-										"ko": "() => void | Promise",
-										"en": "() => void | Promise"
+										"ko": "() => void | Promise | ScreenFadeHold",
+										"en": "() => void | Promise | ScreenFadeHold"
 									}
 								}
 							],
@@ -24149,8 +24338,8 @@
 								}
 							},
 							"description": {
-								"ko": "어두워졌다 밝아지기.\n- 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도) 어둡게 두었다가 밝힌다.\n- 막이 걸린 동안(어두워지고, 기다리고, 밝아지는 동안)은 누름과 휠을 받지 않는다.\n- 이미 페이드 중이면 무시하고 false.",
-								"en": "Fades to dark and back.\n- Calls onDark once fully dark, and if it returns a Promise, stays dark until it settles (even if it fails), then brightens.\n- While the overlay is up (darkening, waiting, brightening), presses and the wheel are not received.\n- If already fading, ignores the call and returns false."
+								"ko": "어두워졌다 밝아지기.\n- 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도), ScreenFadeHold 를 돌려주면 release 할 때까지 어둡게 두었다가 밝힌다.\n- 막이 걸린 동안(어두워지고, 기다리고, 밝아지는 동안)은 누름과 휠을 받지 않는다.\n- 이미 페이드 중이면 무시하고 false.",
+								"en": "Fades to dark and back.\n- When fully dark, calls onDark. If it returns a Promise, the screen stays dark until it settles (even on failure), and if it returns a ScreenFadeHold, until the hold is released. Then it brightens.\n- While the overlay is up (darkening, waiting, brightening), presses and wheel input are not received.\n- If already fading, the call is ignored and returns false."
 							},
 							"since": "0.4.0",
 							"source": "src/game/gamescene.js",
@@ -24160,6 +24349,34 @@
 								"class": "GameSceneBase",
 								"name": "fade_screen"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "fadeScreenWithHold",
+							"signature": "fadeScreenWithHold(onDark)",
+							"params": [
+								{
+									"name": "onDark",
+									"type": "function(ScreenFadeHold): void",
+									"description": {
+										"ko": "다 어두워지면 손잡이를 받아 부를 함수.",
+										"en": "Function called with the hold when the screen is fully dark."
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "시작했는지.",
+									"en": "Whether it started."
+								}
+							},
+							"description": {
+								"ko": "어두워졌다 밝아지기의 손잡이 꼴. (러스트 판 fade_screen_with_hold 와 같다)\n- 다 어두워지면 onDark 에 새 ScreenFadeHold 를 넘기고, 그 손잡이를 release 할 때까지 어둡게 둔다.\n- 이미 페이드 중이면 무시하고 false.",
+								"en": "The hold form of fading to dark and back. (Same as Rust fade_screen_with_hold)\n- When fully dark, passes a new ScreenFadeHold to onDark and stays dark until that hold is released.\n- If already fading, the call is ignored and returns false."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
 						},
 						{
 							"kind": "method",
@@ -28200,7 +28417,7 @@
 								"ko": "값 두 개를 0.5 초 동안 바꾸기",
 								"en": "Change two values over 0.5 seconds"
 							},
-							"code": "import { Tween } from \"./build/vanilla.js\";\n\nconst tween = new Tween({ x: 0, alpha: 1 });\ntween.to({ x: 100, alpha: 0 }, 0.5);\ntween.easing(Tween.easingFunction.quadratic.out);\ntween.setUpdate((values) => {\n\tconsole.log(values.x, values.alpha);\n});\ntween.setComplete(() => {\n\tconsole.log(\"complete\");\n});\ntween.start();\nfor (let step = 0; step < 5; ++step) {\n\ttween.tick(0.1);\n}\nconsole.log(tween.isFinished());",
+							"code": "import { Tween } from \"./build/vanilla.js\";\n\nconst tween = new Tween({ x: 0, alpha: 1 });\ntween.to({ x: 100, alpha: 0 }, 0.5);\ntween.easing(Tween.easingFunction.quadratic.easeOut);\ntween.setUpdate((values) => {\n\tconsole.log(values.x, values.alpha);\n});\ntween.setComplete(() => {\n\tconsole.log(\"complete\");\n});\ntween.start();\nfor (let step = 0; step < 5; ++step) {\n\ttween.tick(0.1);\n}\nconsole.log(tween.isFinished());",
 							"language": "javascript"
 						}
 					],
@@ -28309,7 +28526,7 @@
 										"ko": "씬에서 노드 위치를 움직이기",
 										"en": "Move a node position in a scene"
 									},
-									"code": "import { Engine, EngineConfiguration, Scene, WorldNode, Tween, TweenProperty, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst node = new WorldNode();\n\t\tconst root = this.getRoot();\n\t\troot.addChild(node);\n\t\tconst tween = Tween.createNodeTween(node, TweenProperty.localPosition, Vector2.create(0, 0), Vector2.create(200, 100), 0.5);\n\t\ttween.easing(Tween.easingFunction.cubic.inOut);\n\t\ttween.setComplete(() => {\n\t\t\tconst localPosition = node.getLocalPosition();\n\t\t\tconsole.log(localPosition.x, localPosition.y);\n\t\t});\n\t\tthis.startTween(tween);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"code": "import { Engine, EngineConfiguration, Scene, WorldNode, Tween, TweenProperty, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst node = new WorldNode();\n\t\tconst root = this.getRoot();\n\t\troot.addChild(node);\n\t\tconst tween = Tween.createNodeTween(node, TweenProperty.localPosition, Vector2.create(0, 0), Vector2.create(200, 100), 0.5);\n\t\ttween.easing(Tween.easingFunction.cubic.easeInOut);\n\t\ttween.setComplete(() => {\n\t\t\tconst localPosition = node.getLocalPosition();\n\t\t\tconsole.log(localPosition.x, localPosition.y);\n\t\t});\n\t\tthis.startTween(tween);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
 									"language": "javascript"
 								}
 							]
@@ -35944,8 +36161,8 @@
 								}
 							],
 							"description": {
-								"ko": "주기적 갱신.\n- viewSize 변화 감지 → layout 자동 호출.\n  (모바일 주소창 토글로 100vh 가 동적으로 변하는 경우 등에서 resize 이벤트만으론\n   누락될 수 있어 매 tick 보정.)\n- 트리 내 새로 추가된 UINode 들을 솔버에 자동 부착 후 솔버 한 번 풀이.\n- DEVTools tick.",
-								"en": "Periodic update.\n- Detects viewSize changes → calls layout automatically.\n  (in cases such as 100vh changing dynamically when the mobile address bar toggles, resize events alone\n   can miss it, so it is corrected every tick.)\n- Automatically attaches UINodes newly added in the tree to the solver, then solves once.\n- DEVTools tick."
+								"ko": "주기적 갱신.\n- viewSize 변화 감지 → layout 자동 호출.\n  (모바일 주소창 토글로 100vh 가 동적으로 변하는 경우 등에서 resize 이벤트만으론\n   누락될 수 있어 매 tick 보정.)\n- 트리 내 새로 추가된 UINode 들을 솔버에 자동 부착 후 솔버 한 번 풀이.\n- DevTools tick.",
+								"en": "Periodic update.\n- Detects viewSize changes → calls layout automatically.\n  (in cases such as 100vh changing dynamically when the mobile address bar toggles, resize events alone\n   can miss it, so it is corrected every tick.)\n- Automatically attaches UINodes newly added in the tree to the solver, then solves once.\n- DevTools tick."
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiscene.js",
@@ -36080,7 +36297,7 @@
 							"signature": "getDevTools()",
 							"params": [],
 							"returns": {
-								"type": "DEVTools | null",
+								"type": "DevTools | null",
 								"description": {
 									"ko": "개발자 도구. (만들지 않았으면 null)",
 									"en": "Developer tools. (null if not created)"
@@ -36338,8 +36555,8 @@
 								}
 							],
 							"description": {
-								"ko": "postDraw. DEVTools 를 화면 위에 그린다.",
-								"en": "postDraw. Draws DEVTools over the screen."
+								"ko": "postDraw. DevTools 를 화면 위에 그린다.",
+								"en": "postDraw. Draws DevTools over the screen."
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiscene.js",
@@ -43814,6 +44031,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "set_multiline"
+							},
 							"examples": [
 								{
 									"title": {
@@ -43842,7 +44065,13 @@
 								"en": "Whether it is multiline."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "is_multiline"
+							}
 						},
 						{
 							"kind": "method",
@@ -43863,7 +44092,13 @@
 								"en": "Sets the line height. (Multiline field, null is CSS normal. Like Chrome it is computed from the ascent, descent and line gap of the primary font)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "set_line_height"
+							}
 						},
 						{
 							"kind": "method",
@@ -43882,7 +44117,13 @@
 								"en": "Returns the line height. (multiline field)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "get_line_height"
+							}
 						},
 						{
 							"kind": "method",
@@ -43903,7 +44144,13 @@
 								"en": "Sets the tab size. (multiline field, width in spaces, CSS tab-size)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "set_tab_size"
+							}
 						},
 						{
 							"kind": "method",
@@ -43922,7 +44169,13 @@
 								"en": "Returns the tab size."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "get_tab_size"
+							}
 						},
 						{
 							"kind": "method",
@@ -43941,7 +44194,13 @@
 								"en": "Returns the amount scrolled up. (multiline field, textarea scrollTop)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "get_scroll_top"
+							}
 						},
 						{
 							"kind": "method",
@@ -43962,7 +44221,13 @@
 								"en": "Scrolls up. (Multiline field, clamped within the end of the text on the next draw)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "set_scroll_top"
+							}
 						},
 						{
 							"kind": "method",
@@ -43982,6 +44247,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "can_undo"
+							},
 							"examples": [
 								{
 									"title": {
@@ -44010,7 +44281,13 @@
 								"en": "Whether there is anything to redo."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
+							"source": "src/ui/uiinputfield.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiinputfield",
+								"class": "UIInputField",
+								"name": "can_redo"
+							}
 						},
 						{
 							"kind": "method",
@@ -50616,8 +50893,8 @@
 				{
 					"name": "ImageAsset",
 					"summary": {
-						"ko": "이미지 애셋.",
-						"en": "Image asset."
+						"ko": "이미지 애셋.\n- 읽을 때 파일 바이트를 받아 그림 요소와, 주 스레드 밖에서 푼 ImageBitmap 을 함께 짓는다. (createImageBitmap)\n  그래서 처음 그릴 때 texImage2D 가 주 스레드에서 그림을 다시 풀지 않는다. (풀린 그림은 처음 올린 뒤 닫는다)\n  ImageBitmap 결과가 그림 요소를 올린 결과와 화소까지 같은 꼴만 미리 푼다. (DecodedImageStore)\n- 읽은 그림은 씬을 불러오는 동안(로딩 화면) SceneManager 가 GPU 에 올린다. (Graphic.prepareLoadedImages)\n- 바이트를 받지 못하면(file:// 주소, CORS 없는 다른 출처) 예전처럼 그림 요소에 주소를 바로 넣는다.\n  그때 getImage().src 는 그 주소이고, 바이트를 받았으면 blob: 주소다. (애셋 경로는 getAssetPath)",
+						"en": "Image asset.\n- When loading, receives the file bytes and builds both the image element and an ImageBitmap decoded off the main thread. (createImageBitmap)\n  So texImage2D does not decode the image again on the main thread when it is first drawn. (The decoded image is closed after the first upload)\n  Only formats whose ImageBitmap result is identical to uploading the image element, down to the pixel, are pre-decoded. (DecodedImageStore)\n- SceneManager uploads the loaded images to the GPU while the scene loads (the loading screen). (Graphic.prepareLoadedImages)\n- If the bytes cannot be received (a file:// address, another origin without CORS), the address is put into the image element directly as before.\n  In that case getImage().src is that address, and it is a blob: address if the bytes were received. (The asset path is getAssetPath)"
 					},
 					"examples": [
 						{
@@ -50758,6 +51035,18 @@
 									"language": "javascript"
 								}
 							]
+						},
+						{
+							"kind": "method",
+							"name": "unload",
+							"signature": "unload()",
+							"params": [],
+							"description": {
+								"ko": "애셋 언로드. (아직 올리지 않은 미리 푼 그림이 있으면 닫는다)",
+								"en": "Unloads the asset. (Closes the pre-decoded image if it has not been uploaded yet)"
+							},
+							"since": "0.4.0",
+							"source": "src/resource/imageasset.js"
 						},
 						{
 							"kind": "method",
@@ -56852,8 +57141,8 @@
 						},
 						{
 							"kind": "method",
-							"name": "loop",
-							"signature": "loop(conditionFn, innerAction)",
+							"name": "repeatWhile",
+							"signature": "repeatWhile(conditionFn, innerAction)",
 							"params": [
 								{
 									"name": "conditionFn",
@@ -56883,7 +57172,7 @@
 								"ko": "조건이 참인 동안 내부 액션을 반복. (조건 함수는 대상을 받는다)",
 								"en": "Repeats the inner action while the condition is true. (the condition function receives the target)"
 							},
-							"since": "0.0.9",
+							"since": "0.4.0",
 							"source": "src/animation/action.js",
 							"examples": [
 								{
@@ -56891,7 +57180,7 @@
 										"ko": "조건이 참인 동안 반복하기",
 										"en": "Repeat while a condition is true"
 									},
-									"code": "import { Action } from \"./build/vanilla.js\";\n\nconst counter = { count: 0 };\nconst incrementAction = new Action();\nincrementAction.call((target) => {\n\ttarget.count += 1;\n});\nconst action = new Action();\naction.loop((target) => {\n\treturn target.count < 3;\n}, incrementAction);\naction.start(counter);\nfor (let frame = 0; frame < 10; ++frame) {\n\taction.step(1 / 60);\n}\nconsole.log(counter.count, action.isDone());",
+									"code": "import { Action } from \"./build/vanilla.js\";\n\nconst counter = { count: 0 };\nconst incrementAction = new Action();\nincrementAction.call((target) => {\n\ttarget.count += 1;\n});\nconst action = new Action();\naction.repeatWhile((target) => {\n\treturn target.count < 3;\n}, incrementAction);\naction.start(counter);\nfor (let frame = 0; frame < 10; ++frame) {\n\taction.step(1 / 60);\n}\nconsole.log(counter.count, action.isDone());",
 									"language": "javascript"
 								}
 							]
@@ -57268,8 +57557,8 @@
 							"signature": "use()",
 							"params": [],
 							"description": {
-								"ko": "프로그램 사용 시작.",
-								"en": "Starts using the program."
+								"ko": "프로그램 사용 시작. (컨텍스트의 상태 캐시가 이미 이 프로그램을 쓴다고 기억하면 다시 걸지 않는다)",
+								"en": "Starts using the program. (Does not set it again when the context's state cache remembers that this program is already in use)"
 							},
 							"since": "0.3.0",
 							"source": "src/core/graphic/shaderprogram.js"
@@ -57615,7 +57904,7 @@
 								"ko": "프래그먼트 셰이더 하나로 화면 채우기",
 								"en": "Fill the screen with a single fragment shader"
 							},
-							"code": "import { FullscreenPass } from \"./build/vanilla.js\";\n\nconst width = 320;\nconst height = 180;\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = width;\ncanvas.height = height;\ndocument.body.appendChild(canvas);\nconst webGL2RenderingContext = canvas.getContext(\"webgl2\");\nconst fragmentShaderSource = `#version 300 es\nprecision highp float;\nin vec2 fragmentTextureCoordinate;\nuniform vec3 tintColor;\nout vec4 outputColor;\nvoid main() {\n\toutputColor = vec4(fragmentTextureCoordinate * tintColor.rg, tintColor.b, 1.0);\n}\n`;\nconst fullscreenPass = new FullscreenPass(webGL2RenderingContext, fragmentShaderSource);\nwebGL2RenderingContext.viewport(0, 0, width, height);\nfullscreenPass.use();\nconst tintColorLocation = fullscreenPass.getUniformLocation(\"tintColor\");\nwebGL2RenderingContext.uniform3f(tintColorLocation, 1.0, 0.6, 0.3);\nfullscreenPass.draw();\nconst errorCode = webGL2RenderingContext.getError();\nconsole.log(errorCode === webGL2RenderingContext.NO_ERROR);",
+							"code": "import { FullscreenPass } from \"./build/vanilla.js\";\n\nconst width = 320;\nconst height = 180;\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = width;\ncanvas.height = height;\ndocument.body.appendChild(canvas);\nconst webGL2RenderingContext = canvas.getContext(\"webgl2\");\nconst fragmentShaderSource = `#version 300 es\nprecision highp float;\nin vec2 fragmentTextureCoordinate;\nuniform vec3 tintColor;\nout vec4 outputColor;\nvoid main() {\n\toutputColor = vec4(fragmentTextureCoordinate * tintColor.rg, tintColor.b, 1.0);\n}\n`;\nconst fullscreenPass = new FullscreenPass(webGL2RenderingContext, fragmentShaderSource);\nwebGL2RenderingContext.viewport(0, 0, width, height);\nfullscreenPass.useProgram();\nconst tintColorLocation = fullscreenPass.getUniformLocation(\"tintColor\");\nwebGL2RenderingContext.uniform3f(tintColorLocation, 1.0, 0.6, 0.3);\nfullscreenPass.draw();\nconst errorCode = webGL2RenderingContext.getError();\nconsole.log(errorCode === webGL2RenderingContext.NO_ERROR);",
 							"language": "javascript"
 						}
 					],
@@ -57663,14 +57952,14 @@
 						},
 						{
 							"kind": "method",
-							"name": "use",
-							"signature": "use()",
+							"name": "useProgram",
+							"signature": "useProgram()",
 							"params": [],
 							"description": {
-								"ko": "패스 사용 시작. (프로그램 + 빈 버텍스 어레이 바인드)",
-								"en": "Starts using the pass. (binds program + empty vertex array)"
+								"ko": "패스 사용 시작. (프로그램 + 빈 버텍스 어레이 바인드, 러스트 판 use_program 과 같다)",
+								"en": "Starts using the pass. (Binds the program and an empty vertex array, same as Rust use_program)"
 							},
-							"since": "0.3.0",
+							"since": "0.4.0",
 							"source": "src/core/fullscreenpass.js"
 						},
 						{
@@ -57828,8 +58117,8 @@
 				{
 					"name": "RenderTarget",
 					"summary": {
-						"ko": "렌더 타겟. (오프스크린 프레임버퍼 + 컬러 텍스처 [+ 깊이 렌더버퍼 / 깊이 텍스처])\n- 포스트 프로세싱 체인의 기본 단위.\n- 옵션으로 다중 컬러 어태치먼트(MRT) / 반정밀 실수 컬러(HDR) / 깊이 텍스처 / 멀티샘플 / 깊이 비트를 켤 수 있다.\n  { colorAttachmentCount: 1, useFloatColor: false, useDepthTexture: false, sampleCount: 0, depthBits: 16 }\n- sampleCount 가 2 이상이면 멀티샘플(MSAA) 렌더버퍼에 그리고 resolve() 가 컬러 텍스처(와 깊이 텍스처)로 푼다.\n  기기가 받는 수(MAX_SAMPLES, 포맷마다 받는 표본 수)를 넘으면 그 밑의 가장 큰 수로 줄이고, 못 받거나 프레임버퍼가 완성되지 않으면 멀티샘플 없이 짓는다. (getSampleCount)\n  멀티샘플이면 getFramebuffer 는 그리는 멀티샘플 프레임버퍼, getResolveFramebuffer 는 텍스처가 붙은 프레임버퍼다. 텍스처를 읽기 전에 resolve() 를 부른다.\n- depthBits 는 깊이 렌더버퍼의 비트 수(16 이나 24)다. 깊이 텍스처는 늘 24 비트다. 멀티샘플이면서 깊이 텍스처를 쓰면 멀티샘플 깊이도 24 비트로 지어 그대로 푼다.",
-						"en": "Render target. (offscreen framebuffer + color texture [+ depth renderbuffer / depth texture])\n- The basic unit of the post processing chain.\n- Multiple color attachments (MRT) / half precision float color (HDR) / depth texture / multisample / depth bits can be enabled as options.\n  { colorAttachmentCount: 1, useFloatColor: false, useDepthTexture: false, sampleCount: 0, depthBits: 16 }\n- If sampleCount is 2 or more, draws into a multisample (MSAA) renderbuffer and resolve() resolves it into the color texture (and the depth texture).\n  If it exceeds what the device accepts (MAX_SAMPLES, the sample counts each format accepts), it is reduced to the largest number below that, and if none is accepted or the framebuffer is incomplete, it is built without multisampling. (getSampleCount)\n  When multisampled, getFramebuffer is the multisample framebuffer that is drawn into, and getResolveFramebuffer is the framebuffer with the textures attached. Call resolve() before reading the textures.\n- depthBits is the bit count (16 or 24) of the depth renderbuffer. The depth texture is always 24 bits. When multisampled with a depth texture, the multisample depth is also built at 24 bits and resolved as is."
+						"ko": "렌더 타겟. (오프스크린 프레임버퍼 + 컬러 텍스처 [+ 깊이 렌더버퍼 / 깊이 텍스처])\n- 포스트 프로세싱 체인의 기본 단위.\n- 옵션으로 다중 컬러 어태치먼트(MRT) / 반정밀 실수 컬러(HDR) / 깊이 텍스처 / 멀티샘플 / 깊이 비트를 켤 수 있다.\n  { colorAttachmentCount: 1, useFloatColor: false, useDepthTexture: false, sampleCount: 0, depthBits: 16 }\n- sampleCount 가 2 이상이면 멀티샘플(MSAA) 렌더버퍼에 그리고 resolve() 가 컬러 텍스처(와 깊이 텍스처)로 푼다.\n  기기가 받는 수(MAX_SAMPLES, 포맷마다 받는 표본 수)를 넘으면 그 밑의 가장 큰 수로 줄이고, 못 받거나 프레임버퍼가 완성되지 않으면 멀티샘플 없이 짓는다. (getSampleCount)\n  멀티샘플이면 getFramebuffer 는 그리는 멀티샘플 프레임버퍼, getResolveFramebuffer 는 텍스처가 붙은 프레임버퍼다. 텍스처를 읽기 전에 resolve() 를 부른다.\n- resolve() 는 그리기를 끝낸 뒤 다시 읽지 않는 첨부(멀티샘플 색과 깊이, 텍스처가 아닌 깊이 렌더버퍼)를 버린다. (invalidateFramebuffer)\n  모바일 타일 GPU 가 그 첨부를 메모리에 쓰지 않고 넘긴다. 다음에 그릴 때는 비우고 그린다. 풀고 나서 이어 그리려면 resolve(true) 로 남긴다.\n- depthBits 는 깊이 렌더버퍼의 비트 수(16 이나 24)다. 깊이 텍스처는 늘 24 비트다. 멀티샘플이면서 깊이 텍스처를 쓰면 멀티샘플 깊이도 24 비트로 지어 그대로 푼다.",
+						"en": "Render target. (offscreen framebuffer + color texture [+ depth renderbuffer / depth texture])\n- The basic unit of the post processing chain.\n- Multiple color attachments (MRT) / half precision float color (HDR) / depth texture / multisample / depth bits can be enabled as options.\n  { colorAttachmentCount: 1, useFloatColor: false, useDepthTexture: false, sampleCount: 0, depthBits: 16 }\n- If sampleCount is 2 or more, draws into a multisample (MSAA) renderbuffer and resolve() resolves it into the color texture (and the depth texture).\n  If it exceeds what the device accepts (MAX_SAMPLES, the sample counts each format accepts), it is reduced to the largest number below that, and if none is accepted or the framebuffer is incomplete, it is built without multisampling. (getSampleCount)\n  When multisampled, getFramebuffer is the multisample framebuffer that is drawn into, and getResolveFramebuffer is the framebuffer with the textures attached. Call resolve() before reading the textures.\n- resolve() discards the attachments that are not read again after drawing (the multisample color and depth, a depth renderbuffer that is not a texture). (invalidateFramebuffer)\n  Mobile tile GPUs skip writing those attachments to memory. Clear before drawing the next time. To keep drawing after resolving, keep them with resolve(true).\n- depthBits is the bit count (16 or 24) of the depth renderbuffer. The depth texture is always 24 bits. When multisampled with a depth texture, the multisample depth is also built at 24 bits and resolved as is."
 					},
 					"examples": [
 						{
@@ -57997,11 +58286,20 @@
 						{
 							"kind": "method",
 							"name": "resolve",
-							"signature": "resolve()",
-							"params": [],
+							"signature": "resolve(isAttachmentKept = false)",
+							"params": [
+								{
+									"name": "isAttachmentKept",
+									"type": "boolean",
+									"description": {
+										"ko": "true 면 버리지 않고 남긴다. (풀고 나서 같은 판에 이어 그릴 때, 기본 false)",
+										"en": "If true, keeps them instead of discarding. (When drawing more into the same target after resolving, default false)"
+									}
+								}
+							],
 							"description": {
-								"ko": "멀티샘플을 텍스처로 풀기. (멀티샘플이 아니면 아무것도 하지 않음, 컬러 어태치먼트마다와 깊이 텍스처, 묶여 있던 프레임버퍼로 돌림)",
-								"en": "Resolves multisample into textures. (Does nothing if not multisampled, for each color attachment and the depth texture, restores the previously bound framebuffer)"
+								"ko": "멀티샘플을 텍스처로 풀기. (컬러 어태치먼트마다와 깊이 텍스처, 묶여 있던 프레임버퍼로 돌림)\n- 그리기를 끝낸 판의 다시 읽지 않는 첨부를 버린다. (멀티샘플이면 멀티샘플 색과 깊이, 아니면 텍스처가 아닌 깊이 렌더버퍼)\n  유니티, 언리얼이 판 끝에 저장하지 않는 첨부(store action 을 버림으로)와 같다. 모바일 타일 GPU 가 그 첨부를 메모리에 쓰지 않는다.\n  버린 첨부의 값은 정해지지 않으므로 다음에 그릴 때는 비우고 그린다. (데스크탑 GPU 에서는 거의 차이가 없다)",
+								"en": "Resolves multisample into textures. (For each color attachment and the depth texture, restores the previously bound framebuffer)\n- Discards the attachments of the finished target that are not read again. (The multisample color and depth if multisampled, otherwise a depth renderbuffer that is not a texture)\n  Same as Unity and Unreal not storing attachments at the end of a pass (store action set to discard). Mobile tile GPUs do not write those attachments to memory.\n  The values of discarded attachments are undefined, so clear before drawing the next time. (There is almost no difference on desktop GPUs)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/rendertarget.js",
@@ -58010,7 +58308,17 @@
 								"module": "graphics3d/rendertarget",
 								"class": "RenderTarget",
 								"name": "resolve"
-							}
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "풀고 나서 같은 판에 이어 그리기",
+										"en": "Keep drawing into the same target after resolving"
+									},
+									"code": "import { RenderTarget } from \"./build/vanilla.js\";\n\nconst canvas = document.createElement(\"canvas\");\nconst webGL2RenderingContext = canvas.getContext(\"webgl2\");\nconst renderTarget = new RenderTarget(webGL2RenderingContext, 128, 128, true, { sampleCount: 4 });\nrenderTarget.bind();\nwebGL2RenderingContext.clearColor(0.1, 0.2, 0.3, 1.0);\nwebGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);\nrenderTarget.resolve(true);\nrenderTarget.bind();\nrenderTarget.resolve();\nwebGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);\nconsole.log(renderTarget.getSampleCount());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -58388,7 +58696,7 @@
 								"ko": "씬 텍스처에서 블룸을 뽑아 화면에 더하기",
 								"en": "Extract bloom from a scene texture and add it to the screen"
 							},
-							"code": "import { BloomEffect, RenderTarget, FullscreenPass } from \"./build/vanilla.js\";\n\nconst width = 320;\nconst height = 180;\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = width;\ncanvas.height = height;\ndocument.body.appendChild(canvas);\nconst webGL2RenderingContext = canvas.getContext(\"webgl2\");\nconst sceneRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true);\nsceneRenderTarget.bind();\nwebGL2RenderingContext.clearColor(1.0, 0.9, 0.6, 1.0);\nwebGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);\n\nconst bloomEffect = new BloomEffect(webGL2RenderingContext);\nbloomEffect.resize(width, height);\nbloomEffect.setThreshold(0.6, 0.9);\nbloomEffect.setIterationCount(3);\nconst sceneColorTexture = sceneRenderTarget.getColorTexture();\nbloomEffect.render(sceneColorTexture);\nconst bloomTexture = bloomEffect.getResultTexture();\n\nconst compositeShaderSource = `#version 300 es\nprecision highp float;\nin vec2 fragmentTextureCoordinate;\nuniform sampler2D sceneTexture;\nuniform sampler2D bloomTexture;\nout vec4 outputColor;\nvoid main() {\n\tvec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;\n\tvec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;\n\toutputColor = vec4(sceneColor + bloomColor * 0.8, 1.0);\n}\n`;\nconst compositePass = new FullscreenPass(webGL2RenderingContext, compositeShaderSource);\nwebGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);\nwebGL2RenderingContext.viewport(0, 0, width, height);\ncompositePass.use();\nconst sceneTextureLocation = compositePass.getUniformLocation(\"sceneTexture\");\nconst bloomTextureLocation = compositePass.getUniformLocation(\"bloomTexture\");\nwebGL2RenderingContext.uniform1i(sceneTextureLocation, 0);\nwebGL2RenderingContext.uniform1i(bloomTextureLocation, 1);\nwebGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);\nwebGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);\nwebGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);\nwebGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomTexture);\ncompositePass.draw();\nwebGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);",
+							"code": "import { BloomEffect, RenderTarget, FullscreenPass } from \"./build/vanilla.js\";\n\nconst width = 320;\nconst height = 180;\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = width;\ncanvas.height = height;\ndocument.body.appendChild(canvas);\nconst webGL2RenderingContext = canvas.getContext(\"webgl2\");\nconst sceneRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true);\nsceneRenderTarget.bind();\nwebGL2RenderingContext.clearColor(1.0, 0.9, 0.6, 1.0);\nwebGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);\n\nconst bloomEffect = new BloomEffect(webGL2RenderingContext);\nbloomEffect.resize(width, height);\nbloomEffect.setThreshold(0.6, 0.9);\nbloomEffect.setIterationCount(3);\nconst sceneColorTexture = sceneRenderTarget.getColorTexture();\nbloomEffect.render(sceneColorTexture);\nconst bloomTexture = bloomEffect.getResultTexture();\n\nconst compositeShaderSource = `#version 300 es\nprecision highp float;\nin vec2 fragmentTextureCoordinate;\nuniform sampler2D sceneTexture;\nuniform sampler2D bloomTexture;\nout vec4 outputColor;\nvoid main() {\n\tvec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;\n\tvec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;\n\toutputColor = vec4(sceneColor + bloomColor * 0.8, 1.0);\n}\n`;\nconst compositePass = new FullscreenPass(webGL2RenderingContext, compositeShaderSource);\nwebGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);\nwebGL2RenderingContext.viewport(0, 0, width, height);\ncompositePass.useProgram();\nconst sceneTextureLocation = compositePass.getUniformLocation(\"sceneTexture\");\nconst bloomTextureLocation = compositePass.getUniformLocation(\"bloomTexture\");\nwebGL2RenderingContext.uniform1i(sceneTextureLocation, 0);\nwebGL2RenderingContext.uniform1i(bloomTextureLocation, 1);\nwebGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);\nwebGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);\nwebGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);\nwebGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomTexture);\ncompositePass.draw();\nwebGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);",
 							"language": "javascript"
 						}
 					],
@@ -73068,7 +73376,7 @@
 				{
 					"name": "Cooldown",
 					"summary": {
-						"ko": "쿨다운.\n- \"timer -= dt; if (timer <= 0) ...\" 를 매번 손으로 쓰던 것을 표준화했다.\n- use() 로 발동하면 지정한 시간 동안 isReady() 가 거짓이 된다.",
+						"ko": "쿨다운.\n- \"timer -= dt; if (timer <= 0) ...\" 를 매번 손으로 쓰던 것을 표준화했다.\n- activate() 로 발동하면 지정한 시간 동안 isReady() 가 거짓이 된다.",
 						"en": "Cooldown.\n- Standardizes the \"timer -= dt; if (timer <= 0) ...\" that was written by hand every time.\n- When triggered with use(), isReady() becomes false for the specified time."
 					},
 					"examples": [
@@ -73077,7 +73385,7 @@
 								"ko": "발동하고 시간이 지나 다시 준비되기",
 								"en": "Trigger and become ready again over time"
 							},
-							"code": "import { Cooldown } from \"./build/vanilla.js\";\n\nconst cooldown = new Cooldown(0.5);\nconsole.log(cooldown.use(), cooldown.use());\ncooldown.tick(0.25);\nconsole.log(cooldown.getRemainSeconds(), cooldown.getProgress());\ncooldown.tick(0.25);\nconsole.log(cooldown.isReady());",
+							"code": "import { Cooldown } from \"./build/vanilla.js\";\n\nconst cooldown = new Cooldown(0.5);\nconsole.log(cooldown.activate(), cooldown.activate());\ncooldown.tick(0.25);\nconsole.log(cooldown.getRemainSeconds(), cooldown.getProgress());\ncooldown.tick(0.25);\nconsole.log(cooldown.isReady());",
 							"language": "javascript"
 						}
 					],
@@ -73169,25 +73477,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "use",
-							"signature": "use()",
-							"params": [],
-							"returns": {
-								"type": "boolean",
-								"description": {
-									"ko": "발동했으면 참. (쿨다운 중이면 거짓, 남은 시간은 그대로)",
-									"en": "True if triggered. (false during cooldown, the remaining time is kept)"
-								}
-							},
-							"description": {
-								"ko": "발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환)",
-								"en": "Triggers. (if ready, starts the cooldown and returns true)"
-							},
-							"since": "0.3.0",
-							"source": "src/base/timer.js"
-						},
-						{
-							"kind": "method",
 							"name": "activate",
 							"signature": "activate()",
 							"params": [],
@@ -73199,8 +73488,8 @@
 								}
 							},
 							"description": {
-								"ko": "발동. (use 와 같다, use 를 이름으로 쓸 수 없는 언어와 같은 코드로 쓰려고 둔다)",
-								"en": "Triggers. (same as use, kept so the code matches languages where use cannot be used as a name)"
+								"ko": "발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환, 러스트 판 activate 와 같다)",
+								"en": "Activates. (If ready, starts the cooldown and returns true, same as Rust activate)"
 							},
 							"since": "0.4.0",
 							"source": "src/base/timer.js",
@@ -77077,8 +77366,8 @@
 				{
 					"name": "PointerGesture",
 					"summary": {
-						"ko": "포인터 제스처 인식기. (헤드리스)\n- 탭 / 드래그 / 롱프레스를 임계값으로 분류한다. 노드에 얽매이지 않아 어디서나 쓴다.\n- 사용: press(x, y) → move(x, y) → tick(dt) → release() 순으로 넘기고,\n  콜백(setTapEvent / setDragEvent / setLongPressEvent)으로 결과를 받는다.\n- 여러 게임이 pressedTime / dragMoved 변수를 제각각 들고 다니던 것을 표준화했다.",
-						"en": "Pointer gesture recognizer. (headless)\n- Classifies tap / drag / long press by thresholds. Not tied to nodes, so it can be used anywhere.\n- Usage: pass press(x, y) → move(x, y) → tick(dt) → release() in order,\n  and receive the results through callbacks (setTapEvent / setDragEvent / setLongPressEvent).\n- Standardizes the pressedTime / dragMoved variables that several games each carried around."
+						"ko": "포인터 제스처 인식기. (헤드리스)\n- 탭 / 드래그 / 롱프레스를 임계값으로 분류한다. 노드에 얽매이지 않아 어디서나 쓴다.\n- 사용: press(x, y) → movePointer(x, y) → tick(dt) → release() 순으로 넘기고,\n  콜백(setTapEvent / setDragEvent / setLongPressEvent)으로 결과를 받는다.\n- 여러 게임이 pressedTime / dragMoved 변수를 제각각 들고 다니던 것을 표준화했다.",
+						"en": "Pointer gesture recognizer. (headless)\n- Classifies tap / drag / long press by thresholds. Not tied to nodes, so it can be used anywhere.\n- Usage: pass press(x, y) → movePointer(x, y) → tick(dt) → release() in order,\n  and receive the results through callbacks (setTapEvent / setDragEvent / setLongPressEvent).\n- Standardizes the pressedTime / dragMoved variables that several games each carried around."
 					},
 					"examples": [
 						{
@@ -77086,7 +77375,7 @@
 								"ko": "탭, 드래그, 롱프레스 가려 받기",
 								"en": "Tell taps, drags and long presses apart"
 							},
-							"code": "import { PointerGesture } from \"./build/vanilla.js\";\n\nconst pointerGesture = new PointerGesture({ dragThreshold: 12, longPressSeconds: 0.6 });\npointerGesture.setTapEvent((position) => {\n\tconsole.log(\"tap\", position.x, position.y);\n});\npointerGesture.setDragEvent((currentPosition, pressPosition) => {\n\tconsole.log(\"drag\", currentPosition.x - pressPosition.x);\n});\npointerGesture.setDragEndEvent((currentPosition, pressPosition) => {\n\tconsole.log(\"drag end\", currentPosition.x - pressPosition.x);\n});\npointerGesture.setLongPressEvent((pressPosition) => {\n\tconsole.log(\"long press\", pressPosition.x, pressPosition.y);\n});\n\npointerGesture.press(100, 100);\npointerGesture.release();\n\npointerGesture.press(100, 100);\npointerGesture.move(105, 100);\npointerGesture.move(130, 100);\npointerGesture.release();\n\npointerGesture.press(50, 50);\npointerGesture.tick(0.3);\nconsole.log(pointerGesture.getLongPressRatio());\npointerGesture.tick(0.3);\npointerGesture.release();",
+							"code": "import { PointerGesture } from \"./build/vanilla.js\";\n\nconst pointerGesture = new PointerGesture({ dragThreshold: 12, longPressSeconds: 0.6 });\npointerGesture.setTapEvent((position) => {\n\tconsole.log(\"tap\", position.x, position.y);\n});\npointerGesture.setDragEvent((currentPosition, pressPosition) => {\n\tconsole.log(\"drag\", currentPosition.x - pressPosition.x);\n});\npointerGesture.setDragEndEvent((currentPosition, pressPosition) => {\n\tconsole.log(\"drag end\", currentPosition.x - pressPosition.x);\n});\npointerGesture.setLongPressEvent((pressPosition) => {\n\tconsole.log(\"long press\", pressPosition.x, pressPosition.y);\n});\n\npointerGesture.press(100, 100);\npointerGesture.release();\n\npointerGesture.press(100, 100);\npointerGesture.movePointer(105, 100);\npointerGesture.movePointer(130, 100);\npointerGesture.release();\n\npointerGesture.press(50, 50);\npointerGesture.tick(0.3);\nconsole.log(pointerGesture.getLongPressRatio());\npointerGesture.tick(0.3);\npointerGesture.release();",
 							"language": "javascript"
 						}
 					],
@@ -77161,8 +77450,8 @@
 						},
 						{
 							"kind": "method",
-							"name": "move",
-							"signature": "move(x, y)",
+							"name": "movePointer",
+							"signature": "movePointer(x, y)",
 							"params": [
 								{
 									"name": "x",
@@ -77185,7 +77474,7 @@
 								"ko": "이동.\n- 누른 지점에서 임계값을 넘으면 드래그로 확정하고 이후 매 이동마다 dragEvent 를 부른다.",
 								"en": "Move.\n- Once it exceeds the threshold from the press point, it is confirmed as a drag and dragEvent is called on every move after that."
 							},
-							"since": "0.3.0",
+							"since": "0.4.0",
 							"source": "src/misc/pointergesture.js"
 						},
 						{
@@ -97302,8 +97591,8 @@
 				{
 					"name": "ToonDrawQueue",
 					"summary": {
-						"ko": "툰 그리기 줄. (한 프레임에 그릴 모형을 담아 두었다가 ToonRenderer 로 차례를 맞춰 그린다)\n- 차례: (화면 공간 바깥선의 선의 판) → 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 껍데기 → 화면 공간 바깥선 → afterOutline\n  → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.\n  몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.\n- 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선 껍데기도 함께(hasOutline) 그린다.\n- 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.\n  options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.\n  여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.\n- 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.\n  번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.\n  비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.\n- 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.\n- 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.\n- 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.\n  점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)\n- 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)\n  draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)\n  화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)\n- 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.",
-						"en": "Toon draw queue. (Holds the models to draw in a frame, then draws them in order with ToonRenderer)\n- Order: (line target of the screen-space outline) → stage beforeOpaque → opaque bodies → afterOpaque → outline shells of opaque things → screen-space outline → afterOutline\n  → transparent things (farthest from the camera first, depth not written) → afterTransparent.\n  Outlines are drawn together after all bodies to switch programs less, and transparent things are blended last from the farthest so what is behind shows through.\n- Transparent things: those whose alpha or tintColor alpha at draw time is below 1, or whose blendMode is not alpha. Their outline shells are drawn with them too (hasOutline).\n- Groups: transparent things with the same options.group are sorted as one lump by the middle depth (average of the members) and drawn in the order they were added.\n  If even one member of a group has options.isDepthPrepassed, that lump draws depth first and then paints color only on pixels with the same depth (LEQUAL).\n  A hologram made of several overlapping parts shows through as one lump instead of being doubly bright. Lumps are drawn farthest first so they show through each other.\n- Screen-space outline: if setScreenOutline(ToonScreenOutline) is given, draw draws opaque things into the line target before the bodies and blends it after the outline shells.\n  The ID is options.lineId (the order added + 1 if not given, for instances instances[i].lineId comes first), and per model options.hasScreenOutline and options.hasCreaseLine turn it off and on.\n  Transparent things are not drawn into the line target. If there is a screen rectangle (ToonRenderer.setScreenRect), that rectangle is used as the drawing area of the line target.\n- Stage callbacks: callback(renderer, webGL2RenderingContext) of addPass(stage, callback) is called at that point. After the call, the renderer sets the frame's draw state again.\n- Instance batches (addMeshInstanced) draw body and outline shell at once if opaque, and if transparent are sorted as one lump by the center of the instance positions.\n- Shadows: drawShadows(renderer, shadowMap) draws only opaque things whose castsShadow is not false into the sun's shadow depth. Call it before draw.\n  For point light and spotlight shadows, drawLocalShadows(renderer, shadowAtlas) draws the same things per atlas tile. (Set on the renderer with setLocalShadows)\n- Use: every frame clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) or drawWithMatrices(renderer, view matrix, projection matrix)\n  draw calls renderer.beginFrameWithCamera(camera) and endFrame by itself. drawWithMatrices calls beginFrameWithMatrices. (Orthographic or raw matrix camera)\n  The screen rectangle (ToonRenderer.setScreenRect) is set before that. clear empties all added models and stage callbacks. (The screen-space outline is kept)\n- What is added are references to matrices and options. Do not change them until draw is called."
+						"ko": "툰 그리기 줄. (한 프레임에 그릴 모형을 담아 두었다가 ToonRenderer 로 차례를 맞춰 그린다)\n- 차례: (화면 공간 바깥선의 선의 판) → 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 껍데기 → 화면 공간 바깥선 → afterOutline\n  → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.\n  몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.\n- 불투명한 것(몸, 바깥선 껍데기, 그림자 깊이)은 재질, 모형, 바탕색 텍스처로 정렬해 그린다. (같은 것끼리는 담은 차례, 유니티 SRP Batcher 처럼 상태를 덜 바꾼다)\n  깊이 시험(LEQUAL)으로 가장 가까운 것이 남으므로 화면은 담은 차례와 같다. 깊이가 꼭 같은 면(겹친 평면)만 나중에 그린 것이 이겨 차례가 드러난다.\n  그런 것은 한 모형으로 합치거나 깊이를 띄운다. 비치는 것은 지금처럼 먼 것부터 담은 차례로 그린다.\n- 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선 껍데기도 함께(hasOutline) 그린다.\n- 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.\n  options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.\n  여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.\n- 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.\n  번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.\n  비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.\n- 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.\n- 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.\n- 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.\n  점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)\n- 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)\n  draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)\n  화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)\n- 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.",
+						"en": "Toon draw queue. (Holds the models to draw in a frame, then draws them in order with ToonRenderer)\n- Order: (line target of the screen-space outline) → stage beforeOpaque → opaque bodies → afterOpaque → outline shells of opaque things → screen-space outline → afterOutline\n  → transparent things (farthest from the camera first, depth not written) → afterTransparent.\n  Outlines are drawn together after all bodies to switch programs less, and transparent things are blended last from the farthest so what is behind shows through.\n- Opaque things (bodies, outline shells, shadow depth) are drawn sorted by material, model and base color texture. (Ties keep the order they were added, so state changes less, like the Unity SRP Batcher)\n  The depth test (LEQUAL) keeps the nearest one, so the screen is the same as in the added order. Only faces at exactly the same depth (overlapping planes) show the order, because the one drawn later wins.\n  Merge such things into one model or offset their depth. Transparent things are drawn as before, farthest first in the added order.\n- Transparent things: those whose alpha or tintColor alpha at draw time is below 1, or whose blendMode is not alpha. Their outline shells are drawn with them too (hasOutline).\n- Groups: transparent things with the same options.group are sorted as one lump by the middle depth (average of the members) and drawn in the order they were added.\n  If even one member of a group has options.isDepthPrepassed, that lump draws depth first and then paints color only on pixels with the same depth (LEQUAL).\n  A hologram made of several overlapping parts shows through as one lump instead of being doubly bright. Lumps are drawn farthest first so they show through each other.\n- Screen-space outline: if setScreenOutline(ToonScreenOutline) is given, draw draws opaque things into the line target before the bodies and blends it after the outline shells.\n  The ID is options.lineId (the order added + 1 if not given, for instances instances[i].lineId comes first), and per model options.hasScreenOutline and options.hasCreaseLine turn it off and on.\n  Transparent things are not drawn into the line target. If there is a screen rectangle (ToonRenderer.setScreenRect), that rectangle is used as the drawing area of the line target.\n- Stage callbacks: callback(renderer, webGL2RenderingContext) of addPass(stage, callback) is called at that point. After the call, the renderer sets the frame's draw state again.\n- Instance batches (addMeshInstanced) draw body and outline shell at once if opaque, and if transparent are sorted as one lump by the center of the instance positions.\n- Shadows: drawShadows(renderer, shadowMap) draws only opaque things whose castsShadow is not false into the sun's shadow depth. Call it before draw.\n  For point light and spotlight shadows, drawLocalShadows(renderer, shadowAtlas) draws the same things per atlas tile. (Set on the renderer with setLocalShadows)\n- Use: every frame clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) or drawWithMatrices(renderer, view matrix, projection matrix)\n  draw calls renderer.beginFrameWithCamera(camera) and endFrame by itself. drawWithMatrices calls beginFrameWithMatrices. (Orthographic or raw matrix camera)\n  The screen rectangle (ToonRenderer.setScreenRect) is set before that. clear empties all added models and stage callbacks. (The screen-space outline is kept)\n- What is added are references to matrices and options. Do not change them until draw is called."
 					},
 					"examples": [
 						{

@@ -33307,6 +33307,126 @@
 			"vanilla-engine": {
 				"module": "ui/uiinputfield",
 				"class": "UIInputField",
+				"name": "set_multiline"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "setMultiline"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "is_multiline"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "isMultiline"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "set_line_height"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "setLineHeight"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "get_line_height"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "getLineHeight"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "set_tab_size"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "setTabSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "get_tab_size"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "getTabSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "get_scroll_top"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "getScrollTop"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "set_scroll_top"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "setScrollTop"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "can_undo"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "canUndo"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "can_redo"
+			},
+			"vanilla.js": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
+				"name": "canRedo"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiinputfield",
+				"class": "UIInputField",
 				"name": "set_text"
 			},
 			"vanilla.js": {
