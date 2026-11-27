@@ -1384,12 +1384,12 @@ function createBlockCache(binding, floatCount) {
 // - 그리기마다 꼴 객체의 칸을 이름으로 찾아 읽지 않게 한 번 풀어 번호로 읽는 배열에 둔다. (그리기 줄도 같이 읽는다)
 //==============================================================================
 export const DRAW_STATE_MATERIAL = 0; // ToonMaterial 이나 null.
-const DRAW_STATE_JOINT_MATRICES = 1; // Float32Array 나 null.
-const DRAW_STATE_INDEX_START = 2; // 꼴의 indexStart. (없으면 0)
-const DRAW_STATE_INDEX_COUNT = 3; // 꼴의 indexCount. (없거나 0 이하면 -1)
+export const DRAW_STATE_JOINT_MATRICES = 1; // Float32Array 나 null.
+export const DRAW_STATE_INDEX_START = 2; // 꼴의 indexStart. (없으면 0)
+export const DRAW_STATE_INDEX_COUNT = 3; // 꼴의 indexCount. (없거나 0 이하면 -1)
 const DRAW_STATE_OUTLINE_INDEX_START = 4;
 const DRAW_STATE_OUTLINE_INDEX_COUNT = 5;
-const DRAW_STATE_IS_MIRRORED = 6; // -1 행렬로 가림, 1 뒤집음, 0 안 뒤집음.
+export const DRAW_STATE_IS_MIRRORED = 6; // -1 행렬로 가림, 1 뒤집음, 0 안 뒤집음.
 const DRAW_STATE_ON_BEFORE_DRAW = 7; // 함수나 null.
 export const DRAW_STATE_IS_TRANSPARENT = 8; // alpha 나 틴트 알파가 1 보다 작거나 섞는 방식이 곧은 알파가 아님.
 const DRAW_STATE_ALPHA = 9;
@@ -1397,7 +1397,7 @@ const DRAW_STATE_BLEND_MODE = 10;
 export const DRAW_STATE_HAS_OUTLINE = 11; // hasOutline 이 false 가 아님.
 const DRAW_STATE_IS_BODY_DRAWN = 12; // isBodyDrawn 이 false 가 아님.
 const DRAW_STATE_LIGHT_SET = 13; // ToonLightSet 이나 null.
-const DRAW_STATE_BASE_COLOR_TEXTURE = 14; // 텍스처 다섯. (없으면 null)
+export const DRAW_STATE_BASE_COLOR_TEXTURE = 14; // 텍스처 다섯. (없으면 null)
 const DRAW_STATE_EMISSIVE_TEXTURE = 15;
 const DRAW_STATE_DECAL_TEXTURE = 16;
 const DRAW_STATE_MATCAP_TEXTURE = 17;
