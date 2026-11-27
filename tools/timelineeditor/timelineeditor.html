@@ -6091,6 +6091,15 @@
     /** @private @type { number } */
     static #compactionLength = 64;
     // 이만큼 쌓이면 수거된 참조와 올린 그림을 걸러 낸다.
+    /** @private @type { WeakMap<object, object | null> } */
+    static #ownerMap = /* @__PURE__ */ new WeakMap();
+    // 그림 요소 → 주인 WebGL 컨텍스트. (null 이면 주인을 모른다)
+    /** @private @type { Array<object> } */
+    static #loadingOwnerList = [];
+    // 지금 씬을 불러오는 주인. (불러오기마다 하나, 같은 주인이 겹칠 수 있다)
+    /** @private @type { Array<WeakRef<object>> } */
+    static #ownerReferenceList = [];
+    // 그림을 올릴 수 있는 주인. (Graphic 이 지어질 때 알린다)
     //==============================================================================
     // 그림 바이트를 ImageBitmap 으로 풀기. (그림 요소를 올린 결과와 같게 풀 수 있는 꼴만, 아니면 null)
     // - createImageBitmap 이 없거나 풀지 못하면 null 이다. (그러면 그림 요소를 그대로 올린다)
@@ -6217,10 +6226,12 @@
     /**
      * @param { object } image 그림 요소. (ImageAsset 의 HTMLImageElement)
      * @param { ImageBitmap | null } imageBitmap 미리 푼 그림. (없으면 null)
+     * @param { object | null } owner 주인 WebGL 컨텍스트. (getLoadingOwner 로 읽기 시작할 때 받아 둔 것, 모르면 null)
      */
-    static register(image, imageBitmap) {
+    static register(image, imageBitmap, owner = null) {
       _DecodedImageStore.release(image);
       _DecodedImageStore.#decodedImageMap.set(image, imageBitmap);
+      _DecodedImageStore.#ownerMap.set(image, owner);
       const pendingImageReferenceList = _DecodedImageStore.#pendingImageReferenceList;
       pendingImageReferenceList.push(new System11.WeakRef(image));
       if (pendingImageReferenceList.length >= _DecodedImageStore.#compactionLength) {
@@ -6243,11 +6254,16 @@
     //==============================================================================
     /**
      * @param { object } image 그림 요소.
-     * @returns { ImageBitmap | null } 미리 푼 그림. (없거나 이미 꺼냈으면 null)
+     * @param { object | null } owner 꺼내는 쪽의 WebGL 컨텍스트. (주인이 적힌 그림은 주인만 꺼낸다, null 이면 가리지 않는다)
+     * @returns { ImageBitmap | null } 미리 푼 그림. (없거나 이미 꺼냈거나 남의 것이면 null)
      */
-    static take(image) {
+    static take(image, owner = null) {
       const decodedImageMap = _DecodedImageStore.#decodedImageMap;
       if (!decodedImageMap.has(image)) {
+        return null;
+      }
+      const imageOwner = _DecodedImageStore.#ownerMap.get(image) ?? null;
+      if (owner !== null && imageOwner !== null && imageOwner !== owner) {
         return null;
       }
       const imageBitmap = decodedImageMap.get(image);
@@ -6268,17 +6284,89 @@
     }
     //==============================================================================
     // 아직 올리지 않은 그림 목록. (맡긴 차례)
+    // - 주인을 주면 그 주인의 것만 준다. 주인을 모르는 그림은 알려진 주인이 하나뿐일 때만 넣는다.
     //==============================================================================
     /**
+     * @param { object | null } owner 올릴 쪽의 WebGL 컨텍스트. (null 이면 모두)
      * @returns { Array<object> } 그림 요소 목록.
      */
-    static getPendingImageList() {
+    static getPendingImageList(owner = null) {
       _DecodedImageStore.compact();
+      const ownerMap = _DecodedImageStore.#ownerMap;
+      const isUnknownOwnerIncluded = owner === null || _DecodedImageStore.getOwnerCount() <= 1;
       const pendingImageList = [];
       for (const imageReference of _DecodedImageStore.#pendingImageReferenceList) {
-        pendingImageList.push(imageReference.deref());
+        const image = imageReference.deref();
+        const imageOwner = ownerMap.get(image) ?? null;
+        if (owner === null || imageOwner === owner || imageOwner === null && isUnknownOwnerIncluded) {
+          pendingImageList.push(image);
+        }
       }
       return pendingImageList;
+    }
+    //==============================================================================
+    // 그림을 올릴 수 있는 주인 알리기. (Graphic 이 지어질 때 제 WebGL 컨텍스트로 부른다)
+    //==============================================================================
+    /**
+     * @param { object } owner WebGL 컨텍스트.
+     */
+    static addOwner(owner) {
+      const ownerReferenceList = _DecodedImageStore.#ownerReferenceList.filter((ownerReference) => ownerReference.deref() !== void 0);
+      if (!ownerReferenceList.some((ownerReference) => ownerReference.deref() === owner)) {
+        ownerReferenceList.push(new System11.WeakRef(owner));
+      }
+      _DecodedImageStore.#ownerReferenceList = ownerReferenceList;
+    }
+    //==============================================================================
+    // 알려진 주인 수. (수거된 것은 세지 않는다)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    static getOwnerCount() {
+      let ownerCount = 0;
+      for (const ownerReference of _DecodedImageStore.#ownerReferenceList) {
+        if (ownerReference.deref() !== void 0) {
+          ownerCount += 1;
+        }
+      }
+      return ownerCount;
+    }
+    //==============================================================================
+    // 씬 불러오기 시작 알리기. (SceneManager 가 씬의 load 앞에서 부른다, endLoading 까지 읽기 시작한 그림의 주인이 된다)
+    //==============================================================================
+    /**
+     * @param { object } owner 불러오는 Graphic 의 WebGL 컨텍스트.
+     */
+    static beginLoading(owner) {
+      _DecodedImageStore.#loadingOwnerList.push(owner);
+    }
+    //==============================================================================
+    // 씬 불러오기 끝 알리기. (SceneManager 가 씬의 load 가 끝나면 부른다, 실패해도 부른다)
+    //==============================================================================
+    /**
+     * @param { object } owner beginLoading 에 준 것.
+     */
+    static endLoading(owner) {
+      const loadingOwnerList = _DecodedImageStore.#loadingOwnerList;
+      const ownerIndex = loadingOwnerList.indexOf(owner);
+      if (ownerIndex >= 0) {
+        loadingOwnerList.splice(ownerIndex, 1);
+      }
+    }
+    //==============================================================================
+    // 지금 읽기 시작하는 그림의 주인. (씬을 불러오는 주인이 하나면 그 주인, 없거나 둘 이상이면 모른다)
+    //==============================================================================
+    /**
+     * @returns { object | null } WebGL 컨텍스트. (모르면 null)
+     */
+    static getLoadingOwner() {
+      const loadingOwnerList = _DecodedImageStore.#loadingOwnerList;
+      if (loadingOwnerList.length === 0) {
+        return null;
+      }
+      const owner = loadingOwnerList[0];
+      return loadingOwnerList.every((loadingOwner) => loadingOwner === owner) ? owner : null;
     }
     //==============================================================================
     // 수거된 참조와 이미 꺼낸 그림, 겹친 참조 걸러 내기. (같은 그림을 다시 맡기면 참조가 겹칠 수 있다)
@@ -6349,7 +6437,7 @@
       if (!entry) {
         const texture = webGL2RenderingContext.createTexture();
         this.bindTexture(texture);
-        const decodedImage = DecodedImageStore.take(image);
+        const decodedImage = DecodedImageStore.take(image, webGL2RenderingContext);
         webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, decodedImage !== null ? decodedImage : image);
         webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -6419,16 +6507,7 @@
   var COMBINING_MARK_PATTERN = /\p{M}/u;
   var EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
   var BLANK_CHUNK_PATTERN = /^[\u0009\u0020\u00A0\u2000-\u200B\u202F\u205F\u3000]+$/u;
-  var isTextAntialiasEnabled = true;
   var ALPHA_THRESHOLD = 128;
-  function setTextAntialiasEnabled(value) {
-    isTextAntialiasEnabled = value;
-  }
-  __name(setTextAntialiasEnabled, "setTextAntialiasEnabled");
-  function isTextAntialiasOn() {
-    return isTextAntialiasEnabled;
-  }
-  __name(isTextAntialiasOn, "isTextAntialiasOn");
   var MAXIMUM_MEASURE_COUNT = 2048;
   var measureCache = new System12.Map();
   var measureCanvasRenderingContext = null;
@@ -6601,6 +6680,9 @@
     /** @private @type { number } */
     #useSerial;
     // 엔트리를 줄 때마다 늘리는 번호. (장의 LRU)
+    /** @private @type { boolean } */
+    #isTextAntialiasEnabled;
+    // 글자 안티앨리어싱. (끄면 구운 글자의 알파를 문턱값으로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다, 도트 글꼴용, 기본 켬)
     /** @private @type { number } */
     #bakedGlyphCount;
     // 지금까지 구운 글리프 수. (통계)
@@ -6642,6 +6724,7 @@
       this.#glyphs = /* @__PURE__ */ new Map();
       this.#atlasPages = [];
       this.#useSerial = 0;
+      this.#isTextAntialiasEnabled = true;
       this.#bakedGlyphCount = 0;
       this.#uploadCount = 0;
       this.#textureBinder = textureBinder;
@@ -6713,11 +6796,12 @@
       }
       this.#useSerial += 1;
       const useSerial = this.#useSerial;
+      const isNearest = !this.#isTextAntialiasEnabled;
       const entries = this.getEntries();
       const entryList = this.#entriesByText.get(text);
       if (entryList !== void 0) {
         for (const entry2 of entryList) {
-          if (entry2.mode !== mode || entry2.textDirection !== textDirection || entry2.scale !== scale || entry2.lineWidth !== lineWidth || entry2.colorString !== colorString || entry2.fontString !== fontString) {
+          if (entry2.isNearest !== isNearest || entry2.mode !== mode || entry2.textDirection !== textDirection || entry2.scale !== scale || entry2.lineWidth !== lineWidth || entry2.colorString !== colorString || entry2.fontString !== fontString) {
             continue;
           }
           const entryKey2 = entry2.entryKey;
@@ -6729,12 +6813,13 @@
           return entry2;
         }
       }
-      const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
+      const entryKey = `${mode}|${isNearest ? 1 : 0}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
       const entry = this.buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
       if (!entry) {
         return null;
       }
       entry.entryKey = entryKey;
+      entry.isNearest = isNearest;
       entry.mode = mode;
       entry.text = text;
       entry.fontString = fontString;
@@ -6821,7 +6906,7 @@
       const chunks = this.splitTextChunks(text, scaledFontString, textDirection);
       this.measureChunkPositions(text, chunks, scaledFontString);
       const cellPadding = mode === "stroke" ? ceil(lineWidth * scale * STROKE_MITER_LIMIT / 2) + 2 : scaledPadding + 1;
-      const isNearest = !isTextAntialiasEnabled;
+      const isNearest = !this.#isTextAntialiasEnabled;
       const strikeKey = `${mode}|${lineWidth * scale}|${isNearest ? 1 : 0}|${textDirection}|${scaledFontString}`;
       const useSerial = this.#useSerial;
       const glyphList = [];
@@ -7038,7 +7123,7 @@
      * @param { string } textDirection
      */
     bakeGlyphs(glyphList, mode, colorString, scaledLineWidth, textDirection) {
-      const isNearest = !isTextAntialiasEnabled;
+      const isNearest = !this.#isTextAntialiasEnabled;
       const spans = [];
       let currentSpan = null;
       for (const glyph of glyphList) {
@@ -7264,6 +7349,25 @@
         this.#atlasPages.splice(atlasPageIndex, 1);
       }
       this.getWebGL2RenderingContext().deleteTexture(atlasPage.texture);
+    }
+    //==============================================================================
+    // 글자 안티앨리어싱 켬 / 끔. (러스트 TextStringTextureCache::set_text_antialias_enabled 와 같다)
+    // - 바꾼 뒤 그리는 글부터 새 꼴로 굽는다. 구운 글은 꼴마다 따로 남아 되돌리면 다시 굽지 않는다.
+    //==============================================================================
+    /**
+     * @param { boolean } value 켜면 참.
+     */
+    setTextAntialiasEnabled(value) {
+      this.#isTextAntialiasEnabled = value !== false;
+    }
+    //==============================================================================
+    // 글자 안티앨리어싱이 켜져 있는지.
+    //==============================================================================
+    /**
+     * @returns { boolean } 켜졌으면 참.
+     */
+    isTextAntialiasOn() {
+      return this.#isTextAntialiasEnabled;
     }
     //==============================================================================
     // 모든 엔트리와 글리프 파기. (아틀라스 텍스처 삭제 포함)
@@ -8359,6 +8463,7 @@ void main() {
         this.bindTexture(texture);
       }, "textureBinder");
       this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
+      DecodedImageStore.addOwner(webGL2RenderingContext);
       const beforeTextureOverwrite = /* @__PURE__ */ __name(() => {
         this.flushBatch();
       }, "beforeTextureOverwrite");
@@ -9121,6 +9226,8 @@ void main() {
       webGL2RenderingContext.scissor(backdropRect.x, backdropRect.y, backdropRect.width, backdropRect.height);
       webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
       webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+      this.#isClipScissorEnabled = false;
+      this.applyClipScissor();
       this.useShaderProgram(shaderProgramOverride);
       this.uploadDrawUniforms(shaderProgramOverride, color);
       this.bindTexture(texture);
@@ -11547,7 +11654,7 @@ void main() {
      * engine.run(new MainScene());
      */
     prepareLoadedImages(timeLimitMilliseconds = System13.Infinity) {
-      const pendingImageList = DecodedImageStore.getPendingImageList();
+      const pendingImageList = DecodedImageStore.getPendingImageList(this.getWebGL2RenderingContext());
       const startTime = System13.performance.now();
       let imageIndex = 0;
       while (imageIndex < pendingImageList.length) {
@@ -12025,7 +12132,7 @@ void main() {
     // 글자 안티앨리어싱 켬 / 끔. (러스트 Graphic::set_text_antialias_enabled 와 같다)
     //
     // 끄면 구운 글자의 알파를 문턱값 128 로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다. (도트 글꼴용)
-    // 켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다. (기본 켬)
+    // 이 Graphic 에만 걸린다. 바꾼 뒤 그리는 글부터 새 꼴이다. (이미 만든 글도 다음 그리기부터, 구운 글은 꼴마다 따로 남아 되돌리면 다시 굽지 않는다, 기본 켬)
     //==============================================================================
     /**
      * @param { boolean } isTextAntialiasEnabled 켜면 참.
@@ -12052,8 +12159,16 @@ void main() {
      * const engine = new Engine(engineConfiguration);
      * engine.run(new MainScene());
      */
-    setTextAntialiasEnabled(isTextAntialiasEnabled2) {
-      setTextAntialiasEnabled(isTextAntialiasEnabled2);
+    setTextAntialiasEnabled(isTextAntialiasEnabled) {
+      const textStringTextureCache = this.getTextStringTextureCache();
+      const isEnabled = isTextAntialiasEnabled !== false;
+      if (textStringTextureCache.isTextAntialiasOn() === isEnabled) {
+        return;
+      }
+      this.breakGeometryRecord();
+      this.flushBatch();
+      textStringTextureCache.setTextAntialiasEnabled(isEnabled);
+      this.#geometryCacheGeneration += 1;
     }
     //==============================================================================
     // 글자 안티앨리어싱이 켜져 있는지.
@@ -12062,7 +12177,7 @@ void main() {
      * @returns { boolean } 켜졌으면 참.
      */
     isTextAntialiasEnabled() {
-      return isTextAntialiasOn();
+      return this.getTextStringTextureCache().isTextAntialiasOn();
     }
     //==============================================================================
     // 텍스트 베이크 스케일 계산. (현재 변환 행렬 기반, 양자화 단위는 setTextBakeScaleStep)
@@ -12513,7 +12628,7 @@ void main() {
     //==============================================================================
     // 투명도 층 시작. (CSS opacity, 어도비 투명도 묶음처럼 endOpacityLayer 까지 그린 것을 따로 칸에 모았다가 지금 전역 알파로 한 번에 얹는다)
     // - 층 안의 그림은 서로 겹친 자리가 비치지 않는다. (노드마다 투명도를 곱해 따로 얹으면 겹친 자리에서 아래 그림이 비친다)
-    // - 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기도 그대로 된다.
+    // - 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 깊이를 비우고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기와 3D 패스(clearDepth: false)도 그대로 된다.
     //   바깥 자르기는 얹을 때 걸린다. 층은 겹쳐 열 수 있다. 칸을 지을 수 없으면 층 없이 그대로 그린다.
     // - 노드는 setOpacityLayer 를 켜고 투명도가 1 보다 작으면 그 노드와 자손을 층으로 그린다.
     //==============================================================================
@@ -12552,8 +12667,9 @@ void main() {
         webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
         webGL2RenderingContext.colorMask(true, true, true, true);
         webGL2RenderingContext.stencilMask(255);
+        webGL2RenderingContext.depthMask(true);
         webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
-        webGL2RenderingContext.clearBufferiv(webGL2RenderingContext.STENCIL, 0, new Int32Array([this.#stencilClipDepth]));
+        webGL2RenderingContext.clearBufferfi(webGL2RenderingContext.DEPTH_STENCIL, 0, 1, this.#stencilClipDepth);
         this.#globalAlpha = 1;
       }
       this.#opacityLayerStack.push({ target, previousFramebuffer, globalAlpha });
@@ -17511,6 +17627,9 @@ void main() {
     /** @private @type { boolean } */
     #isLoaded;
     // 비동기 로딩 완료 여부.
+    /** @private @type { boolean } */
+    #isCaptureFrameHeld;
+    // 찍기 모드에서 실제 시간이 드는 불러오기(애셋 받기) 중이라 엔진 프레임 번호와 시계를 세우는지.
     /** @private @type { TouchRaycaster | null } */
     #touchRaycaster;
     // 노드에 터치를 넘기는 레이캐스터. (null 이면 넘기지 않는다)
@@ -17537,6 +17656,7 @@ void main() {
       this.#tweens = [];
       this.#isGizmoVisible = false;
       this.#isLoaded = false;
+      this.#isCaptureFrameHeld = false;
       this.#root = new WorldNode();
       const root = this.getRoot();
       root.setName("root");
@@ -17561,6 +17681,27 @@ void main() {
      */
     setLoaded(isLoaded) {
       this.#isLoaded = isLoaded;
+    }
+    //==============================================================================
+    // 찍기 모드의 프레임 세우기 설정. (SceneManager 가 load 동안 참, GameScene 과 UIScene 은 애셋을 다 받으면 거짓)
+    // - 찍기 모드에서 이것이 참인 불러오는 씬이 있으면 엔진이 프레임 번호와 시계를 올리지 않는다. 애셋 받기처럼 실제 시간이 드는 것은 다 받은 뒤부터 센다.
+    //==============================================================================
+    /**
+     * @private
+     * @param { boolean } isCaptureFrameHeld 실제 시간이 드는 불러오기 중이면 참.
+     */
+    setCaptureFrameHeld(isCaptureFrameHeld) {
+      this.#isCaptureFrameHeld = isCaptureFrameHeld;
+    }
+    //==============================================================================
+    // 찍기 모드의 프레임 세우기 여부 반환.
+    //==============================================================================
+    /**
+     * @private
+     * @returns { boolean } 실제 시간이 드는 불러오기 중이면 참.
+     */
+    isCaptureFrameHeld() {
+      return this.#isCaptureFrameHeld === true;
     }
     //==============================================================================
     // 로딩 완료 여부 반환.
@@ -18118,6 +18259,7 @@ void main() {
   // src/core/scenemanager.js
   var System21 = globalThis;
   var IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS = 2;
+  var SCENE_LOAD_EXTRA_WAIT_SECONDS = 0.3;
   var SceneManager = class extends Object2 {
     static {
       __name(this, "SceneManager");
@@ -18155,27 +18297,59 @@ void main() {
         scene.create();
         scene.setEngine(engine);
         loadedScenes.push(scene);
-        await scene.load(engine);
-        const minimumWaitPromise = new System21.Promise((resolve) => {
-          System21.setTimeout(resolve, 300);
-        });
-        const graphic = engine ? engine.getGraphic() : null;
-        if (graphic) {
-          while (graphic.prepareLoadedImages(IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS) > 0) {
-            await new System21.Promise((resolve) => {
-              const timeoutIdentifier = System21.setTimeout(resolve, 50);
-              if (typeof System21.requestAnimationFrame === "function") {
-                System21.requestAnimationFrame(() => {
-                  System21.clearTimeout(timeoutIdentifier);
-                  resolve();
-                });
-              }
-            });
+        const loadingGraphic = engine ? engine.getGraphic() : null;
+        const loadingOwner = loadingGraphic ? loadingGraphic.getWebGL2RenderingContext() : null;
+        if (loadingOwner !== null) {
+          DecodedImageStore.beginLoading(loadingOwner);
+        }
+        scene.setCaptureFrameHeld(true);
+        try {
+          await scene.load(engine);
+        } finally {
+          scene.setCaptureFrameHeld(false);
+          if (loadingOwner !== null) {
+            DecodedImageStore.endLoading(loadingOwner);
           }
         }
-        await minimumWaitPromise;
-        scene.setLoaded(true);
-        scene.initialize(engine);
+        const graphic = engine ? engine.getGraphic() : null;
+        if (engine && engine.isCaptureTimeStepFixed()) {
+          if (graphic) {
+            graphic.prepareLoadedImages();
+          }
+          const timeManager = engine.getTimeManager();
+          const waitStartTime = timeManager.getRealtimeSinceStartup();
+          await new System21.Promise((resolve) => {
+            engine.addEngineFrameCallback(() => {
+              if (timeManager.getRealtimeSinceStartup() - waitStartTime < SCENE_LOAD_EXTRA_WAIT_SECONDS) {
+                return false;
+              }
+              scene.setLoaded(true);
+              scene.initialize(engine);
+              resolve();
+              return true;
+            });
+          });
+        } else {
+          const minimumWaitPromise = new System21.Promise((resolve) => {
+            System21.setTimeout(resolve, SCENE_LOAD_EXTRA_WAIT_SECONDS * 1e3);
+          });
+          if (graphic) {
+            while (graphic.prepareLoadedImages(IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS) > 0) {
+              await new System21.Promise((resolve) => {
+                const timeoutIdentifier = System21.setTimeout(resolve, 50);
+                if (typeof System21.requestAnimationFrame === "function") {
+                  System21.requestAnimationFrame(() => {
+                    System21.clearTimeout(timeoutIdentifier);
+                    resolve();
+                  });
+                }
+              });
+            }
+          }
+          await minimumWaitPromise;
+          scene.setLoaded(true);
+          scene.initialize(engine);
+        }
       }
     }
     //==============================================================================
@@ -18426,7 +18600,7 @@ void main() {
     // 읽기 방식 반환.
     //==============================================================================
     /**
-     * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
+     * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 엔진 SoundSystem 의 배경음악만 소리 표에 loadType 이 없으면 streaming)
      */
     getLoadType() {
       return this.#loadType;
@@ -20036,6 +20210,9 @@ void main() {
     /** @private @type { boolean } */
     #isCaptureTimeStepFixed;
     // 찍기 모드라 시간을 프레임마다 1/60 초씩 보내는지. (주소 쿼리 capture)
+    /** @private @type { Array<() => boolean> } */
+    #engineFrameCallbacks;
+    // 엔진 프레임마다 시간을 올린 바로 뒤 부를 함수 목록. (참을 돌려주면 뺀다, 찍기 모드의 로딩 기다림)
     /** @private @type { boolean } */
     #isExitRequested;
     // 종료를 요청했는지.
@@ -20085,6 +20262,7 @@ void main() {
       this.#version = Version.create(0, 3, 2);
       this.#frameCaptureRequests = new System28.Map();
       this.#isCaptureTimeStepFixed = false;
+      this.#engineFrameCallbacks = [];
       this.#isExitRequested = false;
       this.#isPageHidden = System28.document.visibilityState === "hidden";
       this.#pageEventListeners = [];
@@ -20658,6 +20836,21 @@ void main() {
       const timeManager = this.getTimeManager();
       timeManager.update(timestamp);
       const timeDelta = timeManager.getTimeDelta();
+      if (this.#engineFrameCallbacks.length > 0) {
+        const engineFrameCallbacks = this.#engineFrameCallbacks;
+        this.#engineFrameCallbacks = [];
+        for (const engineFrameCallback of engineFrameCallbacks) {
+          let isFinished = true;
+          try {
+            isFinished = engineFrameCallback() !== false;
+          } catch (error) {
+            console.error(error);
+          }
+          if (!isFinished) {
+            this.#engineFrameCallbacks.push(engineFrameCallback);
+          }
+        }
+      }
       const inputManager = this.getInputManager();
       inputManager.tick(timeDelta);
       const isModalDialogOpen = this.isModalDialogOpen();
@@ -20709,7 +20902,10 @@ void main() {
       inputManager.clearWheelDelta();
       inputManager.updateFrameSnapshot();
       this.captureFrameIfRequested();
-      ++this.#frameNumber;
+      const isCaptureFrameHeld = this.#isCaptureTimeStepFixed && sceneManager.getAllLoadedScenes().some((loadedScene) => !loadedScene.isLoaded() && loadedScene.isCaptureFrameHeld());
+      if (!isCaptureFrameHeld) {
+        ++this.#frameNumber;
+      }
       System28.window.requestAnimationFrame(this.#updateEngineCallback);
     }
     //==============================================================================
@@ -20862,6 +21058,44 @@ void main() {
         System28.window.close();
       } catch (closeError) {
       }
+    }
+    //==============================================================================
+    // 찍기 모드 여부 반환. (주소 쿼리 capture 로 시간을 프레임마다 1/60 초씩 보내는지)
+    //==============================================================================
+    /**
+     * @private
+     * @returns { boolean } 찍기 모드면 참. (씬 매니저와 게임 씬이 로딩 기다림을 엔진 시계로 셀 때 읽는다)
+     */
+    isCaptureTimeStepFixed() {
+      return this.#isCaptureTimeStepFixed;
+    }
+    //==============================================================================
+    // 엔진 프레임 함수 걸기.
+    // - 엔진 갱신이 시간을 올린 바로 뒤, 씬 갱신 앞에 프레임마다 부른다. false 를 돌려주면 다음 프레임에 또 부르고, 그 밖의 값이면 뺀다.
+    // - 찍기 모드의 로딩 기다림이 실제 시각(setTimeout) 대신 엔진 시계로 세게 해, 같은 예제를 두 번 찍으면 같은 프레임에 같은 그림이 나오게 한다. (러스트 판이 프레임 머리에서 씬을 initialize 하는 자리와 같다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { () => boolean } engineFrameCallback 프레임마다 부를 함수. (끝났으면 참)
+     */
+    addEngineFrameCallback(engineFrameCallback) {
+      this.#engineFrameCallbacks.push(engineFrameCallback);
+    }
+    //==============================================================================
+    // 다음 엔진 프레임까지 기다리기.
+    // - 엔진 갱신이 시간을 올린 바로 뒤 푼다. 이어지는 일은 그 프레임의 갱신과 그리기가 끝난 뒤 돈다.
+    //==============================================================================
+    /**
+     * @private
+     * @returns { Promise<void> } 다음 엔진 프레임에 풀리는 약속.
+     */
+    waitForNextEngineFrame() {
+      return new System28.Promise((resolve) => {
+        this.addEngineFrameCallback(() => {
+          resolve();
+          return true;
+        });
+      });
     }
     //==============================================================================
     // 현재 프레임 번호 반환.
@@ -22668,6 +22902,7 @@ void main() {
       if (isLoaded) {
         return Promise.resolve();
       }
+      const owner = DecodedImageStore.getLoadingOwner();
       await super.load(assetPath);
       let response = null;
       try {
@@ -22680,7 +22915,7 @@ void main() {
           throw new Error(`Load fail: ${assetPath}`);
         }
         const blob = await response.blob();
-        await this.loadFromBlob(assetPath, blob);
+        await this.loadFromBlob(assetPath, blob, owner);
         this.setLoaded(true);
         return;
       }
@@ -22689,7 +22924,7 @@ void main() {
       this.image.src = assetPath;
       await new Promise((resolve, reject) => {
         this.image.onload = () => {
-          DecodedImageStore.register(this.image, null);
+          DecodedImageStore.register(this.image, null, owner);
           this.setLoaded(true);
           resolve();
         };
@@ -22719,8 +22954,9 @@ void main() {
     async loadFromBytes(assetPath, bytes) {
       this.setLoaded(false);
       this.setAssetPath(assetPath);
+      const owner = DecodedImageStore.getLoadingOwner();
       const blob = bytes instanceof System31.Blob ? bytes : new System31.Blob([bytes]);
-      await this.loadFromBlob(assetPath, blob);
+      await this.loadFromBlob(assetPath, blob, owner);
       this.setLoaded(true);
     }
     //==============================================================================
@@ -22732,9 +22968,10 @@ void main() {
      * @private
      * @param { string } assetPath 실패 알림에 쓸 이름.
      * @param { Blob } blob 그림 파일의 바이트.
+     * @param { object | null } owner 그림 주인. (읽기 시작할 때 DecodedImageStore.getLoadingOwner 로 받은 것)
      * @returns { Promise<void> } 그림이 다 풀리면 풀리는 프로미스. (그림 요소가 풀지 못하면 거부된다)
      */
-    async loadFromBlob(assetPath, blob) {
+    async loadFromBlob(assetPath, blob, owner) {
       DecodedImageStore.release(this.image);
       const objectUrl = System31.URL.createObjectURL(blob);
       const image = new System31.window.Image();
@@ -22770,7 +23007,7 @@ void main() {
         }
         return;
       }
-      DecodedImageStore.register(image, imageBitmap);
+      DecodedImageStore.register(image, imageBitmap, owner);
     }
     //==============================================================================
     // 애셋 언로드. (아직 올리지 않은 미리 푼 그림이 있으면 닫는다)

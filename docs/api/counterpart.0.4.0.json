@@ -14647,6 +14647,18 @@
 			"vanilla-engine": {
 				"module": "core/scene",
 				"class": "Scene",
+				"name": "load"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "load"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/scene",
+				"class": "Scene",
 				"name": "initialize"
 			},
 			"vanilla.js": {
@@ -18091,12 +18103,12 @@
 			"vanilla-engine": {
 				"module": "game/gamescene",
 				"class": "GameSceneBase",
-				"name": "create"
+				"name": "load"
 			},
 			"vanilla.js": {
-				"module": "core/scene",
-				"class": "Scene",
-				"name": "create"
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "load"
 			}
 		},
 		{
@@ -39873,12 +39885,12 @@
 			"vanilla-engine": {
 				"module": "ui/uiscene",
 				"class": "UISceneBase",
-				"name": "create"
+				"name": "load"
 			},
 			"vanilla.js": {
 				"module": "ui/uiscene",
 				"class": "UIScene",
-				"name": "create"
+				"name": "load"
 			}
 		},
 		{
