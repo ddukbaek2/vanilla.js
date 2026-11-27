@@ -802,6 +802,12 @@ export class Graphic extends Object {
 	/** @private @type { boolean } */ #isSubtreeCullingEnabled; // 화면 밖 하위 트리의 그리기 순회를 통째로 건너뛸지. (화면 밖 거르기가 켜졌을 때만, 기본 켜짐)
 	/** @private @type { number } */ #culledSubtreeCount; // 이번 프레임에 화면 밖이라 그리기를 통째로 건너뛴 하위 트리 수.
 	/** @private @type { number } */ #lastFrameCulledSubtreeCount; // 지난 프레임에 그 수.
+	/** @private @type { Float64Array } */ #localVisibleKeyList; // 지역 좌표의 보이는 사각형을 셈한 때의 변환(a, b, c, d, e, f)과 보이는 디바이스 사각형(왼쪽, 위, 오른쪽, 아래). (같으면 다시 셈하지 않는다)
+	/** @private @type { boolean } */ #isLocalVisibleBoundsKnown; // 지역 좌표의 보이는 사각형을 셈할 수 있었는지. (변환을 거꾸로 걸 수 없으면 거짓)
+	/** @private @type { number } */ #localVisibleMinimumX; // 지금 변환의 지역 좌표로 옮긴 보이는 사각형의 경계 상자. (화면과 걸린 자르기, 한 디바이스 픽셀 넉넉히)
+	/** @private @type { number } */ #localVisibleMinimumY;
+	/** @private @type { number } */ #localVisibleMaximumX;
+	/** @private @type { number } */ #localVisibleMaximumY;
 	/** @private @type { boolean } */ #isGeometryCachingEnabled; // 컴포넌트가 그린 정점을 캐시해 두고 바뀐 것만 다시 셈할지. (기본 켜짐)
 	/** @private @type { WeakMap<Component, object> } */ #geometryCacheMap; // 컴포넌트마다의 기하 캐시.
 	/** @private @type { object | null } */ #geometryActiveCache; // 지금 적거나 다시 옮기는 기하 캐시.
@@ -1009,6 +1015,12 @@ export class Graphic extends Object {
 		this.#isSubtreeCullingEnabled = true;
 		this.#culledSubtreeCount = 0;
 		this.#lastFrameCulledSubtreeCount = 0;
+		this.#localVisibleKeyList = new System.Float64Array(10).fill(System.Number.NaN);
+		this.#isLocalVisibleBoundsKnown = false;
+		this.#localVisibleMinimumX = 0;
+		this.#localVisibleMinimumY = 0;
+		this.#localVisibleMaximumX = 0;
+		this.#localVisibleMaximumY = 0;
 		this.#isGeometryCachingEnabled = true;
 		this.#geometryCacheMap = new WeakMap();
 		this.#geometryActiveCache = null;
@@ -2347,6 +2359,116 @@ export class Graphic extends Object {
 			return true;
 		}
 		return !this.isLocalRectVisible(drawBounds);
+	}
+
+	//==============================================================================
+	// 노드를 부모 좌표에서 보아 화면 밖이라 건너뛸지 반환. (drawNode 가 노드에 변환을 걸기 전에 부른다, 지금 변환은 부모의 내용 좌표)
+	// - 부모가 셈해 둔 노드의 경계(TransformNode.readParentDrawBounds)를 부모 좌표의 보이는 사각형과 견준다. 경계가 없으면 건너뛰지 않는다(변환을 건 뒤 #isNodeSubtreeCulled 가 본다).
+	// - 보이는 사각형은 부모 하나에 한 번 셈한다. (변환과 자르기가 같으면 셈해 둔 것을 쓴다)
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node 그릴 노드.
+	 * @returns { boolean } 건너뛰면 참.
+	 */
+	#isNodeCulledInParent(node) {
+		if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || this.#isForceGizmosVisible || typeof node.readParentDrawBounds !== "function") {
+			return false;
+		}
+		const drawBounds = subtreeCullRect;
+		if (!node.readParentDrawBounds(drawBounds)) {
+			return false;
+		}
+		if (!(drawBounds.size.x > 0 && drawBounds.size.y > 0)) {
+			return true;
+		}
+		if (!this.#updateLocalVisibleBounds()) {
+			return false;
+		}
+		const leftX = drawBounds.position.x;
+		const topY = drawBounds.position.y;
+		return leftX > this.#localVisibleMaximumX || topY > this.#localVisibleMaximumY || leftX + drawBounds.size.x < this.#localVisibleMinimumX || topY + drawBounds.size.y < this.#localVisibleMinimumY;
+	}
+
+	//==============================================================================
+	// 보이는 사각형(화면과 걸린 자르기, isLocalRectVisible 과 같은 것)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 셈하기. (셈할 수 있으면 true)
+	// - 돌림이나 기울임이 있으면 네 꼭짓점을 옮긴 경계 상자라 넉넉하다. 셈의 오차를 덮으려고 디바이스 사각형을 한 픽셀씩 넓혀 옮긴다.
+	// - 변환과 보이는 디바이스 사각형이 지난번과 같으면 다시 셈하지 않는다. (한 부모의 자식들을 그리는 동안은 같다)
+	// - 뷰포트를 아직 정하지 않았거나 변환을 거꾸로 걸 수 없으면(배율 0) false.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 셈할 수 있으면 참.
+	 */
+	#updateLocalVisibleBounds() {
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		if (viewportWidth <= 0 || viewportHeight <= 0) {
+			return false;
+		}
+		let visibleMinimumX = 0;
+		let visibleMinimumY = 0;
+		let visibleMaximumX = viewportWidth;
+		let visibleMaximumY = viewportHeight;
+		const clipStack = this.#clipStack;
+		if (clipStack.length > 0) {
+			const clipEntry = clipStack[clipStack.length - 1];
+			visibleMinimumX = System.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
+			visibleMinimumY = System.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
+			visibleMaximumX = System.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
+			visibleMaximumY = System.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
+		}
+		const transformMatrix = this.#transformMatrix;
+		const matrixA = transformMatrix.a;
+		const matrixB = transformMatrix.b;
+		const matrixC = transformMatrix.c;
+		const matrixD = transformMatrix.d;
+		const matrixE = transformMatrix.e;
+		const matrixF = transformMatrix.f;
+		const keyList = this.#localVisibleKeyList;
+		if (keyList[0] === matrixA && keyList[1] === matrixB && keyList[2] === matrixC && keyList[3] === matrixD && keyList[4] === matrixE && keyList[5] === matrixF
+			&& keyList[6] === visibleMinimumX && keyList[7] === visibleMinimumY && keyList[8] === visibleMaximumX && keyList[9] === visibleMaximumY) {
+			return this.#isLocalVisibleBoundsKnown;
+		}
+		keyList[0] = matrixA;
+		keyList[1] = matrixB;
+		keyList[2] = matrixC;
+		keyList[3] = matrixD;
+		keyList[4] = matrixE;
+		keyList[5] = matrixF;
+		keyList[6] = visibleMinimumX;
+		keyList[7] = visibleMinimumY;
+		keyList[8] = visibleMaximumX;
+		keyList[9] = visibleMaximumY;
+
+		// 거꾸로 건다. (지역 = 역행렬 x (디바이스 - 옮김))
+		const determinant = matrixA * matrixD - matrixB * matrixC;
+		if (determinant === 0 || !System.Number.isFinite(determinant)) {
+			this.#isLocalVisibleBoundsKnown = false;
+			return false;
+		}
+		const inverseDeterminant = 1 / determinant;
+		const leftX = visibleMinimumX - 1 - matrixE;
+		const topY = visibleMinimumY - 1 - matrixF;
+		const rightX = visibleMaximumX + 1 - matrixE;
+		const bottomY = visibleMaximumY + 1 - matrixF;
+		const leftTopX = (matrixD * leftX - matrixC * topY) * inverseDeterminant;
+		const leftTopY = (matrixA * topY - matrixB * leftX) * inverseDeterminant;
+		const rightTopX = (matrixD * rightX - matrixC * topY) * inverseDeterminant;
+		const rightTopY = (matrixA * topY - matrixB * rightX) * inverseDeterminant;
+		const leftBottomX = (matrixD * leftX - matrixC * bottomY) * inverseDeterminant;
+		const leftBottomY = (matrixA * bottomY - matrixB * leftX) * inverseDeterminant;
+		const rightBottomX = (matrixD * rightX - matrixC * bottomY) * inverseDeterminant;
+		const rightBottomY = (matrixA * bottomY - matrixB * rightX) * inverseDeterminant;
+		const minimumX = System.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+		const minimumY = System.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+		const maximumX = System.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+		const maximumY = System.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+		const isFinite = System.Number.isFinite(minimumX) && System.Number.isFinite(minimumY) && System.Number.isFinite(maximumX) && System.Number.isFinite(maximumY);
+		this.#localVisibleMinimumX = minimumX;
+		this.#localVisibleMinimumY = minimumY;
+		this.#localVisibleMaximumX = maximumX;
+		this.#localVisibleMaximumY = maximumY;
+		this.#isLocalVisibleBoundsKnown = isFinite;
+		return isFinite;
 	}
 
 	//==============================================================================
@@ -5210,6 +5332,12 @@ export class Graphic extends Object {
 	 */
 	drawNode(node) {
 		if (node === null || node == undefined || !node.isActive()) {
+			return;
+		}
+
+		// 부모가 셈해 둔 이 노드의 경계(부모 좌표)가 부모 좌표의 보이는 사각형 밖이면 변환을 걸지 않고 건너뛴다. (스크롤 목록의 많은 줄을 하나씩 들어가지 않는다)
+		if (this.#isNodeCulledInParent(node)) {
+			this.#culledSubtreeCount += 1;
 			return;
 		}
 

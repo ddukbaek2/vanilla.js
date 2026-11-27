@@ -91,6 +91,11 @@ export class TrailRenderer extends Component {
 		const node = this.getNode();
 		const localPosition = node.getLocalPosition();
 
+		// 점이 늙고 노드가 움직이면 그리는 사각형이 바뀐다. (점이 있으면 프레임마다 노드에 알린다, 유니티처럼 프레임마다 경계를 다시 셈한다)
+		if (this.#pointList.length > 0) {
+			this.markDrawnRectDirty();
+		}
+
 		for (let pointIndex = this.#pointList.length - 1; pointIndex >= 0; --pointIndex) {
 			const point = this.#pointList[pointIndex];
 			point.age += timeDelta;
@@ -111,6 +116,7 @@ export class TrailRenderer extends Component {
 			}
 		}
 		this.#pointList.push({ x: localPosition.x, y: localPosition.y, age: 0 });
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -156,7 +162,56 @@ export class TrailRenderer extends Component {
 	// 흔적 지우기.
 	//==============================================================================
 	clear() {
+		if (this.#pointList.length > 0) {
+			this.markDrawnRectDirty();
+		}
 		this.#pointList.length = 0;
+	}
+
+	//==============================================================================
+	// 그리는 사각형 셈하기. (오버라이드: 점을 이은 띠를 모두 품는 사각형, 노드 내용 좌표)
+	// - 점은 노드 자리를 뺀 자리에 그리므로 지금 노드 자리로 옮기고, 두 굵기 가운데 큰 것의 반과 한 단위 여유만큼 넓힌다. (선 끝과 이음까지)
+	// - 점이 있으면 tick 마다, 지움(clear)과 굵기를 바꾸면 다시 셈하게 알린다. 점이 둘보다 적으면 그리지 않으므로 크기 0.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 알면 참.
+	 * @example <caption>지나간 자리를 품는 사각형</caption>
+	 * import { WorldNode, TrailRenderer, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * const trailRenderer = node.addComponent(TrailRenderer);
+	 * trailRenderer.setWidth(10, 0);
+	 * trailRenderer.tick(0.016);
+	 * node.setLocalPosition(Vector2.create(100, 0));
+	 * trailRenderer.tick(0.016);
+	 * const drawnRect = Rect.zero();
+	 * console.log(trailRenderer.calculateDrawnRect(drawnRect), drawnRect.position.x, drawnRect.size.x);
+	 */
+	calculateDrawnRect(rect) {
+		const pointList = this.#pointList;
+		const node = this.getNode();
+		if (pointList.length < 2 || node === null || node === undefined) {
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
+		}
+		const nodePosition = node.getLocalPosition();
+		const extent = System.Math.max(System.Math.abs(this.#startWidth), System.Math.abs(this.#endWidth), 0.1) * 0.5 + 1;
+		let minimumX = System.Number.POSITIVE_INFINITY;
+		let minimumY = System.Number.POSITIVE_INFINITY;
+		let maximumX = System.Number.NEGATIVE_INFINITY;
+		let maximumY = System.Number.NEGATIVE_INFINITY;
+		for (const point of pointList) {
+			minimumX = System.Math.min(minimumX, point.x);
+			minimumY = System.Math.min(minimumY, point.y);
+			maximumX = System.Math.max(maximumX, point.x);
+			maximumY = System.Math.max(maximumY, point.y);
+		}
+		rect.position.set(minimumX - nodePosition.x - extent, minimumY - nodePosition.y - extent);
+		rect.size.set(maximumX - minimumX + extent * 2, maximumY - minimumY + extent * 2);
+		return true;
 	}
 
 	//==============================================================================
@@ -193,6 +248,7 @@ export class TrailRenderer extends Component {
 	setWidth(startWidth, endWidth) {
 		this.#startWidth = startWidth;
 		this.#endWidth = endWidth;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================

@@ -23,6 +23,8 @@ const childDrawBounds = new Rect();
 const subtreeNodeRect = new Rect();
 const subtreeComponentRect = new Rect();
 const subtreeContentSize = Vector2.zero();
+// 하위 트리 경계를 셈한 차례 번호. (셀 때마다 하나씩 늘려 그 노드에 적는다, 자식이 부모 좌표로 옮긴 경계를 언제 적었는지 견준다)
+let drawBoundsStampCounter = 0;
 
 
 //==============================================================================
@@ -64,6 +66,10 @@ export class TransformNode extends ComponentNode {
 	/** @private @type { number } */ #drawBoundsState; // 하위 트리 그리기 경계의 상태. (DRAW_BOUNDS_DIRTY, KNOWN, UNKNOWN)
 	/** @private @type { number } */ #drawBoundsGeneration; // 경계를 셈한 때의 컴포넌트 그리는 사각형 세대. (Component.getDrawnRectGeneration)
 	/** @private @type { Rect | null } */ #drawBounds; // 셈해 둔 하위 트리 그리기 경계. (이 노드의 내용 좌표, 처음 읽을 때 만든다)
+	/** @private @type { number } */ #drawBoundsStamp; // 이 노드의 경계를 마지막으로 셈한 차례 번호. (0 이면 셈한 적 없다)
+	/** @private @type { number } */ #parentDrawBoundsStamp; // 부모가 이 노드의 경계를 부모 좌표로 옮겨 적은 때 부모의 차례 번호. (-1 이면 적은 적 없다)
+	/** @private @type { Rect | null } */ #parentDrawBounds; // 부모가 셈하며 적어 둔 이 노드의 하위 트리 경계. (부모의 내용 좌표, 처음 적을 때 만든다)
+	/** @private @type { boolean } */ #isParentDrawBoundsEmpty; // 적어 둔 경계가 아무것도 그리지 않는지. (옮기기 전 크기가 0)
 
 	//==============================================================================
 	// 생성.
@@ -86,6 +92,10 @@ export class TransformNode extends ComponentNode {
 		this.#drawBoundsState = DRAW_BOUNDS_DIRTY;
 		this.#drawBoundsGeneration = -1;
 		this.#drawBounds = null;
+		this.#drawBoundsStamp = 0;
+		this.#parentDrawBoundsStamp = -1;
+		this.#parentDrawBounds = null;
+		this.#isParentDrawBoundsEmpty = false;
 	}
 
 	//==============================================================================
@@ -775,6 +785,9 @@ export class TransformNode extends ComponentNode {
 		}
 		const drawnRectGeneration = Component.getDrawnRectGeneration();
 		if (this.#drawBoundsState === DRAW_BOUNDS_DIRTY || this.#drawBoundsGeneration !== drawnRectGeneration) {
+			// 새 차례 번호를 먼저 적는다. (셈하며 자식에 적는 부모 좌표 경계가 이 번호를 단다, 앞 차례에 적은 것은 맞지 않게 된다)
+			drawBoundsStampCounter += 1;
+			this.#drawBoundsStamp = drawBoundsStampCounter;
 			const isKnown = this.calculateSubtreeDrawBounds(drawBounds) === true;
 			const leftX = drawBounds.position.x;
 			const topY = drawBounds.position.y;
@@ -790,6 +803,76 @@ export class TransformNode extends ComponentNode {
 		rect.position.set(drawBounds.position.x, drawBounds.position.y);
 		rect.size.set(drawBounds.size.x, drawBounds.size.y);
 		return true;
+	}
+
+	//==============================================================================
+	// 부모가 셈해 둔 이 노드의 하위 트리 그리기 경계 읽기. (부모의 내용 좌표, 이 노드의 변환을 건 경계 상자, 맞으면 true)
+	// - 부모가 하위 트리 경계를 셈할 때(calculateSubtreeDrawBounds) 자식마다 옮겨 적어 둔 것이다. 이 노드의 변환이나 경계가 바뀌면 부모가 다시 셈하므로 그때까지 그대로 쓴다.
+	// - 그리기 순회가 부모의 변환 아래에서 이 사각형을 먼저 보아, 부모 좌표의 보이는 사각형 밖이면 이 노드에 변환을 걸지 않고 건너뛴다. (스크롤은 부모의 변환만 바뀌므로 자식마다 다시 셈하지 않는다)
+	// - 부모가 아직 셈하지 않았거나 셈한 뒤 바뀌었으면(다시 셈할 차례), 이 노드가 어디에 그리는지 모르거나 놓이는 곳을 모르면 false.
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 경계를 적을 곳. (부모의 내용 좌표, 크기가 0 이면 아무것도 그리지 않는다)
+	 * @returns { boolean } 맞는 경계가 있으면 참. (없으면 rect 를 건드리지 않는다)
+	 * @example <caption>부모가 셈해 둔 줄의 경계를 부모 좌표로 읽기</caption>
+	 * import { WorldNode, Paint, Rect, Vector2, Pivot } from "./build/vanilla.js";
+	 *
+	 * const listNode = new WorldNode();
+	 * listNode.setPivot(Pivot.topLeft);
+	 * const rowNode = new WorldNode();
+	 * rowNode.setPivot(Pivot.topLeft);
+	 * rowNode.setRect(0, 120, 300, 40);
+	 * rowNode.addComponent(Paint);
+	 * listNode.addChild(rowNode);
+	 * const drawBounds = Rect.zero();
+	 * console.log(rowNode.readParentDrawBounds(drawBounds));
+	 * listNode.readSubtreeDrawBounds(drawBounds);
+	 * console.log(rowNode.readParentDrawBounds(drawBounds), drawBounds.position.y, drawBounds.size.y);
+	 */
+	readParentDrawBounds(rect) {
+		const parent = this.getParent();
+		if (parent === null || parent === undefined || !(#drawBoundsState in parent)) {
+			return false;
+		}
+		if (this.#parentDrawBoundsStamp !== parent.#drawBoundsStamp || parent.#drawBoundsState === DRAW_BOUNDS_DIRTY || parent.#drawBoundsGeneration !== Component.getDrawnRectGeneration()) {
+			return false;
+		}
+		const parentDrawBounds = this.#parentDrawBounds;
+		if (this.#isParentDrawBoundsEmpty) {
+			rect.position.set(parentDrawBounds.position.x, parentDrawBounds.position.y);
+			rect.size.set(0, 0);
+			return true;
+		}
+		rect.position.set(parentDrawBounds.position.x, parentDrawBounds.position.y);
+		rect.size.set(parentDrawBounds.size.x, parentDrawBounds.size.y);
+		return true;
+	}
+
+	//==============================================================================
+	// 부모가 셈한 이 노드의 부모 좌표 경계 적기. (부모의 calculateSubtreeDrawBounds 가 자식마다 부른다, 값이 수가 아니면 적지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 부모 좌표로 옮긴 경계.
+	 * @param { boolean } isEmpty 옮기기 전 크기가 0 이었는지.
+	 * @param { number } parentStamp 부모의 차례 번호.
+	 */
+	#writeParentDrawBounds(rect, isEmpty, parentStamp) {
+		const leftX = rect.position.x;
+		const topY = rect.position.y;
+		const width = rect.size.x;
+		const height = rect.size.y;
+		if (!isEmpty && !(System.Number.isFinite(leftX) && System.Number.isFinite(topY) && System.Number.isFinite(width) && System.Number.isFinite(height))) {
+			return;
+		}
+		let parentDrawBounds = this.#parentDrawBounds;
+		if (parentDrawBounds === null) {
+			parentDrawBounds = new Rect();
+			this.#parentDrawBounds = parentDrawBounds;
+		}
+		parentDrawBounds.position.set(leftX, topY);
+		parentDrawBounds.size.set(width, height);
+		this.#isParentDrawBoundsEmpty = isEmpty;
+		this.#parentDrawBoundsStamp = parentStamp;
 	}
 
 	//==============================================================================
@@ -887,6 +970,7 @@ export class TransformNode extends ComponentNode {
 	//   모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드와 내용 크기를 읽을 수 없는 노드(내용 영역 안 컴포넌트가 있을 때)도 모른다.
 	// - 자식: 자식의 하위 트리 경계를 자식이 옮긴(transformDrawBoundsToParent) 이 노드의 내용 좌표 경계 상자. 놓이는 곳을 모르는 자식이 있으면 모른다.
 	// - 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)
+	// - 부모 좌표로 옮긴 자식의 경계는 자식에 적어 둔다. (readParentDrawBounds, 그리기 순회가 자식에 변환을 걸기 전에 본다, 이 노드가 다시 셈할 때까지 맞다)
 	// - 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)
 	//==============================================================================
 	/**
@@ -1007,6 +1091,7 @@ export class TransformNode extends ComponentNode {
 				isKnown = false;
 				continue;
 			}
+			child.#writeParentDrawBounds(childRect, isChildEmpty, this.#drawBoundsStamp);
 			if (!isKnown || isChildEmpty) {
 				continue;
 			}
