@@ -35,6 +35,9 @@ const MOUSE_DEVICE_MOVE_THRESHOLD = 6;
 // 검증용 화면 저장의 기본 파일 이름. ("{frame}" 은 프레임 번호로 바뀐다)
 const DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
 
+// 찍기 모드(주소 쿼리 capture)의 한 프레임 간격. (밀리초, 1/60 초. 러스트 판 찍기 모드와 같은 셈)
+const CAPTURE_FRAME_MILLISECONDS = 1000 / 60;
+
 
 //==============================================================================
 // 페이지 이벤트. (엔진이 리스너에 넘긴다, addPageEventListener)
@@ -185,6 +188,7 @@ export class Engine extends Object {
 	/** @private @type { Rect } */ #statisticsTextRect;
 	/** @private @type { Version } */ #version;
 	/** @private @type { Map<number, Array<Function>> } */ #frameCaptureRequests; // 프레임 번호 → 화면을 받을 함수 목록. (검증용 화면 저장)
+	/** @private @type { boolean } */ #isCaptureTimeStepFixed; // 찍기 모드라 시간을 프레임마다 1/60 초씩 보내는지. (주소 쿼리 capture)
 	/** @private @type { boolean } */ #isExitRequested; // 종료를 요청했는지.
 	/** @private @type { boolean } */ #isPageHidden; // 페이지가 가려져 있는지.
 	/** @private @type { Array<Function> } */ #pageEventListeners; // 페이지 이벤트 리스너. ((pageEvent) => void)
@@ -238,6 +242,7 @@ export class Engine extends Object {
 		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 3, 2);
 		this.#frameCaptureRequests = new System.Map();
+		this.#isCaptureTimeStepFixed = false;
 		this.#isExitRequested = false;
 		this.#isPageHidden = System.document.visibilityState === "hidden";
 		this.#pageEventListeners = [];
@@ -1021,7 +1026,7 @@ export class Engine extends Object {
 		//  밀린 것은 다음 프레임에 처리하므로 주사율이 최대 FPS 로 나누어떨어지지 않아도(90 Hz 에서 60 FPS 등) 평균이 최대 FPS 가 된다)
 		const engineConfiguration = this.getEngineConfiguration();
 		const maximumFramePerSecond = engineConfiguration.maximumFramePerSecond;
-		if (maximumFramePerSecond > 0) {
+		if (maximumFramePerSecond > 0 && !this.#isCaptureTimeStepFixed) {
 			const frameInterval = 1000 / maximumFramePerSecond;
 			if (this.#frameLimitStartTimestamp < 0 || this.#frameLimitFramePerSecond !== maximumFramePerSecond) {
 				this.#frameLimitStartTimestamp = timestamp;
@@ -1053,6 +1058,11 @@ export class Engine extends Object {
 		graphic.applySettings(this);
 
 		// 시간 처리.
+		// 찍기 모드는 결정적으로 찍게 실제 시각 대신 프레임 번호 x 1/60 초를 쓴다. (기계 빠르기와 상관없이 같은 프레임에 같은 시간, 러스트 판과 같은 셈)
+		// 최대 FPS 제한도 건너뛴다. (같은 시각이 되풀이되면 제한이 프레임을 넘기지 못한다)
+		if (this.#isCaptureTimeStepFixed) {
+			timestamp = this.#frameNumber * CAPTURE_FRAME_MILLISECONDS;
+		}
 		const timeManager = this.getTimeManager();
 		timeManager.update(timestamp);
 		const timeDelta = timeManager.getTimeDelta();
@@ -1690,6 +1700,7 @@ export class Engine extends Object {
 	// 검증용 화면 저장 요청. (그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다)
 	// - 이미 지난 번호면 이번(프레임 사이에 부르면 다음) 프레임을 저장한다.
 	// - 주소 쿼리로도 건다. (?capture=120,240 은 그 프레임들을 내려받기로 저장, captureName 은 파일 이름("{frame}" 은 번호), captureExit=1 은 마지막 저장 뒤 exitApplication)
+	//   주소 쿼리로 건 찍기 모드는 결정적으로 찍게 시간이 프레임마다 1/60 초씩 간다. (실제 시각과 최대 FPS 제한을 쓰지 않는다, 러스트 판 VANILLA_CAPTURE_* 와 같다)
 	//==============================================================================
 	/**
 	 * @param { number } frameNumber 저장할 프레임 번호. (소수는 버리고, 이미 지났으면 지금 프레임)
@@ -1763,6 +1774,7 @@ export class Engine extends Object {
 		if (frameNumbers.length === 0) {
 			frameNumbers.push(120);
 		}
+		this.#isCaptureTimeStepFixed = true;
 		const captureNameText = searchParameters.get("captureName");
 		const captureFileName = captureNameText !== null && captureNameText !== "" ? captureNameText : DEFAULT_CAPTURE_FILE_NAME;
 		const isExitAfterLastCapture = searchParameters.get("captureExit") === "1";
