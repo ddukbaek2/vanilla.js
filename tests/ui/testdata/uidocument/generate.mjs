@@ -9,10 +9,12 @@
 //==============================================================================
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as url from "node:url";
 
 const repositoryPath = path.resolve(process.argv[2]);
 const outputPath = path.resolve(process.argv[3]);
-const Engine = await import(path.join(repositoryPath, "import.js"));
+// 윈도우의 절대 경로(D:\...)는 import 가 못 받아 file:// 주소로 바꿔 넘긴다.
+const Engine = await import(url.pathToFileURL(path.join(repositoryPath, "import.js")).href);
 const { UIDocument, WorldNode, Component, Pivot, Vector2, Color } = Engine;
 
 // 원본 에디터가 등록하는 종류. (tools/uieditor/uieditor.js 의 등록 고리와 같은 판정, 내보낸 이름 차례)

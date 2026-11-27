@@ -3542,6 +3542,7 @@ function buildExamplePage(example, engineUrl, exampleIndex) {
 // 헤드리스 크롬으로 예제들 돌리기. ([오류 글 목록] 을 예제 차례대로)
 // - 노드 내장 http 로 저장소를 루트로 하는 정적 서버를 띄우고, 실행 페이지가 예제마다 iframe 을 만들어 몇 개씩 겹쳐 돌린 뒤 결과를 POST 로 돌려준다.
 // - 크롬은 하나만, 창 없이(--headless=new), 임시 프로필로 띄우고 결과를 받으면 바로 끈다.
+//   GPU 가 없는 기계(CI 의 리눅스)는 --enable-unsafe-swiftshader 가 있어야 WebGL 을 SwiftShader 로 돌린다. (없으면 WebGL2 를 못 만든다, GPU 가 있으면 GPU 를 쓴다)
 //==============================================================================
 /**
  * @param { object[] } exampleList
@@ -3694,7 +3695,7 @@ function runExamplesInChrome(exampleList, chromePath) {
 		server.listen(0, "127.0.0.1", () => {
 			profileDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "apidoc-chrome-"));
 			const runnerUrl = "http://127.0.0.1:" + server.address().port + "/__runner.html";
-			chromeProcess = childProcess.spawn(chromePath, ["--headless=new", "--user-data-dir=" + profileDirectoryPath, "--no-first-run", "--no-default-browser-check", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required", "--mute-audio", "--window-size=1280,720", runnerUrl], { stdio: "ignore" });
+			chromeProcess = childProcess.spawn(chromePath, ["--headless=new", "--user-data-dir=" + profileDirectoryPath, "--no-first-run", "--no-default-browser-check", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader", "--autoplay-policy=no-user-gesture-required", "--mute-audio", "--window-size=1280,720", runnerUrl], { stdio: "ignore" });
 			chromeProcess.on("error", (error) => {
 				cleanUp();
 				reject(error);

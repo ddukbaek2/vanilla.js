@@ -12,6 +12,7 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
+import { gotoPage } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -58,7 +59,7 @@ const chromeVersion = await browser.version();
 let result = null;
 try {
 	const page = await browser.newPage();
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	result = await page.evaluate(async () => {
 		const Experimental = await import("/src/experimental/experimental.js");
 		const { Skeleton2DData, Skeleton2D, Skeleton2DAnimationState } = Experimental;

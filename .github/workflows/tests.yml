@@ -1,0 +1,95 @@
+# 원본 시험. (원본만 바꾼 푸시도 시험이 돌게 한다)
+# - 시험: node tests/run.mjs (node 시험과 헤드리스 크롬 시험 모두), 리눅스, 윈도우, 맥.
+#   러스트 판 CI(vanilla-engine .github/workflows/platforms.yml)도 같은 시험을 세 기계에서 돌리므로 원본 쪽에서 먼저 걸리게 같은 기계를 쓴다.
+# - API 문서 검사: node tools/apidoc.cjs 0.4.0 --check (자료 꼴, 그림 파일), --check-examples (예제 문법, 엔진 이름, node 와 헤드리스 크롬으로 돌려 보기).
+# - 크롬은 러너에 깔린 것을 쓰지 않고 browser-actions/setup-chrome 으로 Chrome for Testing 판을 고정한다. (러스트 판 CI 와 같은 158.0.8127.88, CHROME_PATH)
+#   puppeteer-core 도 러스트 판 CI 와 같은 판을 받는다. (NODE_PATH)
+name: 원본 시험
+
+on:
+  push:
+    branches: [dev, release, "ci-*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: 시험 ${{ matrix.tag }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tag: linux
+            os: ubuntu-latest
+          - tag: windows
+            os: windows-latest
+          - tag: macos
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: 원본 받기
+        uses: actions/checkout@v7
+
+      - name: 크롬 (Chrome for Testing 158.0.8127.88)
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 158.0.8127.88
+          install-dependencies: true
+
+      - name: 크롬 경로와 노드 꾸러미 (puppeteer-core)
+        run: |
+          echo "CHROME_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # 우분투 23.10 뒤로는 AppArmor 가 권한 없는 사용자 이름공간을 막아, AppArmor 프로필이 없는 Chrome for Testing 이 샌드박스를 못 띄운다.
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          # 윈도우는 노드도 읽는 D:/a/... 꼴로 둔다.
+          temporary_path=$(cygpath -m "$RUNNER_TEMP" 2>/dev/null || echo "$RUNNER_TEMP")
+          npm install --no-save --no-package-lock --prefix "$temporary_path/npm" puppeteer-core@25.17.0
+          echo "NODE_PATH=$temporary_path/npm/node_modules" >> "$GITHUB_ENV"
+          node --version
+          echo "크롬 ${{ steps.chrome.outputs.chrome-version }}: ${{ steps.chrome.outputs.chrome-path }}"
+
+      - name: 시험 (node tests/run.mjs)
+        run: node tests/run.mjs
+
+  apidoc:
+    name: API 문서 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 원본 받기
+        uses: actions/checkout@v7
+
+      - name: 크롬 (Chrome for Testing 158.0.8127.88)
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 158.0.8127.88
+          install-dependencies: true
+
+      - name: 크롬 경로와 노드 꾸러미 (puppeteer-core)
+        run: |
+          echo "CHROME_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          npm install --no-save --no-package-lock --prefix "$RUNNER_TEMP/npm" puppeteer-core@25.17.0
+          echo "NODE_PATH=$RUNNER_TEMP/npm/node_modules" >> "$GITHUB_ENV"
+
+      - name: 자료 꼴 검사 (--check)
+        run: node tools/apidoc.cjs 0.4.0 --check
+
+      - name: 예제 검사 (--check-examples)
+        if: success() || failure()
+        run: node tools/apidoc.cjs 0.4.0 --check-examples
