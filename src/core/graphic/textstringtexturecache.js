@@ -716,7 +716,7 @@ export class TextStringTextureCache extends Object {
 	}
 
 	//==============================================================================
-	// 글리프 칸 자리 잡기. (같은 높이의 줄에 이어 놓고, 없으면 새 줄, 새 장, 그래도 없으면 가장 오래 안 쓴 장을 비운다)
+	// 글리프 칸 자리 잡기. (가장 나중에 연 장의 같은 높이 줄에 이어 놓고, 없으면 새 줄, 새 장, 장 수가 상한이면 가장 오래 안 쓴 장을 비운다)
 	// - 이번 엔트리가 쓰는 장(lastUseSerial 이 지금 번호)은 비우지 않는다. 그것뿐이면 상한을 넘겨 새 장을 연다.
 	//==============================================================================
 	/**
@@ -737,13 +737,16 @@ export class TextStringTextureCache extends Object {
 			return;
 		}
 
-		for (const atlasPage of atlasPages) {
+		// 가장 나중에 연 장에만 이어 놓는다. 차면 새 장을 연다. (TextMeshPro 여러 장 아틀라스처럼, 앞 장의 남은 틈을 채우면 한 문자열의 글리프가 여러 장에 흩어져 드로 콜이 나뉜다)
+		for (let atlasPageIndex = atlasPages.length - 1; atlasPageIndex >= 0; --atlasPageIndex) {
+			const atlasPage = atlasPages[atlasPageIndex];
 			if (atlasPage.isNearest !== isNearest || atlasPage.isDedicated) {
 				continue;
 			}
 			if (this.tryPlaceGlyph(glyph, atlasPage)) {
 				return;
 			}
+			break;
 		}
 		this.makeRoomForAtlasPage();
 		const atlasPage = this.createAtlasPage(ATLAS_PAGE_SIZE, ATLAS_PAGE_SIZE, isNearest, false);
