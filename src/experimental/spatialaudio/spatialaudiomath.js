@@ -25,7 +25,7 @@ const RADIAN_TO_DEGREE_F32 = System.Math.fround(180 / System.Math.fround(System.
 //==============================================================================
 export const PanningModel = System.Object.freeze({
 	EqualPower: "equalpower", // 등력 좌우. (기본, 방위각만 쓴다)
-	Hrtf: "HRTF", // 머리 전달 함수. (브라우저가 IRCAM 자료로 셈한다, 러스트 데스크탑은 아직 등력)
+	Hrtf: "HRTF", // 머리 전달 함수. (브라우저가 IRCAM 자료로 셈한다, 러스트 데스크탑도 크로미엄 HRTFPanner 와 같은 셈이다)
 });
 
 

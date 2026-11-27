@@ -316,7 +316,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 - 러스트 판(vanilla-engine)은 이 엔진의 `src/` 200 파일(초안 자리 src/experimental 은 빼고) 가운데 182 파일을 옮겼다. 일부러 옮기지 않은 18 파일은 빈 파일(calculator, layer, resources, uibuilder), 데드 코드(deprecated 의 aabb, transform2d, gl2d, webgl2, anchoredworldmnode), 러스트 언어와 표준이 맡는 것(object, reflection, singleton, base/collection 다섯), Camera2D 가 덮는 deprecated/camera.js 다.
 - 폴더는 러스트 판과 같다. (graphics3d, graphics3d/toon, animation, misc, resource) 원본 core/graphic/* 만 러스트 판에서 core/ 바로 아래에 있다.
 - 두 엔진의 공개 API 와 동작은 같게 둔다. 이름만 러스트 규칙(snake_case, UpperCamelCase, SCREAMING_SNAKE_CASE)으로 바뀐다. (setFillColor → set_fill_color)
-- 남은 차이(정말 맞출 수 없는 것과 러스트에 맞게 정한 꼴)는 러스트 판 저장소의 ARCHITECTURE.md 9장과 10장에 모았다. 요점: 러스트 판은 async 대신 받기 손잡이와 콜백, 리플렉션 대신 등록 표, 전역 엔진 대신 인자로 넘기기, 노드는 핸들(NodeId), 데스크탑에는 DOM 과 브라우저 설정과 세이프 에어리어가 없다.
+- 남은 차이(정말 맞출 수 없는 것과 러스트에 맞게 정한 꼴)는 러스트 판 저장소의 ARCHITECTURE.md 9장과 10장에 모았다. 요점: 러스트 판은 async/await 를 엔진이 품은 스레드 하나짜리 실행기(core/task.rs)로 돌리고, 리플렉션은 `#[vanilla::reflect]` 절차 매크로가 컴파일 때 짓고, 전역 엔진 대신 인자로 넘기고, 노드는 핸들(NodeId)이며, 데스크탑에는 DOM 과 브라우저 설정이 없고 세이프 에어리어 인셋은 크롬 데스크탑처럼 0 이다(`set_safe_area_insets` 로 넣을 수 있다).
 
 ---
 
