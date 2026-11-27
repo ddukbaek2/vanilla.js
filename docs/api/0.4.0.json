@@ -2253,6 +2253,68 @@
 						},
 						{
 							"kind": "static",
+							"name": "create",
+							"signature": "static create(red = 1.0, green = 1.0, blue = 1.0, alpha = 1.0)",
+							"params": [
+								{
+									"name": "red",
+									"type": "number",
+									"description": {
+										"ko": "빨강. (0 ~ 1, 기본 1)",
+										"en": "Red. (0 to 1, default 1)"
+									}
+								},
+								{
+									"name": "green",
+									"type": "number",
+									"description": {
+										"ko": "초록. (0 ~ 1, 기본 1)",
+										"en": "Green. (0 to 1, default 1)"
+									}
+								},
+								{
+									"name": "blue",
+									"type": "number",
+									"description": {
+										"ko": "파랑. (0 ~ 1, 기본 1)",
+										"en": "Blue. (0 to 1, default 1)"
+									}
+								},
+								{
+									"name": "alpha",
+									"type": "number",
+									"description": {
+										"ko": "알파. (0 ~ 1, 기본 1, 범위를 자르지 않는다)",
+										"en": "Alpha. (0 to 1, default 1, the range is not clamped)"
+									}
+								}
+							],
+							"returns": {
+								"type": "Color",
+								"description": {
+									"ko": "만든 색.",
+									"en": "The new color."
+								}
+							},
+							"description": {
+								"ko": "생성. (러스트 Color::create 와 같은 이름, new Color 와 같다)",
+								"en": "Create. (same name as the Rust edition Color::create, same as new Color)"
+							},
+							"since": "0.4.0",
+							"source": "src/base/color.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "반투명 빨강 만들기",
+										"en": "Making a translucent red"
+									},
+									"code": "import { Color } from \"./build/vanilla.js\";\n\nconst color = Color.create(1, 0, 0, 0.5);\nconsole.log(color.red, color.alpha);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "static",
 							"name": "createFromBytes",
 							"signature": "static createFromBytes(red, green, blue, alpha)",
 							"params": [
@@ -9655,7 +9717,7 @@
 								"ko": "설정을 채워 엔진 만들기",
 								"en": "Fill in the configuration and create the engine"
 							},
-							"code": "import { Engine, EngineConfiguration, Scene, Vector2, ViewScaleMode } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.canvasId = \"gameCanvas\";\nengineConfiguration.title = \"My Game\";\nengineConfiguration.referenceResolutionSize = Vector2.create(1920, 1080);\nengineConfiguration.viewScaleMode = ViewScaleMode.stretchShortExpandLong;\nengineConfiguration.autoResizeOnWindowResize = true;\nengineConfiguration.maximumFramePerSecond = 60;\nengineConfiguration.useStatistics = true;\nengineConfiguration.useDevTools = false;\nconst engine = new Engine(engineConfiguration);\nengine.run(new Scene());",
+							"code": "import { Engine, EngineConfiguration, Scene, Vector2, ViewScaleMode } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.canvasId = \"gameCanvas\";\nengineConfiguration.title = \"My Game\";\nengineConfiguration.referenceResolutionSize = Vector2.create(1920, 1080);\nengineConfiguration.viewScaleMode = ViewScaleMode.stretchShortExpandLong;\nengineConfiguration.autoResizeOnWindowResize = true;\nengineConfiguration.maximumFramePerSecond = 60;\nengineConfiguration.antialias = true;\nengineConfiguration.useStatistics = true;\nengineConfiguration.useDevTools = false;\nconst engine = new Engine(engineConfiguration);\nengine.run(new Scene());",
 							"language": "javascript"
 						}
 					],
@@ -9834,6 +9896,25 @@
 								"class": "EngineConfiguration",
 								"name": "preserve_drawing_buffer"
 							}
+						},
+						{
+							"kind": "field",
+							"name": "antialias",
+							"signature": "antialias",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "캔버스(기본 프레임 버퍼)의 멀티샘플 안티에일리어싱(MSAA)을 켤지. 생성 때 정한다. 켜면(기본) 지금까지와 같다.\n끄면 도형과 3D 의 가장자리가 계단져 보이는 대신 고해상도 모바일에서 프레임마다 드는 리졸브 비용이 빠진다.\n(웹은 WebGL 컨텍스트 속성 antialias 로 켬과 끔만 고르고 표본 수는 브라우저가 정한다. 데스크탑은 켜면 표본 4)",
+								"en": "Whether to enable multisample anti-aliasing (MSAA) on the canvas (default framebuffer). Set at creation. On (default) keeps the previous behavior.\nOff makes the edges of shapes and 3D look stepped, but removes the per-frame resolve cost on high-resolution mobile devices.\n(On the web it only chooses on or off through the WebGL context attribute antialias and the browser picks the sample count. On desktop, on means 4 samples)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js"
 						},
 						{
 							"kind": "field",
@@ -13191,8 +13272,8 @@
 								}
 							],
 							"description": {
-								"ko": "렌더 배율 상한 설정.\n- 고DPI 기기에서 캔버스가 과대해지는 것을 막는다. 0 이면 제한하지 않는다.",
-								"en": "Sets the render scale upper limit.\n- Prevents the canvas from becoming oversized on high-DPI devices. 0 means no limit."
+								"ko": "렌더 배율 상한 설정.\n- 고DPI 기기에서 캔버스가 과대해지는 것을 막는다. 0 이면 제한하지 않는다.\n- 캔버스 크기는 다음 프레임 머리에서 엔진이 창 크기 바뀜과 같은 길(Engine.resize)로 맞춘다. (씬도 화면 영역이 바뀐 것을 받는다)\n  프레임 가운데(tick, draw)에서 캔버스 크기를 바꾸면 그리기 버퍼가 비워지는데 그 프레임은 앞서 맞춘 뷰포트로 그려 한 프레임이 까맸다.",
+								"en": "Set the render pixel ratio cap.\n- Keeps the canvas from growing too large on high-DPI devices. 0 means no cap.\n- The engine applies the canvas size at the start of the next frame through the same path as a window resize (Engine.resize). (scenes also receive the screen area change)\n  Resizing the canvas in the middle of a frame (tick, draw) clears the drawing buffer while that frame still draws with the earlier viewport, which made one frame black."
 							},
 							"since": "0.3.0",
 							"source": "src/core/viewmanager.js",
@@ -13202,6 +13283,35 @@
 								"class": "ViewManager",
 								"name": "set_max_render_pixel_ratio"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "isViewRectPending",
+							"signature": "isViewRectPending()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "다시 셈할 것이 남았으면 참. (calculateViewRect 가 맞추면 거짓)",
+									"en": "True when a recalculation is still pending. (false once calculateViewRect applies it)"
+								}
+							},
+							"description": {
+								"ko": "다음 프레임 머리에 뷰 영역을 다시 셈할지 반환. (렌더 배율 상한을 바꾼 뒤 아직 맞추지 않았으면 true)",
+								"en": "Return whether the view area is recalculated at the start of the next frame. (true after the render pixel ratio cap changed and before it is applied)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/viewmanager.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "렌더 배율 상한을 바꾼 뒤 맞출 것이 남았는지 보기",
+										"en": "Check whether applying a changed render pixel ratio cap is still pending"
+									},
+									"code": "import { Engine, EngineConfiguration } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nconst viewManager = engine.getViewManager();\nviewManager.setMaxRenderPixelRatio(1);\nconsole.log(viewManager.isViewRectPending());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -17985,7 +18095,7 @@
 						{
 							"kind": "constructor",
 							"name": "constructor",
-							"signature": "constructor(canvas, preserveDrawingBuffer)",
+							"signature": "constructor(canvas, preserveDrawingBuffer, antialias = true)",
 							"params": [
 								{
 									"name": "canvas",
@@ -18001,6 +18111,14 @@
 									"description": {
 										"ko": "프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. (true 일 때만 남긴다)",
 										"en": "Whether drawings stay on the canvas after the frame ends. (kept only when true)"
+									}
+								},
+								{
+									"name": "antialias",
+									"type": "boolean",
+									"description": {
+										"ko": "캔버스의 멀티샘플 안티에일리어싱을 켤지. (기본 true, false 일 때만 끈다)",
+										"en": "Whether to enable multisample anti-aliasing on the canvas. (default true, turned off only when false)"
 									}
 								}
 							],
@@ -19202,8 +19320,8 @@
 								}
 							},
 							"description": {
-								"ko": "지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)\n- 투영과 같은 디바이스 픽셀 좌표로 보므로 클립 공간 밖인지와 같다. (뷰포트를 줄여 그려도 맞다)\n- 뷰포트를 아직 정하지 않았으면(applySettings 전) 걸치는 것으로 본다.",
-								"en": "Returns whether a rectangle moved by the current transform overlaps the screen (drawing buffer). (checked with the bounding box of the four moved corners)\n- Checked in the same device pixel coordinates as the projection, so it is the same as testing whether it is outside clip space. (correct even when drawing with a reduced viewport)\n- If the viewport is not set yet (before applySettings), it is treated as overlapping."
+								"ko": "지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)과 걸린 자르기 안에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)\n- 투영과 같은 디바이스 픽셀 좌표로 보므로 클립 공간 밖인지와 같다. (뷰포트를 줄여 그려도 맞다)\n- beginClipRect 로 건 자르기(겹친 것 모두)의 경계 상자 밖이면 보이지 않는 것으로 본다. (유니티 RectMask2D 처럼 스크롤 칸 밖 줄을 그리지 않는다)\n- 뷰포트를 아직 정하지 않았으면(applySettings 전) 걸치는 것으로 본다.",
+								"en": "Returns whether a rectangle moved by the current transform overlaps the screen (drawing buffer) and the active clip. (judged by the bounding box of the four moved corners)\n- It works in the same device pixel coordinates as the projection, so it equals testing outside clip space. (correct even when drawing to a smaller viewport)\n- Outside the bounding box of the clips set with beginClipRect (all nested ones), it counts as not visible. (like Unity RectMask2D, rows outside a scroll view are not drawn)\n- Before the viewport is set (before applySettings), it counts as overlapping."
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
@@ -19281,8 +19399,8 @@
 								}
 							],
 							"description": {
-								"ko": "스프라이트 묶어 그리기 설정.\n- 켜면 같은 텍스처를 쓰는 연이은 드로우(이미지, 도형, 글자)를 정점에 변환과 색을 실어 쌓아 두었다가 한 번의 드로우 콜로 그린다.\n- 텍스처, 블렌드, 클리핑, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.\n- 여러 그림을 한 장(아틀라스)에 모아 두면 드로우 콜이 크게 준다.\n- 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.",
-								"en": "Sets sprite batching.\n- When on, consecutive draws (images, shapes, text) using the same texture are accumulated with transform and color stored in the vertices, then drawn in a single draw call.\n- When the texture, blend, clipping or swapped-in shader changes, or the buffer fills, everything accumulated so far is drawn, and the engine draws the rest at frame end.\n- Gathering many images into one sheet (atlas) greatly reduces draw calls.\n- When inserting a pass that handles WebGL directly (external renderer, etc.) with this on, call flushSpriteBatch() before it."
+								"ko": "스프라이트 묶어 그리기 설정.\n- 켜면 연이은 드로우(이미지, 도형, 글자, 정점 색 쿼드)를 정점에 변환과 색을 실어 쌓아 두었다가 한 번의 드로우 콜로 그린다.\n- 텍스처는 한 묶음에 여러 장(기기 텍스처 유닛 수와 16 가운데 작은 것)까지 묶어 텍스처가 바뀌어도 이어진다. (PixiJS 와 같은 꼴)\n- 축에 맞고 화소 경계에 놓인 자르기(beginClipRect)는 정점의 자르기 사각형으로 셰이더가 잘라 묶음을 끊지 않는다. (돌아갔거나 둥근 자르기는 스텐실)\n- 텍스처 칸이 차거나, 블렌드, 스텐실 자르기, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.\n- 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.",
+								"en": "Sets sprite batching.\n- When on, consecutive draws (images, shapes, text, vertex-color quads) are accumulated with transform and color carried in the vertices and drawn in one draw call.\n- One batch binds several textures (the smaller of the device texture unit count and 16), so the batch continues when the texture changes. (the same scheme as PixiJS)\n- Axis-aligned clips (beginClipRect) whose edges lie on pixel boundaries are clipped by the shader with a clip rectangle carried in the vertices, so they do not break the batch. (rotated or rounded clips use the stencil)\n- When the texture slots fill up, when the blend, a stencil clip or a swapped-in shader changes, or when the buffer is full, what has accumulated is drawn, and the engine draws the rest at the end of the frame.\n- When inserting a pass that touches WebGL directly (an external renderer and the like) while it is on, call flushSpriteBatch() first."
 							},
 							"since": "0.3.2",
 							"source": "src/core/graphic.js"
@@ -19312,8 +19430,8 @@
 							"signature": "flushSpriteBatch()",
 							"params": [],
 							"description": {
-								"ko": "쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)",
-								"en": "Draws the accumulated batch. (does nothing if nothing is accumulated)"
+								"ko": "쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)\n- 묶음의 텍스처를 0 번부터의 유닛에 묶는다. 쓰지 않는 칸의 유닛에는 흰 텍스처를 묶어, 지난 그리기의 텍스처가 지금 그리는 칸(렌더 타겟)이어도 되먹임이 생기지 않게 한다.",
+								"en": "Draws the accumulated batch. (does nothing if nothing has accumulated)\n- Binds the batch textures to units from 0 up. Units of unused slots get the white texture, so a texture from an earlier draw never forms a feedback loop even if it is the current target (render target)."
 							},
 							"since": "0.3.2",
 							"source": "src/core/graphic.js"
@@ -21286,6 +21404,86 @@
 						},
 						{
 							"kind": "method",
+							"name": "getCurrentFramebuffer",
+							"signature": "getCurrentFramebuffer()",
+							"params": [],
+							"returns": {
+								"type": "WebGLFramebuffer | null",
+								"description": {
+									"ko": "지금 묶인 그리기 프레임 버퍼. (null 이면 캔버스의 기본 프레임 버퍼)",
+									"en": "The draw framebuffer bound now. (null means the canvas default framebuffer)"
+								}
+							},
+							"description": {
+								"ko": "지금 그리는 프레임 버퍼 반환. (null 이면 캔버스, GL 에 묻지 않고 기억한 값)",
+								"en": "Return the framebuffer being drawn to now. (null means the canvas, a remembered value read without asking GL)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "바깥 패스에서 렌더 타깃을 바꿨다가 되돌리기",
+										"en": "Switch the render target in an external pass and switch it back"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tgraphic.runExternalPass((webGL2RenderingContext) => {\n\t\t\tconst previousFramebuffer = graphic.getCurrentFramebuffer();\n\t\t\tconst framebuffer = webGL2RenderingContext.createFramebuffer();\n\t\t\twebGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);\n\t\t\twebGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);\n\t\t\twebGL2RenderingContext.deleteFramebuffer(framebuffer);\n\t\t}, { clearDepth: false });\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getCurrentViewport",
+							"signature": "getCurrentViewport()",
+							"params": [],
+							"returns": {
+								"type": "Rect",
+								"description": {
+									"ko": "지금 뷰포트. (위치 x, y 와 크기 너비, 높이, 새 Rect)",
+									"en": "The current viewport. (position x, y and size width, height, a new Rect)"
+								}
+							},
+							"description": {
+								"ko": "지금 뷰포트 반환. (디바이스 픽셀, GL 처럼 왼쪽 아래가 원점, GL 에 묻지 않고 기억한 값)",
+								"en": "Return the current viewport. (device pixels, origin at the bottom left like GL, a remembered value read without asking GL)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "지금 뷰포트 크기 읽기",
+										"en": "Read the current viewport size"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tconst viewport = graphic.getCurrentViewport();\n\t\tconsole.log(viewport.position.x, viewport.position.y, viewport.width, viewport.height);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "resetGLStateCache",
+							"signature": "resetGLStateCache()",
+							"params": [],
+							"description": {
+								"ko": "GL 상태 기억 다시 맞추기. (three.js 의 resetState 처럼 바깥 GL 코드가 상태를 바꾼 뒤 부른다)\n- 엔진은 컨텍스트의 상태 함수(bindFramebuffer, viewport, enable 같은 것)를 가로채 기억하므로, 같은 컨텍스트 객체로 부른 것은 따로 알리지 않아도 된다.\n- 프로토타입 함수를 직접 부르는 것처럼 가로채지 못한 길로 바꿨을 때 부른다. 기억을 모두 잊고 다음에 읽을 때 GL 에 한 번씩 묻는다.\n  마지막으로 쓰게 한 프로그램과 묶은 텍스처의 기억도 잊는다. (invalidateRenderStateCache)",
+								"en": "Resynchronize the remembered GL state. (call it after outside GL code changed the state, like resetState in three.js)\n- The engine intercepts the context's state functions (bindFramebuffer, viewport, enable and so on) and remembers them, so calls made through the same context object need no notice.\n- Call it after changing state in a way that cannot be intercepted, such as calling a prototype function directly. It forgets everything and asks GL once for each value the next time it is read.\n  It also forgets the last shader program used and the last texture bound. (invalidateRenderStateCache)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "가로채지 못한 길로 상태를 바꾼 뒤 기억 맞추기",
+										"en": "Resynchronize after changing state in a way that cannot be intercepted"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tgraphic.runExternalPass((webGL2RenderingContext) => {\n\t\t\tWebGL2RenderingContext.prototype.viewport.call(webGL2RenderingContext, 0, 0, 64, 64);\n\t\t\tgraphic.resetGLStateCache();\n\t\t\tconsole.log(graphic.getCurrentViewport().width);\n\t\t}, { clearDepth: false });\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "getDrawingBufferWidth",
 							"signature": "getDrawingBufferWidth()",
 							"params": [],
@@ -21733,6 +21931,60 @@
 								"class": "Graphic",
 								"name": "get_text_string_texture_cache"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "resolveShaderProgram",
+							"signature": "resolveShaderProgram(programGroupName, programName, createShaderSource)",
+							"params": [
+								{
+									"name": "programGroupName",
+									"type": "string",
+									"description": {
+										"ko": "묶음 이름. (효과 종류 같은 것, 열쇠의 앞)",
+										"en": "Group name. (such as an effect kind, the first half of the key)"
+									}
+								},
+								{
+									"name": "programName",
+									"type": "string",
+									"description": {
+										"ko": "프로그램 이름. (열쇠의 뒤)",
+										"en": "Program name. (the second half of the key)"
+									}
+								},
+								{
+									"name": "createShaderSource",
+									"type": "() => [string, string]",
+									"description": {
+										"ko": "담긴 것이 없을 때만 부르는 함수. ([버텍스 소스, 프래그먼트 소스], GLSL ES 3.00)",
+										"en": "Function called only when nothing is cached. ([vertex source, fragment source], GLSL ES 3.00)"
+									}
+								}
+							],
+							"returns": {
+								"type": "ShaderProgram | null",
+								"description": {
+									"ko": "담아 둔 프로그램. 만들기에 실패했으면 null. (그 뒤로도 null)",
+									"en": "The cached program. null if building failed. (null afterwards too)"
+								}
+							},
+							"description": {
+								"ko": "이름으로 담아 둔 바꿔 끼울 셰이더 프로그램 반환. (없으면 createShaderSource 가 준 소스로 만들어 담는다)\n- 어트리뷰트 위치를 기본 프로그램과 같게 고정해 링크하므로 기본 버텍스 어레이를 그대로 쓴다.\n- 만들기에 실패하면 한 번만 알리고 null 을 담아 두어 다시 만들지 않는다.",
+								"en": "Return a cached program, swappable into drawing, by name. (if none is cached, build it from the sources createShaderSource gives and cache it)\n- Links with the attribute locations pinned to the default program, so the default vertex array is used as is.\n- If building fails it reports once and caches null so it is never built again."
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "흑백 셰이더로 바꿔 끼워 도형 그리기",
+										"en": "Drawing a shape with a swapped-in grayscale shader"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Color, Rect } from \"./build/vanilla.js\";\n\nconst VERTEXSHADER_SOURCE = `#version 300 es\nin vec2 vertexPosition;\nin vec2 vertexTextureCoordinate;\nuniform mat3 projectionMatrix;\nuniform mat3 modelMatrix;\nout vec2 fragmentTextureCoordinate;\nvoid main() {\n\tvec3 transformedPosition = projectionMatrix * (modelMatrix * vec3(vertexPosition, 1.0));\n\tgl_Position = vec4(transformedPosition.xy, 0.0, 1.0);\n\tfragmentTextureCoordinate = vertexTextureCoordinate;\n}\n`;\nconst GRAY_FRAGMENTSHADER_SOURCE = `#version 300 es\nprecision highp float;\nin vec2 fragmentTextureCoordinate;\nuniform sampler2D mainTexture;\nuniform vec4 mainColor;\nuniform float globalAlpha;\nout vec4 outputColor;\nvoid main() {\n\tvec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);\n\tfloat gray = dot(textureColor.rgb * mainColor.rgb, vec3(0.299, 0.587, 0.114));\n\tfloat alpha = textureColor.a * mainColor.a * globalAlpha;\n\toutputColor = vec4(vec3(gray) * alpha, alpha);\n}\n`;\n\nclass MainScene extends Scene {\n\tpreDraw(graphic) {\n\t\tsuper.preDraw(graphic);\n\t\tconst shaderProgram = graphic.resolveShaderProgram(\"example\", \"gray\", () => [VERTEXSHADER_SOURCE, GRAY_FRAGMENTSHADER_SOURCE]);\n\t\tgraphic.setShaderProgramOverride(shaderProgram);\n\t\tgraphic.setFillColor(new Color(1, 0.4, 0.2, 1));\n\t\tgraphic.drawRect(Rect.create(220, 100, 200, 160));\n\t\tgraphic.setShaderProgramOverride(null);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
 						}
 					]
 				}
@@ -29006,10 +29258,10 @@
 							"params": [
 								{
 									"name": "image",
-									"type": "HTMLImageElement",
+									"type": "HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | ImageBitmap",
 									"description": {
-										"ko": "스프라이트 시트 이미지. (HTMLImageElement 가 아니면 무시한다)",
-										"en": "Sprite sheet image. (ignored if not an HTMLImageElement)"
+										"ko": "스프라이트 시트 그림. (이미지, 캔버스, ImageBitmap 만 받고 그 밖의 값은 무시한다)",
+										"en": "Sprite sheet picture. (only images, canvases, OffscreenCanvas and ImageBitmap are accepted; other values are ignored)"
 									}
 								},
 								{
@@ -35934,6 +36186,25 @@
 						},
 						{
 							"kind": "method",
+							"name": "isDrawnInsideContent",
+							"signature": "isDrawnInsideContent()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "내용 영역 안에서만 그리면 참.",
+									"en": "True if drawing only inside the content area."
+								}
+							},
+							"description": {
+								"ko": "내용 영역 안에서만 그리는지 반환. (배경은 내용 크기의 사각형만 칠한다, 화면 밖과 자르기 밖 거르기가 쓴다)\n- draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)",
+								"en": "Returns whether it draws only inside the content area. (the background fills only the content-size rectangle; used by off-screen and outside-clip culling)\n- Subclasses that override draw return false because where they draw is unknown. (such a class overrides this function too to report it)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiview.js"
+						},
+						{
+							"kind": "method",
 							"name": "draw",
 							"signature": "draw(graphic)",
 							"params": [
@@ -38086,6 +38357,25 @@
 								"en": "Draw."
 							},
 							"since": "0.2.0",
+							"source": "src/ui/uibutton.js"
+						},
+						{
+							"kind": "method",
+							"name": "isDrawnInsideContent",
+							"signature": "isDrawnInsideContent()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "내용 영역 안에서만 그리면 참.",
+									"en": "True if drawing only inside the content area."
+								}
+							},
+							"description": {
+								"ko": "내용 영역 안에서만 그리는지 반환. (버튼은 스스로 그리지 않는다, 화면 밖과 자르기 밖 거르기가 쓴다)\n- draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)",
+								"en": "Returns whether it draws only inside the content area. (the button draws nothing itself; used by off-screen and outside-clip culling)\n- Subclasses that override draw return false because where they draw is unknown. (such a class overrides this function too to report it)"
+							},
+							"since": "0.4.0",
 							"source": "src/ui/uibutton.js"
 						},
 						{
@@ -40297,6 +40587,25 @@
 								"class": "UIProgressView",
 								"name": "new"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "isDrawnInsideContent",
+							"signature": "isDrawnInsideContent()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "내용 영역 안에서만 그리면 참.",
+									"en": "True if drawing only inside the content area."
+								}
+							},
+							"description": {
+								"ko": "내용 영역 안에서만 그리는지 반환. (트랙과 채움은 내용 크기의 사각형 안만 칠한다, 화면 밖과 자르기 밖 거르기가 쓴다)\n- draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)",
+								"en": "Returns whether it draws only inside the content area. (the track and fill paint only inside the content-size rectangle; used by off-screen and outside-clip culling)\n- Subclasses that override draw return false because where they draw is unknown. (such a class overrides this function too to report it)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiprogressview.js"
 						},
 						{
 							"kind": "method",
@@ -42913,8 +43222,8 @@
 									"name": "engine",
 									"type": "Engine",
 									"description": {
-										"ko": "엔진. (DOM 입력의 자리, 캔버스 사건, 문맥 메뉴에 쓴다, attach 전에 준다)",
-										"en": "Engine. (used for the DOM input position, canvas events and the context menu, give it before attach)"
+										"ko": "엔진. (DOM 입력의 자리, 캔버스 사건, 문맥 메뉴에 쓴다, 주지 않으면 Engine.getEngine() 을 쓴다)",
+										"en": "Engine. (used for the DOM input position, canvas events and the context menu; Engine.getEngine() is used when not given)"
 									}
 								}
 							],
@@ -43894,25 +44203,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "getRenderState",
-							"signature": "getRenderState()",
-							"params": [],
-							"returns": {
-								"type": "object",
-								"description": {
-									"ko": "그릴 때 쓸 상태를 담은 새 객체. ({ value, composition, cursorIndex, selectionStart, focused, cursorVisible, fontSize, fontFace, padding, cursorColor, compositionUnderlineColor, focusBorderColor, focusBorderWidth, selectionColor, bgRoundSize })",
-									"en": "A new object holding the state used for drawing. ({ value, composition, cursorIndex, selectionStart, focused, cursorVisible, fontSize, fontFace, padding, cursorColor, compositionUnderlineColor, focusBorderColor, focusBorderWidth, selectionColor, bgRoundSize })"
-								}
-							},
-							"description": {
-								"ko": "렌더 상태 스냅샷 (오버레이/배경 렌더러가 읽음).",
-								"en": "Render state snapshot (read by the overlay/background renderer)."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
 							"name": "attach",
 							"signature": "attach()",
 							"params": [],
@@ -44149,145 +44439,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "getMeasureContext",
-							"signature": "getMeasureContext()",
-							"params": [],
-							"returns": {
-								"type": "CanvasRenderingContext2D | null",
-								"description": {
-									"ko": "2D 컨텍스트. (캔버스를 만들 수 없으면 null)",
-									"en": "2D context. (null if a canvas cannot be created)"
-								}
-							},
-							"description": {
-								"ko": "글 너비를 잴 2D 컨텍스트 반환. (모듈이 함께 쓰는 오프스크린 캔버스)",
-								"en": "Returns the 2D context to measure text width with. (an offscreen canvas shared by the module)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "refreshTexts",
-							"signature": "refreshTexts()",
-							"params": [],
-							"description": {
-								"ko": "라벨(UILabel) 갱신.\n- 값이 비어있으면 textText 숨김 + placeholder 표시.\n- 조합 중이면 (value + composition) 을 textText 에 합성 표시.",
-								"en": "Updates the labels (UILabel).\n- If the value is empty, hides textText + shows placeholder.\n- While composing, shows (value + composition) combined in textText."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "refreshTextPositions",
-							"signature": "refreshTextPositions()",
-							"params": [],
-							"description": {
-								"ko": "라벨과 오버레이 노드의 자리, 크기 맞추기. (내용 크기가 0 이면 하지 않는다)",
-								"en": "Fits the position and size of the label and overlay nodes. (skipped if the content size is 0)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachDOMInput",
-							"signature": "attachDOMInput()",
-							"params": [],
-							"description": {
-								"ko": "DOM <input> (옵션).",
-								"en": "DOM <input> (optional)."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "detachDOMInput",
-							"signature": "detachDOMInput()",
-							"params": [],
-							"description": {
-								"ko": "DOM 입력 떼기. (캔버스 포커스 핸들러도 떼고 포커스와 조합을 푼다)",
-								"en": "Removes the DOM input. (also removes the canvas focus handler and clears focus and composition)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachCanvasFocusHandler",
-							"signature": "attachCanvasFocusHandler()",
-							"params": [],
-							"description": {
-								"ko": "캔버스 touchstart 동기 focus 핸들러 등록.\n- 엔진의 touchPress 가 rAF 에서 dispatch 되어 iOS 가 gesture 만료로 키보드\n  호출을 막는 문제를 우회한다.\n- hit-test 통과 시: 동기 focus → 키보드 표시.\n- hit-test 실패 (필드 바깥 터치) 시: 현재 focus 상태면 blur → 키보드 숨김.\n- setUseTouchEndFocus(true) 일 때만 touchend 에서도 hit-test 통과 시 focus\n  한다. touchstart 는 사용자 활성화를 주지 않아, 페이지의 첫 터치가 필드면\n  안드로이드 크롬(웹뷰, 다른 출처의 iframe 포함)이 focus 는 받되 키보드를\n  띄우지 않는다. 그때 얻은 포커스면 (활성화를 주는) touchend 에서 blur 뒤\n  다시 focus 해 키보드를 띄운다. 꺼져 있으면 touchend 는 아무것도 하지 않는다.",
-								"en": "Registers the canvas touchstart synchronous focus handler.\n- Works around the problem where the engine's touchPress is dispatched in rAF, so iOS blocks the keyboard\n  call due to gesture expiry.\n- On hit-test pass: synchronous focus → show keyboard.\n- On hit-test fail (touch outside the field): if currently focused, blur → hide keyboard.\n- Only when setUseTouchEndFocus(true), also focuses on touchend when the hit-test\n  passes. touchstart does not grant user activation, so if the page's first touch is the field,\n  Android Chrome (including webviews and cross-origin iframes) accepts focus but does not show\n  the keyboard. If the focus was obtained then, blurs on touchend (which grants activation) and\n  focuses again to show the keyboard. When off, touchend does nothing."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "detachCanvasFocusHandler",
-							"signature": "detachCanvasFocusHandler()",
-							"params": [],
-							"description": {
-								"ko": "캔버스 touchstart 동기 focus 핸들러 해제.",
-								"en": "Unregisters the canvas touchstart synchronous focus handler."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "layoutDOMInput",
-							"signature": "layoutDOMInput()",
-							"params": [],
-							"description": {
-								"ko": "DOM 입력을 필드의 화면 자리에 맞추기. (직접 누름이면 보이는 동안만 누름을 받는다)",
-								"en": "Fits the DOM input to the field's screen position. (with direct touch, it takes presses only while visible)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "handleDOMInputEvent",
-							"signature": "handleDOMInputEvent()",
-							"params": [],
-							"description": {
-								"ko": "DOM 입력의 값 받기. (조합 중이 아니고 값이 바뀌었으면 담고 바뀜 콜백을 부른다)",
-								"en": "Takes the DOM input value. (if not composing and the value changed, stores it and calls the change callback)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachCanvasKeyboard",
-							"signature": "attachCanvasKeyboard()",
-							"params": [],
-							"description": {
-								"ko": "캔버스 모드 키보드 (DOM input 미사용 시).",
-								"en": "Canvas mode keyboard (when DOM input is not used)."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "detachCanvasKeyboard",
-							"signature": "detachCanvasKeyboard()",
-							"params": [],
-							"description": {
-								"ko": "캔버스 모드 키보드 사건 떼기.",
-								"en": "Removes the canvas mode keyboard event."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
 							"name": "handleCanvasKeydown",
 							"signature": "handleCanvasKeydown(event)",
 							"params": [
@@ -44341,80 +44492,6 @@
 								"class": "UIInputField",
 								"name": "move_cursor"
 							}
-						},
-						{
-							"kind": "method",
-							"name": "deleteCharAt",
-							"signature": "deleteCharAt(index)",
-							"params": [
-								{
-									"name": "index",
-									"type": "number",
-									"description": {
-										"ko": "지울 글자의 자리. (UTF-16 단위)",
-										"en": "Index of the character to delete. (UTF-16 units)"
-									}
-								}
-							],
-							"description": {
-								"ko": "한 글자 지우기. (그 자리부터 글자 묶음 하나, 크롬 Delete 키처럼 이모지나 결합 부호를 쪼개지 않는다, 바뀜 콜백을 부른다)",
-								"en": "Deletes one character. (One grapheme cluster from that index, does not split emoji or combining marks like the Chrome Delete key, calls the change callback)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "deleteRange",
-							"signature": "deleteRange(startIndex, endIndex)",
-							"params": [
-								{
-									"name": "startIndex",
-									"type": "number",
-									"description": {
-										"ko": "지울 범위의 앞. (UTF-16 단위)",
-										"en": "Start of the range to delete. (UTF-16 units)"
-									}
-								},
-								{
-									"name": "endIndex",
-									"type": "number",
-									"description": {
-										"ko": "지울 범위의 뒤. (UTF-16 단위, 앞보다 크지 않으면 아무것도 하지 않는다)",
-										"en": "End of the range to delete. (UTF-16 units, does nothing if it is not greater than the start)"
-									}
-								}
-							],
-							"description": {
-								"ko": "글 범위 지우기. (커서는 지운 자리로 당기고 선택은 접는다, 바뀜 콜백을 부른다)",
-								"en": "Deletes a text range. (Pulls the cursor back to the deleted spot and collapses the selection, calls the change callback)"
-							},
-							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "handleFocus",
-							"signature": "handleFocus()",
-							"params": [],
-							"description": {
-								"ko": "포커스 / 블러 핸들러 (DOM/캔버스 모드 공용).",
-								"en": "Focus / blur handlers (shared by DOM/canvas modes)."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "handleBlur",
-							"signature": "handleBlur()",
-							"params": [],
-							"description": {
-								"ko": "포커스 잃음 처리. (문맥 메뉴를 닫는다)",
-								"en": "Handles losing focus. (closes the context menu)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
 						},
 						{
 							"kind": "method",
@@ -44611,133 +44688,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "performMenuAction",
-							"signature": "performMenuAction(menuAction)",
-							"params": [
-								{
-									"name": "menuAction",
-									"type": "string",
-									"description": {
-										"ko": "할 항목. (UIInputFieldMenuAction 의 값, 그 밖이면 아무것도 하지 않는다)",
-										"en": "Item to perform. (a UIInputFieldMenuAction value, does nothing otherwise)"
-									}
-								}
-							],
-							"description": {
-								"ko": "문맥 메뉴 항목 하기.",
-								"en": "Performs a context menu item."
-							},
-							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "writeClipboard",
-							"signature": "writeClipboard(text)",
-							"params": [
-								{
-									"name": "text",
-									"type": "string",
-									"description": {
-										"ko": "쓸 글.",
-										"en": "Text to write."
-									}
-								}
-							],
-							"description": {
-								"ko": "클립보드에 쓰기. (navigator.clipboard 가 없거나 막히면 무시한다)",
-								"en": "Writes to the clipboard. (ignored if navigator.clipboard is missing or blocked)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "readClipboard",
-							"signature": "readClipboard()",
-							"params": [],
-							"returns": {
-								"type": "Promise<string>",
-								"description": {
-									"ko": "클립보드 글로 풀리는 프로미스. (navigator.clipboard 가 없으면 빈 글, 읽기가 막히면 거부될 수 있다)",
-									"en": "A Promise that resolves to the clipboard text. (empty if navigator.clipboard is missing, may reject if reading is blocked)"
-								}
-							},
-							"description": {
-								"ko": "클립보드 읽기.",
-								"en": "Reads the clipboard."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachContextMenuHandler",
-							"signature": "attachContextMenuHandler()",
-							"params": [],
-							"description": {
-								"ko": "컨텍스트 메뉴 (우클릭).",
-								"en": "Context menu (right click)."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "detachContextMenuHandler",
-							"signature": "detachContextMenuHandler()",
-							"params": [],
-							"description": {
-								"ko": "캔버스의 contextmenu 사건 떼기.",
-								"en": "Removes the canvas contextmenu event."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "handleContextMenuEvent",
-							"signature": "handleContextMenuEvent(event)",
-							"params": [
-								{
-									"name": "event",
-									"type": "MouseEvent",
-									"description": {
-										"ko": "캔버스의 contextmenu 사건.",
-										"en": "The canvas contextmenu event."
-									}
-								}
-							],
-							"description": {
-								"ko": "우클릭 처리. (필드 안이면 기본 메뉴를 막고 포커스한 뒤 문맥 메뉴를 띄운다, 밖이면 띄운 메뉴를 닫는다)",
-								"en": "Handles a right click. (Inside the field it blocks the default menu, focuses and opens the context menu; outside it closes an open menu)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "handleDOMInputContextMenuEvent",
-							"signature": "handleDOMInputContextMenuEvent(event)",
-							"params": [
-								{
-									"name": "event",
-									"type": "MouseEvent",
-									"description": {
-										"ko": "DOM 입력의 contextmenu 사건.",
-										"en": "The contextmenu event of the DOM input."
-									}
-								}
-							],
-							"description": {
-								"ko": "직접 누름 DOM 입력의 오른쪽 클릭 처리. (브라우저 편집 칸 메뉴를 막고 엔진 문맥 메뉴를 띄운다)",
-								"en": "Handles a right click on the direct-touch DOM input. (blocks the browser edit-field menu and opens the engine context menu)"
-							},
-							"since": "0.4.0",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
 							"name": "showContextMenu",
 							"signature": "showContextMenu(viewPosition)",
 							"params": [
@@ -44753,18 +44703,6 @@
 							"description": {
 								"ko": "문맥 메뉴 띄우기. (엔진이 그린 잘라내기, 복사, 붙여넣기, 모두 선택 메뉴, 러스트 판 show_context_menu 와 같다)\n- 루트의 마지막 자식 노드(UIInputFieldContextMenu 컴포넌트)로 만들어 위에 그린다. 메뉴 왼쪽 위가 누른 자리다.\n- 메뉴 밖을 누르거나, 필드가 포커스를 잃거나 트리에서 빠지면 닫힌다.",
 								"en": "Shows the context menu. (An engine-drawn cut, copy, paste and select all menu, same as show_context_menu in the Rust edition)\n- It is made as the last child node of the root (a UIInputFieldContextMenu component) and drawn on top. The menu top left is the pressed point.\n- It closes when pressed outside the menu, or when the field loses focus or leaves the tree."
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiinputfield.js"
-						},
-						{
-							"kind": "method",
-							"name": "hideContextMenu",
-							"signature": "hideContextMenu()",
-							"params": [],
-							"description": {
-								"ko": "문맥 메뉴 닫기. (러스트 판 hide_context_menu 와 같다)",
-								"en": "Closes the context menu. (same as hide_context_menu in the Rust edition)"
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiinputfield.js"
@@ -63705,78 +63643,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "createProgramSet",
-							"signature": "createProgramSet(material, instanceLayout)",
-							"params": [
-								{
-									"name": "material",
-									"type": "ToonMaterial | null",
-									"description": {
-										"ko": "머티리얼. (null 이면 빈 조각)",
-										"en": "Material. (Empty chunks if null)"
-									}
-								},
-								{
-									"name": "instanceLayout",
-									"type": "ToonInstanceLayout | null",
-									"description": {
-										"ko": "인스턴스 꼴. (null 이면 없음)",
-										"en": "Instance layout. (None if null)"
-									}
-								}
-							],
-							"returns": {
-								"type": "object",
-								"description": {
-									"ko": "세 프로그램 칸. ({ solid, outline, depth } 마다 { program, kind, frameSerial, lightSet, lightVersion })",
-									"en": "Three program slots. ({ program, kind, frameSerial, lightSet, lightVersion } for each of { solid, outline, depth })"
-								}
-							},
-							"description": {
-								"ko": "세 프로그램 짓기. (짓지 못하면 던진다)",
-								"en": "Builds the three programs. (throws on failure)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "readProgramSet",
-							"signature": "readProgramSet(material, instanceLayout)",
-							"params": [
-								{
-									"name": "material",
-									"type": "ToonMaterial | null",
-									"description": {
-										"ko": "머티리얼. (null 이면 빈 조각)",
-										"en": "Material. (Empty chunks if null)"
-									}
-								},
-								{
-									"name": "instanceLayout",
-									"type": "ToonInstanceLayout | null",
-									"description": {
-										"ko": "인스턴스 꼴. (null 이면 없음)",
-										"en": "Instance layout. (None if null)"
-									}
-								}
-							],
-							"returns": {
-								"type": "object | null",
-								"description": {
-									"ko": "{ solid, outline, depth } 프로그램 칸. (짓지 못했으면 null)",
-									"en": "{ solid, outline, depth } program slots. (null if they could not be built)"
-								}
-							},
-							"description": {
-								"ko": "머티리얼과 인스턴스 꼴의 프로그램 반환. (없으면 짓고, 짓지 못한 것은 알리고 null 을 기억해 다시 짓지 않는다)",
-								"en": "Returns the programs for a material and instance layout. (builds them if missing, reports failures and remembers null so they are not rebuilt)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
 							"name": "createMaterial",
 							"signature": "createMaterial(chunks)",
 							"params": [
@@ -63887,27 +63753,6 @@
 								"class": "ToonRenderer",
 								"name": "delete_material"
 							}
-						},
-						{
-							"kind": "method",
-							"name": "deleteProgramSet",
-							"signature": "deleteProgramSet(programSet)",
-							"params": [
-								{
-									"name": "programSet",
-									"type": "object | null",
-									"description": {
-										"ko": "createProgramSet 의 결과. (null 이면 하지 않는다)",
-										"en": "Result of createProgramSet. (Does nothing if null)"
-									}
-								}
-							],
-							"description": {
-								"ko": "세 프로그램 지우기.",
-								"en": "Deletes the three programs."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
 						},
 						{
 							"kind": "method",
@@ -64250,219 +64095,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "createArrayBuffer",
-							"signature": "createArrayBuffer(data, usage)",
-							"params": [
-								{
-									"name": "data",
-									"type": "Float32Array",
-									"description": {
-										"ko": "올릴 수.",
-										"en": "Number to round up."
-									}
-								},
-								{
-									"name": "usage",
-									"type": "number",
-									"description": {
-										"ko": "STATIC_DRAW 나 DYNAMIC_DRAW.",
-										"en": "STATIC_DRAW or DYNAMIC_DRAW."
-									}
-								}
-							],
-							"returns": {
-								"type": "WebGLBuffer",
-								"description": {
-									"ko": "지은 꼭짓점 버퍼.",
-									"en": "The built vertex buffer."
-								}
-							},
-							"description": {
-								"ko": "꼭짓점 버퍼 만들기.",
-								"en": "Creates a vertex buffer."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "createIndexBuffer",
-							"signature": "createIndexBuffer(data)",
-							"params": [
-								{
-									"name": "data",
-									"type": "Uint32Array",
-									"description": {
-										"ko": "꼭짓점 번호.",
-										"en": "Vertex indices."
-									}
-								}
-							],
-							"returns": {
-								"type": "WebGLBuffer",
-								"description": {
-									"ko": "지은 번호 버퍼.",
-									"en": "The built index buffer."
-								}
-							},
-							"description": {
-								"ko": "번호 버퍼 만들기. (지금 묶인 버텍스 어레이에 붙는다)",
-								"en": "Creates an index buffer. (attached to the currently bound vertex array)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachBodyAttributes",
-							"signature": "attachBodyAttributes(mesh)",
-							"params": [
-								{
-									"name": "mesh",
-									"type": "object",
-									"description": {
-										"ko": "createMesh 가 짓는 모형.",
-										"en": "Model built by createMesh."
-									}
-								}
-							],
-							"description": {
-								"ko": "몸의 꼭짓점, 뼈대, UV 어트리뷰트와 번호 버퍼를 지금 묶인 버텍스 어레이에 붙이기.",
-								"en": "Attaches the body's vertex, skeleton and UV attributes and index buffer to the currently bound vertex array."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachOutlineAttributes",
-							"signature": "attachOutlineAttributes(mesh)",
-							"params": [
-								{
-									"name": "mesh",
-									"type": "object",
-									"description": {
-										"ko": "createMesh 가 짓는 모형. (껍데기가 있는 것)",
-										"en": "Model built by createMesh. (One with a shell)"
-									}
-								}
-							],
-							"description": {
-								"ko": "바깥선 껍데기의 자리, 뼈대 어트리뷰트와 번호 버퍼를 지금 묶인 버텍스 어레이에 붙이기.",
-								"en": "Attaches the outline shell's position and skeleton attributes and index buffer to the currently bound vertex array."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachSkinAttributes",
-							"signature": "attachSkinAttributes(skinBuffer)",
-							"params": [
-								{
-									"name": "skinBuffer",
-									"type": "WebGLBuffer",
-									"description": {
-										"ko": "꼭짓점마다 뼈대 번호 4 와 무게 4 를 담은 버퍼.",
-										"en": "Buffer with 4 joint indices and 4 weights per vertex."
-									}
-								}
-							],
-							"description": {
-								"ko": "뼈대 번호와 무게의 버퍼를 지금 묶인 버텍스 어레이에 어트리뷰트로 붙이기.",
-								"en": "Attaches the joint index and weight buffers as attributes to the currently bound vertex array."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachInstanceAttributes",
-							"signature": "attachInstanceAttributes(instanceBuffer)",
-							"params": [
-								{
-									"name": "instanceBuffer",
-									"type": "WebGLBuffer",
-									"description": {
-										"ko": "인스턴스마다 행렬 16 과 틴트 4 를 담은 버퍼.",
-										"en": "Buffer with a 16 matrix and a 4 tint per instance."
-									}
-								}
-							],
-							"description": {
-								"ko": "인스턴스 버퍼를 지금 묶인 버텍스 어레이의 인스턴스 어트리뷰트로. (행렬 네 줄, 틴트, 인스턴스마다 하나씩)",
-								"en": "Sets the instance buffer as instance attributes of the currently bound vertex array. (four matrix rows, tint, one per instance)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "attachLayoutAttributes",
-							"signature": "attachLayoutAttributes(instanceLayout, buffer)",
-							"params": [
-								{
-									"name": "instanceLayout",
-									"type": "ToonInstanceLayout",
-									"description": {
-										"ko": "버퍼의 인스턴스 꼴.",
-										"en": "Instance layout of the buffer."
-									}
-								},
-								{
-									"name": "buffer",
-									"type": "WebGLBuffer",
-									"description": {
-										"ko": "그 꼴로 담은 버퍼.",
-										"en": "Buffer stored in that layout."
-									}
-								}
-							],
-							"description": {
-								"ko": "인스턴스 꼴의 버퍼를 지금 묶인 버텍스 어레이의 인스턴스 어트리뷰트로.",
-								"en": "Sets the instance layout's buffer as instance attributes of the currently bound vertex array."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "readInstanceVertexArrays",
-							"signature": "readInstanceVertexArrays(mesh, instanceBuffer)",
-							"params": [
-								{
-									"name": "mesh",
-									"type": "object",
-									"description": {
-										"ko": "createMesh 의 결과.",
-										"en": "Result of createMesh."
-									}
-								},
-								{
-									"name": "instanceBuffer",
-									"type": "object",
-									"description": {
-										"ko": "createInstanceBuffer 의 결과.",
-										"en": "Result of createInstanceBuffer."
-									}
-								}
-							],
-							"returns": {
-								"type": "object",
-								"description": {
-									"ko": "몸과 바깥선의 버텍스 어레이. ({ body, outline }, 껍데기가 없으면 outline 은 null)",
-									"en": "Vertex arrays of body and outline. ({ body, outline }, outline is null if there is no shell)"
-								}
-							},
-							"description": {
-								"ko": "모형과 인스턴스 버퍼를 함께 묶은 버텍스 어레이. (처음 그릴 때 짓고 인스턴스 버퍼에 담아 둔다)",
-								"en": "Vertex array binding the model and instance buffer together. (built on first draw and kept in the instance buffer)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
 							"name": "createEmptyShadowTexture",
 							"signature": "createEmptyShadowTexture()",
 							"params": [],
@@ -64539,25 +64171,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "readFirstUnitTexture",
-							"signature": "readFirstUnitTexture()",
-							"params": [],
-							"returns": {
-								"type": "WebGLTexture | null",
-								"description": {
-									"ko": "유닛 0 의 텍스처. (없으면 null)",
-									"en": "Texture of unit 0. (null if none)"
-								}
-							},
-							"description": {
-								"ko": "유닛 0 에 묶인 텍스처 읽기. (지금 고른 유닛은 그대로 둔다)",
-								"en": "Read the texture bound to unit 0. (Leaves the currently selected unit as is)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
 							"name": "restoreState",
 							"signature": "restoreState(isFramebufferRestored)",
 							"params": [
@@ -64573,35 +64186,6 @@
 							"description": {
 								"ko": "적어 둔 상태로 돌리기.",
 								"en": "Restores the recorded state."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "applyCapability",
-							"signature": "applyCapability(capability, isEnabled)",
-							"params": [
-								{
-									"name": "capability",
-									"type": "GLenum",
-									"description": {
-										"ko": "WebGL 기능. (BLEND, DEPTH_TEST 같은)",
-										"en": "WebGL capability. (Such as BLEND, DEPTH_TEST)"
-									}
-								},
-								{
-									"name": "isEnabled",
-									"type": "boolean",
-									"description": {
-										"ko": "켤지.",
-										"en": "Whether to enable it."
-									}
-								}
-							],
-							"description": {
-								"ko": "그리기 기능 켜고 끄기.",
-								"en": "Enables or disables a drawing capability."
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js"
@@ -64869,30 +64453,6 @@
 								"class": "ToonRenderer",
 								"name": "get_screen_rect"
 							}
-						},
-						{
-							"kind": "method",
-							"name": "applyScreenRect",
-							"signature": "applyScreenRect()",
-							"params": [],
-							"description": {
-								"ko": "화면 사각형 걸기. (beginFrame 이 상태를 적은 뒤, 클립 x, y 에 사각형의 비를 곱하고 자리를 더한 뒤 가위를 켠다)",
-								"en": "Applies the screen rectangle. (after beginFrame records the state, multiplies clip x, y by the rectangle's ratio, adds its position, then enables the scissor)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "releaseScreenRect",
-							"signature": "releaseScreenRect()",
-							"params": [],
-							"description": {
-								"ko": "화면 사각형의 가위 풀기. (applyScreenRect 가 켰을 때만)",
-								"en": "Releases the screen rectangle's scissor. (only if applyScreenRect enabled it)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
 						},
 						{
 							"kind": "method",
@@ -65275,77 +64835,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "uploadFrameUniforms",
-							"signature": "uploadFrameUniforms(entry)",
-							"params": [
-								{
-									"name": "entry",
-									"type": "object",
-									"description": {
-										"ko": "프로그램 칸.",
-										"en": "Program slot."
-									}
-								}
-							],
-							"description": {
-								"ko": "프로그램의 프레임 값 올리기. (보기와 투영, 카메라, HDR, 그림자, 바깥선 색, 이번 프레임에 이미 올렸으면 건너뛴다)",
-								"en": "Uploads a program's frame values. (view and projection, camera, HDR, shadow, outline color, skipped if already uploaded this frame)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "uploadLocalShadowUniforms",
-							"signature": "uploadLocalShadowUniforms(shaderProgram)",
-							"params": [
-								{
-									"name": "shaderProgram",
-									"type": "ShaderProgram",
-									"description": {
-										"ko": "몸 프로그램.",
-										"en": "Body program."
-									}
-								}
-							],
-							"description": {
-								"ko": "점광과 스포트라이트 그림자 올리기. (아틀라스의 빛마다 자리, 바탕, 거리, 첫 칸과 점광마다의 칸 번호)",
-								"en": "Upload point light and spotlight shadows. (Position, basis, distances and first tile per atlas light, and the tile number per point light)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "uploadLightUniforms",
-							"signature": "uploadLightUniforms(entry, lightSet)",
-							"params": [
-								{
-									"name": "entry",
-									"type": "object",
-									"description": {
-										"ko": "몸 프로그램 칸.",
-										"en": "Body program slot."
-									}
-								},
-								{
-									"name": "lightSet",
-									"type": "ToonLightSet",
-									"description": {
-										"ko": "올릴 빛 묶음.",
-										"en": "Light set to upload."
-									}
-								}
-							],
-							"description": {
-								"ko": "몸 프로그램의 빛 묶음 올리기. (같은 묶음, 같은 판이면 건너뛴다)",
-								"en": "Uploads the light set for the body program. (skipped if same set and same version)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
 							"name": "uploadDrawUniforms",
 							"signature": "uploadDrawUniforms(shaderProgram, modelElements, isSkinned, instancedMode, jointMatrices)",
 							"params": [
@@ -65393,35 +64882,6 @@
 							"description": {
 								"ko": "그리기마다의 공용 유니폼 올리기. (모형 행렬, 뼈대, 인스턴싱)",
 								"en": "Uploads the common per-draw uniforms. (model matrix, skeleton, instancing)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
-						},
-						{
-							"kind": "method",
-							"name": "bindTextureUnit",
-							"signature": "bindTextureUnit(unit, texture)",
-							"params": [
-								{
-									"name": "unit",
-									"type": "number",
-									"description": {
-										"ko": "텍스처 유닛 번호.",
-										"en": "Texture unit number."
-									}
-								},
-								{
-									"name": "texture",
-									"type": "WebGLTexture | null | undefined",
-									"description": {
-										"ko": "묶을 텍스처. (없으면 흰 텍스처)",
-										"en": "Texture to bind. (White texture if none)"
-									}
-								}
-							],
-							"description": {
-								"ko": "텍스처 유닛에 묶기. (없으면 흰 텍스처)",
-								"en": "Binds to a texture unit. (white texture if none)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js"
@@ -78060,15 +77520,15 @@
 							"signature": "takePan()",
 							"params": [],
 							"returns": {
-								"type": "object",
+								"type": "Vector2",
 								"description": {
-									"ko": "모인 밀기. ({ x, y }, 뷰 단위)",
-									"en": "Accumulated pan. ({ x, y }, view units)"
+									"ko": "모인 밀기. (x, y 가 뷰 단위)",
+									"en": "The gathered pan. (x and y are in view units)"
 								}
 							},
 							"description": {
-								"ko": "모인 밀기 꺼내기. ({ x, y } 뷰 단위, 꺼내면 비웁다)",
-								"en": "Takes the accumulated pan. ({ x, y } in view units, cleared when taken)"
+								"ko": "모인 밀기 꺼내기. (Vector2 뷰 단위, 꺼내면 비웁다)",
+								"en": "Take the gathered pan. (Vector2 in view units, emptied once taken)"
 							},
 							"since": "0.4.0",
 							"source": "src/misc/cameragestures.js",
@@ -89183,8 +88643,8 @@
 				{
 					"name": "ScreenEffect",
 					"summary": {
-						"ko": "화면 효과. (씬 후처리 사슬)\n- 씬은 화면에 그대로 그리고, end() 에서 화면(또는 setRegion 으로 정한 영역)을 떠 와 켜진 효과를 차례로 건 뒤 같은 자리에 되돌려 놓는다.\n- 영역은 캔버스 픽셀 좌표(왼쪽 위 원점)이며 둥근 모서리 반지름을 주면 그 바깥은 원본을 유지한다.\n- 사용:\n    // 씬 load 에서\n    this.screenEffect = new ScreenEffect(engine.getGraphic());\n    this.screenEffect.setEnabled(ScreenEffectType.vignette, true);\n    // preDraw 처음 / postDraw 끝에서\n    this.screenEffect.begin(graphic);  ...  this.screenEffect.end(graphic);\n    // tick 에서\n    this.screenEffect.tick(timeDelta);",
-						"en": "Screen effect. (scene post-processing chain)\n- The scene draws to the screen as is, and end() captures the screen (or the region set with setRegion), applies the enabled effects in order, and puts it back in the same place.\n- The region is in canvas pixel coordinates (top-left origin), and if a rounded corner radius is given, the original is kept outside it.\n- Usage:\n    // in the scene's load\n    this.screenEffect = new ScreenEffect(engine.getGraphic());\n    this.screenEffect.setEnabled(ScreenEffectType.vignette, true);\n    // at the start of preDraw / the end of postDraw\n    this.screenEffect.begin(graphic);  ...  this.screenEffect.end(graphic);\n    // in tick\n    this.screenEffect.tick(timeDelta);"
+						"ko": "화면 효과. (씬 후처리 사슬)\n- 씬은 화면에 그대로 그리고, end() 에서 화면(또는 setRegion 으로 정한 영역)을 떠 와 켜진 효과를 차례로 건 뒤 같은 자리에 되돌려 놓는다.\n- 영역은 캔버스 픽셀 좌표(왼쪽 위 원점)이며 둥근 모서리 반지름을 주면 그 바깥은 원본을 유지한다.\n- 사용:\n    // 씬 load 에서\n    this.screenEffect = new ScreenEffect();\n    this.screenEffect.setEnabled(ScreenEffectType.vignette, true);\n    // preDraw 처음 / postDraw 끝에서\n    this.screenEffect.begin(graphic);  ...  this.screenEffect.end(graphic);\n    // tick 에서\n    this.screenEffect.tick(timeDelta);",
+						"en": "Screen effect. (scene post-processing chain)\n- The scene draws to the screen as is, and end() captures the screen (or the region set with setRegion), applies the enabled effects in order, and puts it back in the same place.\n- The region is in canvas pixel coordinates (top-left origin), and if a rounded corner radius is given, the original is kept outside it.\n- Usage:\n    // in the scene's load\n    this.screenEffect = new ScreenEffect();\n    this.screenEffect.setEnabled(ScreenEffectType.vignette, true);\n    // at the start of preDraw / the end of postDraw\n    this.screenEffect.begin(graphic);  ...  this.screenEffect.end(graphic);\n    // in tick\n    this.screenEffect.tick(timeDelta);"
 					},
 					"examples": [
 						{
@@ -89192,7 +88652,7 @@
 								"ko": "씬 영역에 비네트와 색수차 걸기",
 								"en": "Apply a vignette and chromatic aberration to a scene region"
 							},
-							"code": "import { Engine, EngineConfiguration, Scene, ScreenEffect, ScreenEffectType, Color, Colors, Rect } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst graphic = engine.getGraphic();\n\t\tthis.screenEffect = new ScreenEffect(graphic);\n\t\tthis.screenEffect.setRegion(40, 20, 560, 320, 24);\n\t\tthis.screenEffect.setEnabled(ScreenEffectType.vignette, true);\n\t\tthis.screenEffect.setColor(ScreenEffectType.vignette, new Color(0.1, 0, 0.2, 1));\n\t\tthis.screenEffect.setEnabled(ScreenEffectType.chromatic, true);\n\t\tthis.screenEffect.setStrength(ScreenEffectType.chromatic, 0.5);\n\t}\n\n\ttick(timeDelta) {\n\t\tsuper.tick(timeDelta);\n\t\tthis.screenEffect.tick(timeDelta);\n\t}\n\n\tpreDraw(graphic) {\n\t\tsuper.preDraw(graphic);\n\t\tthis.screenEffect.begin(graphic);\n\t\tgraphic.setFillColor(Colors.white);\n\t\tgraphic.drawRect(Rect.create(220, 100, 200, 160));\n\t}\n\n\tpostDraw(graphic) {\n\t\tsuper.postDraw(graphic);\n\t\tthis.screenEffect.end(graphic);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+							"code": "import { Engine, EngineConfiguration, Scene, ScreenEffect, ScreenEffectType, Color, Colors, Rect } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst graphic = engine.getGraphic();\n\t\tthis.screenEffect = new ScreenEffect();\n\t\tthis.screenEffect.setRegion(40, 20, 560, 320, 24);\n\t\tthis.screenEffect.setEnabled(ScreenEffectType.vignette, true);\n\t\tthis.screenEffect.setColor(ScreenEffectType.vignette, new Color(0.1, 0, 0.2, 1));\n\t\tthis.screenEffect.setEnabled(ScreenEffectType.chromatic, true);\n\t\tthis.screenEffect.setStrength(ScreenEffectType.chromatic, 0.5);\n\t}\n\n\ttick(timeDelta) {\n\t\tsuper.tick(timeDelta);\n\t\tthis.screenEffect.tick(timeDelta);\n\t}\n\n\tpreDraw(graphic) {\n\t\tsuper.preDraw(graphic);\n\t\tthis.screenEffect.begin(graphic);\n\t\tgraphic.setFillColor(Colors.white);\n\t\tgraphic.drawRect(Rect.create(220, 100, 200, 160));\n\t}\n\n\tpostDraw(graphic) {\n\t\tsuper.postDraw(graphic);\n\t\tthis.screenEffect.end(graphic);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
 							"language": "javascript"
 						}
 					],
@@ -89206,20 +88666,11 @@
 						{
 							"kind": "constructor",
 							"name": "constructor",
-							"signature": "constructor(graphic)",
-							"params": [
-								{
-									"name": "graphic",
-									"type": "Graphic",
-									"description": {
-										"ko": "화면을 떠 올 그래픽. (그 WebGL2 컨텍스트를 쓴다)",
-										"en": "Graphic to capture the screen from. (uses its WebGL2 context)"
-									}
-								}
-							],
+							"signature": "constructor()",
+							"params": [],
 							"description": {
-								"ko": "생성.",
-								"en": "Constructor."
+								"ko": "생성.\n- 그래픽은 begin / end 에 받는다. (처음 그릴 때 그 WebGL2 컨텍스트를 받는다, 러스트 ScreenEffect::new() 와 같다)",
+								"en": "Create.\n- The graphic is received in begin and end. (the WebGL2 context is taken the first time it draws, same as the Rust edition ScreenEffect::new())"
 							},
 							"since": "0.3.0",
 							"source": "src/effect/screeneffect.js",
@@ -89914,7 +89365,7 @@
 										"ko": "타임라인 속성 이름으로 충격파와 페이드 바꾸기",
 										"en": "Change a shockwave and a fade by timeline property names"
 									},
-									"code": "import { Engine, EngineConfiguration, ScreenEffect, ScreenEffectType } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nconst graphic = engine.getGraphic();\nconst screenEffect = new ScreenEffect(graphic);\nscreenEffect.setTimelineProperty(\"shockwave\", 1);\nscreenEffect.setTimelineProperty(\"shockwave.radius\", 0.4);\nscreenEffect.setTimelineProperty(\"fade.color\", \"#ff8800\");\nscreenEffect.setParameter(ScreenEffectType.shockwave, \"width\", 0.2);\nconsole.log(screenEffect.isEnabled(ScreenEffectType.shockwave), screenEffect.getParameters(ScreenEffectType.shockwave));",
+									"code": "import { Engine, EngineConfiguration, ScreenEffect, ScreenEffectType } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nconst graphic = engine.getGraphic();\nconst screenEffect = new ScreenEffect();\nscreenEffect.setTimelineProperty(\"shockwave\", 1);\nscreenEffect.setTimelineProperty(\"shockwave.radius\", 0.4);\nscreenEffect.setTimelineProperty(\"fade.color\", \"#ff8800\");\nscreenEffect.setParameter(ScreenEffectType.shockwave, \"width\", 0.2);\nconsole.log(screenEffect.isEnabled(ScreenEffectType.shockwave), screenEffect.getParameters(ScreenEffectType.shockwave));",
 									"language": "javascript"
 								}
 							]
@@ -97883,6 +97334,56 @@
 						},
 						{
 							"kind": "method",
+							"name": "setRenderScale",
+							"signature": "setRenderScale(renderScale)",
+							"params": [
+								{
+									"name": "renderScale",
+									"type": "number",
+									"description": {
+										"ko": "배율. (0.05 ~ 4, 1 이면 화면에 바로, 수가 아니면 1)",
+										"en": "Scale. (0.05 to 4, 1 draws straight to the screen, 1 when not a number)"
+									}
+								}
+							],
+							"description": {
+								"ko": "렌더 스케일 설정. (3D 만 이 배율의 판에 그려 선형 거르기로 늘여 얹는다, UI 는 기기 화소 그대로. 유니티 URP renderScale, 언리얼 화면 비율과 같은 뜻)\n- 1(기본)이면 지금처럼 화면에 바로 그린다. 1 이 아니면 판(내용 영역의 화면 크기 x 배율, 깊이 포함, 캔버스가 안티에일리어싱이면 멀티샘플 4)에\n  투명하게 비운 뒤 그리고, 2D 그리기 길로 source-over 로 얹는다. (2D 자르기를 따르고, 3D 가 덮지 않은 곳은 아래 2D 가 비친다)\n- 판은 제 깊이를 쓰므로 setDepthCleared(false) 로 앞의 3D 깊이를 이어 쓰던 것은 배율이 1 일 때만 된다.\n- 그리기 함수는 넘겨받은 사각형의 outputFramebuffer, outputViewport 로 내야 배율과 상관없이 맞는 자리에 낸다. (ToonPostProcess.end 같은 것)",
+								"en": "Set the render scale. (only the 3D is drawn into a target at this scale and stretched on with linear filtering, the UI stays at device pixels. Same meaning as Unity URP renderScale and Unreal screen percentage)\n- At 1 (default) it draws straight to the screen as before. Otherwise it clears a target (the on-screen size of the content area x scale, with depth, multisampled with 4 samples when the canvas is anti-aliased)\n  to transparent, draws into it and puts it on with source-over through the 2D drawing path. (it follows 2D clipping, and the 2D below shows where the 3D does not cover)\n- The target has its own depth, so reusing earlier 3D depth with setDepthCleared(false) only works at scale 1.\n- The draw function must output to outputFramebuffer and outputViewport of the rect it receives to land in the right place at any scale. (ToonPostProcess.end and so on)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonview3d.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "3D 만 반 해상도로 그리기",
+										"en": "Draw only the 3D at half resolution"
+									},
+									"code": "import { WorldNode, ToonView3D } from \"./vanilla.js\";\nconst node = new WorldNode();\nnode.setContentSizeXY(320, 240);\nconst view = node.addComponent(ToonView3D);\nview.setRenderScale(0.5);\nconst renderScale = view.getRenderScale();",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getRenderScale",
+							"signature": "getRenderScale()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "배율. (1 이면 화면에 바로 그린다)",
+									"en": "Scale. (1 draws straight to the screen)"
+								}
+							},
+							"description": {
+								"ko": "렌더 스케일 반환.",
+								"en": "Return the render scale."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonview3d.js"
+						},
+						{
+							"kind": "method",
 							"name": "setDrawCallback",
 							"signature": "setDrawCallback(drawCallback)",
 							"params": [
@@ -97896,8 +97397,8 @@
 								}
 							],
 							"description": {
-								"ko": "그리기 함수 설정. ((renderer, camera, screenRect, webGL2RenderingContext) => void, null 이면 그리지 않음)",
-								"en": "Sets the draw function. ((renderer, camera, screenRect, webGL2RenderingContext) => void, does not draw if null)"
+								"ko": "그리기 함수 설정. ((renderer, camera, screenRect, webGL2RenderingContext) => void, null 이면 그리지 않음)\n- screenRect 는 { x, y, width, height, outputFramebuffer, outputViewport } 다. x, y, width, height 는 지금 프레임 버퍼에서 그릴 사각형(픽셀, 왼쪽 위 원점),\n  outputFramebuffer 는 지금 묶인 프레임 버퍼(null 이면 캔버스), outputViewport 는 그 안의 GL 뷰포트([x, y, 너비, 높이], 정수, 왼쪽 아래 원점)다.\n  ToonPostProcess.end 처럼 따로 내는 것은 이 둘로 내야 렌더 스케일, 투명도 층과 상관없이 맞는 자리에 낸다.",
+								"en": "Set the draw function. ((renderer, camera, screenRect, webGL2RenderingContext) => void, null draws nothing)\n- screenRect is { x, y, width, height, outputFramebuffer, outputViewport }. x, y, width, height are the rect to draw in the current framebuffer (pixels, top-left origin),\n  outputFramebuffer is the framebuffer bound now (null for the canvas) and outputViewport is the GL viewport inside it ([x, y, width, height], integers, bottom-left origin).\n  Anything output separately, such as ToonPostProcess.end, must use these two to land in the right place regardless of render scale and opacity layers."
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonview3d.js",
@@ -97913,7 +97414,7 @@
 										"ko": "노드 사각형 안에 HDR 마무리를 걸어 그리기",
 										"en": "Draw inside a node rectangle with HDR finishing"
 									},
-									"code": "import { WorldNode, ToonView3D, ToonPostProcess } from \"./vanilla.js\";\nconst node = new WorldNode();\nnode.setContentSizeXY(320, 240);\nconst view = node.addComponent(ToonView3D);\nlet postProcess = null;\nview.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext) => {\n\tif (postProcess === null) {\n\t\tpostProcess = new ToonPostProcess(webGL2RenderingContext, screenRect.width, screenRect.height);\n\t\trenderer.setHdrOutput(postProcess.getUseFloatColor());\n\t}\n\trenderer.clearScreenRect();\n\tpostProcess.resize(screenRect.width, screenRect.height);\n\tpostProcess.begin([0.05, 0.05, 0.08]);\n\trenderer.beginFrameWithCamera(camera);\n\trenderer.endFrame();\n\tpostProcess.end(null, [screenRect.x, webGL2RenderingContext.drawingBufferHeight - screenRect.y - screenRect.height, screenRect.width, screenRect.height]);\n});",
+									"code": "import { WorldNode, ToonView3D, ToonPostProcess } from \"./vanilla.js\";\nconst node = new WorldNode();\nnode.setContentSizeXY(320, 240);\nconst view = node.addComponent(ToonView3D);\nlet postProcess = null;\nview.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext) => {\n\tif (postProcess === null) {\n\t\tpostProcess = new ToonPostProcess(webGL2RenderingContext, screenRect.width, screenRect.height);\n\t\trenderer.setHdrOutput(postProcess.getUseFloatColor());\n\t}\n\trenderer.clearScreenRect();\n\tpostProcess.resize(screenRect.width, screenRect.height);\n\tpostProcess.begin([0.05, 0.05, 0.08]);\n\trenderer.beginFrameWithCamera(camera);\n\trenderer.endFrame();\n\tpostProcess.end(screenRect.outputFramebuffer, screenRect.outputViewport);\n});",
 									"language": "javascript"
 								}
 							]
@@ -98240,6 +97741,27 @@
 							"description": {
 								"ko": "출력.",
 								"en": "Draw."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonview3d.js"
+						},
+						{
+							"kind": "method",
+							"name": "detach",
+							"signature": "detach(node)",
+							"params": [
+								{
+									"name": "node",
+									"type": "object",
+									"description": {
+										"ko": "떨어진 노드.",
+										"en": "The node detached from."
+									}
+								}
+							],
+							"description": {
+								"ko": "노드에서 떨어짐. (배율 판을 지운다, 다시 붙으면 처음 쓸 때 다시 짓는다)",
+								"en": "Detached from the node. (deletes the scale target, which is built again on first use after reattaching)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonview3d.js"
@@ -101482,107 +101004,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "createParticleVertexArray",
-							"signature": "createParticleVertexArray(cornerData, instanceBuffer)",
-							"params": [
-								{
-									"name": "cornerData",
-									"type": "Float32Array",
-									"description": {
-										"ko": "네 귀퉁이의 (x, y) 여덟 값.",
-										"en": "Eight (x, y) values of the four corners."
-									}
-								},
-								{
-									"name": "instanceBuffer",
-									"type": "WebGLBuffer",
-									"description": {
-										"ko": "인스턴스 값을 담을 버퍼.",
-										"en": "Buffer holding the instance values."
-									}
-								}
-							],
-							"returns": {
-								"type": "WebGLVertexArrayObject",
-								"description": {
-									"ko": "지은 버텍스 어레이.",
-									"en": "The built vertex array."
-								}
-							},
-							"description": {
-								"ko": "파티클 꼴의 버텍스 어레이. (네 귀퉁이와 인스턴스 값 일곱)",
-								"en": "Vertex array for the particle shape. (Four corners and seven instance values)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "bindCornerBuffer",
-							"signature": "bindCornerBuffer(cornerData, location)",
-							"params": [
-								{
-									"name": "cornerData",
-									"type": "Float32Array",
-									"description": {
-										"ko": "네 귀퉁이의 (x, y) 여덟 값.",
-										"en": "Eight (x, y) values of the four corners."
-									}
-								},
-								{
-									"name": "location",
-									"type": "number",
-									"description": {
-										"ko": "붙일 어트리뷰트 자리.",
-										"en": "Attribute location to attach."
-									}
-								}
-							],
-							"description": {
-								"ko": "네 귀퉁이 버퍼를 묶인 버텍스 어레이에 붙이기.",
-								"en": "Attaches the four-corner buffer to the bound vertex array."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "createIndexedMesh",
-							"signature": "createIndexedMesh(arrays, componentCount)",
-							"params": [
-								{
-									"name": "arrays",
-									"type": "object",
-									"description": {
-										"ko": "{ positions, indices }",
-										"en": "{ positions, indices }"
-									}
-								},
-								{
-									"name": "componentCount",
-									"type": "number",
-									"description": {
-										"ko": "정점 하나의 자리 값 수. (2 나 3)",
-										"en": "Number of position values of one vertex. (2 or 3)"
-									}
-								}
-							],
-							"returns": {
-								"type": "object",
-								"description": {
-									"ko": "{ vertexArray, indexCount }.",
-									"en": "{ vertexArray, indexCount }."
-								}
-							},
-							"description": {
-								"ko": "번호로 그리는 메쉬 짓기. ({ vertexArray, indexCount }, 자리는 어트리뷰트 0)",
-								"en": "Builds an indexed mesh. ({ vertexArray, indexCount }, position is attribute 0)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
 							"name": "setRamps",
 							"signature": "setRamps(ramps)",
 							"params": [
@@ -101617,25 +101038,6 @@
 									"language": "javascript"
 								}
 							]
-						},
-						{
-							"kind": "method",
-							"name": "readAtlasTexture",
-							"signature": "readAtlasTexture()",
-							"params": [],
-							"returns": {
-								"type": "WebGLTexture",
-								"description": {
-									"ko": "효과 아틀라스 텍스처.",
-									"en": "Effect atlas texture."
-								}
-							},
-							"description": {
-								"ko": "아틀라스 텍스처 읽기. (처음 부를 때 픽셀을 지어 올리고, 램프가 바뀌었으면 다시 올림)",
-								"en": "Reads the atlas texture. (Builds and uploads the pixels on the first call, re-uploads if the ramps changed)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
 						},
 						{
 							"kind": "method",
@@ -102200,34 +101602,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "readCount",
-							"signature": "readCount(count)",
-							"params": [
-								{
-									"name": "count",
-									"type": "number",
-									"description": {
-										"ko": "처방의 파티클 수.",
-										"en": "Particle count of the recipe."
-									}
-								}
-							],
-							"returns": {
-								"type": "number",
-								"description": {
-									"ko": "몫을 곱한 수. (count 가 0 보다 크면 1 이상)",
-									"en": "Count with the fraction applied. (1 or more if count is above 0)"
-								}
-							},
-							"description": {
-								"ko": "낼 파티클 수. (몫을 곱하고, 내면 하나 이상)",
-								"en": "Number of particles to emit. (Multiplied by the fraction, at least one when emitting)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
 							"name": "emitParticles",
 							"signature": "emitParticles(options)",
 							"params": [
@@ -102262,75 +101636,6 @@
 									"language": "javascript"
 								}
 							]
-						},
-						{
-							"kind": "method",
-							"name": "writeParticle",
-							"signature": "writeParticle(start, velocity, motion, color, look, extra, shape)",
-							"params": [
-								{
-									"name": "start",
-									"type": "Array<number>",
-									"description": {
-										"ko": "[x, y, z, 낸 시각]",
-										"en": "[x, y, z, emit time]"
-									}
-								},
-								{
-									"name": "velocity",
-									"type": "Array<number>",
-									"description": {
-										"ko": "[x, y, z, 초]",
-										"en": "[x, y, z, seconds]"
-									}
-								},
-								{
-									"name": "motion",
-									"type": "Array<number>",
-									"description": {
-										"ko": "[중력, 끌림, 시작 크기, 끝 크기]",
-										"en": "[gravity, drag, start size, end size]"
-									}
-								},
-								{
-									"name": "color",
-									"type": "Array<number>",
-									"description": {
-										"ko": "[r, g, b, 램프]",
-										"en": "[r, g, b, ramp]"
-									}
-								},
-								{
-									"name": "look",
-									"type": "Array<number>",
-									"description": {
-										"ko": "[꼴, 늘임, 돎, 바닥]",
-										"en": "[look, stretch, spin, floor]"
-									}
-								},
-								{
-									"name": "extra",
-									"type": "Array<number>",
-									"description": {
-										"ko": "[밝기, 알파, 씨앗, 나타나는 몫]",
-										"en": "[brightness, alpha, seed, fade-in fraction]"
-									}
-								},
-								{
-									"name": "shape",
-									"type": "Array<number>",
-									"description": {
-										"ko": "[크기 곡선, 테, 비움, 비움]",
-										"en": "[size curve, rim, unused, unused]"
-									}
-								}
-							],
-							"description": {
-								"ko": "파티클 하나를 다음 칸에 쓰기. (가득 차면 가장 오래 전에 쓴 칸을 덮음)",
-								"en": "Writes one particle to the next slot. (Overwrites the oldest written slot when full)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
 						},
 						{
 							"kind": "method",
@@ -102516,50 +101821,6 @@
 									"language": "javascript"
 								}
 							]
-						},
-						{
-							"kind": "method",
-							"name": "createDecal",
-							"signature": "createDecal(options, defaultAngle, seed)",
-							"params": [
-								{
-									"name": "options",
-									"type": "object",
-									"description": {
-										"ko": "addDecal, queueDecal 이 받은 값.",
-										"en": "Values received by addDecal, queueDecal."
-									}
-								},
-								{
-									"name": "defaultAngle",
-									"type": "number",
-									"description": {
-										"ko": "angle 을 주지 않았을 때의 돎. (라디안)",
-										"en": "Rotation when angle is not given. (Radians)"
-									}
-								},
-								{
-									"name": "seed",
-									"type": "number",
-									"description": {
-										"ko": "잡음 씨앗.",
-										"en": "Noise seed."
-									}
-								}
-							],
-							"returns": {
-								"type": "object",
-								"description": {
-									"ko": "그릴 자국 값. (heat 와 age 는 0)",
-									"en": "Scorch values to draw. (heat and age are 0)"
-								}
-							},
-							"description": {
-								"ko": "바닥 자국 값 짓기. (addDecal, queueDecal 이 함께 씀)",
-								"en": "Builds floor decal values. (Shared by addDecal and queueDecal)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
 						},
 						{
 							"kind": "method",
@@ -103013,210 +102274,6 @@
 							"description": {
 								"ko": "프로그램을 쓰고 보기와 투영과 아틀라스 유니폼 올리기.",
 								"en": "Uses the program and uploads the view, projection and atlas uniforms."
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawDecals",
-							"signature": "drawDecals(frame)",
-							"params": [
-								{
-									"name": "frame",
-									"type": "object",
-									"description": {
-										"ko": "readFrame 이 돌려준 그리는 프레임의 카메라.",
-										"en": "Camera of the drawing frame returned by readFrame."
-									}
-								}
-							],
-							"description": {
-								"ko": "바닥 자국 그리기. (나이 먹는 자국, 이번 프레임에 넘긴 자국 차례, 아직 나타나지 않은 것은 건너뜀, 깜빡이면 걸러 엷게)",
-								"en": "Draws floor decals. (Aging decals, then decals passed this frame, skips those not yet visible, flickering ones are faded on alternate cycles)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawDecal",
-							"signature": "drawDecal(decal, alpha, heat)",
-							"params": [
-								{
-									"name": "decal",
-									"type": "object",
-									"description": {
-										"ko": "createDecal 이 지은 자국 값.",
-										"en": "Scorch values built by createDecal."
-									}
-								},
-								{
-									"name": "alpha",
-									"type": "number",
-									"description": {
-										"ko": "덮는 몫. (0 ~ 1)",
-										"en": "Coverage. (0 ~ 1)"
-									}
-								},
-								{
-									"name": "heat",
-									"type": "number",
-									"description": {
-										"ko": "열기. (0 ~ 1, 1 이면 램프의 흰 심)",
-										"en": "Heat. (0 ~ 1, 1 is the white core of the ramp)"
-									}
-								}
-							],
-							"description": {
-								"ko": "바닥 자국 하나 그리기. (자국 셰이더와 네 귀퉁이가 묶여 있음)",
-								"en": "Draws one floor decal. (The decal shader and four corners are bound)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawBands",
-							"signature": "drawBands(frame)",
-							"params": [
-								{
-									"name": "frame",
-									"type": "object",
-									"description": {
-										"ko": "readFrame 이 돌려준 그리는 프레임의 카메라.",
-										"en": "Camera of the drawing frame returned by readFrame."
-									}
-								}
-							],
-							"description": {
-								"ko": "충격파 띠 그리기. (바닥 빛을 먼저 납작하게, 그 위에 말려 오르는 띠)",
-								"en": "Draws shockwave rings. (The floor glow first, flat, then the curling ring on top)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawPlumes",
-							"signature": "drawPlumes(frame)",
-							"params": [
-								{
-									"name": "frame",
-									"type": "object",
-									"description": {
-										"ko": "readFrame 이 돌려준 그리는 프레임의 카메라.",
-										"en": "Camera of the drawing frame returned by readFrame."
-									}
-								}
-							],
-							"description": {
-								"ko": "연기 기둥 그리기. (빠르게 솟아 퍼지고, 열기는 앞 칠 할에 식고, 끝 사 할에 엷어짐)",
-								"en": "Draws smoke plumes. (Rises and spreads quickly, heat cools in the first 70 percent, fades in the last 40 percent)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawFireballs",
-							"signature": "drawFireballs(frame)",
-							"params": [
-								{
-									"name": "frame",
-									"type": "object",
-									"description": {
-										"ko": "readFrame 이 돌려준 그리는 프레임의 카메라.",
-										"en": "Camera of the drawing frame returned by readFrame."
-									}
-								}
-							],
-							"description": {
-								"ko": "불덩이 그리기. (부풀기는 빠르게 시작해 느려지고, 열기는 식고, 끝에 연기로 걷힘)",
-								"en": "Draws fireballs. (Swelling starts fast and slows, heat cools, clears into smoke at the end)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawBeams",
-							"signature": "drawBeams(frame)",
-							"params": [
-								{
-									"name": "frame",
-									"type": "object",
-									"description": {
-										"ko": "readFrame 이 돌려준 그리는 프레임의 카메라.",
-										"en": "Camera of the drawing frame returned by readFrame."
-									}
-								}
-							],
-							"description": {
-								"ko": "회전체 빔 그리기. (넘긴 차례대로, 축과 두 옆 쪽은 여기서 셈)",
-								"en": "Draws solid-of-revolution beams. (In the order passed, the axis and two side directions are computed here)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawRibbons",
-							"signature": "drawRibbons(frame)",
-							"params": [
-								{
-									"name": "frame",
-									"type": "object",
-									"description": {
-										"ko": "readFrame 이 돌려준 그리는 프레임의 카메라.",
-										"en": "Camera of the drawing frame returned by readFrame."
-									}
-								}
-							],
-							"description": {
-								"ko": "리본 그리기. (점마다 앞뒤 점으로 잡은 쪽과 카메라 쪽에 수직으로 펴서 한 버퍼에 쓰고, 리본마다 띠로 그림)",
-								"en": "Draws ribbons. (Spreads each point perpendicular to the direction taken from its neighboring points and to the camera direction, writes into one buffer, draws each ribbon as a strip)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawParticles",
-							"signature": "drawParticles(frame, isParticleLive)",
-							"params": [
-								{
-									"name": "frame",
-									"type": "object",
-									"description": {
-										"ko": "readFrame 이 돌려준 그리는 프레임의 카메라.",
-										"en": "Camera of the drawing frame returned by readFrame."
-									}
-								},
-								{
-									"name": "isParticleLive",
-									"type": "boolean",
-									"description": {
-										"ko": "낸 파티클이 아직 떠 있는지.",
-										"en": "Whether emitted particles are still alive."
-									}
-								}
-							],
-							"description": {
-								"ko": "파티클 그리기. (새로 낸 것이 있으면 쓴 칸까지 버퍼를 다시 올림, 사라진 것은 정점 셰이더가 접음, 이번 프레임의 빛 점도 같은 셰이더로)",
-								"en": "Draws particles. (Re-uploads the buffer up to the written slots if new ones were emitted, the vertex shader collapses dead ones, this frame's glints also use the same shader)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonvfx.js"
-						},
-						{
-							"kind": "method",
-							"name": "drawFlashes",
-							"signature": "drawFlashes()",
-							"params": [],
-							"description": {
-								"ko": "섬광 그리기. (뷰포트 전체의 네 귀퉁이를 깊이 시험 없이, 섬광마다 처음이 세고 나이로 빠르게 걷힘)",
-								"en": "Draws flashes. (Four corners of the whole viewport without depth test, each flash strong at first and fading fast with age)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonvfx.js"
