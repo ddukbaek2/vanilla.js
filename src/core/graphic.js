@@ -3489,10 +3489,10 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 폰트 문자열 설정. (Canvas2D font 대응, 예: "16px DOSGothic")
+	// 폰트 문자열 설정. (Canvas2D font 대응, 예: "16px DOSGothic", 이름 default 는 엔진 기본 글꼴 사슬)
 	//==============================================================================
 	/**
-	 * @param { string } fontString CSS 글꼴 글. (예: "16px DOSGothic", 비었으면 바꾸지 않는다)
+	 * @param { string } fontString CSS 글꼴 글. (예: "16px DOSGothic", 이름 default 는 엔진 기본 글꼴 사슬 SYSTEM_FONT_STRING, 비었으면 바꾸지 않는다)
 	 */
 	setFontString(fontString) {
 		if (fontString) {

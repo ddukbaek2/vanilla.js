@@ -4,6 +4,7 @@
 const System = globalThis;
 import { Object } from "../../base/object.js";
 import * as Math from "../../base/math.js";
+import { SYSTEM_FONT_STRING } from "../../base/platform.js";
 
 /**
  * @example <caption>Graphic 없이 글 너비 재기</caption>
@@ -78,8 +79,98 @@ if (System.document !== undefined && System.document.fonts !== undefined) {
 }
 
 //==============================================================================
+// 글꼴 크기 낱말. (CSS font 줄임 꼴에서 이 낱말 뒤가 글꼴 이름 목록이다, 줄높이 "/20px" 가 붙을 수 있다)
+//==============================================================================
+const FONT_SIZE_PATTERN = /^(?:[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?(?:px|pt|pc|in|cm|mm|q|em|rem|ex|ch|vw|vh|vmin|vmax|%)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|larger|smaller)(?:\/.*)?$/i;
+const DEFAULT_FONT_FAMILY = "default"; // 엔진 기본 글꼴 이름. (러스트 판 Text, DynamicFont 의 처음 글꼴 이름)
+
+//==============================================================================
+// 글꼴 글의 기본 글꼴 이름 default 를 엔진 기본 글꼴 사슬로 풀기. (러스트 판 TextStringTextureCache 의 글꼴 찾기와 같다)
+// - 이름 목록에 default(따옴표를 쳐도, 대소문자를 가리지 않는다)가 있으면 그 자리는 그 이름으로 올린 글꼴만 찾고("default" 로 따옴표를 친다),
+//   목록 끝에 엔진 기본 글꼴 사슬 SYSTEM_FONT_STRING 을 잇는다. (러스트 판은 이름 목록 다음에 기본 폰트, 시스템 글꼴 사슬 차례로 찾는다)
+// - CSS 에서 따옴표 없는 default 는 예약어라 캔버스가 그 글꼴 글을 통째로 버린다. (크롬은 앞의 글꼴을 그대로 둔다)
+// - default 가 없거나 크기 낱말을 찾지 못한 글은 그대로 돌려준다.
+//==============================================================================
+/**
+ * @param { string } fontString CSS 글꼴 글. (예: "bold 16px default")
+ * @returns { string } 캔버스에 넣을 글꼴 글.
+ */
+function resolveFontString(fontString) {
+	if (!/default/i.test(fontString)) {
+		return fontString;
+	}
+
+	// 크기 낱말을 찾아 그 뒤를 이름 목록으로 본다. (앞의 기울임, 굵기 같은 낱말에는 따옴표와 쉼표가 없다)
+	const wordPattern = /\S+/g;
+	let familyListStart = -1;
+	let wordMatch = wordPattern.exec(fontString);
+	while (wordMatch !== null) {
+		if (wordMatch[0].includes(",") || wordMatch[0].includes("\"") || wordMatch[0].includes("'")) {
+			break;
+		}
+		if (FONT_SIZE_PATTERN.test(wordMatch[0])) {
+			familyListStart = wordMatch.index + wordMatch[0].length;
+			// 줄높이를 빈칸을 두고 적은 꼴. ("16px / 20px")
+			const lineHeightMatch = /^\s*\/\s*\S+/.exec(fontString.slice(familyListStart));
+			if (lineHeightMatch !== null && !wordMatch[0].includes("/")) {
+				familyListStart += lineHeightMatch[0].length;
+			}
+			break;
+		}
+		wordMatch = wordPattern.exec(fontString);
+	}
+	if (familyListStart < 0) {
+		return fontString;
+	}
+
+	// 쉼표로 이름을 나눈다. (따옴표 안의 쉼표는 이름의 글자다)
+	const familyListText = fontString.slice(familyListStart);
+	const familyNameList = [];
+	let familyName = "";
+	let quoteCharacter = "";
+	for (const character of familyListText) {
+		if (quoteCharacter !== "") {
+			familyName += character;
+			if (character === quoteCharacter) {
+				quoteCharacter = "";
+			}
+			continue;
+		}
+		if (character === "\"" || character === "'") {
+			quoteCharacter = character;
+			familyName += character;
+			continue;
+		}
+		if (character === ",") {
+			familyNameList.push(familyName.trim());
+			familyName = "";
+			continue;
+		}
+		familyName += character;
+	}
+	familyNameList.push(familyName.trim());
+
+	let isDefaultRequested = false;
+	const resolvedFamilyNameList = familyNameList.map((name) => {
+		const unquotedName = /^(["'])(.*)\1$/.exec(name);
+		const bareName = unquotedName !== null ? unquotedName[2] : name;
+		if (bareName.toLowerCase() !== DEFAULT_FONT_FAMILY) {
+			return name;
+		}
+		isDefaultRequested = true;
+		return `"${DEFAULT_FONT_FAMILY}"`;
+	});
+	if (!isDefaultRequested) {
+		return fontString;
+	}
+	resolvedFamilyNameList.push(SYSTEM_FONT_STRING);
+	return fontString.slice(0, familyListStart).trimEnd() + " " + resolvedFamilyNameList.join(", ");
+}
+
+//==============================================================================
 // 글 재기. (캐시를 거친다, 문서가 없으면 null)
 // - 돌려준 TextMetrics 는 캐시가 나눠 쓰므로 고치지 않는다.
+// - 기본 글꼴 이름 default 는 엔진 기본 글꼴 사슬로 잰다. (resolveFontString)
 //==============================================================================
 /**
  * @param { string } fontString
@@ -108,7 +199,7 @@ export function measureTextMetrics(fontString, text) {
 		measureCache.set(cacheKey, cachedTextMetrics);
 		return cachedTextMetrics;
 	}
-	measureCanvasRenderingContext.font = fontString;
+	measureCanvasRenderingContext.font = resolveFontString(fontString);
 	const textMetrics = measureCanvasRenderingContext.measureText(text);
 	measureCache.set(cacheKey, textMetrics);
 	while (measureCache.size > MAXIMUM_MEASURE_COUNT) {
@@ -273,7 +364,7 @@ export class TextStringTextureCache extends Object {
 			return textMetrics;
 		}
 		const measurementCanvasRenderingContext = this.getMeasurementCanvasRenderingContext();
-		measurementCanvasRenderingContext.font = fontString;
+		measurementCanvasRenderingContext.font = resolveFontString(fontString);
 		return measurementCanvasRenderingContext.measureText(text);
 	}
 
@@ -393,8 +484,8 @@ export class TextStringTextureCache extends Object {
 	 * @returns { object | null }
 	 */
 	buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
-		// 확대 배율이 적용된 폰트로 측정. (문자열째 그릴 때의 캔버스 크기와 펜 자리를 예전 굽기와 같게 셈한다)
-		const scaledFontString = this.buildScaledFontString(fontString, scale);
+		// 확대 배율이 적용된 폰트로 측정. (문자열째 그릴 때의 캔버스 크기와 펜 자리를 예전 굽기와 같게 셈한다, 기본 글꼴 이름 default 는 엔진 기본 글꼴 사슬로 푼다)
+		const scaledFontString = this.buildScaledFontString(resolveFontString(fontString), scale);
 		const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
 		layoutCanvasRenderingContext.font = scaledFontString;
 		layoutCanvasRenderingContext.direction = textDirection;
@@ -970,7 +1061,7 @@ export class TextStringTextureCache extends Object {
 		const entries = this.getEntries();
 		let removedCount = 0;
 		for (const [entryKey, entry] of System.Array.from(entries)) {
-			if (!isAffected(entry.fontString, entry.text)) {
+			if (!isAffected(resolveFontString(entry.fontString), entry.text)) {
 				continue;
 			}
 			this.removeEntry(entryKey, entry);
