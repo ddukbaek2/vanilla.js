@@ -26,38 +26,37 @@ if (System.document !== undefined && System.document.fonts !== undefined) {
 
 
 //==============================================================================
-// "#rrggbb" 와 불투명도로 캔버스의 rgba 색 글 만들기.
+// 색과 불투명도로 캔버스의 rgba 색 글 만들기. (색의 알파는 읽지 않고 불투명도로 바꾼다)
 //==============================================================================
 /**
- * @param { string } colorText - "#rrggbb"
+ * @param { Color } color 색. (알파는 읽지 않는다)
  * @param { number } opacity - 0 ~ 1
- * @returns { string }
+ * @returns { string } "rgba(r, g, b, a)" 나 불투명하면 "rgb(r, g, b)".
+ * @example
+ * const shadowText = buildRGBAString(new Color(1, 0, 0, 1), 0.5);
+ * console.log(shadowText);
  */
-export function buildRGBAString(colorText, opacity) {
-	const hexText = colorText.slice(1);
-	const value = System.parseInt(hexText, 16);
-	const red = (value >> 16) & 255;
-	const green = (value >> 8) & 255;
-	const blue = value & 255;
-	return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+export function buildRGBAString(color, opacity) {
+	return color.withAlpha(System.Math.min(1, System.Math.max(0, opacity))).toRGBAString();
 }
 
 
 //==============================================================================
-// 색 인자를 굽기에 쓰는 색 글로. (글은 그대로, Color 는 알파를 뺀 "#rrggbb", 러스트 판 impl Into<Color> 자리의 짝)
-// - 이 컴포넌트들은 색을 글로 담아 굽는 열쇠와 캔버스 색에 쓴다. 불투명도는 따로 받으므로 Color 의 알파는 쓰지 않는다.
+// 색 인자를 담을 Color 로. (Color 는 복사, 글은 풀어서, 러스트 판 impl Into<Color> 의 짝)
+// - ShadowText, ShadowImage, SoftShade 가 색을 러스트 판처럼 Color 로 담는다. 받은 Color 를 나중에 고쳐도 담은 색은 바뀌지 않는다.
 //==============================================================================
 /**
  * @param { Color | string } color - Color 나 "#rrggbb" 같은 색 글
- * @returns { string }
+ * @returns { Color } 새 Color.
+ * @example
+ * const color = readColor("#ff8000");
+ * console.log(color.toHEXString());
  */
-export function readColorText(color) {
+export function readColor(color) {
 	if (typeof color === "string") {
-		return color;
+		return Color.from(color);
 	}
-	const rgbColor = Color.from(color).clone();
-	rgbColor.alpha = 1;
-	return rgbColor.toHEXString();
+	return color.clone();
 }
 
 
@@ -112,8 +111,8 @@ export class ShadowText extends Component {
 	/** @private @type { boolean } */ #isStrikethrough;
 	/** @private @type { string } */ #textAlign; // "left", "center", "right", "start", "end"
 	/** @private @type { string } */ #textDirection; // "ltr", "rtl", "auto"
-	/** @private @type { string } */ #textColor; // "#rrggbb" 나 CSS 색.
-	/** @private @type { string } */ #shadowColor; // "#rrggbb"
+	/** @private @type { Color } */ #textColor; // 알파가 글자 불투명도.
+	/** @private @type { Color } */ #shadowColor; // 알파는 읽지 않는다. (불투명도는 #shadowOpacity)
 	/** @private @type { number } */ #shadowOpacity;
 	/** @private @type { number } */ #shadowOffset; // 그림자가 글 아래로 내려가는 만큼. (내용 크기 단위)
 	/** @private @type { number } */ #shadowBlur; // 그림자가 번지는 만큼. (내용 크기 단위, 0 이면 번지지 않는다)
@@ -140,8 +139,8 @@ export class ShadowText extends Component {
 		this.#isStrikethrough = false;
 		this.#textAlign = "center";
 		this.#textDirection = "ltr";
-		this.#textColor = "#ffffff";
-		this.#shadowColor = "#000000";
+		this.#textColor = Color.white();
+		this.#shadowColor = Color.black();
 		this.#shadowOpacity = 1;
 		this.#shadowOffset = 0;
 		this.#shadowBlur = 0;
@@ -170,7 +169,7 @@ export class ShadowText extends Component {
 		const textDirection = this.resolveBakeTextDirection();
 		const fontFace = this.getFontFace();
 		const fontFamily = fontFace === null ? "" : fontFace.family;
-		const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#isItalic, this.#isUnderline, this.#isStrikethrough, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount].join("|");
+		const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#isItalic, this.#isUnderline, this.#isStrikethrough, this.#textColor.toRGBAString(), this.#shadowColor.toHEXString(), this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount].join("|");
 		if (bakeKey !== this.#bakeKey) {
 			// 같은 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
 			releaseSharedBake(this.#bakeKey, this);
@@ -306,7 +305,7 @@ export class ShadowText extends Component {
 		canvasRenderingContext.shadowBlur = scaledShadowBlur;
 		canvasRenderingContext.shadowOffsetX = 0;
 		canvasRenderingContext.shadowOffsetY = scaledShadowOffset;
-		canvasRenderingContext.fillStyle = this.#textColor;
+		canvasRenderingContext.fillStyle = this.#textColor.toRGBAString();
 		canvasRenderingContext.fillText(text, scaledPenX, scaledBaselineY);
 		// 밑줄과 취소선도 같은 그림자로 칠한다. (길이는 전진폭, Text 의 가운데 기준선과 같은 자리)
 		if (this.#isUnderline) {
@@ -391,10 +390,10 @@ export class ShadowText extends Component {
 	/**
 	 * @param { number } fontSize 처음 글자 크기. (내용 크기 단위, 넘치면 줄여 굽는다)
 	 * @param { boolean } isBold 굵게 할지.
-	 * @param { Color | string } textColor 글 색. ("#rrggbb" 나 CSS 색)
+	 * @param { Color | string } textColor 글 색. (Color 나 "#rrggbb" 같은 색 글, 알파가 글자 불투명도)
 	 */
 	setTextStyle(fontSize, isBold, textColor) {
-		textColor = readColorText(textColor);
+		textColor = readColor(textColor);
 		this.#fontSize = fontSize;
 		this.#isBold = isBold;
 		this.#textColor = textColor;
@@ -540,13 +539,13 @@ export class ShadowText extends Component {
 	// 그림자 설정. (색, 불투명도, 글 아래로 내려가는 만큼, 번지는 만큼)
 	//==============================================================================
 	/**
-	 * @param { Color | string } shadowColor - "#rrggbb"
+	 * @param { Color | string } shadowColor 그림자 색. (Color 나 "#rrggbb" 같은 색 글, 알파는 읽지 않는다)
 	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
 	 * @param { number } shadowOffset 그림자가 글 아래로 내려가는 만큼. (내용 크기 단위)
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
-		shadowColor = readColorText(shadowColor);
+		shadowColor = readColor(shadowColor);
 		this.#shadowColor = shadowColor;
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;

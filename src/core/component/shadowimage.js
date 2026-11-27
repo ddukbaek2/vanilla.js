@@ -5,7 +5,8 @@ const System = globalThis;
 import { Rect } from "../../base/rect.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
-import { buildRGBAString, readColorText } from "./shadowtext.js";
+import { Color } from "../../base/color.js";
+import { buildRGBAString, readColor } from "./shadowtext.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
 
@@ -60,8 +61,8 @@ export class ShadowImage extends Component {
 	/** @private @type { HTMLImageElement | HTMLCanvasElement | null } */ #image; // 그림.
 	/** @private @type { string } */ #imagePath; // 그림 경로. (UIDocument 가 그림 대신 적고 읽는다, 그리기에는 쓰지 않는다)
 	/** @private @type { Rect | null } */ #imageRect; // 그림 안의 조각. (null 이면 그림 전체)
-	/** @private @type { string | null } */ #imageColor; // 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
-	/** @private @type { string } */ #shadowColor; // "#rrggbb"
+	/** @private @type { Color | null } */ #imageColor; // 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
+	/** @private @type { Color } */ #shadowColor; // 알파는 읽지 않는다. (불투명도는 #shadowOpacity)
 	/** @private @type { number } */ #shadowOpacity;
 	/** @private @type { number } */ #shadowOffset; // 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
 	/** @private @type { number } */ #shadowBlur; // 그림자가 번지는 만큼. (내용 크기 단위, 0 이면 번지지 않는다)
@@ -83,7 +84,7 @@ export class ShadowImage extends Component {
 		this.#image = null;
 		this.#imageRect = null;
 		this.#imageColor = null;
-		this.#shadowColor = "#000000";
+		this.#shadowColor = Color.black();
 		this.#shadowOpacity = 1;
 		this.#shadowOffset = 0;
 		this.#shadowBlur = 0;
@@ -127,7 +128,7 @@ export class ShadowImage extends Component {
 			nextImageIdentifier += 1;
 			imageIdentifiers.set(image, imageIdentifier);
 		}
-		const bakeKey = ["ShadowImage", imageIdentifier, sourceRect.left, sourceRect.top, sourceRect.width, sourceRect.height, this.#imageColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, imageWidth, imageHeight, bakeScale].join("|");
+		const bakeKey = ["ShadowImage", imageIdentifier, sourceRect.left, sourceRect.top, sourceRect.width, sourceRect.height, this.#imageColor === null ? "" : this.#imageColor.toRGBAString(), this.#shadowColor.toHEXString(), this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, imageWidth, imageHeight, bakeScale].join("|");
 		if (bakeKey !== this.#bakeKey) {
 			// 같은 그림과 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
 			releaseSharedBake(this.#bakeKey, this);
@@ -247,7 +248,7 @@ export class ShadowImage extends Component {
 		const imageColor = this.getImageColor();
 		if (imageColor !== null) {
 			canvasRenderingContext.globalCompositeOperation = "source-in";
-			canvasRenderingContext.fillStyle = imageColor;
+			canvasRenderingContext.fillStyle = imageColor.toRGBAString();
 			canvasRenderingContext.fillRect(0, 0, scaledImageWidth, scaledImageHeight);
 		}
 		return scaledCanvas;
@@ -314,17 +315,17 @@ export class ShadowImage extends Component {
 	// 그림을 한 빛으로 칠할 색 설정. (null 이면 그림 그대로)
 	//==============================================================================
 	/**
-	 * @param { string | null } imageColor 그림을 한 빛으로 칠할 CSS 색. (null 이면 그림 그대로)
+	 * @param { Color | string | null } imageColor 그림을 한 빛으로 칠할 색. (Color 나 "#rrggbb" 같은 색 글, 알파가 칠의 불투명도, null 이면 그림 그대로)
 	 */
 	setImageColor(imageColor) {
-		this.#imageColor = imageColor;
+		this.#imageColor = imageColor === null ? null : readColor(imageColor);
 	}
 
 	//==============================================================================
 	// 그림을 한 빛으로 칠할 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { string | null } 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
+	 * @returns { Color | null } 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
 	 */
 	getImageColor() {
 		return this.#imageColor;
@@ -334,13 +335,13 @@ export class ShadowImage extends Component {
 	// 그림자 설정. (색, 불투명도, 그림 아래로 내려가는 만큼, 번지는 만큼)
 	//==============================================================================
 	/**
-	 * @param { Color | string } shadowColor - "#rrggbb"
+	 * @param { Color | string } shadowColor 그림자 색. (Color 나 "#rrggbb" 같은 색 글, 알파는 읽지 않는다)
 	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
 	 * @param { number } shadowOffset 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
-		shadowColor = readColorText(shadowColor);
+		shadowColor = readColor(shadowColor);
 		this.#shadowColor = shadowColor;
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;

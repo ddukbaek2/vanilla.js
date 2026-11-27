@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 굽는 컴포넌트의 색을 Color 로(러스트 판 ShadowText, SoftShade, ShadowImage 와 같게): ShadowText, SoftShade, ShadowImage 가 색을 "#rrggbb" 글 대신 Color 로 담는다. 세터는 전처럼 Color 와 색 글을 다 받고 받은 Color 는 복사해 담는다. SoftShade.getColor() 는 Color, ShadowImage.getImageColor() 는 Color 나 null 을 돌려주고, UIDocument 는 ShadowImage 의 ImageColor 를 러스트 판처럼 수 넷 배열([r, g, b, a])로 적는다(색 글로 적힌 옛 문서도 그대로 읽는다). ShadowText 의 글 색 알파는 글자 불투명도다. 모듈 함수 readColorText 는 readColor(Color 를 돌려줌)로, buildRGBAString 은 Color 를 받는다.
+  - 옮기는 법: softShade.getColor(), shadowImage.getImageColor() 를 글로 쓰던 곳은 .toHEXString() 을 붙인다.
 - 화면 페이드 손잡이(러스트 판 ScreenFadeHold, fade_screen_with_hold 와 같게): ScreenFadeHold(release, isReleased) 와 GameScene.fadeScreenWithHold(onDark) 를 더했다. 다 어두워지면 onDark 에 새 손잡이를 넘기고 release 할 때까지 어둡게 둔다. fadeScreen 의 onDark 도 Promise 말고 ScreenFadeHold 를 돌려주면 release 할 때까지 어둡게 둔다(러스트 판 fade_screen 이 Option<ScreenFadeHold> 를 받는 것과 같다). import.js 가 ScreenFadeHold 를 내보낸다.
   - 옮기는 법: 없다. (새 기능, Promise 를 돌려주던 onDark 는 그대로)
 - 예약어 이름 없애기(러스트 판과 같은 이름): 두 엔진 모두 예약어(use, move, loop, in)를 이름으로 쓰지 않는다. Cooldown.use() 를 빼고 activate() 하나로(러스트 판 activate), FullscreenPass.use() 와 ShaderProgram.use() 는 useProgram()(러스트 판 use_program), PointerGesture.move(x, y) 는 movePointer(x, y)(러스트 판 move_pointer), Action.loop(조건, 안쪽) 은 repeatWhile(조건, 안쪽)(러스트 판 repeat_while), Tween.easingFunction 의 in, out, inOut 은 easeIn, easeOut, easeInOut(러스트 판 ease_in, ease_out, ease_in_out). 타임라인 자료의 이징 이름("quadratic.in" 같은)은 자료 꼴이라 그대로다.

@@ -10,7 +10,7 @@ import * as Vanilla from "../../import.js";
 import { check, checkEqual, checkJson, checkNear, finish } from "../testcheck.mjs";
 
 const { Color, Paint, Outline, SoftShade, ShadowText, UIView, UISlider, WorldNode, Vector2, Sprite, ShadowImage, UIImageView, UIDropdown, UIDialog, UIDocument, isViewPositionInsideNode, GameScene, Scene, UIScene } = Vanilla;
-const { readColorText } = await import("../../src/core/component/shadowtext.js");
+const { readColor } = await import("../../src/core/component/shadowtext.js");
 
 // GameScene 도 맨 위에서 나간다. (러스트 판 vanilla::GameScene)
 {
@@ -52,19 +52,36 @@ const { readColorText } = await import("../../src/core/component/shadowtext.js")
 	checkEqual(uiScene.getSceneBackgroundColor().toHEXString(), "#00ff00", "UIScene 은 Scene 의 배경색을 쓴다");
 	checkEqual(typeof uiScene.drawSceneBackground, "function", "drawSceneBackground");
 
-	// 색을 글로 담아 굽는 컴포넌트도 Color 를 받는다. (글은 그대로, Color 는 알파를 뺀 "#rrggbb", 불투명도는 따로 받는다)
+	// 굽는 컴포넌트도 러스트 판처럼 색을 Color 로 담는다. (Color 와 색 글을 다 받고, 게터는 Color, 받은 Color 를 고쳐도 담은 색은 그대로)
 	const softShade = new SoftShade();
-	softShade.setShade("band", new Color(1, 0, 0, 0.5), 0.4);
-	checkEqual(softShade.getColor(), "#ff0000", "SoftShade.setShade 의 Color");
+	check(softShade.getColor() instanceof Color && softShade.getColor().toHEXString() === "#000000", "SoftShade 처음 색은 검정 Color");
+	const shadeColor = new Color(1, 0, 0, 0.5);
+	softShade.setShade("band", shadeColor, 0.4);
+	shadeColor.red = 0;
+	checkEqual(softShade.getColor().toHEXString(), "#ff000080", "SoftShade.setShade 의 Color 는 복사해 담는다");
 	softShade.setShade("band", "#123456", 0.4);
-	checkEqual(softShade.getColor(), "#123456", "SoftShade.setShade 의 색 글은 그대로");
-	checkEqual(readColorText(new Color(0, 0, 1, 0.25)), "#0000ff", "ShadowText, ShadowImage 가 담는 Color 의 글 (알파는 뺀다)");
-	checkEqual(readColorText("rgb(1, 2, 3)"), "rgb(1, 2, 3)", "ShadowText 의 CSS 색 글은 그대로");
+	check(softShade.getColor() instanceof Color, "SoftShade.getColor 는 Color");
+	checkEqual(softShade.getColor().toHEXString(), "#123456", "SoftShade.setShade 의 색 글");
+	checkEqual(readColor("rgb(1, 2, 3)").toRGBAString(), "rgb(1, 2, 3)", "색 글을 Color 로");
 	const shadowText = new ShadowText();
 	shadowText.setTextStyle(20, false, new Color(0, 0, 1, 1));
 	shadowText.setShadow(new Color(0, 0, 0, 1), 0.5, 2);
+	shadowText.setTextStyle(20, false, "#ff0000");
 	const shadowImage = new ShadowImage();
 	shadowImage.setShadow(new Color(0, 1, 0, 1), 0.5, 2);
+	checkEqual(shadowImage.getImageColor(), null, "ShadowImage 그림 색 처음은 null");
+	shadowImage.setImageColor("#00ff00");
+	check(shadowImage.getImageColor() instanceof Color, "ShadowImage.getImageColor 는 Color");
+	checkEqual(shadowImage.getImageColor().toHEXString(), "#00ff00", "ShadowImage.setImageColor 의 색 글");
+	const imageNode = new WorldNode();
+	const savedShadowImage = imageNode.addComponent(ShadowImage);
+	savedShadowImage.setImageColor(new Color(0, 1, 0, 1));
+	const imageDocument = UIDocument.serializeNode(imageNode);
+	checkJson(imageDocument.components[0].ImageColor, [0, 1, 0, 1], "ShadowImage 의 ImageColor 는 러스트 판처럼 수 넷 배열로 저장");
+	const loadedNode = UIDocument.deserializeNode(imageDocument);
+	checkEqual(loadedNode.getComponent(ShadowImage).getImageColor().toHEXString(), "#00ff00", "ShadowImage 의 ImageColor 배열을 Color 로 읽는다");
+	shadowImage.setImageColor(null);
+	checkEqual(shadowImage.getImageColor(), null, "ShadowImage.setImageColor(null)");
 }
 
 // 보이기 플래그: 켜짐, 투명도와 따로. (러스트 판 active_and_visible_in_hierarchy 의 set_visible 대목)
