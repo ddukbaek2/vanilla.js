@@ -20972,8 +20972,8 @@
 									"name": "entry",
 									"type": "object",
 									"description": {
-										"ko": "문자열 텍스처 엔트리. (TextStringTextureCache.getEntry)",
-										"en": "String texture entry. (TextStringTextureCache.getEntry)"
+										"ko": "글 배치 엔트리. (TextStringTextureCache.getEntry)",
+										"en": "Text layout entry. (TextStringTextureCache.getEntry)"
 									}
 								},
 								{
@@ -21010,8 +21010,8 @@
 								}
 							],
 							"description": {
-								"ko": "문자열 텍스처 엔트리를 정렬/베이스라인에 맞춰 쿼드로 출력.",
-								"en": "Draws a string texture entry as a quad aligned to the alignment/baseline."
+								"ko": "글 배치 엔트리를 정렬/베이스라인에 맞춰 글리프 쿼드로 출력.\n- 문자열을 통째로 구웠을 때의 사각형 자리(픽셀 스냅 포함)를 셈하고, 그 안의 글리프 사각형을 아틀라스에서 뽑아 그린다.",
+								"en": "Draws a text layout entry as glyph quads aligned to the alignment/baseline.\n- Computes the rectangle the whole string would occupy if baked at once (pixel snap included) and draws the glyph rectangles inside it from the atlas."
 							},
 							"since": "0.3.0",
 							"source": "src/core/graphic.js",

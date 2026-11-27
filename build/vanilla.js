@@ -6766,7 +6766,17 @@ var ImageTextureCache = class extends Object2 {
 
 // src/core/graphic/textstringtexturecache.js
 var System14 = globalThis;
-var MAXIMUM_ENTRY_COUNT = 512;
+var MAXIMUM_ENTRY_COUNT = 1024;
+var ATLAS_PAGE_SIZE = 1024;
+var MAXIMUM_ATLAS_PAGE_COUNT = 8;
+var SUBPIXEL_SLOT_COUNT = 8;
+var MAXIMUM_ATLAS_FONT_SIZE = 256;
+var STROKE_MITER_LIMIT = 10;
+var RIGHT_TO_LEFT_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
+var JOINING_CLUSTER_PATTERN = /^[\p{L}\p{M}]/u;
+var STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}]/u;
+var COMBINING_MARK_PATTERN = /\p{M}/u;
+var EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
 var isTextAntialiasEnabled = true;
 var ALPHA_THRESHOLD = 128;
 var MAXIMUM_MEASURE_COUNT = 2048;
@@ -6857,18 +6867,43 @@ var TextStringTextureCache = class extends Object2 {
   #webGL2RenderingContext;
   /** @private @type { Map<string, object> } */
   #entries;
+  // 글 배치 엔트리. (LRU)
   /** @private @type { Map<string, object[]> } */
   #entriesByText;
   // 문자열마다 그 문자열의 엔트리 목록. (찾을 때 열쇠 문자열을 만들지 않으려고)
+  /** @private @type { Map<string, object> } */
+  #glyphs;
+  // 구운 글리프. (열쇠: 글꼴 열쇠, 글자 덩어리, 자리 열쇠)
+  /** @private @type { object[] } */
+  #atlasPages;
+  // 아틀라스 장 목록.
+  /** @private @type { number } */
+  #useSerial;
+  // 엔트리를 줄 때마다 늘리는 번호. (장의 LRU)
+  /** @private @type { number } */
+  #bakedGlyphCount;
+  // 지금까지 구운 글리프 수. (통계)
+  /** @private @type { number } */
+  #uploadCount;
+  // 지금까지 아틀라스에 올린 수. (통계, 굽기 캔버스 한 장이 한 번)
+  /** @private @type { object | null } */
+  #segmenter;
+  // 글자 덩어리 나누기. (Intl.Segmenter, 없으면 null)
   /** @private @type { HTMLCanvasElement } */
   #bakeCanvas;
   /** @private @type { CanvasRenderingContext2D } */
   #bakeCanvasRenderingContext;
   /** @private @type { CanvasRenderingContext2D } */
   #measurementCanvasRenderingContext;
+  /** @private @type { CanvasRenderingContext2D } */
+  #layoutCanvasRenderingContext;
+  // 글 배치 재기용. (글꼴을 바꿀 때만 다시 건다)
   /** @private @type { ((texture: WebGLTexture) => void) | null } */
   #textureBinder;
   // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
+  /** @private @type { (() => void) | null } */
+  #beforeTextureOverwrite;
+  // 아틀라스 장을 비워 덮어쓰기 전에 부르는 함수. (주인 Graphic 이 쌓아 둔 묶음을 먼저 그린다)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -6876,18 +6911,28 @@ var TextStringTextureCache = class extends Object2 {
    * @constructor
    * @param { WebGL2RenderingContext } webGL2RenderingContext
    * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
+   * @param { (() => void) | null } beforeTextureOverwrite - 아틀라스 장을 비워 덮어쓰기 전에 부르는 함수. (쌓아 둔 그리기를 먼저 내보낸다, null 이면 부르지 않는다)
    */
-  constructor(webGL2RenderingContext, textureBinder = null) {
+  constructor(webGL2RenderingContext, textureBinder = null, beforeTextureOverwrite = null) {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#entries = /* @__PURE__ */ new Map();
     this.#entriesByText = /* @__PURE__ */ new Map();
+    this.#glyphs = /* @__PURE__ */ new Map();
+    this.#atlasPages = [];
+    this.#useSerial = 0;
+    this.#bakedGlyphCount = 0;
+    this.#uploadCount = 0;
     this.#textureBinder = textureBinder;
+    this.#beforeTextureOverwrite = beforeTextureOverwrite;
+    this.#segmenter = System14.Intl !== void 0 && typeof System14.Intl.Segmenter === "function" ? new System14.Intl.Segmenter(void 0, { granularity: "grapheme" }) : null;
     const bakeCanvas = System14.document.createElement("canvas");
     this.#bakeCanvas = bakeCanvas;
     this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
     const measurementCanvas = System14.document.createElement("canvas");
     this.#measurementCanvasRenderingContext = measurementCanvas.getContext("2d");
+    const layoutCanvas = System14.document.createElement("canvas");
+    this.#layoutCanvasRenderingContext = layoutCanvas.getContext("2d");
   }
   //==============================================================================
   // 문자열 측정. (화면에 보이지 않는 오프스크린 컨텍스트 사용, 글꼴 문자열과 글이 같으면 캐시한 것을 준다)
@@ -6925,10 +6970,11 @@ var TextStringTextureCache = class extends Object2 {
     });
   }
   //==============================================================================
-  // 문자열 텍스처 엔트리 반환. (없으면 굽기 후 반환)
+  // 글 배치 엔트리 반환. (없으면 배치하고 처음 보는 글리프만 구워 반환)
   // - mode: "fill" 또는 "stroke".
   // - textDirection: 문단의 방향. ("ltr" 또는 "rtl", 캔버스의 direction 으로 굽는다)
-  // - 반환 필드는 전부 논리 좌표(스케일 나눔) 기준.
+  // - 반환 필드는 전부 논리 좌표(스케일 나눔) 기준. 문자열을 통째로 구웠을 때의 사각형(quadWidth, quadHeight, penOffsetX, baselineOffsetY)과
+  //   그 사각형 왼쪽 위 기준의 글리프 사각형(glyphTextures, glyphRects 의 왼, 위, 오른, 아래, u0, v0, u1, v1 여덟 값씩)을 준다.
   //==============================================================================
   /**
    * @param { string } mode
@@ -6944,6 +6990,8 @@ var TextStringTextureCache = class extends Object2 {
     if (!text) {
       return null;
     }
+    this.#useSerial += 1;
+    const useSerial = this.#useSerial;
     const entries = this.getEntries();
     const entryList = this.#entriesByText.get(text);
     if (entryList !== void 0) {
@@ -6954,11 +7002,14 @@ var TextStringTextureCache = class extends Object2 {
         const entryKey2 = entry2.entryKey;
         entries.delete(entryKey2);
         entries.set(entryKey2, entry2);
+        for (const atlasPage of entry2.atlasPages) {
+          atlasPage.lastUseSerial = useSerial;
+        }
         return entry2;
       }
     }
     const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
-    const entry = this.bakeEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
+    const entry = this.buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
     if (!entry) {
       return null;
     }
@@ -6970,10 +7021,8 @@ var TextStringTextureCache = class extends Object2 {
     entry.lineWidth = lineWidth;
     entry.scale = scale;
     entry.textDirection = textDirection;
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const collidedEntry = entries.get(entryKey);
     if (collidedEntry !== void 0) {
-      webGL2RenderingContext.deleteTexture(collidedEntry.texture);
       this.removeEntry(entryKey, collidedEntry);
     }
     entries.set(entryKey, entry);
@@ -6986,13 +7035,12 @@ var TextStringTextureCache = class extends Object2 {
     while (entries.size > MAXIMUM_ENTRY_COUNT) {
       const oldestEntryKey = entries.keys().next().value;
       const oldestEntry = entries.get(oldestEntryKey);
-      webGL2RenderingContext.deleteTexture(oldestEntry.texture);
       this.removeEntry(oldestEntryKey, oldestEntry);
     }
     return entry;
   }
   //==============================================================================
-  // 문자열을 오프스크린 캔버스에 굽고 텍스처로 업로드.
+  // 글을 글자 덩어리로 나눠 배치하고, 처음 보는 글리프를 아틀라스에 굽는다.
   //==============================================================================
   /**
    * @param { string } mode
@@ -7004,14 +7052,13 @@ var TextStringTextureCache = class extends Object2 {
    * @param { string } textDirection 기본 "ltr".
    * @returns { object | null }
    */
-  bakeEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
-    const bakeCanvas = this.getBakeCanvas();
-    const bakeCanvasRenderingContext = this.getBakeCanvasRenderingContext();
+  buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
     const scaledFontString = this.buildScaledFontString(fontString, scale);
-    bakeCanvasRenderingContext.font = scaledFontString;
-    bakeCanvasRenderingContext.direction = textDirection;
-    bakeCanvasRenderingContext.textAlign = "left";
-    const scaledTextMetrics = bakeCanvasRenderingContext.measureText(text);
+    const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
+    layoutCanvasRenderingContext.font = scaledFontString;
+    layoutCanvasRenderingContext.direction = textDirection;
+    layoutCanvasRenderingContext.textAlign = "left";
+    const scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
     const actualLeft = ceil(max(scaledTextMetrics.actualBoundingBoxLeft || 0, 0));
     const actualRight = ceil(max(scaledTextMetrics.actualBoundingBoxRight || scaledTextMetrics.width, 0));
     let scaledFontAscent = scaledTextMetrics.fontBoundingBoxAscent;
@@ -7030,42 +7077,98 @@ var TextStringTextureCache = class extends Object2 {
     if (bakeWidth <= 0 || bakeHeight <= 0) {
       return null;
     }
-    bakeCanvas.width = bakeWidth;
-    bakeCanvas.height = bakeHeight;
-    bakeCanvasRenderingContext.clearRect(0, 0, bakeWidth, bakeHeight);
-    bakeCanvasRenderingContext.font = scaledFontString;
-    bakeCanvasRenderingContext.direction = textDirection;
-    bakeCanvasRenderingContext.textAlign = "left";
-    bakeCanvasRenderingContext.textBaseline = "alphabetic";
-    if (mode === "stroke") {
-      bakeCanvasRenderingContext.strokeStyle = colorString;
-      bakeCanvasRenderingContext.lineWidth = lineWidth * scale;
-      bakeCanvasRenderingContext.strokeText(text, scaledPenX, scaledBaselineY);
-    } else {
-      bakeCanvasRenderingContext.fillStyle = colorString;
-      bakeCanvasRenderingContext.fillText(text, scaledPenX, scaledBaselineY);
-    }
-    if (!isTextAntialiasEnabled) {
-      const imageData = bakeCanvasRenderingContext.getImageData(0, 0, bakeWidth, bakeHeight);
-      const pixels = imageData.data;
-      for (let pixelIndex = 3; pixelIndex < pixels.length; pixelIndex += 4) {
-        pixels[pixelIndex] = pixels[pixelIndex] >= ALPHA_THRESHOLD ? 255 : 0;
+    const chunks = this.splitTextChunks(text, scaledFontString, textDirection);
+    this.measureChunkPositions(text, chunks, scaledFontString);
+    const cellPadding = mode === "stroke" ? ceil(lineWidth * scale * STROKE_MITER_LIMIT / 2) + 2 : scaledPadding + 1;
+    const isNearest = !isTextAntialiasEnabled;
+    const strikeKey = `${mode}|${lineWidth * scale}|${isNearest ? 1 : 0}|${textDirection}|${scaledFontString}`;
+    const useSerial = this.#useSerial;
+    const glyphList = [];
+    const missingGlyphList = [];
+    for (const chunk of chunks) {
+      const startPosition = chunk.positions[0];
+      const anchorX = floor(startPosition);
+      const fractionX = startPosition - anchorX;
+      let positionKey;
+      if (chunk.isExactPosition) {
+        positionKey = "x" + fractionX;
+      } else {
+        positionKey = "";
+        for (const position of chunk.positions) {
+          const slotIndex = floor(position * SUBPIXEL_SLOT_COUNT);
+          positionKey += System14.String.fromCharCode(97 + (slotIndex % SUBPIXEL_SLOT_COUNT + SUBPIXEL_SLOT_COUNT) % SUBPIXEL_SLOT_COUNT);
+        }
       }
-      bakeCanvasRenderingContext.putImageData(imageData, 0, 0);
+      const glyphKey = strikeKey + chunk.text + "" + positionKey;
+      let glyph = this.#glyphs.get(glyphKey);
+      if (glyph === void 0 && missingGlyphList.length > 0) {
+        glyph = missingGlyphList.find((missingGlyph) => missingGlyph.glyphKey === glyphKey);
+      }
+      if (glyph === void 0) {
+        const chunkMetrics = chunk.isWholeText ? scaledTextMetrics : this.measureLayoutText(scaledFontString, chunk.text);
+        const chunkLeft = ceil(max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
+        const chunkRight = ceil(max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
+        const originX = cellPadding + chunkLeft;
+        glyph = {
+          glyphKey,
+          text: chunk.text,
+          scaledFontString,
+          fractionX,
+          originX,
+          width: originX + 1 + chunkRight + cellPadding,
+          height: bakeHeight,
+          baselineY: scaledBaselineY,
+          atlasPage: null,
+          atlasX: 0,
+          atlasY: 0
+        };
+        missingGlyphList.push(glyph);
+      } else if (glyph.atlasPage !== null) {
+        glyph.atlasPage.lastUseSerial = useSerial;
+      }
+      glyphList.push(glyph, anchorX);
     }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const texture = webGL2RenderingContext.createTexture();
-    this.bindTexture(texture);
-    webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bakeCanvas);
-    webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-    const textureFilter = isTextAntialiasEnabled ? webGL2RenderingContext.LINEAR : webGL2RenderingContext.NEAREST;
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, textureFilter);
-    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, textureFilter);
+    if (missingGlyphList.length > 0) {
+      this.bakeGlyphs(missingGlyphList, mode, colorString, lineWidth * scale, textDirection);
+    }
+    const glyphTextures = [];
+    const glyphRects = [];
+    const atlasPages = [];
+    for (let glyphIndex = 0; glyphIndex < glyphList.length; glyphIndex += 2) {
+      const glyph = glyphList[glyphIndex];
+      const anchorX = glyphList[glyphIndex + 1];
+      const atlasPage = glyph.atlasPage;
+      if (atlasPage === null) {
+        continue;
+      }
+      const cellLeft = scaledPenX + anchorX - glyph.originX;
+      const cellTop = scaledBaselineY - glyph.baselineY;
+      const clippedLeft = max(cellLeft, 0);
+      const clippedRight = min(cellLeft + glyph.width, bakeWidth);
+      const clippedTop = max(cellTop, 0);
+      const clippedBottom = min(cellTop + glyph.height, bakeHeight);
+      if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) {
+        continue;
+      }
+      glyphTextures.push(atlasPage.texture);
+      glyphRects.push(
+        clippedLeft / scale,
+        clippedTop / scale,
+        clippedRight / scale,
+        clippedBottom / scale,
+        (glyph.atlasX + clippedLeft - cellLeft) / atlasPage.width,
+        (glyph.atlasY + clippedTop - cellTop) / atlasPage.height,
+        (glyph.atlasX + clippedRight - cellLeft) / atlasPage.width,
+        (glyph.atlasY + clippedBottom - cellTop) / atlasPage.height
+      );
+      if (!atlasPages.includes(atlasPage)) {
+        atlasPages.push(atlasPage);
+      }
+    }
     const entry = {
-      texture,
+      glyphTextures,
+      glyphRects,
+      atlasPages,
       quadWidth: bakeWidth / scale,
       quadHeight: bakeHeight / scale,
       penOffsetX: scaledPenX / scale,
@@ -7077,19 +7180,351 @@ var TextStringTextureCache = class extends Object2 {
     return entry;
   }
   //==============================================================================
-  // 모든 엔트리 파기. (텍스처 삭제 포함)
+  // 글을 따로 구울 글자 덩어리로 나누기.
+  // - 덩어리마다 text, start(글 안 UTF-16 자리), clusterEnds(덩어리 안 글자 덩어리마다 끝 자리), isExactPosition(자리를 1/8 칸으로 묶지 못함), isWholeText.
+  // - 한글, 한자, 가나, 숫자, 문장 부호, 공백, 이모지는 글자 덩어리마다 따로. 그 밖의 글자(라틴, 키릴, 태국 같은)는 이어진 낱말째.
+  // - 결합 부호가 붙은 덩어리는 부호 글리프의 자리가 덩어리 시작과 따로 놀아 칸으로 묶지 않고 정확한 자리로 굽는다.
+  // - 오른쪽에서 왼쪽 글, 아주 큰 글꼴, 나누기를 못 하는 곳은 글 전체가 한 덩어리.
+  //==============================================================================
+  /**
+   * @param { string } text
+   * @param { string } scaledFontString
+   * @param { string } textDirection
+   * @returns { object[] }
+   */
+  splitTextChunks(text, scaledFontString, textDirection) {
+    const segmenter = this.#segmenter;
+    const fontSizeMatch = scaledFontString.match(/(\d+(?:\.\d+)?)px/);
+    const fontSize = fontSizeMatch !== null ? System14.Number.parseFloat(fontSizeMatch[1]) : Infinity;
+    if (segmenter === null || textDirection !== "ltr" || fontSize > MAXIMUM_ATLAS_FONT_SIZE || RIGHT_TO_LEFT_PATTERN.test(text)) {
+      return [{ text, start: 0, clusterEnds: [text.length], isExactPosition: true, isWholeText: true, positions: [0] }];
+    }
+    const chunks = [];
+    let previousChunk = null;
+    let isPreviousJoining = false;
+    for (const segment of segmenter.segment(text)) {
+      const clusterText = segment.segment;
+      const clusterEnd = segment.index + clusterText.length;
+      const isJoining = JOINING_CLUSTER_PATTERN.test(clusterText) && !STANDALONE_SCRIPT_PATTERN.test(clusterText);
+      const isExactPosition = clusterText.length > 1 && COMBINING_MARK_PATTERN.test(clusterText) && !EMOJI_CLUSTER_PATTERN.test(clusterText);
+      if (isJoining && isPreviousJoining && previousChunk !== null) {
+        previousChunk.text += clusterText;
+        previousChunk.clusterEnds.push(clusterEnd);
+        previousChunk.isExactPosition = previousChunk.isExactPosition || isExactPosition;
+        continue;
+      }
+      previousChunk = { text: clusterText, start: segment.index, clusterEnds: [clusterEnd], isExactPosition, isWholeText: false, positions: null };
+      chunks.push(previousChunk);
+      isPreviousJoining = isJoining;
+    }
+    return chunks;
+  }
+  //==============================================================================
+  // 덩어리 안 글자 덩어리마다 펜에서의 가로 자리 재기. (굽는 배율 텍셀)
+  // - 자리(k) = 자리(k-1) + (앞 글자 덩어리와 이 글자 덩어리를 붙인 너비) - (이 글자 덩어리만의 너비).
+  //   붙인 너비에서 뒤 덩어리 너비를 빼면 앞 덩어리의 커닝까지 든 전진폭이다. 크롬이 셈한 자리와 같다.
+  // - 짝 너비와 덩어리 너비는 글 재기 캐시에 남아 숫자처럼 되풀이되는 짝은 다시 재지 않는다. (글 길이에 비례)
+  // - 자리는 크롬의 글리프 자리처럼 32 비트 실수로 쌓는다.
+  //==============================================================================
+  /**
+   * @param { string } text
+   * @param { object[] } chunks
+   * @param { string } scaledFontString
+   */
+  measureChunkPositions(text, chunks, scaledFontString) {
+    if (chunks.length === 1 && chunks[0].isWholeText) {
+      return;
+    }
+    let previousClusterText = null;
+    let previousPosition = 0;
+    for (const chunk of chunks) {
+      const positions = [];
+      let clusterStart = chunk.start;
+      for (const clusterEnd of chunk.clusterEnds) {
+        const clusterText = text.substring(clusterStart, clusterEnd);
+        let position = 0;
+        if (previousClusterText !== null) {
+          const pairWidth = this.measureLayoutText(scaledFontString, previousClusterText + clusterText).width;
+          const clusterWidth = this.measureLayoutText(scaledFontString, clusterText).width;
+          position = System14.Math.fround(previousPosition + System14.Math.fround(pairWidth - clusterWidth));
+        }
+        positions.push(position);
+        previousClusterText = clusterText;
+        previousPosition = position;
+        clusterStart = clusterEnd;
+      }
+      chunk.positions = positions;
+    }
+  }
+  //==============================================================================
+  // 글자 덩어리 재기. (왼쪽에서 오른쪽, 캐시를 거친다, 배치용 컨텍스트에 그 글꼴이 걸려 있어야 한다)
+  //==============================================================================
+  /**
+   * @param { string } scaledFontString
+   * @param { string } text
+   * @returns { TextMetrics }
+   */
+  measureLayoutText(scaledFontString, text) {
+    const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
+    const textMetrics = measureTextMetrics(scaledFontString, text);
+    if (textMetrics !== null) {
+      return textMetrics;
+    }
+    return layoutCanvasRenderingContext.measureText(text);
+  }
+  //==============================================================================
+  // 글리프들을 아틀라스에 굽기. (한 줄에 이어 놓인 칸은 굽기 캔버스 한 장에 그려 한 번에 올린다)
+  //==============================================================================
+  /**
+   * @param { object[] } glyphList
+   * @param { string } mode
+   * @param { string } colorString
+   * @param { number } scaledLineWidth
+   * @param { string } textDirection
+   */
+  bakeGlyphs(glyphList, mode, colorString, scaledLineWidth, textDirection) {
+    const isNearest = !isTextAntialiasEnabled;
+    const spans = [];
+    let currentSpan = null;
+    for (const glyph of glyphList) {
+      this.allocateGlyphCell(glyph, isNearest);
+      if (glyph.atlasPage === null) {
+        continue;
+      }
+      if (currentSpan !== null && currentSpan.atlasPage === glyph.atlasPage && currentSpan.atlasY === glyph.atlasY && currentSpan.atlasX + currentSpan.width === glyph.atlasX && currentSpan.height === glyph.height) {
+        currentSpan.width += glyph.width;
+        currentSpan.glyphs.push(glyph);
+        continue;
+      }
+      currentSpan = { atlasPage: glyph.atlasPage, atlasX: glyph.atlasX, atlasY: glyph.atlasY, width: glyph.width, height: glyph.height, glyphs: [glyph] };
+      spans.push(currentSpan);
+    }
+    const bakeCanvas = this.getBakeCanvas();
+    const bakeCanvasRenderingContext = this.getBakeCanvasRenderingContext();
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    for (const span of spans) {
+      bakeCanvas.width = span.width;
+      bakeCanvas.height = span.height;
+      bakeCanvasRenderingContext.clearRect(0, 0, span.width, span.height);
+      bakeCanvasRenderingContext.font = span.glyphs[0].scaledFontString;
+      bakeCanvasRenderingContext.direction = textDirection;
+      bakeCanvasRenderingContext.textAlign = "left";
+      bakeCanvasRenderingContext.textBaseline = "alphabetic";
+      if (mode === "stroke") {
+        bakeCanvasRenderingContext.strokeStyle = colorString;
+        bakeCanvasRenderingContext.lineWidth = scaledLineWidth;
+      } else {
+        bakeCanvasRenderingContext.fillStyle = colorString;
+      }
+      for (const glyph of span.glyphs) {
+        const penX = glyph.atlasX - span.atlasX + glyph.originX + glyph.fractionX;
+        if (mode === "stroke") {
+          bakeCanvasRenderingContext.strokeText(glyph.text, penX, glyph.baselineY);
+        } else {
+          bakeCanvasRenderingContext.fillText(glyph.text, penX, glyph.baselineY);
+        }
+      }
+      if (isNearest) {
+        const imageData = bakeCanvasRenderingContext.getImageData(0, 0, span.width, span.height);
+        const pixels = imageData.data;
+        for (let pixelIndex = 3; pixelIndex < pixels.length; pixelIndex += 4) {
+          pixels[pixelIndex] = pixels[pixelIndex] >= ALPHA_THRESHOLD ? 255 : 0;
+        }
+        bakeCanvasRenderingContext.putImageData(imageData, 0, 0);
+      }
+      this.bindTexture(span.atlasPage.texture);
+      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      webGL2RenderingContext.texSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, span.atlasX, span.atlasY, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bakeCanvas);
+      webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      this.#bakedGlyphCount += span.glyphs.length;
+      this.#uploadCount += 1;
+    }
+  }
+  //==============================================================================
+  // 글리프 칸 자리 잡기. (가장 나중에 연 장의 같은 높이 줄에 이어 놓고, 없으면 새 줄, 새 장, 장 수가 상한이면 가장 오래 안 쓴 장을 비운다)
+  // - 이번 엔트리가 쓰는 장(lastUseSerial 이 지금 번호)은 비우지 않는다. 그것뿐이면 상한을 넘겨 새 장을 연다.
+  //==============================================================================
+  /**
+   * @param { object } glyph
+   * @param { boolean } isNearest
+   */
+  allocateGlyphCell(glyph, isNearest) {
+    const useSerial = this.#useSerial;
+    const atlasPages = this.#atlasPages;
+    const width = glyph.width;
+    const height = glyph.height;
+    if (width > ATLAS_PAGE_SIZE || height > ATLAS_PAGE_SIZE) {
+      this.makeRoomForAtlasPage();
+      const atlasPage2 = this.createAtlasPage(width, height, isNearest, true);
+      this.placeGlyph(glyph, atlasPage2, 0, 0);
+      return;
+    }
+    for (let atlasPageIndex = atlasPages.length - 1; atlasPageIndex >= 0; --atlasPageIndex) {
+      const atlasPage2 = atlasPages[atlasPageIndex];
+      if (atlasPage2.isNearest !== isNearest || atlasPage2.isDedicated) {
+        continue;
+      }
+      if (this.tryPlaceGlyph(glyph, atlasPage2)) {
+        return;
+      }
+      break;
+    }
+    this.makeRoomForAtlasPage();
+    const atlasPage = this.createAtlasPage(ATLAS_PAGE_SIZE, ATLAS_PAGE_SIZE, isNearest, false);
+    atlasPage.lastUseSerial = useSerial;
+    this.tryPlaceGlyph(glyph, atlasPage);
+  }
+  //==============================================================================
+  // 장 하나에 글리프 칸 놓아 보기. (같은 높이 줄의 남은 자리, 없으면 새 줄)
+  //==============================================================================
+  /**
+   * @param { object } glyph
+   * @param { object } atlasPage
+   * @returns { boolean } 놓았으면 참.
+   */
+  tryPlaceGlyph(glyph, atlasPage) {
+    const width = glyph.width;
+    const height = glyph.height;
+    for (const shelf of atlasPage.shelves) {
+      if (shelf.height === height && shelf.cursorX + width <= atlasPage.width) {
+        this.placeGlyph(glyph, atlasPage, shelf.cursorX, shelf.y);
+        shelf.cursorX += width;
+        return true;
+      }
+    }
+    if (atlasPage.nextShelfY + height <= atlasPage.height) {
+      const shelf = { y: atlasPage.nextShelfY, height, cursorX: width };
+      atlasPage.shelves.push(shelf);
+      atlasPage.nextShelfY += height;
+      this.placeGlyph(glyph, atlasPage, 0, shelf.y);
+      return true;
+    }
+    return false;
+  }
+  //==============================================================================
+  // 글리프를 장의 자리에 적고 글리프 맵에 넣기.
+  //==============================================================================
+  /**
+   * @param { object } glyph
+   * @param { object } atlasPage
+   * @param { number } atlasX
+   * @param { number } atlasY
+   */
+  placeGlyph(glyph, atlasPage, atlasX, atlasY) {
+    glyph.atlasPage = atlasPage;
+    glyph.atlasX = atlasX;
+    glyph.atlasY = atlasY;
+    atlasPage.glyphs.push(glyph);
+    atlasPage.lastUseSerial = this.#useSerial;
+    this.#glyphs.set(glyph.glyphKey, glyph);
+  }
+  //==============================================================================
+  // 장 수가 상한이면 가장 오래 안 쓴 장 하나를 지워 자리를 낸다. (이번 엔트리가 쓰는 장은 지우지 않는다)
+  //==============================================================================
+  makeRoomForAtlasPage() {
+    const atlasPages = this.#atlasPages;
+    if (atlasPages.length < MAXIMUM_ATLAS_PAGE_COUNT) {
+      return;
+    }
+    let oldestAtlasPage = null;
+    for (const atlasPage of atlasPages) {
+      if (atlasPage.lastUseSerial >= this.#useSerial) {
+        continue;
+      }
+      if (oldestAtlasPage === null || atlasPage.lastUseSerial < oldestAtlasPage.lastUseSerial) {
+        oldestAtlasPage = atlasPage;
+      }
+    }
+    if (oldestAtlasPage === null) {
+      return;
+    }
+    this.removeAtlasPage(oldestAtlasPage);
+  }
+  //==============================================================================
+  // 아틀라스 장 만들기.
+  //==============================================================================
+  /**
+   * @param { number } width
+   * @param { number } height
+   * @param { boolean } isNearest 가까운 텍셀로 뽑을지. (안티앨리어싱을 끈 글자)
+   * @param { boolean } isDedicated 칸 하나만 담는 장인지.
+   * @returns { object }
+   */
+  createAtlasPage(width, height, isNearest, isDedicated) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const texture = webGL2RenderingContext.createTexture();
+    this.bindTexture(texture);
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+    const textureFilter = isNearest ? webGL2RenderingContext.NEAREST : webGL2RenderingContext.LINEAR;
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, textureFilter);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, textureFilter);
+    const atlasPage = {
+      texture,
+      width,
+      height,
+      isNearest,
+      isDedicated,
+      shelves: [],
+      nextShelfY: 0,
+      glyphs: [],
+      lastUseSerial: this.#useSerial
+    };
+    this.#atlasPages.push(atlasPage);
+    return atlasPage;
+  }
+  //==============================================================================
+  // 아틀라스 장 지우기. (그 장의 글리프와 그 장을 쓰는 엔트리도 버린다, 쌓아 둔 그리기를 먼저 내보낸다)
+  //==============================================================================
+  /**
+   * @param { object } atlasPage
+   */
+  removeAtlasPage(atlasPage) {
+    const beforeTextureOverwrite = this.#beforeTextureOverwrite;
+    if (beforeTextureOverwrite !== null) {
+      beforeTextureOverwrite();
+    }
+    for (const glyph of atlasPage.glyphs) {
+      if (this.#glyphs.get(glyph.glyphKey) === glyph) {
+        this.#glyphs.delete(glyph.glyphKey);
+      }
+      glyph.atlasPage = null;
+    }
+    const entries = this.getEntries();
+    for (const [entryKey, entry] of System14.Array.from(entries)) {
+      if (entry.atlasPages.includes(atlasPage)) {
+        this.removeEntry(entryKey, entry);
+      }
+    }
+    const atlasPageIndex = this.#atlasPages.indexOf(atlasPage);
+    if (atlasPageIndex >= 0) {
+      this.#atlasPages.splice(atlasPageIndex, 1);
+    }
+    this.getWebGL2RenderingContext().deleteTexture(atlasPage.texture);
+  }
+  //==============================================================================
+  // 모든 엔트리와 글리프 파기. (아틀라스 텍스처 삭제 포함)
   //==============================================================================
   clear() {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const entries = this.getEntries();
-    for (const entry of entries.values()) {
-      webGL2RenderingContext.deleteTexture(entry.texture);
+    const beforeTextureOverwrite = this.#beforeTextureOverwrite;
+    if (beforeTextureOverwrite !== null && this.#atlasPages.length > 0) {
+      beforeTextureOverwrite();
     }
-    entries.clear();
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    for (const atlasPage of this.#atlasPages) {
+      webGL2RenderingContext.deleteTexture(atlasPage.texture);
+      for (const glyph of atlasPage.glyphs) {
+        glyph.atlasPage = null;
+      }
+    }
+    this.#atlasPages.length = 0;
+    this.#glyphs.clear();
+    this.getEntries().clear();
     this.#entriesByText.clear();
   }
   //==============================================================================
-  // 엔트리 하나를 맵과 문자열별 목록에서 뺀다. (텍스처는 부르는 쪽이 지운다)
+  // 엔트리 하나를 맵과 문자열별 목록에서 뺀다.
   //==============================================================================
   /**
    * @param { string } entryKey
@@ -7111,11 +7546,12 @@ var TextStringTextureCache = class extends Object2 {
     }
   }
   //==============================================================================
-  // 받아진 웹 폰트로 다시 구울 엔트리 파기.
+  // 받아진 웹 폰트로 다시 구울 엔트리와 글리프 파기.
   //
   // 늦게 받아진 폰트 얼굴(FontFace)의 이름을 쓰는 폰트 문자열로 구웠고, 그 얼굴의 글자 범위(unicodeRange)에 든 글자가 있는
-  // 엔트리만 텍스처째 버린다. 다음에 그 글자를 그릴 때 받은 폰트로 다시 굽는다. 나머지 엔트리는 그대로 쓴다.
+  // 엔트리와 글리프만 버린다. 다음에 그 글자를 그릴 때 받은 폰트로 다시 굽는다. 나머지는 그대로 쓴다.
   // (캐시를 통째로 비우면 폰트가 받아질 때마다 모든 글자를 한꺼번에 다시 구워 그 프레임이 길어진다)
+  // 버린 글리프의 칸은 그 장이 비워질 때 다시 쓴다.
   //==============================================================================
   /**
    * @param { Iterable<FontFace> } fontFaces
@@ -7133,24 +7569,42 @@ var TextStringTextureCache = class extends Object2 {
     if (targets.length === 0) {
       return 0;
     }
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const isAffected = /* @__PURE__ */ __name((fontString, text) => {
+      const lowerFontString = fontString.toLowerCase();
+      return targets.some((target) => {
+        return lowerFontString.includes(target.familyName) && hasCharacterInRanges(text, target.ranges);
+      });
+    }, "isAffected");
+    for (const [glyphKey, glyph] of System14.Array.from(this.#glyphs)) {
+      if (isAffected(glyph.scaledFontString, glyph.text)) {
+        this.#glyphs.delete(glyphKey);
+      }
+    }
     const entries = this.getEntries();
     let removedCount = 0;
     for (const [entryKey, entry] of System14.Array.from(entries)) {
-      const keyParts = entryKey.split("|");
-      const fontString = keyParts.length > 5 ? keyParts[5].toLowerCase() : "";
-      const text = keyParts.slice(6).join("|");
-      const isAffected = targets.some((target) => {
-        return fontString.includes(target.familyName) && hasCharacterInRanges(text, target.ranges);
-      });
-      if (!isAffected) {
+      if (!isAffected(entry.fontString, entry.text)) {
         continue;
       }
-      webGL2RenderingContext.deleteTexture(entry.texture);
       this.removeEntry(entryKey, entry);
       removedCount += 1;
     }
     return removedCount;
+  }
+  //==============================================================================
+  // 아틀라스 통계. (시험과 통계용: 장 수, 글리프 수, 지금까지 구운 글리프 수, 지금까지 올린 수, 엔트리 수)
+  //==============================================================================
+  /**
+   * @returns { { atlasPageCount: number, glyphCount: number, bakedGlyphCount: number, uploadCount: number, entryCount: number } }
+   */
+  readAtlasStatistics() {
+    return {
+      atlasPageCount: this.#atlasPages.length,
+      glyphCount: this.#glyphs.size,
+      bakedGlyphCount: this.#bakedGlyphCount,
+      uploadCount: this.#uploadCount,
+      entryCount: this.getEntries().size
+    };
   }
   //==============================================================================
   // 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
@@ -7833,7 +8287,10 @@ var Graphic = class extends Object2 {
       this.bindTexture(texture);
     }, "textureBinder");
     this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
-    this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder);
+    const beforeTextureOverwrite = /* @__PURE__ */ __name(() => {
+      this.flushSpriteBatch();
+    }, "beforeTextureOverwrite");
+    this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder, beforeTextureOverwrite);
     this.#transformMatrix = new TransformMatrix();
     this.#stateStack = [];
     this.#stateSnapshotPool = [];
@@ -10465,10 +10922,11 @@ var Graphic = class extends Object2 {
     return clamp(quantizedScale, 0.25, MAXIMUM_TEXT_BAKE_SCALE);
   }
   //==============================================================================
-  // 문자열 텍스처 엔트리를 정렬/베이스라인에 맞춰 쿼드로 출력.
+  // 글 배치 엔트리를 정렬/베이스라인에 맞춰 글리프 쿼드로 출력.
+  // - 문자열을 통째로 구웠을 때의 사각형 자리(픽셀 스냅 포함)를 셈하고, 그 안의 글리프 사각형을 아틀라스에서 뽑아 그린다.
   //==============================================================================
   /**
-   * @param { object } entry 문자열 텍스처 엔트리. (TextStringTextureCache.getEntry)
+   * @param { object } entry 글 배치 엔트리. (TextStringTextureCache.getEntry)
    * @param { number } x 기준 X. (정렬의 기준점)
    * @param { number } y 기준 Y. (세로 기준의 자리)
    * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
@@ -10502,19 +10960,35 @@ var Graphic = class extends Object2 {
       quadX += (round(devicePoint.x) - devicePoint.x) / transformMatrix.a;
       quadY += (round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
     }
-    const vertexCountOffset = this.writeQuad(
-      0,
-      quadX,
-      quadY,
-      quadX + entry.quadWidth,
-      quadY + entry.quadHeight,
-      0,
-      0,
-      1,
-      1
-    );
-    const whiteColor = this.getWhiteColor();
-    this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, color ? color : whiteColor);
+    const drawColor = color ? color : this.getWhiteColor();
+    const glyphTextures = entry.glyphTextures;
+    const glyphRects = entry.glyphRects;
+    const maximumFloatCount = VERTEX_CAPACITY * FLOATS_PER_VERTEX - 6 * FLOATS_PER_VERTEX;
+    let floatCount = 0;
+    let runTexture = null;
+    for (let glyphIndex = 0; glyphIndex < glyphTextures.length; ++glyphIndex) {
+      const texture = glyphTextures[glyphIndex];
+      if (floatCount > 0 && (texture !== runTexture || floatCount > maximumFloatCount)) {
+        this.drawVertices(floatCount / FLOATS_PER_VERTEX, runTexture, drawColor);
+        floatCount = 0;
+      }
+      runTexture = texture;
+      const rectOffset = glyphIndex * 8;
+      floatCount = this.writeQuad(
+        floatCount,
+        quadX + glyphRects[rectOffset],
+        quadY + glyphRects[rectOffset + 1],
+        quadX + glyphRects[rectOffset + 2],
+        quadY + glyphRects[rectOffset + 3],
+        glyphRects[rectOffset + 4],
+        glyphRects[rectOffset + 5],
+        glyphRects[rectOffset + 6],
+        glyphRects[rectOffset + 7]
+      );
+    }
+    if (floatCount > 0) {
+      this.drawVertices(floatCount / FLOATS_PER_VERTEX, runTexture, drawColor);
+    }
   }
   //==============================================================================
   // 텍스트 채움 출력. (Canvas2D fillText 대응)

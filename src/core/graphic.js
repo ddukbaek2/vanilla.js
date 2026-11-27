@@ -639,7 +639,11 @@ export class Graphic extends Object {
 			this.bindTexture(texture);
 		};
 		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
-		this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder);
+		// 글리프 아틀라스 장을 비워 덮어쓰기 전에 쌓아 둔 묶음을 먼저 그린다. (묶음에 그 장을 쓰는 글자가 있을 수 있다)
+		const beforeTextureOverwrite = () => {
+			this.flushSpriteBatch();
+		};
+		this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder, beforeTextureOverwrite);
 
 		// 상태.
 		this.#transformMatrix = new TransformMatrix();
@@ -3481,10 +3485,11 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 문자열 텍스처 엔트리를 정렬/베이스라인에 맞춰 쿼드로 출력.
+	// 글 배치 엔트리를 정렬/베이스라인에 맞춰 글리프 쿼드로 출력.
+	// - 문자열을 통째로 구웠을 때의 사각형 자리(픽셀 스냅 포함)를 셈하고, 그 안의 글리프 사각형을 아틀라스에서 뽑아 그린다.
 	//==============================================================================
 	/**
-	 * @param { object } entry 문자열 텍스처 엔트리. (TextStringTextureCache.getEntry)
+	 * @param { object } entry 글 배치 엔트리. (TextStringTextureCache.getEntry)
 	 * @param { number } x 기준 X. (정렬의 기준점)
 	 * @param { number } y 기준 Y. (세로 기준의 자리)
 	 * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
@@ -3529,12 +3534,29 @@ export class Graphic extends Object {
 			quadY += (Math.round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
 		}
 
-		const vertexCountOffset = this.writeQuad(0,
-			quadX, quadY,
-			quadX + entry.quadWidth, quadY + entry.quadHeight,
-			0, 0, 1, 1);
-		const whiteColor = this.getWhiteColor();
-		this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, color ? color : whiteColor);
+		// 글리프 사각형을 문자열 사각형 자리에 놓아 그린다. (같은 아틀라스 장의 글리프는 한 번에 넘겨 묶음에 들어간다)
+		const drawColor = color ? color : this.getWhiteColor();
+		const glyphTextures = entry.glyphTextures;
+		const glyphRects = entry.glyphRects;
+		const maximumFloatCount = VERTEX_CAPACITY * FLOATS_PER_VERTEX - 6 * FLOATS_PER_VERTEX;
+		let floatCount = 0;
+		let runTexture = null;
+		for (let glyphIndex = 0; glyphIndex < glyphTextures.length; ++glyphIndex) {
+			const texture = glyphTextures[glyphIndex];
+			if (floatCount > 0 && (texture !== runTexture || floatCount > maximumFloatCount)) {
+				this.drawVertices(floatCount / FLOATS_PER_VERTEX, runTexture, drawColor);
+				floatCount = 0;
+			}
+			runTexture = texture;
+			const rectOffset = glyphIndex * 8;
+			floatCount = this.writeQuad(floatCount,
+				quadX + glyphRects[rectOffset], quadY + glyphRects[rectOffset + 1],
+				quadX + glyphRects[rectOffset + 2], quadY + glyphRects[rectOffset + 3],
+				glyphRects[rectOffset + 4], glyphRects[rectOffset + 5], glyphRects[rectOffset + 6], glyphRects[rectOffset + 7]);
+		}
+		if (floatCount > 0) {
+			this.drawVertices(floatCount / FLOATS_PER_VERTEX, runTexture, drawColor);
+		}
 	}
 
 	//==============================================================================
