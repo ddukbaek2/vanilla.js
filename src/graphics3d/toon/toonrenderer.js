@@ -515,6 +515,27 @@ vec3 readShadeRamp(float coordinate) {
 	}
 	return color;
 }
+vec3 readShadeRampWithWidth(float coordinate, float edgeWidth) {
+	if (rampTextureEnabled > 0.5) {
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+		return textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb;
+#else
+		return toLinear(textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb);
+#endif
+	}
+	if (shadeStopCount < 2) {
+		return vec3(clamp(coordinate, 0.0, 1.0));
+	}
+	vec3 color = shadeStopColors[0];
+	for (int index = 1; index < 8; ++index) {
+		if (index >= shadeStopCount) {
+			break;
+		}
+		float feather = max(shadeStopFeathers[index], edgeWidth);
+		color = mix(color, shadeStopColors[index], clamp((coordinate - shadeStopPositions[index] + feather) / feather, 0.0, 1.0));
+	}
+	return color;
+}
 float readShadeLevel(vec3 rampColor, float cosine) {
 	float bottom;
 	float top;
@@ -540,6 +561,9 @@ float readToonSpecular(vec3 normal, vec3 toLight, vec3 viewDirection) {
 	vec3 halfway = normalize(toLight + viewDirection);
 	float blinn = pow(max(dot(normal, halfway), 0.0), specularLight.y);
 	float edgeWidth = max(fwidth(blinn), 0.0001);
+	return mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, blinn), blinn, specularLight.z);
+}
+float readToonSpecularWithWidth(float blinn, float edgeWidth) {
 	return mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, blinn), blinn, specularLight.z);
 }
 vec3 readViewDirection() {
@@ -654,13 +678,28 @@ ToonLighting readLighting(ToonSurface surface) {
 		}
 		vec3 toLight = pointLightPositions[index].xyz - surface.worldPosition;
 		float lightDistance = length(toLight);
+		vec3 lightDirection = toLight / max(lightDistance, 0.0001);
 		float lightRange = pointLightPositions[index].w;
 		vec3 shape = pointLightShapes[index];
-		// 반지름 밖(window 가 정확히 0)이면 이 빛의 기여가 0 이라 나머지 셈을 건너뛴다. (그림자 읽기 포함, 경계 화소의 fwidth 가 건너뛴 이웃 때문에 달라지지 않게 반지름의 1.1 배부터)
-		if (lightRange > 0.0 && shape.y > 0.0 && lightDistance >= lightRange * 1.1) {
+		float lightShadow = 1.0;
+		int shadowSlot = int(pointLightShadowSlots[index] + 0.5) - 1;
+		if (shadowSlot >= 0 && receivesShadow > 0.5) {
+			lightShadow = readLocalShadow(shadowSlot, surface.worldPosition, normal);
+		}
+		float cosine = (dot(normal, lightDirection) + shape.z) / (1.0 + shape.z);
+		float rampCoordinate = readToonCoordinate(cosine, surface.shadeOffset) * lightShadow;
+		// 도함수(fwidth)는 갈래 안에서 셈하면 쿼드 이웃이 건너뛴 화소에서 정해지지 않으니 모든 화소가 함께 도는 여기서 셈한다.
+		float rampEdgeWidth = max(fwidth(rampCoordinate), 0.0001);
+		float blinn = 0.0;
+		float specularEdgeWidth = 1.0;
+		if (hasSpecular) {
+			blinn = pow(max(dot(normal, normalize(lightDirection + viewDirection)), 0.0), specularLight.y);
+			specularEdgeWidth = max(fwidth(blinn), 0.0001);
+		}
+		// 반지름 밖(window 가 정확히 0)이면 이 빛의 기여가 0 이라 도함수 없는 무거운 셈을 건너뛴다.
+		if (lightRange > 0.0 && shape.y > 0.0 && lightDistance >= lightRange) {
 			continue;
 		}
-		vec3 lightDirection = toLight / max(lightDistance, 0.0001);
 		float window = 1.0;
 		if (lightRange > 0.0) {
 			window = clamp(1.0 - pow(lightDistance / lightRange, shape.y), 0.0, 1.0);
@@ -673,17 +712,11 @@ ToonLighting readLighting(ToonSurface surface) {
 			float angular = clamp(dot(spot.xyz, -lightDirection) * cone.x + cone.y, 0.0, 1.0);
 			falloff *= angular * angular;
 		}
-		float lightShadow = 1.0;
-		int shadowSlot = int(pointLightShadowSlots[index] + 0.5) - 1;
-		if (shadowSlot >= 0 && receivesShadow > 0.5) {
-			lightShadow = readLocalShadow(shadowSlot, surface.worldPosition, normal);
-		}
-		float cosine = (dot(normal, lightDirection) + shape.z) / (1.0 + shape.z);
-		float level = readShadeLevel(readShadeRamp(readToonCoordinate(cosine, surface.shadeOffset) * lightShadow), cosine * lightShadow);
+		float level = readShadeLevel(readShadeRampWithWidth(rampCoordinate, rampEdgeWidth), cosine * lightShadow);
 		vec3 pointColor = readLimitedLocalColor(pointLightColors[index] * falloff);
 		irradiance += readLightColor(pointColor, lightColorUsage.x) * directOcclusion * level;
 		if (hasSpecular) {
-			specularSum += readLightColor(pointColor, lightColorUsage.z) * directOcclusion * readToonSpecular(normal, lightDirection, viewDirection) * level;
+			specularSum += readLightColor(pointColor, lightColorUsage.z) * directOcclusion * readToonSpecularWithWidth(blinn, specularEdgeWidth) * level;
 		}
 	}
 	lighting.irradiance = irradiance;
