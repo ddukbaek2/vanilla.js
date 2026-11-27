@@ -121,8 +121,16 @@ async function runScene(version, sceneName, mode) {
 					continue;
 				}
 				const original = descriptor.value;
+				// bufferData 와 bufferSubData 는 넘긴 바이트도 센다. (WebGL2 의 시작, 수 인자까지)
+				const dataIndex = name === "bufferData" ? 1 : name === "bufferSubData" ? 2 : -1;
 				gl[name] = function (...args) {
 					countTable[name] = (countTable[name] ?? 0) + 1;
+					if (dataIndex >= 0) {
+						const data = args[dataIndex];
+						const elementSize = data !== null && typeof data === "object" && data.BYTES_PER_ELEMENT !== undefined ? data.BYTES_PER_ELEMENT : 1;
+						const byteCount = typeof data === "number" ? 0 : args[dataIndex + 3] !== undefined && args[dataIndex + 3] > 0 ? args[dataIndex + 3] * elementSize : data.byteLength - (args[dataIndex + 2] ?? 0) * elementSize;
+						countTable[name + "Bytes"] = (countTable[name + "Bytes"] ?? 0) + byteCount;
+					}
 					return original.apply(gl, args);
 				};
 			}
@@ -251,7 +259,7 @@ function readAllocations(profileText) {
 }
 
 const COUNT_GROUPS = {
-	all: () => true,
+	all: (name) => !name.endsWith("Bytes"), // 바이트 칸은 호출이 아니다.
 	uniform: (name) => name.startsWith("uniform") && name !== "uniformBlockBinding",
 	useProgram: (name) => name === "useProgram",
 	bindTexture: (name) => name === "bindTexture" || name === "activeTexture",
@@ -282,7 +290,8 @@ try {
 			const groups = Object.entries(COUNT_GROUPS).map(([group, test]) => group + " " + Object.entries(result.counts).filter(([name]) => test(name)).reduce((sum, [, count]) => sum + count, 0));
 			console.log(`${version} 센 값(프레임 100): ${groups.join(", ")}, 그린 ${result.statistics.drawnObjectCount}, 거른 ${result.statistics.culledObjectCount}, 드로 콜 ${result.statistics.drawCallCount}, GL 오류 ${result.error}`);
 			const total = (name) => result.totals[name] ?? 0;
-			console.log(`${version} 240 프레임 합: createBuffer ${total("createBuffer")}, deleteBuffer ${total("deleteBuffer")}, bufferData ${total("bufferData")}, bufferSubData ${total("bufferSubData")}, bindBufferRange ${total("bindBufferRange")}, bindBufferBase ${total("bindBufferBase")}`);
+			console.log(`${version} 240 프레임 합: createBuffer ${total("createBuffer")}, deleteBuffer ${total("deleteBuffer")}, bufferData ${total("bufferData")} (${(total("bufferDataBytes") / 1024).toFixed(1)} KB), bufferSubData ${total("bufferSubData")} (${(total("bufferSubDataBytes") / 1024).toFixed(1)} KB), bindBufferRange ${total("bindBufferRange")}, bindBufferBase ${total("bindBufferBase")}`);
+			console.log(`${version} 프레임 100 올린 바이트: bufferData ${((result.counts.bufferDataBytes ?? 0) / 1024).toFixed(1)} KB, bufferSubData ${((result.counts.bufferSubDataBytes ?? 0) / 1024).toFixed(1)} KB`);
 		}
 		if (sceneName === "lobby") {
 			for (const version of ["a", "b"]) {
