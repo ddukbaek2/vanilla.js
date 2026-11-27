@@ -166,6 +166,8 @@ export function createRoomScene(vanilla, webGL2RenderingContext, width, height, 
 	return {
 		renderer: renderer,
 		queue: queue,
+		screenOutline: screenOutline,
+		camera: camera,
 		path: drawPath,
 		drawFrame(frame) {
 			if (isCameraMoving) {
