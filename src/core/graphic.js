@@ -90,40 +90,101 @@ void main() {
 }
 `;
 
+// 스프라이트 묶어 그리기의 자르기 사각형 표 칸 수. (0 번은 자르지 않는 칸, 차면 그때까지 쌓인 것을 그린다)
+const BATCH_CLIP_SLOT_CAPACITY = 32;
+
+// 스프라이트 묶어 그리기의 텍스처 칸 수 상한. (기기의 MAX_TEXTURE_IMAGE_UNITS 와 이 값 가운데 작은 것, PixiJS 와 같은 16)
+const BATCH_TEXTURE_SLOT_LIMIT = 16;
+
+// 자르지 않는 칸의 사각형 끝. (디바이스 픽셀, float 로 정확한 2^24)
+const BATCH_UNCLIPPED_EXTENT = 16777216;
+
+// 셰이더 자르기 경계가 화소 경계(또는 화소 가운데)에 놓였다고 보는 차이. (디바이스 픽셀, 변환 셈의 float 오차만 받는다)
+const CLIP_EDGE_EPSILON = 1 / 256;
+
+//==============================================================================
+// 자르기 경계가 화소 가운데(정수 + 0.5)에 걸쳤는지. (래스터 동점 규칙이 기기마다 다를 수 있는 자리)
+//==============================================================================
+function isClipEdgeOnPixelCenter(edge) {
+	const fraction = edge - System.Math.floor(edge);
+	return System.Math.abs(fraction - 0.5) < CLIP_EDGE_EPSILON;
+}
+
 // 스프라이트 묶어 그리기 버텍스 셰이더. (정점은 쌓을 때 이미 디바이스 픽셀 좌표로 바꿔 둔다)
+// - vertexSlot.x 는 텍스처 칸 번호, vertexSlot.y 는 자르기 사각형 표의 칸 번호다. (텍스처와 축에 맞는 자르기가 바뀌어도 묶음이 이어진다)
 const BATCH_VERTEXSHADER_SOURCE = `#version 300 es
 in vec2 vertexPosition;
 in vec2 vertexTextureCoordinate;
 in vec4 vertexColor;
 in vec4 vertexTintColor;
+in vec2 vertexSlot;
 uniform mat3 projectionMatrix;
+uniform vec4 clipRectList[${BATCH_CLIP_SLOT_CAPACITY}];
 out vec2 fragmentTextureCoordinate;
 out vec4 fragmentColor;
 out vec4 fragmentTintColor;
+flat out int fragmentTextureSlot;
+flat out vec4 fragmentClipRect;
+flat out float fragmentParticleAlpha;
 void main() {
 	vec3 transformedPosition = projectionMatrix * vec3(vertexPosition, 1.0);
 	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
 	fragmentTextureCoordinate = vertexTextureCoordinate;
 	fragmentColor = vertexColor;
 	fragmentTintColor = vertexTintColor;
+	fragmentTextureSlot = int(vertexSlot.x + 0.5);
+	fragmentClipRect = clipRectList[int(vertexSlot.y + 0.5)];
+	fragmentParticleAlpha = vertexTintColor.a < 0.0 ? vertexTintColor.r : -1.0;
 }
 `;
 
-// 스프라이트 묶어 그리기 프래그먼트 셰이더. (기본 셰이더와 같은 셈. 정점 색은 mainColor.rgb * mainColor.a * globalAlpha 와 mainColor.a * globalAlpha)
-const BATCH_FRAGMENTSHADER_SOURCE = `#version 300 es
+//==============================================================================
+// 스프라이트 묶어 그리기 프래그먼트 셰이더 글 짓기. (기본 셰이더와 같은 셈. 정점 색은 mainColor.rgb * mainColor.a * globalAlpha 와 mainColor.a * globalAlpha)
+// - 텍스처는 칸 수만큼의 샘플러 배열에 묶고 칸 번호로 고른다. (GLSL ES 3.00 은 샘플러 배열을 상수로만 짚을 수 있어 칸마다 갈래를 둔다, PixiJS 와 같은 꼴)
+// - 자르기는 화소 가운데(gl_FragCoord)를 디바이스 픽셀로 옮겨 사각형 [왼쪽, 오른쪽) x [위, 아래) 밖이면 버린다. (스텐실에 사각형을 그려 자른 것과 화소까지 같다)
+// - 틴트 알파가 음수인 정점은 정점 색 쿼드(drawColoredQuads)다. 정점 색은 곱하지 않은 색 그대로, 틴트 빨강 칸에 전역 알파를 싣고 파티클 셰이더와 같은 식으로 셈한다.
+//==============================================================================
+function createBatchFragmentShaderSource(textureSlotCount) {
+	let textureSampleSource = "";
+	for (let slotIndex = 0; slotIndex < textureSlotCount; ++slotIndex) {
+		let branchSource = `else if (fragmentTextureSlot == ${slotIndex})`;
+		if (slotIndex === 0) {
+			branchSource = `if (fragmentTextureSlot == ${slotIndex})`;
+		}
+		if (slotIndex > 0 && slotIndex === textureSlotCount - 1) {
+			branchSource = "else";
+		}
+		textureSampleSource += `	${branchSource} {\n		textureColor = texture(mainTextureList[${slotIndex}], fragmentTextureCoordinate, textureLodBias);\n	}\n`;
+	}
+	return `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
 in vec4 fragmentColor;
 in vec4 fragmentTintColor;
-uniform sampler2D mainTexture;
+flat in int fragmentTextureSlot;
+flat in vec4 fragmentClipRect;
+flat in float fragmentParticleAlpha;
+uniform sampler2D mainTextureList[${textureSlotCount}];
 uniform float textureLodBias;
+uniform float framebufferHeight;
 out vec4 outputColor;
 void main() {
-	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
+	vec2 devicePosition = vec2(gl_FragCoord.x, framebufferHeight - gl_FragCoord.y);
+	if (devicePosition.x < fragmentClipRect.x || devicePosition.y < fragmentClipRect.y || devicePosition.x >= fragmentClipRect.z || devicePosition.y >= fragmentClipRect.w) {
+		discard;
+	}
+	vec4 textureColor = vec4(0.0);
+${textureSampleSource}	if (fragmentParticleAlpha >= 0.0) {
+		float finalAlpha = textureColor.a * fragmentColor.a * fragmentParticleAlpha;
+		vec3 finalColor = textureColor.rgb * fragmentColor.rgb * fragmentColor.a * fragmentParticleAlpha;
+		outputColor = vec4(finalColor, finalAlpha);
+		return;
+	}
 	vec3 tintedColor = mix(textureColor.rgb, fragmentTintColor.rgb * textureColor.a, fragmentTintColor.a);
 	outputColor = vec4(tintedColor * fragmentColor.rgb, textureColor.a * fragmentColor.a);
 }
 `;
+}
 
 // 셰이더 섞기 함수. (고정 블렌딩으로 안 되는 블렌드 모드에서 그릴 영역 아래와 섞는다, 러스트 판과 같은 글)
 // - backdropTexture 는 그리기 직전에 지금 프레임버퍼에서 그릴 영역만 떠 온 것이다. (프레임버퍼와 같은 크기와 형식, 프리멀티플라이드)
@@ -348,8 +409,8 @@ const SHADER_BLEND_PARTICLE_GROUP_CAPACITY = 32;
 const FLOATS_PER_VERTEX = 4;
 const PARTICLE_FLOATS_PER_VERTEX = 8; // x, y, u, v, r, g, b, a
 const PARTICLE_VERTEX_CAPACITY = 8192;
-const BATCH_FLOATS_PER_VERTEX = 12; // x, y, u, v, r, g, b, a, tintR, tintG, tintB, tintA
-const BATCH_VERTEX_CAPACITY = 16384;
+const BATCH_FLOATS_PER_VERTEX = 14; // x, y, u, v, r, g, b, a, tintR, tintG, tintB, tintA, textureSlot, clipSlot
+const BATCH_VERTEX_CAPACITY = 6 * 8192; // 사각형 8192 개. (러스트 판과 같은 값)
 
 // 스크래치 버텍스 버퍼 용량. (버텍스 수)
 const VERTEX_CAPACITY = 4096;
@@ -490,7 +551,20 @@ export class Graphic extends Object {
 	/** @private @type { WebGLBuffer | null } */ #batchVertexBuffer;
 	/** @private @type { Float32Array | null } */ #batchVertexData;
 	/** @private @type { number } */ #batchVertexCount; // 쌓여서 아직 그리지 않은 정점 수.
-	/** @private @type { WebGLTexture | null } */ #batchTexture; // 쌓인 정점이 쓰는 텍스처.
+	/** @private @type { (WebGLTexture | null)[] } */ #batchTextureList; // 쌓인 정점이 쓰는 텍스처. (칸 번호 차례)
+	/** @private @type { number } */ #batchTextureCount; // 쌓인 정점이 쓰는 텍스처 수.
+	/** @private @type { number } */ #batchTextureSlotCount; // 텍스처 칸 수. (기기의 MAX_TEXTURE_IMAGE_UNITS 와 BATCH_TEXTURE_SLOT_LIMIT 가운데 작은 것)
+	/** @private @type { (WebGLTexture | null)[] } */ #batchBoundTextureList; // 1 번부터의 텍스처 유닛에 묶어 둔 것. (0 번은 #boundTexture 가 기억한다, null 이면 모른다)
+	/** @private @type { Float32Array | null } */ #batchClipRectData; // 자르기 사각형 표. (칸마다 왼쪽, 위, 오른쪽, 아래 디바이스 픽셀)
+	/** @private @type { number } */ #batchClipRectCount; // 표에 적은 칸 수. (0 번 자르지 않는 칸 포함)
+	/** @private @type { number } */ #batchGeneration; // 묶음을 그릴 때마다 늘어나는 번호. (자르기 칸 번호가 지금 묶음 것인지 견준다)
+	/** @private @type { boolean } */ #isShaderClipActive; // 축에 맞는 자르기(셰이더로 자르기)가 걸렸는지.
+	/** @private @type { Float32Array } */ #shaderClipRect; // 걸린 셰이더 자르기를 모두 겹친 사각형. (디바이스 픽셀, 왼쪽, 위, 오른쪽, 아래)
+	/** @private @type { number } */ #shaderClipSlot; // 지금 셰이더 자르기의 표 칸 번호. (#shaderClipSlotGeneration 이 지금 묶음이 아니면 다시 적는다)
+	/** @private @type { number } */ #shaderClipSlotGeneration;
+	/** @private @type { number } */ #stencilClipDepth; // 스텐실에 적은 자르기 수. (돌아간 자르기, 둥근 자르기)
+	/** @private @type { boolean } */ #isClipScissorEnabled; // 묶지 않는 그리기에 셰이더 자르기를 가위로 걸어 두었는지.
+	/** @private @type { number } */ #framebufferSampleState; // 기본 프레임버퍼가 멀티샘플인지. (-1 모름, 0 아님, 1 멀티샘플)
 	/** @private @type { ImageTextureCache } */ #imageTextureCache;
 	/** @private @type { TextStringTextureCache } */ #textStringTextureCache;
 	/** @private @type { TransformMatrix } */ #transformMatrix;
@@ -632,7 +706,20 @@ export class Graphic extends Object {
 		this.#batchVertexBuffer = null;
 		this.#batchVertexData = null;
 		this.#batchVertexCount = 0;
-		this.#batchTexture = null;
+		this.#batchTextureList = [];
+		this.#batchTextureCount = 0;
+		this.#batchTextureSlotCount = 1;
+		this.#batchBoundTextureList = [];
+		this.#batchClipRectData = null;
+		this.#batchClipRectCount = 1;
+		this.#batchGeneration = 0;
+		this.#isShaderClipActive = false;
+		this.#shaderClipRect = new Float32Array(4);
+		this.#shaderClipSlot = 0;
+		this.#shaderClipSlotGeneration = -1;
+		this.#stencilClipDepth = 0;
+		this.#isClipScissorEnabled = false;
+		this.#framebufferSampleState = -1;
 
 		// 캐시. (캐시가 텍스처를 묶을 때도 이 Graphic 이 묶은 텍스처를 기억하게 묶는 함수를 넘긴다)
 		const textureBinder = (texture) => {
@@ -791,6 +878,9 @@ export class Graphic extends Object {
 			this.#clipStack.length = 0;
 			webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
 		}
+		this.#stencilClipDepth = 0;
+		this.#isShaderClipActive = false;
+		this.#shaderClipSlot = 0;
 		webGL2RenderingContext.clearStencil(0);
 		webGL2RenderingContext.clear(webGL2RenderingContext.STENCIL_BUFFER_BIT);
 	}
@@ -1384,10 +1474,14 @@ export class Graphic extends Object {
 			return;
 		}
 		this.flushSpriteBatch();
+
+		// 묶지 않고 그리는 것에는 셰이더 자르기를 가위로 건다. (화소 가운데 기준이 같아 결과가 같다)
+		this.applyClipScissor();
 		if (isShaderBlendDraw) {
 			this.applyShaderBlendCompositeFunction(true);
 			this.drawVerticesWithShaderBlend(vertexCount, texture, color, shaderBlendModeIndex);
 			this.applyShaderBlendCompositeFunction(false);
+			this.releaseClipScissor();
 			return;
 		}
 
@@ -1411,6 +1505,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
 		this.#drawCallCount += 1;
 		this.#drawVertexCount += vertexCount;
+		this.releaseClipScissor();
 	}
 
 	//==============================================================================
@@ -1585,6 +1680,7 @@ export class Graphic extends Object {
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, backdropTarget.texture);
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 			this.#boundBackdropTexture = backdropTarget.texture;
+			this.#batchBoundTextureList[1] = null;
 		}
 	}
 
@@ -1915,8 +2011,9 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)
+	// 지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)과 걸린 자르기 안에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)
 	// - 투영과 같은 디바이스 픽셀 좌표로 보므로 클립 공간 밖인지와 같다. (뷰포트를 줄여 그려도 맞다)
+	// - beginClipRect 로 건 자르기(겹친 것 모두)의 경계 상자 밖이면 보이지 않는 것으로 본다. (유니티 RectMask2D 처럼 스크롤 칸 밖 줄을 그리지 않는다)
 	// - 뷰포트를 아직 정하지 않았으면(applySettings 전) 걸치는 것으로 본다.
 	//==============================================================================
 	/**
@@ -1954,7 +2051,21 @@ export class Graphic extends Object {
 		const maximumX = System.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
 		const minimumY = System.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
 		const maximumY = System.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
-		return maximumX >= 0 && maximumY >= 0 && minimumX <= viewportWidth && minimumY <= viewportHeight;
+
+		// 걸린 자르기의 경계 상자도 본다. (자르기 밖은 보이지 않는다, 유니티 RectMask2D 와 같다)
+		let visibleMinimumX = 0;
+		let visibleMinimumY = 0;
+		let visibleMaximumX = viewportWidth;
+		let visibleMaximumY = viewportHeight;
+		const clipStack = this.#clipStack;
+		if (clipStack.length > 0) {
+			const clipEntry = clipStack[clipStack.length - 1];
+			visibleMinimumX = System.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
+			visibleMinimumY = System.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
+			visibleMaximumX = System.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
+			visibleMaximumY = System.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
+		}
+		return maximumX >= visibleMinimumX && maximumY >= visibleMinimumY && minimumX <= visibleMaximumX && minimumY <= visibleMaximumY;
 	}
 
 	//==============================================================================
@@ -2018,7 +2129,19 @@ export class Graphic extends Object {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		this.#batchShaderProgram = new ShaderProgram(webGL2RenderingContext, BATCH_VERTEXSHADER_SOURCE, BATCH_FRAGMENTSHADER_SOURCE);
+		const maximumTextureUnitCount = webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_TEXTURE_IMAGE_UNITS);
+		const textureSlotCount = System.Math.max(1, System.Math.min(maximumTextureUnitCount, BATCH_TEXTURE_SLOT_LIMIT));
+		this.#batchTextureSlotCount = textureSlotCount;
+		this.#batchTextureList = new Array(textureSlotCount).fill(null);
+		this.#batchTextureCount = 0;
+		this.#batchBoundTextureList = new Array(textureSlotCount).fill(null);
+		this.#batchClipRectData = new Float32Array(BATCH_CLIP_SLOT_CAPACITY * 4);
+		this.#batchClipRectData[0] = -BATCH_UNCLIPPED_EXTENT;
+		this.#batchClipRectData[1] = -BATCH_UNCLIPPED_EXTENT;
+		this.#batchClipRectData[2] = BATCH_UNCLIPPED_EXTENT;
+		this.#batchClipRectData[3] = BATCH_UNCLIPPED_EXTENT;
+		this.#batchClipRectCount = 1;
+		this.#batchShaderProgram = new ShaderProgram(webGL2RenderingContext, BATCH_VERTEXSHADER_SOURCE, createBatchFragmentShaderSource(textureSlotCount));
 		this.#batchVertexData = new Float32Array(BATCH_VERTEX_CAPACITY * BATCH_FLOATS_PER_VERTEX);
 		this.#batchVertexArray = webGL2RenderingContext.createVertexArray();
 		this.#batchVertexBuffer = webGL2RenderingContext.createBuffer();
@@ -2029,6 +2152,7 @@ export class Graphic extends Object {
 		const textureCoordinateLocation = this.#batchShaderProgram.getAttributeLocation("vertexTextureCoordinate");
 		const colorLocation = this.#batchShaderProgram.getAttributeLocation("vertexColor");
 		const tintColorLocation = this.#batchShaderProgram.getAttributeLocation("vertexTintColor");
+		const slotLocation = this.#batchShaderProgram.getAttributeLocation("vertexSlot");
 		const strideBytes = BATCH_FLOATS_PER_VERTEX * 4;
 		webGL2RenderingContext.enableVertexAttribArray(positionLocation);
 		webGL2RenderingContext.vertexAttribPointer(positionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
@@ -2038,15 +2162,89 @@ export class Graphic extends Object {
 		webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
 		webGL2RenderingContext.enableVertexAttribArray(tintColorLocation);
 		webGL2RenderingContext.vertexAttribPointer(tintColorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 32);
+		webGL2RenderingContext.enableVertexAttribArray(slotLocation);
+		webGL2RenderingContext.vertexAttribPointer(slotLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 48);
 		webGL2RenderingContext.bindVertexArray(null);
 		this.useShaderProgram(this.#batchShaderProgram);
-		const mainTextureLocation = this.#batchShaderProgram.getUniformLocation("mainTexture");
-		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		const textureUnitList = new Int32Array(textureSlotCount);
+		for (let slotIndex = 0; slotIndex < textureSlotCount; ++slotIndex) {
+			textureUnitList[slotIndex] = slotIndex;
+		}
+		const mainTextureListLocation = this.#batchShaderProgram.getUniformLocation("mainTextureList");
+		webGL2RenderingContext.uniform1iv(mainTextureListLocation, textureUnitList);
 		this.applyImageMipmapBias(this.#batchShaderProgram);
 		const activeShaderProgram = this.getShaderProgram();
 		this.useShaderProgram(activeShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
+	// 묶음에 정점을 쌓을 자리 마련. (텍스처 칸 번호를 돌려준다)
+	// - 텍스처가 묶음에 없으면 빈 칸에 넣는다. 칸이 다 찼거나, 셰이더 자르기의 새 표 칸이 없거나, 정점 자리가 모자라면 그때까지 쌓인 것을 먼저 그린다.
+	// - 셰이더 자르기의 표 칸 번호는 #shaderClipSlot 에 맞춰 둔다. (자르기가 걸리지 않았으면 0)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount 쌓을 정점 수.
+	 * @param { WebGLTexture } texture 쌓을 정점이 쓰는 텍스처.
+	 * @returns { number } 텍스처 칸 번호.
+	 */
+	prepareSpriteBatch(vertexCount, texture) {
+		this.ensureSpriteBatchResources();
+		let textureSlot = this.findSpriteBatchTextureSlot(texture);
+		const isTextureSlotMissing = textureSlot < 0 && this.#batchTextureCount >= this.#batchTextureSlotCount;
+		const isClipSlotMissing = this.#isShaderClipActive && this.#shaderClipSlotGeneration !== this.#batchGeneration && this.#batchClipRectCount >= BATCH_CLIP_SLOT_CAPACITY;
+		const isVertexCapacityMissing = this.#batchVertexCount + vertexCount > BATCH_VERTEX_CAPACITY;
+		if (isTextureSlotMissing || isClipSlotMissing || isVertexCapacityMissing) {
+			this.flushSpriteBatch();
+			textureSlot = -1;
+		}
+		if (textureSlot < 0) {
+			textureSlot = this.#batchTextureCount;
+			this.#batchTextureList[textureSlot] = texture;
+			this.#batchTextureCount += 1;
+		}
+		if (!this.#isShaderClipActive) {
+			this.#shaderClipSlot = 0;
+		}
+		else if (this.#shaderClipSlotGeneration !== this.#batchGeneration) {
+			const clipSlot = this.#batchClipRectCount;
+			const clipRectData = this.#batchClipRectData;
+			const shaderClipRect = this.#shaderClipRect;
+			clipRectData[clipSlot * 4] = shaderClipRect[0];
+			clipRectData[clipSlot * 4 + 1] = shaderClipRect[1];
+			clipRectData[clipSlot * 4 + 2] = shaderClipRect[2];
+			clipRectData[clipSlot * 4 + 3] = shaderClipRect[3];
+			this.#batchClipRectCount += 1;
+			this.#shaderClipSlot = clipSlot;
+			this.#shaderClipSlotGeneration = this.#batchGeneration;
+
+			// 맨 위 자르기 칸에도 적어, 안쪽 자르기를 마치고 돌아올 때 같은 묶음이면 표 칸을 다시 쓴다.
+			const clipStack = this.#clipStack;
+			const topEntry = clipStack[clipStack.length - 1];
+			topEntry.shaderClipSlot = clipSlot;
+			topEntry.shaderClipSlotGeneration = this.#batchGeneration;
+		}
+		return textureSlot;
+	}
+
+	//==============================================================================
+	// 묶음에서 텍스처의 칸 번호 찾기. (없으면 -1)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGLTexture } texture
+	 * @returns { number }
+	 */
+	findSpriteBatchTextureSlot(texture) {
+		const batchTextureList = this.#batchTextureList;
+		for (let slotIndex = this.#batchTextureCount - 1; slotIndex >= 0; --slotIndex) {
+			if (batchTextureList[slotIndex] === texture) {
+				return slotIndex;
+			}
+		}
+		return -1;
 	}
 
 	//==============================================================================
@@ -2059,11 +2257,8 @@ export class Graphic extends Object {
 	 * @param { Color } color
 	 */
 	appendSpriteBatch(vertexCount, texture, color) {
-		this.ensureSpriteBatchResources();
-		if (texture !== this.#batchTexture || this.#batchVertexCount + vertexCount > BATCH_VERTEX_CAPACITY) {
-			this.flushSpriteBatch();
-			this.#batchTexture = texture;
-		}
+		const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
+		const clipSlot = this.#shaderClipSlot;
 
 		// 기본 셰이더와 같은 색 셈을 정점 색 하나로 미리 곱해 둔다.
 		const globalAlpha = this.getGlobalAlpha();
@@ -2109,6 +2304,8 @@ export class Graphic extends Object {
 			batchVertexData[targetOffset + 9] = tintGreen;
 			batchVertexData[targetOffset + 10] = tintBlue;
 			batchVertexData[targetOffset + 11] = tintAlpha;
+			batchVertexData[targetOffset + 12] = textureSlot;
+			batchVertexData[targetOffset + 13] = clipSlot;
 			sourceOffset += FLOATS_PER_VERTEX;
 			targetOffset += BATCH_FLOATS_PER_VERTEX;
 		}
@@ -2116,7 +2313,55 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 정점 색 쿼드(x, y, u, v, r, g, b, a)를 묶음에 쌓기. (drawColoredQuads 가 고정 블렌딩일 때 부른다)
+	// - 정점 색은 그대로 싣고 틴트 칸에 (전역 알파, 0, 0, -1) 을 적어, 묶음 셰이더가 파티클 셰이더와 같은 식으로 셈하게 한다. (화소까지 같게)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 */
+	appendColoredQuadsToSpriteBatch(vertexCount, texture) {
+		const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
+		const clipSlot = this.#shaderClipSlot;
+		const globalAlpha = this.getGlobalAlpha();
+		const transformMatrix = this.#transformMatrix;
+		const matrixA = transformMatrix.a;
+		const matrixB = transformMatrix.b;
+		const matrixC = transformMatrix.c;
+		const matrixD = transformMatrix.d;
+		const matrixE = transformMatrix.e;
+		const matrixF = transformMatrix.f;
+		const particleVertexData = this.#particleVertexData;
+		const batchVertexData = this.#batchVertexData;
+		let sourceOffset = 0;
+		let targetOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
+		for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+			const positionX = particleVertexData[sourceOffset];
+			const positionY = particleVertexData[sourceOffset + 1];
+			batchVertexData[targetOffset] = matrixA * positionX + matrixC * positionY + matrixE;
+			batchVertexData[targetOffset + 1] = matrixB * positionX + matrixD * positionY + matrixF;
+			batchVertexData[targetOffset + 2] = particleVertexData[sourceOffset + 2];
+			batchVertexData[targetOffset + 3] = particleVertexData[sourceOffset + 3];
+			batchVertexData[targetOffset + 4] = particleVertexData[sourceOffset + 4];
+			batchVertexData[targetOffset + 5] = particleVertexData[sourceOffset + 5];
+			batchVertexData[targetOffset + 6] = particleVertexData[sourceOffset + 6];
+			batchVertexData[targetOffset + 7] = particleVertexData[sourceOffset + 7];
+			batchVertexData[targetOffset + 8] = globalAlpha;
+			batchVertexData[targetOffset + 9] = 0;
+			batchVertexData[targetOffset + 10] = 0;
+			batchVertexData[targetOffset + 11] = -1;
+			batchVertexData[targetOffset + 12] = textureSlot;
+			batchVertexData[targetOffset + 13] = clipSlot;
+			sourceOffset += PARTICLE_FLOATS_PER_VERTEX;
+			targetOffset += BATCH_FLOATS_PER_VERTEX;
+		}
+		this.#batchVertexCount += vertexCount;
+	}
+
+	//==============================================================================
 	// 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
+	// - 묶음의 텍스처를 0 번부터의 유닛에 묶는다. 쓰지 않는 칸의 유닛에는 흰 텍스처를 묶어, 지난 그리기의 텍스처가 지금 그리는 칸(렌더 타겟)이어도 되먹임이 생기지 않게 한다.
 	//==============================================================================
 	flushSpriteBatch() {
 		const batchVertexCount = this.#batchVertexCount;
@@ -2124,20 +2369,52 @@ export class Graphic extends Object {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		this.releaseClipScissor();
 
 		this.useShaderProgram(this.#batchShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
 		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
-		const projectionMatrixLocation = this.#batchShaderProgram.getUniformLocation("projectionMatrix");
-		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
-		this.bindTexture(this.#batchTexture);
+		const batchShaderProgram = this.#batchShaderProgram;
+		webGL2RenderingContext.uniformMatrix3fv(batchShaderProgram.getUniformLocation("projectionMatrix"), false, this.#projectionMatrixArray);
+		webGL2RenderingContext.uniform1f(batchShaderProgram.getUniformLocation("framebufferHeight"), this.#appliedViewportHeight);
+		webGL2RenderingContext.uniform4fv(batchShaderProgram.getUniformLocation("clipRectList"), this.#batchClipRectData, 0, this.#batchClipRectCount * 4);
+
+		// 텍스처 묶기. (0 번 유닛은 bindTexture 가 기억하고, 1 번 유닛은 셰이더 섞기의 떠 온 아래와 같이 쓴다)
+		const batchTextureList = this.#batchTextureList;
+		const batchBoundTextureList = this.#batchBoundTextureList;
+		const textureCount = this.#batchTextureCount;
+		this.bindTexture(batchTextureList[0]);
+		const whiteTexture = this.getWhiteTexture();
+		let isTextureUnitChanged = false;
+		for (let slotIndex = 1; slotIndex < this.#batchTextureSlotCount; ++slotIndex) {
+			const texture = slotIndex < textureCount ? batchTextureList[slotIndex] : whiteTexture;
+			if (batchBoundTextureList[slotIndex] === texture) {
+				continue;
+			}
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + slotIndex);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+			batchBoundTextureList[slotIndex] = texture;
+			isTextureUnitChanged = true;
+			if (slotIndex === 1) {
+				this.#boundBackdropTexture = null;
+			}
+		}
+		if (isTextureUnitChanged) {
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		}
+
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, batchVertexCount);
 		this.#drawCallCount += 1;
 		this.#drawVertexCount += batchVertexCount;
 		this.#batchVertexCount = 0;
-		this.#batchTexture = null;
+		for (let slotIndex = 0; slotIndex < textureCount; ++slotIndex) {
+			batchTextureList[slotIndex] = null;
+		}
+		this.#batchTextureCount = 0;
+		this.#batchClipRectCount = 1;
+		this.#batchGeneration += 1;
 
 		// 기본 경로 상태 복원.
 		// 셰이더 프로그램은 되돌리지 않는다. 다음에 그리는 쪽이 제 프로그램을 쓰게 해, 묶음을 잇달아 그릴 때 프로그램을 오가지 않는다.
@@ -2254,13 +2531,20 @@ export class Graphic extends Object {
 		if (vertexCount <= 0) {
 			return;
 		}
+
+		// 고정 블렌딩이면 스프라이트 묶음에 이어 쌓는다. (이미지, 도형, 글자와 같은 드로우 콜에 들어간다)
+		const shaderBlendModeIndex = this.getDrawShaderBlendModeIndex();
+		const isShaderBlendDraw = shaderBlendModeIndex > 0;
+		if (this.#isSpriteBatchingEnabled && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
+			this.appendColoredQuadsToSpriteBatch(vertexCount, texture);
+			return;
+		}
 		this.flushSpriteBatch();
+		this.applyClipScissor();
 		this.ensureParticleBatchResources();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
 		// 셰이더 섞기 모드는 섞기 프로그램으로 그린다.
-		const shaderBlendModeIndex = this.getDrawShaderBlendModeIndex();
-		const isShaderBlendDraw = shaderBlendModeIndex > 0;
 		const particleShaderProgram = isShaderBlendDraw ? this.ensureParticleBlendShaderProgram() : this.#particleShaderProgram;
 		this.useShaderProgram(particleShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
@@ -2294,6 +2578,7 @@ export class Graphic extends Object {
 		// 셰이더 프로그램은 되돌리지 않는다. (flushSpriteBatch 와 같다, 다음에 그리는 쪽이 제 프로그램을 쓰게 한다)
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+		this.releaseClipScissor();
 	}
 
 	//==============================================================================
@@ -3662,6 +3947,15 @@ export class Graphic extends Object {
 				rect: new Rect(),
 				roundSize: 0,
 				transformMatrix: new TransformMatrix(),
+				isShaderClip: false,
+				isShaderClipActive: false,
+				shaderClipRect: new Float32Array(4),
+				shaderClipSlot: 0,
+				shaderClipSlotGeneration: -1,
+				cullMinimumX: 0,
+				cullMinimumY: 0,
+				cullMaximumX: 0,
+				cullMaximumY: 0,
 			};
 			this.#clipEntryPool.push(clipEntry);
 		}
@@ -3669,11 +3963,91 @@ export class Graphic extends Object {
 		clipEntry.rect.size.set(rect.size.x, rect.size.y);
 		clipEntry.roundSize = roundSize;
 		clipEntry.transformMatrix.copyFrom(this.#transformMatrix);
+
+		// 디바이스 픽셀 경계 상자. (네 꼭짓점을 옮긴 것, 거르기와 셰이더 자르기에 쓴다)
+		const transformMatrix = this.#transformMatrix;
+		const matrixA = transformMatrix.a;
+		const matrixB = transformMatrix.b;
+		const matrixC = transformMatrix.c;
+		const matrixD = transformMatrix.d;
+		const leftX = rect.position.x;
+		const topY = rect.position.y;
+		const rightX = leftX + rect.size.x;
+		const bottomY = topY + rect.size.y;
+		const leftTopX = matrixA * leftX + matrixC * topY + transformMatrix.e;
+		const leftTopY = matrixB * leftX + matrixD * topY + transformMatrix.f;
+		const rightTopX = matrixA * rightX + matrixC * topY + transformMatrix.e;
+		const rightTopY = matrixB * rightX + matrixD * topY + transformMatrix.f;
+		const leftBottomX = matrixA * leftX + matrixC * bottomY + transformMatrix.e;
+		const leftBottomY = matrixB * leftX + matrixD * bottomY + transformMatrix.f;
+		const rightBottomX = matrixA * rightX + matrixC * bottomY + transformMatrix.e;
+		const rightBottomY = matrixB * rightX + matrixD * bottomY + transformMatrix.f;
+		const minimumX = System.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+		const maximumX = System.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+		const minimumY = System.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+		const maximumY = System.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+		const parentEntry = previousClipDepth > 0 ? this.#clipStack[previousClipDepth - 1] : null;
+		clipEntry.cullMinimumX = parentEntry ? System.Math.max(parentEntry.cullMinimumX, minimumX) : minimumX;
+		clipEntry.cullMinimumY = parentEntry ? System.Math.max(parentEntry.cullMinimumY, minimumY) : minimumY;
+		clipEntry.cullMaximumX = parentEntry ? System.Math.min(parentEntry.cullMaximumX, maximumX) : maximumX;
+		clipEntry.cullMaximumY = parentEntry ? System.Math.min(parentEntry.cullMaximumY, maximumY) : maximumY;
+
+		// 축에 맞는 각진 사각형은 스텐실 대신 셰이더로 자른다. (묶음을 끊지 않는다, 유니티 RectMask2D 와 같은 꼴)
+		// 돌아갔거나 둥근 자르기, 화소 가운데 기준과 스텐실 결과가 갈릴 수 있는 경계는 스텐실로 자른다. 바깥 셰이더 자르기는 그 안에서도 그대로 걸린다.
+		const isAxisAligned = (matrixB === 0 && matrixC === 0) || (matrixA === 0 && matrixD === 0);
+		let isShaderClip = false;
+		let shaderMinimumX = minimumX;
+		let shaderMinimumY = minimumY;
+		let shaderMaximumX = maximumX;
+		let shaderMaximumY = maximumY;
+		if (roundSize <= 0 && isAxisAligned) {
+			if (this.isFramebufferMultisampled()) {
+				// 멀티샘플 화면에서 스텐실은 샘플마다 걸려 화소 사이 경계가 반쯤 칠해진다. 경계가 화소 경계에 놓일 때만 화소 가운데 기준과 같다.
+				shaderMinimumX = System.Math.round(minimumX);
+				shaderMinimumY = System.Math.round(minimumY);
+				shaderMaximumX = System.Math.round(maximumX);
+				shaderMaximumY = System.Math.round(maximumY);
+				isShaderClip = System.Math.abs(shaderMinimumX - minimumX) < CLIP_EDGE_EPSILON && System.Math.abs(shaderMinimumY - minimumY) < CLIP_EDGE_EPSILON && System.Math.abs(shaderMaximumX - maximumX) < CLIP_EDGE_EPSILON && System.Math.abs(shaderMaximumY - maximumY) < CLIP_EDGE_EPSILON;
+			}
+			else {
+				// 샘플이 하나면 스텐실도 화소 가운데로 고른다. 가운데에 딱 걸친 경계(동점 규칙이 기기마다 다를 수 있다)만 스텐실로 둔다.
+				isShaderClip = !isClipEdgeOnPixelCenter(minimumX) && !isClipEdgeOnPixelCenter(minimumY) && !isClipEdgeOnPixelCenter(maximumX) && !isClipEdgeOnPixelCenter(maximumY);
+			}
+		}
+		const shaderClipRect = clipEntry.shaderClipRect;
+		clipEntry.isShaderClip = isShaderClip;
+		if (parentEntry && parentEntry.isShaderClipActive) {
+			shaderClipRect.set(parentEntry.shaderClipRect);
+			clipEntry.isShaderClipActive = true;
+			clipEntry.shaderClipSlot = parentEntry.shaderClipSlot;
+			clipEntry.shaderClipSlotGeneration = parentEntry.shaderClipSlotGeneration;
+			if (isShaderClip) {
+				shaderClipRect[0] = System.Math.max(shaderClipRect[0], shaderMinimumX);
+				shaderClipRect[1] = System.Math.max(shaderClipRect[1], shaderMinimumY);
+				shaderClipRect[2] = System.Math.min(shaderClipRect[2], shaderMaximumX);
+				shaderClipRect[3] = System.Math.min(shaderClipRect[3], shaderMaximumY);
+				clipEntry.shaderClipSlotGeneration = -1;
+			}
+		}
+		else {
+			shaderClipRect[0] = shaderMinimumX;
+			shaderClipRect[1] = shaderMinimumY;
+			shaderClipRect[2] = shaderMaximumX;
+			shaderClipRect[3] = shaderMaximumY;
+			clipEntry.isShaderClipActive = isShaderClip;
+			clipEntry.shaderClipSlotGeneration = -1;
+		}
 		this.#clipStack.push(clipEntry);
+		this.applyShaderClipFromStack();
+		if (isShaderClip) {
+			return;
+		}
 
 		// 클리핑 전에 쌓인 것을 먼저 그린다. (스텐실 상태가 바뀌기 전)
 		this.flushSpriteBatch();
-		if (previousClipDepth === 0) {
+		const previousStencilClipDepth = this.#stencilClipDepth;
+		this.#stencilClipDepth += 1;
+		if (previousStencilClipDepth === 0) {
 			webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
 		}
 
@@ -3692,7 +4066,135 @@ export class Graphic extends Object {
 		this.#isStencilRecording = false;
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
-		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, previousClipDepth + 1, 0xFF);
+		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, this.#stencilClipDepth, 0xFF);
+	}
+
+	//==============================================================================
+	// 기본 프레임버퍼가 멀티샘플인지 반환. (컨텍스트 속성 antialias, 처음 한 번 읽어 둔다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { boolean }
+	 */
+	isFramebufferMultisampled() {
+		if (this.#framebufferSampleState < 0) {
+			const contextAttributes = this.getWebGL2RenderingContext().getContextAttributes();
+			this.#framebufferSampleState = contextAttributes && contextAttributes.antialias === false ? 0 : 1;
+		}
+		return this.#framebufferSampleState === 1;
+	}
+
+	//==============================================================================
+	// 자르기 칸 맨 위의 셰이더 자르기를 지금 상태로 삼기. (beginClipRect, endClipRect 가 부른다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	applyShaderClipFromStack() {
+		const clipStack = this.#clipStack;
+		const topEntry = clipStack.length > 0 ? clipStack[clipStack.length - 1] : null;
+		if (topEntry === null || !topEntry.isShaderClipActive) {
+			this.#isShaderClipActive = false;
+			this.#shaderClipSlot = 0;
+			return;
+		}
+		this.#isShaderClipActive = true;
+		this.#shaderClipRect.set(topEntry.shaderClipRect);
+		this.#shaderClipSlot = topEntry.shaderClipSlot;
+		this.#shaderClipSlotGeneration = topEntry.shaderClipSlotGeneration;
+	}
+
+	//==============================================================================
+	// 묶지 않고 그리는 것에 셰이더 자르기를 가위로 걸기. (셰이더 자르기가 없으면 아무것도 하지 않는다)
+	// - 화소 가운데가 [왼쪽, 오른쪽) x [위, 아래) 안인 화소만 남기는 것은 셰이더 자르기와 같다. (가위 칸은 화소 단위라 가운데 기준으로 올림한다)
+	// - 그린 뒤 releaseClipScissor 로 푼다. (묶음을 그릴 때와 지우기는 가위를 쓰지 않는다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	applyClipScissor() {
+		if (!this.#isShaderClipActive) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const shaderClipRect = this.#shaderClipRect;
+		const leftX = System.Math.ceil(shaderClipRect[0] - 0.5);
+		const topY = System.Math.ceil(shaderClipRect[1] - 0.5);
+		const rightX = System.Math.max(leftX, System.Math.ceil(shaderClipRect[2] - 0.5));
+		const bottomY = System.Math.max(topY, System.Math.ceil(shaderClipRect[3] - 0.5));
+		webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+		webGL2RenderingContext.scissor(leftX, this.#appliedViewportHeight - bottomY, rightX - leftX, bottomY - topY);
+		this.#isClipScissorEnabled = true;
+	}
+
+	//==============================================================================
+	// applyClipScissor 로 건 가위 풀기.
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	releaseClipScissor() {
+		if (!this.#isClipScissorEnabled) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		this.#isClipScissorEnabled = false;
+	}
+
+	//==============================================================================
+	// 셰이더 자르기를 스텐실에 적거나 지우기. (바깥 WebGL 패스가 스텐실 자르기만 알므로 runExternalPass 가 앞뒤로 부른다)
+	// - 걸린 셰이더 자르기 사각형을 저마다 걸 때의 변환으로 INCR(적기) 또는 DECR(지우기) 한다. 적은 동안 스텐실 비교 값은 걸린 자르기 수 모두다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { boolean } isWriting 적을지. (false 면 지운다)
+	 * @returns { number } 적거나 지운 셰이더 자르기 수.
+	 */
+	writeShaderClipsToStencil(isWriting) {
+		const clipStack = this.#clipStack;
+		let shaderClipCount = 0;
+		for (const clipEntry of clipStack) {
+			if (clipEntry.isShaderClip) {
+				shaderClipCount += 1;
+			}
+		}
+		if (shaderClipCount === 0) {
+			return 0;
+		}
+		this.flushSpriteBatch();
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const isShaderClipActive = this.#isShaderClipActive;
+		this.#isShaderClipActive = false;
+		this.pushState();
+		if (isWriting && this.#stencilClipDepth === 0) {
+			webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
+		}
+		webGL2RenderingContext.colorMask(false, false, false, false);
+		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
+		const stencilOperation = isWriting ? webGL2RenderingContext.INCR : webGL2RenderingContext.DECR;
+		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, stencilOperation);
+		this.#isStencilRecording = true;
+		for (const clipEntry of clipStack) {
+			if (clipEntry.isShaderClip) {
+				this.#transformMatrix.copyFrom(clipEntry.transformMatrix);
+				this.drawRect(clipEntry.rect);
+			}
+		}
+		this.flushSpriteBatch();
+		this.#isStencilRecording = false;
+		webGL2RenderingContext.colorMask(true, true, true, true);
+		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
+		const stencilDepth = isWriting ? clipStack.length : this.#stencilClipDepth;
+		if (stencilDepth === 0) {
+			webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
+		}
+		else {
+			webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, stencilDepth, 0xFF);
+		}
+		this.popState();
+		this.#isShaderClipActive = isShaderClipActive;
+		return shaderClipCount;
 	}
 
 	//==============================================================================
@@ -3737,7 +4239,7 @@ export class Graphic extends Object {
 			webGL2RenderingContext.colorMask(true, true, true, true);
 			webGL2RenderingContext.stencilMask(0xFF);
 			webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
-			webGL2RenderingContext.clearBufferiv(webGL2RenderingContext.STENCIL, 0, new Int32Array([this.#clipStack.length]));
+			webGL2RenderingContext.clearBufferiv(webGL2RenderingContext.STENCIL, 0, new Int32Array([this.#stencilClipDepth]));
 			this.#globalAlpha = 1.0;
 		}
 		this.#opacityLayerStack.push({ target, previousFramebuffer, globalAlpha });
@@ -3836,6 +4338,13 @@ export class Graphic extends Object {
 			return;
 		}
 
+		// 셰이더 자르기는 바깥 자르기로 돌아가기만 한다. (묶음을 끊지 않는다)
+		if (clipEntry.isShaderClip) {
+			this.applyShaderClipFromStack();
+			this.popState();
+			return;
+		}
+
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
 		// 기록 시점의 변환 행렬로 같은 영역을 DECR 해 스텐실 원복.
@@ -3858,13 +4367,15 @@ export class Graphic extends Object {
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 
-		const clipDepth = this.#clipStack.length;
-		if (clipDepth === 0) {
+		this.#stencilClipDepth -= 1;
+		const stencilClipDepth = this.#stencilClipDepth;
+		if (stencilClipDepth === 0) {
 			webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
 		}
 		else {
-			webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, clipDepth, 0xFF);
+			webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, stencilClipDepth, 0xFF);
 		}
+		this.applyShaderClipFromStack();
 
 		// 상태 복원. (Canvas2D restore 대응)
 		this.popState();
@@ -3976,6 +4487,8 @@ export class Graphic extends Object {
 	restoreRenderState() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		webGL2RenderingContext.viewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight);
+		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		this.#isClipScissorEnabled = false;
 		this.invalidateRenderStateCache();
 		const shaderProgram = this.getShaderProgram();
 		this.useShaderProgram(shaderProgram);
@@ -4032,6 +4545,7 @@ export class Graphic extends Object {
 		this.#boundShaderProgram = null;
 		this.#boundTexture = null;
 		this.#boundBackdropTexture = null;
+		this.#batchBoundTextureList.fill(null);
 	}
 
 	//==============================================================================
@@ -4086,6 +4600,8 @@ export class Graphic extends Object {
 		if (isDepthCleared) {
 			this.clearDepthBuffer();
 		}
+		// 셰이더 자르기는 바깥 패스가 모르므로 그동안 스텐실에 적어 둔다.
+		const shaderClipCount = this.writeShaderClipsToStencil(true);
 		this.invalidateRenderStateCache();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		try {
@@ -4093,6 +4609,9 @@ export class Graphic extends Object {
 		}
 		finally {
 			this.restoreRenderState();
+			if (shaderClipCount > 0) {
+				this.writeShaderClipsToStencil(false);
+			}
 		}
 	}
 
