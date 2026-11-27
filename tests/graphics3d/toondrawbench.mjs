@@ -1,7 +1,7 @@
 //==============================================================================
 // 툰 그리기 줄의 그리기마다 CPU 비용 재기. (NODE_PATH=$(npm root -g) node tests/graphics3d/toondrawbench.mjs <견줄 저장소 경로> [반복 수] [장면들])
 // - 두 엔진 사본을 견준다. a: 견줄 저장소(고치기 전 사본), b: 이 저장소. 장면은 이 저장소의 것을 두 엔진에 같이 쓴다.
-//   lobby: 애버런트 로비 꼴(toonlobbyscene.mjs), miner: 광부 mid 꼴(toonminerscene.mjs, 인스턴스 버퍼, 청크 6),
+//   lobby: 애버런트 로비 꼴(toonlobbyscene.mjs), lobbymove: 같은 로비를 카메라가 돌며(프레임 블록 값이 패스마다 바뀜), miner: 광부 mid 꼴(toonminerscene.mjs, 인스턴스 버퍼, 청크 6),
 //   room: 애버런트 판의 방 꼴(toonroomscene.mjs, 부품마다 꼴을 프레임마다 새로 지음), roomitem: 같은 방을 남겨 두는 항목(ToonDrawItem)으로. (엔진에 없으면 room 과 같다)
 // - 찍는 것:
 //   1. 센 값(부하와 상관없음): 프레임당 GL 호출 수(전부, 유니폼, 프로그램 바꿈, 텍스처 묶기, 버텍스 어레이 묶기, 버퍼 올림, 유니폼 버퍼 묶기, 드로 콜).
@@ -128,9 +128,9 @@ async function runScene(version, sceneName, mode) {
 			}
 		}
 		let scene = null;
-		if (sceneName === "lobby") {
+		if (sceneName === "lobby" || sceneName === "lobbymove") {
 			const { createLobbyScene } = await import("/b/tests/graphics3d/toonlobbyscene.mjs");
-			scene = createLobbyScene(vanilla, gl, width, height, mode === "read" ? readCounter : null);
+			scene = createLobbyScene(vanilla, gl, width, height, mode === "read" ? readCounter : null, sceneName === "lobbymove");
 		}
 		else if (sceneName === "room" || sceneName === "roomitem") {
 			const { createRoomScene } = await import("/b/tests/graphics3d/toonroomscene.mjs");
@@ -144,6 +144,7 @@ async function runScene(version, sceneName, mode) {
 		const timeList = [];
 		const hashList = [];
 		const frameCountList = [];
+		const totalTable = {}; // 240 프레임 모두의 버퍼 짓기와 지우기, 올림. (한 프레임만 보면 안 보이는 몰아 지우기를 잡는다)
 		const pixels = new Uint8Array(width * height * 4);
 		const readHash = () => {
 			gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
@@ -158,6 +159,7 @@ async function runScene(version, sceneName, mode) {
 				await window.benchProfile(true);
 			}
 			for (const name of Object.keys(countTable)) {
+				totalTable[name] = (totalTable[name] ?? 0) + countTable[name];
 				countTable[name] = 0;
 			}
 			const startTime = performance.now();
@@ -185,7 +187,7 @@ async function runScene(version, sceneName, mode) {
 			profileText = await window.benchProfile(false);
 		}
 		const sorted = [...timeList].sort((first, second) => first - second);
-		return { time: sorted[Math.floor(sorted.length / 2)], readCount: readCountAtFrame, itemCount: scene.queue !== undefined ? scene.queue.getItemCount() : 0, hashList: hashList, counts: frameCountList[0] ?? null, statistics: scene.renderer.getFrameStatistics(), error: gl.getError(), profileText: profileText };
+		return { time: sorted[Math.floor(sorted.length / 2)], readCount: readCountAtFrame, itemCount: scene.queue !== undefined ? scene.queue.getItemCount() : 0, hashList: hashList, counts: frameCountList[0] ?? null, totals: totalTable, statistics: scene.renderer.getFrameStatistics(), error: gl.getError(), profileText: profileText };
 	}, version, sceneName, mode, WIDTH, HEIGHT);
 	await page.close();
 	return result;
@@ -279,6 +281,8 @@ try {
 			countResult[version] = result;
 			const groups = Object.entries(COUNT_GROUPS).map(([group, test]) => group + " " + Object.entries(result.counts).filter(([name]) => test(name)).reduce((sum, [, count]) => sum + count, 0));
 			console.log(`${version} 센 값(프레임 100): ${groups.join(", ")}, 그린 ${result.statistics.drawnObjectCount}, 거른 ${result.statistics.culledObjectCount}, 드로 콜 ${result.statistics.drawCallCount}, GL 오류 ${result.error}`);
+			const total = (name) => result.totals[name] ?? 0;
+			console.log(`${version} 240 프레임 합: createBuffer ${total("createBuffer")}, deleteBuffer ${total("deleteBuffer")}, bufferData ${total("bufferData")}, bufferSubData ${total("bufferSubData")}, bindBufferRange ${total("bindBufferRange")}, bindBufferBase ${total("bindBufferBase")}`);
 		}
 		if (sceneName === "lobby") {
 			for (const version of ["a", "b"]) {
