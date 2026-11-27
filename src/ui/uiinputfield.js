@@ -12,7 +12,7 @@ import { WorldNode } from "../core/node/worldnode.js";
 import { Component } from "../core/component.js";
 import { Paint } from "../core/component/paint.js";
 import { UILabel } from "./uilabel.js";
-import { buildFontString } from "../core/component/text.js";
+import { buildFontString, getMeasurementCanvasRenderingContext } from "../core/component/text.js";
 import { FontAsset } from "../resource/fontasset.js";
 import { BlurredRoundRectShadow, cssBlurRadiusToSigma } from "../core/blurshadow.js";
 
@@ -2801,6 +2801,19 @@ class UIInputFieldContextMenu extends Component {
 	}
 
 	//==============================================================================
+	// 그리는 사각형. (흰 판은 내용 영역, 그림자가 시그마 8 의 세 배와 기기 한 픽셀만큼 사방으로, 아래로 4 만큼 더 넘친다)
+	//==============================================================================
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (!node) return false;
+		const contentSize = node.getContentSize();
+		const shadowMargin = cssBlurRadiusToSigma(16) * 3 + 2;
+		rect.position.set(-shadowMargin, -shadowMargin);
+		rect.size.set(contentSize.x + shadowMargin * 2, contentSize.y + shadowMargin * 2 + 4);
+		return true;
+	}
+
+	//==============================================================================
 	// 주인과 항목 상태 넣기. (선택이 없으면 잘라내기와 복사, 글이 없으면 모두 선택은 흐리게)
 	//==============================================================================
 	initialize(ownerField, engine, isSelectionAvailable, isTextAvailable) {
@@ -2985,15 +2998,85 @@ class TextAreaWheelReceiver extends Component {
 
 
 //==============================================================================
+// 한 줄 필드의 바탕 층과 덮개 층이 그리는 사각형 적기. (선택, 조합 밑줄, 커서는 안쪽 여백에서 보이는 글 너비까지 가로로 넘칠 수 있다)
+// - 가로는 내용 폭과 안쪽 여백 + 보이는 글(값에 조합 글을 끼운 것) 너비를 합치고, 세로는 내용 높이와 가운데에서 글꼴 크기만큼씩.
+// - 여러 줄은 내용 영역으로 잘라 그리므로 내용 영역. 커서와 밑줄 굵기(2)만큼 넓혀 본다. 잴 수 없으면 false.
+//==============================================================================
+/**
+ * @param { UIInputField } field 주인 필드.
+ * @param { Vector2 } contentSize 그리는 노드의 내용 크기.
+ * @param { Rect } rect 그리는 사각형을 적을 곳.
+ * @returns { boolean } 적었으면 참.
+ */
+function writeInputLayerDrawnRect(field, contentSize, rect) {
+	let minimumX = System.Math.min(0, contentSize.x);
+	let maximumX = System.Math.max(0, contentSize.x);
+	let minimumY = System.Math.min(0, contentSize.y);
+	let maximumY = System.Math.max(0, contentSize.y);
+	if (!field.isMultiline()) {
+		const state = field.getRenderState();
+		const measurementContext = getMeasurementCanvasRenderingContext();
+		if (measurementContext === null) {
+			return false;
+		}
+		measurementContext.save();
+		measurementContext.font = buildFontString(state.fontFace, state.fontSize, false, false);
+		const textWidth = measurementContext.measureText(field.getDisplayText()).width;
+		measurementContext.restore();
+		minimumX = System.Math.min(minimumX, state.padding);
+		maximumX = System.Math.max(maximumX, state.padding + textWidth);
+		minimumY = System.Math.min(minimumY, contentSize.y * 0.5 - state.fontSize);
+		maximumY = System.Math.max(maximumY, contentSize.y * 0.5 + state.fontSize);
+	}
+	rect.position.set(minimumX - 2, minimumY - 2);
+	rect.size.set(maximumX - minimumX + 4, maximumY - minimumY + 4);
+	return true;
+}
+
+//==============================================================================
+// 한 줄 필드의 층이 그리는 사각형을 정하는 값의 열쇠. (보이는 글, 글꼴, 안쪽 여백, 여러 줄인지, 바뀌면 층이 그리는 사각형을 다시 셈하게 한다)
+//==============================================================================
+/**
+ * @param { UIInputField } field 주인 필드.
+ * @returns { string } 열쇠.
+ */
+function readInputLayerDrawnRectKey(field) {
+	const state = field.getRenderState();
+	const fontFamily = (state.fontFace && state.fontFace.family) ? state.fontFace.family : String(state.fontFace);
+	return field.isMultiline() + "|" + state.fontSize + "|" + fontFamily + "|" + state.padding + "|" + field.getDisplayText();
+}
+
+//==============================================================================
 // 텍스트보다 먼저 그려지는 레이어 (선택 영역 하이라이트).
 //==============================================================================
 class BackgroundLayerRenderer extends Component {
+	/** @private @type { string } */ #drawnRectKey = ""; // 그리는 사각형을 셈한 값의 열쇠.
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
 		this.setComponentType("UIInputFieldBgLayer");
+	}
+	//==============================================================================
+	// 매 프레임. (보이는 글, 글꼴, 여백이 바뀌면 그리는 사각형을 다시 셈하게 한다)
+	//==============================================================================
+	tick(timeDelta) {
+		const node = this.getNode();
+		if (!node || typeof node.getRenderState !== "function") return;
+		const drawnRectKey = readInputLayerDrawnRectKey(node);
+		if (drawnRectKey !== this.#drawnRectKey) {
+			this.#drawnRectKey = drawnRectKey;
+			this.markDrawnRectDirty();
+		}
+	}
+	//==============================================================================
+	// 그리는 사각형. (writeInputLayerDrawnRect)
+	//==============================================================================
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (!node || typeof node.getRenderState !== "function") return false;
+		return writeInputLayerDrawnRect(node, node.getContentSize(), rect);
 	}
 	//==============================================================================
 	// 출력. (선택 영역 하이라이트, 조합 중이면 그리지 않는다)
@@ -3034,12 +3117,35 @@ class BackgroundLayerRenderer extends Component {
 // - UIInputField 의 자식 노드에 부착되어 텍스트 라벨보다 늦게 그려진다.
 //==============================================================================
 class OverlayLayerRenderer extends Component {
+	/** @private @type { string } */ #drawnRectKey = ""; // 그리는 사각형을 셈한 값의 열쇠.
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
 		this.setComponentType("UIInputFieldOverlayLayer");
+	}
+	//==============================================================================
+	// 매 프레임. (주인 필드의 보이는 글, 글꼴, 여백이 바뀌면 그리는 사각형을 다시 셈하게 한다)
+	//==============================================================================
+	tick(timeDelta) {
+		const node = this.getNode();
+		const parent = node && typeof node.getParent === "function" ? node.getParent() : null;
+		if (!parent || typeof parent.getRenderState !== "function") return;
+		const drawnRectKey = readInputLayerDrawnRectKey(parent);
+		if (drawnRectKey !== this.#drawnRectKey) {
+			this.#drawnRectKey = drawnRectKey;
+			this.markDrawnRectDirty();
+		}
+	}
+	//==============================================================================
+	// 그리는 사각형. (주인 필드의 글로, writeInputLayerDrawnRect)
+	//==============================================================================
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		const parent = node && typeof node.getParent === "function" ? node.getParent() : null;
+		if (!parent || typeof parent.getRenderState !== "function") return false;
+		return writeInputLayerDrawnRect(parent, node.getContentSize(), rect);
 	}
 	//==============================================================================
 	// 출력. (조합 밑줄, 커서, 포커스 테두리)

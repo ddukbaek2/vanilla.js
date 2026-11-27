@@ -94,6 +94,10 @@ export class UILineChart extends Component {
 		while (this.#valueList.length > this.#maxSampleCount) {
 			this.#valueList.shift();
 		}
+		// 범위를 정했으면 값이 범위 밖으로 나가 내용 영역 밖에 그릴 수 있다. (범위를 스스로 잡으면 늘 안이다)
+		if (this.#minValue !== null || this.#maxValue !== null) {
+			this.markDrawnRectDirty();
+		}
 	}
 
 	//==============================================================================
@@ -122,6 +126,59 @@ export class UILineChart extends Component {
 		}
 		graphic.setStrokeColor(this.#lineColor.toRGBAString());
 		graphic.drawLine(points, this.#lineWidth);
+	}
+
+	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 격자는 내용 영역 안, 선은 값이 정한 범위 밖으로 나간 만큼 위아래로 넘친다)
+	// - 가로는 표본이 내용 폭 안에 퍼지므로 내용 폭. 세로는 내용 높이와 가장 큰 값, 가장 작은 값이 놓이는 높이를 합친다.
+	// - 선 두께만큼(이음새를 메우는 반두께 연장까지) 사방으로 넓혀 본다.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 노드에 붙어 있으면 참.
+	 * @example <caption>범위를 넘는 값이 그리는 곳 보기</caption>
+	 * import { WorldNode, UILineChart, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(160, 60));
+	 * const chart = node.addComponent(UILineChart);
+	 * chart.setValueRange(0, 1);
+	 * chart.setValueList([0.5, 2, 0.2]);
+	 * const drawnRect = Rect.zero();
+	 * chart.calculateDrawnRect(drawnRect);
+	 * console.log(drawnRect.position.y < 0);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		const contentSize = node.getContentSize();
+		const width = contentSize.x;
+		const height = contentSize.y;
+		let minimumY = System.Math.min(0, height);
+		let maximumY = System.Math.max(0, height);
+		const valueList = this.#valueList;
+		if (valueList.length >= 2 && (this.#minValue !== null || this.#maxValue !== null)) {
+			let lowValue = valueList[0];
+			let highValue = valueList[0];
+			for (const value of valueList) {
+				lowValue = System.Math.min(lowValue, value);
+				highValue = System.Math.max(highValue, value);
+			}
+			const rangeLowValue = (this.#minValue !== null) ? this.#minValue : lowValue;
+			const rangeHighValue = (this.#maxValue !== null) ? this.#maxValue : highValue;
+			const valueRange = System.Math.max(rangeHighValue - rangeLowValue, 0.0001);
+			const lowY = height - (lowValue - rangeLowValue) / valueRange * (height - 4) - 2;
+			const highY = height - (highValue - rangeLowValue) / valueRange * (height - 4) - 2;
+			minimumY = System.Math.min(minimumY, lowY, highY);
+			maximumY = System.Math.max(maximumY, lowY, highY);
+		}
+		const margin = System.Math.max(1, this.#lineWidth) + 1;
+		rect.position.set(System.Math.min(0, width) - margin, minimumY - margin);
+		rect.size.set(System.Math.abs(width) + margin * 2, maximumY - minimumY + margin * 2);
+		return true;
 	}
 
 	//==============================================================================
@@ -191,6 +248,7 @@ export class UILineChart extends Component {
 		if (excessCount > 0) {
 			this.#valueList.splice(0, excessCount);
 		}
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -223,6 +281,7 @@ export class UILineChart extends Component {
 	setValueRange(minValue, maxValue) {
 		this.#minValue = minValue;
 		this.#maxValue = maxValue;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -231,6 +290,7 @@ export class UILineChart extends Component {
 	/** @param { number[] } valueList 표본 값 목록. (복사해 쥔다) */
 	setValueList(valueList) {
 		this.#valueList = valueList.slice(-this.#maxSampleCount);
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -265,6 +325,7 @@ export class UILineChart extends Component {
 	/** @param { number } lineWidth 선 굵기. (픽셀) */
 	setLineWidth(lineWidth) {
 		this.#lineWidth = lineWidth;
+		this.markDrawnRectDirty();
 	}
 }
 
@@ -350,6 +411,49 @@ export class UIBarChart extends Component {
 	}
 
 	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 막대는 내용 영역 안, 막대 사이가 너무 넓어 막대 폭이 음수가 되면 그만큼 옆으로 넘친다)
+	// - 세로는 막대가 가장 낮아도 한 단위 높이로 그리므로 내용 높이가 한 단위보다 작으면 위로 넘친다. 한 단위씩 넓혀 본다.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 노드에 붙어 있으면 참.
+	 * @example <caption>막대 그래프가 그리는 곳 보기</caption>
+	 * import { WorldNode, UIBarChart, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(120, 40));
+	 * const chart = node.addComponent(UIBarChart);
+	 * chart.setValueList([3, 5, 2]);
+	 * const drawnRect = Rect.zero();
+	 * chart.calculateDrawnRect(drawnRect);
+	 * console.log(drawnRect.size.x, drawnRect.size.y);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		const barCount = this.#valueList.length;
+		if (barCount === 0) {
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
+		}
+		const contentSize = node.getContentSize();
+		const width = contentSize.x;
+		const height = contentSize.y;
+		const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
+		const minimumX = System.Math.min(0, barWidth, width);
+		const maximumX = System.Math.max(width, width - barWidth, 0);
+		const minimumY = System.Math.min(0, height - 1);
+		const maximumY = System.Math.max(height, 0);
+		rect.position.set(minimumX - 1, minimumY - 1);
+		rect.size.set(maximumX - minimumX + 2, maximumY - minimumY + 2);
+		return true;
+	}
+
+	//==============================================================================
 	// 막대 사각형 목록 계산. (그리기와 같은 자리)
 	//==============================================================================
 	/**
@@ -391,6 +495,7 @@ export class UIBarChart extends Component {
 	/** @param { number[] } valueList 막대 값 목록. (복사해 쥔다) */
 	setValueList(valueList) {
 		this.#valueList = valueList.slice();
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -441,5 +546,6 @@ export class UIBarChart extends Component {
 	/** @param { number } barGap 막대 사이 간격. (픽셀) */
 	setBarGap(barGap) {
 		this.#barGap = barGap;
+		this.markDrawnRectDirty();
 	}
 }
