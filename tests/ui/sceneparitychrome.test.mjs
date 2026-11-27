@@ -25,7 +25,7 @@ const server = http.createServer((request, response) => {
 	const requestPath = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
 	if (requestPath === "/") {
 		response.writeHead(200, { "Content-Type": "text/html" });
-		response.end("<!doctype html><title>sceneparity</title><style>body{margin:0}</style>");
+		response.end("<!doctype html><title>sceneparity</title><link rel=\"icon\" href=\"data:,\"><style>body{margin:0}</style>");
 		return;
 	}
 	const filePath = path.join(repositoryPath, requestPath);
@@ -55,6 +55,12 @@ try {
 	await page.setViewport({ width: 640, height: 360 });
 	page.on("pageerror", (error) => {
 		console.log("페이지 오류: " + error.message);
+	});
+	// 씬 로드는 오류를 console.error 로만 남긴다. (SceneManager.loadScene 의 catch) 그것도 보이게 한다.
+	page.on("console", (message) => {
+		if (message.type() === "error") {
+			console.log("콘솔 오류: " + message.text() + (message.location()?.url ? " (" + message.location().url + ")" : ""));
+		}
 	});
 	await page.goto("http://127.0.0.1:" + port + "/");
 	result = await page.evaluate(async () => {
@@ -99,8 +105,8 @@ try {
 				this.setLoadingMinDurationMs(0);
 			}
 
-			initialize() {
-				super.initialize();
+			initialize(engine) {
+				super.initialize(engine);
 				this.setSceneBackgroundColor("#204060");
 				isInitialized = true;
 			}
