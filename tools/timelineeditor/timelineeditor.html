@@ -1662,6 +1662,7 @@
   // src/base/platform.js
   var System5 = globalThis;
   var SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  var DEFAULT_FONT_FAMILY_STRING = '"default", ' + SYSTEM_FONT_STRING;
   var PlatformType = {
     //System.Object.freeze({
     windows: "Windows",
@@ -6007,7 +6008,7 @@
     //==============================================================================
     // 프로그램 사용 시작. (컨텍스트의 상태 캐시가 이미 이 프로그램을 쓴다고 기억하면 다시 걸지 않는다)
     //==============================================================================
-    use() {
+    useProgram() {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const program = this.getProgram();
       const stateCache = WebGLStateCache.find(webGL2RenderingContext);
@@ -6417,6 +6418,7 @@
   var STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}]/u;
   var COMBINING_MARK_PATTERN = /\p{M}/u;
   var EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+  var BLANK_CHUNK_PATTERN = /^[\u0009\u0020\u00A0\u2000-\u200B\u202F\u205F\u3000]+$/u;
   var isTextAntialiasEnabled = true;
   var ALPHA_THRESHOLD = 128;
   function setTextAntialiasEnabled(value) {
@@ -6820,6 +6822,9 @@
       const glyphList = [];
       const missingGlyphList = [];
       for (const chunk of chunks) {
+        if (BLANK_CHUNK_PATTERN.test(chunk.text)) {
+          continue;
+        }
         const startPosition = chunk.positions[0];
         const anchorX = floor(startPosition);
         const fractionX = startPosition - anchorX;
@@ -6850,8 +6855,8 @@
             fractionX,
             originX,
             width: originX + 1 + chunkRight + cellPadding,
-            height: bakeHeight,
-            baselineY: scaledBaselineY,
+            height: bakeHeight + 2,
+            baselineY: scaledBaselineY + 1,
             atlasPage: null,
             atlasX: 0,
             atlasY: 0
@@ -7050,6 +7055,10 @@
         } else {
           bakeCanvasRenderingContext.fillStyle = colorString;
         }
+        bakeCanvasRenderingContext.save();
+        bakeCanvasRenderingContext.beginPath();
+        bakeCanvasRenderingContext.rect(0, 1, span.width, span.height - 2);
+        bakeCanvasRenderingContext.clip();
         for (const glyph of span.glyphs) {
           const penX = glyph.atlasX - span.atlasX + glyph.originX + glyph.fractionX;
           if (mode === "stroke") {
@@ -7058,6 +7067,9 @@
             bakeCanvasRenderingContext.fillText(glyph.text, penX, glyph.baselineY);
           }
         }
+        bakeCanvasRenderingContext.restore();
+        bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, 1, span.width, 1, 0, 0, span.width, 1);
+        bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, span.height - 2, span.width, 1, 0, span.height - 1, span.width, 1);
         if (isNearest) {
           const imageData = bakeCanvasRenderingContext.getImageData(0, 0, span.width, span.height);
           const pixels = imageData.data;
@@ -12845,7 +12857,7 @@ void main() {
       if (shaderProgram === this.#boundShaderProgram) {
         return;
       }
-      shaderProgram.use();
+      shaderProgram.useProgram();
       this.#boundShaderProgram = shaderProgram;
     }
     //==============================================================================
@@ -15930,7 +15942,7 @@ void main() {
         graphic.beginOpacityLayer();
       }
       const components = this.getAllComponents();
-      const isComponentDrawCulled = this.isComponentDrawCulled(graphic, components);
+      const isComponentDrawCulled = this.#isComponentDrawCulled(graphic, components);
       if (isComponentDrawCulled) {
         graphic.addCulledNodeCount(1);
       }
@@ -15973,7 +15985,7 @@ void main() {
      * @param { Component[] } components 이 노드의 컴포넌트 목록.
      * @returns { boolean } 컴포넌트 그리기를 건너뛰어도 되면 참.
      */
-    isComponentDrawCulled(graphic, components) {
+    #isComponentDrawCulled(graphic, components) {
       if (!graphic.isCullingEnabled()) {
         return false;
       }
@@ -18897,7 +18909,7 @@ void main() {
     //==============================================================================
     /**
      * @constructor
-     * @param { Engine } engine
+     * @param { Engine } engine 소리를 맡을 엔진. (플랫폼 정보로 iOS 인지 가린다)
      */
     constructor(engine) {
       super();
@@ -18920,7 +18932,7 @@ void main() {
     // user gesture 이후인지 여부.
     //==============================================================================
     /**
-     * @returns { boolean }
+     * @returns { boolean } 첫 사용자 입력(클릭, 터치, 키)이 이미 있었으면 참.
      */
     hasUserGesture() {
       return this.#hasUserGesture;
@@ -19023,7 +19035,7 @@ void main() {
     // 오디오 플레이어 생성.
     //==============================================================================
     /**
-     * @returns { AudioPlayer }
+     * @returns { AudioPlayer } 공유 오디오 컨텍스트로 만든 새 오디오 플레이어.
      */
     createAudioPlayer() {
       const audioContext = this.ensureAudioContext();
@@ -19033,7 +19045,7 @@ void main() {
     // 오디오 버스 생성. (AudioContext 가 없으면 만든다, 만들지 못하면 소리 없는 버스)
     //==============================================================================
     /**
-     * @returns { AudioBus }
+     * @returns { AudioBus } 공유 오디오 컨텍스트로 만든 새 오디오 버스. (컨텍스트를 만들 수 없으면 소리 없는 버스)
      */
     createAudioBus() {
       const audioContext = this.ensureAudioContext();
@@ -19043,7 +19055,7 @@ void main() {
     // 오디오 컨텍스트 시계. (초, audioContext.currentTime, AudioContext 가 없으면 0)
     //==============================================================================
     /**
-     * @returns { number }
+     * @returns { number } 오디오 컨텍스트 시계. (초, 컨텍스트가 아직 없으면 0)
      */
     getContextTime() {
       const audioContext = this.getAudioContext();
@@ -19056,7 +19068,7 @@ void main() {
     // 오디오 컨텍스트 반환. (없으면 null)
     //==============================================================================
     /**
-     * @returns { AudioContext | null }
+     * @returns { AudioContext | null } 공유 오디오 컨텍스트. (아직 만들지 않았으면 null)
      */
     getAudioContext() {
       return this.#audioContext;
@@ -19515,8 +19527,9 @@ void main() {
     // 주사율이 높거나 프레임이 들쭉날쭉한 기기에서도 고른 간격으로 돈다.
     /** @type { number } */
     maximumFramePerSecond;
-    // 기본 폰트(DOSGothic) 주소. run() 이 뒤에서 불러온다. 빈 글이면 불러오지 않는다.
-    // (인터넷 없이 도는 데스크탑 앱이나 외부 요청을 막은 페이지는 비우거나 자체 경로를 준다)
+    // 기본 글꼴 주소. (처음은 빈 글, 러스트 판 default_font_url 과 같다) 주면 run() 이 뒤에서 받아 글꼴 이름 "default" 로 올린다.
+    // - 글꼴 이름 "default"(엔진 기본 글꼴 사슬)의 첫 글꼴이 되고, 그 뒤는 시스템 글꼴 사슬 SYSTEM_FONT_STRING 이다. 비우면 받지 않고 시스템 글꼴로 그린다.
+    // - 엔진은 글꼴을 따로 받지 않는다. 게임 글꼴은 이 주소나 FontAsset 으로 넣는다.
     /** @type { string } */
     defaultFontUrl;
     // 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈를 무시할지. (모바일의 화면 키보드)
@@ -19557,7 +19570,7 @@ void main() {
       this.preserveDrawingBuffer = false;
       this.antialias = true;
       this.maximumFramePerSecond = 0;
-      this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
+      this.defaultFontUrl = "";
       this.ignoreVirtualKeyboardResize = false;
       this.rebakeTextOnFontLoad = false;
       this.useDevTools = true;
@@ -19714,7 +19727,7 @@ void main() {
       if (!defaultFontUrl) {
         return;
       }
-      const internalFontFace = new FontFace(`DOSGothic`, `url("${defaultFontUrl}")`);
+      const internalFontFace = new FontFace("default", `url("${defaultFontUrl}")`);
       internalFontFace.load().then((loadedFont) => {
         document.fonts.add(loadedFont);
       }).catch((error) => {
@@ -20164,7 +20177,7 @@ void main() {
         this.#statisticsTextRect.size.y + 20
       ), 12);
       this.#statisticsTextRect.size.y = 0;
-      graphic.setFontString(`16px DOSGothic`);
+      graphic.setFontString("16px default");
       graphic.setTextAlign("left");
       graphic.setTextBaseline("top");
       graphic.setFillColor(Colors.white);
@@ -24088,7 +24101,7 @@ void main() {
   }
   __name(sliceGraphemes, "sliceGraphemes");
   function buildFontString(fontFace, fontSize, bold, italic) {
-    const fontFamily = fontFace ? fontFace.family : SYSTEM_FONT_STRING;
+    const fontFamily = fontFace ? fontFace.family : DEFAULT_FONT_FAMILY_STRING;
     const styleParts = [];
     if (italic) {
       styleParts.push("italic");
@@ -26602,34 +26615,38 @@ void main() {
       resizer: "#333",
       resizerHover: "#007acc"
     },
+    // 색. (CSS 색 글)
     size: {
       resizer: 5
     },
+    // 크기. (픽셀)
     font: {
       family: "sans-serif",
       mono: '"Consolas", monospace',
       size: "13px",
       sizeSmall: "12px"
     }
+    // 글꼴과 글 크기.
   };
   var PaneStyle = class {
     static {
       __name(this, "PaneStyle");
     }
     /**
-     * 엘리먼트에 여러 스타일을 일괄 적용합니다.
-     * @param { HTMLElement } el 
-     * @param { Object } styles 
+     * 엘리먼트에 여러 스타일을 한꺼번에 적용한다. (엘리먼트나 스타일이 없으면 아무것도 하지 않는다)
+     * @param { HTMLElement } el 스타일을 적용할 엘리먼트.
+     * @param { Object } styles 적용할 CSS 속성 이름과 값. (camelCase)
      */
     static apply(el, styles) {
       if (!el || !styles) return;
       Object.assign(el.style, styles);
     }
     /**
-     * 스타일 프리셋이 적용된 엘리먼트를 생성합니다.
-     * @param { string } tagName 
-     * @param { string } preset - "panel" | "toolbar" | "button" | "input" | "textarea" | "text"
-     * @param { Object } options - { id, text, style, type, placeholder, accent, warning }
+     * 스타일 프리셋이 적용된 엘리먼트를 만든다.
+     * @param { string } tagName 만들 태그 이름.
+     * @param { string } preset 프리셋 이름. ("panel", "toolbar", "button", "input", "textarea", "text", 빈 글이면 공통 스타일만)
+     * @param { Object } options { id, text, style, type, placeholder, accent, warning }. (accent 나 warning 이 참인 단추는 그 색 바탕)
+     * @returns { HTMLElement } 만든 엘리먼트.
      */
     static create(tagName, preset = "", options = {}) {
       const el = System35.document.createElement(tagName);
@@ -26769,6 +26786,10 @@ void main() {
     //==============================================================================
     // 생성.
     //==============================================================================
+    /**
+     * @constructor
+     * @param { { direction?: string, size?: number | string, minSize?: number, maxSize?: number, isResizable?: boolean, resizableEdges?: { top: boolean, bottom: boolean, left: boolean, right: boolean } } } options 나누는 방향(horizontal 이나 vertical), 처음 크기(픽셀, 1 이하의 비율, 퍼센트 글, flex), 가장 작고 큰 크기, 조절 가능 여부와 가장자리.
+     */
     constructor(options = {}) {
       this.#direction = options.direction || "horizontal";
       let size = options.size !== void 0 ? options.size : 0;
@@ -26804,6 +26825,9 @@ void main() {
     //==============================================================================
     // 자식 추가.
     //==============================================================================
+    /**
+     * @param { Pane } pane 자식으로 붙일 패널. (앞 자식과의 사이에 리사이저가 생긴다)
+     */
     addPane(pane) {
       if (!(pane instanceof _Pane)) return;
       pane.#parentPane = this;
@@ -26898,6 +26922,12 @@ void main() {
     //==============================================================================
     // 레이아웃 엔진
     //==============================================================================
+    /**
+     * @param { number } x 왼쪽 자리. (픽셀)
+     * @param { number } y 위쪽 자리. (픽셀)
+     * @param { number } w 너비. (픽셀)
+     * @param { number } h 높이. (픽셀)
+     */
     updateLayout(x, y, w, h) {
       this.#container.style.left = `${x}px`;
       this.#container.style.top = `${y}px`;
@@ -26984,6 +27014,9 @@ void main() {
     //==============================================================================
     // 부모 요소에 붙이기. (창 크기가 바뀔 때마다 다시 배치한다)
     //==============================================================================
+    /**
+     * @param { HTMLElement } p 붙일 부모 요소.
+     */
     attachTo(p) {
       p.appendChild(this.#container);
       const run = /* @__PURE__ */ __name(() => this.refresh(), "run");
@@ -26994,6 +27027,9 @@ void main() {
     //==============================================================================
     // 보이기 / 숨기기. (숨긴 패널은 자리를 차지하지 않고, 맞닿은 리사이저도 숨는다)
     //==============================================================================
+    /**
+     * @param { boolean } isVisible 보이면 참, 숨기면 거짓.
+     */
     setVisible(isVisible) {
       this.#isVisible = isVisible;
       this.#container.style.display = isVisible ? "" : "none";
@@ -27004,66 +27040,99 @@ void main() {
     //==============================================================================
     // 보이는지 반환.
     //==============================================================================
+    /**
+     * @returns { boolean } 보이면 참.
+     */
     isVisible() {
       return this.#isVisible;
     }
     //==============================================================================
     // 남는 자리를 나눠 갖는지 반환. (처음 크기가 0 이면 참)
     //==============================================================================
+    /**
+     * @returns { boolean } 남는 자리를 나눠 가지면 참.
+     */
     isFlex() {
       return this.#initialSize === 0;
     }
     //==============================================================================
     // 처음 크기 반환. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)
     //==============================================================================
+    /**
+     * @returns { number } 처음 크기. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)
+     */
     getInitialSize() {
       return this.#initialSize;
     }
     //==============================================================================
     // 정해진 크기 반환. (끌어서 정했거나 처음 크기가 픽셀이면 그 값, 아니면 0)
     //==============================================================================
+    /**
+     * @returns { number } 정해진 크기. (픽셀, 정해진 것이 없으면 0)
+     */
     getFixedSize() {
       return this.#fixedSize;
     }
     //==============================================================================
     // 정해진 크기 설정. (픽셀)
     //==============================================================================
+    /**
+     * @param { number } s 정해 둘 크기. (픽셀)
+     */
     setFixedSize(s) {
       this.#fixedSize = s;
     }
     //==============================================================================
     // 가장 작은 크기 반환. (픽셀)
     //==============================================================================
+    /**
+     * @returns { number } 가장 작은 크기. (픽셀)
+     */
     getMinSize() {
       return this.#minSize;
     }
     //==============================================================================
     // 가장 큰 크기 반환. (픽셀)
     //==============================================================================
+    /**
+     * @returns { number } 가장 큰 크기. (픽셀)
+     */
     getMaxSize() {
       return this.#maxSize;
     }
     //==============================================================================
     // 컨테이너 요소 반환.
     //==============================================================================
+    /**
+     * @returns { HTMLElement } 컨테이너 요소.
+     */
     getContainer() {
       return this.#container;
     }
     //==============================================================================
     // 배치가 바뀔 때마다 부를 함수 설정.
     //==============================================================================
+    /**
+     * @param { Function | null } c 배치가 바뀔 때마다 부를 함수.
+     */
     setCallback(c) {
       this.#onResizeCallback = c;
     }
     //==============================================================================
     // 크기를 조절할 수 있는지 반환.
     //==============================================================================
+    /**
+     * @returns { boolean } 크기를 조절할 수 있으면 참.
+     */
     isResizable() {
       return this.#isResizable;
     }
     //==============================================================================
     // 조절할 수 있는 가장자리 반환. ({ top, right, bottom, left })
     //==============================================================================
+    /**
+     * @returns { { top: boolean, bottom: boolean, left: boolean, right: boolean } } 조절할 수 있는 가장자리.
+     */
     getResizableEdges() {
       return this.#resizableEdges;
     }

@@ -9926,7 +9926,13 @@
 								"en": "Whether to enable multisample anti-aliasing (MSAA) on the canvas (default framebuffer). Set at creation. On (default) keeps the previous behavior.\nOff makes the edges of shapes and 3D look stepped, but removes the per-frame resolve cost on high-resolution mobile devices.\n(On the web it only chooses on or off through the WebGL context attribute antialias and the browser picks the sample count. On desktop, on means 4 samples)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/engine.js"
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "EngineConfiguration",
+								"name": "antialias"
+							}
 						},
 						{
 							"kind": "field",
@@ -9966,8 +9972,8 @@
 								}
 							},
 							"description": {
-								"ko": "기본 폰트(DOSGothic) 주소. run() 이 뒤에서 불러온다. 빈 글이면 불러오지 않는다.\n(인터넷 없이 도는 데스크탑 앱이나 외부 요청을 막은 페이지는 비우거나 자체 경로를 준다)",
-								"en": "Default font (DOSGothic) URL. run() loads it in the background. An empty string means it is not loaded.\n(Desktop apps that run without internet, or pages that block external requests, leave it empty or give their own path)"
+								"ko": "기본 글꼴 주소. (처음은 빈 글, 러스트 판 default_font_url 과 같다) 주면 run() 이 뒤에서 받아 글꼴 이름 \"default\" 로 올린다.\n- 글꼴 이름 \"default\"(엔진 기본 글꼴 사슬)의 첫 글꼴이 되고, 그 뒤는 시스템 글꼴 사슬 SYSTEM_FONT_STRING 이다. 비우면 받지 않고 시스템 글꼴로 그린다.\n- 엔진은 글꼴을 따로 받지 않는다. 게임 글꼴은 이 주소나 FontAsset 으로 넣는다.",
+								"en": "Default font address. (empty at first, same as Rust default_font_url) When given, run() fetches it in the background and adds it under the font name \"default\".\n- It becomes the first font of the font name \"default\" (the engine default font chain), followed by the system font chain SYSTEM_FONT_STRING. When empty, nothing is fetched and text is drawn with the system font.\n- The engine fetches no font of its own. Give game fonts with this address or a FontAsset."
 							},
 							"since": "0.3.2",
 							"source": "src/core/engine.js",
@@ -13314,6 +13320,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/viewmanager.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/viewmanager",
+								"class": "ViewManager",
+								"name": "is_view_rect_pending"
+							},
 							"examples": [
 								{
 									"title": {
@@ -26399,42 +26411,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "isComponentDrawCulled",
-							"signature": "isComponentDrawCulled(graphic, components)",
-							"params": [
-								{
-									"name": "graphic",
-									"type": "Graphic",
-									"description": {
-										"ko": "화면 밖 거르기를 물을 그래픽.",
-										"en": "Graphic asked about off-screen culling."
-									}
-								},
-								{
-									"name": "components",
-									"type": "Component[]",
-									"description": {
-										"ko": "이 노드의 컴포넌트 목록.",
-										"en": "This node's component list."
-									}
-								}
-							],
-							"returns": {
-								"type": "boolean",
-								"description": {
-									"ko": "컴포넌트 그리기를 건너뛰어도 되면 참.",
-									"en": "True if drawing the components can be skipped."
-								}
-							},
-							"description": {
-								"ko": "화면 밖이라 이 노드의 컴포넌트 그리기를 건너뛸지 반환. (draw 가 부른다)\n- Graphic 의 화면 밖 거르기가 켜져 있고, 켜진 컴포넌트가 하나 이상이며 모두 그리는 곳을 알리고,\n  그 사각형들을 합쳐 지금 변환으로 옮긴 사각형이 화면에 걸치지 않으면 true.\n- 내용 영역 안에서만 그린다고 알리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 본다. (나인 슬라이스가 크기를 올림해 한 단위 안쪽으로 넘칠 수 있다)\n- 밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 가 알려 준 사각형으로 본다. (넘친 글 등, 모르면 거르지 않는다)\n- 자식은 여기서 보지 않는다. 자식은 저마다 따로 본다.",
-								"en": "Returns whether to skip drawing this node's components because it is off screen. (called by draw)\n- true if Graphic's off-screen culling is on, there is at least one enabled component, all of them report where they draw,\n  and the union of those rectangles moved by the current transform does not overlap the screen.\n- Components that report drawing only inside the content area (Component.isDrawnInsideContent) are checked with the content area widened by one unit. (nine-slice rounds sizes up and may spill over by one unit)\n- Components that draw outside are checked with the rectangle reported by Component.calculateDrawnRect. (overflowing text, etc., not culled if unknown)\n- Children are not checked here. Each child is checked separately."
-							},
-							"since": "0.4.0",
-							"source": "src/core/node/worldnode.js"
-						},
-						{
-							"kind": "method",
 							"name": "drawGizmos",
 							"signature": "drawGizmos(graphic)",
 							"params": [
@@ -31139,8 +31115,8 @@
 									"name": "color",
 									"type": "Color | string",
 									"description": {
-										"ko": "\"#rrggbb\"",
-										"en": "\"#rrggbb\""
+										"ko": "그늘 색. (Color 나 \"#rrggbb\" 같은 색 글, 알파는 읽지 않는다)",
+										"en": "Shade colour. (a Color or a colour string such as \"#rrggbb\", the alpha is not read)"
 									}
 								},
 								{
@@ -31239,10 +31215,10 @@
 							"signature": "getColor()",
 							"params": [],
 							"returns": {
-								"type": "string",
+								"type": "Color",
 								"description": {
-									"ko": "색. (\"#rrggbb\")",
-									"en": "Color. (\"#rrggbb\")"
+									"ko": "색. (setShade 에 준 색, 알파는 굽기에 쓰지 않는다)",
+									"en": "Colour. (the colour given to setShade, the alpha is not used for baking)"
 								}
 							},
 							"description": {
@@ -31710,8 +31686,8 @@
 									"name": "textColor",
 									"type": "Color | string",
 									"description": {
-										"ko": "글 색. (\"#rrggbb\" 나 CSS 색)",
-										"en": "Text color. (\"#rrggbb\" or a CSS color)"
+										"ko": "글 색. (Color 나 \"#rrggbb\" 같은 색 글, 알파가 글자 불투명도)",
+										"en": "Text colour. (a Color or a colour string such as \"#rrggbb\", the alpha is the text opacity)"
 									}
 								}
 							],
@@ -32066,8 +32042,8 @@
 									"name": "shadowColor",
 									"type": "Color | string",
 									"description": {
-										"ko": "\"#rrggbb\"",
-										"en": "\"#rrggbb\""
+										"ko": "그림자 색. (Color 나 \"#rrggbb\" 같은 색 글, 알파는 읽지 않는다)",
+										"en": "Shadow colour. (a Color or a colour string such as \"#rrggbb\", the alpha is not read)"
 									}
 								},
 								{
@@ -32543,10 +32519,10 @@
 							"params": [
 								{
 									"name": "imageColor",
-									"type": "string | null",
+									"type": "Color | string | null",
 									"description": {
-										"ko": "그림을 한 빛으로 칠할 CSS 색. (null 이면 그림 그대로)",
-										"en": "CSS color to fill the image with a single color. (the image as is if null)"
+										"ko": "그림을 한 빛으로 칠할 색. (Color 나 \"#rrggbb\" 같은 색 글, 알파가 칠의 불투명도, null 이면 그림 그대로)",
+										"en": "Colour to paint the image in one tone. (a Color or a colour string such as \"#rrggbb\", the alpha is the paint opacity, null keeps the image as is)"
 									}
 								}
 							],
@@ -32569,7 +32545,7 @@
 							"signature": "getImageColor()",
 							"params": [],
 							"returns": {
-								"type": "string | null",
+								"type": "Color | null",
 								"description": {
 									"ko": "그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)",
 									"en": "Color to fill the image with a single color. (the image as is if null)"
@@ -32597,8 +32573,8 @@
 									"name": "shadowColor",
 									"type": "Color | string",
 									"description": {
-										"ko": "\"#rrggbb\"",
-										"en": "\"#rrggbb\""
+										"ko": "그림자 색. (Color 나 \"#rrggbb\" 같은 색 글, 알파는 읽지 않는다)",
+										"en": "Shadow colour. (a Color or a colour string such as \"#rrggbb\", the alpha is not read)"
 									}
 								},
 								{
@@ -39802,35 +39778,6 @@
 								"class": "UIButton",
 								"name": "set_click_event"
 							}
-						},
-						{
-							"kind": "method",
-							"name": "setStateEvent",
-							"signature": "setStateEvent(buttonState, callback)",
-							"params": [
-								{
-									"name": "buttonState",
-									"type": "ButtonState",
-									"description": {
-										"ko": "버튼 상태. (지금은 쓰지 않는다)",
-										"en": "Button state. (currently unused)"
-									}
-								},
-								{
-									"name": "callback",
-									"type": "function(UIButton): boolean",
-									"description": {
-										"ko": "그 상태에 걸 함수. (지금은 담지 않는다)",
-										"en": "Function to hook to that state. (currently not stored)"
-									}
-								}
-							],
-							"description": {
-								"ko": "클릭 이벤트 설정.",
-								"en": "Sets the click event."
-							},
-							"since": "0.2.0",
-							"source": "src/ui/uibutton.js"
 						},
 						{
 							"kind": "method",
@@ -57978,14 +57925,14 @@
 						},
 						{
 							"kind": "method",
-							"name": "use",
-							"signature": "use()",
+							"name": "useProgram",
+							"signature": "useProgram()",
 							"params": [],
 							"description": {
 								"ko": "프로그램 사용 시작. (컨텍스트의 상태 캐시가 이미 이 프로그램을 쓴다고 기억하면 다시 걸지 않는다)",
 								"en": "Starts using the program. (Does not set it again when the context's state cache remembers that this program is already in use)"
 							},
-							"since": "0.3.0",
+							"since": "0.4.0",
 							"source": "src/core/graphic/shaderprogram.js"
 						},
 						{
@@ -75177,25 +75124,6 @@
 								"class": "LocalStorage",
 								"name": "is_memory_fallback"
 							}
-						},
-						{
-							"kind": "static",
-							"name": "readStorage",
-							"signature": "static readStorage()",
-							"params": [],
-							"returns": {
-								"type": "object | null",
-								"description": {
-									"ko": "지금 쓰는 저장소. 못 쓰면 null.",
-									"en": "The storage in use. null if unavailable."
-								}
-							},
-							"description": {
-								"ko": "지금 쓰는 저장소 반환. (갈아 끼운 것, 없으면 window.localStorage, 그것도 막혀 있으면 null)",
-								"en": "Returns the storage currently in use. (the swapped-in one, else window.localStorage, null if that is also blocked)"
-							},
-							"since": "0.4.0",
-							"source": "src/misc/localstorage.js"
 						},
 						{
 							"kind": "static",
@@ -97706,18 +97634,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "refreshMatrices",
-							"signature": "refreshMatrices()",
-							"params": [],
-							"description": {
-								"ko": "바뀐 값이 있으면 행렬 넷을 다시 셈하기. (원 행렬이 있으면 그것으로)",
-								"en": "Recomputes the four matrices if any value changed. (from the raw matrices if present)"
-							},
-							"since": "0.4.0",
-							"source": "src/graphics3d/camera3d.js"
-						},
-						{
-							"kind": "method",
 							"name": "getViewMatrix",
 							"signature": "getViewMatrix()",
 							"params": [],
@@ -98744,6 +98660,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonview3d.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonview3d",
+								"class": "ToonView3D",
+								"name": "set_render_scale"
+							},
 							"examples": [
 								{
 									"title": {
@@ -98772,7 +98694,13 @@
 								"en": "Return the render scale."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonview3d.js"
+							"source": "src/graphics3d/toon/toonview3d.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonview3d",
+								"class": "ToonView3D",
+								"name": "get_render_scale"
+							}
 						},
 						{
 							"kind": "method",
@@ -110643,6 +110571,1287 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "core/audiomanager",
+			"summary": {
+				"ko": "오디오 매니저.\n공유 AudioContext를 소유하며 AudioPlayer 생성을 담당한다.\n\n브라우저 자동재생 정책 대응:\n - 첫 user gesture (click/touch/keydown) 전에 AudioContext 를 만들면\n   브라우저가 console 경고(\"AudioContext was not allowed to start ...\")를 띄운다.\n - 그래서 AudioContext 는 lazy 생성 + user gesture 가 발생한 뒤에만 만든다.\n - resumeContext() 도 user gesture 이전에는 silently no-op 한다.\n - createAudioPlayer() 가 user gesture 전에 호출될 수 있는 경우를 위해\n   플레이어 생성 시점에는 (마지못해) AudioContext 를 만든다, 이때만 경고가 날 수 있음.\n\niOS 버전업 대응 (2026-10-22 03:41, iOS 26.6.2 에서 확인):\n - iOS 에서는 resumeContext() 로 복원된 컨텍스트가 \"running\" 이면 verifyContextClock() 으로 시계가 실제로 흐르는지 확인한다.\n - 옵션이 아니라 iOS(iPadOS 포함) 에서 늘 한다. 다른 플랫폼은 지금까지와 같다.",
+				"en": "Audio manager.\nOwns the shared AudioContext and creates AudioPlayer instances.\n\nHandling the browser autoplay policy:\n - Creating an AudioContext before the first user gesture (click/touch/keydown) makes the browser print a console warning (\"AudioContext was not allowed to start ...\").\n - So the AudioContext is created lazily, only after a user gesture has happened.\n - resumeContext() also silently does nothing before a user gesture.\n - For the case where createAudioPlayer() is called before a user gesture, the AudioContext is created (reluctantly) when the player is created, and only then a warning may appear.\n\nHandling iOS updates (2026-10-22 03:41, confirmed on iOS 26.6.2):\n - On iOS, when a context restored by resumeContext() is \"running\", verifyContextClock() checks that the clock is really advancing.\n - This is not an option: it always runs on iOS (including iPadOS). Other platforms behave as before."
+			},
+			"classes": [
+				{
+					"name": "AudioManager",
+					"summary": {
+						"ko": "오디오 매니저.\n공유 AudioContext를 소유하며 AudioPlayer 생성을 담당한다.\n\n브라우저 자동재생 정책 대응:\n - 첫 user gesture (click/touch/keydown) 전에 AudioContext 를 만들면\n   브라우저가 console 경고(\"AudioContext was not allowed to start ...\")를 띄운다.\n - 그래서 AudioContext 는 lazy 생성 + user gesture 가 발생한 뒤에만 만든다.\n - resumeContext() 도 user gesture 이전에는 silently no-op 한다.\n - createAudioPlayer() 가 user gesture 전에 호출될 수 있는 경우를 위해\n   플레이어 생성 시점에는 (마지못해) AudioContext 를 만든다, 이때만 경고가 날 수 있음.\n\niOS 버전업 대응 (2026-10-22 03:41, iOS 26.6.2 에서 확인):\n - iOS 에서는 resumeContext() 로 복원된 컨텍스트가 \"running\" 이면 verifyContextClock() 으로 시계가 실제로 흐르는지 확인한다.\n - 옵션이 아니라 iOS(iPadOS 포함) 에서 늘 한다. 다른 플랫폼은 지금까지와 같다.",
+						"en": "Audio manager.\nOwns the shared AudioContext and creates AudioPlayer instances.\n\nHandling the browser autoplay policy:\n - Creating an AudioContext before the first user gesture (click/touch/keydown) makes the browser print a console warning (\"AudioContext was not allowed to start ...\").\n - So the AudioContext is created lazily, only after a user gesture has happened.\n - resumeContext() also silently does nothing before a user gesture.\n - For the case where createAudioPlayer() is called before a user gesture, the AudioContext is created (reluctantly) when the player is created, and only then a warning may appear.\n\nHandling iOS updates (2026-10-22 03:41, confirmed on iOS 26.6.2):\n - On iOS, when a context restored by resumeContext() is \"running\", verifyContextClock() checks that the clock is really advancing.\n - This is not an option: it always runs on iOS (including iPadOS). Other platforms behave as before."
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "오디오 플레이어와 버스 만들기",
+								"en": "Audio player and bus creation"
+							},
+							"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\ttick(timeDelta) {\n\t\tsuper.tick(timeDelta);\n\t\tconst engine = this.getEngine();\n\t\tconst audioManager = engine.getAudioManager();\n\t\tconsole.log(audioManager.hasUserGesture(), audioManager.getContextTime());\n\t\tconst audioPlayer = audioManager.createAudioPlayer();\n\t\tconst audioBus = audioManager.createAudioBus();\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+							"language": "javascript"
+						}
+					],
+					"extends": "Object",
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor(engine)",
+							"params": [
+								{
+									"name": "engine",
+									"type": "Engine",
+									"description": {
+										"ko": "소리를 맡을 엔진. (플랫폼 정보로 iOS 인지 가린다)",
+										"en": "The engine that owns the sound. (its platform information tells whether this is iOS)"
+									}
+								}
+							],
+							"description": {
+								"ko": "생성.",
+								"en": "Constructor."
+							},
+							"since": "0.0.10",
+							"source": "src/core/audiomanager.js"
+						},
+						{
+							"kind": "method",
+							"name": "markUserGesture",
+							"signature": "markUserGesture()",
+							"params": [],
+							"description": {
+								"ko": "첫 user gesture 가 발생했음을 알린다. (Engine 의 click/touchstart/keydown 핸들러에서 호출)",
+								"en": "Reports that the first user gesture happened. (called from the Engine's click, touchstart and keydown handlers)"
+							},
+							"since": "0.2.1",
+							"source": "src/core/audiomanager.js"
+						},
+						{
+							"kind": "method",
+							"name": "hasUserGesture",
+							"signature": "hasUserGesture()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "첫 사용자 입력(클릭, 터치, 키)이 이미 있었으면 참.",
+									"en": "True if the first user input (click, touch, key) has already happened."
+								}
+							},
+							"description": {
+								"ko": "user gesture 이후인지 여부.",
+								"en": "Whether this is after a user gesture."
+							},
+							"since": "0.2.1",
+							"source": "src/core/audiomanager.js"
+						},
+						{
+							"kind": "method",
+							"name": "resumeContext",
+							"signature": "resumeContext()",
+							"params": [],
+							"description": {
+								"ko": "오디오 컨텍스트 재개.\n- user gesture 전에는 silently no-op (브라우저 경고 회피).\n- resume() 의 promise rejection 도 silently 처리.",
+								"en": "Resumes the audio context.\n- Does nothing silently before a user gesture (avoids the browser warning).\n- Also handles a promise rejection of resume() silently."
+							},
+							"since": "0.0.10",
+							"source": "src/core/audiomanager.js"
+						},
+						{
+							"kind": "method",
+							"name": "createAudioPlayer",
+							"signature": "createAudioPlayer()",
+							"params": [],
+							"returns": {
+								"type": "AudioPlayer",
+								"description": {
+									"ko": "공유 오디오 컨텍스트로 만든 새 오디오 플레이어.",
+									"en": "A new audio player made with the shared audio context."
+								}
+							},
+							"description": {
+								"ko": "오디오 플레이어 생성.",
+								"en": "Creates an audio player."
+							},
+							"since": "0.0.10",
+							"source": "src/core/audiomanager.js"
+						},
+						{
+							"kind": "method",
+							"name": "createAudioBus",
+							"signature": "createAudioBus()",
+							"params": [],
+							"returns": {
+								"type": "AudioBus",
+								"description": {
+									"ko": "공유 오디오 컨텍스트로 만든 새 오디오 버스. (컨텍스트를 만들 수 없으면 소리 없는 버스)",
+									"en": "A new audio bus made with the shared audio context. (a silent bus if the context cannot be created)"
+								}
+							},
+							"description": {
+								"ko": "오디오 버스 생성. (AudioContext 가 없으면 만든다, 만들지 못하면 소리 없는 버스)",
+								"en": "Creates an audio bus. (creates the AudioContext if there is none, a silent bus if it cannot be made)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/audiomanager.js"
+						},
+						{
+							"kind": "method",
+							"name": "getContextTime",
+							"signature": "getContextTime()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "오디오 컨텍스트 시계. (초, 컨텍스트가 아직 없으면 0)",
+									"en": "The audio context clock. (seconds, 0 while there is no context yet)"
+								}
+							},
+							"description": {
+								"ko": "오디오 컨텍스트 시계. (초, audioContext.currentTime, AudioContext 가 없으면 0)",
+								"en": "The audio context clock. (seconds, audioContext.currentTime, 0 if there is no AudioContext)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/audiomanager.js"
+						},
+						{
+							"kind": "method",
+							"name": "getAudioContext",
+							"signature": "getAudioContext()",
+							"params": [],
+							"returns": {
+								"type": "AudioContext | null",
+								"description": {
+									"ko": "공유 오디오 컨텍스트. (아직 만들지 않았으면 null)",
+									"en": "The shared audio context. (null if not created yet)"
+								}
+							},
+							"description": {
+								"ko": "오디오 컨텍스트 반환. (없으면 null)",
+								"en": "Returns the audio context. (null if there is none)"
+							},
+							"since": "0.0.10",
+							"source": "src/core/audiomanager.js"
+						}
+					]
+				}
+			],
+			"functions": [],
+			"enums": []
+		},
+		{
+			"name": "misc/devtools",
+			"summary": {
+				"ko": "고정 레이아웃 상수.",
+				"en": "Fixed layout constants."
+			},
+			"classes": [
+				{
+					"name": "DevTools",
+					"summary": {
+						"ko": "하이어라키 패널.\n- F2 키로 표시/숨김 토글.\n- 씬 노드 계층 구조를 좌측 트리 + 우측 인스펙터로 표시.\n- 타이틀바 드래그로 패널 이동.\n- 모든 엣지/코너 드래그로 크기 조절.\n- 중앙 구분선 드래그로 좌우 비율 조절.\n- 컴포넌트 헤더 클릭으로 프로퍼티 목록 펼침/접힘 (기본값: 펼침).",
+						"en": "Hierarchy panel.\n- The F2 key toggles show and hide.\n- Shows the scene node hierarchy as a left tree and a right inspector.\n- Drag the title bar to move the panel.\n- Drag any edge or corner to resize.\n- Drag the center splitter to change the left and right ratio.\n- Click a component header to expand or collapse its property list. (default: expanded)"
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "패널을 열고 탭 고르기",
+								"en": "Open the panel and choose a tab"
+							},
+							"code": "import { DevTools } from \"./build/vanilla.js\";\n\nconst devTools = new DevTools();\ndevTools.setActiveTab(1);\ndevTools.setVisible(true);\nconsole.log(devTools.isVisible(), devTools.getActiveTab());\nconsole.log(devTools.getPanelRect().width > 0, devTools.isFramePerSecondVisible());",
+							"language": "javascript"
+						}
+					],
+					"extends": "Object",
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor()",
+							"params": [],
+							"description": {
+								"ko": "생성.",
+								"en": "Constructor."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "setEngine",
+							"signature": "setEngine(engine)",
+							"params": [
+								{
+									"name": "engine",
+									"type": "Engine",
+									"description": {
+										"ko": "개발 도구가 들여다볼 엔진. (기즈모 표시는 도구가 맡으므로 강제 기즈모를 끈다)",
+										"en": "The engine the dev tools look into. (the dev tools own gizmo display, so the forced gizmos are turned off)"
+									}
+								}
+							],
+							"description": {
+								"ko": "엔진 설정.",
+								"en": "Engine configuration."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "setRootNodes",
+							"signature": "setRootNodes(rootNodes)",
+							"params": [
+								{
+									"name": "rootNodes",
+									"type": "TransformNode[]",
+									"description": {
+										"ko": "트리에 보일 루트 노드 목록. (루트는 처음부터 펼친다)",
+										"en": "The list of root nodes shown in the tree. (roots start expanded)"
+									}
+								}
+							],
+							"description": {
+								"ko": "루트 노드 목록 설정.",
+								"en": "Sets the root node list."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "isVisible",
+							"signature": "isVisible()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "패널이 보이면 참.",
+									"en": "True if the panel is visible."
+								}
+							},
+							"description": {
+								"ko": "표시 여부 반환.",
+								"en": "Returns whether it is visible."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "setVisible",
+							"signature": "setVisible(isVisible)",
+							"params": [
+								{
+									"name": "isVisible",
+									"type": "boolean",
+									"description": {
+										"ko": "패널을 보이면 참, 숨기면 거짓.",
+										"en": "True to show the panel, false to hide it."
+									}
+								}
+							],
+							"description": {
+								"ko": "보이기와 숨기기. (F2 와 같다. 보일 때 패널을 창 오른쪽 아래에 붙이고, 모든 기즈모 설정을 건다)",
+								"en": "Shows and hides. (same as F2. When shown, the panel is attached to the bottom right of the window and every gizmo setting is turned on)"
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "getActiveTab",
+							"signature": "getActiveTab()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "지금 탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)",
+									"en": "The current tab number. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)"
+								}
+							},
+							"description": {
+								"ko": "지금 탭 반환. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)",
+								"en": "Returns the current tab. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)"
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "setActiveTab",
+							"signature": "setActiveTab(tabIndex)",
+							"params": [
+								{
+									"name": "tabIndex",
+									"type": "number",
+									"description": {
+										"ko": "탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)",
+										"en": "The tab number. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)"
+									}
+								}
+							],
+							"description": {
+								"ko": "탭 설정. (없는 탭이면 무시)",
+								"en": "Sets the tab. (ignored if there is no such tab)"
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "getSelectedNode",
+							"signature": "getSelectedNode()",
+							"params": [],
+							"returns": {
+								"type": "TransformNode | null",
+								"description": {
+									"ko": "고른 노드. (없으면 null)",
+									"en": "The selected node. (null if none)"
+								}
+							},
+							"description": {
+								"ko": "고른 노드 반환.",
+								"en": "Returns the selected node."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "setSelectedNode",
+							"signature": "setSelectedNode(node)",
+							"params": [
+								{
+									"name": "node",
+									"type": "TransformNode | null",
+									"description": {
+										"ko": "고를 노드. (null 이면 선택을 푼다)",
+										"en": "The node to select. (null clears the selection)"
+									}
+								}
+							],
+							"description": {
+								"ko": "노드 고르기. (인스펙터 스크롤은 맨 위로)",
+								"en": "Selects a node. (the inspector scroll goes back to the top)"
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "isNodeExpanded",
+							"signature": "isNodeExpanded(node)",
+							"params": [
+								{
+									"name": "node",
+									"type": "TransformNode",
+									"description": {
+										"ko": "확인할 노드.",
+										"en": "The node to check."
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "트리에서 그 노드를 펼쳤으면 참.",
+									"en": "True if that node is expanded in the tree."
+								}
+							},
+							"description": {
+								"ko": "트리에서 노드를 펼쳤는지.",
+								"en": "Whether the node is expanded in the tree."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "setNodeExpanded",
+							"signature": "setNodeExpanded(node, isExpanded)",
+							"params": [
+								{
+									"name": "node",
+									"type": "TransformNode",
+									"description": {
+										"ko": "펼치거나 접을 노드.",
+										"en": "The node to expand or collapse."
+									}
+								},
+								{
+									"name": "isExpanded",
+									"type": "boolean",
+									"description": {
+										"ko": "펼치면 참, 접으면 거짓.",
+										"en": "True to expand, false to collapse."
+									}
+								}
+							],
+							"description": {
+								"ko": "트리에서 노드 펼치기와 접기.",
+								"en": "Expands and collapses a node in the tree."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "getPanelRect",
+							"signature": "getPanelRect()",
+							"params": [],
+							"returns": {
+								"type": "Rect",
+								"description": {
+									"ko": "패널 영역. (창 안쪽 논리 좌표)",
+									"en": "The panel area. (logical coordinates inside the window)"
+								}
+							},
+							"description": {
+								"ko": "패널 영역 반환. (창 안쪽 논리 좌표)",
+								"en": "Returns the panel area. (logical coordinates inside the window)"
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "isPointerInsidePanel",
+							"signature": "isPointerInsidePanel()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "지금 포인터가 패널 안에 있으면 참. (패널이 숨겨져 있으면 거짓)",
+									"en": "True if the pointer is inside the panel right now. (false while the panel is hidden)"
+								}
+							},
+							"description": {
+								"ko": "현재 터치 위치가 패널 내부에 있는지 반환.",
+								"en": "Returns whether the current touch position is inside the panel."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "tick",
+							"signature": "tick(timeDelta)",
+							"params": [
+								{
+									"name": "timeDelta",
+									"type": "number",
+									"description": {
+										"ko": "지난 프레임과의 간격. (초)",
+										"en": "Interval since the last frame. (seconds)"
+									}
+								}
+							],
+							"description": {
+								"ko": "갱신.",
+								"en": "Update."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "draw",
+							"signature": "draw(graphic)",
+							"params": [
+								{
+									"name": "graphic",
+									"type": "Graphic",
+									"description": {
+										"ko": "그릴 그래픽.",
+										"en": "Graphic to draw with."
+									}
+								}
+							],
+							"description": {
+								"ko": "출력.",
+								"en": "Draw."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						},
+						{
+							"kind": "method",
+							"name": "isFramePerSecondVisible",
+							"signature": "isFramePerSecondVisible()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "Settings 의 Show FPS 가 켜졌으면 참. (켜지면 draw 가 패널을 닫아도 창 왼쪽 위에 FPS 를 그린다)",
+									"en": "True if Show FPS in Settings is on. (when on, draw shows the FPS at the top left of the window even with the panel closed)"
+								}
+							},
+							"description": {
+								"ko": "FPS 표시 여부 반환.",
+								"en": "Returns whether the FPS display is on."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/devtools.js"
+						}
+					]
+				}
+			],
+			"functions": [],
+			"enums": []
+		},
+		{
+			"name": "web/pane",
+			"summary": {
+				"ko": "화면 분할 패널(Pane) 클래스.",
+				"en": "Split panel (Pane) class."
+			},
+			"classes": [
+				{
+					"name": "PaneStyle",
+					"summary": {
+						"ko": "스타일 및 요소 생성 유틸리티.",
+						"en": "Utility for styles and element creation."
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "테마 스타일이 적용된 단추 만들기",
+								"en": "Create a button with the theme style"
+							},
+							"code": "import { PaneStyle, PaneTheme } from \"./build/vanilla.js\";\n\nconst button = PaneStyle.create(\"button\", \"button\", { text: \"OK\", accent: true });\nPaneStyle.apply(button, { margin: \"8px\" });\ndocument.body.appendChild(button);\nconsole.log(button.style.margin, PaneTheme.color.accent);",
+							"language": "javascript"
+						}
+					],
+					"members": [
+						{
+							"kind": "static",
+							"name": "apply",
+							"signature": "static apply(el, styles)",
+							"params": [
+								{
+									"name": "el",
+									"type": "HTMLElement",
+									"description": {
+										"ko": "스타일을 적용할 엘리먼트.",
+										"en": "The element to apply the styles to."
+									}
+								},
+								{
+									"name": "styles",
+									"type": "Object",
+									"description": {
+										"ko": "적용할 CSS 속성 이름과 값. (camelCase)",
+										"en": "CSS property names and values to apply. (camelCase)"
+									}
+								}
+							],
+							"description": {
+								"ko": "엘리먼트에 여러 스타일을 한꺼번에 적용한다. (엘리먼트나 스타일이 없으면 아무것도 하지 않는다)",
+								"en": "Applies several styles to an element at once. (does nothing if the element or the styles are missing)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "static",
+							"name": "create",
+							"signature": "static create(tagName, preset = \"\", options = {})",
+							"params": [
+								{
+									"name": "tagName",
+									"type": "string",
+									"description": {
+										"ko": "만들 태그 이름.",
+										"en": "The tag name to create."
+									}
+								},
+								{
+									"name": "preset",
+									"type": "string",
+									"description": {
+										"ko": "프리셋 이름. (\"panel\", \"toolbar\", \"button\", \"input\", \"textarea\", \"text\", 빈 글이면 공통 스타일만)",
+										"en": "The preset name. (\"panel\", \"toolbar\", \"button\", \"input\", \"textarea\", \"text\", or empty for the common style only)"
+									}
+								},
+								{
+									"name": "options",
+									"type": "Object",
+									"description": {
+										"ko": "{ id, text, style, type, placeholder, accent, warning }. (accent 나 warning 이 참인 단추는 그 색 바탕)",
+										"en": "{ id, text, style, type, placeholder, accent, warning }. (a button with accent or warning true gets that color as its background)"
+									}
+								}
+							],
+							"returns": {
+								"type": "HTMLElement",
+								"description": {
+									"ko": "만든 엘리먼트.",
+									"en": "The created element."
+								}
+							},
+							"description": {
+								"ko": "스타일 프리셋이 적용된 엘리먼트를 만든다.",
+								"en": "Creates an element with a style preset applied."
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						}
+					]
+				},
+				{
+					"name": "Pane",
+					"summary": {
+						"ko": "화면 분할 패널(Pane) 클래스.",
+						"en": "Split panel (Pane) class."
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "좌우로 나누고 부모 요소에 붙이기",
+								"en": "Split left and right and attach to a parent element"
+							},
+							"code": "import { Pane } from \"./build/vanilla.js\";\n\nconst rootPane = new Pane({ direction: \"horizontal\" });\nconst leftPane = new Pane({ size: 200, minSize: 100 });\nconst rightPane = new Pane({ size: \"flex\" });\nrootPane.addPane(leftPane);\nrootPane.addPane(rightPane);\nrootPane.attachTo(document.body);\nconsole.log(leftPane.getInitialSize(), rightPane.isFlex(), leftPane.getMinSize());",
+							"language": "javascript"
+						}
+					],
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor(options = {})",
+							"params": [
+								{
+									"name": "options",
+									"type": "{ direction?: string, size?: number | string, minSize?: number, maxSize?: number, isResizable?: boolean, resizableEdges?: { top: boolean, bottom: boolean, left: boolean, right: boolean } }",
+									"description": {
+										"ko": "나누는 방향(horizontal 이나 vertical), 처음 크기(픽셀, 1 이하의 비율, 퍼센트 글, flex), 가장 작고 큰 크기, 조절 가능 여부와 가장자리.",
+										"en": "The split direction (horizontal or vertical), the initial size (pixels, a ratio of 1 or less, a percent string, or flex), the smallest and largest size, whether it can be resized and which edges."
+									}
+								}
+							],
+							"description": {
+								"ko": "생성.",
+								"en": "Constructor."
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "addPane",
+							"signature": "addPane(pane)",
+							"params": [
+								{
+									"name": "pane",
+									"type": "Pane",
+									"description": {
+										"ko": "자식으로 붙일 패널. (앞 자식과의 사이에 리사이저가 생긴다)",
+										"en": "The panel to attach as a child. (a resizer appears between it and the previous child)"
+									}
+								}
+							],
+							"description": {
+								"ko": "자식 추가.",
+								"en": "Adds a child."
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "updateLayout",
+							"signature": "updateLayout(x, y, w, h)",
+							"params": [
+								{
+									"name": "x",
+									"type": "number",
+									"description": {
+										"ko": "왼쪽 자리. (픽셀)",
+										"en": "The left position. (pixels)"
+									}
+								},
+								{
+									"name": "y",
+									"type": "number",
+									"description": {
+										"ko": "위쪽 자리. (픽셀)",
+										"en": "The top position. (pixels)"
+									}
+								},
+								{
+									"name": "w",
+									"type": "number",
+									"description": {
+										"ko": "너비. (픽셀)",
+										"en": "Width. (pixels)"
+									}
+								},
+								{
+									"name": "h",
+									"type": "number",
+									"description": {
+										"ko": "높이. (픽셀)",
+										"en": "Height. (pixels)"
+									}
+								}
+							],
+							"description": {
+								"ko": "레이아웃 엔진",
+								"en": "Layout engine."
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "resetLayout",
+							"signature": "resetLayout()",
+							"params": [],
+							"description": {
+								"ko": "레이아웃 초기화 (드래그한 크기 삭제)",
+								"en": "Resets the layout. (discards dragged sizes)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "refresh",
+							"signature": "refresh()",
+							"params": [],
+							"description": {
+								"ko": "부모 요소의 크기로 다시 배치. (부모가 없으면 아무것도 하지 않는다)",
+								"en": "Lays out again with the parent element's size. (does nothing if there is no parent)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "attachTo",
+							"signature": "attachTo(p)",
+							"params": [
+								{
+									"name": "p",
+									"type": "HTMLElement",
+									"description": {
+										"ko": "붙일 부모 요소.",
+										"en": "The parent element to attach to."
+									}
+								}
+							],
+							"description": {
+								"ko": "부모 요소에 붙이기. (창 크기가 바뀔 때마다 다시 배치한다)",
+								"en": "Attaches to a parent element. (lays out again every time the window size changes)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "setVisible",
+							"signature": "setVisible(isVisible)",
+							"params": [
+								{
+									"name": "isVisible",
+									"type": "boolean",
+									"description": {
+										"ko": "보이면 참, 숨기면 거짓.",
+										"en": "True to show, false to hide."
+									}
+								}
+							],
+							"description": {
+								"ko": "보이기 / 숨기기. (숨긴 패널은 자리를 차지하지 않고, 맞닿은 리사이저도 숨는다)",
+								"en": "Shows and hides. (a hidden panel takes no space, and the resizers next to it hide too)"
+							},
+							"since": "0.3.2",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "isVisible",
+							"signature": "isVisible()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "보이면 참.",
+									"en": "True if visible."
+								}
+							},
+							"description": {
+								"ko": "보이는지 반환.",
+								"en": "Returns whether it is visible."
+							},
+							"since": "0.3.2",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "isFlex",
+							"signature": "isFlex()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "남는 자리를 나눠 가지면 참.",
+									"en": "True if it shares the remaining space."
+								}
+							},
+							"description": {
+								"ko": "남는 자리를 나눠 갖는지 반환. (처음 크기가 0 이면 참)",
+								"en": "Returns whether it shares the remaining space. (true when the initial size is 0)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "getInitialSize",
+							"signature": "getInitialSize()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "처음 크기. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)",
+									"en": "The initial size. (a ratio of the parent if 1 or less, pixels if more)"
+								}
+							},
+							"description": {
+								"ko": "처음 크기 반환. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)",
+								"en": "Returns the initial size. (a ratio of the parent if 1 or less, pixels if more)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "getFixedSize",
+							"signature": "getFixedSize()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "정해진 크기. (픽셀, 정해진 것이 없으면 0)",
+									"en": "The decided size. (pixels, 0 if none is decided)"
+								}
+							},
+							"description": {
+								"ko": "정해진 크기 반환. (끌어서 정했거나 처음 크기가 픽셀이면 그 값, 아니면 0)",
+								"en": "Returns the decided size. (the value if it was set by dragging or the initial size is in pixels, otherwise 0)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "setFixedSize",
+							"signature": "setFixedSize(s)",
+							"params": [
+								{
+									"name": "s",
+									"type": "number",
+									"description": {
+										"ko": "정해 둘 크기. (픽셀)",
+										"en": "The size to decide. (pixels)"
+									}
+								}
+							],
+							"description": {
+								"ko": "정해진 크기 설정. (픽셀)",
+								"en": "Sets the decided size. (pixels)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "getMinSize",
+							"signature": "getMinSize()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "가장 작은 크기. (픽셀)",
+									"en": "The smallest size. (pixels)"
+								}
+							},
+							"description": {
+								"ko": "가장 작은 크기 반환. (픽셀)",
+								"en": "Returns the smallest size. (pixels)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "getMaxSize",
+							"signature": "getMaxSize()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "가장 큰 크기. (픽셀)",
+									"en": "Largest size. (pixels)"
+								}
+							},
+							"description": {
+								"ko": "가장 큰 크기 반환. (픽셀)",
+								"en": "Returns the largest size. (pixels)"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "getContainer",
+							"signature": "getContainer()",
+							"params": [],
+							"returns": {
+								"type": "HTMLElement",
+								"description": {
+									"ko": "컨테이너 요소.",
+									"en": "The container element."
+								}
+							},
+							"description": {
+								"ko": "컨테이너 요소 반환.",
+								"en": "Returns the container element."
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "setCallback",
+							"signature": "setCallback(c)",
+							"params": [
+								{
+									"name": "c",
+									"type": "Function | null",
+									"description": {
+										"ko": "배치가 바뀔 때마다 부를 함수.",
+										"en": "The function to call every time the layout changes."
+									}
+								}
+							],
+							"description": {
+								"ko": "배치가 바뀔 때마다 부를 함수 설정.",
+								"en": "Sets the function to call every time the layout changes."
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "isResizable",
+							"signature": "isResizable()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "크기를 조절할 수 있으면 참.",
+									"en": "True if the size can be resized."
+								}
+							},
+							"description": {
+								"ko": "크기를 조절할 수 있는지 반환.",
+								"en": "Returns whether the size can be resized."
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						},
+						{
+							"kind": "method",
+							"name": "getResizableEdges",
+							"signature": "getResizableEdges()",
+							"params": [],
+							"returns": {
+								"type": "{ top: boolean, bottom: boolean, left: boolean, right: boolean }",
+								"description": {
+									"ko": "조절할 수 있는 가장자리.",
+									"en": "The edges that can be resized."
+								}
+							},
+							"description": {
+								"ko": "조절할 수 있는 가장자리 반환. ({ top, right, bottom, left })",
+								"en": "Returns the edges that can be resized. ({ top, right, bottom, left })"
+							},
+							"since": "0.0.10",
+							"source": "src/web/pane.js"
+						}
+					]
+				}
+			],
+			"functions": [],
+			"enums": [
+				{
+					"name": "PaneTheme",
+					"summary": {
+						"ko": "테마 상수 정의.",
+						"en": "Theme constants."
+					},
+					"values": [
+						{
+							"name": "color",
+							"value": "{ background: \"#1e1e1e\", panel: \"#252526\", toolbar: \"#2d2d30\", border: \"#444\", text: \"#ccc\", textDim: \"#aaaaaa\", accent: \"#0e639c\", accentHover: \"#1177bb\", warning: \"#d97706\", warningHover: \"#f59e0b\", error: \"#f44336\", success: \"#4CAF50\", inputBg: \"#3c3c3c\", resizer: \"#333\", resizerHover: \"#007acc\" }",
+							"description": {
+								"ko": "색. (CSS 색 글)",
+								"en": "Colors. (CSS color strings)"
+							}
+						},
+						{
+							"name": "size",
+							"value": "{ resizer: 5 }",
+							"description": {
+								"ko": "크기. (픽셀)",
+								"en": "Size. (pixels)"
+							}
+						},
+						{
+							"name": "font",
+							"value": "{ family: \"sans-serif\", mono: \"\\\"Consolas\\\", monospace\", size: \"13px\", sizeSmall: \"12px\" }",
+							"description": {
+								"ko": "글꼴과 글 크기.",
+								"en": "Font and font size."
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "web/websocketclient",
+			"summary": {
+				"ko": "웹소켓 통신 처리기.",
+				"en": "WebSocket communication handler."
+			},
+			"classes": [
+				{
+					"name": "WebSocketClient",
+					"summary": {
+						"ko": "웹소켓 통신 처리기.\n- 받은 JSON 은 수신 콜백이 있으면 그것을 부르고, 없으면 모아 두었다가 takeReceivedMessages 로 꺼낸다. (매 프레임 꺼내 쓰는 게임용)",
+						"en": "WebSocket communication handler.\n- A received JSON is passed to the receive callback if there is one, otherwise it is collected and taken out with takeReceivedMessages. (for games that take them out every frame)"
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "받은 JSON 을 콜백으로 받거나 모아서 꺼내기",
+								"en": "Receive received JSON with a callback or collect and take it out"
+							},
+							"code": "import { WebSocketClient } from \"./build/vanilla.js\";\n\nconst client = new WebSocketClient();\nclient.receiveMessage({ type: \"hello\" });\nconsole.log(client.isConnected(), client.takeReceivedMessages().length);\nclient.setReceiveEvent((message) => {\n\tconsole.log(message.type);\n});\nclient.receiveMessage({ type: \"ping\" });\nconsole.log(client.getReceiveEvent() !== null);",
+							"language": "javascript"
+						}
+					],
+					"extends": "Object",
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor()",
+							"params": [],
+							"description": {
+								"ko": "생성.",
+								"en": "Constructor."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "connect",
+							"signature": "connect(url)",
+							"params": [
+								{
+									"name": "url",
+									"type": "string",
+									"description": {
+										"ko": "접속할 웹소켓 주소. (ws:// 나 wss://, 이미 접속 중이면 무시한다)",
+										"en": "The WebSocket address to connect to. (ws:// or wss://, ignored if already connected)"
+									}
+								}
+							],
+							"description": {
+								"ko": "접속.",
+								"en": "Connects."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "receiveMessage",
+							"signature": "receiveMessage(obj)",
+							"params": [
+								{
+									"name": "obj",
+									"type": "object",
+									"description": {
+										"ko": "받은 JSON 객체. (수신 콜백이 있으면 콜백으로, 없으면 모아 둔다)",
+										"en": "The received JSON object. (to the receive callback if there is one, otherwise collected)"
+									}
+								}
+							],
+							"description": {
+								"ko": "받은 JSON 넘기기. (수신 콜백이 있으면 콜백, 없으면 모아 두었다가 takeReceivedMessages 로 꺼낸다)",
+								"en": "Hands over received JSON. (to the callback if there is one, otherwise collected and taken out with takeReceivedMessages)"
+							},
+							"since": "0.4.0",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "takeReceivedMessages",
+							"signature": "takeReceivedMessages()",
+							"params": [],
+							"returns": {
+								"type": "Array<object>",
+								"description": {
+									"ko": "모아 둔 받은 메시지. (받은 차례, 꺼내면 비운다)",
+									"en": "The collected received messages. (in the order received, emptied once taken)"
+								}
+							},
+							"description": {
+								"ko": "모아 둔 받은 메시지 꺼내기. (수신 콜백이 없을 때 모인 것, 받은 차례, 꺼내면 비운다)",
+								"en": "Takes out the collected received messages. (those collected while there was no receive callback, in the order received, emptied once taken)"
+							},
+							"since": "0.4.0",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "tick",
+							"signature": "tick()",
+							"params": [],
+							"description": {
+								"ko": "갱신. (브라우저가 사건을 그때그때 넘겨 할 일이 없다, 매 프레임 사건을 꺼내야 하는 플랫폼과 같은 코드로 쓰려고 둔다)",
+								"en": "Update. (the browser hands events over as they happen so there is nothing to do, it exists so the same code works on platforms that must take events every frame)"
+							},
+							"since": "0.4.0",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "disconnect",
+							"signature": "disconnect()",
+							"params": [],
+							"description": {
+								"ko": "접속 해제.",
+								"en": "Disconnects."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "send",
+							"signature": "send(obj)",
+							"params": [
+								{
+									"name": "obj",
+									"type": "object",
+									"description": {
+										"ko": "보낼 JSON 객체. (접속 중이 아니면 보내지 않는다)",
+										"en": "The JSON object to send. (not sent if not connected)"
+									}
+								}
+							],
+							"description": {
+								"ko": "JSON 송신.",
+								"en": "Sends JSON."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "isConnected",
+							"signature": "isConnected()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "접속 중이면 참.",
+									"en": "True if connected."
+								}
+							},
+							"description": {
+								"ko": "접속 여부 반환.",
+								"en": "Returns whether it is connected."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "getWebSocket",
+							"signature": "getWebSocket()",
+							"params": [],
+							"returns": {
+								"type": "WebSocket | null",
+								"description": {
+									"ko": "안쪽 웹소켓. (접속하지 않았으면 null)",
+									"en": "The inner WebSocket. (null if not connected)"
+								}
+							},
+							"description": {
+								"ko": "웹소켓 반환.",
+								"en": "Returns the WebSocket."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "setReceiveEvent",
+							"signature": "setReceiveEvent(callback)",
+							"params": [
+								{
+									"name": "callback",
+									"type": "Function | null",
+									"description": {
+										"ko": "받은 JSON 객체를 넘겨 받을 함수. (null 이면 모아 두는 쪽으로 돌아간다)",
+										"en": "The function that receives the received JSON object. (null goes back to collecting)"
+									}
+								}
+							],
+							"description": {
+								"ko": "수신 이벤트 설정.",
+								"en": "Sets the receive event."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						},
+						{
+							"kind": "method",
+							"name": "getReceiveEvent",
+							"signature": "getReceiveEvent()",
+							"params": [],
+							"returns": {
+								"type": "Function | null",
+								"description": {
+									"ko": "수신 콜백. (없으면 null)",
+									"en": "The receive callback. (null if none)"
+								}
+							},
+							"description": {
+								"ko": "수신 이벤트 반환.",
+								"en": "Returns the receive event."
+							},
+							"since": "0.0.11",
+							"source": "src/web/websocketclient.js"
+						}
+					]
+				}
+			],
+			"functions": [],
+			"enums": []
 		}
 	]
 }

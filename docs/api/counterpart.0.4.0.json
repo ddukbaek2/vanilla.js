@@ -8101,6 +8101,18 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "EngineConfiguration",
+				"name": "antialias"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
+				"name": "antialias"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
 				"name": "ignore_virtual_keyboard_resize"
 			},
 			"vanilla.js": {
@@ -15839,6 +15851,18 @@
 			"vanilla-engine": {
 				"module": "core/viewmanager",
 				"class": "ViewManager",
+				"name": "is_view_rect_pending"
+			},
+			"vanilla.js": {
+				"module": "core/viewmanager",
+				"class": "ViewManager",
+				"name": "isViewRectPending"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/viewmanager",
+				"class": "ViewManager",
 				"name": "get_max_render_pixel_ratio"
 			},
 			"vanilla.js": {
@@ -22633,6 +22657,30 @@
 				"module": "graphics3d/toon/toonview3d",
 				"class": "ToonView3D",
 				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonview3d",
+				"class": "ToonView3D",
+				"name": "set_render_scale"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonview3d",
+				"class": "ToonView3D",
+				"name": "setRenderScale"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonview3d",
+				"class": "ToonView3D",
+				"name": "get_render_scale"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonview3d",
+				"class": "ToonView3D",
+				"name": "getRenderScale"
 			}
 		},
 		{

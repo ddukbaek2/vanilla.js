@@ -3472,6 +3472,7 @@ var OBB = class _OBB extends Object2 {
 // src/base/platform.js
 var System8 = globalThis;
 var SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+var DEFAULT_FONT_FAMILY_STRING = '"default", ' + SYSTEM_FONT_STRING;
 var PlatformType = {
   //System.Object.freeze({
   windows: "Windows",
@@ -7645,7 +7646,7 @@ var ShaderProgram = class extends Object2 {
   //==============================================================================
   // 프로그램 사용 시작. (컨텍스트의 상태 캐시가 이미 이 프로그램을 쓴다고 기억하면 다시 걸지 않는다)
   //==============================================================================
-  use() {
+  useProgram() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const program = this.getProgram();
     const stateCache = WebGLStateCache.find(webGL2RenderingContext);
@@ -8055,6 +8056,7 @@ var JOINING_CLUSTER_PATTERN = /^[\p{L}\p{M}]/u;
 var STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}]/u;
 var COMBINING_MARK_PATTERN = /\p{M}/u;
 var EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+var BLANK_CHUNK_PATTERN = /^[\u0009\u0020\u00A0\u2000-\u200B\u202F\u205F\u3000]+$/u;
 var isTextAntialiasEnabled = true;
 var ALPHA_THRESHOLD = 128;
 function setTextAntialiasEnabled(value) {
@@ -8462,6 +8464,9 @@ var TextStringTextureCache = class extends Object2 {
     const glyphList = [];
     const missingGlyphList = [];
     for (const chunk of chunks) {
+      if (BLANK_CHUNK_PATTERN.test(chunk.text)) {
+        continue;
+      }
       const startPosition = chunk.positions[0];
       const anchorX = floor(startPosition);
       const fractionX = startPosition - anchorX;
@@ -8492,8 +8497,8 @@ var TextStringTextureCache = class extends Object2 {
           fractionX,
           originX,
           width: originX + 1 + chunkRight + cellPadding,
-          height: bakeHeight,
-          baselineY: scaledBaselineY,
+          height: bakeHeight + 2,
+          baselineY: scaledBaselineY + 1,
           atlasPage: null,
           atlasX: 0,
           atlasY: 0
@@ -8692,6 +8697,10 @@ var TextStringTextureCache = class extends Object2 {
       } else {
         bakeCanvasRenderingContext.fillStyle = colorString;
       }
+      bakeCanvasRenderingContext.save();
+      bakeCanvasRenderingContext.beginPath();
+      bakeCanvasRenderingContext.rect(0, 1, span.width, span.height - 2);
+      bakeCanvasRenderingContext.clip();
       for (const glyph of span.glyphs) {
         const penX = glyph.atlasX - span.atlasX + glyph.originX + glyph.fractionX;
         if (mode === "stroke") {
@@ -8700,6 +8709,9 @@ var TextStringTextureCache = class extends Object2 {
           bakeCanvasRenderingContext.fillText(glyph.text, penX, glyph.baselineY);
         }
       }
+      bakeCanvasRenderingContext.restore();
+      bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, 1, span.width, 1, 0, 0, span.width, 1);
+      bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, span.height - 2, span.width, 1, 0, span.height - 1, span.width, 1);
       if (isNearest) {
         const imageData = bakeCanvasRenderingContext.getImageData(0, 0, span.width, span.height);
         const pixels = imageData.data;
@@ -14487,7 +14499,7 @@ var Graphic = class extends Object2 {
     if (shaderProgram === this.#boundShaderProgram) {
       return;
     }
-    shaderProgram.use();
+    shaderProgram.useProgram();
     this.#boundShaderProgram = shaderProgram;
   }
   //==============================================================================
@@ -17643,7 +17655,7 @@ var WorldNode = class _WorldNode extends TransformNode {
       graphic.beginOpacityLayer();
     }
     const components = this.getAllComponents();
-    const isComponentDrawCulled = this.isComponentDrawCulled(graphic, components);
+    const isComponentDrawCulled = this.#isComponentDrawCulled(graphic, components);
     if (isComponentDrawCulled) {
       graphic.addCulledNodeCount(1);
     }
@@ -17686,7 +17698,7 @@ var WorldNode = class _WorldNode extends TransformNode {
    * @param { Component[] } components 이 노드의 컴포넌트 목록.
    * @returns { boolean } 컴포넌트 그리기를 건너뛰어도 되면 참.
    */
-  isComponentDrawCulled(graphic, components) {
+  #isComponentDrawCulled(graphic, components) {
     if (!graphic.isCullingEnabled()) {
       return false;
     }
@@ -20610,7 +20622,7 @@ var AudioManager = class extends Object2 {
   //==============================================================================
   /**
    * @constructor
-   * @param { Engine } engine
+   * @param { Engine } engine 소리를 맡을 엔진. (플랫폼 정보로 iOS 인지 가린다)
    */
   constructor(engine) {
     super();
@@ -20633,7 +20645,7 @@ var AudioManager = class extends Object2 {
   // user gesture 이후인지 여부.
   //==============================================================================
   /**
-   * @returns { boolean }
+   * @returns { boolean } 첫 사용자 입력(클릭, 터치, 키)이 이미 있었으면 참.
    */
   hasUserGesture() {
     return this.#hasUserGesture;
@@ -20736,7 +20748,7 @@ var AudioManager = class extends Object2 {
   // 오디오 플레이어 생성.
   //==============================================================================
   /**
-   * @returns { AudioPlayer }
+   * @returns { AudioPlayer } 공유 오디오 컨텍스트로 만든 새 오디오 플레이어.
    */
   createAudioPlayer() {
     const audioContext = this.ensureAudioContext();
@@ -20746,7 +20758,7 @@ var AudioManager = class extends Object2 {
   // 오디오 버스 생성. (AudioContext 가 없으면 만든다, 만들지 못하면 소리 없는 버스)
   //==============================================================================
   /**
-   * @returns { AudioBus }
+   * @returns { AudioBus } 공유 오디오 컨텍스트로 만든 새 오디오 버스. (컨텍스트를 만들 수 없으면 소리 없는 버스)
    */
   createAudioBus() {
     const audioContext = this.ensureAudioContext();
@@ -20756,7 +20768,7 @@ var AudioManager = class extends Object2 {
   // 오디오 컨텍스트 시계. (초, audioContext.currentTime, AudioContext 가 없으면 0)
   //==============================================================================
   /**
-   * @returns { number }
+   * @returns { number } 오디오 컨텍스트 시계. (초, 컨텍스트가 아직 없으면 0)
    */
   getContextTime() {
     const audioContext = this.getAudioContext();
@@ -20769,7 +20781,7 @@ var AudioManager = class extends Object2 {
   // 오디오 컨텍스트 반환. (없으면 null)
   //==============================================================================
   /**
-   * @returns { AudioContext | null }
+   * @returns { AudioContext | null } 공유 오디오 컨텍스트. (아직 만들지 않았으면 null)
    */
   getAudioContext() {
     return this.#audioContext;
@@ -21188,8 +21200,9 @@ var EngineConfiguration = class extends Object2 {
   // 주사율이 높거나 프레임이 들쭉날쭉한 기기에서도 고른 간격으로 돈다.
   /** @type { number } */
   maximumFramePerSecond;
-  // 기본 폰트(DOSGothic) 주소. run() 이 뒤에서 불러온다. 빈 글이면 불러오지 않는다.
-  // (인터넷 없이 도는 데스크탑 앱이나 외부 요청을 막은 페이지는 비우거나 자체 경로를 준다)
+  // 기본 글꼴 주소. (처음은 빈 글, 러스트 판 default_font_url 과 같다) 주면 run() 이 뒤에서 받아 글꼴 이름 "default" 로 올린다.
+  // - 글꼴 이름 "default"(엔진 기본 글꼴 사슬)의 첫 글꼴이 되고, 그 뒤는 시스템 글꼴 사슬 SYSTEM_FONT_STRING 이다. 비우면 받지 않고 시스템 글꼴로 그린다.
+  // - 엔진은 글꼴을 따로 받지 않는다. 게임 글꼴은 이 주소나 FontAsset 으로 넣는다.
   /** @type { string } */
   defaultFontUrl;
   // 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈를 무시할지. (모바일의 화면 키보드)
@@ -21230,7 +21243,7 @@ var EngineConfiguration = class extends Object2 {
     this.preserveDrawingBuffer = false;
     this.antialias = true;
     this.maximumFramePerSecond = 0;
-    this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
+    this.defaultFontUrl = "";
     this.ignoreVirtualKeyboardResize = false;
     this.rebakeTextOnFontLoad = false;
     this.useDevTools = true;
@@ -21387,7 +21400,7 @@ var Engine = class extends Object2 {
     if (!defaultFontUrl) {
       return;
     }
-    const internalFontFace = new FontFace(`DOSGothic`, `url("${defaultFontUrl}")`);
+    const internalFontFace = new FontFace("default", `url("${defaultFontUrl}")`);
     internalFontFace.load().then((loadedFont) => {
       document.fonts.add(loadedFont);
     }).catch((error) => {
@@ -21837,7 +21850,7 @@ var Engine = class extends Object2 {
       this.#statisticsTextRect.size.y + 20
     ), 12);
     this.#statisticsTextRect.size.y = 0;
-    graphic.setFontString(`16px DOSGothic`);
+    graphic.setFontString("16px default");
     graphic.setTextAlign("left");
     graphic.setTextBaseline("top");
     graphic.setFillColor(Colors.white);
@@ -25145,7 +25158,7 @@ function sliceGraphemes(text, count) {
 }
 __name(sliceGraphemes, "sliceGraphemes");
 function buildFontString(fontFace, fontSize, bold, italic) {
-  const fontFamily = fontFace ? fontFace.family : SYSTEM_FONT_STRING;
+  const fontFamily = fontFace ? fontFace.family : DEFAULT_FONT_FAMILY_STRING;
   const styleParts = [];
   if (italic) {
     styleParts.push("italic");
@@ -28522,20 +28535,6 @@ var UIButton = class _UIButton extends UIControl {
     this.#clickEvent = callback;
   }
   //==============================================================================
-  // 클릭 이벤트 설정.
-  //==============================================================================
-  /**
-   * @param { ButtonState } buttonState 버튼 상태. (지금은 쓰지 않는다)
-   * @param { function(UIButton): boolean } callback 그 상태에 걸 함수. (지금은 담지 않는다)
-   */
-  setStateEvent(buttonState, callback) {
-    switch (buttonState) {
-      case ButtonState.normal: {
-        break;
-      }
-    }
-  }
-  //==============================================================================
   // 클릭 이벤트 반환.
   //==============================================================================
   /**
@@ -30021,7 +30020,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   /**
    * @returns { object | null } 지금 쓰는 저장소. 못 쓰면 null.
    */
-  static readStorage() {
+  static #readStorage() {
     const backend = _LocalStorage.getBackend();
     if (backend !== null) {
       return backend;
@@ -30045,7 +30044,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
     if (memoryItemMap.has(key)) {
       return memoryItemMap.get(key);
     }
-    const storage = _LocalStorage.readStorage();
+    const storage = _LocalStorage.#readStorage();
     if (storage === null) {
       return null;
     }
@@ -30069,7 +30068,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    */
   static setItem(key, value) {
     const memoryItemMap = _LocalStorage.#memoryItemMap;
-    const storage = _LocalStorage.readStorage();
+    const storage = _LocalStorage.#readStorage();
     if (storage !== null) {
       try {
         storage.setItem(key, value);
@@ -30091,7 +30090,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    */
   static removeItem(key) {
     _LocalStorage.#memoryItemMap.delete(key);
-    const storage = _LocalStorage.readStorage();
+    const storage = _LocalStorage.#readStorage();
     if (storage === null) {
       return;
     }
@@ -30106,7 +30105,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   //==============================================================================
   static clear() {
     _LocalStorage.#memoryItemMap.clear();
-    const storage = _LocalStorage.readStorage();
+    const storage = _LocalStorage.#readStorage();
     if (storage === null) {
       return;
     }
@@ -30252,7 +30251,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    */
   static getKeys() {
     const keySet = new System42.Set();
-    const storage = _LocalStorage.readStorage();
+    const storage = _LocalStorage.#readStorage();
     if (storage !== null) {
       try {
         if (typeof storage.getKeys === "function") {
@@ -30393,9 +30392,7 @@ var DevToolsFlatItem = class {
   // 생성.
   //==============================================================================
   /**
-   * @param { TransformNode } node
-   * @param { number } depth
-   * @param { boolean } effectiveActive
+   * @constructor
    */
   constructor(node, depth, effectiveActive) {
     this.node = node;
@@ -30621,7 +30618,7 @@ var DevTools = class extends Object2 {
   // 엔진 설정.
   //==============================================================================
   /**
-   * @param { Engine } engine
+   * @param { Engine } engine 개발 도구가 들여다볼 엔진. (기즈모 표시는 도구가 맡으므로 강제 기즈모를 끈다)
    */
   setEngine(engine) {
     this.#engine = engine;
@@ -30632,7 +30629,7 @@ var DevTools = class extends Object2 {
   // 루트 노드 목록 설정.
   //==============================================================================
   /**
-   * @param { TransformNode[] } rootNodes
+   * @param { TransformNode[] } rootNodes 트리에 보일 루트 노드 목록. (루트는 처음부터 펼친다)
    */
   setRootNodes(rootNodes) {
     this.#rootNodes = rootNodes;
@@ -30644,7 +30641,7 @@ var DevTools = class extends Object2 {
   // 표시 여부 반환.
   //==============================================================================
   /**
-   * @returns { boolean }
+   * @returns { boolean } 패널이 보이면 참.
    */
   isVisible() {
     return this.#isVisible;
@@ -30653,7 +30650,7 @@ var DevTools = class extends Object2 {
   // 보이기와 숨기기. (F2 와 같다. 보일 때 패널을 창 오른쪽 아래에 붙이고, 모든 기즈모 설정을 건다)
   //==============================================================================
   /**
-   * @param { boolean } isVisible
+   * @param { boolean } isVisible 패널을 보이면 참, 숨기면 거짓.
    */
   setVisible(isVisible) {
     this.#isVisible = isVisible;
@@ -30674,7 +30671,7 @@ var DevTools = class extends Object2 {
   // 지금 탭 반환. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
   //==============================================================================
   /**
-   * @returns { number }
+   * @returns { number } 지금 탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
    */
   getActiveTab() {
     return this.#activeTab;
@@ -30683,7 +30680,7 @@ var DevTools = class extends Object2 {
   // 탭 설정. (없는 탭이면 무시)
   //==============================================================================
   /**
-   * @param { number } tabIndex
+   * @param { number } tabIndex 탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
    */
   setActiveTab(tabIndex) {
     if (tabIndex >= 0 && tabIndex < TABS.length) {
@@ -30694,7 +30691,7 @@ var DevTools = class extends Object2 {
   // 고른 노드 반환.
   //==============================================================================
   /**
-   * @returns { TransformNode | null }
+   * @returns { TransformNode | null } 고른 노드. (없으면 null)
    */
   getSelectedNode() {
     return this.#selectedNode;
@@ -30703,7 +30700,7 @@ var DevTools = class extends Object2 {
   // 노드 고르기. (인스펙터 스크롤은 맨 위로)
   //==============================================================================
   /**
-   * @param { TransformNode | null } node
+   * @param { TransformNode | null } node 고를 노드. (null 이면 선택을 푼다)
    */
   setSelectedNode(node) {
     this.#selectedNode = node;
@@ -30713,8 +30710,8 @@ var DevTools = class extends Object2 {
   // 트리에서 노드를 펼쳤는지.
   //==============================================================================
   /**
-   * @param { TransformNode } node
-   * @returns { boolean }
+   * @param { TransformNode } node 확인할 노드.
+   * @returns { boolean } 트리에서 그 노드를 펼쳤으면 참.
    */
   isNodeExpanded(node) {
     return this.#expandedNodes.has(node);
@@ -30723,8 +30720,8 @@ var DevTools = class extends Object2 {
   // 트리에서 노드 펼치기와 접기.
   //==============================================================================
   /**
-   * @param { TransformNode } node
-   * @param { boolean } isExpanded
+   * @param { TransformNode } node 펼치거나 접을 노드.
+   * @param { boolean } isExpanded 펼치면 참, 접으면 거짓.
    */
   setNodeExpanded(node, isExpanded) {
     if (isExpanded) {
@@ -30737,7 +30734,7 @@ var DevTools = class extends Object2 {
   // 패널 영역 반환. (창 안쪽 논리 좌표)
   //==============================================================================
   /**
-   * @returns { Rect }
+   * @returns { Rect } 패널 영역. (창 안쪽 논리 좌표)
    */
   getPanelRect() {
     return Rect.create(this.#panelX, this.#panelY, this.#panelWidth, this.#panelHeight);
@@ -30746,7 +30743,7 @@ var DevTools = class extends Object2 {
   // 현재 터치 위치가 패널 내부에 있는지 반환.
   //==============================================================================
   /**
-   * @returns { boolean }
+   * @returns { boolean } 지금 포인터가 패널 안에 있으면 참. (패널이 숨겨져 있으면 거짓)
    */
   isPointerInsidePanel() {
     if (!this.#isVisible || !this.#engine) {
@@ -30764,7 +30761,7 @@ var DevTools = class extends Object2 {
   // 갱신.
   //==============================================================================
   /**
-   * @param { number } timeDelta
+   * @param { number } timeDelta 지난 프레임과의 간격. (초)
    */
   tick(timeDelta) {
     if (!this.#engine) {
@@ -30799,6 +30796,7 @@ var DevTools = class extends Object2 {
   // 리사이즈 드래그 시작.
   //==============================================================================
   /**
+   * @private
    * @param { string } mode
    * @param { number } touchX
    * @param { number } touchY
@@ -30817,6 +30815,7 @@ var DevTools = class extends Object2 {
   // 눌림 처리.
   //==============================================================================
   /**
+   * @private
    * @param { number } touchX
    * @param { number } touchY
    */
@@ -30971,6 +30970,7 @@ var DevTools = class extends Object2 {
   // 이동 처리.
   //==============================================================================
   /**
+   * @private
    * @param { number } touchX
    * @param { number } touchY
    */
@@ -31041,6 +31041,7 @@ var DevTools = class extends Object2 {
   // 뗌 처리.
   //==============================================================================
   /**
+   * @private
    * @param { number } touchX
    * @param { number } touchY
    */
@@ -31056,6 +31057,7 @@ var DevTools = class extends Object2 {
   // 로컬 스토리지 탭 눌림 처리.
   //==============================================================================
   /**
+   * @private
    * @param { number } touchX
    * @param { number } touchY
    * @param { number } panelX
@@ -31187,6 +31189,9 @@ var DevTools = class extends Object2 {
   //==============================================================================
   // 트리 목록 재구성.
   //==============================================================================
+  /**
+   * @private
+   */
   rebuildFlatList() {
     this.#flatList = [];
     for (let rootIndex = 0; rootIndex < this.#rootNodes.length; ++rootIndex) {
@@ -31198,6 +31203,7 @@ var DevTools = class extends Object2 {
   // 노드를 플랫 목록에 재귀 추가.
   //==============================================================================
   /**
+   * @private
    * @param { TransformNode } node
    * @param { number } depth
    * @param { boolean } parentActive
@@ -31220,6 +31226,7 @@ var DevTools = class extends Object2 {
   // 컴포넌트의 get*/is* 프로퍼티 목록 수집.
   //==============================================================================
   /**
+   * @private
    * @param { Component } component
    * @returns { { name: string, value: * }[] }
    */
@@ -31262,6 +31269,7 @@ var DevTools = class extends Object2 {
   // get* 메서드명을 프로퍼티명 형식으로 변환. (getTextColor → textColor)
   //==============================================================================
   /**
+   * @private
    * @param { string } methodName
    * @returns { string }
    */
@@ -31276,6 +31284,7 @@ var DevTools = class extends Object2 {
   // 프로퍼티 값을 문자열로 포맷.
   //==============================================================================
   /**
+   * @private
    * @param { * } value
    * @returns { string }
    */
@@ -31329,6 +31338,7 @@ var DevTools = class extends Object2 {
   // 인스펙터 라인 목록 구성.
   //==============================================================================
   /**
+   * @private
    * @param { TransformNode } node
    * @returns { InspectorLine[] }
    */
@@ -31408,7 +31418,7 @@ var DevTools = class extends Object2 {
   // 출력.
   //==============================================================================
   /**
-   * @param { Graphic } graphic
+   * @param { Graphic } graphic 그릴 그래픽.
    */
   draw(graphic) {
     if (!this.#isVisible) {
@@ -31505,6 +31515,7 @@ var DevTools = class extends Object2 {
   // - 패널처럼 ViewScaleMode 와 무관하게 canvas-native 좌표계에서 그린다.
   //==============================================================================
   /**
+   * @private
    * @param { Graphic } graphic 그릴 그래픽. (끝나면 들어올 때의 그리기 상태로 돌린다)
    */
   drawFramePerSecond(graphic) {
@@ -31534,6 +31545,7 @@ var DevTools = class extends Object2 {
   // 트리 패널 출력.
   //==============================================================================
   /**
+   * @private
    * @param { Graphic } graphic
    * @param { number } panelX
    * @param { number } panelY
@@ -31652,6 +31664,7 @@ var DevTools = class extends Object2 {
   // 인스펙터 패널 출력.
   //==============================================================================
   /**
+   * @private
    * @param { Graphic } graphic
    * @param { number } panelX
    * @param { number } panelY
@@ -31756,6 +31769,7 @@ var DevTools = class extends Object2 {
   // 로컬 스토리지 패널 출력.
   //==============================================================================
   /**
+   * @private
    * @param { Graphic } graphic
    * @param { number } panelX
    * @param { number } panelY
@@ -31919,6 +31933,7 @@ var DevTools = class extends Object2 {
   // 화면 비율 가이드라인 출력.
   //==============================================================================
   /**
+   * @private
    * @param { Graphic } graphic
    */
   drawAspectGuide(graphic) {
@@ -31966,6 +31981,7 @@ var DevTools = class extends Object2 {
   // 세팅 패널 출력.
   //==============================================================================
   /**
+   * @private
    * @param { Graphic } graphic
    * @param { number } panelX
    * @param { number } panelY
@@ -32062,6 +32078,7 @@ var DevTools = class extends Object2 {
   // 세팅 탭 눌림 처리.
   //==============================================================================
   /**
+   * @private
    * @param { number } touchX
    * @param { number } touchY
    * @param { number } panelX
@@ -32125,6 +32142,9 @@ var DevTools = class extends Object2 {
   //==============================================================================
   // 설정 불러오기.
   //==============================================================================
+  /**
+   * @private
+   */
   loadSettings() {
     if (!LocalStorage.containsKey(SETTINGS_STORAGE_KEY)) {
       return;
@@ -32153,6 +32173,9 @@ var DevTools = class extends Object2 {
   //==============================================================================
   // 설정 저장.
   //==============================================================================
+  /**
+   * @private
+   */
   saveSettings() {
     const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
     const settingsJson = System43.JSON.stringify(settingsObject);
@@ -32170,6 +32193,9 @@ var DevTools = class extends Object2 {
   //==============================================================================
   // 통계 항목 수집.
   //==============================================================================
+  /**
+   * @private
+   */
   gatherStatisticsItems() {
     const items = [];
     const platform = this.#engine.getPlatform();
@@ -32246,6 +32272,7 @@ var DevTools = class extends Object2 {
   // 통계 패널 출력.
   //==============================================================================
   /**
+   * @private
    * @param { Graphic } graphic
    * @param { number } panelX
    * @param { number } panelY
@@ -32339,6 +32366,7 @@ var DevTools = class extends Object2 {
   // 통계 탭 눌림 처리.
   //==============================================================================
   /**
+   * @private
    * @param { number } touchX
    * @param { number } touchY
    * @param { number } panelX
@@ -36655,24 +36683,17 @@ if (System55.document !== void 0 && System55.document.fonts !== void 0) {
     fontLoadCount2 += 1;
   });
 }
-function buildRGBAString(colorText, opacity) {
-  const hexText = colorText.slice(1);
-  const value = System55.parseInt(hexText, 16);
-  const red = value >> 16 & 255;
-  const green = value >> 8 & 255;
-  const blue = value & 255;
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+function buildRGBAString(color, opacity) {
+  return color.withAlpha(System55.Math.min(1, System55.Math.max(0, opacity))).toRGBAString();
 }
 __name(buildRGBAString, "buildRGBAString");
-function readColorText(color) {
+function readColor(color) {
   if (typeof color === "string") {
-    return color;
+    return Color.from(color);
   }
-  const rgbColor = Color.from(color).clone();
-  rgbColor.alpha = 1;
-  return rgbColor.toHEXString();
+  return color.clone();
 }
-__name(readColorText, "readColorText");
+__name(readColor, "readColor");
 var ShadowText = class extends Component {
   static {
     __name(this, "ShadowText");
@@ -36702,12 +36723,12 @@ var ShadowText = class extends Component {
   /** @private @type { string } */
   #textDirection;
   // "ltr", "rtl", "auto"
-  /** @private @type { string } */
+  /** @private @type { Color } */
   #textColor;
-  // "#rrggbb" 나 CSS 색.
-  /** @private @type { string } */
+  // 알파가 글자 불투명도.
+  /** @private @type { Color } */
   #shadowColor;
-  // "#rrggbb"
+  // 알파는 읽지 않는다. (불투명도는 #shadowOpacity)
   /** @private @type { number } */
   #shadowOpacity;
   /** @private @type { number } */
@@ -36746,8 +36767,8 @@ var ShadowText = class extends Component {
     this.#isStrikethrough = false;
     this.#textAlign = "center";
     this.#textDirection = "ltr";
-    this.#textColor = "#ffffff";
-    this.#shadowColor = "#000000";
+    this.#textColor = Color.white();
+    this.#shadowColor = Color.black();
     this.#shadowOpacity = 1;
     this.#shadowOffset = 0;
     this.#shadowBlur = 0;
@@ -36775,7 +36796,7 @@ var ShadowText = class extends Component {
     const textDirection = this.resolveBakeTextDirection();
     const fontFace = this.getFontFace();
     const fontFamily = fontFace === null ? "" : fontFace.family;
-    const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#isItalic, this.#isUnderline, this.#isStrikethrough, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount2].join("|");
+    const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#isItalic, this.#isUnderline, this.#isStrikethrough, this.#textColor.toRGBAString(), this.#shadowColor.toHEXString(), this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount2].join("|");
     if (bakeKey !== this.#bakeKey) {
       releaseSharedBake(this.#bakeKey, this);
       this.#bakeKey = bakeKey;
@@ -36894,7 +36915,7 @@ var ShadowText = class extends Component {
     canvasRenderingContext.shadowBlur = scaledShadowBlur;
     canvasRenderingContext.shadowOffsetX = 0;
     canvasRenderingContext.shadowOffsetY = scaledShadowOffset;
-    canvasRenderingContext.fillStyle = this.#textColor;
+    canvasRenderingContext.fillStyle = this.#textColor.toRGBAString();
     canvasRenderingContext.fillText(text, scaledPenX, scaledBaselineY);
     if (this.#isUnderline) {
       canvasRenderingContext.fillRect(scaledPenX, scaledUnderlineY - scaledDecorationLineWidth * 0.5, textMetrics.width, scaledDecorationLineWidth);
@@ -36972,10 +36993,10 @@ var ShadowText = class extends Component {
   /**
    * @param { number } fontSize 처음 글자 크기. (내용 크기 단위, 넘치면 줄여 굽는다)
    * @param { boolean } isBold 굵게 할지.
-   * @param { Color | string } textColor 글 색. ("#rrggbb" 나 CSS 색)
+   * @param { Color | string } textColor 글 색. (Color 나 "#rrggbb" 같은 색 글, 알파가 글자 불투명도)
    */
   setTextStyle(fontSize, isBold, textColor) {
-    textColor = readColorText(textColor);
+    textColor = readColor(textColor);
     this.#fontSize = fontSize;
     this.#isBold = isBold;
     this.#textColor = textColor;
@@ -37107,13 +37128,13 @@ var ShadowText = class extends Component {
   // 그림자 설정. (색, 불투명도, 글 아래로 내려가는 만큼, 번지는 만큼)
   //==============================================================================
   /**
-   * @param { Color | string } shadowColor - "#rrggbb"
+   * @param { Color | string } shadowColor 그림자 색. (Color 나 "#rrggbb" 같은 색 글, 알파는 읽지 않는다)
    * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
    * @param { number } shadowOffset 그림자가 글 아래로 내려가는 만큼. (내용 크기 단위)
    * @param { number } shadowBlur - 0 이면 번지지 않는다.
    */
   setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
-    shadowColor = readColorText(shadowColor);
+    shadowColor = readColor(shadowColor);
     this.#shadowColor = shadowColor;
     this.#shadowOpacity = shadowOpacity;
     this.#shadowOffset = shadowOffset;
@@ -37174,9 +37195,9 @@ var SoftShade = class _SoftShade extends Component {
   /** @private @type { string } */
   #shape;
   // 모양. (SoftShadeShape)
-  /** @private @type { string } */
+  /** @private @type { Color } */
   #color;
-  // 색. ("#rrggbb")
+  // 색. (알파는 읽지 않는다, 짙기는 #opacity)
   /** @private @type { number } */
   #opacity;
   // 가장 짙은 곳의 불투명도.
@@ -37205,7 +37226,7 @@ var SoftShade = class _SoftShade extends Component {
     super();
     this.setComponentType("SoftShade");
     this.#shape = SoftShadeShape.band;
-    this.#color = "#000000";
+    this.#color = Color.black();
     this.#opacity = 0.5;
     this.#fadeWidth = 0;
     this.#bakeUnit = 4;
@@ -37237,7 +37258,7 @@ var SoftShade = class _SoftShade extends Component {
     const shape = this.getShape();
     const color = this.getColor();
     const fadeRatioText = fadeRatio.toFixed(3);
-    const bakeKey = `SoftShade|${shape}|${color}|${opacity}|${fadeRatioText}|${bakeWidth}|${bakeHeight}`;
+    const bakeKey = `SoftShade|${shape}|${color.withAlpha(1).toHEXString()}|${opacity}|${fadeRatioText}|${bakeWidth}|${bakeHeight}`;
     if (bakeKey !== this.#bakeKey) {
       releaseSharedBake(this.#bakeKey, this);
       this.#bakeKey = bakeKey;
@@ -37295,11 +37316,9 @@ var SoftShade = class _SoftShade extends Component {
     bakeCanvas.width = bakeWidth;
     bakeCanvas.height = bakeHeight;
     const color = this.getColor();
-    const colorText = color.slice(1);
-    const colorValue = System56.parseInt(colorText, 16);
-    const red = colorValue >> 16 & 255;
-    const green = colorValue >> 8 & 255;
-    const blue = colorValue & 255;
+    const red = System56.Math.min(255, System56.Math.max(0, System56.Math.round(color.red * 255)));
+    const green = System56.Math.min(255, System56.Math.max(0, System56.Math.round(color.green * 255)));
+    const blue = System56.Math.min(255, System56.Math.max(0, System56.Math.round(color.blue * 255)));
     const opacity = this.getOpacity();
     const shape = this.getShape();
     const isBand = shape === SoftShadeShape.band;
@@ -37326,12 +37345,12 @@ var SoftShade = class _SoftShade extends Component {
   //==============================================================================
   /**
    * @param { string } shape - SoftShadeShape
-   * @param { Color | string } color - "#rrggbb"
+   * @param { Color | string } color 그늘 색. (Color 나 "#rrggbb" 같은 색 글, 알파는 읽지 않는다)
    * @param { number } opacity 가장 짙은 곳의 불투명도. (0 ~ 1, 0 이하면 그리지 않는다)
    * @param { number } fadeWidth 띠의 양옆이 엷어지는 너비. (내용 크기 단위, 내용 너비의 반까지, 0 이면 엷어지지 않는다)
    */
   setShade(shape, color, opacity, fadeWidth = 0) {
-    color = readColorText(color);
+    color = readColor(color);
     this.#shape = shape;
     this.#color = color;
     this.#opacity = opacity;
@@ -37361,7 +37380,7 @@ var SoftShade = class _SoftShade extends Component {
   // 색 반환.
   //==============================================================================
   /**
-   * @returns { string } 색. ("#rrggbb")
+   * @returns { Color } 색. (setShade 에 준 색, 알파는 굽기에 쓰지 않는다)
    */
   getColor() {
     return this.#color;
@@ -37434,12 +37453,12 @@ var ShadowImage = class extends Component {
   /** @private @type { Rect | null } */
   #imageRect;
   // 그림 안의 조각. (null 이면 그림 전체)
-  /** @private @type { string | null } */
+  /** @private @type { Color | null } */
   #imageColor;
   // 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
-  /** @private @type { string } */
+  /** @private @type { Color } */
   #shadowColor;
-  // "#rrggbb"
+  // 알파는 읽지 않는다. (불투명도는 #shadowOpacity)
   /** @private @type { number } */
   #shadowOpacity;
   /** @private @type { number } */
@@ -37473,7 +37492,7 @@ var ShadowImage = class extends Component {
     this.#image = null;
     this.#imageRect = null;
     this.#imageColor = null;
-    this.#shadowColor = "#000000";
+    this.#shadowColor = Color.black();
     this.#shadowOpacity = 1;
     this.#shadowOffset = 0;
     this.#shadowBlur = 0;
@@ -37514,7 +37533,7 @@ var ShadowImage = class extends Component {
       nextImageIdentifier += 1;
       imageIdentifiers.set(image, imageIdentifier);
     }
-    const bakeKey = ["ShadowImage", imageIdentifier, sourceRect.left, sourceRect.top, sourceRect.width, sourceRect.height, this.#imageColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, imageWidth, imageHeight, bakeScale].join("|");
+    const bakeKey = ["ShadowImage", imageIdentifier, sourceRect.left, sourceRect.top, sourceRect.width, sourceRect.height, this.#imageColor === null ? "" : this.#imageColor.toRGBAString(), this.#shadowColor.toHEXString(), this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, imageWidth, imageHeight, bakeScale].join("|");
     if (bakeKey !== this.#bakeKey) {
       releaseSharedBake(this.#bakeKey, this);
       this.#bakeKey = bakeKey;
@@ -37627,7 +37646,7 @@ var ShadowImage = class extends Component {
     const imageColor = this.getImageColor();
     if (imageColor !== null) {
       canvasRenderingContext.globalCompositeOperation = "source-in";
-      canvasRenderingContext.fillStyle = imageColor;
+      canvasRenderingContext.fillStyle = imageColor.toRGBAString();
       canvasRenderingContext.fillRect(0, 0, scaledImageWidth, scaledImageHeight);
     }
     return scaledCanvas;
@@ -37688,16 +37707,16 @@ var ShadowImage = class extends Component {
   // 그림을 한 빛으로 칠할 색 설정. (null 이면 그림 그대로)
   //==============================================================================
   /**
-   * @param { string | null } imageColor 그림을 한 빛으로 칠할 CSS 색. (null 이면 그림 그대로)
+   * @param { Color | string | null } imageColor 그림을 한 빛으로 칠할 색. (Color 나 "#rrggbb" 같은 색 글, 알파가 칠의 불투명도, null 이면 그림 그대로)
    */
   setImageColor(imageColor) {
-    this.#imageColor = imageColor;
+    this.#imageColor = imageColor === null ? null : readColor(imageColor);
   }
   //==============================================================================
   // 그림을 한 빛으로 칠할 색 반환.
   //==============================================================================
   /**
-   * @returns { string | null } 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
+   * @returns { Color | null } 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
    */
   getImageColor() {
     return this.#imageColor;
@@ -37706,13 +37725,13 @@ var ShadowImage = class extends Component {
   // 그림자 설정. (색, 불투명도, 그림 아래로 내려가는 만큼, 번지는 만큼)
   //==============================================================================
   /**
-   * @param { Color | string } shadowColor - "#rrggbb"
+   * @param { Color | string } shadowColor 그림자 색. (Color 나 "#rrggbb" 같은 색 글, 알파는 읽지 않는다)
    * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
    * @param { number } shadowOffset 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
    * @param { number } shadowBlur - 0 이면 번지지 않는다.
    */
   setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
-    shadowColor = readColorText(shadowColor);
+    shadowColor = readColor(shadowColor);
     this.#shadowColor = shadowColor;
     this.#shadowOpacity = shadowOpacity;
     this.#shadowOffset = shadowOffset;
@@ -48276,7 +48295,7 @@ var Camera3D = class {
   //==============================================================================
   // 바뀐 값이 있으면 행렬 넷을 다시 셈하기. (원 행렬이 있으면 그것으로)
   //==============================================================================
-  refreshMatrices() {
+  #refreshMatrices() {
     if (!this.#isMatrixDirty) {
       return;
     }
@@ -48311,7 +48330,7 @@ var Camera3D = class {
    * @returns { Matrix4 } 보기 행렬. (담아 둔 행렬, 고칠 것은 clone)
    */
   getViewMatrix() {
-    this.refreshMatrices();
+    this.#refreshMatrices();
     return this.#viewMatrix;
   }
   //==============================================================================
@@ -48321,7 +48340,7 @@ var Camera3D = class {
    * @returns { Matrix4 } 투영 행렬. (담아 둔 행렬, 고칠 것은 clone)
    */
   getProjectionMatrix() {
-    this.refreshMatrices();
+    this.#refreshMatrices();
     return this.#projectionMatrix;
   }
   //==============================================================================
@@ -48331,7 +48350,7 @@ var Camera3D = class {
    * @returns { Matrix4 } 투영 x 보기 행렬. (담아 둔 행렬, 고칠 것은 clone)
    */
   getViewProjectionMatrix() {
-    this.refreshMatrices();
+    this.#refreshMatrices();
     return this.#viewProjectionMatrix;
   }
   //==============================================================================
@@ -48341,7 +48360,7 @@ var Camera3D = class {
    * @returns { Matrix4 } 보기와 투영의 역행렬. (담아 둔 행렬, 고칠 것은 clone)
    */
   getInverseViewProjectionMatrix() {
-    this.refreshMatrices();
+    this.#refreshMatrices();
     return this.#inverseViewProjectionMatrix;
   }
   //==============================================================================
@@ -51941,7 +51960,7 @@ var ToonRenderer = class {
     }
     const solidProgram = programList[0];
     const previousProgram = webGL2RenderingContext.getParameter(webGL2RenderingContext.CURRENT_PROGRAM);
-    solidProgram.use();
+    solidProgram.useProgram();
     webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("shadowTexture"), SHADOW_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("baseColorTexture"), BASE_COLOR_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("emissiveTexture"), EMISSIVE_TEXTURE_UNIT);
@@ -53548,7 +53567,7 @@ var ToonRenderer = class {
     }, "drawElements");
     if (this.#isShadowPass) {
       const depthEntry = programSet.depth;
-      depthEntry.program.use();
+      depthEntry.program.useProgram();
       this.uploadFrameUniforms(depthEntry);
       this.uploadDrawUniforms(depthEntry.program, modelElements, isSkinned, instancedMode, jointMatrices);
       if (onBeforeDraw !== null) {
@@ -53579,7 +53598,7 @@ var ToonRenderer = class {
     if (hasOutline) {
       const outlineEntry = programSet.outline;
       const outlineProgram = outlineEntry.program;
-      outlineProgram.use();
+      outlineProgram.useProgram();
       this.uploadFrameUniforms(outlineEntry);
       this.uploadDrawUniforms(outlineProgram, modelElements, isSkinned, instancedMode, jointMatrices);
       const outlineColor = options.outlineColor !== void 0 && options.outlineColor !== null ? options.outlineColor : this.#outlineColor;
@@ -53609,7 +53628,7 @@ var ToonRenderer = class {
     }
     const solidEntry = programSet.solid;
     const solidProgram = solidEntry.program;
-    solidProgram.use();
+    solidProgram.useProgram();
     this.uploadFrameUniforms(solidEntry);
     const lightSet = options.lightSet !== void 0 && options.lightSet !== null ? options.lightSet : this.#lightSet;
     this.uploadLightUniforms(solidEntry, lightSet);
@@ -62466,7 +62485,7 @@ var FullscreenPass = class extends Object2 {
   useProgram() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const shaderProgram = this.getShaderProgram();
-    shaderProgram.use();
+    shaderProgram.useProgram();
     const vertexArray = this.getVertexArray();
     webGL2RenderingContext.bindVertexArray(vertexArray);
   }
@@ -66913,7 +66932,7 @@ var SkinnedModelRenderer = class extends Object2 {
   draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const shaderProgram = this.getShaderProgram();
-    shaderProgram.use();
+    shaderProgram.useProgram();
     const viewProjectionLocation = shaderProgram.getUniformLocation("viewProjectionMatrix");
     webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
     const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
@@ -66974,7 +66993,7 @@ var SkinnedModelRenderer = class extends Object2 {
   drawDepth(skinnedModel, lightViewProjectionElements, modelMatrixElements) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const depthShaderProgram = this.getDepthShaderProgram();
-    depthShaderProgram.use();
+    depthShaderProgram.useProgram();
     const lightViewProjectionLocation = depthShaderProgram.getUniformLocation("lightViewProjectionMatrix");
     webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
     const modelMatrixLocation = depthShaderProgram.getUniformLocation("modelMatrix");
@@ -67036,7 +67055,7 @@ var SkinnedModelRenderer = class extends Object2 {
   drawWireframe(skinnedModel, viewProjectionElements, modelMatrixElements, red, green, blue, alpha) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const wireframeShaderProgram = this.getWireframeShaderProgram();
-    wireframeShaderProgram.use();
+    wireframeShaderProgram.useProgram();
     const viewProjectionLocation = wireframeShaderProgram.getUniformLocation("viewProjectionMatrix");
     webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
     const modelMatrixLocation = wireframeShaderProgram.getUniformLocation("modelMatrix");
@@ -69615,7 +69634,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, passMode) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const shaderProgram = this.getShaderProgram();
-    shaderProgram.use();
+    shaderProgram.useProgram();
     const viewProjectionLocation = shaderProgram.getUniformLocation("viewProjectionMatrix");
     webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
     const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
@@ -69676,7 +69695,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     const cutoutDepthShaderProgram = this.getCutoutDepthShaderProgram();
     for (const shaderProgram of [depthShaderProgram, cutoutDepthShaderProgram]) {
       const useCutout = shaderProgram === cutoutDepthShaderProgram;
-      shaderProgram.use();
+      shaderProgram.useProgram();
       const lightViewProjectionLocation = shaderProgram.getUniformLocation("lightViewProjectionMatrix");
       webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
       const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
@@ -79811,7 +79830,7 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
     webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
     const lineProgram = this.#lineProgram;
-    lineProgram.use();
+    lineProgram.useProgram();
     webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("viewProjectionMatrix"), false, this.#frame.viewProjectionElements);
     return true;
   }
@@ -79979,7 +79998,7 @@ var ToonScreenOutline = class {
     const projectionElements = frame.projectionElements;
     const viewElements = frame.viewElements;
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffer);
-    seedProgram.use();
+    seedProgram.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
@@ -80000,14 +80019,14 @@ var ToonScreenOutline = class {
     const seedGatherProgram = this.#seedGatherProgram;
     webGL2RenderingContext.viewport(0, 0, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight);
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[0]);
-    seedGatherProgram.use();
+    seedGatherProgram.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTexture);
     webGL2RenderingContext.uniform1i(seedGatherProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform2f(seedGatherProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
     webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
     const jumpFloodProgram = this.#jumpFloodProgram;
-    jumpFloodProgram.use();
+    jumpFloodProgram.useProgram();
     webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform2f(jumpFloodProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
     const reach = (System135.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System135.Math.min(pointScaleX, pointScaleY) + 1.5;
@@ -80046,7 +80065,7 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
     webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
     const compositeProgram = this.#compositeProgram;
-    compositeProgram.use();
+    compositeProgram.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
@@ -84024,7 +84043,7 @@ var ToonVfx = class {
    */
   useProgram(shaderProgram, frame) {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
-    shaderProgram.use();
+    shaderProgram.useProgram();
     webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
     webGL2RenderingContext.uniform1i(shaderProgram.getUniformLocation("vfxAtlas"), VFX_TEXTURE_UNIT);
   }
@@ -84375,7 +84394,7 @@ var ToonVfx = class {
     }
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     const flashProgram = this.#flashProgram;
-    flashProgram.use();
+    flashProgram.useProgram();
     webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
     webGL2RenderingContext.bindVertexArray(this.#decalVertexArray);
     for (const flash of this.#flashes) {
@@ -85089,7 +85108,7 @@ var DynamicFont = class extends Object2 {
   //==============================================================================
   rebuildAtlas() {
     const document2 = System144.document;
-    const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : SYSTEM_FONT_STRING;
+    const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : DEFAULT_FONT_FAMILY_STRING;
     const fontSize = this.getFontSize();
     const fontString = `${fontSize}px ${fontFamily}`;
     const measureCanvas = document2.createElement("canvas");
@@ -85208,8 +85227,723 @@ var DynamicFont = class extends Object2 {
   }
 };
 
-// import.js
+// src/web/pane.js
 var System145 = globalThis;
+var PaneTheme = {
+  color: {
+    background: "#1e1e1e",
+    panel: "#252526",
+    toolbar: "#2d2d30",
+    border: "#444",
+    text: "#ccc",
+    textDim: "#aaaaaa",
+    accent: "#0e639c",
+    accentHover: "#1177bb",
+    warning: "#d97706",
+    // 주황색 (Orange)
+    warningHover: "#f59e0b",
+    error: "#f44336",
+    success: "#4CAF50",
+    inputBg: "#3c3c3c",
+    resizer: "#333",
+    resizerHover: "#007acc"
+  },
+  // 색. (CSS 색 글)
+  size: {
+    resizer: 5
+  },
+  // 크기. (픽셀)
+  font: {
+    family: "sans-serif",
+    mono: '"Consolas", monospace',
+    size: "13px",
+    sizeSmall: "12px"
+  }
+  // 글꼴과 글 크기.
+};
+var PaneStyle = class {
+  static {
+    __name(this, "PaneStyle");
+  }
+  /**
+   * 엘리먼트에 여러 스타일을 한꺼번에 적용한다. (엘리먼트나 스타일이 없으면 아무것도 하지 않는다)
+   * @param { HTMLElement } el 스타일을 적용할 엘리먼트.
+   * @param { Object } styles 적용할 CSS 속성 이름과 값. (camelCase)
+   */
+  static apply(el, styles) {
+    if (!el || !styles) return;
+    Object.assign(el.style, styles);
+  }
+  /**
+   * 스타일 프리셋이 적용된 엘리먼트를 만든다.
+   * @param { string } tagName 만들 태그 이름.
+   * @param { string } preset 프리셋 이름. ("panel", "toolbar", "button", "input", "textarea", "text", 빈 글이면 공통 스타일만)
+   * @param { Object } options { id, text, style, type, placeholder, accent, warning }. (accent 나 warning 이 참인 단추는 그 색 바탕)
+   * @returns { HTMLElement } 만든 엘리먼트.
+   */
+  static create(tagName, preset = "", options = {}) {
+    const el = System145.document.createElement(tagName);
+    if (options.id) el.id = options.id;
+    if (options.text) el.innerText = options.text;
+    if (options.type) el.type = options.type;
+    if (options.placeholder) el.placeholder = options.placeholder;
+    this.apply(el, {
+      position: "absolute",
+      left: "0",
+      top: "0",
+      width: "100%",
+      height: "100%",
+      boxSizing: "border-box",
+      fontFamily: PaneTheme.font.family,
+      fontSize: PaneTheme.font.size,
+      color: PaneTheme.color.text,
+      margin: "0",
+      padding: "0"
+    });
+    switch (preset) {
+      case "toolbar":
+        this.apply(el, {
+          backgroundColor: PaneTheme.color.toolbar,
+          borderBottom: `1px solid ${PaneTheme.color.border}`,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "10px"
+        });
+        break;
+      case "panel":
+        this.apply(el, {
+          backgroundColor: PaneTheme.color.panel,
+          padding: "10px"
+        });
+        break;
+      case "button":
+        let bgColor = PaneTheme.color.resizer;
+        if (options.accent) bgColor = PaneTheme.color.accent;
+        if (options.warning) bgColor = PaneTheme.color.warning;
+        this.apply(el, {
+          position: "relative",
+          width: "auto",
+          height: "auto",
+          padding: "6px 16px",
+          border: "none",
+          borderRadius: "4px",
+          cursor: "pointer",
+          fontWeight: "bold",
+          backgroundColor: bgColor
+        });
+        el.addEventListener("mouseenter", () => el.style.filter = "brightness(1.2)");
+        el.addEventListener("mouseleave", () => el.style.filter = "none");
+        break;
+      case "input":
+        this.apply(el, {
+          position: "relative",
+          height: "auto",
+          background: PaneTheme.color.inputBg,
+          border: `1px solid ${PaneTheme.color.resizer}`,
+          padding: "4px"
+        });
+        break;
+      case "textarea":
+        this.apply(el, {
+          backgroundColor: PaneTheme.color.background,
+          color: "#d4d4d4",
+          fontFamily: PaneTheme.font.mono,
+          fontSize: "14px",
+          padding: "15px",
+          border: "none",
+          resize: "none",
+          outline: "none",
+          tabSize: "4"
+        });
+        break;
+      case "text":
+        this.apply(el, {
+          position: "relative",
+          width: "auto",
+          height: "auto",
+          fontWeight: "bold"
+        });
+        break;
+    }
+    if (options.style) this.apply(el, options.style);
+    return el;
+  }
+};
+var Pane = class _Pane {
+  static {
+    __name(this, "Pane");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { HTMLElement } */
+  #container;
+  /** @private @type { string } */
+  #direction;
+  /** @private @type { Pane[] } */
+  #children;
+  /** @private @type { HTMLElement[] } */
+  #resizers;
+  /** @private @type { number } */
+  #initialSize;
+  /** @private @type { number } */
+  #fixedSize;
+  /** @private @type { number } */
+  #resizeGrabOffset;
+  /** @private @type { number } */
+  #minSize;
+  /** @private @type { number } */
+  #maxSize;
+  /** @private @type { boolean } */
+  #isResizable;
+  /** @private @type { Object } */
+  #resizableEdges;
+  /** @private @type { boolean } */
+  #isVisible;
+  /** @private @type { Function } */
+  #onResizeCallback;
+  /** @private @type { Pane } */
+  #parentPane;
+  // 리사이즈 드래그 관련
+  /** @private @type { boolean } */
+  #isResizing;
+  /** @private @type { Pane } */
+  #activePrevPane;
+  /** @private @type { Pane } */
+  #activeNextPane;
+  /** @private @type { Function } */
+  #onMouseMoveBind;
+  /** @private @type { Function } */
+  #onMouseUpBind;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { { direction?: string, size?: number | string, minSize?: number, maxSize?: number, isResizable?: boolean, resizableEdges?: { top: boolean, bottom: boolean, left: boolean, right: boolean } } } options 나누는 방향(horizontal 이나 vertical), 처음 크기(픽셀, 1 이하의 비율, 퍼센트 글, flex), 가장 작고 큰 크기, 조절 가능 여부와 가장자리.
+   */
+  constructor(options = {}) {
+    this.#direction = options.direction || "horizontal";
+    let size = options.size !== void 0 ? options.size : 0;
+    if (size === "flex") size = 0;
+    this.#initialSize = typeof size === "string" && size.endsWith("%") ? parseFloat(size) / 100 : parseFloat(size);
+    this.#fixedSize = this.#initialSize > 1 ? this.#initialSize : 0;
+    this.#resizeGrabOffset = 0;
+    this.#minSize = options.minSize !== void 0 ? options.minSize : 50;
+    this.#maxSize = options.maxSize !== void 0 ? options.maxSize : Number.MAX_VALUE;
+    this.#isResizable = options.isResizable !== void 0 ? options.isResizable : true;
+    this.#resizableEdges = options.resizableEdges || { top: true, bottom: true, left: true, right: true };
+    this.#isVisible = true;
+    this.#children = [];
+    this.#resizers = [];
+    this.#parentPane = null;
+    this.#onResizeCallback = null;
+    this.#isResizing = false;
+    this.#onMouseMoveBind = this.#onMouseMove.bind(this);
+    this.#onMouseUpBind = this.#onMouseUp.bind(this);
+    this.#createContainer();
+  }
+  //==============================================================================
+  // 컨테이너 요소 만들기. (절대 자리, 넘치는 것은 숨긴다)
+  //==============================================================================
+  /** @private */
+  #createContainer() {
+    this.#container = System145.document.createElement("div");
+    this.#container.style.position = "absolute";
+    this.#container.style.overflow = "hidden";
+    this.#container.style.boxSizing = "border-box";
+    this.#container.style.backgroundColor = PaneTheme.color.background;
+  }
+  //==============================================================================
+  // 자식 추가.
+  //==============================================================================
+  /**
+   * @param { Pane } pane 자식으로 붙일 패널. (앞 자식과의 사이에 리사이저가 생긴다)
+   */
+  addPane(pane) {
+    if (!(pane instanceof _Pane)) return;
+    pane.#parentPane = this;
+    if (this.#children.length > 0) {
+      const prev = this.#children[this.#children.length - 1];
+      const resizer = this.#createResizer(prev, pane);
+      this.#resizers.push(resizer);
+      this.#container.appendChild(resizer);
+    }
+    this.#children.push(pane);
+    this.#container.appendChild(pane.getContainer());
+  }
+  //==============================================================================
+  // 앞 패널과 뒤 패널 사이의 리사이저 요소 만들기. (부모와 두 패널이 모두 조절할 수 있을 때만 끌린다)
+  //==============================================================================
+  /** @private */
+  #createResizer(prev, next) {
+    const resizer = System145.document.createElement("div");
+    resizer.style.position = "absolute";
+    resizer.style.backgroundColor = PaneTheme.color.resizer;
+    resizer.style.zIndex = "1000";
+    let canResize = this.#isResizable && prev.isResizable() && next.isResizable();
+    if (this.#direction === "horizontal") {
+      if (!prev.getResizableEdges().right || !next.getResizableEdges().left) canResize = false;
+    } else {
+      if (!prev.getResizableEdges().bottom || !next.getResizableEdges().top) canResize = false;
+    }
+    const thickness = canResize ? PaneTheme.size.resizer : 1;
+    if (this.#direction === "horizontal") {
+      resizer.style.width = `${thickness}px`;
+      if (canResize) resizer.style.cursor = "col-resize";
+    } else {
+      resizer.style.height = `${thickness}px`;
+      if (canResize) resizer.style.cursor = "row-resize";
+    }
+    if (canResize) {
+      resizer.addEventListener("mouseenter", () => resizer.style.backgroundColor = PaneTheme.color.resizerHover);
+      resizer.addEventListener("mouseleave", () => {
+        if (!this.#isResizing) resizer.style.backgroundColor = PaneTheme.color.resizer;
+      });
+      resizer.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        this.#isResizing = true;
+        this.#activePrevPane = prev;
+        this.#activeNextPane = next;
+        const grabRect = resizer.getBoundingClientRect();
+        this.#resizeGrabOffset = this.#direction === "horizontal" ? e.clientX - grabRect.left : e.clientY - grabRect.top;
+        resizer.style.backgroundColor = PaneTheme.color.resizerHover;
+        System145.document.body.style.cursor = resizer.style.cursor;
+        System145.document.body.style.userSelect = "none";
+        System145.document.addEventListener("mousemove", this.#onMouseMoveBind);
+        System145.document.addEventListener("mouseup", this.#onMouseUpBind);
+      });
+    }
+    resizer.dataset.thickness = thickness;
+    return resizer;
+  }
+  //==============================================================================
+  // 마우스 이동
+  //==============================================================================
+  /** @private */
+  #onMouseMove(e) {
+    if (!this.#isResizing) return;
+    const prevRect = this.#activePrevPane.getContainer().getBoundingClientRect();
+    const nextRect = this.#activeNextPane.getContainer().getBoundingClientRect();
+    const activeResizerIdx = this.#children.indexOf(this.#activeNextPane) - 1;
+    const thick = parseInt(this.#resizers[activeResizerIdx].dataset.thickness);
+    const totalAvail = this.#direction === "horizontal" ? nextRect.right - prevRect.left - thick : nextRect.bottom - prevRect.top - thick;
+    let newPrevSize = this.#direction === "horizontal" ? e.clientX - this.#resizeGrabOffset - prevRect.left : e.clientY - this.#resizeGrabOffset - prevRect.top;
+    newPrevSize = Math.max(this.#activePrevPane.getMinSize(), Math.min(newPrevSize, totalAvail - this.#activeNextPane.getMinSize()));
+    if (this.#activePrevPane.isFlex() && !this.#activeNextPane.isFlex()) {
+      this.#activeNextPane.setFixedSize(totalAvail - newPrevSize);
+    } else {
+      this.#activePrevPane.setFixedSize(newPrevSize);
+    }
+    let root = this;
+    while (root.#parentPane) root = root.#parentPane;
+    root.refresh();
+  }
+  //==============================================================================
+  // 마우스 놓기. (크기 조절을 끝내고 문서에 건 이벤트를 뗀다)
+  //==============================================================================
+  /** @private */
+  #onMouseUp() {
+    this.#isResizing = false;
+    System145.document.body.style.cursor = "default";
+    System145.document.body.style.userSelect = "auto";
+    System145.document.removeEventListener("mousemove", this.#onMouseMoveBind);
+    System145.document.removeEventListener("mouseup", this.#onMouseUpBind);
+    for (const r of this.#resizers) r.style.backgroundColor = PaneTheme.color.resizer;
+  }
+  //==============================================================================
+  // 레이아웃 엔진
+  //==============================================================================
+  /**
+   * @param { number } x 왼쪽 자리. (픽셀)
+   * @param { number } y 위쪽 자리. (픽셀)
+   * @param { number } w 너비. (픽셀)
+   * @param { number } h 높이. (픽셀)
+   */
+  updateLayout(x, y, w, h) {
+    this.#container.style.left = `${x}px`;
+    this.#container.style.top = `${y}px`;
+    this.#container.style.width = `${w}px`;
+    this.#container.style.height = `${h}px`;
+    if (this.#children.length === 0) return;
+    let totalResizerThick = 0;
+    for (let i = 0; i < this.#resizers.length; i++) {
+      const isResizerVisible = this.#children[i].isVisible() && this.#children[i + 1].isVisible();
+      this.#resizers[i].style.display = isResizerVisible ? "" : "none";
+      if (isResizerVisible) totalResizerThick += parseInt(this.#resizers[i].dataset.thickness);
+    }
+    const avail = (this.#direction === "horizontal" ? w : h) - totalResizerThick;
+    let used = 0;
+    let flexCount = 0;
+    let lastVisibleIndex = -1;
+    const sizes = new Array(this.#children.length).fill(0);
+    for (let i = 0; i < this.#children.length; i++) {
+      const child = this.#children[i];
+      if (!child.isVisible()) continue;
+      lastVisibleIndex = i;
+      if (child.isFlex()) {
+        flexCount++;
+      } else {
+        let s = child.getFixedSize();
+        if (s === 0) {
+          s = child.getInitialSize() <= 1 ? avail * child.getInitialSize() : child.getInitialSize();
+        }
+        s = Math.max(child.getMinSize(), Math.min(s, child.getMaxSize()));
+        sizes[i] = s;
+        used += s;
+      }
+    }
+    const perFlex = flexCount > 0 ? Math.max(0, avail - used) / flexCount : 0;
+    for (let i = 0; i < this.#children.length; i++) {
+      if (this.#children[i].isVisible() && this.#children[i].isFlex()) sizes[i] = perFlex;
+    }
+    let offset = 0;
+    for (let i = 0; i < this.#children.length; i++) {
+      if (!this.#children[i].isVisible()) continue;
+      const childSize = i === lastVisibleIndex ? (this.#direction === "horizontal" ? w : h) - offset : sizes[i];
+      if (this.#direction === "horizontal") {
+        this.#children[i].updateLayout(offset, 0, childSize, h);
+      } else {
+        this.#children[i].updateLayout(0, offset, w, childSize);
+      }
+      offset += childSize;
+      if (i < this.#resizers.length && this.#resizers[i].style.display !== "none") {
+        const r = this.#resizers[i];
+        const thick = parseInt(r.dataset.thickness);
+        if (this.#direction === "horizontal") {
+          r.style.left = `${offset}px`;
+          r.style.top = "0px";
+          r.style.width = `${thick}px`;
+          r.style.height = `${h}px`;
+        } else {
+          r.style.left = "0px";
+          r.style.top = `${offset}px`;
+          r.style.width = `${w}px`;
+          r.style.height = `${thick}px`;
+        }
+        offset += thick;
+      }
+    }
+    if (this.#onResizeCallback) this.#onResizeCallback();
+  }
+  //==============================================================================
+  // 레이아웃 초기화 (드래그한 크기 삭제)
+  //==============================================================================
+  resetLayout() {
+    this.#fixedSize = 0;
+    for (const child of this.#children) {
+      child.resetLayout();
+    }
+  }
+  //==============================================================================
+  // 부모 요소의 크기로 다시 배치. (부모가 없으면 아무것도 하지 않는다)
+  //==============================================================================
+  refresh() {
+    const p = this.#container.parentElement;
+    if (!p) return;
+    this.updateLayout(0, 0, p.clientWidth || System145.window.innerWidth, p.clientHeight || System145.window.innerHeight);
+  }
+  //==============================================================================
+  // 부모 요소에 붙이기. (창 크기가 바뀔 때마다 다시 배치한다)
+  //==============================================================================
+  /**
+   * @param { HTMLElement } p 붙일 부모 요소.
+   */
+  attachTo(p) {
+    p.appendChild(this.#container);
+    const run = /* @__PURE__ */ __name(() => this.refresh(), "run");
+    System145.window.addEventListener("resize", run);
+    run();
+    System145.requestAnimationFrame(run);
+  }
+  //==============================================================================
+  // 보이기 / 숨기기. (숨긴 패널은 자리를 차지하지 않고, 맞닿은 리사이저도 숨는다)
+  //==============================================================================
+  /**
+   * @param { boolean } isVisible 보이면 참, 숨기면 거짓.
+   */
+  setVisible(isVisible) {
+    this.#isVisible = isVisible;
+    this.#container.style.display = isVisible ? "" : "none";
+    let root = this;
+    while (root.#parentPane) root = root.#parentPane;
+    root.refresh();
+  }
+  //==============================================================================
+  // 보이는지 반환.
+  //==============================================================================
+  /**
+   * @returns { boolean } 보이면 참.
+   */
+  isVisible() {
+    return this.#isVisible;
+  }
+  //==============================================================================
+  // 남는 자리를 나눠 갖는지 반환. (처음 크기가 0 이면 참)
+  //==============================================================================
+  /**
+   * @returns { boolean } 남는 자리를 나눠 가지면 참.
+   */
+  isFlex() {
+    return this.#initialSize === 0;
+  }
+  //==============================================================================
+  // 처음 크기 반환. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)
+  //==============================================================================
+  /**
+   * @returns { number } 처음 크기. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)
+   */
+  getInitialSize() {
+    return this.#initialSize;
+  }
+  //==============================================================================
+  // 정해진 크기 반환. (끌어서 정했거나 처음 크기가 픽셀이면 그 값, 아니면 0)
+  //==============================================================================
+  /**
+   * @returns { number } 정해진 크기. (픽셀, 정해진 것이 없으면 0)
+   */
+  getFixedSize() {
+    return this.#fixedSize;
+  }
+  //==============================================================================
+  // 정해진 크기 설정. (픽셀)
+  //==============================================================================
+  /**
+   * @param { number } s 정해 둘 크기. (픽셀)
+   */
+  setFixedSize(s) {
+    this.#fixedSize = s;
+  }
+  //==============================================================================
+  // 가장 작은 크기 반환. (픽셀)
+  //==============================================================================
+  /**
+   * @returns { number } 가장 작은 크기. (픽셀)
+   */
+  getMinSize() {
+    return this.#minSize;
+  }
+  //==============================================================================
+  // 가장 큰 크기 반환. (픽셀)
+  //==============================================================================
+  /**
+   * @returns { number } 가장 큰 크기. (픽셀)
+   */
+  getMaxSize() {
+    return this.#maxSize;
+  }
+  //==============================================================================
+  // 컨테이너 요소 반환.
+  //==============================================================================
+  /**
+   * @returns { HTMLElement } 컨테이너 요소.
+   */
+  getContainer() {
+    return this.#container;
+  }
+  //==============================================================================
+  // 배치가 바뀔 때마다 부를 함수 설정.
+  //==============================================================================
+  /**
+   * @param { Function | null } c 배치가 바뀔 때마다 부를 함수.
+   */
+  setCallback(c) {
+    this.#onResizeCallback = c;
+  }
+  //==============================================================================
+  // 크기를 조절할 수 있는지 반환.
+  //==============================================================================
+  /**
+   * @returns { boolean } 크기를 조절할 수 있으면 참.
+   */
+  isResizable() {
+    return this.#isResizable;
+  }
+  //==============================================================================
+  // 조절할 수 있는 가장자리 반환. ({ top, right, bottom, left })
+  //==============================================================================
+  /**
+   * @returns { { top: boolean, bottom: boolean, left: boolean, right: boolean } } 조절할 수 있는 가장자리.
+   */
+  getResizableEdges() {
+    return this.#resizableEdges;
+  }
+};
+
+// src/web/websocketclient.js
+var System146 = globalThis;
+var RECEIVED_MESSAGE_LIMIT = 1024;
+var WebSocketClient = class extends Object2 {
+  static {
+    __name(this, "WebSocketClient");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebSocket | null } */
+  #webSocket = null;
+  /** @private @type { boolean } */
+  #isConnected = false;
+  /** @private @type { Function | null } */
+  #receiveEvent = null;
+  /** @private @type { Array<object> } */
+  #receivedMessageList = [];
+  // 수신 콜백이 없을 때 모은 받은 JSON. (받은 차례)
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.#webSocket = null;
+    this.#isConnected = false;
+    this.#receiveEvent = null;
+    this.#receivedMessageList = [];
+  }
+  //==============================================================================
+  // 접속.
+  //==============================================================================
+  /**
+   * @param { string } url 접속할 웹소켓 주소. (ws:// 나 wss://, 이미 접속 중이면 무시한다)
+   */
+  connect(url) {
+    if (this.#isConnected) {
+      return;
+    }
+    this.#webSocket = new System146.WebSocket(url);
+    const webSocket = this.getWebSocket();
+    webSocket.binaryType = "arraybuffer";
+    webSocket.onopen = () => {
+      this.#isConnected = true;
+    };
+    webSocket.onclose = () => {
+      this.#isConnected = false;
+      this.#webSocket = null;
+    };
+    webSocket.onerror = (errorEvent) => {
+      console.error(errorEvent);
+    };
+    webSocket.onmessage = (messageEvent) => {
+      try {
+        const data = messageEvent.data;
+        let text = data;
+        if (data instanceof System146.ArrayBuffer) {
+          const textDecoder = new System146.TextDecoder("utf-8", { fatal: true });
+          text = textDecoder.decode(data);
+        }
+        const obj = System146.JSON.parse(text);
+        this.receiveMessage(obj);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+  }
+  //==============================================================================
+  // 받은 JSON 넘기기. (수신 콜백이 있으면 콜백, 없으면 모아 두었다가 takeReceivedMessages 로 꺼낸다)
+  //==============================================================================
+  /**
+   * @param { object } obj 받은 JSON 객체. (수신 콜백이 있으면 콜백으로, 없으면 모아 둔다)
+   */
+  receiveMessage(obj) {
+    const receiveEvent = this.#receiveEvent;
+    if (receiveEvent !== null) {
+      receiveEvent(obj);
+      return;
+    }
+    if (this.#receivedMessageList.length >= RECEIVED_MESSAGE_LIMIT) {
+      this.#receivedMessageList.shift();
+    }
+    this.#receivedMessageList.push(obj);
+  }
+  //==============================================================================
+  // 모아 둔 받은 메시지 꺼내기. (수신 콜백이 없을 때 모인 것, 받은 차례, 꺼내면 비운다)
+  //==============================================================================
+  /**
+   * @returns { Array<object> } 모아 둔 받은 메시지. (받은 차례, 꺼내면 비운다)
+   */
+  takeReceivedMessages() {
+    const receivedMessageList = this.#receivedMessageList;
+    this.#receivedMessageList = [];
+    return receivedMessageList;
+  }
+  //==============================================================================
+  // 갱신. (브라우저가 사건을 그때그때 넘겨 할 일이 없다, 매 프레임 사건을 꺼내야 하는 플랫폼과 같은 코드로 쓰려고 둔다)
+  //==============================================================================
+  tick() {
+  }
+  //==============================================================================
+  // 접속 해제.
+  //==============================================================================
+  disconnect() {
+    const isConnected = this.isConnected();
+    if (!isConnected) {
+      return;
+    }
+    const webSocket = this.getWebSocket();
+    webSocket.close();
+  }
+  //==============================================================================
+  // JSON 송신.
+  //==============================================================================
+  /**
+   * @param { object } obj 보낼 JSON 객체. (접속 중이 아니면 보내지 않는다)
+   */
+  send(obj) {
+    const isConnected = this.isConnected();
+    if (!isConnected) {
+      return;
+    }
+    try {
+      const json = System146.JSON.stringify(obj);
+      const webSocket = this.getWebSocket();
+      webSocket.send(json);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  //==============================================================================
+  // 접속 여부 반환.
+  //==============================================================================
+  /**
+   * @returns { boolean } 접속 중이면 참.
+   */
+  isConnected() {
+    return this.#isConnected;
+  }
+  //==============================================================================
+  // 웹소켓 반환.
+  //==============================================================================
+  /**
+   * @returns { WebSocket | null } 안쪽 웹소켓. (접속하지 않았으면 null)
+   */
+  getWebSocket() {
+    return this.#webSocket;
+  }
+  //==============================================================================
+  // 수신 이벤트 설정.
+  //==============================================================================
+  /**
+   * @param { Function | null } callback 받은 JSON 객체를 넘겨 받을 함수. (null 이면 모아 두는 쪽으로 돌아간다)
+   */
+  setReceiveEvent(callback) {
+    this.#receiveEvent = callback;
+  }
+  //==============================================================================
+  // 수신 이벤트 반환.
+  //==============================================================================
+  /**
+   * @returns { Function | null } 수신 콜백. (없으면 null)
+   */
+  getReceiveEvent() {
+    return this.#receiveEvent;
+  }
+};
+
+// import.js
+var System147 = globalThis;
 export {
   Action,
   AmbientOcclusionEffect,
@@ -85224,6 +85958,7 @@ export {
   AssetType,
   AudioAsset,
   AudioBus,
+  AudioManager,
   AudioPlayer,
   BeepPlayer,
   BlobAsset,
@@ -85244,6 +85979,7 @@ export {
   Component,
   ComponentNode,
   Cooldown,
+  DevTools,
   DialogueRunner,
   DialogueScriptParser,
   Dictionary,
@@ -85316,6 +86052,9 @@ export {
   Outline,
   PageEvent,
   Paint,
+  Pane,
+  PaneStyle,
+  PaneTheme,
   ParticleEmitterShape,
   ParticleRenderShape,
   ParticleSystem,
@@ -85386,7 +86125,7 @@ export {
   Stack,
   Steering2D,
   SubsurfaceScatteringEffect,
-  System145 as System,
+  System147 as System,
   TIMELINE_EASING_NAMES,
   TIMELINE_NODE_DEFAULTS,
   TIMELINE_PROPERTY_DEFINITIONS,
@@ -85487,6 +86226,7 @@ export {
   VisualAsset,
   WRINKLE_CHANNEL_COUNT,
   wait_exports as Wait,
+  WebSocketClient,
   WorldNode,
   applyTweenProperty,
   attachButtonMotion,
