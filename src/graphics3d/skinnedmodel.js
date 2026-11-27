@@ -210,6 +210,9 @@ export function readAccessorArray(json, binaryBuffer, accessorIndex) {
 	}
 	else {
 		const bufferView = json.bufferViews[accessor.bufferView];
+		if ((bufferView.buffer || 0) !== 0) {
+			throw new Error(`SkinnedModel: external buffer buffers[${bufferView.buffer}] is not supported. (only the GLB binary chunk buffers[0] is read, this includes the EXT_meshopt_compression fallback buffer)`);
+		}
 		const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
 		const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
 		const byteStride = bufferView.byteStride || 0;

@@ -4,7 +4,7 @@
 //   - 갈래 A: 위치 UNSIGNED_SHORT(정규화 아님, 칸 8 바이트) + 되풀이 잎 노드, 노멀 BYTE 정규화(칸 4 바이트), UV UNSIGNED_SHORT 정규화 + KHR_texture_transform.
 //   - 갈래 B: 위치 SHORT 정규화, 노멀 SHORT 정규화(-32768 은 -1 로 자름), UV BYTE(정규화 아님) + KHR_texture_transform.
 //   - 뼈대: 위치 UNSIGNED_SHORT 를 inverseBindMatrices 로 되풀이, 무게 UNSIGNED_BYTE 정규화, 돌림 움직임 SHORT 정규화.
-// - extensionsRequired 의 EXT_meshopt_compression 과 모르는 확장은 분명한 오류를 던진다.
+// - extensionsRequired 의 EXT_meshopt_compression 과 모르는 확장, 바이너리 덩어리 밖 버퍼(meshopt 의 fallback 버퍼)는 분명한 오류를 던진다.
 //==============================================================================
 import { readGlbArrays, readGlbNodeArrays, readGlbNodeInfos, writeSkinPose } from "../../src/graphics3d/toon/glbmeshreader.js";
 import { SkinnedModel } from "../../src/graphics3d/skinnedmodel.js";
@@ -348,6 +348,53 @@ for (const [extensionName, expectedText] of [["EXT_meshopt_compression", "EXT_me
 		}
 		check(errorMessage.includes(expectedText), readerName + " 의 " + extensionName + " 오류 글: " + errorMessage);
 	}
+}
+
+// 필수가 아닌 meshopt 압축(fallback 버퍼를 가리키는 bufferView)도 엉뚱한 값을 읽지 않고 오류.
+{
+	const sourceChunks = readChunks(createQuantizedModelA().arrayBuffer);
+	const json = sourceChunks[0];
+	json.extensionsUsed.push("EXT_meshopt_compression");
+	const arrayBuffer = rebuildGlb(json, sourceChunks[1]);
+	const fallbackJson = readChunks(arrayBuffer)[0];
+	fallbackJson.buffers.push({ byteLength: fallbackJson.buffers[0].byteLength, extensions: { EXT_meshopt_compression: { fallback: true } } });
+	fallbackJson.bufferViews[0].buffer = 1;
+	const fallbackArrayBuffer = rebuildGlbKeepingBuffers(fallbackJson, readChunks(arrayBuffer)[1]);
+	for (const [readerName, readEvent] of [["readGlbArrays", () => readGlbArrays(fallbackArrayBuffer)], ["SkinnedModel", () => SkinnedModel.createWithoutShaderProgram().interpretContent(...readChunks(fallbackArrayBuffer))]]) {
+		let errorMessage = "";
+		try {
+			readEvent();
+		}
+		catch (error) {
+			errorMessage = String(error.message);
+		}
+		check(errorMessage.includes("buffers[1]"), readerName + " 의 바깥 버퍼 오류 글: " + errorMessage);
+	}
+}
+
+//==============================================================================
+// json 을 그대로 두고 GLB 다시 짓기. (bufferViews, buffers 를 고치지 않음)
+//==============================================================================
+function rebuildGlbKeepingBuffers(json, binaryBuffer) {
+	let jsonText = JSON.stringify(json);
+	while (jsonText.length % 4 !== 0) {
+		jsonText += " ";
+	}
+	const jsonBytes = new TextEncoder().encode(jsonText);
+	const binaryBytes = new Uint8Array(binaryBuffer);
+	const totalLength = 12 + 8 + jsonBytes.length + 8 + binaryBytes.length;
+	const arrayBuffer = new ArrayBuffer(totalLength);
+	const dataView = new DataView(arrayBuffer);
+	dataView.setUint32(0, 0x46546c67, true);
+	dataView.setUint32(4, 2, true);
+	dataView.setUint32(8, totalLength, true);
+	dataView.setUint32(12, jsonBytes.length, true);
+	dataView.setUint32(16, 0x4e4f534a, true);
+	new Uint8Array(arrayBuffer, 20, jsonBytes.length).set(jsonBytes);
+	dataView.setUint32(20 + jsonBytes.length, binaryBytes.length, true);
+	dataView.setUint32(24 + jsonBytes.length, 0x004e4942, true);
+	new Uint8Array(arrayBuffer, 28 + jsonBytes.length, binaryBytes.length).set(binaryBytes);
+	return arrayBuffer;
 }
 
 //==============================================================================

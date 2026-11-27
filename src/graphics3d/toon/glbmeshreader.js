@@ -109,6 +109,9 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
 	const componentCount = TYPE_COMPONENT_COUNTS[accessor.type];
 	const ArrayConstructor = COMPONENT_ARRAYS[accessor.componentType];
 	const bufferView = json.bufferViews[accessor.bufferView];
+	if ((bufferView.buffer || 0) !== 0) {
+		throw new System.Error(`GLB 의 바깥 버퍼(buffers[${bufferView.buffer}])는 읽지 못합니다. (바이너리 덩어리 buffers[0] 만 읽는다, EXT_meshopt_compression 의 fallback 버퍼도 여기 든다)`);
+	}
 	const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
 	const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
 	const byteStride = bufferView.byteStride || 0;
