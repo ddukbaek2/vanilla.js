@@ -729,6 +729,8 @@ export class Graphic extends Object {
 	/** @private @type { WebGLBuffer | null } */ #batchVertexBuffer;
 	/** @private @type { Float32Array | null } */ #batchVertexData;
 	/** @private @type { number } */ #batchVertexCount; // 쌓여서 아직 그리지 않은 정점 수.
+	/** @private @type { boolean } */ #isBatchFlushScheduled; // 이 작업이 끝날 때 남은 묶음을 그리는 마이크로태스크를 걸었는지.
+	/** @private @type { function(): void } */ #scheduledBatchFlush; // 걸어 둔 마이크로태스크가 부르는 함수.
 	/** @private @type { (WebGLTexture | null)[] } */ #batchTextureList; // 쌓인 정점이 쓰는 텍스처. (칸 번호 차례)
 	/** @private @type { number } */ #batchTextureCount; // 쌓인 정점이 쓰는 텍스처 수.
 	/** @private @type { number } */ #batchTextureSlotCount; // 텍스처 칸 수. (기기의 MAX_TEXTURE_IMAGE_UNITS 와 BATCH_TEXTURE_SLOT_LIMIT 가운데 작은 것)
@@ -920,6 +922,11 @@ export class Graphic extends Object {
 		this.#batchVertexBuffer = null;
 		this.#batchVertexData = null;
 		this.#batchVertexCount = 0;
+		this.#isBatchFlushScheduled = false;
+		this.#scheduledBatchFlush = () => {
+			this.#isBatchFlushScheduled = false;
+			this.flushBatch();
+		};
 		this.#batchTextureList = [];
 		this.#batchTextureCount = 0;
 		this.#batchTextureSlotCount = 1;
@@ -2584,6 +2591,7 @@ export class Graphic extends Object {
 	// - 텍스처는 한 묶음에 여러 장(기기 텍스처 유닛 수와 16 가운데 작은 것)까지 묶어 텍스처가 바뀌어도 이어진다. (PixiJS 와 같은 꼴)
 	// - 축에 맞고 화소 경계에 놓인 자르기(beginClipRect)는 정점의 자르기 사각형으로 셰이더가 잘라 묶음을 끊지 않는다. (돌아갔거나 둥근 자르기는 스텐실)
 	// - 텍스처 칸이 차거나, 블렌드, 스텐실 자르기, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.
+	// - 엔진 루프 밖에서 그려도(엔진 없이 만든 Graphic, 제 requestAnimationFrame, 입력 처리기) 그 작업이 끝날 때(마이크로태스크) 남은 것을 그린다. 브라우저가 캔버스를 화면에 내기 전이라, 2D 캔버스처럼 따로 내보내지 않아도 보인다.
 	// - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushBatch() 를 부른다.
 	//==============================================================================
 	/**
@@ -2796,6 +2804,11 @@ export class Graphic extends Object {
 	 */
 	prepareSpriteBatch(vertexCount, texture) {
 		this.ensureSpriteBatchResources();
+		// 엔진 루프 밖에서 그린 것도 이 작업이 끝날 때 그린다. (엔진 프레임 안이면 프레임 끝에 엔진이 먼저 그려 빈 묶음이다)
+		if (!this.#isBatchFlushScheduled) {
+			this.#isBatchFlushScheduled = true;
+			System.queueMicrotask(this.#scheduledBatchFlush);
+		}
 		let textureSlot = this.findSpriteBatchTextureSlot(texture);
 		const isTextureSlotMissing = textureSlot < 0 && this.#batchTextureCount >= this.#batchTextureSlotCount;
 		const isClipSlotMissing = this.#isShaderClipActive && this.#shaderClipSlotGeneration !== this.#batchGeneration && this.#batchClipRectCount >= BATCH_CLIP_SLOT_CAPACITY;

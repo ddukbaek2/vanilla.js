@@ -36,6 +36,41 @@ const BLANK_CHUNK_PATTERN = /^[\u0009\u0020\u00A0\u2000-\u200B\u202F\u205F\u3000
 const ALPHA_THRESHOLD = 128;
 
 
+// 글자 하나가 글자 덩어리 하나인 글. (인쇄할 수 있는 아스키, UAX #29 에서 이 글자들 사이는 늘 끊겨 Intl.Segmenter 없이 나눈다)
+const PRINTABLE_ASCII_PATTERN = /^[\u0020-\u007E]*$/;
+// 글자 덩어리 나누개. (처음 쓸 때 하나 만들어 모든 캐시가 나눠 쓴다, 아직 안 만들었으면 undefined, Intl.Segmenter 가 없으면 null)
+let graphemeSegmenter = undefined;
+
+//==============================================================================
+// 글자 덩어리 나누개 반환. (처음 부를 때 만든다)
+// - 크롬은 Intl.Segmenter 를 처음 만들 때 5 ms 쯤 든다. (ICU 자료 읽기) 그래서 Graphic 을 만들 때가 아니라 아스키 밖 글을 처음 나눌 때 만든다.
+//==============================================================================
+/**
+ * @returns { object | null } Intl.Segmenter. (없으면 null)
+ */
+function getGraphemeSegmenter() {
+	if (graphemeSegmenter === undefined) {
+		graphemeSegmenter = System.Intl !== undefined && typeof System.Intl.Segmenter === "function" ? new System.Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+	}
+	return graphemeSegmenter;
+}
+
+//==============================================================================
+// 인쇄할 수 있는 아스키 글을 글자 덩어리로 나누기. (글자 하나가 덩어리 하나, Intl.Segmenter 의 조각과 같은 꼴)
+//==============================================================================
+/**
+ * @param { string } text 인쇄할 수 있는 아스키 글.
+ * @returns { object[] } 조각 목록. ({ segment, index })
+ */
+function splitAsciiSegments(text) {
+	const segments = [];
+	for (let index = 0; index < text.length; ++index) {
+		segments.push({ segment: text[index], index: index });
+	}
+	return segments;
+}
+
+
 //==============================================================================
 // 글 재기 캐시. (글꼴 문자열과 글이 같으면 다시 재지 않는다, measureTextMetrics)
 // - 오래 안 쓴 것부터 버린다. (MAXIMUM_MEASURE_COUNT 개까지)
@@ -304,7 +339,6 @@ export class TextStringTextureCache extends Object {
 	/** @private @type { boolean } */ #isTextAntialiasEnabled; // 글자 안티앨리어싱. (끄면 구운 글자의 알파를 문턱값으로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다, 도트 글꼴용, 기본 켬)
 	/** @private @type { number } */ #bakedGlyphCount; // 지금까지 구운 글리프 수. (통계)
 	/** @private @type { number } */ #uploadCount; // 지금까지 아틀라스에 올린 수. (통계, 굽기 캔버스 한 장이 한 번)
-	/** @private @type { object | null } */ #segmenter; // 글자 덩어리 나누기. (Intl.Segmenter, 없으면 null)
 	/** @private @type { HTMLCanvasElement } */ #bakeCanvas;
 	/** @private @type { CanvasRenderingContext2D } */ #bakeCanvasRenderingContext;
 	/** @private @type { CanvasRenderingContext2D } */ #measurementCanvasRenderingContext;
@@ -335,7 +369,6 @@ export class TextStringTextureCache extends Object {
 		this.#uploadCount = 0;
 		this.#textureBinder = textureBinder;
 		this.#beforeTextureOverwrite = beforeTextureOverwrite;
-		this.#segmenter = System.Intl !== undefined && typeof System.Intl.Segmenter === "function" ? new System.Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
 
 		const bakeCanvas = System.document.createElement("canvas");
 		this.#bakeCanvas = bakeCanvas;
@@ -516,7 +549,14 @@ export class TextStringTextureCache extends Object {
 		layoutCanvasRenderingContext.direction = textDirection;
 		// 경계는 왼쪽 기준으로 잰다. (오른쪽에서 왼쪽 방향의 기본 정렬 "start" 는 오른쪽 기준이다)
 		layoutCanvasRenderingContext.textAlign = "left";
-		const scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
+		// 배율 1 의 왼쪽에서 오른쪽 글은 글 재기 캐시를 거친다. (Text 가 그릴 자리를 잴 때 같은 글꼴 글과 글로 이미 잰 것을 다시 재지 않는다, 캐시 컨텍스트도 왼쪽 기준이다)
+		let scaledTextMetrics = null;
+		if (scale === 1 && textDirection === "ltr") {
+			scaledTextMetrics = measureTextMetrics(fontString, text);
+		}
+		if (scaledTextMetrics === null) {
+			scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
+		}
 
 		// 글리프 실측 경계. (측정 미지원 브라우저는 전진폭 기반 근사)
 		const actualLeft = Math.ceil(Math.max(scaledTextMetrics.actualBoundingBoxLeft || 0, 0));
@@ -687,17 +727,18 @@ export class TextStringTextureCache extends Object {
 	 * @returns { object[] }
 	 */
 	splitTextChunks(text, scaledFontString, textDirection) {
-		const segmenter = this.#segmenter;
+		const isSegmenterAvailable = System.Intl !== undefined && typeof System.Intl.Segmenter === "function";
 		const fontSizeMatch = scaledFontString.match(/(\d+(?:\.\d+)?)px/);
 		const fontSize = fontSizeMatch !== null ? System.Number.parseFloat(fontSizeMatch[1]) : Infinity;
-		if (segmenter === null || textDirection !== "ltr" || fontSize > MAXIMUM_ATLAS_FONT_SIZE || RIGHT_TO_LEFT_PATTERN.test(text)) {
+		if (!isSegmenterAvailable || textDirection !== "ltr" || fontSize > MAXIMUM_ATLAS_FONT_SIZE || RIGHT_TO_LEFT_PATTERN.test(text)) {
 			return [{ text: text, start: 0, clusterEnds: [text.length], isExactPosition: true, isWholeText: true, positions: [0] }];
 		}
 
 		const chunks = [];
 		let previousChunk = null;
 		let isPreviousJoining = false;
-		for (const segment of segmenter.segment(text)) {
+		const segments = PRINTABLE_ASCII_PATTERN.test(text) ? splitAsciiSegments(text) : getGraphemeSegmenter().segment(text);
+		for (const segment of segments) {
 			const clusterText = segment.segment;
 			const clusterEnd = segment.index + clusterText.length;
 			const isJoining = JOINING_CLUSTER_PATTERN.test(clusterText) && !STANDALONE_SCRIPT_PATTERN.test(clusterText);

@@ -24,12 +24,13 @@
 
 ![빠른 시작 코드를 돌린 화면: 검은 바탕에 흰 사각형 하나](../images/quickstart.webp)
 
-번들을 직접 만들 때는 esbuild 를 씁니다.
+번들을 직접 만들 때는 esbuild 를 씁니다. 저장소 루트에서 아래 명령이 `build/vanilla.js` 와 `build/vanilla.min.js` 를 짓습니다.
 
 ```bash
-esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+node tools/bundle.cjs
 ```
+
+- `vanilla.js` 는 줄과 들여쓰기를 남기고 주석을 뺀 읽는 판입니다. 원래 소스와 주석은 소스 맵(`vanilla.js.map`)에 들어 있습니다. `vanilla.min.js` 는 줄인 판입니다.
 
 ## 샘플
 
