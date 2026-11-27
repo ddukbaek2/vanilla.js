@@ -654,7 +654,7 @@ class EffectGalleryScene extends Scene {
 	initialize(engine) {
 		super.initialize(engine);
 		// 원본 ScreenEffect 는 만들 때 그래픽의 WebGL 컨텍스트를 받는다.
-		this.#screenEffect = new ScreenEffect(engine.getGraphic());
+		this.#screenEffect = new ScreenEffect();
 		const root = this.getRoot();
 		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
 		const sheetImage = createCharacterSheet();

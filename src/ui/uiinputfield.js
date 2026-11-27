@@ -7,6 +7,7 @@ import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
 import { Pivot } from "../base/pivot.js";
 import { Color } from "../base/color.js";
+import { Engine } from "../core/engine.js";
 import { WorldNode } from "../core/node/worldnode.js";
 import { Component } from "../core/component.js";
 import { Paint } from "../core/component/paint.js";
@@ -232,9 +233,21 @@ export class UIInputField extends WorldNode {
 	// 설정.
 	//==============================================================================
 	/**
-	 * @param { Engine } engine 엔진. (DOM 입력의 자리, 캔버스 사건, 문맥 메뉴에 쓴다, attach 전에 준다)
+	 * @param { Engine } engine 엔진. (DOM 입력의 자리, 캔버스 사건, 문맥 메뉴에 쓴다, 주지 않으면 Engine.getEngine() 을 쓴다)
 	 */
 	setEngine(engine) { this.#engine = engine; }
+	//==============================================================================
+	// 쓸 엔진 찾기. (setEngine 으로 준 엔진, 없으면 마지막으로 만든 엔진 Engine.getEngine())
+	//==============================================================================
+	/**
+	 * @returns { Engine | null } 쓸 엔진. (없으면 null)
+	 * @private
+	 */
+	#resolveEngine() {
+		if (this.#engine) return this.#engine;
+		const engine = Engine.getEngine();
+		return engine ? engine : null;
+	}
 	//==============================================================================
 	// DOM 입력 사용 설정. (attach 때 보므로 그 전에 정한다)
 	//==============================================================================
@@ -594,6 +607,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @returns { object } 그릴 때 쓸 상태를 담은 새 객체. ({ value, composition, cursorIndex, selectionStart, focused, cursorVisible, fontSize, fontFace, padding, cursorColor, compositionUnderlineColor, focusBorderColor, focusBorderWidth, selectionColor, bgRoundSize })
+	 * @private
 	 */
 	getRenderState() {
 		return {
@@ -840,6 +854,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @returns { CanvasRenderingContext2D | null } 2D 컨텍스트. (캔버스를 만들 수 없으면 null)
+	 * @private
 	 */
 	getMeasureContext() {
 		return getOffscreenMeasureContext();
@@ -850,6 +865,7 @@ export class UIInputField extends WorldNode {
 	// - 값이 비어있으면 textText 숨김 + placeholder 표시.
 	// - 조합 중이면 (value + composition) 을 textText 에 합성 표시.
 	//==============================================================================
+	/** @private */
 	refreshTexts() {
 		const hasValue = this.#value.length > 0 || this.#composition.length > 0;
 		this.#placeholderTextNode.setActive(!hasValue);
@@ -865,6 +881,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 라벨과 오버레이 노드의 자리, 크기 맞추기. (내용 크기가 0 이면 하지 않는다)
 	//==============================================================================
+	/** @private */
 	refreshTextPositions() {
 		const size = this.getContentSize();
 		if (size.x <= 0 || size.y <= 0) return;
@@ -880,6 +897,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// DOM <input> (옵션).
 	//==============================================================================
+	/** @private */
 	attachDOMInput() {
 		if (this.#domInput) return;
 		const doc = System.document;
@@ -952,6 +970,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// DOM 입력 떼기. (캔버스 포커스 핸들러도 떼고 포커스와 조합을 푼다)
 	//==============================================================================
+	/** @private */
 	detachDOMInput() {
 		this.detachCanvasFocusHandler();
 		if (!this.#domInput) return;
@@ -977,9 +996,10 @@ export class UIInputField extends WorldNode {
 	//   띄우지 않는다. 그때 얻은 포커스면 (활성화를 주는) touchend 에서 blur 뒤
 	//   다시 focus 해 키보드를 띄운다. 꺼져 있으면 touchend 는 아무것도 하지 않는다.
 	//==============================================================================
+	/** @private */
 	attachCanvasFocusHandler() {
 		if (this.#canvasFocusHandler) return;
-		const engine = this.#engine;
+		const engine = this.#resolveEngine();
 		if (!engine) return;
 		const viewManager = engine.getViewManager();
 		if (!viewManager) return;
@@ -1037,9 +1057,10 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 캔버스 touchstart 동기 focus 핸들러 해제.
 	//==============================================================================
+	/** @private */
 	detachCanvasFocusHandler() {
 		if (!this.#canvasFocusHandler) return;
-		const engine = this.#engine;
+		const engine = this.#resolveEngine();
 		if (engine) {
 			const viewManager = engine.getViewManager();
 			if (viewManager) {
@@ -1057,9 +1078,10 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// DOM 입력을 필드의 화면 자리에 맞추기. (직접 누름이면 보이는 동안만 누름을 받는다)
 	//==============================================================================
+	/** @private */
 	layoutDOMInput() {
-		if (!this.#domInput || !this.#engine) return;
-		const viewManager = this.#engine.getViewManager();
+		if (!this.#domInput || !this.#resolveEngine()) return;
+		const viewManager = this.#resolveEngine().getViewManager();
 		const canvas = viewManager.getCanvas();
 		if (!canvas) return;
 		const canvasRect = canvas.getBoundingClientRect();
@@ -1088,6 +1110,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// DOM 입력의 값 받기. (조합 중이 아니고 값이 바뀌었으면 담고 바뀜 콜백을 부른다)
 	//==============================================================================
+	/** @private */
 	handleDOMInputEvent() {
 		if (!this.#domInput) return;
 		if (this.#isComposing) return;
@@ -1106,6 +1129,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 캔버스 모드 키보드 (DOM input 미사용 시).
 	//==============================================================================
+	/** @private */
 	attachCanvasKeyboard() {
 		if (this.#canvasKeydownHandler) return;
 		this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
@@ -1114,6 +1138,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 캔버스 모드 키보드 사건 떼기.
 	//==============================================================================
+	/** @private */
 	detachCanvasKeyboard() {
 		if (!this.#canvasKeydownHandler) return;
 		System.document.removeEventListener("keydown", this.#canvasKeydownHandler);
@@ -1268,6 +1293,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { number } index 지울 글자의 자리. (UTF-16 단위)
+	 * @private
 	 */
 	deleteCharAt(index) {
 		const endIndex = findNextGraphemeBoundary(this.#value, index);
@@ -1279,6 +1305,7 @@ export class UIInputField extends WorldNode {
 	/**
 	 * @param { number } startIndex 지울 범위의 앞. (UTF-16 단위)
 	 * @param { number } endIndex 지울 범위의 뒤. (UTF-16 단위, 앞보다 크지 않으면 아무것도 하지 않는다)
+	 * @private
 	 */
 	deleteRange(startIndex, endIndex) {
 		const start = System.Math.max(0, startIndex);
@@ -1303,6 +1330,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 포커스 / 블러 핸들러 (DOM/캔버스 모드 공용).
 	//==============================================================================
+	/** @private */
 	handleFocus() {
 		this.#focused = true;
 		this.#isFocusedWithoutActivation = !hasStickyUserActivation();
@@ -1321,6 +1349,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 포커스 잃음 처리. (문맥 메뉴를 닫는다)
 	//==============================================================================
+	/** @private */
 	handleBlur() {
 		this.#focused = false;
 		this.hideContextMenu();
@@ -1456,6 +1485,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { string } menuAction 할 항목. (UIInputFieldMenuAction 의 값, 그 밖이면 아무것도 하지 않는다)
+	 * @private
 	 */
 	performMenuAction(menuAction) {
 		switch (menuAction) {
@@ -1482,6 +1512,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { string } text 쓸 글.
+	 * @private
 	 */
 	writeClipboard(text) {
 		try {
@@ -1496,6 +1527,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @returns { Promise<string> } 클립보드 글로 풀리는 프로미스. (navigator.clipboard 가 없으면 빈 글, 읽기가 막히면 거부될 수 있다)
+	 * @private
 	 */
 	readClipboard() {
 		try {
@@ -1510,9 +1542,10 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 컨텍스트 메뉴 (우클릭).
 	//==============================================================================
+	/** @private */
 	attachContextMenuHandler() {
-		if (!this.#engine || this.#contextMenuHandler) return;
-		const canvas = this.#engine.getViewManager().getCanvas();
+		if (!this.#resolveEngine() || this.#contextMenuHandler) return;
+		const canvas = this.#resolveEngine().getViewManager().getCanvas();
 		if (!canvas) return;
 		this.#contextMenuHandler = (event) => this.handleContextMenuEvent(event);
 		canvas.addEventListener("contextmenu", this.#contextMenuHandler);
@@ -1520,9 +1553,10 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 캔버스의 contextmenu 사건 떼기.
 	//==============================================================================
+	/** @private */
 	detachContextMenuHandler() {
-		if (!this.#contextMenuHandler || !this.#engine) return;
-		const canvas = this.#engine.getViewManager().getCanvas();
+		if (!this.#contextMenuHandler || !this.#resolveEngine()) return;
+		const canvas = this.#resolveEngine().getViewManager().getCanvas();
 		if (canvas) canvas.removeEventListener("contextmenu", this.#contextMenuHandler);
 		this.#contextMenuHandler = null;
 	}
@@ -1531,9 +1565,10 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { MouseEvent } event 캔버스의 contextmenu 사건.
+	 * @private
 	 */
 	handleContextMenuEvent(event) {
-		if (!this.#engine) return;
+		if (!this.#resolveEngine()) return;
 		const viewPosition = this.#convertClientPositionToViewPosition(event.clientX, event.clientY);
 		if (viewPosition === null) return;
 		if (!this.contains(viewPosition)) {
@@ -1556,6 +1591,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { MouseEvent } event DOM 입력의 contextmenu 사건.
+	 * @private
 	 */
 	handleDOMInputContextMenuEvent(event) {
 		if (!this.#useDirectTouch) return;
@@ -1575,8 +1611,8 @@ export class UIInputField extends WorldNode {
 	 * @returns { Vector2 | null } 뷰 좌표. (엔진이나 캔버스가 없으면 null)
 	 */
 	#convertClientPositionToViewPosition(clientX, clientY) {
-		if (!this.#engine) return null;
-		const viewManager = this.#engine.getViewManager();
+		if (!this.#resolveEngine()) return null;
+		const viewManager = this.#resolveEngine().getViewManager();
 		const canvas = viewManager.getCanvas();
 		if (!canvas) return null;
 		const rect = canvas.getBoundingClientRect();
@@ -1605,10 +1641,10 @@ export class UIInputField extends WorldNode {
 		menuNode.setContentSize(Vector2.create(CONTEXT_MENU_WIDTH, CONTEXT_MENU_PADDING_Y * 2 + CONTEXT_MENU_ITEM_HEIGHT * CONTEXT_MENU_ITEM_LIST.length));
 		root.addChild(menuNode);
 		const menu = menuNode.addComponent(UIInputFieldContextMenu);
-		menu.initialize(this, this.#engine, this.hasSelection(), this.#value.length > 0);
+		menu.initialize(this, this.#resolveEngine(), this.hasSelection(), this.#value.length > 0);
 		this.#contextMenuNode = menuNode;
 		// 메뉴 위 mousedown 은 입력 칸 포커스를 빼지 않게 기본 동작을 막는다. (메뉴 항목을 누르는 동안 입력 칸이 포커스를 잃어 메뉴가 닫히지 않게)
-		const canvas = this.#engine ? this.#engine.getViewManager().getCanvas() : null;
+		const canvas = this.#resolveEngine() ? this.#resolveEngine().getViewManager().getCanvas() : null;
 		if (canvas && !this.#contextMenuMouseDownHandler) {
 			this.#contextMenuMouseDownHandler = (event) => {
 				const position = this.#convertClientPositionToViewPosition(event.clientX, event.clientY);
@@ -1622,6 +1658,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 문맥 메뉴 닫기. (러스트 판 hide_context_menu 와 같다)
 	//==============================================================================
+	/** @private */
 	hideContextMenu() {
 		const menuNode = this.#contextMenuNode;
 		this.#contextMenuNode = null;
@@ -1629,7 +1666,7 @@ export class UIInputField extends WorldNode {
 			menuNode.getParent().removeChild(menuNode);
 		}
 		if (this.#contextMenuMouseDownHandler) {
-			const canvas = this.#engine ? this.#engine.getViewManager().getCanvas() : null;
+			const canvas = this.#resolveEngine() ? this.#resolveEngine().getViewManager().getCanvas() : null;
 			if (canvas) {
 				canvas.removeEventListener("mousedown", this.#contextMenuMouseDownHandler);
 			}

@@ -1305,6 +1305,7 @@ export class ToonRenderer {
 	 * @param { ToonMaterial | null } material - 머티리얼. (null 이면 빈 조각)
 	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴. (null 이면 없음)
 	 * @returns { object } 세 프로그램 칸. ({ solid, outline, depth } 마다 { program, kind, frameSerial, lightSet, lightVersion })
+	 * @private
 	 */
 	createProgramSet(material, instanceLayout) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1346,6 +1347,7 @@ export class ToonRenderer {
 	 * @param { ToonMaterial | null } material - 머티리얼. (null 이면 빈 조각)
 	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴. (null 이면 없음)
 	 * @returns { object | null } { solid, outline, depth } 프로그램 칸. (짓지 못했으면 null)
+	 * @private
 	 */
 	readProgramSet(material, instanceLayout) {
 		if (material === null && instanceLayout === null) {
@@ -1424,6 +1426,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { object | null } programSet - createProgramSet 의 결과. (null 이면 하지 않는다)
+	 * @private
 	 */
 	deleteProgramSet(programSet) {
 		if (programSet === null) {
@@ -1717,6 +1720,7 @@ export class ToonRenderer {
 	 * @param { Float32Array } data - 올릴 수.
 	 * @param { number } usage - STATIC_DRAW 나 DYNAMIC_DRAW.
 	 * @returns { WebGLBuffer } 지은 꼭짓점 버퍼.
+	 * @private
 	 */
 	createArrayBuffer(data, usage) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1732,6 +1736,7 @@ export class ToonRenderer {
 	/**
 	 * @param { Uint32Array } data - 꼭짓점 번호.
 	 * @returns { WebGLBuffer } 지은 번호 버퍼.
+	 * @private
 	 */
 	createIndexBuffer(data) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1746,6 +1751,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { object } mesh - createMesh 가 짓는 모형.
+	 * @private
 	 */
 	attachBodyAttributes(mesh) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1778,6 +1784,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { object } mesh - createMesh 가 짓는 모형. (껍데기가 있는 것)
+	 * @private
 	 */
 	attachOutlineAttributes(mesh) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1797,6 +1804,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { WebGLBuffer } skinBuffer - 꼭짓점마다 뼈대 번호 4 와 무게 4 를 담은 버퍼.
+	 * @private
 	 */
 	attachSkinAttributes(skinBuffer) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1813,6 +1821,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { WebGLBuffer } instanceBuffer - 인스턴스마다 행렬 16 과 틴트 4 를 담은 버퍼.
+	 * @private
 	 */
 	attachInstanceAttributes(instanceBuffer) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1832,6 +1841,7 @@ export class ToonRenderer {
 	/**
 	 * @param { ToonInstanceLayout } instanceLayout - 버퍼의 인스턴스 꼴.
 	 * @param { WebGLBuffer } buffer - 그 꼴로 담은 버퍼.
+	 * @private
 	 */
 	attachLayoutAttributes(instanceLayout, buffer) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1864,6 +1874,7 @@ export class ToonRenderer {
 	 * @param { object } mesh - createMesh 의 결과.
 	 * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
 	 * @returns { object } 몸과 바깥선의 버텍스 어레이. ({ body, outline }, 껍데기가 없으면 outline 은 null)
+	 * @private
 	 */
 	readInstanceVertexArrays(mesh, instanceBuffer) {
 		const existing = instanceBuffer.vertexArrays.get(mesh);
@@ -1972,6 +1983,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @returns { WebGLTexture | null } 유닛 0 의 텍스처. (없으면 null)
+	 * @private
 	 */
 	readFirstUnitTexture() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -2021,6 +2033,7 @@ export class ToonRenderer {
 	/**
 	 * @param { GLenum } capability - WebGL 기능. (BLEND, DEPTH_TEST 같은)
 	 * @param { boolean } isEnabled - 켤지.
+	 * @private
 	 */
 	applyCapability(capability, isEnabled) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -2172,6 +2185,7 @@ export class ToonRenderer {
 	//==============================================================================
 	// 화면 사각형 걸기. (beginFrame 이 상태를 적은 뒤, 클립 x, y 에 사각형의 비를 곱하고 자리를 더한 뒤 가위를 켠다)
 	//==============================================================================
+	/** @private */
 	applyScreenRect() {
 		const screenRect = this.#screenRect;
 		const savedState = this.#savedState;
@@ -2204,6 +2218,7 @@ export class ToonRenderer {
 	//==============================================================================
 	// 화면 사각형의 가위 풀기. (applyScreenRect 가 켰을 때만)
 	//==============================================================================
+	/** @private */
 	releaseScreenRect() {
 		if (!this.#isScissorApplied) {
 			return;
@@ -2487,6 +2502,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { object } entry - 프로그램 칸.
+	 * @private
 	 */
 	uploadFrameUniforms(entry) {
 		if (entry.frameSerial === this.#frameSerial) {
@@ -2534,6 +2550,7 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { ShaderProgram } shaderProgram - 몸 프로그램.
+	 * @private
 	 */
 	uploadLocalShadowUniforms(shaderProgram) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -2573,6 +2590,7 @@ export class ToonRenderer {
 	/**
 	 * @param { object } entry - 몸 프로그램 칸.
 	 * @param { ToonLightSet } lightSet - 올릴 빛 묶음.
+	 * @private
 	 */
 	uploadLightUniforms(entry, lightSet) {
 		if (entry.lightSet === lightSet && entry.lightVersion === lightSet.getVersion()) {
@@ -2688,6 +2706,7 @@ export class ToonRenderer {
 	/**
 	 * @param { number } unit - 텍스처 유닛 번호.
 	 * @param { WebGLTexture | null | undefined } texture - 묶을 텍스처. (없으면 흰 텍스처)
+	 * @private
 	 */
 	bindTextureUnit(unit, texture) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();

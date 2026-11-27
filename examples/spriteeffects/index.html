@@ -1055,7 +1055,7 @@
 		async load(engine) {
 			const viewManager = engine.getViewManager();
 			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
-			this.screenEffect = new ScreenEffect(engine.getGraphic());
+			this.screenEffect = new ScreenEffect();
 			await System.Promise.all(IMAGE_NAME_LIST.map((imageName) => {
 				return new System.Promise((resolve) => {
 					const imageElement = new System.Image();

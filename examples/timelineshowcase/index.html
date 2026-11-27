@@ -190,7 +190,7 @@
 		async load(engine) {
 			const viewManager = engine.getViewManager();
 			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
-			this.#screenEffect = new ScreenEffect(engine.getGraphic());
+			this.#screenEffect = new ScreenEffect();
 			Timeline.setAudioManager(engine.getAudioManager());
 
 			// 이미지 미리 읽기. (문서는 파일 이름으로 가리킨다)

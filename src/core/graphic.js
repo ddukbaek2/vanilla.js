@@ -535,6 +535,7 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #imageMipmapBias;
 	/** @private @type { string } */ #imageSmoothingQuality;
 	/** @private @type { ShaderProgram } */ #shaderProgram;
+	/** @private @type { Map<string, ShaderProgram | null> } */ #resolvedShaderProgramTable = new System.Map(); // resolveShaderProgram 이 담아 둔 프로그램. ("묶음\u0000이름" → 프로그램, 실패는 null)
 	/** @private @type { ShaderProgram | null } */ #shaderProgramOverride; // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
 	/** @private @type { WebGLVertexArrayObject } */ #vertexArray;
 	/** @private @type { WebGLBuffer } */ #vertexBuffer;
@@ -4708,5 +4709,83 @@ export class Graphic extends Object {
 	 */
 	getTextStringTextureCache() {
 		return this.#textStringTextureCache;
+	}
+
+	//==============================================================================
+	// 이름으로 담아 둔 바꿔 끼울 셰이더 프로그램 반환. (없으면 createShaderSource 가 준 소스로 만들어 담는다)
+	// - 어트리뷰트 위치를 기본 프로그램과 같게 고정해 링크하므로 기본 버텍스 어레이를 그대로 쓴다.
+	// - 만들기에 실패하면 한 번만 알리고 null 을 담아 두어 다시 만들지 않는다.
+	//==============================================================================
+	/**
+	 * @param { string } programGroupName 묶음 이름. (효과 종류 같은 것, 열쇠의 앞)
+	 * @param { string } programName 프로그램 이름. (열쇠의 뒤)
+	 * @param { () => [string, string] } createShaderSource 담긴 것이 없을 때만 부르는 함수. ([버텍스 소스, 프래그먼트 소스], GLSL ES 3.00)
+	 * @returns { ShaderProgram | null } 담아 둔 프로그램. 만들기에 실패했으면 null. (그 뒤로도 null)
+	 *
+	 * @example <caption>흑백 셰이더로 바꿔 끼워 도형 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Color, Rect } from "./build/vanilla.js";
+	 *
+	 * const VERTEXSHADER_SOURCE = `#version 300 es
+	 * in vec2 vertexPosition;
+	 * in vec2 vertexTextureCoordinate;
+	 * uniform mat3 projectionMatrix;
+	 * uniform mat3 modelMatrix;
+	 * out vec2 fragmentTextureCoordinate;
+	 * void main() {
+	 * 	vec3 transformedPosition = projectionMatrix * (modelMatrix * vec3(vertexPosition, 1.0));
+	 * 	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
+	 * 	fragmentTextureCoordinate = vertexTextureCoordinate;
+	 * }
+	 * `;
+	 * const GRAY_FRAGMENTSHADER_SOURCE = `#version 300 es
+	 * precision highp float;
+	 * in vec2 fragmentTextureCoordinate;
+	 * uniform sampler2D mainTexture;
+	 * uniform vec4 mainColor;
+	 * uniform float globalAlpha;
+	 * out vec4 outputColor;
+	 * void main() {
+	 * 	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	 * 	float gray = dot(textureColor.rgb * mainColor.rgb, vec3(0.299, 0.587, 0.114));
+	 * 	float alpha = textureColor.a * mainColor.a * globalAlpha;
+	 * 	outputColor = vec4(vec3(gray) * alpha, alpha);
+	 * }
+	 * `;
+	 *
+	 * class MainScene extends Scene {
+	 * 	preDraw(graphic) {
+	 * 		super.preDraw(graphic);
+	 * 		const shaderProgram = graphic.resolveShaderProgram("example", "gray", () => [VERTEXSHADER_SOURCE, GRAY_FRAGMENTSHADER_SOURCE]);
+	 * 		graphic.setShaderProgramOverride(shaderProgram);
+	 * 		graphic.setFillColor(new Color(1, 0.4, 0.2, 1));
+	 * 		graphic.drawRect(Rect.create(220, 100, 200, 160));
+	 * 		graphic.setShaderProgramOverride(null);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	resolveShaderProgram(programGroupName, programName, createShaderSource) {
+		const cacheKey = `${programGroupName}\u0000${programName}`;
+		if (this.#resolvedShaderProgramTable.has(cacheKey)) {
+			return this.#resolvedShaderProgramTable.get(cacheKey);
+		}
+		const [vertexShaderSource, fragmentShaderSource] = createShaderSource();
+		const attributeLocationTable = {
+			vertexPosition: this.#shaderProgram.getAttributeLocation("vertexPosition"),
+			vertexTextureCoordinate: this.#shaderProgram.getAttributeLocation("vertexTextureCoordinate"),
+		};
+		let shaderProgram = null;
+		try {
+			shaderProgram = new ShaderProgram(this.getWebGL2RenderingContext(), vertexShaderSource, fragmentShaderSource, attributeLocationTable);
+		}
+		catch (error) {
+			console.error(`Graphic: shader program "${programGroupName}.${programName}" failed: ${error && error.message !== undefined ? error.message : error}`);
+			shaderProgram = null;
+		}
+		this.#resolvedShaderProgramTable.set(cacheKey, shaderProgram);
+		return shaderProgram;
 	}
 }
