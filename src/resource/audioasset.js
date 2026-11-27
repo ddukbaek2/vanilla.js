@@ -97,7 +97,7 @@ export class AudioAsset extends Asset {
 	// 읽기 방식 반환.
 	//==============================================================================
 	/**
-	 * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
+	 * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 엔진 SoundSystem 의 배경음악만 소리 표에 loadType 이 없으면 streaming)
 	 */
 	getLoadType() {
 		return this.#loadType;
