@@ -15687,8 +15687,6 @@ void main() {
         return;
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
       const viewportWidth = this.#appliedViewportWidth;
       const viewportHeight = this.#appliedViewportHeight;
@@ -50483,12 +50481,10 @@ void main() {
     }
     //==============================================================================
     // 멀티샘플을 텍스처로 풀기. (컬러 어태치먼트마다와 깊이 텍스처, 묶여 있던 프레임버퍼로 돌림)
-    // - 그리기를 끝낸 판의 다시 읽지 않는 첨부를 버린다. (멀티샘플이면 멀티샘플 색과 깊이, 아니면 텍스처가 아닌 깊이 렌더버퍼)
-    //   유니티, 언리얼이 판 끝에 저장하지 않는 첨부(store action 을 버림으로)와 같다. 모바일 타일 GPU 가 그 첨부를 메모리에 쓰지 않는다.
-    //   버린 첨부의 값은 정해지지 않으므로 다음에 그릴 때는 비우고 그린다. (데스크탑 GPU 에서는 거의 차이가 없다)
+    // - 푼 뒤에도 멀티샘플 색과 깊이는 그대로 남는다. (invalidateFramebuffer 로 버리지 않는다, 아이패드와 아이폰 사파리에서 프레임마다 수 ~ 수십 ms 가 붙고 이득이 재어지지 않았다)
     //==============================================================================
     /**
-     * @param { boolean } isAttachmentKept true 면 버리지 않고 남긴다. (풀고 나서 같은 판에 이어 그릴 때, 기본 false)
+     * @param { boolean } isAttachmentKept 더는 쓰지 않는다. (옛 꼴과 맞추려고 남김, 어느 쪽이든 푼 뒤에 멀티샘플 색과 깊이를 버리지 않는다)
      * @example <caption>풀고 나서 같은 판에 이어 그리기</caption>
      * import { RenderTarget } from "./build/vanilla.js";
      *
@@ -50508,12 +50504,6 @@ void main() {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const multisampleFramebuffer = this.#multisampleFramebuffer;
       if (multisampleFramebuffer === null) {
-        if (!isAttachmentKept && this.#depthRenderbuffer !== null) {
-          const previousFramebuffer2 = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
-          webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.getFramebuffer());
-          webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_ATTACHMENT]);
-          webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer2);
-        }
         return;
       }
       const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
@@ -50544,16 +50534,6 @@ void main() {
       const depthTexture = this.getDepthTexture();
       if (depthTexture !== null) {
         webGL2RenderingContext.blitFramebuffer(0, 0, width, height, 0, 0, width, height, webGL2RenderingContext.DEPTH_BUFFER_BIT, webGL2RenderingContext.NEAREST);
-      }
-      if (!isAttachmentKept) {
-        const invalidatedAttachmentList = [];
-        for (let attachmentIndex = 0; attachmentIndex < colorAttachmentCount; ++attachmentIndex) {
-          invalidatedAttachmentList.push(webGL2RenderingContext.COLOR_ATTACHMENT0 + attachmentIndex);
-        }
-        if (this.#multisampleDepthRenderbuffer !== null) {
-          invalidatedAttachmentList.push(webGL2RenderingContext.DEPTH_ATTACHMENT);
-        }
-        webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, invalidatedAttachmentList);
       }
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
     }

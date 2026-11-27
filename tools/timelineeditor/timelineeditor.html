@@ -14465,8 +14465,6 @@ void main() {
         return;
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
       const viewportWidth = this.#appliedViewportWidth;
       const viewportHeight = this.#appliedViewportHeight;

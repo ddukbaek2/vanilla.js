@@ -9528,8 +9528,6 @@ var Graphic = class extends Object2 {
       return;
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
     const viewportWidth = this.#appliedViewportWidth;
     const viewportHeight = this.#appliedViewportHeight;
@@ -34948,12 +34946,6 @@ var RenderTarget = class extends Object2 {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const multisampleFramebuffer = this.#multisampleFramebuffer;
     if (multisampleFramebuffer === null) {
-      if (!isAttachmentKept && this.#depthRenderbuffer !== null) {
-        const previousFramebuffer2 = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
-        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.getFramebuffer());
-        webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_ATTACHMENT]);
-        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer2);
-      }
       return;
     }
     const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
@@ -34984,16 +34976,6 @@ var RenderTarget = class extends Object2 {
     const depthTexture = this.getDepthTexture();
     if (depthTexture !== null) {
       webGL2RenderingContext.blitFramebuffer(0, 0, width, height, 0, 0, width, height, webGL2RenderingContext.DEPTH_BUFFER_BIT, webGL2RenderingContext.NEAREST);
-    }
-    if (!isAttachmentKept) {
-      const invalidatedAttachmentList = [];
-      for (let attachmentIndex = 0; attachmentIndex < colorAttachmentCount; ++attachmentIndex) {
-        invalidatedAttachmentList.push(webGL2RenderingContext.COLOR_ATTACHMENT0 + attachmentIndex);
-      }
-      if (this.#multisampleDepthRenderbuffer !== null) {
-        invalidatedAttachmentList.push(webGL2RenderingContext.DEPTH_ATTACHMENT);
-      }
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, invalidatedAttachmentList);
     }
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
   }
@@ -39519,6 +39501,7 @@ var FullscreenPass = class extends Object2 {
   }
 };
 var System101 = globalThis;
+var ZERO_CLEAR_FLOAT_VALUE = new System101.Float32Array(4);
 var BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -39586,7 +39569,7 @@ var BloomEffect = class extends Object2 {
     const pingRenderTarget = this.getPingRenderTarget();
     const pongRenderTarget = this.getPongRenderTarget();
     pingRenderTarget.bind();
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
     const brightPass = this.getBrightPass();
     brightPass.useProgram();
     const brightSceneTextureLocation = brightPass.getUniformLocation("sceneTexture");
@@ -39603,14 +39586,14 @@ var BloomEffect = class extends Object2 {
     const iterationCount = this.getIterationCount();
     for (let blurIndex = 0; blurIndex < iterationCount; ++blurIndex) {
       pongRenderTarget.bind();
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+      webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
       const pingWidth = pingRenderTarget.getWidth();
       webGL2RenderingContext.uniform2f(blurDirectionLocation, 1 / pingWidth, 0);
       const pingColorTexture = pingRenderTarget.getColorTexture();
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, pingColorTexture);
       blurPass.draw();
       pingRenderTarget.bind();
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+      webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
       const pongHeight = pongRenderTarget.getHeight();
       webGL2RenderingContext.uniform2f(blurDirectionLocation, 0, 1 / pongHeight);
       const pongColorTexture = pongRenderTarget.getColorTexture();
@@ -43583,6 +43566,7 @@ function writeSkinPose(skeleton, animationName, time, target, blend = null, swin
 }
 __name(writeSkinPose, "writeSkinPose");
 var System108 = globalThis;
+var ZERO_CLEAR_FLOAT_VALUE2 = new System108.Float32Array(4);
 var EXTRACT_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -43722,7 +43706,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     const extractPass = this.#extractPass;
     const firstRenderTarget = levelRenderTargetList[0];
     firstRenderTarget.bind();
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE2);
     extractPass.useProgram();
     webGL2RenderingContext.uniform1i(extractPass.getUniformLocation("sourceTexture"), 0);
     webGL2RenderingContext.uniform2f(extractPass.getUniformLocation("sourceTexel"), 1 / this.#sceneWidth, 1 / this.#sceneHeight);
@@ -43738,7 +43722,7 @@ var MultiLevelBloomEffect = class extends Object2 {
       const sourceRenderTarget = levelRenderTargetList[levelIndex - 1];
       const targetRenderTarget = levelRenderTargetList[levelIndex];
       targetRenderTarget.bind();
-      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+      webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE2);
       webGL2RenderingContext.uniform2f(downsampleTexelLocation, 1 / sourceRenderTarget.getWidth(), 1 / sourceRenderTarget.getHeight());
       const sourceTexture = sourceRenderTarget.getColorTexture(0);
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
@@ -43787,7 +43771,7 @@ var MultiLevelBloomEffect = class extends Object2 {
 var System109 = globalThis;
 var ToonOutlineWidthUnit = System109.Object.freeze({ world: "world", pixel: "pixel" });
 var ZERO_CLEAR_VALUE = new System109.Uint32Array(4);
-var ZERO_CLEAR_FLOAT_VALUE = new System109.Float32Array(4);
+var ZERO_CLEAR_FLOAT_VALUE3 = new System109.Float32Array(4);
 var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
 var BATCH_SLOT_MESH_LIMIT2 = 8;
 var IDENTITY_ELEMENTS2 = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -44805,7 +44789,7 @@ var ToonScreenOutline = class {
     const program = this.#thinCoverageProgram;
     const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.coverageFramebuffer);
-    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE3);
     program.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.edgeMaskTexture);
@@ -45208,6 +45192,7 @@ var ToonScreenOutline = class {
   }
 };
 var System110 = globalThis;
+var ZERO_CLEAR_FLOAT_VALUE4 = new System110.Float32Array(4);
 var COMPOSITE_FRAGMENT_SHADER2 = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -45796,7 +45781,7 @@ var ToonPostProcess = class _ToonPostProcess {
       webGL2RenderingContext.uniform1f(pass.getUniformLocation("planeTolerance"), ambientOcclusion.radius * 0.1);
     }, "bindCommon");
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE4);
     webGL2RenderingContext.viewport(0, 0, target.cellWidth, target.cellHeight);
     const occlusionPass = passes.occlusionPass;
     bindCommon(occlusionPass, target.blurTexture);
@@ -45806,17 +45791,17 @@ var ToonPostProcess = class _ToonPostProcess {
     webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("pixelsPerUnit"), 0.5 * System110.Math.abs(projectionElements[0]) * width);
     occlusionPass.draw();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.blurFramebuffer);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE4);
     bindCommon(passes.blurPass, target.occlusionTexture);
     webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 1, 0);
     passes.blurPass.draw();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE4);
     bindCommon(passes.blurPass, target.blurTexture);
     webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 0, 1);
     passes.blurPass.draw();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.resultFramebuffer);
-    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE4);
     webGL2RenderingContext.viewport(0, 0, width, height);
     const upsamplePass = passes.upsamplePass;
     bindCommon(upsamplePass, target.occlusionTexture);
