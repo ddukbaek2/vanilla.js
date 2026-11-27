@@ -21180,6 +21180,16 @@
 		{
 			"vanilla-engine": {
 				"module": "graphics3d/toon/glbmeshreader",
+				"class": "BoneModifyMode"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/glbmeshreader",
+				"class": "BoneModifyMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/glbmeshreader",
 				"name": "read_glb_images"
 			},
 			"vanilla.js": {
@@ -21235,6 +21245,16 @@
 			"vanilla.js": {
 				"module": "graphics3d/toon/glbmeshreader",
 				"name": "readAnimationSwing"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/glbmeshreader",
+				"name": "adjust_bones"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/glbmeshreader",
+				"name": "adjustBones"
 			}
 		},
 		{
@@ -24833,6 +24853,18 @@
 			"vanilla-engine": {
 				"module": "graphics3d/camera3d",
 				"class": "Camera3D",
+				"name": "set_view_offset"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camera3d",
+				"class": "Camera3D",
+				"name": "setViewOffset"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camera3d",
+				"class": "Camera3D",
 				"name": "get_view_matrix"
 			},
 			"vanilla.js": {
@@ -24911,6 +24943,98 @@
 				"module": "graphics3d/camera3d",
 				"class": "Camera3D",
 				"name": "unprojectToPlane"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "add"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "add"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "update"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "update"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "read"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "read"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "is_shaking"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "isShaking"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "clear"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"class": "CameraShake",
+				"name": "clear"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/camerashake",
+				"name": "create_offset_view_matrix"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/camerashake",
+				"name": "createOffsetViewMatrix"
 			}
 		},
 		{
