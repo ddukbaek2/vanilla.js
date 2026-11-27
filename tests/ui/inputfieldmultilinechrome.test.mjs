@@ -54,11 +54,11 @@ const commandKey = isMac ? "Meta" : "Control";
 // 러스트 판 line_break_list_matches_chrome_textarea 의 글.
 const lineBreakTextList = [
 	"hello world foo", "state-of-the-art e-mail", "a/b http://x.com/a?b=c", "(abc) [def] {ghi}", "1,000.50 $30 30% 3.14",
-	"안녕하세요 반갑습니다", "日本語の文章です。終わり", "中文句子，测试。", "ภาษาไทยเป็นภาษาที่สวยงาม", "foo—bar…baz",
+	"안녕하세요 반갑습니다", "日本語の文章です。終わり", "中文句子，测试。", "ภาษาไทยเป็นภาษาที่สวยงาม", "foo\u2014bar\u2026baz",
 	"don't stop", "a  b", "가나다abc가나", "x=1;y=2", "「こんにちは」と言った",
 	"テスト・ケース", "a(b)c x)(y z=[1]", "foo-123 a-1 -1 1-2", "«bonjour» déjà-vu ¿qué?", "price: $5, ok! 50%off",
 	"tab\there", "C++/C# a.b,c;d", "über-straße", "A&B|C~D", "привет мир",
-	"ABC-DEF?ghi", "あ〜い゠う", "ぁぃぅ々〻", "「中」〜〜", "a‐b–c—d",
+	"ABC-DEF?ghi", "あ〜い゠う", "ぁぃぅ々〻", "「中」〜〜", "a\u2010b\u2013c\u2014d",
 ];
 
 const browser = await puppeteer.launch({ executablePath, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
@@ -266,6 +266,23 @@ try {
 		verticalList.push((await readCanvasField()).cursor);
 	}
 	checkJson(verticalList, [9, 14, 16, 9, 4, 0, 0], "위아래 이동 자리");
+	// 휠: 여러 줄 필드만 휠 받기 컴포넌트를 갖고, 글 끝 안에서 넘긴다. (러스트 판 wheel)
+	const wheelResult = await page.evaluate(() => {
+		const field = globalThis.canvasField;
+		field.setText(Array.from({ length: 30 }, (unused, index) => "line " + index).join("\n"));
+		const findReceiver = (node) => node.getAllComponents().find((component) => typeof component.wheel === "function" && typeof component.getScrollContentSize === "function");
+		const receiver = findReceiver(field);
+		receiver.wheel(globalThis.Vanilla.Vector2.create(0, 50));
+		const afterWheel = field.getScrollTop();
+		receiver.wheel(globalThis.Vanilla.Vector2.create(0, 100000));
+		const maximumScrollTop = field.getScrollTop();
+		const expectedMaximum = field.getLineHeight() * 30 + 16 * 2 - field.getContentSize().y;
+		field.setMultiline(false);
+		const hasReceiverWhenSingle = findReceiver(field) !== undefined;
+		field.setMultiline(true);
+		return { afterWheel, isMaximumRight: Math.abs(maximumScrollTop - expectedMaximum) < 0.001, hasReceiverWhenSingle };
+	});
+	checkJson(wheelResult, { afterWheel: 50, isMaximumRight: true, hasReceiverWhenSingle: false }, "휠 넘기기와 끝, 한 줄은 휠을 받지 않는다");
 	await page.evaluate(() => (globalThis.canvasField.detach(), globalThis.canvasField.getParent().removeChild(globalThis.canvasField)));
 
 	// 5) 한 줄 Enter 는 제출한다.

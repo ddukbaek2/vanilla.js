@@ -189,6 +189,7 @@ export class UIInputField extends WorldNode {
 	/** @private @type { string | null } */ #caretRevealRequest; // 다음 배치에서 커서가 보이게 스크롤할지. ("ifNeeded", "always", null)
 	/** @private @type { TextAreaLayout | null } */ #textAreaLayout; // 여러 줄 배치.
 	/** @private @type { string | null } */ #textAreaLayoutKey; // 여러 줄 배치의 열쇠. (보인 글, 폰트, 폭, 줄 높이, 탭 크기)
+	/** @private @type { Component | null } */ #textAreaWheelReceiver; // 여러 줄일 때만 붙는 휠 받기 컴포넌트. (TextAreaWheelReceiver)
 
 	//==============================================================================
 	// 생성.
@@ -257,6 +258,7 @@ export class UIInputField extends WorldNode {
 		this.#caretRevealRequest = null;
 		this.#textAreaLayout = null;
 		this.#textAreaLayoutKey = null;
+		this.#textAreaWheelReceiver = null;
 
 		// 1) 배경 (드로 순서: 가장 먼저).
 		this.#bgPaint = this.addComponent(Paint);
@@ -445,6 +447,14 @@ export class UIInputField extends WorldNode {
 		this.#scrollTop = 0;
 		this.#preferredCaretX = null;
 		this.#isCaretUpstream = false;
+		// 휠은 여러 줄일 때만 받는다. (한 줄 필드는 부모 스크롤 칸이 받는다)
+		if (this.#isMultilineEnabled && !this.#textAreaWheelReceiver) {
+			this.#textAreaWheelReceiver = this.addComponent(TextAreaWheelReceiver);
+		}
+		else if (!this.#isMultilineEnabled && this.#textAreaWheelReceiver) {
+			this.removeComponent(this.#textAreaWheelReceiver);
+			this.#textAreaWheelReceiver = null;
+		}
 		this.refreshTexts();
 		// 붙인 DOM 입력은 input 과 textarea 를 바꿔 단다. (포커스를 가졌으면 다시 준다)
 		if (isChanged && this.#domInput) {
@@ -540,7 +550,6 @@ export class UIInputField extends WorldNode {
 	 * 		inputField.replaceSelection("a");
 	 * 		inputField.replaceSelection("b");
 	 * 		console.log(inputField.getText(), inputField.canUndo(), inputField.canRedo());
-	 * 		// Ctrl + Z (맥은 Cmd + Z) 한 번이면 "ab" 가 함께 지워진다.
 	 * 	}
 	 * }
 	 *
@@ -820,6 +829,31 @@ export class UIInputField extends WorldNode {
 		const layout = this.#ensureTextAreaLayout();
 		const position = this.getPosition();
 		return layout.findCharacterIndexAt(viewInputPosition.x - position.x - this.#padding, viewInputPosition.y - position.y - this.#padding + this.#scrollTop);
+	}
+	//==============================================================================
+	// 휠로 넘기기. (여러 줄 필드, 글 끝 안으로 줄인다, 러스트 판 wheel)
+	//==============================================================================
+	/**
+	 * @param { number } deltaY 휠의 세로 값. (아래가 +)
+	 * @returns { boolean } 넘겼으면 참.
+	 * @private
+	 */
+	scrollTextAreaByWheel(deltaY) {
+		if (!this.#isMultilineEnabled) return false;
+		const previousScrollTop = this.#scrollTop;
+		this.#scrollTop = System.Math.max(0, System.Math.min(this.#getMaximumScrollTop(this.getContentSize().y), this.#scrollTop + deltaY));
+		return this.#scrollTop !== previousScrollTop;
+	}
+	//==============================================================================
+	// 여러 줄 필드의 스크롤 높이. (글 높이 + 위아래 여백, textarea scrollHeight)
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 넘겨 볼 내용 크기. (폭은 노드 폭)
+	 * @private
+	 */
+	getTextAreaScrollContentSize() {
+		const layout = this.#ensureTextAreaLayout();
+		return Vector2.create(this.getContentSize().x, layout.getContentHeight() + this.#padding * 2);
 	}
 	//==============================================================================
 	// 여러 줄 필드의 보이는 줄 범위 목록. (시험과 확인용, 줄마다 { start, end, isHardBreak })
@@ -2764,6 +2798,42 @@ class UIInputFieldContextMenu extends Component {
 			graphic.drawFillText(itemText, CONTEXT_MENU_ITEM_PADDING_X, itemTop + CONTEXT_MENU_ITEM_HEIGHT * 0.5);
 		}
 		graphic.popState();
+	}
+}
+
+
+//==============================================================================
+// 여러 줄 필드의 휠 받기. (TouchRaycaster 가 휠을 넘기는 스크롤 칸 꼴, 여러 줄일 때만 필드에 붙는다)
+//==============================================================================
+class TextAreaWheelReceiver extends Component {
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	constructor() {
+		super();
+		this.setComponentType("UIInputFieldWheelReceiver");
+	}
+	//==============================================================================
+	// 휠 받기. (필드의 scrollTop 을 휠 세로 값만큼 넘긴다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } delta 휠 값. (아래가 +y)
+	 */
+	wheel(delta) {
+		const node = this.getNode();
+		if (!delta || !node || typeof node.scrollTextAreaByWheel !== "function") return;
+		node.scrollTextAreaByWheel(delta.y);
+	}
+	//==============================================================================
+	// 넘겨 볼 내용 크기. (필드의 글 높이 + 위아래 여백)
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 내용 크기.
+	 */
+	getScrollContentSize() {
+		const node = this.getNode();
+		if (!node || typeof node.getTextAreaScrollContentSize !== "function") return Vector2.zero();
+		return node.getTextAreaScrollContentSize();
 	}
 }
 
