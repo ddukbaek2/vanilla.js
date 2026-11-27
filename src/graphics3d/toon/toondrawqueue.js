@@ -9,11 +9,11 @@ import { ShadowUpdateMode } from "../shadowmap.js";
 
 /**
  * @example <caption>그리기 줄로 그림자, 화면 공간 바깥선, 비치는 것까지 한 프레임</caption>
- * import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, ToonMesh, ShadowMap, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createSphereGeometry, ShadowMap, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f0e8e0", { hasOutline: false });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f0e8e0", { hasOutline: false });
  * const ballMesh = renderer.createMesh(builder.readArrays());
  * const shadowMap = new ShadowMap(webGL2RenderingContext, 1024);
  * shadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.4, -1, -0.3), 5, 0.5, 30);
@@ -196,14 +196,14 @@ export const ToonDrawStage = System.Object.freeze({
 //==============================================================================
 /**
  * @example <caption>모형마다 바깥선 꼴 정하기</caption>
- * import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, ToonMesh, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createBoxGeometry, createFacetedChunkGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const floorBuilder = new ToonMesh.MeshBuilder();
- * floorBuilder.addPart(ToonMesh.createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), "#708090", { hasOutline: false });
+ * const floorBuilder = new MeshBuilder();
+ * floorBuilder.addPart(createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), "#708090", { hasOutline: false });
  * const floorMesh = renderer.createMesh(floorBuilder.readArrays());
- * const gemBuilder = new ToonMesh.MeshBuilder();
- * gemBuilder.addPart(ToonMesh.createFacetedChunkGeometry(0.5, [1, 0.9, 1.1], [1, 1, 1]), Matrix4.createTranslation(0, 0.5, 0), "#a0c0ff", { hasOutline: false });
+ * const gemBuilder = new MeshBuilder();
+ * gemBuilder.addPart(createFacetedChunkGeometry(0.5, [1, 0.9, 1.1], [1, 1, 1]), Matrix4.createTranslation(0, 0.5, 0), "#a0c0ff", { hasOutline: false });
  * const gemMesh = renderer.createMesh(gemBuilder.readArrays());
  * const camera = new Camera3D();
  * camera.setPerspective(0.8, 0.1, 100);
@@ -375,12 +375,12 @@ export class ToonDrawQueue {
 	 * @param { object } renderer - ToonRenderer.
 	 * @param { object } shadowAtlas - ShadowAtlas. (updateLights 를 부른 것)
 	 * @example <caption>점광 그림자를 굽고 받기</caption>
-	 * import { ToonRenderer, ToonDrawQueue, ToonMesh, ShadowAtlas, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, ToonDrawQueue, MeshBuilder, createBoxGeometry, createSphereGeometry, ShadowAtlas, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
 	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), "#8090a0", { hasOutline: false });
-	 * builder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { hasOutline: false });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), "#8090a0", { hasOutline: false });
+	 * builder.addPart(createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { hasOutline: false });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * renderer.setPointLights([{ position: [1, 2, 1], color: [1, 0.85, 0.6], intensity: 4, range: 8, castsShadow: true }]);
 	 * const shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);

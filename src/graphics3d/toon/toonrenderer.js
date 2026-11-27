@@ -13,12 +13,12 @@ import { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonB
 
 /**
  * @example <caption>그늘, 림, 하이라이트, 점광과 스포트라이트를 걸고 한 프레임 그리기</caption>
- * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, MeshBuilder, createSphereGeometry, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createTranslation(0, 0.5, 0), "#f0c8a0", { hasOutline: true });
- * builder.addPart(ToonMesh.createBoxGeometry(3, 0.1, 3), Matrix4.createTranslation(0, -0.05, 0), "#708090", { hasOutline: false });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createTranslation(0, 0.5, 0), "#f0c8a0", { hasOutline: true });
+ * builder.addPart(createBoxGeometry(3, 0.1, 3), Matrix4.createTranslation(0, -0.05, 0), "#708090", { hasOutline: false });
  * const mesh = renderer.createMesh(builder.readArrays());
  * renderer.setShade({ step: 0.5, feather: 0.02, color: [0.6, 0.55, 0.75], secondStep: 0.2, secondFeather: 0.02, secondColor: [0.4, 0.36, 0.55], isHalfLambert: true });
  * renderer.setRimLight([0.5, 0.55, 0.7], 3, 0.2, 1);
@@ -80,11 +80,11 @@ export const TOON_ATTRIBUTE_LOCATIONS = System.Object.freeze({
 /**
  * 그리기의 프로그램 종류. (onBeforeDraw 의 셋째 인자)
  * @example <caption>몸 프로그램에만 머티리얼 유니폼 쓰기</caption>
- * import { ToonRenderer, ToonMaterial, ToonProgramKind, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonMaterial, ToonProgramKind, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
  * const material = new ToonMaterial({ name: "pulse", uniformChunk: "uniform float pulse;", surfaceChunk: "void applySurface(inout ToonSurface surface) { surface.emission += vec3(pulse); }" });
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#d06060", { hasOutline: true });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#d06060", { hasOutline: true });
  * const mesh = renderer.createMesh(builder.readArrays());
  * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
  * renderer.drawMesh(mesh, Matrix4.createIdentity(), {
@@ -981,9 +981,9 @@ export function readUvData(uvData, uv1Data, vertexCount) {
  * @param { Float32Array | undefined | null } outlineBaseData - 밀기 전 바탕 자리. (3 씩)
  * @returns { Float32Array } 점마다 6 개.
  * @example <caption>MeshBuilder 의 껍데기를 바탕 자리와 미는 쪽으로 풀기</caption>
- * import { readOutlineVertexData, ToonMesh, Matrix4 } from "./vanilla.js";
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#a0a0a0", { outlineWidth: 0.02 });
+ * import { readOutlineVertexData, MeshBuilder, createBoxGeometry, Matrix4 } from "./vanilla.js";
+ * const builder = new MeshBuilder();
+ * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#a0a0a0", { outlineWidth: 0.02 });
  * const arrays = builder.readArrays();
  * const outlineData = readOutlineVertexData(arrays.outlineVertexData, arrays.outlineBaseData);
  * const firstPush = Math.hypot(outlineData[3], outlineData[4], outlineData[5]);
@@ -1015,10 +1015,10 @@ export function readOutlineVertexData(outlineVertexData, outlineBaseData) {
  * @param { Array<number> } planeNormal - 평면의 노멀. ([x, y, z], 길이는 상관없다)
  * @returns { Matrix4 } 평면에 비친 행렬.
  * @example <caption>바닥 거울에 비친 모습을 어둡게 그리기</caption>
- * import { ToonRenderer, ToonMesh, createReflectionMatrix, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, MeshBuilder, createSphereGeometry, createReflectionMatrix, Matrix4, Vector3 } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createSphereGeometry(0.4, 24, 16), Matrix4.createIdentity(), "#e0a060", { hasOutline: true });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.4, 24, 16), Matrix4.createIdentity(), "#e0a060", { hasOutline: true });
  * const mesh = renderer.createMesh(builder.readArrays());
  * const modelMatrix = Matrix4.createTranslation(0, 0.6, 0);
  * const mirroredMatrix = createReflectionMatrix([0, 0, 0], [0, 1, 0]);
@@ -1110,7 +1110,7 @@ function isSameNumber(value, other) {
 
 
 //==============================================================================
-// 툰 렌더러. (ToonMesh 와 ToonGlb 의 배열을 한 색 재질과 바깥선으로 그린다)
+// 툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)
 // - 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).
 //   셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)
 //   해는 램프 색을 통째로, 채움 빛과 점광과 스포트라이트는 램프의 밝기 단계를 받는다. 하이라이트와 림은 단단한 툰 꼴에서 부드러운 꼴까지. 셈은 ToonLightSet 머리말에 있다.
@@ -1154,7 +1154,7 @@ function isSameNumber(value, other) {
 // - HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.
 // - 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.
 //   beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.
-//   (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)
+//   (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)
 //   beginFrameWithMatrices(보기, 투영) 는 두 행렬로 시작한다. (직교 원 행렬 카메라) 카메라의 자리와 보기 돌림(하이라이트, 림, 소프트 엣지, 매트캡)은 보기와 투영에서 읽는다.
 // - 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR)과 빛 묶음은 바뀔 때만 올린다. 그리기마다 바뀌는 값(모형 행렬, 틴트, 텍스처)만 매번 올린다.
 // - readProgramSources(material, instanceLayout) 로 ShaderWarmer 에 넘길 소스를 준다.
@@ -1170,13 +1170,13 @@ function isSameNumber(value, other) {
 //==============================================================================
 /**
  * @example <caption>해와 바깥선 색을 정해 그린 뒤 통계를 읽고 치우기</caption>
- * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, MeshBuilder, createCapsuleGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * renderer.setLight([-0.4, -1, -0.3], [1, 0.96, 0.9], [0.45, 0.5, 0.6], [0.25, 0.22, 0.2]);
  * renderer.setOutlineColor([0.1, 0.06, 0.08, 1]);
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createCapsuleGeometry(0.3, 0.6, 8, 16), Matrix4.createIdentity(), "#a0d0a0", { outlineWidth: 0.02 });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createCapsuleGeometry(0.3, 0.6, 8, 16), Matrix4.createIdentity(), "#a0d0a0", { outlineWidth: 0.02 });
  * const mesh = renderer.createMesh(builder.readArrays());
  * webGL2RenderingContext.clearColor(0.9, 0.9, 0.95, 1);
  * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
@@ -1567,7 +1567,7 @@ export class ToonRenderer {
 	 * @param { object } [options] - { isMipmapped (기본 true), isRepeated (기본 true, false 면 가장자리 붙임), isFiltered (기본 true, false 면 가까운 화소) }
 	 * @returns { WebGLTexture } 지은 RGBA 텍스처.
 	 * @example <caption>캔버스에 그린 무늬를 바탕색 텍스처로 쓰기</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
 	 * const canvas = document.createElement("canvas");
 	 * canvas.width = 64;
@@ -1578,8 +1578,8 @@ export class ToonRenderer {
 	 * context.fillStyle = "#c04040";
 	 * context.fillRect(0, 0, 32, 32);
 	 * const baseColorTexture = renderer.createTexture(canvas, { isRepeated: true });
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
 	 * renderer.drawMesh(mesh, Matrix4.createIdentity(), { baseColorTexture: baseColorTexture, uvTransform: [0, 0, 2, 2] });
@@ -1636,17 +1636,17 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
-	// 모형 올리기. (MeshBuilder.readArrays 나 ToonGlb.readGlbArrays 의 결과, 몸이 비면 null)
+	// 모형 올리기. (MeshBuilder.readArrays 나 readGlbArrays 의 결과, 몸이 비면 null)
 	//==============================================================================
 	/**
-	 * @param { object } arrays - MeshBuilder.readArrays 나 ToonGlb.readGlbArrays 의 결과.
+	 * @param { object } arrays - MeshBuilder.readArrays 나 readGlbArrays 의 결과.
 	 * @returns { object | null } GPU 에 올린 모형. (몸의 꼭짓점 번호가 비면 null)
 	 * @example <caption>부품 둘을 한 모형으로 올리고 다 쓰면 지우기</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createBoxGeometry, createSphereGeometry, Matrix4 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createBoxGeometry(0.8, 1, 0.5), Matrix4.createTranslation(0, 0.5, 0), "#6080c0", { hasOutline: true });
-	 * builder.addPart(ToonMesh.createSphereGeometry(0.3, 20, 14), Matrix4.createTranslation(0, 1.3, 0), "#f0d0b0", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createBoxGeometry(0.8, 1, 0.5), Matrix4.createTranslation(0, 0.5, 0), "#6080c0", { hasOutline: true });
+	 * builder.addPart(createSphereGeometry(0.3, 20, 14), Matrix4.createTranslation(0, 1.3, 0), "#f0d0b0", { hasOutline: true });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * if (mesh === null) {
 	 * 	throw new Error("empty mesh");
@@ -2120,10 +2120,10 @@ export class ToonRenderer {
 	/**
 	 * @param { object } camera - Camera3D. (보기와 투영을 읽는다)
 	 * @example <caption>Camera3D 로 프레임 시작하기</caption>
-	 * import { ToonRenderer, ToonMesh, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createCylinderGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createCylinderGeometry(0.4, 0.4, 1, 24), Matrix4.createIdentity(), "#c0a0e0", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createCylinderGeometry(0.4, 0.4, 1, 24), Matrix4.createIdentity(), "#c0a0e0", { hasOutline: true });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * const camera = new Camera3D();
 	 * camera.setPerspective(0.8, 0.1, 100);
@@ -2169,13 +2169,13 @@ export class ToonRenderer {
 	 * @param { number } width - 너비. (픽셀)
 	 * @param { number } height - 높이. (픽셀)
 	 * @example <caption>드로잉 버퍼 오른쪽 위 사각형에만 미리보기 그리기</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const canvas = document.createElement("canvas");
 	 * canvas.width = 320;
 	 * canvas.height = 240;
 	 * const renderer = new ToonRenderer(canvas.getContext("webgl2"));
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createOctahedronGeometry(0.6), Matrix4.createIdentity(), "#60c0a0", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.6), Matrix4.createIdentity(), "#60c0a0", { hasOutline: true });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * renderer.setScreenRect(200, 16, 104, 78);
 	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 104 / 78, 0.1, 20));
@@ -2256,12 +2256,12 @@ export class ToonRenderer {
 	/**
 	 * @param { object } shadowMap - ShadowMap. (깊이를 그릴 곳, updateLightMatrix 로 빛 행렬을 정해 둔다)
 	 * @example <caption>해의 그림자를 ShadowMap 에 드리우고 받기</caption>
-	 * import { ToonRenderer, ToonMesh, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createBoxGeometry, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
 	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createBoxGeometry(0.6, 0.6, 0.6), Matrix4.createTranslation(0, 0.6, 0), "#e0b080", { hasOutline: true });
-	 * builder.addPart(ToonMesh.createBoxGeometry(4, 0.1, 4), Matrix4.createTranslation(0, -0.05, 0), "#a0b0a0", { hasOutline: false });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createBoxGeometry(0.6, 0.6, 0.6), Matrix4.createTranslation(0, 0.6, 0), "#e0b080", { hasOutline: true });
+	 * builder.addPart(createBoxGeometry(4, 0.1, 4), Matrix4.createTranslation(0, -0.05, 0), "#a0b0a0", { hasOutline: false });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * const shadowMap = new ShadowMap(webGL2RenderingContext, 1024);
 	 * const sunDirection = renderer.getSunDirection();
@@ -2297,11 +2297,11 @@ export class ToonRenderer {
 	/**
 	 * @param { object } shadowAtlas - ShadowAtlas.
 	 * @example <caption>점광 그림자 아틀라스의 칸마다 깊이 그리기</caption>
-	 * import { ToonRenderer, ToonMesh, ShadowAtlas, Matrix4 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createBoxGeometry, ShadowAtlas, Matrix4 } from "./vanilla.js";
 	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createTranslation(0, 0.5, 0), "#c0a080", { hasOutline: false });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createTranslation(0, 0.5, 0), "#c0a080", { hasOutline: false });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * renderer.setPointLights([{ position: [0, 2.5, 1], color: [1, 0.8, 0.6], intensity: 3, range: 8, castsShadow: true }]);
 	 * const shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);
@@ -2382,10 +2382,10 @@ export class ToonRenderer {
 	 * @param { Matrix4 } modelMatrix - 모형 행렬.
 	 * @param { object } [options] - 클래스 머리말의 그리기 꼴과 jointMatrices Float32Array, hasOutline (기본 true), isCulled (기본 true)
 	 * @example <caption>틴트, 바깥선 색과 굵기, 반투명을 그리기마다 바꾸기</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createRoundedBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createRoundedBoxGeometry(0.8, 0.8, 0.8, 4, 0.1), Matrix4.createIdentity(), "#e0e0e0", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createRoundedBoxGeometry(0.8, 0.8, 0.8, 4, 0.1), Matrix4.createIdentity(), "#e0e0e0", { hasOutline: true });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
 	 * renderer.drawMesh(mesh, Matrix4.createTranslation(-1, 0, 0), { tintColor: [1, 0.6, 0.6, 1], outlineColor: [0.4, 0.05, 0.05, 1], outlineWidthScale: 1.5 });
@@ -2415,10 +2415,10 @@ export class ToonRenderer {
 	 * @param { Array<object> } instances - { modelMatrix: Matrix4, tintColor: [r, g, b, a] } 의 배열.
 	 * @param { object } [options] - drawMesh 와 같다. (모든 인스턴스에 같게 건다)
 	 * @example <caption>같은 바위 스무 개를 인스턴스마다 다른 틴트로</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#909098", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#909098", { hasOutline: true });
 	 * const rockMesh = renderer.createMesh(builder.readArrays());
 	 * const instances = [];
 	 * for (let index = 0; index < 20; ++index) {
@@ -2475,10 +2475,10 @@ export class ToonRenderer {
 	 * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다)
 	 * @param { object } [options] - drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다)
 	 * @example <caption>자리만 담은 영구 버퍼로 풀숲 그리기</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createCylinderGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createCylinderGeometry(0.02, 0.15, 0.6, 6), Matrix4.createTranslation(0, 0.3, 0), "#60a050", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createCylinderGeometry(0.02, 0.15, 0.6, 6), Matrix4.createTranslation(0, 0.3, 0), "#60a050", { hasOutline: true });
 	 * const grassMesh = renderer.createMesh(builder.readArrays());
 	 * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceOffset", size: 3 }]);
 	 * const material = renderer.createMaterial({ name: "grass", vertexChunk: "void applyVertex(inout ToonVertex vertex) { vertex.modelMatrix[3].xyz += instanceOffset; }" });
@@ -3269,11 +3269,11 @@ export class ToonRenderer {
 	/**
 	 * @param { object } shade - 바탕에서 1 차, 2 차 그늘로 넘어가는 문턱, 부드러움, 색. ({ step, feather, color, secondStep, secondFeather, secondColor, isHalfLambert })
 	 * @example <caption>밝은 피부와 그늘 두 단계를 단단하게 가르기</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createSphereGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
 	 * renderer.setShade({ step: 0.55, feather: 0.01, color: [0.85, 0.62, 0.6], secondStep: 0.25, secondFeather: 0.01, secondColor: [0.6, 0.42, 0.45], isHalfLambert: true });
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f8e0d0", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f8e0d0", { hasOutline: true });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 0, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
 	 * renderer.drawMesh(mesh, Matrix4.createIdentity());
@@ -3346,13 +3346,13 @@ export class ToonRenderer {
 	 * @param { WebGLTexture | null } rampTexture - createTexture 로 지은 램프 텍스처나 null.
 	 * @param { boolean } [isHalfLambert] - 반 램버트로 셀지. (기본 true)
 	 * @example <caption>네 칸 램프 텍스처로 그늘 색을 주고 다시 칸으로 돌리기</caption>
-	 * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createTorusGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
 	 * const rampData = new Uint8Array([60, 50, 110, 255, 110, 100, 160, 255, 200, 185, 215, 255, 255, 255, 255, 255]);
 	 * const rampTexture = renderer.createTexture({ width: 4, height: 1, data: rampData }, { isMipmapped: false, isRepeated: false, isFiltered: false });
 	 * renderer.setRampTexture(rampTexture, true);
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createTorusGeometry(0.4, 0.15, 16, 32), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createTorusGeometry(0.4, 0.15, 16, 32), Matrix4.createIdentity(), "#ffffff", { hasOutline: true });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
 	 * renderer.drawMesh(mesh, Matrix4.createIdentity());
@@ -3534,11 +3534,11 @@ export class ToonRenderer {
 	 * @param { object | null } shadowMap - 받을 ShadowMap. (null 이면 그림자를 받지 않는다)
 	 * @param { number } [strength] - 그림자 세기 0 ~ 1. (기본 0.6)
 	 * @example <caption>그림자를 받되 공중의 빛 구슬은 받지 않게 하기</caption>
-	 * import { ToonRenderer, ToonMesh, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, MeshBuilder, createSphereGeometry, ShadowMap, Matrix4, Vector3 } from "./vanilla.js";
 	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createSphereGeometry(0.3, 20, 14), Matrix4.createIdentity(), "#ffe080", { glow: 1, hasOutline: false });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createSphereGeometry(0.3, 20, 14), Matrix4.createIdentity(), "#ffe080", { glow: 1, hasOutline: false });
 	 * const mesh = renderer.createMesh(builder.readArrays());
 	 * const shadowMap = new ShadowMap(webGL2RenderingContext, 512);
 	 * shadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.3, -1, -0.2), 4, 0.5, 20);

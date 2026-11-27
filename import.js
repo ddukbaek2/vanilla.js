@@ -171,9 +171,6 @@ export { ShadowMap, ShadowAtlas, ShadowUpdateMode, SHADOW_ATLAS_MAXIMUM_LIGHTS }
 //==============================================================================
 // 폐기 예정 목록. (다음 판에서 빠진다)
 //==============================================================================
-// ToonMesh, ToonGlb 이름 공간: 메시 빌더와 GLB 읽기 함수는 위에서 이름마다 낸다(러스트 판과 같다). ToonMesh 는 러스트 판에서 렌더러의 메시(ToonRenderer.createMesh 가 돌려주는 것)라 이 이름 공간은 툰 파일들의 예제를 옮긴 뒤 뺀다.
-export * as ToonMesh from "./src/graphics3d/toon/meshbuilder.js";
-export * as ToonGlb from "./src/graphics3d/toon/glbmeshreader.js";
 
 
 //==============================================================================

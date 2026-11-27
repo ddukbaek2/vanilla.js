@@ -28,7 +28,7 @@ src/animation/             # Timeline, Animator, Action
 src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, SkinnedModelRenderer, HumanSkinRenderer, Camera3D,
                            #     ShadowMap, RenderTarget, BloomEffect, MultiLevelBloomEffect,
                            #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass 는 core)
-src/graphics3d/toon/       # 툰 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
+src/graphics3d/toon/       # 툰 3D: MeshBuilder, glbmeshreader, ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
 src/experimental/          # 0.4.0 뒤 기능의 초안 (import.js 와 묶음에 들지 않고 experimental.js 를 직접 불러온다, API 가 바뀔 수 있다)
 src/deprecated/            # AnchoredWorldNode (폐기), Camera (폐기 예정, Camera2D 가 덮는다), 죽은 코드 aabb, transform2d, gl2d, webgl2
@@ -45,7 +45,7 @@ src/deprecated/            # AnchoredWorldNode (폐기), Camera (폐기 예정, 
 3. **게임오브젝트/컴포넌트 월드 없음(3D)**: 3D 쪽은 씬그래프 엔티티 시스템이 아니다. 로더가 `SkinnedModel` 이라는 완결된 모델 인스턴스를 만들고, 그 안에 메시, 본, 스킨, 머티리얼, 애니메이션이 전부 연결된다.
 4. **임포터는 임포터일 뿐**: `FbxLoader` 는 파싱만 한다. GL 리소스나 셰이딩 로직을 갖지 않는다. 포맷별 해석 결과는 공통 중립 스키마로 수렴한 뒤 모델이 소비한다.
 5. **Shader, Material, Model 계층 (유니티/언리얼 사상)**: Material 은 셰이더(템플릿)를 참조하는 인스턴스이고, 모델은 드로어블별로 Material 인스턴스를 참조하며, 렌더러가 이를 그린다.
-6. **모델과 렌더 기능의 분리**: `SkinnedModel` 은 데이터 + 포즈 상태만 갖는다. 그리는 것은 `SkinnedModelRenderer` 라는 별도 객체다. 환경 상태(태양/안개/그림자)도 모델이 아닌 렌더러 소유다. 툰 3D 도 같아서 메시 배열(ToonMesh, ToonGlb)과 렌더러(ToonRenderer), 빛 값(ToonLightSet)이 따로다.
+6. **모델과 렌더 기능의 분리**: `SkinnedModel` 은 데이터 + 포즈 상태만 갖는다. 그리는 것은 `SkinnedModelRenderer` 라는 별도 객체다. 환경 상태(태양/안개/그림자)도 모델이 아닌 렌더러 소유다. 툰 3D 도 같아서 메시 배열(MeshBuilder, readGlbArrays)과 렌더러(ToonRenderer), 빛 값(ToonLightSet)이 따로다.
 7. **2D 와 3D 는 하나의 GL 컨텍스트를 공유**: core 의 `Graphic`(2D)과 graphics3d(3D)는 같은 `WebGL2RenderingContext` 위에 공존한다. 2D 그리기 사이에 끼우는 3D 는 `Graphic.runExternalPass` 로 감싼다.
 8. **러스트 판과 같게**: 러스트 판 [vanilla-engine](https://github.com/ddukbaek2/vanilla-engine) 은 이 엔진을 옮긴 것이고, 두 엔진은 기능 차이를 두지 않는다. 한쪽에만 생긴 범용 기능과 한쪽에서 찾은 버그는 양쪽에 같이 넣는다. (9장)
 
@@ -205,7 +205,7 @@ UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 
 └── BloomEffect, MultiLevelBloomEffect ── 밝은 영역 추출 → 블러(다단은 반씩 줄이고 천막 꼴로 키움) → 합성 체인
 
 툰 3D (graphics3d/toon)
-├── ToonMesh(MeshBuilder), ToonGlb ── 꼭짓점 배열 짓기와 GLB 읽기 (UV, 재질 범위 포함, GL 무관)
+├── MeshBuilder, readGlbArrays ── 꼭짓점 배열 짓기와 GLB 읽기 (UV, 재질 범위 포함, GL 무관)
 ├── ToonRenderer ── 몸, 바깥선 껍데기, 그림자 깊이 프로그램 + 머티리얼과 인스턴스 꼴마다 지은 프로그램
 │   ├── ToonLightSet (기본 빛 묶음: 해, 채움 빛, 점광과 스포트라이트 8 개, 그늘 램프나 램프 텍스처, 하이라이트, 림, 빛 꼴)
 │   └── ToonMaterial (참조, 셰이더 조각: uniform, surface, light, vertex)
@@ -338,7 +338,7 @@ rim        = 색 x mix(0.5 를 가른 pow(1 - N.V, 거듭제곱), 그대로, 부
 - 저장소 루트의 단일 배럴 파일. 주석 섹션 13블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/컬렉션/애니메이션/셰이더와 풀스크린 패스/3D 그래픽스/폐기 예정/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
 - 실험 블록은 주석뿐이다. 0.4.0 뒤 기능의 초안은 src/experimental/experimental.js 에 모으고, 진입점과 묶음에는 넣지 않는다. 쓰는 쪽이 `import * as Experimental from "./src/experimental/experimental.js"` 로 불러 `Experimental.이름` 으로 쓴다. (experimental.js 가 맨 먼저 import.js 를 불러 엔진 모듈의 차례를 맞춘다) 초안은 API 가 바뀔 수 있고, 다 자라면 제자리 폴더로 옮겨 import.js 에서 바로 낸다.
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
-- 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
+- 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`).
 - API 문서 자료(docs/api/<버전>.json)는 tools/apidoc.cjs 가 이 표면의 소스 주석과 JSDoc 에서 뽑는다. 예제는 `@example`, 그 바로 뒤의 `@exampleImage <파일 이름>` 이 예제 그림(docs/guide/<버전>/images/, 가이드와 같이 씀)이다. 자세한 꼴은 tools/TOOLS.md.
 - **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DevTools`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
 

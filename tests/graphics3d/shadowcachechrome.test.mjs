@@ -61,19 +61,19 @@ try {
 	const page = await browser.newPage();
 	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	result = await page.evaluate(async () => {
-		const { ToonRenderer, ToonDrawQueue, ToonMesh, ShadowMap, ShadowAtlas, ShadowUpdateMode, Matrix4, Vector3, Camera3D } = await import("/import.js");
+		const { ToonRenderer, ToonDrawQueue, MeshBuilder, createBoxGeometry, createSphereGeometry, createOctahedronGeometry, ShadowMap, ShadowAtlas, ShadowUpdateMode, Matrix4, Vector3, Camera3D } = await import("/import.js");
 		const canvas = document.getElementById("canvas");
 		const gl = canvas.getContext("webgl2", { antialias: false, preserveDrawingBuffer: true });
 		const renderer = new ToonRenderer(gl);
 		const createMesh = (geometry, color) => {
-			const builder = new ToonMesh.MeshBuilder();
+			const builder = new MeshBuilder();
 			builder.addPart(geometry, Matrix4.createIdentity(), color, { hasOutline: false });
 			return renderer.createMesh(builder.readArrays());
 		};
-		const groundMesh = createMesh(ToonMesh.createBoxGeometry(8, 0.2, 8), "#a0a8b0");
-		const boxMesh = createMesh(ToonMesh.createBoxGeometry(0.6, 0.8, 0.6), "#e0a070");
-		const ballMesh = createMesh(ToonMesh.createSphereGeometry(0.35, 16, 12), "#80c0e0");
-		const pebbleMesh = createMesh(ToonMesh.createOctahedronGeometry(0.2), "#c0b090");
+		const groundMesh = createMesh(createBoxGeometry(8, 0.2, 8), "#a0a8b0");
+		const boxMesh = createMesh(createBoxGeometry(0.6, 0.8, 0.6), "#e0a070");
+		const ballMesh = createMesh(createSphereGeometry(0.35, 16, 12), "#80c0e0");
+		const pebbleMesh = createMesh(createOctahedronGeometry(0.2), "#c0b090");
 		const camera = new Camera3D();
 		camera.setPerspective(0.9, 0.1, 50);
 		camera.setAspectRatio(160 / 120);

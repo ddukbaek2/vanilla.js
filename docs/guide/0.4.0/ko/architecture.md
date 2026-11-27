@@ -44,7 +44,7 @@ src/deprecated/            # AnchoredWorldNode (폐기), Camera (폐기 예정, 
 3. **게임오브젝트/컴포넌트 월드 없음(3D)**: 3D 쪽은 씬그래프 엔티티 시스템이 아니다. 로더가 `SkinnedModel` 이라는 완결된 모델 인스턴스를 만들고, 그 안에 메시, 본, 스킨, 머티리얼, 애니메이션이 전부 연결된다.
 4. **임포터는 임포터일 뿐**: `FbxLoader` 는 파싱만 한다. GL 리소스나 셰이딩 로직을 갖지 않는다. 포맷별 해석 결과는 공통 중립 스키마로 수렴한 뒤 모델이 소비한다.
 5. **Shader, Material, Model 계층 (유니티/언리얼 사상)**: Material 은 셰이더(템플릿)를 참조하는 인스턴스이고, 모델은 드로어블별로 Material 인스턴스를 참조하며, 렌더러가 이를 그린다.
-6. **모델과 렌더 기능의 분리**: `SkinnedModel` 은 데이터 + 포즈 상태만 갖는다. 그리는 것은 `SkinnedModelRenderer` 라는 별도 객체다. 환경 상태(태양/안개/그림자)도 모델이 아닌 렌더러 소유다. 툰 3D 도 같아서 메시 배열(ToonMesh, ToonGlb)과 렌더러(ToonRenderer), 빛 값(ToonLightSet)이 따로다.
+6. **모델과 렌더 기능의 분리**: `SkinnedModel` 은 데이터 + 포즈 상태만 갖는다. 그리는 것은 `SkinnedModelRenderer` 라는 별도 객체다. 환경 상태(태양/안개/그림자)도 모델이 아닌 렌더러 소유다. 툰 3D 도 같아서 메시 배열(MeshBuilder, readGlbArrays)과 렌더러(ToonRenderer), 빛 값(ToonLightSet)이 따로다.
 7. **2D 와 3D 는 하나의 GL 컨텍스트를 공유**: core 의 `Graphic`(2D)과 graphics3d(3D)는 같은 `WebGL2RenderingContext` 위에 공존한다. 2D 그리기 사이에 끼우는 3D 는 `Graphic.runExternalPass` 로 감싼다.
 8. **러스트 판과 같게**: 러스트 판 [vanilla-engine](https://github.com/ddukbaek2/vanilla-engine) 은 이 엔진을 옮긴 것이고, 두 엔진은 기능 차이를 두지 않는다. 한쪽에만 생긴 범용 기능과 한쪽에서 찾은 버그는 양쪽에 같이 넣는다. (9장)
 
