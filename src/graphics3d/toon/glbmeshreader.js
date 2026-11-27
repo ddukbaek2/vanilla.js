@@ -262,6 +262,58 @@ function readNodeMatrix(node) {
 }
 
 //==============================================================================
+// 뼈대 메시의 쉬는 자세 크기. (본마다 본의 쉬는 월드 행렬 x inverseBindMatrices 의 균일 크기, 그 가운데값)
+//   - 정수 위치(KHR_mesh_quantization)의 뼈대 메시는 되풀이 크기가 inverseBindMatrices 에 들어 있어, 메시 좌표 1 이 모형 좌표로 이만큼이다.
+//   - 쉬는 자세가 묶은 자세와 같은 보통 모형에서 실수 위치면 1 에 가깝다.
+//==============================================================================
+/**
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @param { object } skin - glTF skin.
+ * @returns { number } 메시 좌표 1 의 모형 좌표 크기. (셀 수 없으면 1)
+ */
+function readSkinBindScale(json, binaryBuffer, skin) {
+	const parentIndices = json.nodes.map(() => {
+		return -1;
+	});
+	json.nodes.forEach((node, nodeIndex) => {
+		if (System.Array.isArray(node.children)) {
+			for (const childIndex of node.children) {
+				parentIndices[childIndex] = nodeIndex;
+			}
+		}
+	});
+	const inverseBindMatrices = skin.inverseBindMatrices !== undefined ? readFloatAccessor(json, binaryBuffer, skin.inverseBindMatrices) : null;
+	const scales = [];
+	skin.joints.forEach((jointNodeIndex, jointIndex) => {
+		const worldMatrix = Matrix4.createIdentity();
+		for (let nodeIndex = jointNodeIndex; nodeIndex >= 0; nodeIndex = parentIndices[nodeIndex]) {
+			const parentMatrix = readNodeMatrix(json.nodes[nodeIndex]);
+			parentMatrix.multiply(worldMatrix);
+			worldMatrix.getElements().set(parentMatrix.getElements());
+		}
+		if (inverseBindMatrices !== null) {
+			const inverseBindMatrix = Matrix4.createIdentity();
+			inverseBindMatrix.getElements().set(inverseBindMatrices.subarray(jointIndex * 16, jointIndex * 16 + 16));
+			worldMatrix.multiply(inverseBindMatrix);
+		}
+		const elements = worldMatrix.getElements();
+		const determinant = elements[0] * (elements[5] * elements[10] - elements[6] * elements[9]) - elements[4] * (elements[1] * elements[10] - elements[2] * elements[9]) + elements[8] * (elements[1] * elements[6] - elements[2] * elements[5]);
+		const scale = System.Math.cbrt(System.Math.abs(determinant));
+		if (scale > 0 && System.Number.isFinite(scale)) {
+			scales.push(scale);
+		}
+	});
+	if (scales.length === 0) {
+		return 1;
+	}
+	scales.sort((first, second) => {
+		return first - second;
+	});
+	return scales[System.Math.floor(scales.length / 2)];
+}
+
+//==============================================================================
 // 프리미티브 하나 담기. (바깥선 껍데기는 바깥선 배열에, 나머지는 색과 빛남과 함께)
 //   - 뼈대로 움직이는 프리미티브는 노드 행렬을 쓰지 않는다. (glTF 의 약속, 자리는 본이 정함)
 //==============================================================================
@@ -395,7 +447,7 @@ function readRebuiltOutlineWidth(node, nodeNames, outlineOptions) {
  * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
  * @param { object } node - 껍데기를 지을 메시 노드.
  * @param { Matrix4 } matrix - 부모까지 곱한 노드 행렬. (뼈대 노드는 쓰지 않음)
- * @param { number } outlineWidth - 껍데기 굵기. (모형 좌표)
+ * @param { number } outlineWidth - 껍데기 굵기. (모형 좌표, 정수 위치 뼈대 메시는 readSkinBindScale 로 나눠 메시 좌표로 바꿈)
  */
 function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWidth) {
 	const positions = [];
@@ -404,6 +456,7 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 	const isSkinned = node.skin !== undefined;
 	const joints = isSkinned ? [] : null;
 	const weights = isSkinned ? [] : null;
+	let hasIntegerPositions = false;
 	for (const primitive of json.meshes[node.mesh].primitives) {
 		const mode = primitive.mode !== undefined ? primitive.mode : TRIANGLES_MODE;
 		const attributes = primitive.attributes;
@@ -417,6 +470,7 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 			continue;
 		}
 		const startIndex = positions.length / 3;
+		hasIntegerPositions = hasIntegerPositions || json.accessors[attributes.POSITION].componentType !== FLOAT_COMPONENT_TYPE;
 		const primitivePositions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
 		const primitiveNormals = readFloatAccessor(json, binaryBuffer, attributes.NORMAL);
 		for (let valueIndex = 0; valueIndex < primitivePositions.length; ++valueIndex) {
@@ -447,7 +501,9 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 		return;
 	}
 	const partMatrix = isSkinned ? Matrix4.createIdentity() : matrix;
-	builder.addTriangleShell(positions, normals, indices, partMatrix, outlineWidth, joints, weights);
+	// 정수 위치 뼈대 메시는 메시 좌표가 양자화 칸이라, 굵기를 쉬는 자세의 모형 좌표로 맞춘다. (실수 위치는 메시 좌표 그대로)
+	const shellWidth = isSkinned && hasIntegerPositions ? outlineWidth / readSkinBindScale(json, binaryBuffer, json.skins[node.skin]) : outlineWidth;
+	builder.addTriangleShell(positions, normals, indices, partMatrix, shellWidth, joints, weights);
 }
 
 //==============================================================================

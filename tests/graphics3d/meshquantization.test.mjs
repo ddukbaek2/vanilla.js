@@ -323,6 +323,22 @@ for (const [label, model, normalTolerance] of [["갈래 A", createQuantizedModel
 		return points;
 	};
 	checkNear(skinPoints(quantizedSkinned, quantizedJointMatrices), skinPoints(floatSkinned, floatJointMatrices), quantizedModel.positionCellSize * 2, "뼈대 툰 자세 위치");
+	// 몸으로 새로 지은 바깥선: 정수 위치 뼈대 메시도 굵기가 모형 좌표다. (inverseBindMatrices 의 되풀이 크기로 나눔)
+	const outlineOptions = { width: 0.05, addedParts: ["skin"] };
+	const floatOutlined = readGlbArrays(createSkinnedModel(false).arrayBuffer, outlineOptions);
+	const quantizedOutlined = readGlbArrays(quantizedModel.arrayBuffer, outlineOptions);
+	const outlinePoints = (arrays, jointMatrices) => {
+		const points = [];
+		const positions = arrays.outlineVertexData;
+		for (let offset = 0; offset < positions.length; offset += 3) {
+			for (let row = 0; row < 3; ++row) {
+				points.push(jointMatrices[row] * positions[offset] + jointMatrices[4 + row] * positions[offset + 1] + jointMatrices[8 + row] * positions[offset + 2] + jointMatrices[12 + row]);
+			}
+		}
+		return points;
+	};
+	check(floatOutlined.outlineVertexData.length > 0, "뼈대 바깥선 껍데기");
+	checkNear(outlinePoints(quantizedOutlined, quantizedJointMatrices), outlinePoints(floatOutlined, floatJointMatrices), 0.05 * 0.05 + quantizedModel.positionCellSize * 2, "뼈대 바깥선 껍데기 자리 (굵기 0.05)");
 	checkNear(quantizedSkinned.skeleton.animations.Turn.channels[0].values, floatSkinned.skeleton.animations.Turn.channels[0].values, 1 / 32767, "툰 SHORT 정규화 돌림 값");
 	checkNear(Array.from(quantizedSkinned.skinData).slice(0, 8), Array.from(floatSkinned.skinData).slice(0, 8), 1e-6, "툰 UNSIGNED_BYTE 정규화 무게");
 	const floatModel = SkinnedModel.createWithoutShaderProgram();
