@@ -548,6 +548,7 @@ export class UIDocument extends Object {
 	/** @private @type { object } */ #nodeTypeTable; // 노드 종류 표. (문서 이름 → 생성자)
 	/** @private @type { Function | null } */ #imageResolver; // 그림 경로 해석기. (경로 → 그림, null 이면 loadImages 로 요청한 애셋에서 찾는다)
 	/** @private @type { Map<string, object> } */ #imageAssetMap; // loadImages 로 요청한 그림. (경로 → { asset, isFinished })
+	/** @private @type { Map<string, object> } */ #serializedImageMap; // 이 문서로 적은 그림. (경로 → 그림, 적은 노드를 이 문서로 다시 읽으면 같은 그림을 넣는다)
 	/** @private @type { object[] } */ #pendingImageList; // 맡아 둔 그림. ({ component, imagePath })
 	/** @private @type { object[] } */ #pendingNodeReferenceList; // 트리를 다 지은 뒤 이을 노드 참조. ({ target, setterName, path })
 	/** @private @type { WorldNode | null } */ #serializeRootNode; // 적고 있는 문서의 뿌리. (노드 참조 경로의 기준, 적는 동안만)
@@ -575,6 +576,7 @@ export class UIDocument extends Object {
 		this.#nodeTypeTable = System.Object.assign({}, DEFAULT_NODE_TYPE_TABLE);
 		this.#imageResolver = null;
 		this.#imageAssetMap = new System.Map();
+		this.#serializedImageMap = new System.Map();
 		this.#pendingImageList = [];
 		this.#pendingNodeReferenceList = [];
 		this.#serializeRootNode = null;
@@ -618,11 +620,11 @@ export class UIDocument extends Object {
 	}
 
 	//==============================================================================
-	// 이미지 경로 해석. (찾지 못했거나 아직 읽히는 중이면 null)
+	// 이미지 경로 해석. (해석기, loadImages 로 요청한 애셋, 이 문서로 적은 그림 차례로 찾는다. 찾지 못했거나 아직 읽히는 중이면 null)
 	//==============================================================================
 	/**
 	 * @param { string } imagePath 문서에 적힌 이미지 경로.
-	 * @returns { HTMLImageElement | null } 찾은 그림. (해석기가 null 을 주었거나, 해석기가 없고 loadImages 로 요청하지 않았거나 아직 읽히는 중이거나 읽기에 실패했으면 null)
+	 * @returns { HTMLImageElement | null } 찾은 그림. (해석기가 null 을 주었거나, 해석기가 없고 loadImages 로 요청하지 않았거나 아직 읽히는 중이거나 읽기에 실패했고, 이 문서로 적은 그 경로의 그림도 없으면 null)
 	 */
 	resolveImage(imagePath) {
 		const imageLookup = this.#findImage(imagePath);
@@ -630,7 +632,9 @@ export class UIDocument extends Object {
 	}
 
 	//==============================================================================
-	// 그림 찾기. (해석기가 있으면 해석기, 없으면 loadImages 로 요청한 애셋)
+	// 그림 찾기. (해석기가 있으면 해석기, 없으면 loadImages 로 요청한 애셋, 둘 다 못 찾으면 이 문서로 적은 그림)
+	// - 적은 그림은 serializeNode, toJsonText 가 그 경로의 컴포넌트에 든 그림을 기억한 것이다. 노드를 같은 문서로 적고 읽어 복제하면(UIListView 템플릿, Visual.createNode)
+	//   해석기나 loadImages 없이도 본의 그림을 그대로 쓴다. (유니티 Instantiate 처럼 복제본이 같은 그림을 가리킨다)
 	//==============================================================================
 	/**
 	 * @private
@@ -638,23 +642,28 @@ export class UIDocument extends Object {
 	 * @returns { object } { image, isWaiting }. (image 가 null 이고 isWaiting 이 참이면 아직 읽히는 중)
 	 */
 	#findImage(imagePath) {
+		const serializedImage = this.#serializedImageMap.get(imagePath);
+		const fallbackImage = serializedImage !== undefined ? serializedImage : null;
 		const imageResolver = this.#imageResolver;
 		if (imageResolver !== null) {
 			const resolvedImage = imageResolver(imagePath);
-			return { image: resolvedImage ? resolvedImage : null, isWaiting: false };
+			return { image: resolvedImage ? resolvedImage : fallbackImage, isWaiting: false };
 		}
 		const imageEntry = this.#imageAssetMap.get(imagePath);
 		if (imageEntry === undefined) {
-			return { image: null, isWaiting: false };
+			return { image: fallbackImage, isWaiting: false };
 		}
 		if (imageEntry.asset.isLoaded()) {
 			return { image: imageEntry.asset.getImage(), isWaiting: false };
 		}
-		return { image: null, isWaiting: !imageEntry.isFinished };
+		if (!imageEntry.isFinished) {
+			return { image: null, isWaiting: true };
+		}
+		return { image: fallbackImage, isWaiting: false };
 	}
 
 	//==============================================================================
-	// 문서의 그림 읽기 요청. (imagePath 마다 ImageAsset 을 요청해 문서에 든다. 이미 요청한 경로는 건너뛴다)
+	// 문서의 그림 읽기 요청. (imagePath 마다 ImageAsset 을 요청해 문서에 든다. 이미 요청한 경로는 건너뛰고, 읽지 못한 경로는 다시 요청한다)
 	// - 새로 요청한 그림마다 다 읽히면(읽지 못해도) 풀리는 프로미스를 돌려준다. 씬의 loadAssets 에서 Promise.all 로 기다린 뒤 fromJsonText 하면 그림이 다 붙는다.
 	// - 기다리지 않고 지으면 아직 읽히는 그림은 맡아 두므로, 씬의 update 에서 bindPendingImages 를 남은 수가 0 이 될 때까지 부른다.
 	//==============================================================================
@@ -691,8 +700,11 @@ export class UIDocument extends Object {
 			const loadPromise = imageEntry.asset.load(imagePath).then(() => {
 				imageEntry.isFinished = true;
 			}, () => {
-				// 읽지 못한 그림은 bindPendingImages 가 경고를 내고 버린다.
+				// 읽지 못한 그림은 bindPendingImages 가 경고를 내고 버린다. 표에서 빼서 다음 loadImages 가 다시 요청한다.
 				imageEntry.isFinished = true;
+				if (this.#imageAssetMap.get(imagePath) === imageEntry) {
+					this.#imageAssetMap.delete(imagePath);
+				}
 			});
 			loadPromiseList.push(loadPromise);
 		}
@@ -703,6 +715,7 @@ export class UIDocument extends Object {
 	// 맡아 둔 그림 붙이기. (찾은 그림은 넣고, 아직 읽히는 그림은 남긴다. 남은 수를 돌려준다)
 	// - fromJsonText, deserializeNode 가 끝에 한 번 부른다. 그림을 기다리지 않고 지었으면 씬의 update 에서 남은 수가 0 이 될 때까지 부른다.
 	// - 찾지 못한 그림(해석기가 null, 애셋이 없거나 실패)은 경고를 내고 버린다. 그 컴포넌트는 그림 없이 남는다.
+	// - 그사이 게임이 그림을 넣었거나(getImage 가 null 이 아님) 경로를 바꾼 컴포넌트는 건드리지 않고 버린다.
 	//==============================================================================
 	/**
 	 * @returns { number } 아직 읽히는 중이라 남은 그림 수. (0 이면 다 붙였거나 버렸다)
@@ -711,9 +724,15 @@ export class UIDocument extends Object {
 		const pendingImageList = this.#pendingImageList;
 		this.#pendingImageList = [];
 		for (const pendingImage of pendingImageList) {
+			// 그사이 게임이 그림이나 경로를 바꾼 컴포넌트는 그대로 둔다.
+			const component = pendingImage.component;
+			const currentImage = component.getImage();
+			if (component.getImagePath() !== pendingImage.imagePath || (currentImage !== null && currentImage !== undefined)) {
+				continue;
+			}
 			const imageLookup = this.#findImage(pendingImage.imagePath);
 			if (imageLookup.image !== null) {
-				pendingImage.component.setImage(imageLookup.image);
+				component.setImage(imageLookup.image);
 			}
 			else if (imageLookup.isWaiting) {
 				this.#pendingImageList.push(pendingImage);
@@ -727,10 +746,13 @@ export class UIDocument extends Object {
 
 	//==============================================================================
 	// 노드 트리 → 문서 데이터. (노드 참조는 이 노드 기준 경로로 적는다)
+	// - imagePath 를 적은 컴포넌트에 그림이 들었으면 그 그림을 경로로 기억한다. 같은 문서로 다시 읽으면 해석기나 loadImages 없이도 그 그림을 넣는다.
+	// - 노드 참조가 이름이 같은 앞 형제가 있는 노드를 가리키면 경고를 낸다. (경로는 이름으로만 적어 다시 읽으면 앞 형제에 이어진다)
+	// - 숨긴 노드(setVisible(false))는 visible: false 를 적는다. (보이면 적지 않는다)
 	//==============================================================================
 	/**
 	 * @param { WorldNode } node 적을 노드. (자식까지)
-	 * @returns { object } 노드 데이터. ({ type, name, active, position, scale, rotation, opacity, pivot, anchor, contentSize, interactable, components, children, contentChildren? })
+	 * @returns { object } 노드 데이터. ({ type, name, active, position, scale, rotation, opacity, pivot, anchor, contentSize, interactable, visible?, components, children, contentChildren? })
 	 * @example <caption>노드를 문서 값으로 떠서 복제본 짓기</caption>
 	 * import { UIDocument, WorldNode, Vector2 } from "./build/vanilla.js";
 	 *
@@ -783,9 +805,13 @@ export class UIDocument extends Object {
 			anchor: [anchor.x, anchor.y],
 			contentSize: [contentSize.x, contentSize.y],
 			interactable: node.isInteractable(),
-			components: [],
-			children: [],
 		};
+		// 보이기 플래그는 숨겼을 때만 적는다. (기본이 보임이라 지금까지 적은 문서와 0.3.x 문서는 그대로 보인다)
+		if (!node.isVisible()) {
+			nodeData.visible = false;
+		}
+		nodeData.components = [];
+		nodeData.children = [];
 
 		// 위젯이 스스로 만든 컴포넌트는 문서에 담지 않는다. (복원 시 다시 생성된다)
 		const componentList = node.getAllComponents();
@@ -811,6 +837,7 @@ export class UIDocument extends Object {
 			}
 			componentData.type = componentTypeName;
 			nodeData.components.push(componentData);
+			this.#rememberSerializedImage(component, componentData);
 		}
 
 		// 위젯의 content 노드는 복원 시 위젯이 다시 만든다. 그 안의 자식만 보존한다.
@@ -826,6 +853,25 @@ export class UIDocument extends Object {
 			nodeData.children.push(this.#serializeNodeFromRoot(childNode));
 		}
 		return nodeData;
+	}
+
+	//==============================================================================
+	// 적은 컴포넌트의 그림 기억. (imagePath 를 적은 컴포넌트에 그림이 들었으면 경로 → 그림)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { Component } component 적은 컴포넌트.
+	 * @param { object } componentData 그 컴포넌트 데이터.
+	 */
+	#rememberSerializedImage(component, componentData) {
+		const imagePath = componentData.imagePath;
+		if (typeof imagePath !== "string" || imagePath.length === 0 || typeof component.getImage !== "function") {
+			return;
+		}
+		const image = component.getImage();
+		if (image !== null && image !== undefined) {
+			this.#serializedImageMap.set(imagePath, image);
+		}
 	}
 
 	//==============================================================================
@@ -943,6 +989,9 @@ export class UIDocument extends Object {
 		}
 		if (nodeData.interactable !== undefined) {
 			node.setInteractable(nodeData.interactable);
+		}
+		if (nodeData.visible !== undefined) {
+			node.setVisible(nodeData.visible);
 		}
 
 		// 이미 있는 컴포넌트와 자식. (위젯이 require 로 붙인 컴포넌트와 위젯의 content 노드는 문서에 적히지 않으므로 뺀다)
@@ -1189,11 +1238,29 @@ export class UIDocument extends Object {
 			if (!(currentValue instanceof WorldNode)) {
 				continue;
 			}
-			const referencePath = UIDocument.findNodePath(this.#serializeRootNode, currentValue);
+			const referencePath = this.#findReferencePath(currentValue);
 			if (referencePath !== null) {
 				componentData[property.name] = { [NODE_REFERENCE_KEY]: referencePath };
 			}
 		}
+	}
+
+	//==============================================================================
+	// 노드 참조 경로. (적는 문서의 뿌리 기준, 다시 읽어 다른 노드에 이어지면 경고를 낸다)
+	// - 경로는 이름으로만 적는다(러스트 판 find_node_path 와 같다). 이름이 같은 앞 형제가 있으면 다시 읽을 때 그 앞 형제에 이어진다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WorldNode } node 가리키는 노드.
+	 * @returns { string | null } 경로. (뿌리 아래가 아니면 null)
+	 */
+	#findReferencePath(node) {
+		const rootNode = this.#serializeRootNode;
+		const referencePath = UIDocument.findNodePath(rootNode, node);
+		if (referencePath !== null && referencePath !== undefined && UIDocument.findNodeByPath(rootNode, referencePath) !== node) {
+			System.console.warn(`UIDocument: 노드 참조 ${referencePath} 는 이름이 같은 앞 형제가 있어 다시 읽으면 앞 형제에 이어집니다 (형제 이름을 다르게 지으세요)`);
+		}
+		return referencePath;
 	}
 
 	//==============================================================================
@@ -1453,7 +1520,7 @@ export class UIDocument extends Object {
 				componentData[property.name] = [currentValue.x, currentValue.y];
 			}
 			else if (currentValue instanceof WorldNode) {
-				const referencePath = UIDocument.findNodePath(this.#serializeRootNode, currentValue);
+				const referencePath = this.#findReferencePath(currentValue);
 				if (referencePath !== null) {
 					componentData[property.name] = { [NODE_REFERENCE_KEY]: referencePath };
 				}
@@ -1464,7 +1531,7 @@ export class UIDocument extends Object {
 
 	//==============================================================================
 	// 짝이 맞는 get/set 속성으로 컴포넌트 복원.
-	// - 지금 값의 꼴로 받을지 가린다. 지금 값이 없으면(null) 저장할 때의 꼴로 받는다.
+	// - 지금 값의 꼴로 받을지 가린다. 지금 값이 없으면(null) 저장할 때의 꼴로 받는다. 지금 값이 Color 이고 적힌 값이 글이면(색 칸을 Color 로 바꾸기 전에 적은 옛 문서) Color.from 으로 읽는다.
 	//   (saveByReflection 은 Color 만 수 넷 배열로, Vector2 만 수 둘 배열로, 그 밖은 수, 글, 불 그대로 적는다)
 	// - 노드 참조는 맡아 두었다가 deserializeNode, fromJsonText 가 트리를 다 지은 뒤 잇는다. (그 밖에서 부르면 잇지 않는다)
 	//==============================================================================
@@ -1501,6 +1568,11 @@ export class UIDocument extends Object {
 				else if ((currentValue instanceof Vector2 || isCurrentEmpty) && storedValue.length === 2) {
 					component[property.setterName](Vector2.create(storedValue[0], storedValue[1]));
 				}
+				continue;
+			}
+			// 색 칸을 Color 로 바꾸기 전에 적은 옛 문서는 색을 글("#rrggbb", "rgba(...)")로 적었다. (게임 컴포넌트, 바꾸기 전의 ShadowImage ImageColor 같은)
+			if (currentValue instanceof Color && typeof storedValue === "string") {
+				component[property.setterName](Color.from(storedValue));
 				continue;
 			}
 			const isStoredPrimitive = typeof storedValue === "number" || typeof storedValue === "string" || typeof storedValue === "boolean";

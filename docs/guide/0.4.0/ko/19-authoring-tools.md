@@ -94,12 +94,15 @@ engine.run(new TitleScene());
 
 - `UIScene.loadAssets()` 는 `UIScene` 이 로딩 화면을 보이는 동안 부르는 자리입니다. 덮어쓸 때는 `super.loadAssets()` 를 부릅니다. `Scene` 을 바로 이어받았으면 `load` 에서 읽습니다.
 - 스크롤 뷰처럼 `UIView` 계열 위젯은 붙을 때 안쪽 content 노드를 스스로 만듭니다. 그래서 문서에는 위젯만 적고, content 안에 넣은 자식(목록 항목 등)은 `contentChildren` 으로 따로 적었다가 되살릴 때 content 아래에 붙입니다. content 노드의 이름은 `content` 이므로 경로에 넣어 찾습니다. (예: `/Panel/ItemList/content/Item0`)
-- 다른 노드를 가리키는 값(노드 참조)은 문서에 `$nodeRef` 와 뿌리 기준 경로로 적혀 있고, 트리를 다 만든 뒤 이어 붙입니다.
+- 다른 노드를 가리키는 값(노드 참조)은 문서에 `$nodeRef` 와 뿌리 기준 경로로 적혀 있고, 트리를 다 만든 뒤 이어 붙입니다. 경로는 이름으로만 적으므로 이름이 같은 형제가 있으면 앞의 것에 이어집니다. 그런 노드를 가리키면 적을 때 경고가 나니 형제 이름을 다르게 짓습니다.
+- 숨긴 노드(`setVisible(false)`)는 `visible: false` 로 적고 되살립니다. 보이는 노드는 이 칸을 적지 않습니다.
 - 노드 생성자가 스스로 만드는 컴포넌트와 자식(`UIWindow` 의 제목 막대, `UIImageView` 가 붙이는 `Sprite` 같은)은 문서의 앞에서부터 차례와 종류(자식은 이름)가 맞으면 그것에 문서 값을 넣고 겹쳐 만들지 않습니다. 그래서 읽고 다시 저장하면 같은 문서입니다.
 
 ### 그림 경로 해석
 
-문서에는 그림 원본이 아니라 경로(`imagePath`)만 적힙니다. `Sprite` 와 `UIImageView` 가 이 칸을 씁니다. 되살릴 때 그림을 이으려면 `fromJsonText` 를 부르기 전에 그 문서의 `uiDocument.setImageResolver(resolver)` 로 경로 → `HTMLImageElement` 함수를 겁니다. 이 함수는 바로 돌려줘야 하므로(비동기 불가) 그림은 먼저 받아 둡니다. 해석기 대신 `await Promise.all(uiDocument.loadImages(jsonText))` 로 문서의 그림을 경로대로 받아 둘 수도 있습니다. 아직 읽히는 그림은 문서가 맡아 두었다가 `uiDocument.bindPendingImages()` 가 넣습니다(남은 수를 돌려줍니다). 찾지 못한 그림은 경고를 내고, 그 컴포넌트는 그림 없이 경로만 `imagePath` 에 남깁니다.
+문서에는 그림 원본이 아니라 경로(`imagePath`)만 적힙니다. `Sprite` 와 `UIImageView` 가 이 칸을 씁니다. 되살릴 때 그림을 이으려면 `fromJsonText` 를 부르기 전에 그 문서의 `uiDocument.setImageResolver(resolver)` 로 경로 → `HTMLImageElement` 함수를 겁니다. 이 함수는 바로 돌려줘야 하므로(비동기 불가) 그림은 먼저 받아 둡니다. 해석기 대신 `await Promise.all(uiDocument.loadImages(jsonText))` 로 문서의 그림을 경로대로 받아 둘 수도 있습니다. 아직 읽히는 그림은 문서가 맡아 두었다가 `uiDocument.bindPendingImages()` 가 넣습니다(남은 수를 돌려줍니다). 찾지 못한 그림은 경고를 내고, 그 컴포넌트는 그림 없이 경로만 `imagePath` 에 남깁니다. 그사이 게임이 그림을 넣었거나 경로를 바꾼 컴포넌트는 덮지 않고, 읽지 못한 그림은 다음 `loadImages` 가 다시 요청합니다.
+
+노드를 적은 문서는 `imagePath` 를 적은 컴포넌트의 그림을 경로로 기억합니다. 그래서 같은 문서로 적고 다시 읽은 복제본(`UIListView.setTemplateNode` 의 항목 같은)은 해석기나 `loadImages` 없이도 본의 그림을 그대로 씁니다.
 
 ### 컴포넌트와 노드 종류 등록
 

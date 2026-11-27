@@ -175,4 +175,78 @@ checkEqual(UIDocument.findNodeByPath(pathRootNode, "/panel/button"), pathButtonN
 checkEqual(UIDocument.findNodeByPath(pathRootNode, "/"), pathRootNode, "뿌리 findNodeByPath");
 check(UIDocument.findNodeByPath(pathRootNode, "/panel/missing") === null || UIDocument.findNodeByPath(pathRootNode, "/panel/missing") === undefined, "없는 경로 findNodeByPath");
 
+// 노드 참조가 이름이 같은 앞 형제가 있는 노드를 가리키면 적을 때 경고한다. (경로는 이름으로만 적는다, 러스트 판 find_node_path 와 같다)
+class NodePointer extends Engine.Component {
+	#targetNode = null;
+	getTargetNode() {
+		return this.#targetNode;
+	}
+	setTargetNode(targetNode) {
+		this.#targetNode = targetNode;
+	}
+}
+const pointerDocument = new UIDocument();
+pointerDocument.registerComponentType("NodePointer", NodePointer);
+const pointerRootNode = new WorldNode();
+pointerRootNode.setName("Root");
+const firstSlotNode = new WorldNode();
+firstSlotNode.setName("Slot");
+const secondSlotNode = new WorldNode();
+secondSlotNode.setName("Slot");
+const pointerNode = new WorldNode();
+pointerNode.setName("Pointer");
+pointerRootNode.addChild(firstSlotNode);
+pointerRootNode.addChild(secondSlotNode);
+pointerRootNode.addChild(pointerNode);
+const nodePointer = pointerNode.addComponent(NodePointer);
+const warningList = [];
+const originalWarn = console.warn;
+console.warn = (...argumentList) => {
+	warningList.push(argumentList.join(" "));
+};
+try {
+	nodePointer.setTargetNode(firstSlotNode);
+	pointerDocument.toJsonText(pointerRootNode, false);
+	checkEqual(warningList.length, 0, "앞 형제를 가리키는 노드 참조는 경고 없음");
+	nodePointer.setTargetNode(secondSlotNode);
+	pointerDocument.toJsonText(pointerRootNode, false);
+	checkEqual(warningList.length, 1, "이름 같은 뒤 형제를 가리키는 노드 참조는 경고");
+	check(warningList.length > 0 && warningList[0].includes("/Slot"), "경고에 참조 경로: " + warningList[0]);
+}
+finally {
+	console.warn = originalWarn;
+}
+
+// 지금 값이 Color 인 반사 속성에 글로 적은 색(0.3.x 꼴)은 Color.from 으로 읽는다.
+class TintColorHolder extends Engine.Component {
+	#tintColor = Engine.Color.white();
+	getTintColor() {
+		return this.#tintColor;
+	}
+	setTintColor(tintColor) {
+		this.#tintColor = Engine.Color.from(tintColor);
+	}
+}
+const colorDocument = new UIDocument();
+colorDocument.registerComponentType("TintColorHolder", TintColorHolder);
+const tintNode = colorDocument.fromJsonText(JSON.stringify({ version: 1, root: { name: "Tint", components: [{ type: "TintColorHolder", TintColor: "#00ff00" }] } }));
+checkEqual(tintNode.getComponent(TintColorHolder).getTintColor().toHEXString(), "#00ff00", "글로 적은 색을 Color 로 읽는다");
+const imageColorNode = colorDocument.fromJsonText(JSON.stringify({ version: 1, root: { name: "Shadow", components: [{ type: "ShadowImage", ImageColor: "#ff0000" }] } }));
+checkEqual(imageColorNode.getComponent(Engine.ShadowImage).getImageColor().toHEXString(), "#ff0000", "ShadowImage 의 글로 적은 ImageColor");
+
+// 숨긴 노드(setVisible(false))는 visible: false 를 적고 되살린다. 보이는 노드는 적지 않는다.
+const visibleRootNode = new WorldNode();
+visibleRootNode.setName("Root");
+const hiddenNode = new WorldNode();
+hiddenNode.setName("Hidden");
+hiddenNode.setVisible(false);
+visibleRootNode.addChild(hiddenNode);
+const visibleData = uiDocument.serializeNode(visibleRootNode);
+checkEqual(visibleData.visible, undefined, "보이는 노드는 visible 을 적지 않는다");
+checkEqual(visibleData.children[0].visible, false, "숨긴 노드는 visible: false");
+checkEqual(Object.keys(visibleData.children[0]).join(","), "type,name,active,position,scale,rotation,opacity,pivot,anchor,contentSize,interactable,visible,components,children", "visible 칸 자리");
+const loadedVisibleRootNode = uiDocument.deserializeNode(visibleData);
+checkEqual(loadedVisibleRootNode.isVisible(), true, "되살린 보이는 노드");
+checkEqual(loadedVisibleRootNode.findChildByName("Hidden").isVisible(), false, "되살린 숨긴 노드");
+
 finish("tests/ui/uidocument.test.mjs");

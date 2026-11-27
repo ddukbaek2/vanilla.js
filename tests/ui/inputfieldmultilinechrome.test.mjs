@@ -389,6 +389,46 @@ try {
 		globalThis.domField.getParent().removeChild(globalThis.domField);
 	});
 
+	// 7-1) 고른 채 조합하기. (한 줄과 여러 줄 DOM 입력, 틱이 선택을 맞추기 전에 바로 조합한다)
+	// - 조합 중 보이는 글은 [고른 글 앞, 조합 글, 고른 글 뒤], 확정 뒤 되돌리기는 고르기 전 값(친 글), 조합 중 setText 는 조합을 비운다.
+	for (const isMultiline of [false, true]) {
+		const modeName = isMultiline ? "여러 줄" : "한 줄";
+		await page.evaluate((isMultiline) => {
+			globalThis.domField = globalThis.createField(true, isMultiline, 400, 200, false);
+			globalThis.domField.focus();
+		}, isMultiline);
+		const readSelectionField = async () => await page.evaluate(() => {
+			const field = globalThis.domField;
+			const domInput = document.querySelector(".uiinputfield-hidden");
+			return { text: field.getText(), displayText: field.getDisplayText(), composition: field.getComposition(), domText: domInput.value, isComposing: field.isComposing() };
+		});
+		await page.keyboard.type("abcd");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.down("Shift");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.up("Shift");
+		await client.send("Input.imeSetComposition", { text: "가", selectionStart: 1, selectionEnd: 1 });
+		checkJson(await readSelectionField(), { text: "abcd", displayText: "a가d", composition: "가", domText: "a가d", isComposing: true }, "IME " + modeName + ": 고른 채 조합 중 보이는 글");
+		await client.send("Input.insertText", { text: "가" });
+		checkEqual((await readSelectionField()).text, "a가d", "IME " + modeName + ": 고른 글을 갈음해 확정");
+		await pressCommand("KeyZ", false);
+		checkEqual((await readSelectionField()).text, "abcd", "IME " + modeName + ": 확정 뒤 되돌리기는 고르기 전 값");
+		await pressCommand("KeyZ", true);
+		checkEqual((await readSelectionField()).text, "a가d", "IME " + modeName + ": 다시 하기");
+		await client.send("Input.imeSetComposition", { text: "나", selectionStart: 1, selectionEnd: 1 });
+		await page.evaluate(() => globalThis.domField.setText("zz"));
+		checkJson(await readSelectionField(), { text: "zz", displayText: "zz", composition: "", domText: "zz", isComposing: false }, "IME " + modeName + ": 조합 중 setText 는 조합을 비운다");
+		await client.send("Input.insertText", { text: "나" });
+		const afterSetTextCommit = await readSelectionField();
+		checkEqual(afterSetTextCommit.isComposing, false, "IME " + modeName + ": setText 뒤 확정하면 조합 상태가 아니다");
+		checkEqual(afterSetTextCommit.text, afterSetTextCommit.domText, "IME " + modeName + ": setText 뒤 확정하면 엔진 값이 DOM 입력과 같다");
+		await page.evaluate(() => {
+			globalThis.domField.detach();
+			globalThis.domField.getParent().removeChild(globalThis.domField);
+		});
+	}
+
 	// 8) 클래식 스크롤 막대: 넘치면 막대 두께만큼 글 폭을 줄인다. (크롬 textarea 의 overflow: auto, 러스트 판 ensure_text_area_layout)
 	await page.goto("http://127.0.0.1:" + port + "/classic");
 	const classicResult = await page.evaluate(async () => {
