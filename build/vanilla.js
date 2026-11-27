@@ -4101,6 +4101,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
   #textureTargetTable;
   #programLinkStatusTable;
   #deletedObjectSet;
+  #isContextLost;
   constructor(webGL2RenderingContext) {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
@@ -4112,17 +4113,21 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
     this.#bufferElementTable = new System15.WeakMap();
     this.#programLinkStatusTable = new System15.WeakMap();
     this.#deletedObjectSet = new System15.WeakSet();
+    this.#isContextLost = typeof webGL2RenderingContext.isContextLost === "function" && webGL2RenderingContext.isContextLost();
     this.#originalGetParameter = webGL2RenderingContext.getParameter;
     this.#originalIsEnabled = webGL2RenderingContext.isEnabled;
     this.reset();
     this.installTrackers();
     const canvas = webGL2RenderingContext.canvas;
     if (canvas && typeof canvas.addEventListener === "function") {
-      const contextChangeCallback = __name(() => {
+      canvas.addEventListener("webglcontextlost", () => {
+        this.#isContextLost = true;
         this.reset();
-      }, "contextChangeCallback");
-      canvas.addEventListener("webglcontextlost", contextChangeCallback);
-      canvas.addEventListener("webglcontextrestored", contextChangeCallback);
+      });
+      canvas.addEventListener("webglcontextrestored", () => {
+        this.#isContextLost = false;
+        this.reset();
+      });
     }
   }
   static attach(webGL2RenderingContext) {
@@ -4158,8 +4163,7 @@ var WebGLStateCache = class _WebGLStateCache extends Object2 {
     return this.#originalGetParameter.call(this.#webGL2RenderingContext, parameterName);
   }
   canRemember() {
-    const webGL2RenderingContext = this.#webGL2RenderingContext;
-    return typeof webGL2RenderingContext.isContextLost !== "function" || !webGL2RenderingContext.isContextLost();
+    return !this.#isContextLost;
   }
   readConstantParameter(parameterName) {
     if (this.#constantParameterTable.has(parameterName)) {
@@ -6214,7 +6218,10 @@ var GEOMETRY_COMMAND_SPRITE = 0;
 var GEOMETRY_COMMAND_TEXT = 1;
 var GEOMETRY_COPY_LOOP_VERTEX_COUNT = 12;
 var BATCH_VERTEX_CAPACITY = 6 * 8192;
+var BATCH_INITIAL_VERTEX_CAPACITY = 6 * 512;
 var BATCH_RETAINED_FLUSH_CAPACITY = 32;
+var BATCH_RETAINED_MERGE_GAP_VERTEX_COUNT = 256;
+var BATCH_RETAINED_RANGE_LIMIT = 4;
 var VERTEX_CAPACITY = 4096;
 var CORNER_SEGMENT_COUNT = 8;
 var ROUND_RECT_POSITION_COUNT = 4 * (CORNER_SEGMENT_COUNT + 1);
@@ -6447,7 +6454,7 @@ var Graphic = class extends Object2 {
   #batchFlushIndex;
   #batchSegmentCount;
   #batchDeferredSegmentCount;
-  #isBatchSegmentMatching;
+  #batchDirtyRangeList;
   #isBatchSegmentDeferring;
   #retainedBatchCount;
   #lastFrameRetainedBatchCount;
@@ -6473,6 +6480,7 @@ var Graphic = class extends Object2 {
       for (const retainedFlush of this.#batchRetainedFlushList) {
         retainedFlush.vertexArray = null;
         retainedFlush.vertexBuffer = null;
+        retainedFlush.bufferVertexCount = 0;
         retainedFlush.isValid = false;
       }
     }, "contextChangeCallback");
@@ -6633,7 +6641,7 @@ var Graphic = class extends Object2 {
     this.#batchFlushIndex = 0;
     this.#batchSegmentCount = 0;
     this.#batchDeferredSegmentCount = 0;
-    this.#isBatchSegmentMatching = false;
+    this.#batchDirtyRangeList = [];
     this.#isBatchSegmentDeferring = false;
     this.#retainedBatchCount = 0;
     this.#lastFrameRetainedBatchCount = 0;
@@ -7505,12 +7513,11 @@ var Graphic = class extends Object2 {
     this.#batchClipRectData[3] = BATCH_UNCLIPPED_EXTENT;
     this.#batchClipRectCount = 1;
     this.#batchShaderProgram = new ShaderProgram(webGL2RenderingContext, BATCH_VERTEXSHADER_SOURCE, createBatchFragmentShaderSource(textureSlotCount));
-    this.#batchVertexData = new Float32Array(BATCH_VERTEX_CAPACITY * BATCH_FLOATS_PER_VERTEX);
+    this.#batchVertexData = new Float32Array(BATCH_INITIAL_VERTEX_CAPACITY * BATCH_FLOATS_PER_VERTEX);
     this.#batchVertexArray = webGL2RenderingContext.createVertexArray();
     this.#batchVertexBuffer = webGL2RenderingContext.createBuffer();
     webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
-    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
     this.setupBatchVertexAttributes();
     webGL2RenderingContext.bindVertexArray(null);
     this.useShaderProgram(this.#batchShaderProgram);
@@ -7554,28 +7561,38 @@ var Graphic = class extends Object2 {
     }
     const retainedFlushList = this.#batchRetainedFlushList;
     while (retainedFlushList.length <= flushIndex) {
-      retainedFlushList.push({ vertexArray: null, vertexBuffer: null, segmentList: [], versionList: [], deferredList: [], segmentCount: 0, vertexCount: 0, isValid: false });
+      retainedFlushList.push({ vertexArray: null, vertexBuffer: null, segmentList: [], versionList: [], countList: [], deferredList: [], directOffsetList: [], directVertexData: null, previousSegmentList: [], previousVersionList: [], previousCountList: [], previousDirectOffsetList: [], previousDirectVertexData: null, previousSegmentCount: 0, bufferVertexCount: 0, isValid: false });
     }
     const retainedFlush = retainedFlushList[flushIndex];
     this.#batchRetainedFlush = retainedFlush;
     this.#batchSegmentCount = 0;
     this.#batchDeferredSegmentCount = 0;
-    this.#isBatchSegmentMatching = retainedFlush.isValid;
     this.#isBatchSegmentDeferring = retainedFlush.isValid;
   }
   addBatchSegment(subAppend, isDeferred) {
     const retainedFlush = this.#batchRetainedFlush;
     const segmentIndex = this.#batchSegmentCount;
+    retainedFlush.segmentList[segmentIndex] = subAppend;
+    retainedFlush.versionList[segmentIndex] = subAppend.version;
+    retainedFlush.countList[segmentIndex] = subAppend.vertexCount;
     retainedFlush.deferredList[segmentIndex] = isDeferred;
     if (isDeferred) {
       this.#batchDeferredSegmentCount += 1;
     }
-    if (retainedFlush.segmentList[segmentIndex] !== subAppend || retainedFlush.versionList[segmentIndex] !== subAppend.version) {
-      retainedFlush.segmentList[segmentIndex] = subAppend;
-      retainedFlush.versionList[segmentIndex] = subAppend.version;
-      this.#isBatchSegmentMatching = false;
-    }
     subAppend.segmentBatchGeneration = this.#batchGeneration;
+    this.#batchSegmentCount = segmentIndex + 1;
+  }
+  addBatchDirectSpan(vertexCount) {
+    const retainedFlush = this.#batchRetainedFlush;
+    const segmentIndex = this.#batchSegmentCount;
+    if (segmentIndex > 0 && retainedFlush.segmentList[segmentIndex - 1] === null) {
+      retainedFlush.countList[segmentIndex - 1] += vertexCount;
+      return;
+    }
+    retainedFlush.segmentList[segmentIndex] = null;
+    retainedFlush.versionList[segmentIndex] = -1;
+    retainedFlush.countList[segmentIndex] = vertexCount;
+    retainedFlush.deferredList[segmentIndex] = false;
     this.#batchSegmentCount = segmentIndex + 1;
   }
   writeBatchSegments(retainedFlush) {
@@ -7586,14 +7603,15 @@ var Graphic = class extends Object2 {
     const deferredList = retainedFlush.deferredList;
     const batchVertexData = this.#batchVertexData;
     let targetOffset = 0;
+    const countList = retainedFlush.countList;
     for (let segmentIndex = 0; segmentIndex < this.#batchSegmentCount; ++segmentIndex) {
-      const subAppend = segmentList[segmentIndex];
-      const worldVertexData = subAppend.worldVertexData;
-      const floatCount = subAppend.vertexCount * BATCH_FLOATS_PER_VERTEX;
+      const floatCount = countList[segmentIndex] * BATCH_FLOATS_PER_VERTEX;
       if (!deferredList[segmentIndex]) {
         targetOffset += floatCount;
         continue;
       }
+      const subAppend = segmentList[segmentIndex];
+      const worldVertexData = subAppend.worldVertexData;
       if (subAppend.vertexCount > GEOMETRY_COPY_LOOP_VERTEX_COUNT) {
         batchVertexData.set(worldVertexData, targetOffset);
       } else {
@@ -7626,6 +7644,7 @@ var Graphic = class extends Object2 {
       this.flushBatch();
       textureSlot = -1;
     }
+    this.ensureBatchVertexCapacity(this.#batchVertexCount + vertexCount);
     if (textureSlot < 0) {
       textureSlot = this.#batchTextureCount;
       this.#batchTextureList[textureSlot] = texture;
@@ -7651,6 +7670,149 @@ var Graphic = class extends Object2 {
     }
     return textureSlot;
   }
+  collectBatchDirtyRanges(retainedFlush) {
+    const segmentList = retainedFlush.segmentList;
+    const versionList = retainedFlush.versionList;
+    const countList = retainedFlush.countList;
+    const previousSegmentList = retainedFlush.previousSegmentList;
+    const previousVersionList = retainedFlush.previousVersionList;
+    const previousCountList = retainedFlush.previousCountList;
+    const previousDirectOffsetList = retainedFlush.previousDirectOffsetList;
+    const previousDirectVertexData = retainedFlush.previousDirectVertexData;
+    const previousSegmentCount = retainedFlush.previousSegmentCount;
+    const segmentCount = this.#batchSegmentCount;
+    const batchVertexData = this.#batchVertexData;
+    const dirtyRangeList = this.#batchDirtyRangeList;
+    let rangeCount = 0;
+    let directFloatCount = 0;
+    let isLayoutSame = true;
+    let startVertex = 0;
+    for (let segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex) {
+      const subAppend = segmentList[segmentIndex];
+      const vertexCount = countList[segmentIndex];
+      if (isLayoutSame && (segmentIndex >= previousSegmentCount || previousCountList[segmentIndex] !== vertexCount)) {
+        isLayoutSame = false;
+      }
+      let isDirty = !isLayoutSame || previousSegmentList[segmentIndex] !== subAppend || previousVersionList[segmentIndex] !== versionList[segmentIndex];
+      if (subAppend === null) {
+        const floatStart = startVertex * BATCH_FLOATS_PER_VERTEX;
+        const floatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
+        if (!isDirty) {
+          const previousOffset = previousDirectOffsetList[segmentIndex];
+          for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
+            if (batchVertexData[floatStart + floatIndex] !== previousDirectVertexData[previousOffset + floatIndex]) {
+              isDirty = true;
+              break;
+            }
+          }
+        }
+        directFloatCount = this.recordBatchDirectSpan(retainedFlush, segmentIndex, floatStart, floatCount, directFloatCount);
+      }
+      const endVertex = startVertex + vertexCount;
+      if (isDirty) {
+        if (rangeCount > 0 && startVertex - dirtyRangeList[rangeCount * 2 - 1] <= BATCH_RETAINED_MERGE_GAP_VERTEX_COUNT) {
+          dirtyRangeList[rangeCount * 2 - 1] = endVertex;
+        } else {
+          dirtyRangeList[rangeCount * 2] = startVertex;
+          dirtyRangeList[rangeCount * 2 + 1] = endVertex;
+          rangeCount += 1;
+        }
+      }
+      startVertex = endVertex;
+    }
+    if (rangeCount > BATCH_RETAINED_RANGE_LIMIT) {
+      dirtyRangeList[1] = dirtyRangeList[rangeCount * 2 - 1];
+      rangeCount = 1;
+    }
+    return rangeCount;
+  }
+  recordBatchDirectSpan(retainedFlush, segmentIndex, floatStart, floatCount, directFloatCount) {
+    let directVertexData = retainedFlush.directVertexData;
+    const requiredFloatCount = directFloatCount + floatCount;
+    if (directVertexData === null || directVertexData.length < requiredFloatCount) {
+      let floatCapacity = directVertexData === null ? 6 * 64 * BATCH_FLOATS_PER_VERTEX : directVertexData.length;
+      while (floatCapacity < requiredFloatCount) {
+        floatCapacity *= 2;
+      }
+      const grownVertexData = new Float32Array(floatCapacity);
+      if (directVertexData !== null) {
+        grownVertexData.set(directVertexData.subarray(0, directFloatCount));
+      }
+      directVertexData = grownVertexData;
+      retainedFlush.directVertexData = directVertexData;
+    }
+    directVertexData.set(this.#batchVertexData.subarray(floatStart, floatStart + floatCount), directFloatCount);
+    retainedFlush.directOffsetList[segmentIndex] = directFloatCount;
+    return requiredFloatCount;
+  }
+  recordBatchDirectSpans(retainedFlush) {
+    const segmentList = retainedFlush.segmentList;
+    const countList = retainedFlush.countList;
+    let startVertex = 0;
+    let directFloatCount = 0;
+    for (let segmentIndex = 0; segmentIndex < this.#batchSegmentCount; ++segmentIndex) {
+      const vertexCount = countList[segmentIndex];
+      if (segmentList[segmentIndex] === null) {
+        directFloatCount = this.recordBatchDirectSpan(retainedFlush, segmentIndex, startVertex * BATCH_FLOATS_PER_VERTEX, vertexCount * BATCH_FLOATS_PER_VERTEX, directFloatCount);
+      }
+      startVertex += vertexCount;
+    }
+  }
+  writeBatchSegmentsInRanges(retainedFlush, rangeCount) {
+    if (this.#batchDeferredSegmentCount === 0) {
+      return;
+    }
+    const segmentList = retainedFlush.segmentList;
+    const countList = retainedFlush.countList;
+    const deferredList = retainedFlush.deferredList;
+    const dirtyRangeList = this.#batchDirtyRangeList;
+    const batchVertexData = this.#batchVertexData;
+    let rangeIndex = 0;
+    let startVertex = 0;
+    for (let segmentIndex = 0; segmentIndex < this.#batchSegmentCount && rangeIndex < rangeCount; ++segmentIndex) {
+      while (rangeIndex < rangeCount && dirtyRangeList[rangeIndex * 2 + 1] <= startVertex) {
+        rangeIndex += 1;
+      }
+      if (rangeIndex < rangeCount && deferredList[segmentIndex] && startVertex >= dirtyRangeList[rangeIndex * 2]) {
+        batchVertexData.set(segmentList[segmentIndex].worldVertexData, startVertex * BATCH_FLOATS_PER_VERTEX);
+      }
+      startVertex += countList[segmentIndex];
+    }
+    this.#batchDeferredSegmentCount = 0;
+  }
+  swapBatchSegments(retainedFlush) {
+    const segmentList = retainedFlush.segmentList;
+    const versionList = retainedFlush.versionList;
+    const countList = retainedFlush.countList;
+    const directOffsetList = retainedFlush.directOffsetList;
+    const directVertexData = retainedFlush.directVertexData;
+    retainedFlush.segmentList = retainedFlush.previousSegmentList;
+    retainedFlush.versionList = retainedFlush.previousVersionList;
+    retainedFlush.countList = retainedFlush.previousCountList;
+    retainedFlush.directOffsetList = retainedFlush.previousDirectOffsetList;
+    retainedFlush.directVertexData = retainedFlush.previousDirectVertexData;
+    retainedFlush.previousSegmentList = segmentList;
+    retainedFlush.previousVersionList = versionList;
+    retainedFlush.previousCountList = countList;
+    retainedFlush.previousDirectOffsetList = directOffsetList;
+    retainedFlush.previousDirectVertexData = directVertexData;
+    retainedFlush.previousSegmentCount = this.#batchSegmentCount;
+    retainedFlush.isValid = true;
+  }
+  ensureBatchVertexCapacity(vertexCount) {
+    const batchVertexData = this.#batchVertexData;
+    if (vertexCount * BATCH_FLOATS_PER_VERTEX <= batchVertexData.length) {
+      return;
+    }
+    let vertexCapacity = batchVertexData.length / BATCH_FLOATS_PER_VERTEX;
+    while (vertexCapacity < vertexCount) {
+      vertexCapacity *= 2;
+    }
+    vertexCapacity = System19.Math.min(vertexCapacity, BATCH_VERTEX_CAPACITY);
+    const grownVertexData = new Float32Array(vertexCapacity * BATCH_FLOATS_PER_VERTEX);
+    grownVertexData.set(batchVertexData.subarray(0, this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX));
+    this.#batchVertexData = grownVertexData;
+  }
   findSpriteBatchTextureSlot(texture) {
     const batchTextureList = this.#batchTextureList;
     for (let slotIndex = this.#batchTextureCount - 1; slotIndex >= 0; --slotIndex) {
@@ -7664,12 +7826,8 @@ var Graphic = class extends Object2 {
     const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
     const clipSlot = this.#shaderClipSlot;
     const isCapturing = this.#geometryActiveCache !== null;
-    if (isCapturing) {
-      if (this.#batchVertexCount === 0) {
-        this.beginBatchSegments();
-      }
-    } else if (this.#batchRetainedFlush !== null) {
-      this.endBatchSegments();
+    if (this.#batchVertexCount === 0) {
+      this.beginBatchSegments();
     }
     const globalAlpha = this.getGlobalAlpha();
     const colorAlpha = color.alpha * globalAlpha;
@@ -7723,14 +7881,19 @@ var Graphic = class extends Object2 {
       if (this.#batchRetainedFlush !== null) {
         this.addBatchSegment(subAppend, false);
       }
+    } else if (this.#batchRetainedFlush !== null) {
+      this.addBatchDirectSpan(vertexCount);
     }
     this.#batchVertexCount += vertexCount;
   }
   appendColoredQuadsToSpriteBatch(vertexCount, texture) {
     const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
     const clipSlot = this.#shaderClipSlot;
+    if (this.#batchVertexCount === 0) {
+      this.beginBatchSegments();
+    }
     if (this.#batchRetainedFlush !== null) {
-      this.endBatchSegments();
+      this.addBatchDirectSpan(vertexCount);
     }
     const globalAlpha = this.getGlobalAlpha();
     const transformMatrix = this.#transformMatrix;
@@ -7784,26 +7947,42 @@ var Graphic = class extends Object2 {
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
       webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
     } else {
-      const isRetainedSame = this.#isBatchSegmentMatching && retainedFlush.isValid && retainedFlush.segmentCount === this.#batchSegmentCount && retainedFlush.vertexCount === batchVertexCount && retainedFlush.vertexArray !== null;
       if (retainedFlush.vertexArray === null) {
         retainedFlush.vertexArray = webGL2RenderingContext.createVertexArray();
         retainedFlush.vertexBuffer = webGL2RenderingContext.createBuffer();
+        retainedFlush.bufferVertexCount = 0;
+        retainedFlush.isValid = false;
         webGL2RenderingContext.bindVertexArray(retainedFlush.vertexArray);
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
         this.setupBatchVertexAttributes();
       } else {
         webGL2RenderingContext.bindVertexArray(retainedFlush.vertexArray);
       }
-      if (isRetainedSame) {
+      const isPartialUploadable = retainedFlush.isValid && retainedFlush.bufferVertexCount >= batchVertexCount;
+      const dirtyRangeCount = isPartialUploadable ? this.collectBatchDirtyRanges(retainedFlush) : -1;
+      const dirtyRangeList = this.#batchDirtyRangeList;
+      if (dirtyRangeCount === 0) {
         this.#retainedBatchCount += 1;
-      } else {
+      } else if (dirtyRangeCount < 0 || dirtyRangeCount === 1 && dirtyRangeList[0] === 0 && dirtyRangeList[1] === batchVertexCount) {
+        if (dirtyRangeCount < 0) {
+          this.recordBatchDirectSpans(retainedFlush);
+        }
         this.writeBatchSegments(retainedFlush);
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
-        retainedFlush.segmentCount = this.#batchSegmentCount;
-        retainedFlush.vertexCount = batchVertexCount;
-        retainedFlush.isValid = true;
+        retainedFlush.bufferVertexCount = batchVertexCount;
+      } else {
+        this.writeBatchSegmentsInRanges(retainedFlush, dirtyRangeCount);
+        const batchVertexData = this.#batchVertexData;
+        const strideBytes = BATCH_FLOATS_PER_VERTEX * 4;
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
+        for (let rangeIndex = 0; rangeIndex < dirtyRangeCount; ++rangeIndex) {
+          const startVertex = dirtyRangeList[rangeIndex * 2];
+          const endVertex = dirtyRangeList[rangeIndex * 2 + 1];
+          webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, startVertex * strideBytes, batchVertexData, startVertex * BATCH_FLOATS_PER_VERTEX, (endVertex - startVertex) * BATCH_FLOATS_PER_VERTEX);
+        }
       }
+      this.swapBatchSegments(retainedFlush);
       this.#batchRetainedFlush = null;
       this.#batchSegmentCount = 0;
       this.#batchDeferredSegmentCount = 0;
@@ -8175,8 +8354,11 @@ var Graphic = class extends Object2 {
     }
     const textureSlot = this.prepareSpriteBatch(vertexCount, geometryCommand.texture);
     const clipSlot = this.#shaderClipSlot;
+    if (this.#batchVertexCount === 0) {
+      this.beginBatchSegments();
+    }
     if (this.#batchRetainedFlush !== null) {
-      this.endBatchSegments();
+      this.addBatchDirectSpan(vertexCount);
     }
     const color = geometryCommand.color;
     const colorAlpha = color.alpha * this.#globalAlpha;
@@ -33349,6 +33531,9 @@ var ToonRenderer = class {
   readFirstUnitTexture() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const activeTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.ACTIVE_TEXTURE);
+    if (activeTexture === webGL2RenderingContext.TEXTURE0) {
+      return webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+    }
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
     const texture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
     webGL2RenderingContext.activeTexture(activeTexture);
@@ -33376,9 +33561,8 @@ var ToonRenderer = class {
     this.applyCapability(webGL2RenderingContext.BLEND, savedState.isBlendEnabled);
     this.applyCapability(webGL2RenderingContext.DEPTH_TEST, savedState.isDepthTestEnabled);
     this.applyCapability(webGL2RenderingContext.CULL_FACE, savedState.isCullFaceEnabled);
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, savedState.firstUnitTexture);
-    webGL2RenderingContext.activeTexture(savedState.activeTexture);
+    this.bindTexture2D(0, savedState.firstUnitTexture);
+    this.applyActiveTexture(savedState.activeTexture);
     this.#savedState = null;
   }
   applyCapability(capability, isEnabled) {
@@ -34088,6 +34272,9 @@ var ToonRenderer = class {
     this.#hintEntry = null;
   }
   pauseTrustedOptions(isPaused) {
+    if (isPaused) {
+      this.applyActiveTexture(this.getWebGL2RenderingContext().TEXTURE0);
+    }
     this.#isTrusting = !isPaused;
     this.#hintOptions = null;
     this.#hintEntry = null;
@@ -34433,8 +34620,8 @@ var ToonRenderer = class {
         unit += 1;
       }
     }
-    this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
     if (onBeforeDraw !== null) {
+      this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
       onBeforeDraw(solidProgram, webGL2RenderingContext, ToonProgramKind.solid);
       this.forgetUniformValues(solidProgram);
     }
@@ -52578,7 +52765,7 @@ var ToonDrawQueue = class {
     const itemCount = this.#itemCount;
     let item = itemList[itemCount];
     if (item === void 0) {
-      item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, drawItem: null, entry: null, heldEntry: null, heldRenderer: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
+      item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, drawItem: null, entry: null, heldEntry: null, heldRenderer: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, isStaticCaster: false, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
       itemList.push(item);
     }
     item.mesh = mesh;
@@ -52791,16 +52978,18 @@ var ToonDrawQueue = class {
     if (recordList.length > casterList.length) {
       recordList.length = casterList.length;
     }
-    const staticList = this.#staticCasterList;
-    const dynamicList = this.#dynamicCasterList;
-    let staticCount = 0;
-    let dynamicCount = 0;
-    for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
-      const item = casterList[casterIndex];
+    const itemList = this.#itemList;
+    let casterIndex = 0;
+    for (let index = 0; index < this.#itemCount; ++index) {
+      const item = itemList[index];
+      if (item.isTransparent || !item.state[DRAW_STATE_CASTS_SHADOW]) {
+        continue;
+      }
       if (casterIndex >= recordList.length) {
         recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System140.Float32Array(0), stableFrameCount: 0, isStatic: false, drawItem: null, changeSerial: -1 });
       }
       const record = recordList[casterIndex];
+      casterIndex += 1;
       const material = item.state[DRAW_STATE_MATERIAL];
       const isVertexAnimated = material !== void 0 && material !== null && material.getVertexChunk() !== "";
       if (this.isCasterChanged(record, item) || isVertexAnimated) {
@@ -52814,7 +53003,15 @@ var ToonDrawQueue = class {
           isCacheStale = true;
         }
       }
-      if (record.isStatic) {
+      item.isStaticCaster = record.isStatic;
+    }
+    const staticList = this.#staticCasterList;
+    const dynamicList = this.#dynamicCasterList;
+    let staticCount = 0;
+    let dynamicCount = 0;
+    for (let index = 0; index < casterList.length; ++index) {
+      const item = casterList[index];
+      if (item.isStaticCaster) {
         staticList[staticCount] = item;
         staticCount += 1;
       } else {

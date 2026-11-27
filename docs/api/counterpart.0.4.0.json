@@ -5721,6 +5721,16 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "core/colorspace",
+				"class": "ColorSpace"
+			},
+			"vanilla.js": {
+				"module": "core/graphic/colorspace",
+				"class": "ColorSpace"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "core/component",
 				"class": "ComponentBase",
 				"name": "new"
@@ -8303,6 +8313,18 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "EngineConfiguration",
+				"name": "color_space"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
+				"name": "colorSpace"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
 				"name": "new"
 			},
 			"vanilla.js": {
@@ -8691,6 +8713,18 @@
 				"module": "core/engine",
 				"class": "Engine",
 				"name": "readClipboardText"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "get_color_space"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "getColorSpace"
 			}
 		},
 		{
@@ -11125,6 +11159,18 @@
 				"module": "core/graphic",
 				"class": "Graphic",
 				"name": "readFramebufferPixels"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "get_color_space"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "getColorSpace"
 			}
 		},
 		{
@@ -22197,6 +22243,102 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "get_color_space"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "getColorSpace"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "set_ambient_occlusion"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "setAmbientOcclusion"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "get_ambient_occlusion"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "getAmbientOcclusion"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "get_ambient_occlusion_direct_lighting_strength"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "getAmbientOcclusionDirectLightingStrength"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "is_ambient_occlusion_enabled"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "isAmbientOcclusionEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "get_ambient_occlusion_prepass"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "getAmbientOcclusionPrepass"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "draw_ambient_occlusion"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "drawAmbientOcclusion"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "get_ambient_occlusion_texture"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonpostprocess",
+				"class": "ToonPostProcess",
+				"name": "getAmbientOcclusionTexture"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "graphics3d/toon/toonrenderer",
 				"class": "ToonRenderer"
 			},
@@ -22953,6 +23095,54 @@
 			"vanilla-engine": {
 				"module": "graphics3d/toon/toonrenderer",
 				"class": "ToonRenderer",
+				"name": "get_color_space"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "getColorSpace"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "set_ambient_occlusion_texture"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "setAmbientOcclusionTexture"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "get_ambient_occlusion_texture"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "getAmbientOcclusionTexture"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "get_ambient_occlusion_direct_lighting_strength"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "getAmbientOcclusionDirectLightingStrength"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
 				"name": "get_solid_program"
 			},
 			"vanilla.js": {
@@ -23181,6 +23371,18 @@
 				"module": "graphics3d/toon/toondrawqueue",
 				"class": "ToonDrawQueue",
 				"name": "setScreenOutline"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toondrawqueue",
+				"class": "ToonDrawQueue",
+				"name": "set_post_process"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toondrawqueue",
+				"class": "ToonDrawQueue",
+				"name": "setPostProcess"
 			}
 		},
 		{
@@ -23499,6 +23701,18 @@
 				"module": "graphics3d/toon/toonscreenoutline",
 				"class": "ToonScreenOutline",
 				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "get_color_space"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "getColorSpace"
 			}
 		},
 		{

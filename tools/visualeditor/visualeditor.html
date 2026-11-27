@@ -7329,6 +7329,9 @@
     /** @private @type { WeakSet<object> } */
     #deletedObjectSet;
     // 지운 프레임 버퍼, 텍스처, 버텍스 어레이, 프로그램. (묶으면 GL 이 무시한다)
+    /** @private @type { boolean } */
+    #isContextLost;
+    // 컨텍스트를 잃었는지. (webglcontextlost, webglcontextrestored 이벤트로 바꾼다, 읽을 때마다 isContextLost 를 부르지 않는다)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -7347,17 +7350,21 @@
       this.#bufferElementTable = new System14.WeakMap();
       this.#programLinkStatusTable = new System14.WeakMap();
       this.#deletedObjectSet = new System14.WeakSet();
+      this.#isContextLost = typeof webGL2RenderingContext.isContextLost === "function" && webGL2RenderingContext.isContextLost();
       this.#originalGetParameter = webGL2RenderingContext.getParameter;
       this.#originalIsEnabled = webGL2RenderingContext.isEnabled;
       this.reset();
       this.installTrackers();
       const canvas = webGL2RenderingContext.canvas;
       if (canvas && typeof canvas.addEventListener === "function") {
-        const contextChangeCallback = /* @__PURE__ */ __name(() => {
+        canvas.addEventListener("webglcontextlost", () => {
+          this.#isContextLost = true;
           this.reset();
-        }, "contextChangeCallback");
-        canvas.addEventListener("webglcontextlost", contextChangeCallback);
-        canvas.addEventListener("webglcontextrestored", contextChangeCallback);
+        });
+        canvas.addEventListener("webglcontextrestored", () => {
+          this.#isContextLost = false;
+          this.reset();
+        });
       }
     }
     //==============================================================================
@@ -7413,14 +7420,14 @@
     }
     //==============================================================================
     // 모르는 값을 GL 에서 채워도 되는지. (컨텍스트를 잃은 동안 읽은 null 은 기억하지 않는다)
+    // - 잃음 이벤트로 세운 깃발만 본다. getParameter, isEnabled 를 가로챌 때마다 불리므로 GL 의 isContextLost 를 부르지 않는다.
     //==============================================================================
     /**
      * @private
      * @returns { boolean }
      */
     canRemember() {
-      const webGL2RenderingContext = this.#webGL2RenderingContext;
-      return typeof webGL2RenderingContext.isContextLost !== "function" || !webGL2RenderingContext.isContextLost();
+      return !this.#isContextLost;
     }
     //==============================================================================
     // 바뀌지 않는 한도 값 읽기. (처음에 한 번 묻는다)
@@ -10196,7 +10203,10 @@ void main() {
   var GEOMETRY_COMMAND_TEXT = 1;
   var GEOMETRY_COPY_LOOP_VERTEX_COUNT = 12;
   var BATCH_VERTEX_CAPACITY = 6 * 8192;
+  var BATCH_INITIAL_VERTEX_CAPACITY = 6 * 512;
   var BATCH_RETAINED_FLUSH_CAPACITY = 32;
+  var BATCH_RETAINED_MERGE_GAP_VERTEX_COUNT = 256;
+  var BATCH_RETAINED_RANGE_LIMIT = 4;
   var VERTEX_CAPACITY = 4096;
   var CORNER_SEGMENT_COUNT = 8;
   var ROUND_RECT_POSITION_COUNT = 4 * (CORNER_SEGMENT_COUNT + 1);
@@ -10695,22 +10705,22 @@ void main() {
     // 캐시 조각의 디바이스 정점을 고쳐 쓸 때마다 올리는 수.
     /** @private @type { Array<object> } */
     #batchRetainedFlushList;
-    // 프레임 안 그리기 차례마다 GPU 버퍼에 남겨 둔 묶음. (기하 캐시 조각만으로 채운 묶음)
+    // 프레임 안 그리기 차례마다 GPU 버퍼에 남겨 둔 묶음. (캐시 조각과 바로 쓴 구간의 차례를 적어 둔다)
     /** @private @type { object | null } */
     #batchRetainedFlush;
-    // 지금 묶음이 채우는 남김 칸. (null 이면 정점을 묶음 배열에 바로 쓴다)
+    // 지금 묶음이 채우는 남김 칸. (null 이면 정점을 묶음 배열에 바로 쓰고 남기지 않는다)
     /** @private @type { number } */
     #batchFlushIndex;
     // 이번 프레임에 그린 묶음 수. (남김 칸 번호)
     /** @private @type { number } */
     #batchSegmentCount;
-    // 지금 묶음에 적은 캐시 조각 수.
+    // 지금 묶음에 적은 조각 수. (캐시 조각과 바로 쓴 구간)
     /** @private @type { number } */
     #batchDeferredSegmentCount;
     // 그 가운데 정점을 묶음 배열에 아직 옮기지 않은 조각 수.
-    /** @private @type { boolean } */
-    #isBatchSegmentMatching;
-    // 미뤄 둔 조각이 남김 칸의 지난 조각과 차례까지 모두 같은지.
+    /** @private @type { number[] } */
+    #batchDirtyRangeList;
+    // 남긴 묶음에서 고쳐 올릴 정점 범위. ([시작, 끝, 시작, 끝, ...], 묶음을 그릴 때마다 다시 쓴다)
     /** @private @type { boolean } */
     #isBatchSegmentDeferring;
     // 캐시 조각의 정점을 묶음 배열에 옮기지 않고 미루는지. (지난 프레임 같은 차례가 조각만으로 찼을 때만)
@@ -10772,6 +10782,7 @@ void main() {
         for (const retainedFlush of this.#batchRetainedFlushList) {
           retainedFlush.vertexArray = null;
           retainedFlush.vertexBuffer = null;
+          retainedFlush.bufferVertexCount = 0;
           retainedFlush.isValid = false;
         }
       }, "contextChangeCallback");
@@ -10932,7 +10943,7 @@ void main() {
       this.#batchFlushIndex = 0;
       this.#batchSegmentCount = 0;
       this.#batchDeferredSegmentCount = 0;
-      this.#isBatchSegmentMatching = false;
+      this.#batchDirtyRangeList = [];
       this.#isBatchSegmentDeferring = false;
       this.#retainedBatchCount = 0;
       this.#lastFrameRetainedBatchCount = 0;
@@ -12506,12 +12517,11 @@ void main() {
       this.#batchClipRectData[3] = BATCH_UNCLIPPED_EXTENT;
       this.#batchClipRectCount = 1;
       this.#batchShaderProgram = new ShaderProgram(webGL2RenderingContext, BATCH_VERTEXSHADER_SOURCE, createBatchFragmentShaderSource(textureSlotCount));
-      this.#batchVertexData = new Float32Array(BATCH_VERTEX_CAPACITY * BATCH_FLOATS_PER_VERTEX);
+      this.#batchVertexData = new Float32Array(BATCH_INITIAL_VERTEX_CAPACITY * BATCH_FLOATS_PER_VERTEX);
       this.#batchVertexArray = webGL2RenderingContext.createVertexArray();
       this.#batchVertexBuffer = webGL2RenderingContext.createBuffer();
       webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
-      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
       this.setupBatchVertexAttributes();
       webGL2RenderingContext.bindVertexArray(null);
       this.useShaderProgram(this.#batchShaderProgram);
@@ -12554,9 +12564,12 @@ void main() {
       webGL2RenderingContext.vertexAttribPointer(slotLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 48);
     }
     //==============================================================================
-    // 빈 묶음에 캐시 조각을 미뤄 쌓기 시작. (이번 프레임 그리기 차례의 남김 칸을 고른다)
-    // - 묶음이 캐시 조각만으로 차면 정점을 묶음 배열에 옮기지 않고 조각 목록만 적는다. 그릴 때 지난 프레임 같은 차례의 조각과 모두 같으면 남긴 GPU 버퍼를 그대로 그린다.
-    //   (유니티 UGUI Canvas 가 바뀐 것이 없으면 지난 묶음 메시를 다시 짓지 않고 그대로 그리는 꼴)
+    // 빈 묶음에 조각을 적기 시작. (이번 프레임 그리기 차례의 남김 칸을 고른다)
+    // - 묶음에 넣는 정점을 차례대로 조각으로 적는다. 캐시 조각은 조각과 그 판을, 캐시 없이 바로 쓴 정점은 '바로 쓴 구간'으로 정점 수만 적는다.
+    // - 그릴 때 지난 프레임 같은 차례의 조각과 같은 자리의 같은 캐시 조각(같은 판)은 GPU 버퍼에 이미 있으므로 올리지 않고, 바뀐 범위만 bufferSubData 로 고쳐 올린다.
+    //   바로 쓴 구간은 늘 바뀐 것으로 친다. 앞 조각의 정점 수가 달라 자리가 밀리면 그 뒤는 모두 바뀐 것이다. 바뀐 것이 없으면 남긴 버퍼를 그대로 그린다.
+    //   (유니티 UGUI Canvas 가 바뀐 것이 없으면 지난 묶음 메시를 다시 짓지 않고 그대로 그리는 꼴, 바뀐 그래픽만 다시 짓는 것과 같은 사상)
+    // - 캐시 조각은 지난 프레임 같은 차례를 남겼을 때만 정점을 묶음 배열에 옮기지 않고 미뤄 둔다. 올릴 때 바뀐 조각만 옮긴다.
     //==============================================================================
     /**
      * @private
@@ -12569,17 +12582,16 @@ void main() {
       }
       const retainedFlushList = this.#batchRetainedFlushList;
       while (retainedFlushList.length <= flushIndex) {
-        retainedFlushList.push({ vertexArray: null, vertexBuffer: null, segmentList: [], versionList: [], deferredList: [], segmentCount: 0, vertexCount: 0, isValid: false });
+        retainedFlushList.push({ vertexArray: null, vertexBuffer: null, segmentList: [], versionList: [], countList: [], deferredList: [], directOffsetList: [], directVertexData: null, previousSegmentList: [], previousVersionList: [], previousCountList: [], previousDirectOffsetList: [], previousDirectVertexData: null, previousSegmentCount: 0, bufferVertexCount: 0, isValid: false });
       }
       const retainedFlush = retainedFlushList[flushIndex];
       this.#batchRetainedFlush = retainedFlush;
       this.#batchSegmentCount = 0;
       this.#batchDeferredSegmentCount = 0;
-      this.#isBatchSegmentMatching = retainedFlush.isValid;
       this.#isBatchSegmentDeferring = retainedFlush.isValid;
     }
     //==============================================================================
-    // 지금 묶음에 캐시 조각 하나 적기. (지난 프레임 같은 차례 같은 자리의 조각과 판까지 견준다)
+    // 지금 묶음에 캐시 조각 하나 적기. (그릴 때 지난 프레임 같은 차례 같은 자리의 조각과 판까지 견준다)
     //==============================================================================
     /**
      * @private
@@ -12589,16 +12601,34 @@ void main() {
     addBatchSegment(subAppend, isDeferred) {
       const retainedFlush = this.#batchRetainedFlush;
       const segmentIndex = this.#batchSegmentCount;
+      retainedFlush.segmentList[segmentIndex] = subAppend;
+      retainedFlush.versionList[segmentIndex] = subAppend.version;
+      retainedFlush.countList[segmentIndex] = subAppend.vertexCount;
       retainedFlush.deferredList[segmentIndex] = isDeferred;
       if (isDeferred) {
         this.#batchDeferredSegmentCount += 1;
       }
-      if (retainedFlush.segmentList[segmentIndex] !== subAppend || retainedFlush.versionList[segmentIndex] !== subAppend.version) {
-        retainedFlush.segmentList[segmentIndex] = subAppend;
-        retainedFlush.versionList[segmentIndex] = subAppend.version;
-        this.#isBatchSegmentMatching = false;
-      }
       subAppend.segmentBatchGeneration = this.#batchGeneration;
+      this.#batchSegmentCount = segmentIndex + 1;
+    }
+    //==============================================================================
+    // 지금 묶음에 캐시 없이 바로 쓴 정점 적기. (바로 앞 조각도 바로 쓴 구간이면 그 구간을 늘린다, 그릴 때 늘 바뀐 것으로 친다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { number } vertexCount 묶음 배열에 바로 쓴 정점 수.
+     */
+    addBatchDirectSpan(vertexCount) {
+      const retainedFlush = this.#batchRetainedFlush;
+      const segmentIndex = this.#batchSegmentCount;
+      if (segmentIndex > 0 && retainedFlush.segmentList[segmentIndex - 1] === null) {
+        retainedFlush.countList[segmentIndex - 1] += vertexCount;
+        return;
+      }
+      retainedFlush.segmentList[segmentIndex] = null;
+      retainedFlush.versionList[segmentIndex] = -1;
+      retainedFlush.countList[segmentIndex] = vertexCount;
+      retainedFlush.deferredList[segmentIndex] = false;
       this.#batchSegmentCount = segmentIndex + 1;
     }
     //==============================================================================
@@ -12616,14 +12646,15 @@ void main() {
       const deferredList = retainedFlush.deferredList;
       const batchVertexData = this.#batchVertexData;
       let targetOffset = 0;
+      const countList = retainedFlush.countList;
       for (let segmentIndex = 0; segmentIndex < this.#batchSegmentCount; ++segmentIndex) {
-        const subAppend = segmentList[segmentIndex];
-        const worldVertexData = subAppend.worldVertexData;
-        const floatCount = subAppend.vertexCount * BATCH_FLOATS_PER_VERTEX;
+        const floatCount = countList[segmentIndex] * BATCH_FLOATS_PER_VERTEX;
         if (!deferredList[segmentIndex]) {
           targetOffset += floatCount;
           continue;
         }
+        const subAppend = segmentList[segmentIndex];
+        const worldVertexData = subAppend.worldVertexData;
         if (subAppend.vertexCount > GEOMETRY_COPY_LOOP_VERTEX_COUNT) {
           batchVertexData.set(worldVertexData, targetOffset);
         } else {
@@ -12636,7 +12667,7 @@ void main() {
       this.#batchDeferredSegmentCount = 0;
     }
     //==============================================================================
-    // 미뤄 쌓던 묶음에 정점을 바로 쓰는 그리기가 끼면, 미뤄 둔 조각을 옮겨 쓰고 이 묶음은 남기지 않는다.
+    // 미뤄 둔 조각의 정점을 덮어써야 하면(한 묶음에 같은 캐시 조각을 다시 넣음), 미뤄 둔 조각을 옮겨 쓰고 이 묶음은 남기지 않는다.
     //==============================================================================
     /**
      * @private
@@ -12673,6 +12704,7 @@ void main() {
         this.flushBatch();
         textureSlot = -1;
       }
+      this.ensureBatchVertexCapacity(this.#batchVertexCount + vertexCount);
       if (textureSlot < 0) {
         textureSlot = this.#batchTextureCount;
         this.#batchTextureList[textureSlot] = texture;
@@ -12697,6 +12729,204 @@ void main() {
         topEntry.shaderClipSlotGeneration = this.#batchGeneration;
       }
       return textureSlot;
+    }
+    //==============================================================================
+    // 남긴 묶음에서 지난번과 달라 고쳐 올릴 정점 범위 모으기. (#batchDirtyRangeList 에 [시작, 끝] 을 차례로 적고 범위 수를 돌려준다)
+    // - 같은 자리에 같은 캐시 조각(같은 판, 같은 정점 수)이 있으면 GPU 버퍼에 이미 있다. 바뀐 조각은 바뀐 것이다.
+    //   바로 쓴 구간은 판이 없으므로 지난 프레임 같은 자리의 바로 쓴 구간과 정점 값을 견준다. (바깥선처럼 캐시 없이 그리는 것이 그대로면 올리지 않는다)
+    //   앞 조각의 정점 수가 달라져 자리가 밀린 뒤로는 모두 바뀐 것이다. (미룬 조각의 정점은 옮기지 않는다, writeBatchSegmentsInRanges)
+    // - 바로 쓴 구간의 정점은 다음 프레임에 견주게 떠 둔다. (recordBatchDirectSpan)
+    // - 사이가 BATCH_RETAINED_MERGE_GAP_VERTEX_COUNT 이하인 범위는 합치고, 범위가 BATCH_RETAINED_RANGE_LIMIT 개를 넘으면 첫 범위부터 끝 범위까지 하나로 합친다.
+    //==============================================================================
+    /**
+     * @private
+     * @param { object } retainedFlush 조각을 적은 남김 칸. (지난 조각 목록이 GPU 버퍼에 든 것과 같아야 한다)
+     * @returns { number } 고쳐 올릴 범위 수. (0 이면 바뀐 것이 없다)
+     */
+    collectBatchDirtyRanges(retainedFlush) {
+      const segmentList = retainedFlush.segmentList;
+      const versionList = retainedFlush.versionList;
+      const countList = retainedFlush.countList;
+      const previousSegmentList = retainedFlush.previousSegmentList;
+      const previousVersionList = retainedFlush.previousVersionList;
+      const previousCountList = retainedFlush.previousCountList;
+      const previousDirectOffsetList = retainedFlush.previousDirectOffsetList;
+      const previousDirectVertexData = retainedFlush.previousDirectVertexData;
+      const previousSegmentCount = retainedFlush.previousSegmentCount;
+      const segmentCount = this.#batchSegmentCount;
+      const batchVertexData = this.#batchVertexData;
+      const dirtyRangeList = this.#batchDirtyRangeList;
+      let rangeCount = 0;
+      let directFloatCount = 0;
+      let isLayoutSame = true;
+      let startVertex = 0;
+      for (let segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex) {
+        const subAppend = segmentList[segmentIndex];
+        const vertexCount = countList[segmentIndex];
+        if (isLayoutSame && (segmentIndex >= previousSegmentCount || previousCountList[segmentIndex] !== vertexCount)) {
+          isLayoutSame = false;
+        }
+        let isDirty = !isLayoutSame || previousSegmentList[segmentIndex] !== subAppend || previousVersionList[segmentIndex] !== versionList[segmentIndex];
+        if (subAppend === null) {
+          const floatStart = startVertex * BATCH_FLOATS_PER_VERTEX;
+          const floatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
+          if (!isDirty) {
+            const previousOffset = previousDirectOffsetList[segmentIndex];
+            for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
+              if (batchVertexData[floatStart + floatIndex] !== previousDirectVertexData[previousOffset + floatIndex]) {
+                isDirty = true;
+                break;
+              }
+            }
+          }
+          directFloatCount = this.recordBatchDirectSpan(retainedFlush, segmentIndex, floatStart, floatCount, directFloatCount);
+        }
+        const endVertex = startVertex + vertexCount;
+        if (isDirty) {
+          if (rangeCount > 0 && startVertex - dirtyRangeList[rangeCount * 2 - 1] <= BATCH_RETAINED_MERGE_GAP_VERTEX_COUNT) {
+            dirtyRangeList[rangeCount * 2 - 1] = endVertex;
+          } else {
+            dirtyRangeList[rangeCount * 2] = startVertex;
+            dirtyRangeList[rangeCount * 2 + 1] = endVertex;
+            rangeCount += 1;
+          }
+        }
+        startVertex = endVertex;
+      }
+      if (rangeCount > BATCH_RETAINED_RANGE_LIMIT) {
+        dirtyRangeList[1] = dirtyRangeList[rangeCount * 2 - 1];
+        rangeCount = 1;
+      }
+      return rangeCount;
+    }
+    //==============================================================================
+    // 바로 쓴 구간 하나의 정점을 남김 칸에 떠 두기. (다음 프레임에 같은 자리의 구간과 견준다, 모자라면 두 배씩 늘린다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { object } retainedFlush 조각을 적은 남김 칸.
+     * @param { number } segmentIndex 조각 번호.
+     * @param { number } floatStart 묶음 배열에서 구간이 시작하는 자리. (float 수)
+     * @param { number } floatCount 구간의 float 수.
+     * @param { number } directFloatCount 이번 묶음에서 이미 떠 둔 float 수.
+     * @returns { number } 이 구간까지 떠 둔 float 수.
+     */
+    recordBatchDirectSpan(retainedFlush, segmentIndex, floatStart, floatCount, directFloatCount) {
+      let directVertexData = retainedFlush.directVertexData;
+      const requiredFloatCount = directFloatCount + floatCount;
+      if (directVertexData === null || directVertexData.length < requiredFloatCount) {
+        let floatCapacity = directVertexData === null ? 6 * 64 * BATCH_FLOATS_PER_VERTEX : directVertexData.length;
+        while (floatCapacity < requiredFloatCount) {
+          floatCapacity *= 2;
+        }
+        const grownVertexData = new Float32Array(floatCapacity);
+        if (directVertexData !== null) {
+          grownVertexData.set(directVertexData.subarray(0, directFloatCount));
+        }
+        directVertexData = grownVertexData;
+        retainedFlush.directVertexData = directVertexData;
+      }
+      directVertexData.set(this.#batchVertexData.subarray(floatStart, floatStart + floatCount), directFloatCount);
+      retainedFlush.directOffsetList[segmentIndex] = directFloatCount;
+      return requiredFloatCount;
+    }
+    //==============================================================================
+    // 묶음의 바로 쓴 구간을 모두 떠 두기. (지난 조각과 견주지 않고 모두 올리는 때, 다음 프레임에 견줄 것을 남긴다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { object } retainedFlush 조각을 적은 남김 칸.
+     */
+    recordBatchDirectSpans(retainedFlush) {
+      const segmentList = retainedFlush.segmentList;
+      const countList = retainedFlush.countList;
+      let startVertex = 0;
+      let directFloatCount = 0;
+      for (let segmentIndex = 0; segmentIndex < this.#batchSegmentCount; ++segmentIndex) {
+        const vertexCount = countList[segmentIndex];
+        if (segmentList[segmentIndex] === null) {
+          directFloatCount = this.recordBatchDirectSpan(retainedFlush, segmentIndex, startVertex * BATCH_FLOATS_PER_VERTEX, vertexCount * BATCH_FLOATS_PER_VERTEX, directFloatCount);
+        }
+        startVertex += vertexCount;
+      }
+    }
+    //==============================================================================
+    // 고쳐 올릴 범위에 드는 미룬 조각의 정점만 묶음 배열의 제자리에 옮겨 쓰기. (범위 밖의 미룬 조각은 GPU 버퍼에 이미 있어 옮기지 않는다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { object } retainedFlush 조각을 적은 남김 칸.
+     * @param { number } rangeCount #batchDirtyRangeList 에 적은 범위 수.
+     */
+    writeBatchSegmentsInRanges(retainedFlush, rangeCount) {
+      if (this.#batchDeferredSegmentCount === 0) {
+        return;
+      }
+      const segmentList = retainedFlush.segmentList;
+      const countList = retainedFlush.countList;
+      const deferredList = retainedFlush.deferredList;
+      const dirtyRangeList = this.#batchDirtyRangeList;
+      const batchVertexData = this.#batchVertexData;
+      let rangeIndex = 0;
+      let startVertex = 0;
+      for (let segmentIndex = 0; segmentIndex < this.#batchSegmentCount && rangeIndex < rangeCount; ++segmentIndex) {
+        while (rangeIndex < rangeCount && dirtyRangeList[rangeIndex * 2 + 1] <= startVertex) {
+          rangeIndex += 1;
+        }
+        if (rangeIndex < rangeCount && deferredList[segmentIndex] && startVertex >= dirtyRangeList[rangeIndex * 2]) {
+          batchVertexData.set(segmentList[segmentIndex].worldVertexData, startVertex * BATCH_FLOATS_PER_VERTEX);
+        }
+        startVertex += countList[segmentIndex];
+      }
+      this.#batchDeferredSegmentCount = 0;
+    }
+    //==============================================================================
+    // 그린 묶음의 조각 목록을 GPU 버퍼에 든 지난 목록으로 넘기기. (두 목록을 맞바꿔 다음 프레임에 새로 할당하지 않는다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { object } retainedFlush 그린 남김 칸.
+     */
+    swapBatchSegments(retainedFlush) {
+      const segmentList = retainedFlush.segmentList;
+      const versionList = retainedFlush.versionList;
+      const countList = retainedFlush.countList;
+      const directOffsetList = retainedFlush.directOffsetList;
+      const directVertexData = retainedFlush.directVertexData;
+      retainedFlush.segmentList = retainedFlush.previousSegmentList;
+      retainedFlush.versionList = retainedFlush.previousVersionList;
+      retainedFlush.countList = retainedFlush.previousCountList;
+      retainedFlush.directOffsetList = retainedFlush.previousDirectOffsetList;
+      retainedFlush.directVertexData = retainedFlush.previousDirectVertexData;
+      retainedFlush.previousSegmentList = segmentList;
+      retainedFlush.previousVersionList = versionList;
+      retainedFlush.previousCountList = countList;
+      retainedFlush.previousDirectOffsetList = directOffsetList;
+      retainedFlush.previousDirectVertexData = directVertexData;
+      retainedFlush.previousSegmentCount = this.#batchSegmentCount;
+      retainedFlush.isValid = true;
+    }
+    //==============================================================================
+    // 묶음 배열이 정점 수만큼 들 수 있게 늘리기. (두 배씩, 한도 BATCH_VERTEX_CAPACITY 까지, 쌓인 정점은 옮긴다)
+    // - 처음에는 작게 짓고 쓰는 만큼만 늘린다. (std::vector, List<T> 가 자리가 모자랄 때 두 배로 늘리는 것과 같은 꼴)
+    //==============================================================================
+    /**
+     * @private
+     * @param { number } vertexCount 들어야 하는 정점 수. (BATCH_VERTEX_CAPACITY 이하)
+     */
+    ensureBatchVertexCapacity(vertexCount) {
+      const batchVertexData = this.#batchVertexData;
+      if (vertexCount * BATCH_FLOATS_PER_VERTEX <= batchVertexData.length) {
+        return;
+      }
+      let vertexCapacity = batchVertexData.length / BATCH_FLOATS_PER_VERTEX;
+      while (vertexCapacity < vertexCount) {
+        vertexCapacity *= 2;
+      }
+      vertexCapacity = System18.Math.min(vertexCapacity, BATCH_VERTEX_CAPACITY);
+      const grownVertexData = new Float32Array(vertexCapacity * BATCH_FLOATS_PER_VERTEX);
+      grownVertexData.set(batchVertexData.subarray(0, this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX));
+      this.#batchVertexData = grownVertexData;
     }
     //==============================================================================
     // 묶음에서 텍스처의 칸 번호 찾기. (없으면 -1)
@@ -12728,12 +12958,8 @@ void main() {
       const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
       const clipSlot = this.#shaderClipSlot;
       const isCapturing = this.#geometryActiveCache !== null;
-      if (isCapturing) {
-        if (this.#batchVertexCount === 0) {
-          this.beginBatchSegments();
-        }
-      } else if (this.#batchRetainedFlush !== null) {
-        this.endBatchSegments();
+      if (this.#batchVertexCount === 0) {
+        this.beginBatchSegments();
       }
       const globalAlpha = this.getGlobalAlpha();
       const colorAlpha = color.alpha * globalAlpha;
@@ -12787,6 +13013,8 @@ void main() {
         if (this.#batchRetainedFlush !== null) {
           this.addBatchSegment(subAppend, false);
         }
+      } else if (this.#batchRetainedFlush !== null) {
+        this.addBatchDirectSpan(vertexCount);
       }
       this.#batchVertexCount += vertexCount;
     }
@@ -12802,8 +13030,11 @@ void main() {
     appendColoredQuadsToSpriteBatch(vertexCount, texture) {
       const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
       const clipSlot = this.#shaderClipSlot;
+      if (this.#batchVertexCount === 0) {
+        this.beginBatchSegments();
+      }
       if (this.#batchRetainedFlush !== null) {
-        this.endBatchSegments();
+        this.addBatchDirectSpan(vertexCount);
       }
       const globalAlpha = this.getGlobalAlpha();
       const transformMatrix = this.#transformMatrix;
@@ -12861,26 +13092,42 @@ void main() {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
       } else {
-        const isRetainedSame = this.#isBatchSegmentMatching && retainedFlush.isValid && retainedFlush.segmentCount === this.#batchSegmentCount && retainedFlush.vertexCount === batchVertexCount && retainedFlush.vertexArray !== null;
         if (retainedFlush.vertexArray === null) {
           retainedFlush.vertexArray = webGL2RenderingContext.createVertexArray();
           retainedFlush.vertexBuffer = webGL2RenderingContext.createBuffer();
+          retainedFlush.bufferVertexCount = 0;
+          retainedFlush.isValid = false;
           webGL2RenderingContext.bindVertexArray(retainedFlush.vertexArray);
           webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
           this.setupBatchVertexAttributes();
         } else {
           webGL2RenderingContext.bindVertexArray(retainedFlush.vertexArray);
         }
-        if (isRetainedSame) {
+        const isPartialUploadable = retainedFlush.isValid && retainedFlush.bufferVertexCount >= batchVertexCount;
+        const dirtyRangeCount = isPartialUploadable ? this.collectBatchDirtyRanges(retainedFlush) : -1;
+        const dirtyRangeList = this.#batchDirtyRangeList;
+        if (dirtyRangeCount === 0) {
           this.#retainedBatchCount += 1;
-        } else {
+        } else if (dirtyRangeCount < 0 || dirtyRangeCount === 1 && dirtyRangeList[0] === 0 && dirtyRangeList[1] === batchVertexCount) {
+          if (dirtyRangeCount < 0) {
+            this.recordBatchDirectSpans(retainedFlush);
+          }
           this.writeBatchSegments(retainedFlush);
           webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
           webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
-          retainedFlush.segmentCount = this.#batchSegmentCount;
-          retainedFlush.vertexCount = batchVertexCount;
-          retainedFlush.isValid = true;
+          retainedFlush.bufferVertexCount = batchVertexCount;
+        } else {
+          this.writeBatchSegmentsInRanges(retainedFlush, dirtyRangeCount);
+          const batchVertexData = this.#batchVertexData;
+          const strideBytes = BATCH_FLOATS_PER_VERTEX * 4;
+          webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
+          for (let rangeIndex = 0; rangeIndex < dirtyRangeCount; ++rangeIndex) {
+            const startVertex = dirtyRangeList[rangeIndex * 2];
+            const endVertex = dirtyRangeList[rangeIndex * 2 + 1];
+            webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, startVertex * strideBytes, batchVertexData, startVertex * BATCH_FLOATS_PER_VERTEX, (endVertex - startVertex) * BATCH_FLOATS_PER_VERTEX);
+          }
         }
+        this.swapBatchSegments(retainedFlush);
         this.#batchRetainedFlush = null;
         this.#batchSegmentCount = 0;
         this.#batchDeferredSegmentCount = 0;
@@ -12992,7 +13239,8 @@ void main() {
     }
     //==============================================================================
     // 지난 프레임에 정점을 다시 올리지 않고 GPU 에 남겨 둔 버퍼로 그린 묶음 수 반환.
-    // - 기하 캐시 조각만으로 찬 묶음이 지난 프레임 같은 차례의 묶음과 조각까지 같으면 정점을 옮기지도 올리지도 않고 드로 콜만 낸다.
+    // - 묶음에 넣은 조각(기하 캐시 조각과 판, 캐시 없이 바로 쓴 구간의 정점 값)이 지난 프레임 같은 차례의 묶음과 모두 같으면 정점을 옮기지도 올리지도 않고 드로 콜만 낸다.
+    // - 일부만 바뀐 묶음은 바뀐 범위만 bufferSubData 로 고쳐 올리고, 이 수에 들지 않는다.
     //==============================================================================
     /**
      * @returns { number } 남긴 버퍼로 그린 묶음 수.
@@ -13432,8 +13680,11 @@ void main() {
       }
       const textureSlot = this.prepareSpriteBatch(vertexCount, geometryCommand.texture);
       const clipSlot = this.#shaderClipSlot;
+      if (this.#batchVertexCount === 0) {
+        this.beginBatchSegments();
+      }
       if (this.#batchRetainedFlush !== null) {
-        this.endBatchSegments();
+        this.addBatchDirectSpan(vertexCount);
       }
       const color = geometryCommand.color;
       const colorAlpha = color.alpha * this.#globalAlpha;
@@ -47823,7 +48074,7 @@ void main() {
       };
     }
     //==============================================================================
-    // 유닛 0 에 묶인 텍스처 읽기. (지금 고른 유닛은 그대로 둔다)
+    // 유닛 0 에 묶인 텍스처 읽기. (지금 고른 유닛은 그대로 둔다, 이미 유닛 0 이면 고르지 않는다)
     //==============================================================================
     /**
      * @returns { WebGLTexture | null } 유닛 0 의 텍스처. (없으면 null)
@@ -47832,6 +48083,9 @@ void main() {
     readFirstUnitTexture() {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const activeTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.ACTIVE_TEXTURE);
+      if (activeTexture === webGL2RenderingContext.TEXTURE0) {
+        return webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+      }
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
       const texture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
       webGL2RenderingContext.activeTexture(activeTexture);
@@ -47865,9 +48119,8 @@ void main() {
       this.applyCapability(webGL2RenderingContext.BLEND, savedState.isBlendEnabled);
       this.applyCapability(webGL2RenderingContext.DEPTH_TEST, savedState.isDepthTestEnabled);
       this.applyCapability(webGL2RenderingContext.CULL_FACE, savedState.isCullFaceEnabled);
-      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, savedState.firstUnitTexture);
-      webGL2RenderingContext.activeTexture(savedState.activeTexture);
+      this.bindTexture2D(0, savedState.firstUnitTexture);
+      this.applyActiveTexture(savedState.activeTexture);
       this.#savedState = null;
     }
     //==============================================================================
@@ -49059,6 +49312,9 @@ void main() {
      * @private
      */
     pauseTrustedOptions(isPaused) {
+      if (isPaused) {
+        this.applyActiveTexture(this.getWebGL2RenderingContext().TEXTURE0);
+      }
       this.#isTrusting = !isPaused;
       this.#hintOptions = null;
       this.#hintEntry = null;
@@ -49496,8 +49752,8 @@ void main() {
           unit += 1;
         }
       }
-      this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
       if (onBeforeDraw !== null) {
+        this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
         onBeforeDraw(solidProgram, webGL2RenderingContext, ToonProgramKind.solid);
         this.forgetUniformValues(solidProgram);
       }
