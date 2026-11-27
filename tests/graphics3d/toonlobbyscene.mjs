@@ -6,6 +6,7 @@
 //   열은 프레임마다 돌고(새 행렬), 꼴 하나는 틴트 배열을 그 자리에서 고친다(같은 객체의 값이 바뀜).
 // - 프레임 번호로만 움직인다. (같은 프레임 번호면 같은 화면)
 // - 쓰는 법: const scene = createLobbyScene(vanilla, webGL2RenderingContext, width, height); scene.drawFrame(frame);
+// - isCameraMoving 을 주면 카메라가 프레임마다 장면을 돈다. (프레임 블록 값이 패스마다 새로 바뀌는 꼴, toondrawbench.mjs 의 lobbymove 와 toonscenepage.html)
 //==============================================================================
 const System = globalThis;
 
@@ -22,9 +23,10 @@ export const LOBBY_MESH_KIND_COUNT = 30;
  * @param { number } width - 캔버스 너비.
  * @param { number } height - 캔버스 높이.
  * @param { object | null } [readCounter] - { count } 를 주면 엔진에 넘기는 꼴 객체를 Proxy 로 감싸 칸 읽기(get)를 센다. (재기용, 시간은 재지 않는다)
+ * @param { boolean } [isCameraMoving] - 참이면 카메라가 프레임마다 장면을 돈다. (기본 거짓)
  * @returns { object } { renderer, queue, drawFrame(frame), looks }
  */
-export function createLobbyScene(vanilla, webGL2RenderingContext, width, height, readCounter = null) {
+export function createLobbyScene(vanilla, webGL2RenderingContext, width, height, readCounter = null, isCameraMoving = false) {
 	const wrapOptions = (options) => {
 		if (readCounter === null) {
 			return options;
@@ -170,6 +172,10 @@ export function createLobbyScene(vanilla, webGL2RenderingContext, width, height,
 		looks: looks,
 		objectList: objectList,
 		drawFrame(frame) {
+			if (isCameraMoving) {
+				const angle = frame * 0.01;
+				camera.lookAt(Vector3.create(12 * System.Math.sin(angle), 11, 12 * System.Math.cos(angle)), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+			}
 			// 꼴 하나의 틴트를 그 자리에서 고친다. (같은 꼴 객체, 값만 바뀜)
 			animatedLook.tintColor[0] = 0.6 + 0.3 * ((frame % 40) / 40);
 			queue.clear();

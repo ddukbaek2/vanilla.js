@@ -8,6 +8,7 @@
 //   (엔진에 ToonDrawItem 이 없으면 fresh 로 그린다, 고치기 전 엔진과 화면을 견줄 때)
 // - 두 길의 화면은 같다. 프레임 번호로만 움직인다.
 // - 쓰는 법: const scene = createRoomScene(vanilla, webGL2RenderingContext, width, height, "item"); scene.drawFrame(frame);
+// - isCameraMoving 을 주면 카메라가 프레임마다 방을 돈다. (프레임 블록 값이 패스마다 바뀌는 꼴, toondrawbench.mjs 와 toonscenepage.html 의 roommove)
 //==============================================================================
 const System = globalThis;
 
@@ -24,9 +25,10 @@ export const ROOM_KIND_COUNT = 6;
  * @param { number } width - 캔버스 너비.
  * @param { number } height - 캔버스 높이.
  * @param { string } path - "fresh" 나 "item".
+ * @param { boolean } [isCameraMoving] - 참이면 카메라가 프레임마다 방을 돈다. (기본 거짓)
  * @returns { object } { renderer, queue, drawFrame(frame), path }
  */
-export function createRoomScene(vanilla, webGL2RenderingContext, width, height, path) {
+export function createRoomScene(vanilla, webGL2RenderingContext, width, height, path, isCameraMoving = false) {
 	const { ToonRenderer, ToonDrawQueue, ToonScreenOutline, ToonMaterial, MeshBuilder, createBoxGeometry, createSphereGeometry, createRoundedBoxGeometry, createCylinderGeometry, createOctahedronGeometry, ShadowMap, ShadowUpdateMode, Camera3D, Matrix4, Vector3 } = vanilla;
 	const drawPath = path === "item" && vanilla.ToonDrawItem !== undefined ? "item" : "fresh";
 	const renderer = new ToonRenderer(webGL2RenderingContext);
@@ -166,6 +168,10 @@ export function createRoomScene(vanilla, webGL2RenderingContext, width, height, 
 		queue: queue,
 		path: drawPath,
 		drawFrame(frame) {
+			if (isCameraMoving) {
+				const angle = frame * 0.01;
+				camera.lookAt(Vector3.create(10 * System.Math.sin(angle), 9, 10 * System.Math.cos(angle)), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+			}
 			pulsePart.look.emissiveIntensity = readPulse(frame);
 			queue.clear();
 			if (drawPath === "item") {
