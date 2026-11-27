@@ -6,7 +6,7 @@
 //   (나) 열린 페이지에 붙기(--attach): 이미 떠 있는 크롬(원격 디버깅)의 페이지에 붙어, 그 페이지를 그대로(해상도, dpr 안 바꿈, 데움 기본 0) 잰다. 찍개가 페이지 안에서 장면(로비, 매칭, 판)까지 데려간 뒤 재는 데 쓴다. 끝나면 떨어질 뿐 크롬은 끄지 않는다.
 //       크롬 띄우기 예: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --remote-debugging-port=9222 --user-data-dir=/tmp/perfprofile <주소>
 //       NODE_PATH=$(npm root -g) node tools/perftrace.mjs --attach http://127.0.0.1:9222 [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--throughput [프레임 수 120]] [--out 결과.json] [--keep-trace 트레이스.json]
-//       --target 은 주소에 그 글이 든 첫 페이지를 고른다(없으면 첫 페이지). ws:// 주소(브라우저 웹소켓)도 받는다.
+//       --target 은 주소에 그 글이 든 첫 페이지를 고른다(맞는 페이지가 없으면 열린 페이지 목록을 찍고 오류로 끝남, --target 이 없으면 첫 페이지). ws:// 주소(브라우저 웹소켓)도 받는다.
 //   (다) 모듈로 부르기(게임 찍개 안에서): 이미 puppeteer 를 쥔 스크립트가 page(또는 browser)를 넘긴다. 같은 결과 객체를 돌려준다.
 //       import { measureAttached } from "<엔진 저장소>/tools/perftrace.mjs";
 //       const result = await measureAttached(page, { seconds: 4, warmup: 0, throughput: 120, keepTrace: null, silent: false });  // browser 를 넘기면 options.target 으로 페이지를 고른다
@@ -172,7 +172,12 @@ export async function measureAttached(browserOrPage, options = {}) {
 	let page = browserOrPage;
 	if (typeof browserOrPage.pages === "function") {
 		const pages = await browserOrPage.pages();
-		page = (settings.target !== null ? pages.find((candidate) => candidate.url().includes(settings.target)) : undefined) ?? pages[0];
+		if (settings.target !== null) {
+			page = pages.find((candidate) => candidate.url().includes(settings.target));
+			if (page === undefined) throw new Error("--target 과 맞는 페이지가 없다(" + settings.target + "). 열린 페이지: " + pages.map((candidate) => candidate.url()).join(", "));
+		} else {
+			page = pages[0];
+		}
 		if (page === undefined) throw new Error("붙을 페이지가 없다");
 	}
 	const tracePath = settings.keepTrace ?? path.join(process.env.TMPDIR ?? "/tmp", "perftrace_" + process.pid + "_" + Date.now() + ".json");
