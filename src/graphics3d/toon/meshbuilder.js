@@ -657,7 +657,7 @@ export class MeshBuilder {
 			const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
 			const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
 			const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-			const normalLength = System.Math.hypot(normalX, normalY, normalZ);
+			const normalLength = System.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
 			const unitX = normalLength > 0 ? normalX / normalLength : 0;
 			const unitY = normalLength > 0 ? normalY / normalLength : 1;
 			const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -832,7 +832,7 @@ export class MeshBuilder {
 			const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
 			const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
 			const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-			const normalLength = System.Math.hypot(normalX, normalY, normalZ);
+			const normalLength = System.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
 			const unitX = normalLength > 0 ? normalX / normalLength : 0;
 			const unitY = normalLength > 0 ? normalY / normalLength : 1;
 			const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -906,7 +906,7 @@ export class MeshBuilder {
 			const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
 			const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
 			const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-			const normalLength = System.Math.hypot(normalX, normalY, normalZ);
+			const normalLength = System.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
 			const unitX = normalLength > 0 ? normalX / normalLength : 0;
 			const unitY = normalLength > 0 ? normalY / normalLength : 1;
 			const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -1230,7 +1230,7 @@ export class MeshBuilder {
 				sum[1] += normal[1];
 				sum[2] += normal[2];
 			}
-			const sumLength = System.Math.hypot(sum[0], sum[1], sum[2]);
+			const sumLength = System.Math.sqrt(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]);
 			if (sumLength <= 0) {
 				pointOffsets.set(pointKey, null);
 				continue;

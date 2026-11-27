@@ -309,6 +309,82 @@ function applyTextureTransform(textureCoordinates, textureInfo, texCoordIndex) {
 }
 
 //==============================================================================
+// 꼭짓점 속성을 삼각형 꼭짓점마다 따로 풀기. (번호 차례대로 componentCount 씩 옮김, 범위 밖 번호는 0, 받은 배열과 같은 종류)
+//==============================================================================
+/**
+ * @param { Float32Array | Uint16Array } values 꼭짓점마다 componentCount 개의 값.
+ * @param { ArrayLike<number> } cornerIndices 삼각형마다 꼭짓점 번호 셋.
+ * @param { number } componentCount 꼭짓점 하나의 값 수.
+ * @returns { Float32Array | Uint16Array } 번호마다 푼 값. (cornerIndices.length x componentCount 개)
+ */
+function unweldAttributeArray(values, cornerIndices, componentCount) {
+	const resultArray = new values.constructor(cornerIndices.length * componentCount);
+	for (let cornerIndex = 0; cornerIndex < cornerIndices.length; ++cornerIndex) {
+		for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
+			const valueIndex = cornerIndices[cornerIndex] * componentCount + componentIndex;
+			resultArray[cornerIndex * componentCount + componentIndex] = valueIndex < values.length ? values[valueIndex] : 0;
+		}
+	}
+	return resultArray;
+}
+
+//==============================================================================
+// 노멀이 없는 glTF 프리미티브를 평평한 노멀로 풀기. (glTF 2.0 명세: 노멀이 없으면 삼각형마다 노멀 하나인 평평한 노멀이고, 탄젠트는 무시한다)
+// - 꼭짓점을 번호 차례대로 삼각형마다 따로 풀고 번호 없이 그린다. (위치, 텍스처 좌표, 조인트, 가중치, 모프 타깃의 델타)
+// - 삼각형마다 (p1 - p0) x (p2 - p0) 을 길이 1 로 줄여 세 꼭짓점에 준다. (넓이가 0 인 삼각형은 0, 셈은 64 비트 실수로 하고 Float32Array 에 담는다)
+// - 툰 GLB 읽기(glbmeshreader.js 의 createFlatNormals)와 같은 차례, 같은 셈이다.
+//==============================================================================
+/**
+ * @param { { positions: Float32Array, textureCoordinates: Float32Array | null, joints: Uint16Array, weights: Float32Array, indices: Uint16Array | Uint32Array | null, morphTargets: object[] } } primitiveArrays 프리미티브의 꼭짓점 배열. (indices 가 null 이면 꼭짓점 셋씩 삼각형)
+ * @returns { object } 같은 칸에 normals 를 더한 것. (indices 는 null, morphTargets 는 델타를 푼 새 목록)
+ */
+function createFlatNormalArrays(primitiveArrays) {
+	const vertexCount = primitiveArrays.positions.length / 3;
+	const cornerIndices = primitiveArrays.indices !== null ? primitiveArrays.indices : System.Array.from({ length: vertexCount }, (value, index) => {
+		return index;
+	});
+	const positions = unweldAttributeArray(primitiveArrays.positions, cornerIndices, 3);
+	const normals = new System.Float32Array(positions.length);
+	const triangleCount = System.Math.floor(positions.length / 9);
+	for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+		const offset = triangleIndex * 9;
+		const firstEdgeX = positions[offset + 3] - positions[offset];
+		const firstEdgeY = positions[offset + 4] - positions[offset + 1];
+		const firstEdgeZ = positions[offset + 5] - positions[offset + 2];
+		const secondEdgeX = positions[offset + 6] - positions[offset];
+		const secondEdgeY = positions[offset + 7] - positions[offset + 1];
+		const secondEdgeZ = positions[offset + 8] - positions[offset + 2];
+		const crossX = firstEdgeY * secondEdgeZ - firstEdgeZ * secondEdgeY;
+		const crossY = firstEdgeZ * secondEdgeX - firstEdgeX * secondEdgeZ;
+		const crossZ = firstEdgeX * secondEdgeY - firstEdgeY * secondEdgeX;
+		const length = System.Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+		if (length <= 0) {
+			continue;
+		}
+		for (let cornerIndex = 0; cornerIndex < 3; ++cornerIndex) {
+			normals[offset + cornerIndex * 3] = crossX / length;
+			normals[offset + cornerIndex * 3 + 1] = crossY / length;
+			normals[offset + cornerIndex * 3 + 2] = crossZ / length;
+		}
+	}
+	return {
+		positions: positions,
+		normals: normals,
+		textureCoordinates: primitiveArrays.textureCoordinates !== null ? unweldAttributeArray(primitiveArrays.textureCoordinates, cornerIndices, 2) : null,
+		joints: unweldAttributeArray(primitiveArrays.joints, cornerIndices, 4),
+		weights: unweldAttributeArray(primitiveArrays.weights, cornerIndices, 4),
+		indices: null,
+		morphTargets: primitiveArrays.morphTargets.map((morphTarget) => {
+			return {
+				name: morphTarget.name,
+				positionDeltas: unweldAttributeArray(morphTarget.positionDeltas, cornerIndices, 3),
+				normalDeltas: morphTarget.normalDeltas !== null ? unweldAttributeArray(morphTarget.normalDeltas, cornerIndices, 3) : null,
+			};
+		}),
+	};
+}
+
+//==============================================================================
 // glTF 필수 확장 확인. (extensionsRequired 에 읽지 못하는 확장이 있으면 오류를 던진다)
 //==============================================================================
 /**
@@ -724,6 +800,7 @@ export class SkinnedModel extends Object {
 	//==============================================================================
 	// glTF 내용 해석. (GL 무관, 노드 / 스킨 / 애니메이션을 채우고 중립 메시 / 머티리얼 서술을 돌려준다)
 	// - 바깥(uri) 이미지는 텍스처 없음, inverseBindMatrices 가 없는 스킨은 단위 행렬, 노드가 없거나 모르는 경로의 채널은 버린다.
+	// - 노멀이 없는 프리미티브는 glTF 2.0 명세대로 평평한 노멀(삼각형마다 하나)이다. 꼭짓점을 삼각형마다 따로 풀어 면 노멀을 주고 indices 는 null 이다.
 	//==============================================================================
 	/**
 	 * @param { object } json glTF JSON.
@@ -889,19 +966,25 @@ export class SkinnedModel extends Object {
 					morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== undefined ? baseMorphWeights[weightIndex] : 0;
 				}
 
+				// 노멀이 없으면 glTF 2.0 명세대로 평평한 노멀이다. (꼭짓점을 삼각형마다 풀어 번호 없이 그린다, 툰 GLB 읽기와 같다)
+				let primitiveArrays = { positions: positions, normals: normals, textureCoordinates: textureCoordinates, joints: joints, weights: weights, indices: indices, morphTargets: morphTargets };
+				if (normals === null) {
+					primitiveArrays = createFlatNormalArrays(primitiveArrays);
+				}
+
 				const materialName = primitiveMaterial && primitiveMaterial.name ? primitiveMaterial.name : "";
 				meshDescriptionList.push({
-					positions: positions,
-					normals: normals,
-					textureCoordinates: textureCoordinates,
-					joints: joints,
-					weights: weights,
-					indices: indices,
+					positions: primitiveArrays.positions,
+					normals: primitiveArrays.normals,
+					textureCoordinates: primitiveArrays.textureCoordinates,
+					joints: primitiveArrays.joints,
+					weights: primitiveArrays.weights,
+					indices: primitiveArrays.indices,
 					skinIndex: node.skinIndex,
 					materialIndex: primitive.material !== undefined ? primitive.material : -1,
 					materialName: materialName,
 					nodeIndex: nodeIndex,
-					morphTargets: morphTargets,
+					morphTargets: primitiveArrays.morphTargets,
 					morphWeights: morphWeights,
 				});
 			}

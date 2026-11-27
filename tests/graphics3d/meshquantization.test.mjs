@@ -5,11 +5,15 @@
 //   - 갈래 B: 위치 SHORT 정규화, 노멀 SHORT 정규화(-32768 은 -1 로 자름), UV BYTE(정규화 아님) + KHR_texture_transform.
 //   - 뼈대: 위치 UNSIGNED_SHORT 를 inverseBindMatrices 로 되풀이, 무게 UNSIGNED_BYTE 정규화, 돌림 움직임 SHORT 정규화.
 // - extensionsRequired 의 EXT_meshopt_compression 과 모르는 확장, 바이너리 덩어리 밖 버퍼(meshopt 의 fallback 버퍼)는 분명한 오류를 던진다.
+// - 노멀이 없는 프리미티브는 glTF 2.0 명세대로 평평한 노멀이다. (툰과 PBR 둘 다 꼭짓점을 삼각형마다 풀고, 새로 짓는 바깥선도 짓는다, 러스트 판 tests/glbquantization.rs 와 같다)
 //==============================================================================
 import { readGlbArrays, readGlbNodeArrays, readGlbNodeInfos, writeSkinPose } from "../../src/graphics3d/toon/glbmeshreader.js";
 import { SkinnedModel } from "../../src/graphics3d/skinnedmodel.js";
 import { VERTEX_FLOAT_COUNT } from "../../src/graphics3d/toon/meshbuilder.js";
 import { check, checkEqual, checkNear, finish } from "../testcheck.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import url from "node:url";
 
 const POSITIONS = [[0.1, -0.3, 0.5], [1.2, 0.4, -0.2], [-0.7, 0.9, 0.3], [0.5, 0.5, 1.1]];
 const NORMALS = [[0, 0, 1], [0.6, 0, 0.8], [0, -1, 0], [-0.48, 0.6, 0.64]];
@@ -346,6 +350,98 @@ for (const [label, model, normalTolerance] of [["갈래 A", createQuantizedModel
 	const quantizedSkinnedModel = SkinnedModel.createWithoutShaderProgram();
 	quantizedSkinnedModel.interpretContent(...readChunks(quantizedModel.arrayBuffer));
 	checkNear(quantizedSkinnedModel.getAnimationList()[0].channels[0].values, floatModel.getAnimationList()[0].channels[0].values, 1 / 32767, "PBR SHORT 정규화 돌림 값");
+}
+
+//==============================================================================
+// 삼각형마다의 평평한 노멀 기대값. ((p1 - p0) x (p2 - p0) 을 길이 1 로, 위치는 GLB 에 담긴 32 비트 실수)
+//==============================================================================
+function createExpectedFlatNormals(positionList, indexList) {
+	const normals = [];
+	for (let offset = 0; offset < indexList.length; offset += 3) {
+		const [first, second, third] = [0, 1, 2].map((corner) => positionList[indexList[offset + corner]].map((value) => Math.fround(value)));
+		const firstEdge = [second[0] - first[0], second[1] - first[1], second[2] - first[2]];
+		const secondEdge = [third[0] - first[0], third[1] - first[1], third[2] - first[2]];
+		const cross = [firstEdge[1] * secondEdge[2] - firstEdge[2] * secondEdge[1], firstEdge[2] * secondEdge[0] - firstEdge[0] * secondEdge[2], firstEdge[0] * secondEdge[1] - firstEdge[1] * secondEdge[0]];
+		const length = Math.hypot(cross[0], cross[1], cross[2]);
+		for (let corner = 0; corner < 3; ++corner) {
+			normals.push(cross[0] / length, cross[1] / length, cross[2] / length);
+		}
+	}
+	return normals;
+}
+
+//==============================================================================
+// json 에서 노멀을 뺀 GLB. (glTF 2.0 명세: 노멀이 없으면 평평한 노멀)
+//==============================================================================
+function removeNormals(arrayBuffer) {
+	const [json, binaryBuffer] = readChunks(arrayBuffer);
+	for (const mesh of json.meshes) {
+		for (const primitive of mesh.primitives) {
+			delete primitive.attributes.NORMAL;
+		}
+	}
+	return rebuildGlb(json, binaryBuffer);
+}
+
+// 노멀 없는 실수 모형: 툰은 꼭짓점을 삼각형마다 풀어 평평한 노멀을 짓고(고치기 전에는 빈 배열), 새로 짓는 바깥선도 짓는다.
+{
+	const flatModel = removeNormals(createFloatModel());
+	const flatArrays = readGlbArrays(flatModel);
+	checkEqual(flatArrays.vertexData.length, INDICES.length * VERTEX_FLOAT_COUNT, "노멀 없는 툰: 꼭짓점을 삼각형마다 푼다");
+	checkNear(readVertexColumns(flatArrays.vertexData, 0), INDICES.flatMap((index) => POSITIONS[index]), 1e-6, "노멀 없는 툰 위치");
+	checkNear(readVertexColumns(flatArrays.vertexData, 3), createExpectedFlatNormals(POSITIONS, INDICES), 1e-6, "노멀 없는 툰 평평한 노멀");
+	checkNear(Array.from(flatArrays.indexData), INDICES.map((value, index) => index), 0, "노멀 없는 툰 번호는 0 부터 차례로");
+	checkNear(Array.from(flatArrays.uvData), INDICES.flatMap((index) => UVS[index]), 1e-6, "노멀 없는 툰 텍스처 좌표도 삼각형마다 푼다");
+	checkEqual(flatArrays.materialRanges.length, 1, "노멀 없는 툰 재질 범위");
+	checkEqual(flatArrays.materialRanges[0].indexCount, INDICES.length, "노멀 없는 툰 재질 범위 번호 수");
+	const outlinedArrays = readGlbArrays(flatModel, { width: 0.02, addedParts: ["hull"] });
+	checkEqual(outlinedArrays.outlineVertexData.length, INDICES.length * 3, "노멀이 없어도 몸으로 바깥선 껍데기를 짓는다");
+	checkEqual(readGlbNodeArrays(flatModel, { width: 0.02, addedParts: ["hull"] }).hull.vertexData.length, INDICES.length * VERTEX_FLOAT_COUNT, "노멀 없는 툰 부품 읽기");
+	// 노멀이 있는 것과 없는 것이 한 노드에 섞이면 껍데기는 둘을 이어 붙인다.
+	const [mixedJson, mixedBinary] = readChunks(createFloatModel());
+	mixedJson.meshes[0].primitives.push({ attributes: { POSITION: 0, TEXCOORD_0: 2 }, indices: 3, material: 0 });
+	const mixedArrays = readGlbArrays(rebuildGlb(mixedJson, mixedBinary), { width: 0.02, addedParts: ["hull"] });
+	checkEqual(mixedArrays.vertexData.length, (POSITIONS.length + INDICES.length) * VERTEX_FLOAT_COUNT, "노멀 있는 프리미티브와 없는 프리미티브");
+	checkEqual(mixedArrays.outlineVertexData.length, (POSITIONS.length + INDICES.length) * 3, "섞인 노드의 껍데기");
+}
+
+// 노멀 없는 실수 모형: PBR 은 꼭짓점을 삼각형마다 풀어 평평한 노멀을 짓고 번호 없이 그린다. (고치기 전에는 노멀이 없어 업로드 때 부드러운 노멀)
+{
+	const meshDescription = SkinnedModel.createWithoutShaderProgram().interpretContent(...readChunks(removeNormals(createFloatModel()))).meshDescriptionList[0];
+	check(meshDescription.normals !== null, "노멀 없는 PBR 노멀");
+	check(meshDescription.indices === null, "노멀 없는 PBR 은 번호 없이");
+	checkNear(Array.from(meshDescription.positions), INDICES.flatMap((index) => POSITIONS[index]), 1e-6, "노멀 없는 PBR 위치");
+	checkNear(Array.from(meshDescription.normals || []), createExpectedFlatNormals(POSITIONS, INDICES), 1e-6, "노멀 없는 PBR 평평한 노멀");
+	checkNear(Array.from(meshDescription.textureCoordinates), INDICES.flatMap((index) => UVS[index]), 1e-6, "노멀 없는 PBR 텍스처 좌표");
+	checkEqual(meshDescription.weights.length, INDICES.length * 4, "노멀 없는 PBR 가중치 수");
+}
+
+// 노멀 없는 뼈대 모형: 뼈대 번호와 무게도 삼각형마다 푼다. (툰과 PBR)
+{
+	const flatSkinnedModel = removeNormals(createSkinnedModel(false).arrayBuffer);
+	const flatSkinned = readGlbArrays(flatSkinnedModel, { width: 0.05, addedParts: ["skin"] });
+	checkNear(readVertexColumns(flatSkinned.vertexData, 3), createExpectedFlatNormals(POSITIONS, INDICES), 1e-6, "노멀 없는 뼈대 툰 평평한 노멀");
+	checkNear(Array.from(flatSkinned.skinData), INDICES.flatMap(() => [0, 0, 0, 0, 1, 0, 0, 0]), 1e-6, "노멀 없는 뼈대 툰 뼈대 번호와 무게");
+	checkEqual(flatSkinned.outlineSkinData.length, INDICES.length * 8, "노멀 없는 뼈대 툰 껍데기 뼈대 값");
+	const meshDescription = SkinnedModel.createWithoutShaderProgram().interpretContent(...readChunks(flatSkinnedModel)).meshDescriptionList[0];
+	checkNear(Array.from(meshDescription.normals || []), createExpectedFlatNormals(POSITIONS, INDICES), 1e-6, "노멀 없는 뼈대 PBR 평평한 노멀");
+	checkNear(Array.from(meshDescription.joints), INDICES.flatMap(() => [0, 0, 0, 0]), 0, "노멀 없는 뼈대 PBR 조인트");
+	checkNear(Array.from(meshDescription.weights), INDICES.flatMap(() => [1, 0, 0, 0]), 1e-6, "노멀 없는 뼈대 PBR 가중치");
+}
+
+// 예제 여우(fox.glb, 노멀과 번호 없음): 툰도 그림을 낸다. (고치기 전에는 빈 배열이라 맨 위 예제가 빈 그림)
+{
+	const foxBuffer = fs.readFileSync(path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "../../examples/ancientmountain/assets/fox.glb"));
+	const foxArrayBuffer = foxBuffer.buffer.slice(foxBuffer.byteOffset, foxBuffer.byteOffset + foxBuffer.byteLength);
+	const foxArrays = readGlbArrays(foxArrayBuffer, { width: 1.5, addedParts: ["fox"] });
+	const foxVertexCount = foxArrays.vertexData.length / VERTEX_FLOAT_COUNT;
+	check(foxVertexCount > 0 && foxVertexCount % 3 === 0, "여우 툰 꼭짓점: " + foxVertexCount);
+	checkEqual(foxArrays.indexData.length, foxVertexCount, "여우 툰 번호 수");
+	check(foxArrays.outlineVertexData.length > 0, "여우 툰 바깥선 껍데기");
+	checkEqual(foxArrays.skinData.length, foxVertexCount * 8, "여우 툰 뼈대 값");
+	const foxNormals = readVertexColumns(foxArrays.vertexData, 3);
+	check(foxNormals.every((value) => Number.isFinite(value)), "여우 툰 노멀 유한");
+	checkNear(Math.hypot(foxNormals[0], foxNormals[1], foxNormals[2]), 1, 1e-6, "여우 툰 노멀 길이");
 }
 
 // 필수 확장: meshopt 압축과 모르는 확장은 분명한 오류.
