@@ -10472,5 +10472,11 @@
 	"로컬 위치를 주어진 벡터에 쓰기. (getLocalPosition 과 같은 값, 복제하지 않는다)": "Writes the local position into a given vector. (Same value as getLocalPosition, no clone)",
 	"로컬 위치 읽기": "Read the local position",
 	"로컬 크기를 주어진 벡터에 쓰기. (getLocalScale 과 같은 값, 복제하지 않는다)": "Writes the local scale into a given vector. (Same value as getLocalScale, no clone)",
-	"로컬 크기 읽기": "Read the local scale"
+	"로컬 크기 읽기": "Read the local scale",
+	"기준점을 주어진 벡터에 쓰기. (getPivot 과 같은 값, 복제하지 않는다)": "Writes the pivot into a given vector. (Same value as getPivot, no clone)",
+	"기준점 읽기": "Read the pivot",
+	"내용 크기를 주어진 벡터에 쓰기. (getContentSize 와 같은 값, 복제하지 않는다)": "Writes the content size into a given vector. (Same value as getContentSize, no clone)",
+	"내용 크기 읽기": "Read the content size",
+	"out. (기준점의 자리)": "out. (Position of the pivot)",
+	"글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 셈과 차례, 새 벡터를 짓지 않는다)\n- getPosition 이나 부모의 내용 크기, 기준점 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다.": "Writes the global position into a given vector. (Same arithmetic in the same order as getPosition, no new vector)\n- Subclasses that override getPosition or the parent's content size or pivot readers are read through those functions."
 }

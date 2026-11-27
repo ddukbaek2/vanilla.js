@@ -381,27 +381,36 @@ async function measureAllocation(sceneName) {
 	await page.close();
 	const frameCount = endFrame - startFrame;
 	const ownerTable = new Map();
+	const callerTable = new Map();
 	let engineSize = 0;
 	let totalSize = 0;
-	const visit = (node, owner) => {
+	// 부른 자리: 위치와 크기 읽기(getScale, getPosition, getWorldCorners 같은 것) 밖의 첫 자리. (그 할당을 누가 프레임마다 부르는지)
+	const READER_NAME_SET = new Set(["getScale", "getPosition", "getRotation", "getWorldCorners", "getWorldBounds", "convertToViewPosition", "create", "clone", "Vector2", "Rect"]);
+	const visit = (node, owner, caller) => {
 		const callFrame = node.callFrame;
 		const nextOwner = (!callFrame.url.includes("/src/base/") && callFrame.url !== "") ? callFrame : owner;
+		const nextCaller = (callFrame.url !== "" && !READER_NAME_SET.has(callFrame.functionName)) ? callFrame : caller;
 		if (node.selfSize > 0) {
 			totalSize += node.selfSize;
 			if (nextOwner !== null && nextOwner.url.includes("/src/")) {
 				engineSize += node.selfSize;
 				const key = (nextOwner.functionName || "(anonymous)") + " " + path.basename(nextOwner.url) + ":" + nextOwner.lineNumber;
 				ownerTable.set(key, (ownerTable.get(key) ?? 0) + node.selfSize);
+				if (nextCaller !== null) {
+					const callerKey = (nextCaller.functionName || "(anonymous)") + " " + path.basename(nextCaller.url) + ":" + nextCaller.lineNumber;
+					callerTable.set(callerKey, (callerTable.get(callerKey) ?? 0) + node.selfSize);
+				}
 			}
 		}
 		for (const child of node.children ?? []) {
-			visit(child, nextOwner);
+			visit(child, nextOwner, nextCaller);
 		}
 	};
-	visit(profile.head, null);
+	visit(profile.head, null, null);
 	const toKilobyte = (size) => (size / 1024 / frameCount).toFixed(2);
 	const topList = [...ownerTable.entries()].sort((first, second) => second[1] - first[1]).slice(0, 10).map(([key, size]) => key + " " + toKilobyte(size));
-	console.log(`${sceneName} 켬 멈춤 할당 (KB/프레임, ${frameCount} 프레임): 전체 ${toKilobyte(totalSize)}, 엔진 몫 ${toKilobyte(engineSize)}\n  ${topList.join(" | ")}`);
+	const callerList = [...callerTable.entries()].sort((first, second) => second[1] - first[1]).slice(0, 8).map(([key, size]) => key + " " + toKilobyte(size));
+	console.log(`${sceneName} 켬 멈춤 할당 (KB/프레임, ${frameCount} 프레임): 전체 ${toKilobyte(totalSize)}, 엔진 몫 ${toKilobyte(engineSize)}\n  ${topList.join(" | ")}\n  부른 자리: ${callerList.join(" | ")}`);
 }
 
 try {

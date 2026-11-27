@@ -9,7 +9,7 @@
 //   3. 스크립트 시간: drawFrame 의 CPU 시간(gl.finish 없음, 교차 출처 격리) 가운데 값, a 와 b 를 번갈아(ABAB) 새 페이지로, 반복의 가운데 값.
 //   4. 프로파일: CDP Profiler 로 프레임 60 ~ 239 의 자기 시간 위 함수(ms/프레임), 엔진 JS(src) 자체 시간 합, 가비지 컬렉터 시간.
 //   5. 할당: CDP HeapProfiler 표본(1 KB 마다)으로 프레임 60 ~ 239 에 잡은 메모리(KB/프레임). 엔진 몫(장면 코드가 바로 부른 수학 함수는 장면 몫)과 함수마다 위.
-//      BENCH_ALLOCATION=0 이면 뺀다. BENCH_ONLY=allocation 이면 할당만 잰다. (센 값, 화면 해시, 시간, 프로파일을 건너뜀)
+//      BENCH_ALLOCATION=0 이면 뺀다. BENCH_ONLY=allocation 이면 할당만 잰다. (센 값, 화면 해시, 시간, 프로파일을 건너뜀) BENCH_ONLY=count 면 센 값과 화면 해시만.
 // - 시작과 끝의 기계 부하를 찍는다. 시험이 아니다. (tests/run.mjs 가 돌리지 않는다)
 //==============================================================================
 import fs from "node:fs";
@@ -255,6 +255,9 @@ const COUNT_GROUPS = {
 	bindTexture: (name) => name === "bindTexture" || name === "activeTexture",
 	bindVertexArray: (name) => name === "bindVertexArray",
 	upload: (name) => name === "bufferData" || name === "bufferSubData",
+	bufferData: (name) => name === "bufferData",
+	createBuffer: (name) => name === "createBuffer",
+	deleteBuffer: (name) => name === "deleteBuffer",
 	bindBufferBase: (name) => name === "bindBufferBase" || name === "bindBufferRange",
 	draw: (name) => name.startsWith("draw"),
 };
@@ -284,6 +287,9 @@ try {
 			}
 		}
 		console.log(`화면 해시 a ${countResult.a.hashList.join(" ")}, b ${countResult.b.hashList.join(" ")}, 같음 ${countResult.a.hashList.join() === countResult.b.hashList.join()}`);
+		if (process.env.BENCH_ONLY === "count") {
+			continue;
+		}
 		const timeTable = { a: [], b: [] };
 		for (let repeat = 0; repeat < repeatCount; ++repeat) {
 			for (const version of ["a", "b"]) {
