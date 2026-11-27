@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Glyph Parity</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 글리프 래스터 견주기 예제. (러스트 예제 glyphparity 와 같은 장면)
+// - 10 ~ 48px 글, serif, 굵게, 기울임, 한글, 이모지, 소수 자리, 빨간 글을 흰 바탕(위 절반)과 어두운 바탕(아래 절반)에 그린다.
+// - 렌더 배율 상한 1. 두 엔진의 찍은 화면에서 글자 구역의 화소를 견준다.
+//==============================================================================
+const { Engine, EngineConfiguration, Scene, Vector2, Color, Rect, TextAlign, TextBaseline } = await import("../../import.js");
+
+// 논리 화면 크기.
+const VIEW_WIDTH = 960;
+const VIEW_HEIGHT = 720;
+// 크기 줄의 글자 크기. (픽셀)
+const SIZE_LIST = [10, 12, 13, 14, 16, 18, 20, 24, 32, 48];
+// 크기 줄의 글.
+const SAMPLE_TEXT = "Hamburgefonstiv 0123 Ag";
+// 오른쪽 줄. (폰트 문자열, 글, 가로 자리)
+const LINE_LIST = [
+	["16px serif", "Serif Hamburgefonstiv 0123", 545],
+	["bold 16px sans-serif", "Bold Hamburgefonstiv 0123", 545],
+	["italic 16px sans-serif", "Italic Hamburgefonstiv", 545],
+	["16px sans-serif", "다람쥐 헌 쳇바퀴에 타고파", 545],
+	["24px sans-serif", "다람쥐 헌 쳇바퀴", 545],
+	["24px sans-serif", "\u{1F600}\u{1F3AE}\u{1F44D}\u{2764}\u{FE0F}", 545],
+	["16px sans-serif", "Subpixel 0.37 offset", 545.37],
+	["15px sans-serif", "Subpixel 0.62 offset", 545.62],
+	["13px sans-serif", "The quick brown fox jumps", 545],
+];
+
+//==============================================================================
+// 반쪽 그리기. (위 끝 y 와 글 색)
+//==============================================================================
+/**
+ * @param { object } graphic
+ * @param { number } topY
+ * @param { Color } textColor
+ */
+function drawHalf(graphic, topY, textColor) {
+	graphic.setFillColor(textColor);
+	let baselineY = topY + 4;
+	for (const size of SIZE_LIST) {
+		baselineY += size * 1.2 + 2;
+		graphic.setFontString(`${size}px sans-serif`);
+		graphic.drawFillText(SAMPLE_TEXT, 10, baselineY);
+	}
+	let lineY = topY + 24;
+	for (const [fontString, text, positionX] of LINE_LIST) {
+		graphic.setFontString(fontString);
+		graphic.drawFillText(text, positionX, lineY);
+		lineY += 34;
+	}
+	graphic.setFillColor(Color.createFromBytes(220, 40, 40, 255));
+	graphic.setFontString("18px sans-serif");
+	graphic.drawFillText("Red Hamburgefonstiv", 545, lineY);
+}
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class MainScene extends Scene {
+	//==============================================================================
+	// 그리기.
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	draw(graphic) {
+		graphic.setTextBaseline(TextBaseline.alphabetic);
+		graphic.setTextAlign(TextAlign.left);
+		graphic.setFillColor(Color.createFromBytes(255, 255, 255, 255));
+		graphic.drawRect(Rect.create(0, 0, VIEW_WIDTH, VIEW_HEIGHT / 2));
+		graphic.setFillColor(Color.createFromBytes(32, 32, 32, 255));
+		graphic.drawRect(Rect.create(0, VIEW_HEIGHT / 2, VIEW_WIDTH, VIEW_HEIGHT / 2));
+		drawHalf(graphic, 0, Color.createFromBytes(0, 0, 0, 255));
+		drawHalf(graphic, VIEW_HEIGHT / 2, Color.createFromBytes(255, 255, 255, 255));
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+// 렌더 배율 상한 1. (러스트 판은 씬 create 에서 건다, 원본 씬의 create 는 엔진을 받기 전이라 돌리기 전에 건다)
+engine.getViewManager().setMaxRenderPixelRatio(1);
+engine.run(new MainScene());
+</script>
+</body>
+</html>

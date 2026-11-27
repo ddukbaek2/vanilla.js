@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Misc Tour</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #14141f; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// misc 도구 둘러보기 예제. (러스트 예제 misctour 와 같은 장면)
+// - ImageScroller(흐르는 배경), Camera2D(천천히 좌우로 도는 회전) + Shaker(월드 격자와 PathFinder 경로), NodeLayout(패널), Typewriter + Localization(대사),
+//   FloatingText(떠오르는 숫자), TouchEffect(빛 입자), SpriteAnimator(시트 애니메이션), VirtualPad(조이스틱)를 한 화면에 그린다.
+//==============================================================================
+const engineModule = await import("../../import.js");
+const { Engine, EngineConfiguration, Scene, WorldNode, Camera2D, Color, FloatingText, Grid, ImageScroller, Localization, NodeLayout, Paint, PathFinder, Pivot, Rect, Shaker, Sprite, SpriteAnimator, Text, TouchEffect, Typewriter, Vector2, ViewScaleMode, VirtualPad } = engineModule;
+const MathUtility = engineModule.Math;
+
+// 화면 크기.
+const VIEW_WIDTH = 960;
+const VIEW_HEIGHT = 640;
+// 월드 격자.
+const GRID_COLUMN_COUNT = 12;
+const GRID_ROW_COUNT = 8;
+const TILE_SIZE = 48;
+// 격자의 벽. ('#')
+const GRID_MAP = [
+	"............",
+	"..####......",
+	".....#..###.",
+	".....#....#.",
+	"..#..#....#.",
+	"..#.......#.",
+	"..#######.#.",
+	"............",
+];
+
+//==============================================================================
+// 격자 칸이 막혔는지.
+//==============================================================================
+/**
+ * @param { number } column
+ * @param { number } row
+ * @returns { boolean }
+ */
+function isWall(column, row) {
+	return GRID_MAP[row][column] === "#";
+}
+
+//==============================================================================
+// 화소로 그림 만들기. (캔버스에 RGBA 를 그대로 놓는다)
+//==============================================================================
+/**
+ * @param { number } width
+ * @param { number } height
+ * @param { Uint8ClampedArray } pixels
+ * @returns { HTMLCanvasElement }
+ */
+function createImageFromPixels(width, height, pixels) {
+	const canvas = System.document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	canvas.getContext("2d").putImageData(new System.ImageData(pixels, width, height), 0, 0);
+	return canvas;
+}
+
+//==============================================================================
+// 줄무늬 배경 그림을 만든다. (ImageScroller 용, 64x64)
+//==============================================================================
+/**
+ * @returns { HTMLCanvasElement }
+ */
+function createStripeImage() {
+	const imageSize = 64;
+	const pixels = new System.Uint8ClampedArray(imageSize * imageSize * 4);
+	for (let pixelY = 0; pixelY < imageSize; pixelY++) {
+		for (let pixelX = 0; pixelX < imageSize; pixelX++) {
+			const isStripe = System.Math.floor((pixelX + pixelY) / 16) % 2 === 0;
+			const brightness = isStripe ? 48 : 36;
+			const pixelIndex = (pixelY * imageSize + pixelX) * 4;
+			pixels[pixelIndex] = brightness;
+			pixels[pixelIndex + 1] = brightness;
+			pixels[pixelIndex + 2] = brightness + 16;
+			pixels[pixelIndex + 3] = 255;
+		}
+	}
+	return createImageFromPixels(imageSize, imageSize, pixels);
+}
+
+//==============================================================================
+// 색 칸 네 개짜리 스프라이트 시트를 만든다. (SpriteAnimator 용, 128x32)
+// - 원본 SpriteAnimator(Animation.setFramesFromRects)는 HTMLImageElement 만 받아, 캔버스를 PNG 로 옮겨 그림 요소로 읽는다.
+//==============================================================================
+/**
+ * @returns { Promise<HTMLImageElement> }
+ */
+async function createSheetImage() {
+	const frameColors = [[255, 120, 120], [255, 220, 120], [120, 230, 140], [120, 170, 255]];
+	const imageWidth = 128;
+	const imageHeight = 32;
+	const pixels = new System.Uint8ClampedArray(imageWidth * imageHeight * 4);
+	for (let pixelY = 0; pixelY < imageHeight; pixelY++) {
+		for (let pixelX = 0; pixelX < imageWidth; pixelX++) {
+			const frameColor = frameColors[System.Math.floor(pixelX / 32)];
+			const localX = (pixelX % 32) - 15.5;
+			const localY = pixelY - 15.5;
+			if (localX * localX + localY * localY <= 14 * 14) {
+				const pixelIndex = (pixelY * imageWidth + pixelX) * 4;
+				pixels[pixelIndex] = frameColor[0];
+				pixels[pixelIndex + 1] = frameColor[1];
+				pixels[pixelIndex + 2] = frameColor[2];
+				pixels[pixelIndex + 3] = 255;
+			}
+		}
+	}
+	const imageElement = new System.Image();
+	imageElement.src = createImageFromPixels(imageWidth, imageHeight, pixels).toDataURL("image/png");
+	await imageElement.decode();
+	return imageElement;
+}
+
+//==============================================================================
+// 둘러보기 씬.
+//==============================================================================
+class MiscTourScene extends Scene {
+	/** @private @type { Camera2D } */ #camera;
+	/** @private @type { Shaker } */ #shaker;
+	/** @private @type { Typewriter | null } */ #typewriter;
+	/** @private @type { VirtualPad } */ #virtualPad;
+	/** @private @type { ImageScroller } */ #imageScroller;
+	/** @private @type { Array<object> } */ #path;
+	/** @private @type { FloatingText | null } */ #floatingText;
+	/** @private @type { TouchEffect | null } */ #touchEffect;
+	/** @private @type { number } */ #elapsedSeconds;
+	/** @private @type { number } */ #spawnSeconds;
+	/** @private @type { HTMLImageElement } */ #sheetImage;
+
+	/**
+	 * @constructor
+	 * @param { HTMLImageElement } sheetImage 시트 애니메이션 그림.
+	 */
+	constructor(sheetImage) {
+		super();
+		this.#sheetImage = sheetImage;
+		this.#camera = new Camera2D();
+		this.#shaker = new Shaker();
+		this.#typewriter = null;
+		this.#virtualPad = new VirtualPad();
+		this.#imageScroller = new ImageScroller();
+		this.#path = [];
+		this.#floatingText = null;
+		this.#touchEffect = null;
+		this.#elapsedSeconds = 0;
+		this.#spawnSeconds = 0;
+	}
+
+	//==============================================================================
+	// 월드 격자와 경로 그리기. (카메라 좌표계)
+	//==============================================================================
+	drawWorld(graphic) {
+		for (let row = 0; row < GRID_ROW_COUNT; row++) {
+			for (let column = 0; column < GRID_COLUMN_COUNT; column++) {
+				graphic.setFillColor(isWall(column, row) ? new Color(0.45, 0.32, 0.25, 1) : new Color(0.18, 0.22, 0.3, 1));
+				graphic.drawRect(Rect.create(column * TILE_SIZE, row * TILE_SIZE, TILE_SIZE - 2, TILE_SIZE - 2));
+			}
+		}
+		const pathPositions = [Grid.toWorldCenter(0, 7, TILE_SIZE)];
+		for (const cell of this.#path) {
+			pathPositions.push(Grid.toWorldCenter(cell.column, cell.row, TILE_SIZE));
+		}
+		graphic.setStrokeColor(new Color(1, 0.85, 0.3, 1));
+		graphic.drawLine(pathPositions, 6);
+	}
+
+	//==============================================================================
+	// 생성. (노드와 도구들)
+	//==============================================================================
+	create() {
+		super.create();
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+
+		// 흐르는 배경.
+		this.#imageScroller.setImage(createStripeImage());
+		this.#imageScroller.setViewRect(Rect.create(0, 0, VIEW_WIDTH, VIEW_HEIGHT));
+		this.#imageScroller.setHorizontalScrollSpeed(-40);
+		this.#imageScroller.setVerticalScrollSpeed(20);
+
+		// 카메라와 길찾기.
+		this.#camera.setViewSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		this.#camera.setWorldBounds(Rect.create(0, 0, GRID_COLUMN_COUNT * TILE_SIZE, GRID_ROW_COUNT * TILE_SIZE));
+		this.#camera.setZoom(1.2);
+		this.#path = PathFinder.findPath(GRID_COLUMN_COUNT, GRID_ROW_COUNT, { column: 0, row: 7 }, { column: 11, row: 3 }, isWall) ?? [];
+		this.#shaker.addShake(6);
+
+		// 대사 패널. (번역 표의 대사를 타자기로)
+		Localization.setTable("en", { "{0}번째 misc 도구 둘러보기": "Misc tour number {0}: camera, path, dialogue" });
+		Localization.setLanguage("en");
+		let labelText = null;
+		NodeLayout.create()
+			.name("panel")
+			.pivot(Pivot.bottomCenter)
+			.contentSize(620, 110)
+			.localPosition(VIEW_WIDTH * 0.5, VIEW_HEIGHT - 24)
+			.component(Paint, (paint) => {
+				paint.setColor(new Color(0, 0, 0, 0.7));
+				paint.setRoundSize(16);
+			})
+			.children(NodeLayout.create().name("label").pivot(Pivot.topLeft).contentSize(580, 90).localPosition(20, 10).component(Text, (text) => {
+				text.setFontSize(24);
+				text.setWordWrapWidth(580);
+				labelText = text;
+			}))
+			.build(root);
+		this.#typewriter = new Typewriter(labelText, { charactersPerSecond: 16 });
+		this.#typewriter.start(Localization.text("{0}번째 misc 도구 둘러보기", 1));
+
+		// 시트 애니메이션.
+		const sheetImage = this.#sheetImage;
+		const heroNode = new WorldNode();
+		heroNode.setName("hero");
+		heroNode.setLocalPosition(Vector2.create(120, 120));
+		heroNode.setContentSize(Vector2.create(64, 64));
+		heroNode.addComponent(Sprite);
+		const animator = heroNode.addComponent(SpriteAnimator);
+		const frameRects = [0, 1, 2, 3].map((frameIndex) => Rect.create(frameIndex * 32, 0, 32, 32));
+		animator.addClip("spin", sheetImage, frameRects, 6, true);
+		root.addChild(heroNode);
+		SpriteAnimator.play(heroNode, "spin");
+
+		// 떠오르는 숫자와 빛 입자.
+		this.#floatingText = new FloatingText();
+		root.addChild(this.#floatingText);
+		this.#touchEffect = new TouchEffect();
+		this.#touchEffect.setName("TouchEffect");
+		this.#touchEffect.setPivot(Pivot.topLeft);
+		root.addChild(this.#touchEffect);
+
+		// 조이스틱. (누른 채 오른쪽 위로 끈 모습)
+		this.#virtualPad.setPadRadius(70);
+		this.#virtualPad.setBallRadius(28);
+		this.#virtualPad.setPadColor(new Color(1, 1, 1, 0.15));
+		this.#virtualPad.setBallColor(new Color(1, 1, 1, 0.5));
+		this.#virtualPad.setPadPosition(Vector2.create(VIEW_WIDTH - 120, VIEW_HEIGHT - 220));
+		this.#virtualPad.touchPress(this.#virtualPad.getPadPosition());
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta
+	 */
+	tick(timeDelta) {
+		this.#elapsedSeconds += timeDelta;
+		this.#spawnSeconds += timeDelta;
+		this.#imageScroller.tick(timeDelta);
+
+		// 천천히 좌우로 돈다. (예제 cameratour 와 같은 흔들기)
+		this.#camera.setRotation(System.Math.sin(this.#elapsedSeconds * 0.6) * 12);
+		this.#camera.follow([Grid.toWorldCenter(11, 3, TILE_SIZE)], 1.5, timeDelta);
+		this.#camera.tick(timeDelta);
+		this.#shaker.tick(timeDelta);
+
+		// 조이스틱 구슬을 원을 그리며 끈다.
+		const padPosition = this.#virtualPad.getPadPosition();
+		const dragAngle = this.#elapsedSeconds * 2 - 0.8;
+		this.#virtualPad.touchMove(Vector2.create(padPosition.x + System.Math.cos(dragAngle) * 120, padPosition.y + System.Math.sin(dragAngle) * 120));
+		this.#virtualPad.tick(timeDelta);
+		this.#typewriter.tick(timeDelta);
+
+		if (this.#spawnSeconds >= 0.2) {
+			this.#spawnSeconds = 0;
+			const spawnX = MathUtility.randomRange(300, 660);
+			this.#floatingText.spawn(`-${System.Math.round(MathUtility.random() * 300)}`, Vector2.create(spawnX, 260), { color: new Color(1, 0.45, 0.45, 1), fontSize: 28 });
+			for (let particleIndex = 0; particleIndex < 6; particleIndex++) {
+				this.#touchEffect.createTouchParticle(spawnX, 340);
+			}
+		}
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (배경색, 흐르는 줄무늬)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	preDraw(graphic) {
+		super.preDraw(graphic);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(new Color(0.08, 0.08, 0.12, 1));
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+		this.#imageScroller.draw(graphic);
+	}
+
+	//==============================================================================
+	// 출력. (카메라 + 흔들림으로 월드, 그 위에 노드)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	draw(graphic) {
+		graphic.pushState();
+		const shakeOffset = this.#shaker.getOffset();
+		graphic.translate(shakeOffset.x, shakeOffset.y);
+		this.#camera.begin(graphic);
+		this.drawWorld(graphic);
+		this.#camera.end(graphic);
+		graphic.popState();
+		super.draw(graphic);
+	}
+
+	//==============================================================================
+	// 이후 출력. (조이스틱)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	postDraw(graphic) {
+		super.postDraw(graphic);
+		this.#virtualPad.draw(graphic);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
+engine.run(new MiscTourScene(await createSheetImage()));
+</script>
+</body>
+</html>

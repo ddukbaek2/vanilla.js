@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Input Gallery</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #e9edf3; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 입력 필드 갤러리. (러스트 예제 inputgallery 와 같은 장면, UIInputField, RichText)
+// - 입력 필드 넷: 포커스를 받아 한글을 치는 칸, 안내 글만 있는 칸, 선택 영역이 남은 칸, 캔버스 모드(useDOMInput 꺼짐) 칸.
+// - 리치텍스트 라벨 넷: 굵게, 색, 크기, 밑줄, 취소선, 기울임, 모르는 태그. 정렬을 달리한다.
+// - 사람이 없어도 확인할 수 있게, 정해 둔 씬 프레임에 입력을 흉내 낸다. (글은 포커스된 DOM 입력 칸에 값과 조합 사건으로 넣는다)
+//   5 프레임: 첫 칸을 누름 → 12, 16: 확정 글 "안녕하세요 ", "vanilla" → 30 ~ 36: 조합 "ㅎ" → "하" → "한"
+//   130: 셋째 칸에 문맥 메뉴 → 140 부터: 메뉴의 "복사" 위에 마우스.
+// - 오른쪽 아래: 입력 동작(InputActions), 손가락 목록, 마지막으로 쓴 장치. 정해 둔 프레임에 키와 손가락, 바깥 입력원을 흉내 낸다.
+//   40 ~ 120: ArrowRight 누름(반복), 50 ~ 110: KeyW 누름(이동 축 대각선), 60: 두 손가락, 70: 둘째 손가락 움직임, 85: 첫째 손가락 뗌,
+//   80 ~ 95: 바깥 입력원이 menu 를 누름(플레이스테이션 패드로 적힘).
+// - 패드 진동 시험: 실제 게임패드의 A(크로스)는 무거운 모터 0.5초, B(서클)는 가벼운 모터 0.5초, X(스퀘어)는 둘 다 1초, Y(트라이앵글)는 멈춤.
+//==============================================================================
+const { Engine, EngineConfiguration, Scene, WorldNode, Paint, Color, Pivot, Rect, Vector2, ViewScaleMode, TextAlign, TextBaseline, UILabel, UIInputField, GamepadButtonCode, GamepadKind } = await import("../../import.js");
+
+// 전역 상수 목록.
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const BACKGROUND_COLOR = "#e9edf3";
+const PANEL_COLOR = "#ffffff";
+const TITLE_COLOR = "#1f2937";
+const CAPTION_COLOR = "#6b7280";
+const ACCENT_COLOR = "#2563eb";
+const FIELD_WIDTH = 520;
+const FIELD_HEIGHT = 64;
+const LEFT_PANEL_POSITION = Vector2.create(32, 96);
+
+//==============================================================================
+// 왼쪽 위 기준 상자 노드 만들기.
+//==============================================================================
+function createBoxNode(parent, name, position, size) {
+	const node = new WorldNode();
+	node.setName(name);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(position);
+	node.setContentSize(size);
+	parent.addChild(node);
+	return node;
+}
+
+//==============================================================================
+// 글자 노드 만들기. (UILabel)
+//==============================================================================
+function createLabelNode(parent, name, position, size, text, fontSize, color) {
+	const labelNode = createBoxNode(parent, name, position, size);
+	const label = labelNode.addComponent(UILabel);
+	label.setText(text);
+	label.setFontSize(fontSize);
+	label.setTextColor(color);
+	label.setTextAlign(TextAlign.left);
+	label.setTextBaseline(TextBaseline.middle);
+	return labelNode;
+}
+
+//==============================================================================
+// 입력 필드 노드 만들기. (위에 설명 글, DOM 입력 여부, 원본의 UIInputField 는 노드다, attach 는 엔진을 넘긴 뒤 initialize 에서)
+//==============================================================================
+function createFieldNode(parent, name, position, caption, useDOMInput) {
+	createLabelNode(parent, "caption", Vector2.create(position.x, position.y - 28), Vector2.create(FIELD_WIDTH, 24), caption, 16, CAPTION_COLOR);
+	const field = new UIInputField();
+	field.setName(name);
+	field.setPivot(Pivot.topLeft);
+	field.setLocalPosition(position);
+	field.setContentSize(Vector2.create(FIELD_WIDTH, FIELD_HEIGHT));
+	parent.addChild(field);
+	field.setUseDOMInput(useDOMInput);
+	field.setBackgroundColor("#f8fafc");
+	// 원본의 커서, 테 색은 Color 를 받는다. (글로 주면 그릴 때 toHEXString 이 없다)
+	field.setCursorColor(Color.createFromHEX(ACCENT_COLOR));
+	field.setFocusBorderColor(Color.createFromHEX(ACCENT_COLOR));
+	field.setFocusBorderWidth(2);
+	field.setRoundSize(12);
+	return field;
+}
+
+//==============================================================================
+// 리치텍스트 라벨 만들기.
+//==============================================================================
+function createRichLabelNode(parent, name, position, size, markup, textAlign) {
+	const labelNode = createBoxNode(parent, name, position, size);
+	const paint = labelNode.addComponent(Paint);
+	paint.setColor("#f1f5f9");
+	paint.setRoundSize(10);
+	const label = labelNode.addComponent(UILabel);
+	label.setText(markup);
+	label.setFontSize(26);
+	label.useRichText(true);
+	label.setTextColor(TITLE_COLOR);
+	label.setTextAlign(textAlign);
+	label.setTextBaseline(TextBaseline.middle);
+	return labelNode;
+}
+
+//==============================================================================
+// 포커스된 DOM 입력 칸에 사건 넣기. (확정 글은 값을 덧붙이고 input, 조합은 compositionstart / compositionupdate)
+//==============================================================================
+function pushFocusedFieldEvent(kind, text) {
+	const inputElement = System.document.activeElement;
+	if (!(inputElement instanceof System.HTMLInputElement)) {
+		return;
+	}
+	if (kind === "commit") {
+		const insertIndex = inputElement.selectionEnd ?? inputElement.value.length;
+		inputElement.value = inputElement.value.slice(0, insertIndex) + text + inputElement.value.slice(insertIndex);
+		inputElement.setSelectionRange(insertIndex + text.length, insertIndex + text.length);
+		inputElement.dispatchEvent(new System.InputEvent("input", { data: text, inputType: "insertText" }));
+	}
+	else if (kind === "compositionStart") {
+		inputElement.dispatchEvent(new System.CompositionEvent("compositionstart", { data: "" }));
+	}
+	else if (kind === "preedit") {
+		inputElement.dispatchEvent(new System.CompositionEvent("compositionupdate", { data: text }));
+	}
+}
+
+//==============================================================================
+// 입력 필드 갤러리 씬.
+//==============================================================================
+class InputGalleryScene extends Scene {
+	/** @private @type { number } */ #frameCount;
+	/** @private @type { UIInputField | null } */ #typingField;
+	/** @private @type { UIInputField | null } */ #selectionField;
+	/** @private @type { UILabel | null } */ #actionLabel;
+	/** @private @type { UILabel | null } */ #touchLabel;
+	/** @private @type { UILabel | null } */ #gamepadLabel;
+	/** @private @type { number } */ #rightJustPressedCount;
+	/** @private @type { number } */ #endedTouchCount;
+	/** @private @type { string } */ #vibrationText;
+	/** @private @type { Array<UIInputField> } */ #fieldList;
+
+	constructor() {
+		super();
+		this.#fieldList = [];
+		this.#frameCount = 0;
+		this.#typingField = null;
+		this.#selectionField = null;
+		this.#actionLabel = null;
+		this.#touchLabel = null;
+		this.#gamepadLabel = null;
+		this.#rightJustPressedCount = 0;
+		this.#endedTouchCount = 0;
+		this.#vibrationText = "없음";
+	}
+
+	//==============================================================================
+	// 흉내 낸 키와 손가락. (씬 tick 에서 넣으므로 입력 동작은 다음 프레임에 본다, 손가락의 캔버스 자리는 보이지 않아 0 으로 넣는다)
+	//==============================================================================
+	simulateActionInput() {
+		const inputManager = this.getEngine().getInputManager();
+		const zero = Vector2.create(0, 0);
+		switch (this.#frameCount) {
+			case 40:
+				inputManager.pushKey("ArrowRight");
+				break;
+			case 50:
+				inputManager.pushKey("KeyW");
+				break;
+			case 60:
+				inputManager.beginTouchPoint(1, zero, Vector2.create(900, 300));
+				inputManager.beginTouchPoint(2, zero, Vector2.create(1000, 330));
+				break;
+			case 70:
+				inputManager.moveTouchPoint(2, zero, Vector2.create(1040, 360));
+				break;
+			case 85:
+				inputManager.endTouchPoint(1, zero, Vector2.create(900, 300), false);
+				break;
+			case 110:
+				inputManager.popKey("KeyW");
+				break;
+			case 120:
+				inputManager.popKey("ArrowRight");
+				break;
+		}
+	}
+
+	//==============================================================================
+	// 입력 동작, 손가락, 마지막 장치 글.
+	//==============================================================================
+	updateActionStatus() {
+		const inputManager = this.getEngine().getInputManager();
+		const inputActions = inputManager.getInputActions();
+		if (inputActions.isJustPressed("right")) {
+			this.#rightJustPressedCount += 1;
+		}
+		this.#endedTouchCount += inputManager.getEndedTouchPoints().length;
+		const mark = (isPressed) => isPressed ? "●" : "○";
+		const moveAxis = inputActions.readMoveAxis();
+		this.#actionLabel.setText(`동작 confirm ${mark(inputActions.isPressed("confirm"))}  right ${mark(inputActions.isPressed("right"))} (누름과 반복 ${this.#rightJustPressedCount}번)  menu ${mark(inputActions.isPressed("menu"))}  이동 (${moveAxis.x.toFixed(2)}, ${moveAxis.y.toFixed(2)})`);
+		const touchTextList = inputManager.getTouchPoints().map((touchPoint) => `#${touchPoint.identifier} ${touchPoint.phase} (${touchPoint.viewPosition.x.toFixed(0)}, ${touchPoint.viewPosition.y.toFixed(0)})`);
+		this.#touchLabel.setText(`손가락 ${touchTextList.length}개 ${touchTextList.join(" ")}  뗀 것 ${this.#endedTouchCount}  장치 ${inputManager.getLastInputDevice()} (${inputManager.getLastGamepadKind()})  입력칸 ${inputManager.isTypingInTextField()}`);
+	}
+
+	//==============================================================================
+	// 패드 진동 시험. (실제 패드의 앞면 단추를 누르면 연결된 패드를 모두 떤다)
+	//==============================================================================
+	updateGamepadVibration() {
+		const gamepadManager = this.getEngine().getInputManager().getGamepadManager();
+		const gamepadIndexList = gamepadManager.getAllConnectedGamepads().map((gamepad) => gamepad.index);
+		const vibrationList = [
+			[GamepadButtonCode.A_CROSS, 1, 0, 0.5, "무거운 모터 0.5초"],
+			[GamepadButtonCode.B_CIRCLE, 0, 1, 0.5, "가벼운 모터 0.5초"],
+			[GamepadButtonCode.X_SQUARE, 1, 1, 1, "둘 다 1초"],
+			[GamepadButtonCode.Y_TRIANGLE, 0, 0, 0, "멈춤"],
+		];
+		for (const gamepadIndex of gamepadIndexList) {
+			for (const [buttonIndex, strongMagnitude, weakMagnitude, seconds, vibrationText] of vibrationList) {
+				if (gamepadManager.isButtonJustPressed(gamepadIndex, buttonIndex)) {
+					gamepadManager.vibrate(strongMagnitude, weakMagnitude, seconds);
+					this.#vibrationText = vibrationText;
+					console.log(`[inputgallery] 패드 ${gamepadIndex} 진동 요청: ${vibrationText}`);
+				}
+			}
+		}
+		this.#gamepadLabel.setText(`패드 ${gamepadIndexList.length}개  진동: A 무거운 모터, B 가벼운 모터, X 둘 다, Y 멈춤  (마지막: ${this.#vibrationText})`);
+	}
+
+	//==============================================================================
+	// 흉내 낸 입력. (누름, 확정 글, 조합 글, 문맥 메뉴)
+	// - 필드는 돌리거나 키우지 않은 노드라 뷰 자리는 패널 자리 + 필드 자리 + 필드 안 자리다.
+	//==============================================================================
+	simulateInput() {
+		const frameCount = this.#frameCount;
+		const typingPosition = this.#typingField.getLocalPosition();
+		const selectionPosition = this.#selectionField.getLocalPosition();
+		const typingPoint = Vector2.create(LEFT_PANEL_POSITION.x + typingPosition.x + FIELD_WIDTH - 40, LEFT_PANEL_POSITION.y + typingPosition.y + FIELD_HEIGHT * 0.5);
+		const selectionPoint = Vector2.create(LEFT_PANEL_POSITION.x + selectionPosition.x + 160, LEFT_PANEL_POSITION.y + selectionPosition.y + FIELD_HEIGHT * 0.5);
+		const inputManager = this.getEngine().getInputManager();
+		let inputPosition = Vector2.create(-100, -100);
+		if (frameCount < 20) {
+			inputPosition = typingPoint;
+		}
+		else if (frameCount >= 140) {
+			// 문맥 메뉴의 둘째 항목(복사) 위. (메뉴 왼쪽 위는 오른쪽 단추를 누른 자리)
+			inputPosition = Vector2.create(selectionPoint.x + 40, selectionPoint.y + 4 + 34 * 1.5);
+		}
+		inputManager.setViewInputPosition(inputPosition);
+		if (frameCount === 5) {
+			inputManager.setTouchPressed(true);
+			inputManager.setTouchDown(true);
+		}
+		if (frameCount === 7) {
+			inputManager.setTouchReleased(true);
+			inputManager.setTouchDown(false);
+		}
+		switch (frameCount) {
+			case 12:
+				pushFocusedFieldEvent("commit", "안녕하세요 ");
+				break;
+			case 16:
+				pushFocusedFieldEvent("commit", "vanilla");
+				break;
+			case 30:
+				pushFocusedFieldEvent("compositionStart", "");
+				pushFocusedFieldEvent("preedit", "ㅎ");
+				break;
+			case 33:
+				pushFocusedFieldEvent("preedit", "하");
+				break;
+			case 36:
+				pushFocusedFieldEvent("preedit", "한");
+				break;
+			case 130:
+				// 오른쪽 단추 누름. (캔버스에 contextmenu 사건을 그 자리의 화면 좌표로 보낸다, 필드가 포커스를 옮기고 문맥 메뉴를 띄운다)
+				this.dispatchContextMenu(selectionPoint);
+				break;
+		}
+	}
+
+	//==============================================================================
+	// 뷰 자리에 오른쪽 단추 사건 보내기. (뷰 → 캔버스 → 화면 좌표)
+	//==============================================================================
+	dispatchContextMenu(viewPosition) {
+		const viewManager = this.getEngine().getViewManager();
+		const canvasRect = viewManager.getCanvas().getBoundingClientRect();
+		const targetResolutionScale = viewManager.getTargetResolutionScale();
+		const viewNativeRect = viewManager.getViewNativeRect();
+		const clientX = canvasRect.left + viewNativeRect.position.x + viewPosition.x * targetResolutionScale;
+		const clientY = canvasRect.top + viewNativeRect.position.y + viewPosition.y * targetResolutionScale;
+		viewManager.getCanvas().dispatchEvent(new System.MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2, clientX: clientX, clientY: clientY }));
+	}
+
+	//==============================================================================
+	// 생성. (필드와 리치텍스트 라벨을 놓는다)
+	//==============================================================================
+	create() {
+		super.create();
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		createLabelNode(root, "title", Vector2.create(48, 24), Vector2.create(900, 50), "바닐라엔진 입력 필드와 리치텍스트", 32, TITLE_COLOR).getComponent(UILabel).setBold(true);
+		const leftPanelNode = createBoxNode(root, "leftPanel", LEFT_PANEL_POSITION, Vector2.create(584, 580));
+		const leftPaint = leftPanelNode.addComponent(Paint);
+		leftPaint.setColor(PANEL_COLOR);
+		leftPaint.setRoundSize(16);
+		const rightPanelNode = createBoxNode(root, "rightPanel", Vector2.create(648, 96), Vector2.create(600, 580));
+		const rightPaint = rightPanelNode.addComponent(Paint);
+		rightPaint.setColor(PANEL_COLOR);
+		rightPaint.setRoundSize(16);
+
+		// 입력 필드.
+		const typingField = createFieldNode(leftPanelNode, "typingField", Vector2.create(32, 60), "포커스 + 확정 글 + 조합 중인 글 (useDOMInput, maxLength 20)", true);
+		typingField.setPlaceholder("닉네임");
+		typingField.setMaxLength(20);
+		const placeholderField = createFieldNode(leftPanelNode, "placeholderField", Vector2.create(32, 196), "빈 칸 (안내 글)", true);
+		placeholderField.setPlaceholder("여기에 입력하세요");
+		const selectionField = createFieldNode(leftPanelNode, "selectionField", Vector2.create(32, 332), "선택 영역 (오른쪽 단추 → 문맥 메뉴)", true);
+		selectionField.setText("선택된 글자 영역입니다");
+		selectionField.moveCursor(3, false);
+		selectionField.moveCursor(8, true);
+		const canvasField = createFieldNode(leftPanelNode, "canvasField", Vector2.create(32, 468), "캔버스 모드 (useDOMInput 꺼짐, 색 바꿈)", false);
+		canvasField.setText("canvas mode ABC 123");
+		canvasField.setBackgroundColor("#1f2937");
+		canvasField.setTextColor("#f9fafb");
+		canvasField.setFontSize(24);
+		canvasField.setRoundSize(24);
+		canvasField.setPadding(24);
+		this.#typingField = typingField;
+		this.#selectionField = selectionField;
+		this.#fieldList = [typingField, placeholderField, selectionField, canvasField];
+
+		// 리치텍스트 라벨.
+		createLabelNode(rightPanelNode, "richCaption", Vector2.create(32, 24), Vector2.create(536, 24), "RichText (UILabel.useRichText)", 16, CAPTION_COLOR);
+		createRichLabelNode(rightPanelNode, "richLeft", Vector2.create(32, 60), Vector2.create(536, 80), "<b>굵게</b> 보통 <color=#ef4444>빨강</color> <size=40>크게</size> 끝", TextAlign.left);
+		createRichLabelNode(rightPanelNode, "richCenter", Vector2.create(32, 160), Vector2.create(536, 80), "<u>밑줄</u> <s>취소선</s> <color=teal><i>기울임</i></color> <color=#2563eb80>반투명</color>", TextAlign.center);
+		createRichLabelNode(rightPanelNode, "richRight", Vector2.create(32, 260), Vector2.create(536, 80), "<unknown>모르는 태그</unknown> <size=18>작게</size> <b><color=orange>굵은 주황</color></b>", TextAlign.right);
+		createRichLabelNode(rightPanelNode, "richPlain", Vector2.create(32, 360), Vector2.create(536, 80), "마크업 없는 글은 Text 로 그린다", TextAlign.center);
+
+		// 입력 동작, 손가락, 마지막 장치.
+		createLabelNode(rightPanelNode, "actionCaption", Vector2.create(32, 456), Vector2.create(536, 24), "InputActions, 손가락, 마지막 장치 (흉내 낸 입력)", 16, CAPTION_COLOR);
+		this.#actionLabel = createLabelNode(rightPanelNode, "actionStatus", Vector2.create(32, 486), Vector2.create(536, 30), "", 16, TITLE_COLOR).getComponent(UILabel);
+		this.#touchLabel = createLabelNode(rightPanelNode, "touchStatus", Vector2.create(32, 522), Vector2.create(536, 30), "", 16, TITLE_COLOR).getComponent(UILabel);
+		this.#gamepadLabel = createLabelNode(rightPanelNode, "gamepadStatus", Vector2.create(32, 552), Vector2.create(536, 22), "", 14, CAPTION_COLOR).getComponent(UILabel);
+	}
+
+	//==============================================================================
+	// 초기화. (입력 동작: 키를 묶고 반복을 걸고, 흉내 낸 바깥 입력원을 끼운다)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		// 원본 입력 필드는 문맥 메뉴 사건을 엔진의 캔버스에 붙이므로 엔진을 넘긴 뒤 attach 한다.
+		for (const field of this.#fieldList) {
+			field.setEngine(engine);
+			field.attach();
+		}
+		const inputManager = engine.getInputManager();
+		inputManager.setPreventedKeys(["Tab", "Space"]);
+		const inputActions = inputManager.getInputActions();
+		inputActions.bindKey("confirm", "Space");
+		inputActions.bindKey("right", "ArrowRight");
+		inputActions.setRepeat("right", 0.25, 0.1);
+		inputActions.bindKey("menu", "Escape");
+		inputActions.addSource({
+			readActionValue: (action) => action === "menu" && this.#frameCount >= 80 && this.#frameCount < 95 ? 1 : 0,
+			readGamepadKind: () => GamepadKind.playstation,
+		});
+		// 첫 입력 필드에 포커스가 있어 글자 입력 중에도 키를 듣게 한다. (기본은 듣지 않는다)
+		inputActions.setKeysIgnoredWhileTyping(false);
+	}
+
+	//==============================================================================
+	// 주기적 갱신. (흉내 낸 입력 → 패드 진동 시험 → 노드 갱신과 터치)
+	//==============================================================================
+	tick(timeDelta) {
+		this.#frameCount += 1;
+		this.simulateInput();
+		this.simulateActionInput();
+		this.updateActionStatus();
+		this.updateGamepadVibration();
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (캔버스 전체를 배경색으로 칠하고 기준 해상도 좌표계를 건다)
+	//==============================================================================
+	preDraw(graphic) {
+		super.preDraw(graphic);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.maximumFramePerSecond = 60;
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
+engine.run(new InputGalleryScene());
+</script>
+</body>
+</html>

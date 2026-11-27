@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Audio Tone</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #15171c; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 오디오 확인 예제. (러스트 예제 audiotone 과 같은 순서, 1초 남짓 소리를 내고 결과 줄을 화면과 콘솔에 남긴다)
+// - 440Hz 사인파 wav 를 메모리에서 만들어 AudioAsset.loadFromBytes 로 디코딩하고, AudioPlayer, SoundEffectPool, BeepPlayer 로 차례로 튼다.
+// - 브라우저는 사용자 입력 전에 소리 장치를 열지 않으므로 화면을 누르면 시작한다. 주소 ?autostart=1 이면 바로 시작한다. (자동재생을 허락한 헤드리스 크롬 확인용)
+//==============================================================================
+const { Engine, EngineConfiguration, Scene, Vector2, Rect, AudioAsset, SoundEffectPool, BeepPlayer, Wait } = await import("../../import.js");
+
+// 만들 소리의 샘플레이트.
+const TONE_SAMPLE_RATE = 44100;
+// 화면 크기와 색.
+const VIEW_WIDTH = 960;
+const VIEW_HEIGHT = 540;
+const BACKGROUND_COLOR = "#15171c";
+const TEXT_COLOR = "#e8e2d0";
+
+//==============================================================================
+// 사인파 wav 파일 내용을 만든다. (16비트 PCM 모노, 앞뒤 5밀리초는 부드럽게)
+//==============================================================================
+/**
+ * @param { number } frequency
+ * @param { number } durationSeconds
+ * @param { number } amplitude
+ * @returns { Uint8Array }
+ */
+function createToneWaveBytes(frequency, durationSeconds, amplitude) {
+	const sampleCount = System.Math.floor(durationSeconds * TONE_SAMPLE_RATE);
+	const fadeSampleCount = System.Math.floor(0.005 * TONE_SAMPLE_RATE);
+	const dataByteCount = sampleCount * 2;
+	const waveBytes = new System.Uint8Array(44 + dataByteCount);
+	const dataView = new System.DataView(waveBytes.buffer);
+	const writeAscii = (offset, text) => {
+		for (let characterIndex = 0; characterIndex < text.length; characterIndex++) {
+			dataView.setUint8(offset + characterIndex, text.charCodeAt(characterIndex));
+		}
+	};
+	writeAscii(0, "RIFF");
+	dataView.setUint32(4, 36 + dataByteCount, true);
+	writeAscii(8, "WAVE");
+	writeAscii(12, "fmt ");
+	dataView.setUint32(16, 16, true);
+	dataView.setUint16(20, 1, true);
+	dataView.setUint16(22, 1, true);
+	dataView.setUint32(24, TONE_SAMPLE_RATE, true);
+	dataView.setUint32(28, TONE_SAMPLE_RATE * 2, true);
+	dataView.setUint16(32, 2, true);
+	dataView.setUint16(34, 16, true);
+	writeAscii(36, "data");
+	dataView.setUint32(40, dataByteCount, true);
+	for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+		const elapsedSeconds = sampleIndex / TONE_SAMPLE_RATE;
+		const fadeInScale = System.Math.min(sampleIndex / fadeSampleCount, 1);
+		const fadeOutScale = System.Math.min((sampleCount - sampleIndex) / fadeSampleCount, 1);
+		const sampleValue = System.Math.sin(elapsedSeconds * frequency * System.Math.PI * 2) * amplitude * fadeInScale * fadeOutScale;
+		dataView.setInt16(44 + sampleIndex * 2, System.Math.trunc(sampleValue * 32767), true);
+	}
+	return waveBytes;
+}
+
+//==============================================================================
+// 오디오 확인 씬. (결과 줄을 그린다)
+//==============================================================================
+class AudioToneScene extends Scene {
+	/** @private @type { Array<string> } */ #lineList;
+	/** @private @type { boolean } */ #isStarted;
+
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.#lineList = ["audiotone: 화면을 누르면 시작한다"];
+		this.#isStarted = false;
+	}
+
+	//==============================================================================
+	// 초기화. (?autostart=1 이면 바로 시작)
+	//==============================================================================
+	/**
+	 * @param { Engine } engine
+	 */
+	initialize(engine) {
+		super.initialize(engine);
+		const query = new System.URLSearchParams(System.location.search);
+		if (query.get("autostart") === "1") {
+			this.start();
+		}
+	}
+
+	//==============================================================================
+	// 누르면 시작.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchPress(viewInputPosition) {
+		super.touchPress(viewInputPosition);
+		this.start();
+	}
+
+	//==============================================================================
+	// 한 줄 남기기. (화면과 콘솔)
+	//==============================================================================
+	/**
+	 * @param { string } line
+	 */
+	writeLine(line) {
+		this.#lineList.push(line);
+		console.log(line);
+	}
+
+	//==============================================================================
+	// 확인 순서. (러스트 예제 audiotone 의 main 과 같은 차례와 같은 기다림)
+	//==============================================================================
+	async start() {
+		if (this.#isStarted) {
+			return;
+		}
+		this.#lineList.length = 0;
+		this.#isStarted = true;
+		const audioManager = this.getEngine().getAudioManager();
+
+		// 메모리의 wav 를 디코딩한다.
+		const toneAudioAsset = new AudioAsset();
+		try {
+			await toneAudioAsset.loadFromBytes(createToneWaveBytes(440, 0.4, 0.5));
+		}
+		catch (error) {
+		}
+		if (toneAudioAsset.getLoadError() !== null) {
+			this.writeLine(`audiotone: ${toneAudioAsset.getLoadError()}`);
+			return;
+		}
+		this.writeLine(`audiotone: 디코딩 ${toneAudioAsset.isLoaded()} (길이 ${toneAudioAsset.getDuration().toFixed(3)}초)`);
+
+		// 플레이어 하나로 튼다.
+		const audioPlayer = audioManager.createAudioPlayer();
+		this.writeLine(`audiotone: 소리 장치 ${audioManager.getAudioContext() !== null}`);
+		audioPlayer.setAudioAsset(toneAudioAsset);
+		audioPlayer.setVolume(0.6);
+		audioPlayer.play(false);
+		await Wait.seconds(0.1);
+		this.writeLine(`audiotone: 재생 중 ${audioPlayer.isPlaying()} (0.1초 뒤)`);
+		await Wait.seconds(0.45);
+		this.writeLine(`audiotone: 재생 중 ${audioPlayer.isPlaying()} (0.55초 뒤, 끝났어야 한다)`);
+
+		// 루프로 틀다가 멈춘다.
+		audioPlayer.setTime(0.1);
+		audioPlayer.play(true);
+		await Wait.seconds(0.5);
+		this.writeLine(`audiotone: 루프 재생 중 ${audioPlayer.isPlaying()} (0.5초 뒤)`);
+		audioPlayer.stop();
+		this.writeLine(`audiotone: 정지 뒤 재생 중 ${audioPlayer.isPlaying()}`);
+
+		// 효과음 풀로 겹쳐 튼다.
+		const soundEffectPool = new SoundEffectPool(audioManager, 3);
+		soundEffectPool.setVolume(0.5);
+		soundEffectPool.play(toneAudioAsset, 1);
+		await Wait.seconds(0.08);
+		soundEffectPool.play(toneAudioAsset, 0.5);
+		await Wait.seconds(0.25);
+
+		// 비프 프리셋.
+		const beepPlayer = new BeepPlayer(audioManager);
+		beepPlayer.playPreset("success");
+		await Wait.seconds(0.4);
+		this.writeLine("audiotone: 끝");
+	}
+
+	//==============================================================================
+	// 이전 출력. (배경)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	preDraw(graphic) {
+		super.preDraw(graphic);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+
+	//==============================================================================
+	// 출력. (결과 줄)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	draw(graphic) {
+		super.draw(graphic);
+		graphic.setFillColor(TEXT_COLOR);
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline("alphabetic");
+		graphic.setFontString("20px sans-serif");
+		for (let lineIndex = 0; lineIndex < this.#lineList.length; lineIndex++) {
+			graphic.drawFillText(this.#lineList[lineIndex], 40, 60 + lineIndex * 34);
+		}
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.run(new AudioToneScene());
+</script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Async Await</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #151821; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// async/await 예제. (러스트 예제 asyncawait 와 같은 장면, async loadAssets, await atlas.load, Wait.seconds, fadeScreen(async () => ...))
+// - 불러오기: loadAssets 에서 아틀라스를 await 로 받고 0.5초 쉰다. 끝날 때까지 GameScene 의 로딩 화면이 보인다.
+// - 이야기: initialize 에서 시작한 async 함수 하나가 위에서 아래로 돈다. 글을 바꾸고, 1초 기다리고(Wait.seconds),
+//   아이콘을 한 프레임씩 옮기고(Wait.nextFrame), 화면이 어두운 동안 아이콘을 바꾼다(fadeScreen). 페이드가 끝나기는 Promise 로 기다린다.
+//==============================================================================
+const { Engine, EngineConfiguration, WorldNode, Sprite, SpriteAtlas, Text, TextAlign, Pivot, Vector2, ViewScaleMode, Wait } = await import("../../import.js");
+const { GameScene } = await import("../../src/game/gamescene.js");
+
+// 화면 크기와 색.
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const BACKGROUND_COLOR = "#151821";
+const TEXT_COLOR = "#e8ebf2";
+const CAPTION_COLOR = "#9aa2b2";
+const ACCENT_COLOR = "#ffcc33";
+// 아이콘.
+const ICON_FRAME_NAMES = ["star", "heart", "leaf", "gem", "coin"];
+const ICON_SIZE = 96;
+const ICON_START_X = 240;
+const ICON_END_X = 1040;
+const ICON_Y = 300;
+const ICON_MOVE_FRAME_COUNT = 60;
+// 원본 JS 와 러스트를 나란히 보이는 줄. (원본, 러스트)
+const CODE_PAIR_LIST = [
+	["await this.atlas.load(\"atlas/icons.json\")", "context.with(|scene, engine| scene.atlas.load(engine, ...)).await"],
+	["await Wait.seconds(1)", "wait::seconds(1.0).await"],
+	["await Wait.nextFrame()", "wait::next_frame().await"],
+	["this.fadeScreen(async () => { ... })", "scene.fade_screen_async(|context| async move { ... })"],
+];
+
+//==============================================================================
+// 글 노드 만들기. (왼쪽 위 피벗)
+//==============================================================================
+/**
+ * @param { WorldNode } parent
+ * @param { number } x
+ * @param { number } y
+ * @param { number } width
+ * @param { string } text
+ * @param { number } fontSize
+ * @param { string } color
+ * @returns { WorldNode }
+ */
+function createTextNode(parent, x, y, width, text, fontSize, color) {
+	const textNode = new WorldNode();
+	textNode.setName("text");
+	textNode.setPivot(Pivot.topLeft);
+	textNode.setRect(x, y, width, fontSize * 1.5);
+	const textComponent = textNode.addComponent(Text);
+	textComponent.setText(text);
+	textComponent.setFontSize(fontSize);
+	textComponent.setTextColor(color);
+	textComponent.setTextAlign(TextAlign.left);
+	parent.addChild(textNode);
+	return textNode;
+}
+
+//==============================================================================
+// async/await 씬.
+//==============================================================================
+class AsyncAwaitScene extends GameScene {
+	/** @private @type { SpriteAtlas } */ #spriteAtlas;
+	/** @private @type { WorldNode | null } */ #statusNode;
+	/** @private @type { WorldNode | null } */ #iconNode;
+	/** @private @type { number } */ #iconFrameIndex;
+
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.setViewScaleMode(ViewScaleMode.stretchShort);
+		this.setLoadingMinDurationMs(0);
+		this.setSceneBackgroundColor(BACKGROUND_COLOR);
+		this.#spriteAtlas = new SpriteAtlas();
+		this.#statusNode = null;
+		this.#iconNode = null;
+		this.#iconFrameIndex = 0;
+	}
+
+	//==============================================================================
+	// 지금 하는 일 글 바꾸기.
+	//==============================================================================
+	/**
+	 * @param { string } status
+	 */
+	setStatus(status) {
+		if (this.#statusNode === null) {
+			return;
+		}
+		this.#statusNode.getComponent(Text).setText(status);
+	}
+
+	//==============================================================================
+	// 아이콘 옮기기. (0 이면 왼쪽 끝, 1 이면 오른쪽 끝)
+	//==============================================================================
+	/**
+	 * @param { number } progress
+	 */
+	moveIcon(progress) {
+		if (this.#iconNode === null) {
+			return;
+		}
+		const iconX = ICON_START_X + (ICON_END_X - ICON_START_X) * progress;
+		this.#iconNode.setRect(iconX, ICON_Y, ICON_SIZE, ICON_SIZE);
+	}
+
+	//==============================================================================
+	// 아이콘 그림을 다음 조각으로 바꾸기.
+	//==============================================================================
+	applyNextIconFrame() {
+		if (this.#iconNode === null) {
+			return;
+		}
+		this.#iconFrameIndex = (this.#iconFrameIndex + 1) % ICON_FRAME_NAMES.length;
+		this.#spriteAtlas.applyFrame(this.#iconNode.getComponent(Sprite), ICON_FRAME_NAMES[this.#iconFrameIndex]);
+	}
+
+	//==============================================================================
+	// 화면 노드 만들기. (제목, 원본과 러스트를 나란히 보이는 줄, 지금 하는 일, 아이콘)
+	//==============================================================================
+	createNodes() {
+		const parent = this.getSafeAreaNode() ?? this.getRoot();
+		createTextNode(parent, 60, 40, 1160, "async/await (원본 vanilla.js 와 같은 꼴)", 34, TEXT_COLOR);
+		createTextNode(parent, 60, 110, 560, "원본 JS", 18, CAPTION_COLOR);
+		createTextNode(parent, 640, 110, 600, "러스트", 18, CAPTION_COLOR);
+		for (let pairIndex = 0; pairIndex < CODE_PAIR_LIST.length; pairIndex++) {
+			const lineY = 140 + pairIndex * 30;
+			createTextNode(parent, 60, lineY, 560, CODE_PAIR_LIST[pairIndex][0], 18, TEXT_COLOR);
+			createTextNode(parent, 640, lineY, 600, CODE_PAIR_LIST[pairIndex][1], 18, ACCENT_COLOR);
+		}
+		this.#statusNode = createTextNode(parent, 60, 460, 1160, "", 26, ACCENT_COLOR);
+		const iconNode = new WorldNode();
+		iconNode.setName("icon");
+		iconNode.setPivot(Pivot.topLeft);
+		iconNode.setRect(ICON_START_X, ICON_Y, ICON_SIZE, ICON_SIZE);
+		const sprite = iconNode.addComponent(Sprite);
+		this.#spriteAtlas.applyFrame(sprite, ICON_FRAME_NAMES[0]);
+		parent.addChild(iconNode);
+		this.#iconNode = iconNode;
+	}
+
+	//==============================================================================
+	// 불러오기. (아틀라스를 await 로 받고 0.5초 쉰다. 끝나야 initialize 가 불린다)
+	//==============================================================================
+	async loadAssets() {
+		await super.loadAssets();
+		await this.#spriteAtlas.load("../assets/atlas/icons.json");
+		await Wait.seconds(0.5);
+	}
+
+	//==============================================================================
+	// 초기화. (노드를 만들고, 차례로 도는 이야기 async 함수를 시작한다)
+	//==============================================================================
+	/**
+	 * @param { Engine } engine
+	 */
+	initialize(engine) {
+		super.initialize(engine);
+		this.createNodes();
+		this.runStory();
+	}
+
+	//==============================================================================
+	// 이야기. (위에서 아래로 도는 async 함수)
+	//==============================================================================
+	async runStory() {
+		let round = 0;
+		while (true) {
+			round += 1;
+			this.setStatus(`${round} 번째: 1초 기다림 (wait::seconds)`);
+			await Wait.seconds(1);
+			this.setStatus("아이콘을 한 프레임씩 옮김 (wait::next_frame)");
+			for (let moveFrame = 0; moveFrame < ICON_MOVE_FRAME_COUNT; moveFrame++) {
+				this.moveIcon(moveFrame / (ICON_MOVE_FRAME_COUNT - 1));
+				await Wait.nextFrame();
+			}
+			// 어두운 동안 아이콘을 바꾸고 0.4초 더 어둡게 둔다. 페이드가 끝나기는 Promise 로 기다린다.
+			this.setStatus("어두운 동안 아이콘을 바꿈 (fade_screen_async)");
+			await new System.Promise((resolve) => {
+				this.fadeScreen(async () => {
+					this.moveIcon(0);
+					this.applyNextIconFrame();
+					await Wait.seconds(0.4);
+					resolve();
+				});
+			});
+		}
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.run(new AsyncAwaitScene());
+</script>
+</body>
+</html>
