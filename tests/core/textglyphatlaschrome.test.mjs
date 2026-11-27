@@ -3,12 +3,15 @@
 // - 원본은 글리프를 (글자 덩어리, 1/8 자리 칸) 열쇠로 아틀라스에 한 번만 굽고 문자열은 글리프 사각형으로 그린다.
 //   헤드리스 크롬(창을 띄우지 않는다)에서 엔진이 그린 글자와, 예전 길(fillText 로 문자열을 통째로 구운 텍스처 한 장을 같은 그리기 길로)로 그린 것을 화소로 견준다.
 //   (한글, 영어, 숫자, 섞인 글, 이모지, 합자, 아랍어, 태국어, 여러 크기와 굵기)
-//   정수 자리(화소 맞추기)와 소수 자리(맞추기 끔, 가로 세로 소수 자리) 둘 다 다른 화소가 하나도 없어야 한다.
-//   (잉크가 빈 열 없이 닿는 덩어리는 한 칸에 묶여, 칸마다 따로 선형 거르기가 걸리지 않는다)
-// - 이미 구운 덩어리로만 된 새 문자열은 굽지 않고(올린 수가 늘지 않고), 글자 많은 화면이 드로 콜 하나로 묶이는지 본다.
+//   정수 자리(화소 맞추기)는 다른 화소가 없어야 한다.
+//   소수 자리(맞추기 끔, 가로 세로 소수 자리)는 덩어리마다 선형 거르기가 따로 걸려 잉크가 닿는 이웃의 겹친 가장자리만 조금 다르다.
+//   그 차이가 정해 둔 상한(화면 전체 다른 화소 수, 가장 큰 차이)을 넘지 않는지 본다. (칸 위아래 가장자리 되풀이로 다른 줄을 뽑지 않는다)
+// - 이미 구운 덩어리로만 된 새 문자열, 숫자만 바뀌는 새 문자열은 굽지 않고(올린 수가 늘지 않고), 글자 많은 화면이 드로 콜 하나로 묶이는지 본다.
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 const System = globalThis;
+const FRACTION_COUNT_LIMIT = 167; // 소수 자리에서 예전 길과 다른 화소 수 상한. (헤드리스 크롬 맥에서 잰 값, 가장자리 되풀이 전 dev 0bcfd84 는 185)
+const FRACTION_MAXIMUM_LIMIT = 17; // 소수 자리에서 가장 큰 화소 차이 상한. (255 단계, dev 0bcfd84 도 17)
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -153,7 +156,7 @@ try {
 					}
 				}
 				else {
-					// 숫자만 바뀌는 새 문자열. (잉크가 닿는 숫자는 한 칸에 묶여 새로 굽는다, 올린 수는 적어 보기만 한다)
+					// 숫자만 바뀌는 새 문자열. (숫자는 덩어리마다 구워 두어 새로 굽지 않는다)
 					graphic.setFontString("14px sans-serif");
 					for (let lineIndex = 0; lineIndex < 50; ++lineIndex) {
 						graphic.drawFillText(`${(lineIndex * 7919 + frame * 104729) % 100000}`, 8 + (lineIndex % 5) * 120, 20 + System.Math.floor(lineIndex / 5) * 20);
@@ -243,14 +246,16 @@ try {
 	result.lineDifferenceList.forEach((lineDifference, lineIndex) => {
 		checkEqual(lineDifference.count, 0, `줄 ${lineIndex} 정수 자리에서 예전 길과 다른 화소 수 (최대 ${lineDifference.maximum})`);
 	});
-	result.fractionLineDifferenceList.forEach((lineDifference, lineIndex) => {
-		checkEqual(lineDifference.count, 0, `줄 ${lineIndex} 소수 자리에서 예전 길과 다른 화소 수 (최대 ${lineDifference.maximum})`);
-	});
+	// 소수 자리는 덩어리마다 거르기가 따로 걸리는 몫만 다르다. (상한을 넘으면 다른 줄을 뽑거나 자리가 어긋난 것)
+	const fractionDifferenceCount = result.fractionLineDifferenceList.reduce((sum, lineDifference) => sum + lineDifference.count, 0);
+	const fractionDifferenceMaximum = System.Math.max(...result.fractionLineDifferenceList.map((lineDifference) => lineDifference.maximum));
+	check(fractionDifferenceCount <= FRACTION_COUNT_LIMIT && fractionDifferenceMaximum <= FRACTION_MAXIMUM_LIMIT, `소수 자리에서 예전 길과 다른 화소 ${fractionDifferenceCount} 개, 최대 ${fractionDifferenceMaximum}`);
 	checkEqual(result.statistics.uploadCountGrowth, 0, "구운 덩어리로 된 새 문자열은 굽지 않음");
 	check(result.statistics.drawCallCount <= 2, "글자 50 줄 드로 콜 " + result.statistics.drawCallCount);
+	checkEqual(result.statistics.numberUploadCountGrowth, 0, "숫자만 바뀌는 새 문자열은 굽지 않음");
 	check(result.statistics.numberDrawCallCount <= 2, "숫자 50 줄 드로 콜 " + result.statistics.numberDrawCallCount);
 	checkEqual(result.statistics.atlasPageCount, 1, "아틀라스 장 수");
-	console.log("줄마다 예전 길과 다른 화소: 정수 자리 " + result.lineDifferenceList.map((lineDifference) => lineDifference.count).join(", ") + ", 소수 자리 " + result.fractionLineDifferenceList.map((lineDifference) => lineDifference.count).join(", ") + ", 드로 콜 " + result.statistics.drawCallCount + ", 새 숫자 50 줄 세 프레임 올린 수 " + result.statistics.numberUploadCountGrowth);
+	console.log("줄마다 예전 길과 다른 화소: 정수 자리 " + result.lineDifferenceList.map((lineDifference) => lineDifference.count).join(", ") + ", 소수 자리 " + result.fractionLineDifferenceList.map((lineDifference) => lineDifference.count + "/" + lineDifference.maximum).join(", ") + ", 드로 콜 " + result.statistics.drawCallCount + ", 새 숫자 50 줄 세 프레임 올린 수 " + result.statistics.numberUploadCountGrowth);
 }
 finally {
 	await browser.close();
