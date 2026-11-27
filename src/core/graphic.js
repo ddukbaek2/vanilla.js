@@ -806,6 +806,7 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #batchSegmentCount; // 지금 묶음에 적은 캐시 조각 수.
 	/** @private @type { number } */ #batchDeferredSegmentCount; // 그 가운데 정점을 묶음 배열에 아직 옮기지 않은 조각 수.
 	/** @private @type { boolean } */ #isBatchSegmentMatching; // 미뤄 둔 조각이 남김 칸의 지난 조각과 차례까지 모두 같은지.
+	/** @private @type { boolean } */ #isBatchSegmentDeferring; // 캐시 조각의 정점을 묶음 배열에 옮기지 않고 미루는지. (지난 프레임 같은 차례가 조각만으로 찼을 때만)
 	/** @private @type { number } */ #retainedBatchCount; // 이번 프레임에 정점을 올리지 않고 남긴 버퍼로 그린 묶음 수.
 	/** @private @type { number } */ #lastFrameRetainedBatchCount; // 지난 프레임의 그 수.
 	/** @private @type { number } */ #geometryCacheGeneration; // 정점 셈을 바꾸는 설정이 바뀔 때마다 늘린다. (다르면 캐시를 다시 적는다)
@@ -1009,6 +1010,7 @@ export class Graphic extends Object {
 		this.#batchSegmentCount = 0;
 		this.#batchDeferredSegmentCount = 0;
 		this.#isBatchSegmentMatching = false;
+		this.#isBatchSegmentDeferring = false;
 		this.#retainedBatchCount = 0;
 		this.#lastFrameRetainedBatchCount = 0;
 
@@ -2458,6 +2460,8 @@ export class Graphic extends Object {
 		this.#batchSegmentCount = 0;
 		this.#batchDeferredSegmentCount = 0;
 		this.#isBatchSegmentMatching = retainedFlush.isValid;
+		// 지난 프레임 같은 차례가 바로 쓰기로 끝났으면(스크롤 등) 이번에도 그럴 것이라 미루지 않고 옮기며 조각만 적는다.
+		this.#isBatchSegmentDeferring = retainedFlush.isValid;
 	}
 
 	//==============================================================================
@@ -3268,11 +3272,12 @@ export class Graphic extends Object {
 					this.beginBatchSegments();
 				}
 				const retainedFlush = this.#batchRetainedFlush;
+				const isDeferred = retainedFlush !== null && this.#isBatchSegmentDeferring;
 				if (retainedFlush !== null) {
 					// 미뤄 쌓는 묶음이면 정점을 옮기지 않고 조각만 적는다.
-					this.addBatchSegment(subAppend, true);
+					this.addBatchSegment(subAppend, isDeferred);
 				}
-				else {
+				if (!isDeferred) {
 					// 정점이 많으면 한 번에 옮기고(memcpy), 적으면 부르는 값이 더 커 하나씩 옮긴다.
 					const batchVertexData = this.#batchVertexData;
 					const startOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
