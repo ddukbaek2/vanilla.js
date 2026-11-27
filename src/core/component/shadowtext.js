@@ -6,7 +6,7 @@ import { Color } from "../../base/color.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { detectTextDirection } from "../graphic.js";
-import { buildFontString } from "./text.js";
+import { buildFontString, getMeasurementCanvasRenderingContext } from "./text.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
 
@@ -216,6 +216,81 @@ export class ShadowText extends Component {
 	}
 
 	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 정렬로 놓은 글에 그림자의 번짐과 내림을 더한 사각형, 화면 밖 거르기와 하위 트리 그리기 경계가 쓴다)
+	// - 가로는 처음 글꼴 크기로 잰 글 너비(넘쳐 줄여도 이보다 좁다)를 정렬대로 놓고, 글꼴 크기의 반과 번짐의 두 배만큼 양옆에 더한다.
+	//   "start" 와 "end" 는 그릴 때의 방향으로 왼쪽이나 오른쪽이 되므로 둘 다 품는다.
+	// - 세로는 내용 높이의 가운데에서 위아래로 글꼴 크기의 1.5 배와 번짐의 두 배씩, 아래는 그림자 내림만큼 더 잡는다. (밑줄, 취소선도 이 안)
+	//   (캔버스 shadowBlur 는 표준 편차 blur / 2 의 가우스라 꼬리가 1.5 배까지 간다, 굽는 칸의 여유와 같이 두 배)
+	// - 글이 없으면 크기 0. 잴 수 없으면 false. (거르지 않는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 적었으면 참. (잴 수 없으면 거짓)
+	 * @example <caption>그림자 글이 그리는 곳 보기</caption>
+	 * import { WorldNode, ShadowText, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(120, 30));
+	 * const shadowText = node.addComponent(ShadowText);
+	 * shadowText.setText("SCORE");
+	 * shadowText.setShadow("#000000", 0.8, 3, 4);
+	 * const drawnRect = Rect.zero();
+	 * const isKnown = shadowText.calculateDrawnRect(drawnRect);
+	 * console.log(isKnown, drawnRect.size.y > 30);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (node === null || node === undefined) {
+			return false;
+		}
+		const text = this.#text;
+		if (text === "") {
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
+		}
+		const measurementContext = getMeasurementCanvasRenderingContext();
+		if (measurementContext === null) {
+			return false;
+		}
+		measurementContext.save();
+		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#isBold, this.#isItalic);
+		const textWidth = measurementContext.measureText(text).width;
+		measurementContext.restore();
+		const contentSize = node.getContentSize();
+		const textAlign = this.#textAlign;
+		let leftX;
+		let rightX;
+		if (textAlign === "left") {
+			leftX = 0;
+			rightX = textWidth;
+		}
+		else if (textAlign === "right") {
+			leftX = contentSize.x - textWidth;
+			rightX = contentSize.x;
+		}
+		else if (textAlign === "start" || textAlign === "end") {
+			leftX = System.Math.min(0, contentSize.x - textWidth);
+			rightX = System.Math.max(textWidth, contentSize.x);
+		}
+		else {
+			leftX = (contentSize.x - textWidth) * 0.5;
+			rightX = leftX + textWidth;
+		}
+		const blurMargin = System.Math.max(0, this.#shadowBlur) * 2 + BAKE_PADDING;
+		const shadowOffset = this.#shadowOffset;
+		const horizontalMargin = this.#fontSize * 0.5 + blurMargin;
+		const verticalMargin = this.#fontSize * 1.5 + blurMargin;
+		const middleY = contentSize.y * 0.5;
+		const topY = middleY - verticalMargin + System.Math.min(0, shadowOffset);
+		const bottomY = middleY + verticalMargin + System.Math.max(0, shadowOffset);
+		rect.position.set(leftX - horizontalMargin, topY);
+		rect.size.set(rightX - leftX + horizontalMargin * 2, bottomY - topY);
+		return true;
+	}
+
+	//==============================================================================
 	// 노드에서 떨어짐. (나눠 쓰던 구운 그림을 놓는다)
 	//==============================================================================
 	/**
@@ -356,6 +431,7 @@ export class ShadowText extends Component {
 	 */
 	setText(text) {
 		this.#text = text;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -376,6 +452,7 @@ export class ShadowText extends Component {
 	 */
 	setFontFace(fontFace) {
 		this.#fontFace = fontFace;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -401,6 +478,7 @@ export class ShadowText extends Component {
 		this.#fontSize = fontSize;
 		this.#isBold = isBold;
 		this.#textColor = textColor;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -421,6 +499,7 @@ export class ShadowText extends Component {
 	 */
 	setTextAlign(textAlign) {
 		this.#textAlign = textAlign;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -441,6 +520,7 @@ export class ShadowText extends Component {
 	 */
 	setTextDirection(textDirection) {
 		this.#textDirection = textDirection;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -487,6 +567,7 @@ export class ShadowText extends Component {
 	 */
 	setItalic(isItalic) {
 		this.#isItalic = isItalic === true;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -554,6 +635,7 @@ export class ShadowText extends Component {
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;
 		this.#shadowBlur = shadowBlur;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================

@@ -289,6 +289,7 @@ export class HeatHazeEffect extends Component {
 	 */
 	setAmplitude(value) { 
 		this.#amplitude = value; 
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -329,6 +330,36 @@ export class HeatHazeEffect extends Component {
 	 */
 	getTimer() {
 		return this.#timer;
+	}
+
+	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 내용 영역을 줄마다 좌우로 흔들림 폭만큼 옮겨 그리므로 양옆으로 폭만큼 넘친다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 노드에 붙어 있으면 참.
+	 * @example <caption>아지랑이가 그리는 곳 보기</caption>
+	 * import { WorldNode, HeatHazeEffect, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(100, 40));
+	 * const heatHazeEffect = node.addComponent(HeatHazeEffect);
+	 * heatHazeEffect.setAmplitude(4);
+	 * const drawnRect = Rect.zero();
+	 * heatHazeEffect.calculateDrawnRect(drawnRect);
+	 * console.log(drawnRect.position.x, drawnRect.size.x);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		const contentSize = node.getContentSize();
+		const amplitude = System.Math.abs(this.#amplitude) + 1;
+		rect.position.set(-amplitude, -1);
+		rect.size.set(contentSize.x + amplitude * 2, contentSize.y + 2);
+		return true;
 	}
 
 	//==============================================================================

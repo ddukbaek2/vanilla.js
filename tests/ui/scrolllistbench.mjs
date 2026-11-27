@@ -5,6 +5,10 @@
 // - 세 길을 견준다. 끔: 하위 트리 거르기를 끔(노드마다 컴포넌트 그리기만 거름), 켬: 엔진 하위 트리 거르기(기본),
 //   게임 거르기: 하위 트리 거르기를 끄고 게임이 보이지 않는 줄을 꺼 버림(광부 키우기의 ScrollCulling 과 같은 일).
 // - 멈춘 구간(프레임 60 ~ 179)과 스크롤 구간(180 ~ 299)을 따로 잰다. 길마다 반복 수(기본 5)만큼 새 페이지로 재어 가운데 값의 가운데 값을 찍는다.
+// - 장면 둘을 잰다. 엔진: 위 장면. 광부 설정 창: 광부 키우기 설정 창(src/ui/settingswindow.js, widgets.js)이 줄마다 붙이는 엔진 컴포넌트를 그대로 단 장면.
+//   (기준 해상도 1280x720, 줄 높이 56 과 사이 12, 보이는 칸 높이 572, 이름 칸과 조절 칸이 묶음 노드 아래 바로 자식으로 납작하게 놓임,
+//    슬라이더 줄(UISlider 손잡이 반지름 13, 켬 칸 단추와 체크 그림, 누름 자리), 고르기 줄(글 단추 셋과 누름 자리), 언어 단추, 계정 줄, 판 줄, 무리 머리글과 줄을 120 줄만큼 되풀이,
+//    글 단추는 칠, UIButton, ButtonMotion, 글 노드의 UILabel. 게임만의 컴포넌트(GlossSkin, GlossSlider, HitArea)는 넣지 않는다. 게임 거르기는 ScrollCulling 처럼 보이는 칸과 위아래 한 줄 밖의 바로 자식을 끈다)
 // - 시험이 아니다. (tests/run.mjs 가 돌리지 않는다, 값은 기계마다 다르다) 크롬 경로는 CHROME_PATH 로 바꿀 수 있다.
 //==============================================================================
 import fs from "node:fs";
@@ -27,8 +31,9 @@ function parseRepeatCount(text) {
 
 const PAGE_SOURCE = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{position:absolute;left:0;top:0;width:100%;height:100%}</style><canvas id="mainCanvas"></canvas>
 <script type="module">
-const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Color, Pivot, Paint, Outline, TextAlign, ViewScaleMode, UIView, UILabel, UIButton, UIScrollView } = await import("/import.js");
+const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Color, Pivot, Paint, Outline, Sprite, TextAlign, ViewScaleMode, UIView, UILabel, UIButton, UIScrollView, UISlider, ButtonMotion } = await import("/import.js");
 const mode = new URLSearchParams(location.search).get("mode");
+const sceneName = new URLSearchParams(location.search).get("scene");
 const ROW_COUNT = 120;
 const ROW_HEIGHT = 34;
 const VIEWPORT_HEIGHT = 340;
@@ -123,12 +128,137 @@ class SettingsScene extends Scene {
 		}
 	}
 }
+// 광부 키우기 설정 창 꼴. (settingswindow.js, widgets.js 의 엔진 컴포넌트만, 기준 해상도 1280x720)
+const RIMMINER_ROW_HEIGHT = 56;
+const RIMMINER_ROW_GAP = 12;
+const RIMMINER_VIEWPORT_HEIGHT = (RIMMINER_ROW_HEIGHT + RIMMINER_ROW_GAP) * 8 + RIMMINER_ROW_HEIGHT * 0.5;
+const RIMMINER_KIND_LIST = ["slider", "slider", "segment", "language", "account", "version", "group"];
+let rowsNode = null;
+function createLabelNode(parentNode, x, y, width, height, text, fontSize, textAlign, isBold) {
+	const node = createBoxNode(parentNode, x, y, width, height);
+	const label = node.addComponent(UILabel);
+	label.setFontSize(fontSize);
+	label.setTextColor("#f1e9d8");
+	label.setTextAlign(textAlign);
+	label.setTextBaseline("middle");
+	label.setBold(isBold);
+	label.setText(text);
+	return node;
+}
+function createTextButtonNode(parentNode, x, y, width, height, text) {
+	const node = createBoxNode(parentNode, x, y, width, height);
+	const paint = node.addComponent(Paint);
+	paint.setColor("#3a3f4a");
+	paint.setRoundSize(12);
+	const button = node.addComponent(UIButton);
+	button.setPressedTintColor(Color.createFromHEX("#c0c0c0"));
+	node.addComponent(ButtonMotion);
+	createLabelNode(node, 0, 0, width, height, text, 16, TextAlign.center, true);
+	// 누름 자리. (단추 뒤 형제, attachHitArea)
+	const hitNode = createBoxNode(parentNode, x - 4, y - 4, width + 8, height + 8);
+	hitNode.addComponent(UIButton);
+	return node;
+}
+class RimminerSettingsScene extends Scene {
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(1280, 720));
+		const scrollNode = createBoxNode(root, 340, 74, 600, RIMMINER_VIEWPORT_HEIGHT);
+		scrollView = scrollNode.addComponent(UIScrollView);
+		scrollView.setBackgroundColor(Color.createFromHEX("#1d1814"));
+		scrollView.setHorizontal(false);
+		rowsNode = createBoxNode(scrollView.getContent(), 0, 0, 600, 1);
+		let rowTop = 0;
+		for (let rowIndex = 0; rowIndex < ROW_COUNT; ++rowIndex) {
+			const kind = RIMMINER_KIND_LIST[rowIndex % RIMMINER_KIND_LIST.length];
+			if (kind === "group") {
+				createLabelNode(rowsNode, 16, rowTop, 568, 36.5, "무리 " + rowIndex, 15, TextAlign.left, true);
+				const lineNode = createBoxNode(rowsNode, 16, rowTop + 36.5, 568, 1.5);
+				lineNode.addComponent(Paint).setColor("#5a4a3c");
+				createBoxNode(rowsNode, 16, rowTop, 1, 38);
+				rowTop += 38 + RIMMINER_ROW_GAP;
+				continue;
+			}
+			createLabelNode(rowsNode, 16, rowTop, 110, RIMMINER_ROW_HEIGHT, "설정 " + rowIndex, 19, TextAlign.left, false);
+			const controlNode = createBoxNode(rowsNode, 138, rowTop, 446, RIMMINER_ROW_HEIGHT);
+			if (kind === "slider") {
+				const sliderNode = createBoxNode(controlNode, 0, (RIMMINER_ROW_HEIGHT - 36) * 0.5, 386, 36);
+				const slider = sliderNode.addComponent(UISlider);
+				slider.setRange(0, 1);
+				slider.setValue((rowIndex % 9) / 8);
+				slider.setTrackColor(Color.createFromHEX("#3a3f4a"));
+				slider.setFillColor(Color.createFromHEX("#e0a040"));
+				slider.setThumbColor(Color.createFromHEX("#f1e9d8"));
+				slider.setThumbRadius(13);
+				slider.setTrackThickness(8);
+				slider.setCornerRadius(4);
+				const checkNode = createTextButtonNode(controlNode, 406, 8, 40, 40, "");
+				const iconNode = createBoxNode(checkNode, 6, 6, 28, 28);
+				iconNode.addComponent(Sprite).setColor(Color.createFromHEX("#1d1814"));
+			}
+			else if (kind === "segment") {
+				for (let segmentIndex = 0; segmentIndex < 3; ++segmentIndex) {
+					createTextButtonNode(controlNode, segmentIndex * 150, 6, 146, 44, ["30", "60", "120"][segmentIndex]);
+				}
+			}
+			else if (kind === "language") {
+				createTextButtonNode(controlNode, 0, 6, 446, 44, "한국어");
+			}
+			else if (kind === "account") {
+				createLabelNode(controlNode, 0, 0, 360, RIMMINER_ROW_HEIGHT, "뚝백이", 19, TextAlign.left, false);
+				createTextButtonNode(controlNode, 370, 6, 76, 44, "로그인");
+			}
+			else {
+				createLabelNode(controlNode, 0, 0, 446, RIMMINER_ROW_HEIGHT, "1.2.0 (" + rowIndex + ")", 19, TextAlign.left, false);
+			}
+			rowTop += RIMMINER_ROW_HEIGHT + RIMMINER_ROW_GAP;
+		}
+		rowsNode.setContentSize(Vector2.create(600, rowTop));
+		scrollView.setScrollContentSize(Vector2.create(600, rowTop));
+	}
+	// 게임 거르기: 보이는 칸과 위아래 한 줄 밖의 바로 자식을 꺼 버린다. (광부 키우기의 ScrollCulling 과 같은 일)
+	applyGameScrollCulling() {
+		const margin = RIMMINER_ROW_HEIGHT + RIMMINER_ROW_GAP;
+		const visibleTop = -scrollView.getScrollOffset().y - margin;
+		const visibleBottom = visibleTop + RIMMINER_VIEWPORT_HEIGHT + margin * 2;
+		for (const childNode of rowsNode.getChildren()) {
+			const childTop = childNode.getLocalPosition().y;
+			const childBottom = childTop + childNode.getContentSize().y;
+			const isInside = childBottom >= visibleTop && childTop <= visibleBottom;
+			if (childNode.isActive() !== isInside) {
+				childNode.setActive(isInside);
+			}
+		}
+	}
+	draw(graphic) {
+		drawnFrameCount += 1;
+		const frameNumber = drawnFrameCount;
+		if (typeof graphic.setSubtreeCullingEnabled === "function") {
+			graphic.setSubtreeCullingEnabled(mode === "on");
+		}
+		if (frameNumber >= SCROLL_FIRST_FRAME) {
+			scrollView.setScrollOffset(Vector2.create(0, -(frameNumber - SCROLL_FIRST_FRAME) * 4.37));
+		}
+		if (mode === "game") {
+			this.applyGameScrollCulling();
+		}
+		const startTime = performance.now();
+		super.draw(graphic);
+		const drawTime = performance.now() - startTime;
+		window.frameList.push({ frameNumber, drawTime, drawCallCount: graphic.getLastFrameDrawCallCount(), culledSubtreeCount: (typeof graphic.getLastFrameCulledSubtreeCount === "function") ? graphic.getLastFrameCulledSubtreeCount() : 0 });
+		if (frameNumber === LAST_FRAME) {
+			window.isFinished = true;
+		}
+	}
+}
+const isRimminerScene = sceneName === "rimminer";
 const engineConfiguration = new EngineConfiguration();
 engineConfiguration.canvasId = "mainCanvas";
-engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+engineConfiguration.referenceResolutionSize = isRimminerScene ? Vector2.create(1280, 720) : Vector2.create(640, 360);
 const engine = new Engine(engineConfiguration);
 engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
-engine.run(new SettingsScene());
+engine.run(isRimminerScene ? new RimminerSettingsScene() : new SettingsScene());
 </script>`;
 
 // 페이지를 교차 출처 격리로 내어 performance.now 가 0.1 ms 로 뭉개지지 않게 한다. (격리하지 않으면 크롬이 시각을 거칠게 준다)
@@ -180,12 +310,12 @@ function readMedian(valueList) {
 }
 
 // 한 길을 한 번 재기. (멈춤, 스크롤 구간의 가운데 값과 드로 콜, 건너뛴 하위 트리 수)
-async function measureOnce(mode) {
+async function measureOnce(mode, sceneName) {
 	const page = await browser.newPage();
 	await page.setViewport({ width: 640 * 2, height: 360 * 2, deviceScaleFactor: 1.5 });
 	const errorList = [];
 	page.on("pageerror", (error) => errorList.push(error.message));
-	await page.goto("http://127.0.0.1:" + port + "/?mode=" + mode);
+	await page.goto("http://127.0.0.1:" + port + "/?mode=" + mode + "&scene=" + sceneName);
 	await page.waitForFunction(() => window.isFinished === true, { timeout: 120000 });
 	const isCrossOriginIsolated = await page.evaluate(() => window.crossOriginIsolated === true);
 	if (!isCrossOriginIsolated) {
@@ -209,20 +339,23 @@ async function measureOnce(mode) {
 try {
 	const modeList = ["off", "on", "game"];
 	const modeNameTable = { off: "끔", on: "켬", game: "게임 거르기" };
-	const resultTable = { off: [], on: [], game: [] };
-	for (let repeatIndex = 0; repeatIndex < repeatCount; ++repeatIndex) {
-		for (const mode of modeList) {
-			resultTable[mode].push(await measureOnce(mode));
+	const sceneNameTable = { engine: "엔진 장면", rimminer: "광부 설정 창 꼴" };
+	for (const sceneName of ["engine", "rimminer"]) {
+		const resultTable = { off: [], on: [], game: [] };
+		for (let repeatIndex = 0; repeatIndex < repeatCount; ++repeatIndex) {
+			for (const mode of modeList) {
+				resultTable[mode].push(await measureOnce(mode, sceneName));
+			}
 		}
-	}
-	console.log(`스크롤 목록 장면 그리기 가운데 값 (반복 ${repeatCount}, ms)`);
-	for (const mode of modeList) {
-		const resultList = resultTable[mode];
-		const staticTime = readMedian(resultList.map((result) => result.staticTime));
-		const scrollTime = readMedian(resultList.map((result) => result.scrollTime));
-		const drawCallCount = readMedian(resultList.map((result) => result.drawCallCount));
-		const culledSubtreeCount = readMedian(resultList.map((result) => result.culledSubtreeCount));
-		console.log(`${modeNameTable[mode]}: 멈춤 ${staticTime.toFixed(3)}, 스크롤 ${scrollTime.toFixed(3)}, 드로 콜 ${drawCallCount}, 건너뛴 하위 트리 ${culledSubtreeCount}`);
+		console.log(`${sceneNameTable[sceneName]} 그리기 가운데 값 (반복 ${repeatCount}, ms)`);
+		for (const mode of modeList) {
+			const resultList = resultTable[mode];
+			const staticTime = readMedian(resultList.map((result) => result.staticTime));
+			const scrollTime = readMedian(resultList.map((result) => result.scrollTime));
+			const drawCallCount = readMedian(resultList.map((result) => result.drawCallCount));
+			const culledSubtreeCount = readMedian(resultList.map((result) => result.culledSubtreeCount));
+			console.log(`${modeNameTable[mode]}: 멈춤 ${staticTime.toFixed(3)}, 스크롤 ${scrollTime.toFixed(3)}, 드로 콜 ${drawCallCount}, 건너뛴 하위 트리 ${culledSubtreeCount}`);
+		}
 	}
 }
 finally {

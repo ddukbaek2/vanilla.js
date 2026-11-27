@@ -118,6 +118,14 @@ export class UINode extends TransformNode {
 		this.#heightVariable = new LayoutVariable("height");
 		this.#centerXVariable = new LayoutVariable("centerX");
 		this.#centerYVariable = new LayoutVariable("centerY");
+		// 솔버가 푼 자리나 크기가 바뀌면 하위 트리 그리기 경계를 다시 셈하게 한다. (부모 경계도 이 노드를 거쳐 번진다)
+		const markDrawBoundsDirtyEvent = () => {
+			this.markDrawBoundsDirty();
+		};
+		this.#leftVariable.setValueChangedEvent(markDrawBoundsDirtyEvent);
+		this.#topVariable.setValueChangedEvent(markDrawBoundsDirtyEvent);
+		this.#widthVariable.setValueChangedEvent(markDrawBoundsDirtyEvent);
+		this.#heightVariable.setValueChangedEvent(markDrawBoundsDirtyEvent);
 		this.#intrinsicConstraints = this.buildIntrinsicConstraints();
 		this.#userConstraints = [];
 		this.#intrinsicSizeConstraints = [];
@@ -169,6 +177,52 @@ export class UINode extends TransformNode {
 			const localOpacity = this.getLocalOpacity();
 			graphic.multiplyGlobalAlpha(localOpacity);
 		}
+	}
+
+	//==============================================================================
+	// 하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (오버라이드: pushTransform 과 같이 솔버가 푼 왼쪽 위로 옮기고 회전, 배율, 기준점 없음)
+	// - 부모가 UINode 면 부모의 왼쪽 위에서 잰 자리, 아니면 솔버의 좌표 그대로.
+	// - pushTransform 이나 자리, 크기, 회전, 배율 읽기를 덮어쓴 노드는 어디에 놓이는지 모르므로 false.
+	// - 솔버가 푼 자리와 크기가 바뀌면(LayoutSolver.updateVariables) 이 노드의 경계를 다시 셈한다.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)
+	 * @returns { boolean } 놓이는 곳을 알면 참.
+	 * @example <caption>솔버가 놓은 줄의 경계를 부모 좌표로 옮기기</caption>
+	 * import { UINode, LayoutSolver, Rect } from "./build/vanilla.js";
+	 *
+	 * const solver = new LayoutSolver();
+	 * const rowNode = new UINode();
+	 * rowNode.setSolver(solver);
+	 * rowNode.addConstraint(rowNode.leftAnchor.equalTo(20));
+	 * rowNode.addConstraint(rowNode.topAnchor.equalTo(40));
+	 * rowNode.addConstraint(rowNode.widthAnchor.equalTo(100));
+	 * rowNode.addConstraint(rowNode.heightAnchor.equalTo(30));
+	 * solver.updateVariables();
+	 * const drawBounds = Rect.create(0, 0, 100, 30);
+	 * rowNode.transformDrawBoundsToParent(drawBounds);
+	 * console.log(drawBounds.position.x, drawBounds.position.y);
+	 */
+	transformDrawBoundsToParent(rect) {
+		const isPlacementKnown = this.pushTransform === UINode.prototype.pushTransform
+			&& this.getLeft === UINode.prototype.getLeft
+			&& this.getTop === UINode.prototype.getTop
+			&& this.getContentSize === UINode.prototype.getContentSize
+			&& this.getLocalScale === TransformNode.prototype.getLocalScale
+			&& this.getLocalRotation === TransformNode.prototype.getLocalRotation;
+		if (!isPlacementKnown) {
+			return false;
+		}
+		let translateX = this.getLeft();
+		let translateY = this.getTop();
+		const parent = this.getParent();
+		if (parent instanceof UINode) {
+			translateX -= parent.getLeft();
+			translateY -= parent.getTop();
+		}
+		this.transformLocalRectToParent(rect, 0, 0, translateX, translateY);
+		return true;
 	}
 
 	//==============================================================================

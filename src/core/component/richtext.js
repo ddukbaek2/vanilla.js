@@ -259,15 +259,106 @@ export class RichText extends Text {
 	}
 
 	//==============================================================================
-	// 그리는 사각형. (조각마다 크기와 글꼴이 달라 Text 의 한 줄 셈이 맞지 않으므로 모른다고 한다, 거르지 않는다)
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 조각이 없으면 Text 와 같고, 있으면 조각을 이은 한 줄의 사각형)
+	// - 조각마다 제 글꼴로 잰 너비를 더한 합산 폭을 정렬대로 놓고(그리기와 같은 자리), 가장 큰 글꼴 크기의 반과 가장 굵은 외곽선만큼 양옆에 더한다.
+	//   "start" 와 "end" 는 그릴 때의 방향으로 왼쪽이나 오른쪽이 되므로 둘 다 품는다.
+	// - 세로는 베이스라인 자리에서 위아래로 가장 큰 글꼴 크기의 1.5 배와 가장 굵은 외곽선만큼. (밑줄, 취소선도 이 안)
+	// - 잴 수 없으면 false. (거르지 않는다)
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Rect } rect 그리는 사각형을 적을 곳. (적지 않는다)
-	 * @returns { boolean } 늘 거짓. (거르지 않는다)
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 적었으면 참. (잴 수 없으면 거짓)
+	 * @example <caption>조각을 이은 글이 그리는 곳 보기</caption>
+	 * import { WorldNode, RichText, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(200, 40));
+	 * const richText = node.addComponent(RichText);
+	 * richText.appendSegment("HP ", { bold: true });
+	 * richText.appendSegment("42", { fontSize: 32 });
+	 * const drawnRect = Rect.zero();
+	 * const isKnown = richText.calculateDrawnRect(drawnRect);
+	 * console.log(isKnown, drawnRect.size.y >= 32);
 	 */
 	calculateDrawnRect(rect) {
-		return false;
+		if (this.hasSegments() === false) {
+			return super.calculateDrawnRect(rect);
+		}
+		const node = this.getNode();
+		if (node === null || node === undefined) {
+			return false;
+		}
+		const measurementContext = getMeasurementCanvasRenderingContext();
+		if (measurementContext === null) {
+			return false;
+		}
+		const fallbackFontFace = this.getFontFace();
+		const fallbackFontSize = this.getFontSize();
+		const fallbackStrokeWidth = this.getStrokeWidth();
+		const fallbackBold = this.isBold();
+		const fallbackItalic = this.isItalic();
+		let totalWidth = 0;
+		let maximumFontSize = 0;
+		let maximumStrokeWidth = 0;
+		for (const segment of this.#segments) {
+			const segmentText = segment.text;
+			if (!segmentText || segmentText.length === 0) {
+				continue;
+			}
+			const segmentFontSize = (typeof segment.attributes.fontSize === "number") ? segment.attributes.fontSize : fallbackFontSize;
+			const segmentFontFace = this.resolveSegmentFontFace(segment.attributes.fontFace, fallbackFontFace);
+			const segmentStrokeWidth = (typeof segment.attributes.strokeWidth === "number") ? segment.attributes.strokeWidth : fallbackStrokeWidth;
+			const segmentBold = (segment.attributes.bold === true) || fallbackBold;
+			const segmentItalic = (segment.attributes.italic === true) || fallbackItalic;
+			measurementContext.save();
+			measurementContext.font = buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic);
+			totalWidth += measurementContext.measureText(segmentText).width;
+			measurementContext.restore();
+			maximumFontSize = System.Math.max(maximumFontSize, segmentFontSize);
+			maximumStrokeWidth = System.Math.max(maximumStrokeWidth, segmentStrokeWidth);
+		}
+		if (maximumFontSize === 0) {
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
+		}
+		const contentSize = node.getContentSize();
+		const textAlign = this.getTextAlign();
+		let leftX;
+		let rightX;
+		if (textAlign === "left") {
+			leftX = 0;
+			rightX = totalWidth;
+		}
+		else if (textAlign === "right") {
+			leftX = contentSize.x - totalWidth;
+			rightX = contentSize.x;
+		}
+		else if (textAlign === "start" || textAlign === "end") {
+			leftX = System.Math.min(0, contentSize.x - totalWidth);
+			rightX = System.Math.max(totalWidth, contentSize.x);
+		}
+		else {
+			leftX = (contentSize.x - totalWidth) * 0.5;
+			rightX = leftX + totalWidth;
+		}
+		const textBaseline = this.getTextBaseline();
+		let baselineY;
+		if (textBaseline === "top" || textBaseline === "hanging") {
+			baselineY = 0;
+		}
+		else if (textBaseline === "bottom" || textBaseline === "ideographic" || textBaseline === "alphabetic") {
+			baselineY = contentSize.y;
+		}
+		else {
+			baselineY = contentSize.y * 0.5;
+		}
+		const horizontalMargin = maximumFontSize * 0.5 + maximumStrokeWidth;
+		const verticalMargin = maximumFontSize * 1.5 + maximumStrokeWidth;
+		rect.position.set(leftX - horizontalMargin, baselineY - verticalMargin);
+		rect.size.set(rightX - leftX + horizontalMargin * 2, verticalMargin * 2);
+		return true;
 	}
 
 	//==============================================================================
@@ -322,6 +413,7 @@ export class RichText extends Text {
 	appendSegment(text, attributes) {
 		const finalAttributes = (attributes !== null && attributes !== undefined) ? attributes : {};
 		this.#segments.push({ text: text, attributes: finalAttributes });
+		this.markDrawnRectDirty();
 		return this;
 	}
 
@@ -330,6 +422,7 @@ export class RichText extends Text {
 	//==============================================================================
 	clearSegments() {
 		this.#segments = [];
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================

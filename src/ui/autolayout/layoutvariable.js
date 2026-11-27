@@ -30,6 +30,7 @@ export class LayoutVariable {
 	//==============================================================================
 	/** @private @type { string } */ #name;
 	/** @private @type { number } */ #value;
+	/** @private @type { ((variable: LayoutVariable) => void) | null } */ #valueChangedEvent; // 값이 바뀔 때 부를 함수.
 
 	//==============================================================================
 	// 생성.
@@ -41,6 +42,7 @@ export class LayoutVariable {
 	constructor(name) {
 		this.#name = (typeof name === "string") ? name : "";
 		this.#value = 0.0;
+		this.#valueChangedEvent = null;
 	}
 
 	//==============================================================================
@@ -70,7 +72,41 @@ export class LayoutVariable {
 	 * @param { number } value 새 값.
 	 */
 	setValue(value) {
+		if (this.#value === value) {
+			return;
+		}
 		this.#value = value;
+		if (this.#valueChangedEvent !== null) {
+			this.#valueChangedEvent(this);
+		}
+	}
+
+	//==============================================================================
+	// 값이 바뀔 때 부를 함수 설정. (솔버가 푼 값이 달라질 때만 부른다, 변수를 가진 쪽이 바뀐 것을 알아챈다. null 이면 부르지 않는다)
+	// - UINode 는 자기 자리와 크기 변수에 걸어 하위 트리 그리기 경계를 다시 셈하게 한다.
+	//==============================================================================
+	/**
+	 * @param { ((variable: LayoutVariable) => void) | null } valueChangedEvent 바뀐 변수를 받는 함수.
+	 * @example <caption>값이 바뀔 때 알기</caption>
+	 * import { LayoutVariable } from "./build/vanilla.js";
+	 *
+	 * const width = new LayoutVariable("width");
+	 * width.setValueChangedEvent((variable) => console.log(variable.getName(), variable.getValue()));
+	 * width.setValue(120);
+	 * width.setValue(120);
+	 */
+	setValueChangedEvent(valueChangedEvent) {
+		this.#valueChangedEvent = valueChangedEvent;
+	}
+
+	//==============================================================================
+	// 값이 바뀔 때 부를 함수 반환.
+	//==============================================================================
+	/**
+	 * @returns { ((variable: LayoutVariable) => void) | null } 건 함수. (없으면 null)
+	 */
+	getValueChangedEvent() {
+		return this.#valueChangedEvent;
 	}
 
 	//==============================================================================

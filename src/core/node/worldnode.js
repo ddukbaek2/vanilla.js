@@ -21,11 +21,6 @@ import { Component } from "../component.js";
 const cullContentSize = Vector2.zero();
 const cullRect = new Rect();
 const cullDrawnRect = new Rect();
-// 하위 트리 그리기 경계를 셀 때 고쳐 쓰는 칸. (읽은 바로 뒤에 쓰고 버리므로 재귀에도 같이 쓴다)
-const subtreeNodeRect = new Rect();
-const subtreeComponentRect = new Rect();
-const subtreeChildRect = new Rect();
-const subtreeContentSize = Vector2.zero();
 // 뷰 좌표를 로컬 좌표로 바꿀 때 내용 크기를 읽어 두는 칸. (convertViewToLocal)
 const convertContentSize = Vector2.zero();
 
@@ -281,7 +276,7 @@ export class WorldNode extends TransformNode {
     //   덮어쓴 노드가 이 함수도 덮어써 그리는 사각형을 알리면 건너뛸 수 있다. 사각형이 바뀌면 markDrawBoundsDirty 를 부른다.
     //==============================================================================
     /**
-     * @virtual
+     * @override
      * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
      * @returns { boolean } 알면 참.
      * @example <caption>스스로 그리는 노드가 그리는 곳 알리기</caption>
@@ -317,168 +312,32 @@ export class WorldNode extends TransformNode {
     }
 
     //==============================================================================
-    // 하위 트리 그리기 경계 셈하기. (오버라이드: 자기 그림과 켜지고 보이는 자식들 경계의 합, readSubtreeDrawBounds 가 바뀐 때만 부른다)
-    // - 자기 그림: calculateDrawnRect 와 켜진 컴포넌트. 내용 영역 안에서만 그리는 컴포넌트는 내용 영역을 한 단위씩 넓혀 보고,
-    //   밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 로 본다. 모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드도 모른다.
-    // - 자식: 자식의 하위 트리 경계를 자식의 변환(위치, 회전, 배율, 피봇)으로 이 노드의 내용 좌표에 옮긴 경계 상자.
-    //   pushTransform 이나 위치, 배율, 회전, 피봇, 내용 크기 읽기를 덮어쓴 자식은 어디에 놓이는지 모르므로 모른다. (그 자식 아래는 저마다 건너뛸 수 있다)
-    // - 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)
+    // 하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (오버라이드: 위치, 회전, 배율, 피봇으로, pushTransform 과 같은 차례)
+    // - pushTransform 이나 위치, 배율, 회전, 피봇, 내용 크기 읽기를 덮어쓴 노드는 어디에 놓이는지 모르므로 false. (부모는 건너뛰지 않고 이 노드 아래는 저마다 건너뛸 수 있다)
     //==============================================================================
     /**
      * @override
-     * @param { Rect } rect 셈한 경계를 적을 곳. (이 노드의 내용 좌표)
-     * @returns { boolean } 경계를 알면 참.
+     * @param { Rect } rect 옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)
+     * @returns { boolean } 놓이는 곳을 알면 참.
+     * @example <caption>자식의 그리기 경계를 부모 좌표로 옮기기</caption>
+     * import { WorldNode, Rect, Vector2, Pivot } from "./build/vanilla.js";
+     *
+     * const node = new WorldNode();
+     * node.setPivot(Pivot.topLeft);
+     * node.setLocalPosition(Vector2.create(100, 20));
+     * node.setLocalScale(Vector2.create(2, 2));
+     * const drawBounds = Rect.create(0, 0, 10, 10);
+     * node.transformDrawBoundsToParent(drawBounds);
+     * console.log(drawBounds.position.x, drawBounds.size.x);
      */
-    calculateSubtreeDrawBounds(rect) {
-        let isKnown = true;
-        let isFound = false;
-        let minimumX = 0;
-        let minimumY = 0;
-        let maximumX = 0;
-        let maximumY = 0;
-
-        // 노드 스스로 그리는 것.
-        const nodeRect = subtreeNodeRect;
-        if (this.isGizmoVisible() || !this.calculateDrawnRect(nodeRect)) {
-            isKnown = false;
-        }
-        else if (nodeRect.size.x > 0 && nodeRect.size.y > 0) {
-            minimumX = nodeRect.position.x;
-            minimumY = nodeRect.position.y;
-            maximumX = minimumX + nodeRect.size.x;
-            maximumY = minimumY + nodeRect.size.y;
-            isFound = true;
-        }
-
-        // 켜진 컴포넌트.
-        if (isKnown) {
-            let isInsideContentReported = false;
-            const componentRect = subtreeComponentRect;
-            const components = this.getAllComponents();
-            for (const component of components) {
-                if (!component.isEnable() || component.draw === Component.prototype.draw) {
-                    continue;
-                }
-                if (component.isDrawnInsideContent()) {
-                    isInsideContentReported = true;
-                    continue;
-                }
-                if (!component.calculateDrawnRect(componentRect)) {
-                    isKnown = false;
-                    break;
-                }
-                if (!(componentRect.size.x > 0 && componentRect.size.y > 0)) {
-                    continue;
-                }
-                const componentRightX = componentRect.position.x + componentRect.size.x;
-                const componentBottomY = componentRect.position.y + componentRect.size.y;
-                if (!isFound) {
-                    minimumX = componentRect.position.x;
-                    minimumY = componentRect.position.y;
-                    maximumX = componentRightX;
-                    maximumY = componentBottomY;
-                    isFound = true;
-                }
-                else {
-                    minimumX = System.Math.min(minimumX, componentRect.position.x);
-                    minimumY = System.Math.min(minimumY, componentRect.position.y);
-                    maximumX = System.Math.max(maximumX, componentRightX);
-                    maximumY = System.Math.max(maximumY, componentBottomY);
-                }
-            }
-
-            // 내용 영역 안에서만 그리는 컴포넌트는 내용 영역을 한 단위씩 넓혀 본다. (화면 밖 거르기와 같다)
-            if (isKnown && isInsideContentReported) {
-                const contentSize = subtreeContentSize;
-                this.copyContentSizeTo(contentSize);
-                const contentMinimumX = System.Math.min(0, contentSize.x) - 1;
-                const contentMinimumY = System.Math.min(0, contentSize.y) - 1;
-                const contentMaximumX = System.Math.max(0, contentSize.x) + 1;
-                const contentMaximumY = System.Math.max(0, contentSize.y) + 1;
-                if (!isFound) {
-                    minimumX = contentMinimumX;
-                    minimumY = contentMinimumY;
-                    maximumX = contentMaximumX;
-                    maximumY = contentMaximumY;
-                    isFound = true;
-                }
-                else {
-                    minimumX = System.Math.min(minimumX, contentMinimumX);
-                    minimumY = System.Math.min(minimumY, contentMinimumY);
-                    maximumX = System.Math.max(maximumX, contentMaximumX);
-                    maximumY = System.Math.max(maximumY, contentMaximumY);
-                }
-            }
-        }
-
-        // 켜지고 보이는 자식. (모르는 것이 나와도 자식이 셈해 두게 끝까지 읽는다)
-        const childRect = subtreeChildRect;
-        const children = this.getChildren();
-        for (const child of children) {
-            if (!(child instanceof TransformNode)) {
-                isKnown = false;
-                continue;
-            }
-            if (!child.isActive() || !child.isVisible()) {
-                continue;
-            }
-            const isChildKnown = child.readSubtreeDrawBounds(childRect);
-            if (!isChildKnown || !(child instanceof WorldNode) || !child.#isPlacementKnown()) {
-                isKnown = false;
-                continue;
-            }
-            if (!isKnown || !(childRect.size.x > 0 && childRect.size.y > 0)) {
-                continue;
-            }
-
-            // 자식의 내용 좌표를 이 노드의 내용 좌표로. (pushTransform 과 같은 차례: 위치, 회전, 배율, 피봇만큼 당김)
-            const localPosition = child.getLocalPosition();
-            const localScale = child.getLocalScale();
-            const radian = Math.degreeToRadian(child.getLocalRotation());
-            const cosRadian = (radian === 0) ? 1 : System.Math.cos(radian);
-            const sinRadian = (radian === 0) ? 0 : System.Math.sin(radian);
-            const pivotOffsetX = child.#contentSize.x * child.#pivot.x;
-            const pivotOffsetY = child.#contentSize.y * child.#pivot.y;
-            const leftX = (childRect.position.x - pivotOffsetX) * localScale.x;
-            const topY = (childRect.position.y - pivotOffsetY) * localScale.y;
-            const rightX = (childRect.position.x + childRect.size.x - pivotOffsetX) * localScale.x;
-            const bottomY = (childRect.position.y + childRect.size.y - pivotOffsetY) * localScale.y;
-            const leftTopX = cosRadian * leftX - sinRadian * topY;
-            const leftTopY = sinRadian * leftX + cosRadian * topY;
-            const rightTopX = cosRadian * rightX - sinRadian * topY;
-            const rightTopY = sinRadian * rightX + cosRadian * topY;
-            const leftBottomX = cosRadian * leftX - sinRadian * bottomY;
-            const leftBottomY = sinRadian * leftX + cosRadian * bottomY;
-            const rightBottomX = cosRadian * rightX - sinRadian * bottomY;
-            const rightBottomY = sinRadian * rightX + cosRadian * bottomY;
-            const childMinimumX = System.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX) + localPosition.x;
-            const childMinimumY = System.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY) + localPosition.y;
-            const childMaximumX = System.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX) + localPosition.x;
-            const childMaximumY = System.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY) + localPosition.y;
-            if (!isFound) {
-                minimumX = childMinimumX;
-                minimumY = childMinimumY;
-                maximumX = childMaximumX;
-                maximumY = childMaximumY;
-                isFound = true;
-            }
-            else {
-                minimumX = System.Math.min(minimumX, childMinimumX);
-                minimumY = System.Math.min(minimumY, childMinimumY);
-                maximumX = System.Math.max(maximumX, childMaximumX);
-                maximumY = System.Math.max(maximumY, childMaximumY);
-            }
-        }
-        if (!isKnown) {
+    transformDrawBoundsToParent(rect) {
+        if (!this.#isPlacementKnown()) {
             return false;
         }
-        if (!isFound) {
-            rect.position.set(0, 0);
-            rect.size.set(0, 0);
-            return true;
-        }
-        rect.position.set(minimumX, minimumY);
-        rect.size.set(maximumX - minimumX, maximumY - minimumY);
+        const pivotOffsetX = this.#contentSize.x * this.#pivot.x;
+        const pivotOffsetY = this.#contentSize.y * this.#pivot.y;
+        const localPosition = this.getLocalPosition();
+        this.transformLocalRectToParent(rect, pivotOffsetX, pivotOffsetY, localPosition.x, localPosition.y);
         return true;
     }
 
@@ -558,9 +417,14 @@ export class WorldNode extends TransformNode {
      */
     setPivot(pivot) {
         // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getPivot() 은 복제해 준다)
-        this.#pivot.x = Math.clamp(pivot.x, 0, 1);
-        this.#pivot.y = Math.clamp(pivot.y, 0, 1);
-        this.markParentDrawBoundsDirty();
+        const pivotX = Math.clamp(pivot.x, 0, 1);
+        const pivotY = Math.clamp(pivot.y, 0, 1);
+        const isChanged = this.#pivot.x !== pivotX || this.#pivot.y !== pivotY;
+        this.#pivot.x = pivotX;
+        this.#pivot.y = pivotY;
+        if (isChanged) {
+            this.markParentDrawBoundsDirty();
+        }
     }
 
     //==============================================================================
@@ -581,9 +445,13 @@ export class WorldNode extends TransformNode {
      */
     setContentSize(contentSize) {
         // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getContentSize() 는 복제해 준다)
+        const isChanged = this.#contentSize.x !== contentSize.x || this.#contentSize.y !== contentSize.y;
         this.#contentSize.x = contentSize.x;
         this.#contentSize.y = contentSize.y;
-        this.markDrawBoundsDirty();
+        // 같은 크기면 경계를 다시 셈하지 않는다. (프레임마다 같은 크기를 다시 놓는 배치)
+        if (isChanged) {
+            this.markDrawBoundsDirty();
+        }
     }
 
     //==============================================================================
@@ -600,9 +468,12 @@ export class WorldNode extends TransformNode {
             this.setContentSize(Vector2.create(width, height));
             return;
         }
+        const isChanged = this.#contentSize.x !== width || this.#contentSize.y !== height;
         this.#contentSize.x = width;
         this.#contentSize.y = height;
-        this.markDrawBoundsDirty();
+        if (isChanged) {
+            this.markDrawBoundsDirty();
+        }
     }
 
     //==============================================================================

@@ -153,6 +153,42 @@ export class ShadowImage extends Component {
 	}
 
 	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 그림은 내용 영역 안에 비를 지켜 들어가고, 그림자가 번짐과 내림만큼 넘친다)
+	// - 내용 영역을 사방으로 번짐의 두 배와 굽는 칸의 여유만큼, 아래(내림이 음수면 위)로 그림자 내림만큼 더 넓힌다.
+	//   (캔버스 shadowBlur 는 표준 편차 blur / 2 의 가우스라 꼬리가 1.5 배까지 간다, 넉넉히 두 배)
+	// - 그림이 있는지와 상관없이 같은 사각형을 알린다. (그림을 바꿔도 다시 셈하지 않는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 노드에 붙어 있으면 참.
+	 * @example <caption>그림자 그림이 그리는 곳 보기</caption>
+	 * import { WorldNode, ShadowImage, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(64, 64));
+	 * const shadowImage = node.addComponent(ShadowImage);
+	 * shadowImage.setShadow("#000000", 0.6, 6, 8);
+	 * const drawnRect = Rect.zero();
+	 * shadowImage.calculateDrawnRect(drawnRect);
+	 * console.log(drawnRect.position.x, drawnRect.size.y);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (node === null || node === undefined) {
+			return false;
+		}
+		const contentSize = node.getContentSize();
+		const blurMargin = System.Math.max(0, this.#shadowBlur) * 2 + BAKE_PADDING;
+		const shadowOffset = this.#shadowOffset;
+		const topY = -blurMargin + System.Math.min(0, shadowOffset);
+		const bottomY = contentSize.y + blurMargin + System.Math.max(0, shadowOffset);
+		rect.position.set(-blurMargin, topY);
+		rect.size.set(contentSize.x + blurMargin * 2, bottomY - topY);
+		return true;
+	}
+
+	//==============================================================================
 	// 노드에서 떨어짐. (나눠 쓰던 구운 그림을 놓는다)
 	//==============================================================================
 	/**
@@ -346,6 +382,7 @@ export class ShadowImage extends Component {
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;
 		this.#shadowBlur = shadowBlur;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================

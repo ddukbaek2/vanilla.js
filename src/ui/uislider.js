@@ -195,6 +195,56 @@ export class UISlider extends UIControl {
 	}
 
 	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 트랙과 채움은 내용 영역 안, 손잡이 원은 값이 움직이는 줄 전체에 반지름만큼 넘친다)
+	// - 값에 따라 움직이는 손잡이가 어디에 있든 품도록 값과 상관없는 사각형을 알린다. (값을 바꿔도 경계를 다시 셈하지 않는다)
+	// - 손잡이 노드를 정했으면 원을 그리지 않으므로 내용 영역만. 가장자리 매끄럽게 하기만큼 한 단위씩 넓혀 본다.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 노드에 붙어 있으면 참.
+	 * @example <caption>손잡이 원이 넘치는 만큼 보기</caption>
+	 * import { WorldNode, UISlider, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const sliderNode = new WorldNode();
+	 * sliderNode.setContentSize(Vector2.create(200, 8));
+	 * const slider = sliderNode.addComponent(UISlider);
+	 * slider.setThumbRadius(12);
+	 * const drawnRect = Rect.zero();
+	 * slider.calculateDrawnRect(drawnRect);
+	 * console.log(drawnRect.position.x, drawnRect.position.y, drawnRect.size.x, drawnRect.size.y);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		const contentSize = node.getContentSize();
+		let minimumX = 0;
+		let minimumY = 0;
+		let maximumX = contentSize.x;
+		let maximumY = contentSize.y;
+		if (this.#thumbNode === null && this.#thumbRadius > 0) {
+			const thumbRadius = this.#thumbRadius;
+			if (this.#direction === ProgressDirection.vertical) {
+				minimumX = System.Math.min(minimumX, contentSize.x * 0.5 - thumbRadius);
+				maximumX = System.Math.max(maximumX, contentSize.x * 0.5 + thumbRadius);
+				minimumY = System.Math.min(minimumY, -thumbRadius);
+				maximumY = System.Math.max(maximumY, contentSize.y + thumbRadius);
+			}
+			else {
+				minimumX = System.Math.min(minimumX, -thumbRadius);
+				maximumX = System.Math.max(maximumX, contentSize.x + thumbRadius);
+				minimumY = System.Math.min(minimumY, contentSize.y * 0.5 - thumbRadius);
+				maximumY = System.Math.max(maximumY, contentSize.y * 0.5 + thumbRadius);
+			}
+		}
+		rect.position.set(minimumX - 1, minimumY - 1);
+		rect.size.set(maximumX - minimumX + 2, maximumY - minimumY + 2);
+		return true;
+	}
+
+	//==============================================================================
 	// 터치 누름.
 	//==============================================================================
 	/**
@@ -389,7 +439,7 @@ export class UISlider extends UIControl {
 	//==============================================================================
 	// 손잡이 반지름 설정.
 	//==============================================================================
-	/** @param { number } radius 손잡이 원의 반지름. (기본 16, 손잡이 노드를 정했으면 쓰지 않는다) */ setThumbRadius(radius) { this.#thumbRadius = radius; }
+	/** @param { number } radius 손잡이 원의 반지름. (기본 16, 손잡이 노드를 정했으면 쓰지 않는다) */ setThumbRadius(radius) { this.#thumbRadius = radius; this.markDrawnRectDirty(); }
 	//==============================================================================
 	// 손잡이 반지름 반환.
 	//==============================================================================
@@ -457,7 +507,7 @@ export class UISlider extends UIControl {
 	 * const engine = new Engine(engineConfiguration);
 	 * engine.run(new MainScene());
 	 */
-	setThumbNode(node) { this.#thumbNode = node; }
+	setThumbNode(node) { this.#thumbNode = node; this.markDrawnRectDirty(); }
 	//==============================================================================
 	// 손잡이 노드 반환.
 	//==============================================================================
@@ -481,7 +531,7 @@ export class UISlider extends UIControl {
 	//==============================================================================
 	// 방향 설정.
 	//==============================================================================
-	/** @param { string } direction 방향. (horizontal 이면 왼쪽에서 오른쪽, vertical 이면 아래에서 위로 찬다, 기본 horizontal) */ setDirection(direction) { this.#direction = direction; }
+	/** @param { string } direction 방향. (horizontal 이면 왼쪽에서 오른쪽, vertical 이면 아래에서 위로 찬다, 기본 horizontal) */ setDirection(direction) { this.#direction = direction; this.markDrawnRectDirty(); }
 	//==============================================================================
 	// 방향 반환.
 	//==============================================================================

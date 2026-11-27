@@ -317,8 +317,8 @@ try {
 	checkEqual(readVisitCount(offFrameTable, 50, 10, 30), 20, "끄면 화면 밖 줄을 프레임마다 돎");
 	checkEqual(readVisitCount(onFrameTable, 50, 10, 30), 0, "켜면 화면 밖 줄을 돌지 않음");
 	checkEqual(readVisitCount(onFrameTable, 1, 10, 30), 20, "켜도 보이는 줄은 돎");
-	// 그림자 글이 든 줄(54 번)과 경계를 모르는 사용자 노드가 든 줄(80 번)은 켜도 돈다.
-	checkEqual(readVisitCount(onFrameTable, 54, 10, 30), 20, "경계를 모르는 그림자 글 줄은 켜도 돎");
+	// 그림자 글이 든 줄(54 번)은 그림자 글이 경계를 알려 켜면 돌지 않고, 경계를 모르는 사용자 노드가 든 줄(80 번)은 켜도 돈다.
+	checkEqual(readVisitCount(onFrameTable, 54, 10, 30), 0, "경계를 알리는 그림자 글 줄은 켜면 돌지 않음");
 	checkEqual(readVisitCount(onFrameTable, 80, 10, 30), 20, "경계를 모르는 사용자 노드 줄은 켜도 돎");
 	// 화면 밖 줄을 옮겨 들이면(82 번, 81 번 프레임) 그 프레임부터 돌고, 되돌리면(84 번 프레임) 다시 돌지 않는다.
 	checkEqual(readVisitCount(onFrameTable, 82, 70, 80), 0, "옮기기 전 82 번 줄은 돌지 않음");
