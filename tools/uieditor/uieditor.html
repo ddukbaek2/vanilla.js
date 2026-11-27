@@ -9352,6 +9352,23 @@
   var EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
   var BLANK_CHUNK_PATTERN = /^[\u0009\u0020\u00A0\u2000-\u200B\u202F\u205F\u3000]+$/u;
   var ALPHA_THRESHOLD = 128;
+  var PRINTABLE_ASCII_PATTERN = /^[\u0020-\u007E]*$/;
+  var graphemeSegmenter = void 0;
+  function getGraphemeSegmenter() {
+    if (graphemeSegmenter === void 0) {
+      graphemeSegmenter = System17.Intl !== void 0 && typeof System17.Intl.Segmenter === "function" ? new System17.Intl.Segmenter(void 0, { granularity: "grapheme" }) : null;
+    }
+    return graphemeSegmenter;
+  }
+  __name(getGraphemeSegmenter, "getGraphemeSegmenter");
+  function splitAsciiSegments(text) {
+    const segments = [];
+    for (let index = 0; index < text.length; ++index) {
+      segments.push({ segment: text[index], index });
+    }
+    return segments;
+  }
+  __name(splitAsciiSegments, "splitAsciiSegments");
   var MAXIMUM_MEASURE_COUNT = 2048;
   var measureCache = new System17.Map();
   var measureCanvasRenderingContext = null;
@@ -9537,9 +9554,6 @@
     /** @private @type { number } */
     #uploadCount;
     // 지금까지 아틀라스에 올린 수. (통계, 굽기 캔버스 한 장이 한 번)
-    /** @private @type { object | null } */
-    #segmenter;
-    // 글자 덩어리 나누기. (Intl.Segmenter, 없으면 null)
     /** @private @type { HTMLCanvasElement } */
     #bakeCanvas;
     /** @private @type { CanvasRenderingContext2D } */
@@ -9577,7 +9591,6 @@
       this.#uploadCount = 0;
       this.#textureBinder = textureBinder;
       this.#beforeTextureOverwrite = beforeTextureOverwrite;
-      this.#segmenter = System17.Intl !== void 0 && typeof System17.Intl.Segmenter === "function" ? new System17.Intl.Segmenter(void 0, { granularity: "grapheme" }) : null;
       const bakeCanvas = System17.document.createElement("canvas");
       this.#bakeCanvas = bakeCanvas;
       this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
@@ -9734,7 +9747,13 @@
       layoutCanvasRenderingContext.font = scaledFontString;
       layoutCanvasRenderingContext.direction = textDirection;
       layoutCanvasRenderingContext.textAlign = "left";
-      const scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
+      let scaledTextMetrics = null;
+      if (scale === 1 && textDirection === "ltr") {
+        scaledTextMetrics = measureTextMetrics(fontString, text);
+      }
+      if (scaledTextMetrics === null) {
+        scaledTextMetrics = layoutCanvasRenderingContext.measureText(text);
+      }
       const actualLeft = ceil(max(scaledTextMetrics.actualBoundingBoxLeft || 0, 0));
       const actualRight = ceil(max(scaledTextMetrics.actualBoundingBoxRight || scaledTextMetrics.width, 0));
       let scaledFontAscent = scaledTextMetrics.fontBoundingBoxAscent;
@@ -9881,16 +9900,17 @@
      * @returns { object[] }
      */
     splitTextChunks(text, scaledFontString, textDirection) {
-      const segmenter = this.#segmenter;
+      const isSegmenterAvailable = System17.Intl !== void 0 && typeof System17.Intl.Segmenter === "function";
       const fontSizeMatch = scaledFontString.match(/(\d+(?:\.\d+)?)px/);
       const fontSize = fontSizeMatch !== null ? System17.Number.parseFloat(fontSizeMatch[1]) : Infinity;
-      if (segmenter === null || textDirection !== "ltr" || fontSize > MAXIMUM_ATLAS_FONT_SIZE || RIGHT_TO_LEFT_PATTERN.test(text)) {
+      if (!isSegmenterAvailable || textDirection !== "ltr" || fontSize > MAXIMUM_ATLAS_FONT_SIZE || RIGHT_TO_LEFT_PATTERN.test(text)) {
         return [{ text, start: 0, clusterEnds: [text.length], isExactPosition: true, isWholeText: true, positions: [0] }];
       }
       const chunks = [];
       let previousChunk = null;
       let isPreviousJoining = false;
-      for (const segment of segmenter.segment(text)) {
+      const segments = PRINTABLE_ASCII_PATTERN.test(text) ? splitAsciiSegments(text) : getGraphemeSegmenter().segment(text);
+      for (const segment of segments) {
         const clusterText = segment.segment;
         const clusterEnd = segment.index + clusterText.length;
         const isJoining = JOINING_CLUSTER_PATTERN.test(clusterText) && !STANDALONE_SCRIPT_PATTERN.test(clusterText);
@@ -10971,6 +10991,12 @@ void main() {
     /** @private @type { number } */
     #batchVertexCount;
     // 쌓여서 아직 그리지 않은 정점 수.
+    /** @private @type { boolean } */
+    #isBatchFlushScheduled;
+    // 이 작업이 끝날 때 남은 묶음을 그리는 마이크로태스크를 걸었는지.
+    /** @private @type { function(): void } */
+    #scheduledBatchFlush;
+    // 걸어 둔 마이크로태스크가 부르는 함수.
     /** @private @type { (WebGLTexture | null)[] } */
     #batchTextureList;
     // 쌓인 정점이 쓰는 텍스처. (칸 번호 차례)
@@ -11306,6 +11332,11 @@ void main() {
       this.#batchVertexBuffer = null;
       this.#batchVertexData = null;
       this.#batchVertexCount = 0;
+      this.#isBatchFlushScheduled = false;
+      this.#scheduledBatchFlush = () => {
+        this.#isBatchFlushScheduled = false;
+        this.flushBatch();
+      };
       this.#batchTextureList = [];
       this.#batchTextureCount = 0;
       this.#batchTextureSlotCount = 1;
@@ -12830,6 +12861,7 @@ void main() {
     // - 텍스처는 한 묶음에 여러 장(기기 텍스처 유닛 수와 16 가운데 작은 것)까지 묶어 텍스처가 바뀌어도 이어진다. (PixiJS 와 같은 꼴)
     // - 축에 맞고 화소 경계에 놓인 자르기(beginClipRect)는 정점의 자르기 사각형으로 셰이더가 잘라 묶음을 끊지 않는다. (돌아갔거나 둥근 자르기는 스텐실)
     // - 텍스처 칸이 차거나, 블렌드, 스텐실 자르기, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.
+    // - 엔진 루프 밖에서 그려도(엔진 없이 만든 Graphic, 제 requestAnimationFrame, 입력 처리기) 그 작업이 끝날 때(마이크로태스크) 남은 것을 그린다. 브라우저가 캔버스를 화면에 내기 전이라, 2D 캔버스처럼 따로 내보내지 않아도 보인다.
     // - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushBatch() 를 부른다.
     //==============================================================================
     /**
@@ -13030,6 +13062,10 @@ void main() {
      */
     prepareSpriteBatch(vertexCount, texture) {
       this.ensureSpriteBatchResources();
+      if (!this.#isBatchFlushScheduled) {
+        this.#isBatchFlushScheduled = true;
+        System18.queueMicrotask(this.#scheduledBatchFlush);
+      }
       let textureSlot = this.findSpriteBatchTextureSlot(texture);
       const isTextureSlotMissing = textureSlot < 0 && this.#batchTextureCount >= this.#batchTextureSlotCount;
       const isClipSlotMissing = this.#isShaderClipActive && this.#shaderClipSlotGeneration !== this.#batchGeneration && this.#batchClipRectCount >= BATCH_CLIP_SLOT_CAPACITY;
@@ -27372,18 +27408,18 @@ void main() {
     return measurementCanvasRenderingContext;
   }
   __name(getMeasurementCanvasRenderingContext, "getMeasurementCanvasRenderingContext");
-  var graphemeSegmenter = null;
+  var graphemeSegmenter2 = null;
   var wordSegmenter = null;
   var NO_BREAK_SPACE = "\xA0";
   function splitGraphemes(text) {
-    if (graphemeSegmenter === null && System36.Intl && typeof System36.Intl.Segmenter === "function") {
-      graphemeSegmenter = new System36.Intl.Segmenter(void 0, { granularity: "grapheme" });
+    if (graphemeSegmenter2 === null && System36.Intl && typeof System36.Intl.Segmenter === "function") {
+      graphemeSegmenter2 = new System36.Intl.Segmenter(void 0, { granularity: "grapheme" });
     }
-    if (graphemeSegmenter === null) {
+    if (graphemeSegmenter2 === null) {
       return System36.Array.from(text);
     }
     const pieces = [];
-    for (const segmentData of graphemeSegmenter.segment(text)) {
+    for (const segmentData of graphemeSegmenter2.segment(text)) {
       pieces.push(segmentData.segment);
     }
     return pieces;
@@ -45541,16 +45577,16 @@ void main() {
       graphic.popState();
     }
   };
-  var graphemeSegmenter2 = void 0;
-  function getGraphemeSegmenter() {
-    if (graphemeSegmenter2 === void 0) {
+  var graphemeSegmenter3 = void 0;
+  function getGraphemeSegmenter2() {
+    if (graphemeSegmenter3 === void 0) {
       const intl = System63.Intl;
       const segmenterClass = intl ? intl.Segmenter : void 0;
-      graphemeSegmenter2 = typeof segmenterClass === "function" ? new segmenterClass(void 0, { granularity: "grapheme" }) : null;
+      graphemeSegmenter3 = typeof segmenterClass === "function" ? new segmenterClass(void 0, { granularity: "grapheme" }) : null;
     }
-    return graphemeSegmenter2;
+    return graphemeSegmenter3;
   }
-  __name(getGraphemeSegmenter, "getGraphemeSegmenter");
+  __name(getGraphemeSegmenter2, "getGraphemeSegmenter");
   function isInsideSurrogatePair(text, index) {
     if (index <= 0 || index >= text.length) {
       return false;
@@ -45564,7 +45600,7 @@ void main() {
     if (index <= 0) {
       return 0;
     }
-    const segmenter = getGraphemeSegmenter();
+    const segmenter = getGraphemeSegmenter2();
     if (segmenter) {
       const segment = segmenter.segment(text).containing(index - 1);
       return segment ? segment.index : index - 1;
@@ -45576,7 +45612,7 @@ void main() {
     if (index >= text.length) {
       return text.length;
     }
-    const segmenter = getGraphemeSegmenter();
+    const segmenter = getGraphemeSegmenter2();
     if (segmenter) {
       const segment = segmenter.segment(text).containing(index);
       return segment ? segment.index + segment.segment.length : index + 1;
