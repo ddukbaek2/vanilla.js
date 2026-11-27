@@ -234,7 +234,7 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
 4. 로드된 씬마다:
    - 미로드 씬 → drawOnLoad() 만 (로딩 화면)
    - scene.tick(timeDelta)      # root.tick 재귀(isTickNeeded 가 참인 컴포넌트만 tick) → 터치 디스패치(한 프레임 안의 누름과 뗌은 둘 다) → 트윈
-   - graphic.invalidateRenderStateCache() → scene.preDraw / draw / postDraw → (기즈모)   # draw 기본 구현 = graphic.drawNode(root) 재귀
+   - scene.preDraw / draw / postDraw → (기즈모)   # draw 기본 구현 = graphic.drawNode(root) 재귀
    (씬마다 try/catch, 한 씬의 예외가 루프를 죽이지 않음)
 5. 통계 출력(옵션) → flushBatch(남은 묶음) → PointerCursor.apply() → 1회성 입력 플래그 클리어 → 검증용 화면 저장(requestFrameCapture, ?capture=) → 다음 rAF
 ```
@@ -252,7 +252,7 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
 - **WebGL2 기반**이다 (Canvas2D 아님, 폴백 없음). Canvas2D 시절의 API 표면(좌상 원점, save/restore 상태 스택, fillRect/drawImage/fillText)을 WebGL2 위에 재현한다.
 - 모든 드로우는 `drawVertices()` 한 지점으로 수렴한다 (배칭 삽입 지점). 단색 도형도 1x1 흰색 텍스처로 텍스처 경로와 통일.
 - 묶어 그리기(`setBatchingEnabled`)와 화면 밖 거르기(`setCullingEnabled`)는 기본으로 켠다. 거르기는 켜진 컴포넌트가 모두 내용 영역 안에서만 그린다고 알리거나(`isDrawnInsideContent`) 그리는 사각형을 알려 줄 때(`calculateDrawnRect`, 한 줄과 여러 줄 Text) 그 경계 상자가 화면에 걸치지 않으면 그 노드의 컴포넌트 그리기를 건너뛴다.
-- 마지막으로 쓰게 한 셰이더 프로그램과 0 번 텍스처 유닛의 텍스처를 기억해 같으면 다시 걸지 않는다. Graphic 을 거치지 않고 WebGL 을 만진 뒤에는 `invalidateRenderStateCache` 를 부른다. (restoreRenderState, applySettings, 컨텍스트를 잃거나 되살릴 때는 스스로 잊는다)
+- 쓰게 한 셰이더 프로그램, 묶은 텍스처, 섞기 같은 것을 따로 기억하지 않고, 그리기 바로 앞에 컨텍스트의 상태 캐시(WebGLStateCache)에 견주어 다른 것만 다시 건다. 그래서 게임이 같은 컨텍스트로 WebGL 을 어디서 써도 다음 2D 그리기가 맞다. (게임 프레임 버퍼를 묶었으면 돌려 두고 스텐실은 바꾸지 않는다, 가로채지 못한 길로 바꿨으면 `resetGLStateCache`)
 - 클리핑은 스텐실 버퍼 기반 (회전/스케일된 마스크 정확히 처리). 텍스트는 오프스크린 2D 캔버스에 구워 텍스처로 출력.
 - 블렌드는 Canvas2D 합성 문자열 26종을 모두 그린다. 13종(포터 더프 연산자, lighter, multiply, screen)은 고정 블렌딩, 나머지 13종(overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity)은 그리기마다 그릴 영역 아래를 지금 프레임버퍼에서 `blitFramebuffer` 로 떠 와 W3C Compositing and Blending Level 1 공식대로 셰이더로 섞는다(섞기 모드에서는 묶어 그리지 않음, 바꿔 끼운 셰이더는 덧그림 칸에 먼저 그린 뒤 섞어 옮김). multiply 는 기본 프레임버퍼에서는 고정 블렌딩이고, 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때만 셰이더로 섞는다(고정 블렌딩은 바탕이 반투명하면 W3C 식과 달라서). Canvas2D 와 달리 source-in, source-out, destination-in, destination-atop, copy 는 그린 도형 안만 바꾼다.
 

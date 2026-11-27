@@ -40,6 +40,9 @@ const VERTEX_ARRAY_BINDING = 0x85B5;
 const ACTIVE_TEXTURE = 0x84E0;
 const LINK_STATUS = 0x8B82;
 const TEXTURE0 = 0x84C0;
+const ARRAY_BUFFER = 0x8892;
+const ELEMENT_ARRAY_BUFFER = 0x8893;
+const BUFFER_TARGET_SET = new System.Set([ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, 0x8F36, 0x8F37, 0x8C8E, 0x8A11, 0x88EB, 0x88EC]); // ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, COPY_READ_BUFFER, COPY_WRITE_BUFFER, TRANSFORM_FEEDBACK_BUFFER, UNIFORM_BUFFER, PIXEL_PACK_BUFFER, PIXEL_UNPACK_BUFFER
 const MAX_COMBINED_TEXTURE_IMAGE_UNITS = 0x8B4D;
 const MAX_VIEWPORT_DIMS = 0x0D3A;
 const UNPACK_FLIP_Y_WEBGL = 0x9240;
@@ -171,11 +174,13 @@ export class WebGLStateCache extends Object {
 	/** @private @type { number | undefined } */ #cullFaceMode; // 가리는 면.
 	/** @private @type { WebGLProgram | null | undefined } */ #program; // 쓰는 프로그램.
 	/** @private @type { WebGLVertexArrayObject | null | undefined } */ #vertexArray; // 묶은 버텍스 어레이. (null 이면 기본)
+	/** @private @type { WebGLBuffer | null | undefined } */ #arrayBuffer; // ARRAY_BUFFER 에 묶은 버퍼. (버텍스 어레이에 들지 않는 전역 묶음, 견주기에만 쓰고 getParameter 는 GL 에 묻는다)
 	/** @private @type { number | undefined } */ #activeTexture; // 활성 텍스처 유닛. (TEXTURE0 + 번호)
 	/** @private @type { Map<number, WebGLTexture | null> } */ #textureBindingTable; // 유닛과 대상마다 묶은 텍스처. (키 유닛 * 4 + 대상 칸, 없으면 모른다)
 	/** @private @type { Map<number, boolean> } */ #capabilityTable; // 켜고 끈 기능. (없으면 모른다)
 	/** @private @type { Map<number, any> } */ #pixelStoreTable; // pixelStorei 값. (없으면 모른다)
 	/** @private @type { Map<number, any> } */ #constantParameterTable; // 바뀌지 않는 한도 값.
+	/** @private @type { WeakMap<WebGLBuffer, boolean> } */ #bufferElementTable; // 버퍼마다 처음 묶은 대상이 ELEMENT_ARRAY_BUFFER 인지. (WebGL 은 둘 사이를 오가며 묶지 못하게 한다)
 	/** @private @type { WeakMap<WebGLTexture, number> } */ #textureTargetTable; // 텍스처마다 처음 묶은 대상 칸. (다른 대상으로 묶으면 GL 이 무시한다)
 	/** @private @type { WeakMap<WebGLProgram, boolean> } */ #programLinkStatusTable; // 프로그램마다 알아낸 링크 결과. (링크에 실패한 프로그램은 쓰게 해도 GL 이 무시한다)
 	/** @private @type { WeakSet<object> } */ #deletedObjectSet; // 지운 프레임 버퍼, 텍스처, 버텍스 어레이, 프로그램. (묶으면 GL 이 무시한다)
@@ -195,6 +200,7 @@ export class WebGLStateCache extends Object {
 		this.#pixelStoreTable = new System.Map();
 		this.#constantParameterTable = new System.Map();
 		this.#textureTargetTable = new System.WeakMap();
+		this.#bufferElementTable = new System.WeakMap();
 		this.#programLinkStatusTable = new System.WeakMap();
 		this.#deletedObjectSet = new System.WeakSet();
 		this.#originalGetParameter = webGL2RenderingContext.getParameter;
@@ -249,6 +255,7 @@ export class WebGLStateCache extends Object {
 		this.#cullFaceMode = undefined;
 		this.#program = undefined;
 		this.#vertexArray = undefined;
+		this.#arrayBuffer = undefined;
 		this.#activeTexture = undefined;
 		this.#textureBindingTable.clear();
 		this.#capabilityTable.clear();
@@ -579,6 +586,70 @@ export class WebGLStateCache extends Object {
 	}
 
 	//==============================================================================
+	// ARRAY_BUFFER 에 묶은 버퍼가 이것인지. (모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { WebGLBuffer | null } buffer 견줄 버퍼.
+	 * @returns { boolean } ARRAY_BUFFER 에 이 버퍼가 묶였다고 기억하면 참.
+	 */
+	isArrayBufferBound(buffer) {
+		return this.#arrayBuffer !== undefined && this.#arrayBuffer === buffer;
+	}
+
+	//==============================================================================
+	// 기능이 켜졌는지 꺼졌는지가 이것인지. (모르면 거짓, GL 에 묻지 않는다)
+	//==============================================================================
+	/**
+	 * @param { number } capability 기능. (BLEND, DEPTH_TEST, CULL_FACE, SCISSOR_TEST 같은 것)
+	 * @param { boolean } isEnabled 견줄 켬. (true 면 켜짐, false 면 꺼짐)
+	 * @returns { boolean } 그 기능이 그렇게 켜졌거나 꺼졌다고 기억하면 참.
+	 */
+	isCapabilitySet(capability, isEnabled) {
+		const rememberedValue = this.#capabilityTable.get(capability);
+		return rememberedValue !== undefined && rememberedValue === isEnabled;
+	}
+
+	//==============================================================================
+	// 섞기 인자가 이것인지. (blendFunc 로 건 꼴, RGB 와 알파가 같은 인자, 모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { number } sourceFactor 견줄 소스 인자.
+	 * @param { number } destinationFactor 견줄 대상 인자.
+	 * @returns { boolean } RGB 와 알파의 섞기 인자가 모두 이것이라고 기억하면 참.
+	 */
+	isBlendFunction(sourceFactor, destinationFactor) {
+		const blendFactors = this.#blendFactors;
+		return blendFactors !== undefined && blendFactors[0] === sourceFactor && blendFactors[1] === destinationFactor && blendFactors[2] === sourceFactor && blendFactors[3] === destinationFactor;
+	}
+
+	//==============================================================================
+	// 섞기 식이 이것인지. (RGB 와 알파가 같은 식, 모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { number } mode 견줄 섞기 식. (FUNC_ADD, FUNC_SUBTRACT, FUNC_REVERSE_SUBTRACT, MIN, MAX)
+	 * @returns { boolean } RGB 와 알파의 섞기 식이 모두 이것이라고 기억하면 참.
+	 */
+	isBlendEquation(mode) {
+		const blendEquations = this.#blendEquations;
+		return blendEquations !== undefined && blendEquations[0] === mode && blendEquations[1] === mode;
+	}
+
+	//==============================================================================
+	// 뷰포트가 이것인지. (모르면 거짓, GL 에 묻지 않는다)
+	//==============================================================================
+	/**
+	 * @param { number } x 견줄 왼쪽. (픽셀)
+	 * @param { number } y 견줄 아래. (픽셀)
+	 * @param { number } width 견줄 너비. (픽셀)
+	 * @param { number } height 견줄 높이. (픽셀)
+	 * @returns { boolean } 뷰포트가 이것이라고 기억하면 참.
+	 */
+	isViewport(x, y, width, height) {
+		const viewport = this.#viewport;
+		return viewport !== undefined && viewport[0] === x && viewport[1] === y && viewport[2] === width && viewport[3] === height;
+	}
+
+	//==============================================================================
 	// 활성 텍스처 유닛이 이것인지. (모르면 거짓)
 	//==============================================================================
 	/**
@@ -890,6 +961,36 @@ export class WebGLStateCache extends Object {
 			this.#deletedObjectSet.add(vertexArray);
 			if (this.#vertexArray === vertexArray) {
 				this.#vertexArray = null;
+			}
+		});
+
+		// ARRAY_BUFFER 묶음. (버퍼는 ELEMENT_ARRAY_BUFFER 와 그 밖의 대상 사이를 오가며 묶지 못한다, 어기면 GL 이 무시한다)
+		wrap("bindBuffer", (target, bufferOrUndefined) => {
+			if (!BUFFER_TARGET_SET.has(target)) {
+				return;
+			}
+			const buffer = bufferOrUndefined === undefined ? null : bufferOrUndefined;
+			const isBufferObject = buffer instanceof System.Object && !this.#deletedObjectSet.has(buffer);
+			const isElementTarget = target === ELEMENT_ARRAY_BUFFER;
+			if (isBufferObject && !this.#bufferElementTable.has(buffer)) {
+				this.#bufferElementTable.set(buffer, isElementTarget);
+			}
+			if (target !== ARRAY_BUFFER) {
+				return;
+			}
+			if (buffer === null) {
+				this.#arrayBuffer = null;
+				return;
+			}
+			this.#arrayBuffer = isBufferObject && this.#bufferElementTable.get(buffer) === false ? buffer : undefined;
+		});
+		wrap("deleteBuffer", (buffer) => {
+			if (buffer === null || buffer === undefined) {
+				return;
+			}
+			this.#deletedObjectSet.add(buffer);
+			if (this.#arrayBuffer === buffer) {
+				this.#arrayBuffer = null;
 			}
 		});
 

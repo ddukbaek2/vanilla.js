@@ -36,8 +36,9 @@ import { RenderTarget } from "../rendertarget.js";
 //==============================================================================
 // 툰 3D 를 노드 사각형 안에 그리는 컴포넌트. (2D 노드 트리 사이에 3D 패스를 끼운다)
 // - draw 에서: 노드의 내용 영역(0, 0, 내용 크기)을 지금 변환으로 드로잉 버퍼 픽셀의 사각형으로 옮기고(돌았으면 감싸는 사각형),
-//   Graphic.runExternalPass 로 앞의 2D 묶음을 그리고 상태 기억을 잊고 깊이를 비운 뒤, 렌더러의 화면 사각형(setScreenRect)을 걸고 그리기 함수를 부른다.
+//   Graphic.runExternalPass 로 앞의 2D 묶음을 그리고 깊이를 비운 뒤, 렌더러의 화면 사각형(setScreenRect)을 걸고 그리기 함수를 부른다.
 //   끝나면 화면 사각형을 풀고 restoreRenderState 로 2D 상태를 되돌린다.
+// - 게임이 draw 앞에 같은 컨텍스트로 WebGL 을 직접 써도(그림자 지도 같은 것) 된다. 게임 프레임 버퍼를 묶었으면 들어올 때 것으로 돌려 두고 스텐실은 바꾸지 않는다. (Graphic.runExternalPass 머리말)
 // - 렌더러는 처음 그릴 때 짓는다. 셰이더를 짓지 못하는 기기면 다시 짓지 않고 대체 그리기 함수(setFallbackDrawCallback)로 2D 를 그린다.
 //   여러 노드가 렌더러 하나를 함께 쓰려면 setRenderer 로 넣는다.
 // - 카메라(getCamera)의 가로 세로 비는 그릴 때마다 사각형의 비로 맞춘다. 3D 점 위의 2D 표시는 같은 카메라의 projectToView 로 셈한다.

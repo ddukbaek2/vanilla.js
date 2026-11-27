@@ -135,7 +135,6 @@ try {
 							webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
 							webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
 							webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-							graphic.invalidateRenderStateCache();
 							referenceTextureList[lineIndex] = { texture: texture, penX: penX, baselineY: baselineY, width: bakeCanvas.width, height: bakeCanvas.height };
 						}
 						const reference = referenceTextureList[lineIndex];
