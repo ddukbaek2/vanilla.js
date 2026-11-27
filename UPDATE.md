@@ -531,7 +531,7 @@
   - 옮기는 법 (공개 API 를 바꿨다)
     - setCrease(각, 진하기, 이어짐 픽셀) → setCrease(각, 굵기, 진하기). 굵기는 setWidth 의 단위이고 기본 1, 진하기는 0 ~ 1 이고 기본 1. 이어짐 픽셀(creaseExtent)은 없어졌다. (화소 하나 사이만 보므로 필요 없다) 옛 setCrease(60, 0.5, 2) 와 비슷한 모습은 픽셀 단위면 setCrease(60, 1, 0.8), 월드 단위면 굵기를 바깥 선 굵기의 반쯤으로 (setWidth(0.022, world) 면 setCrease(60, 0.011, 0.8)). 굵기가 setWidth 의 단위라 월드 단위에 1 을 주면 1 미터 굵기가 된다
     - setDepthThreshold(깊이 문턱, 맞닿음 문턱) → setDepthThreshold(깊이 문턱). 뜻이 접평면 거리로 바뀌었다. (월드 길이, 같은 값을 그대로 넣으면 된다) 맞닿음 문턱(contactTolerance)은 없어졌다. 선을 경계 가운데에 세우므로 어느 쪽에 그을지 가릴 일이 없다
-    - setWidth 의 뜻: 선 하나의 굵기이고, 경계를 가운데로 양쪽에 반씩 덮는다. (지금까지는 실루엣 바깥쪽에만 그 굵기) 기본 1.5 → 2 픽셀. 옛 모습의 바깥 두께를 맞추려면 두 배를 준다
+    - setWidth 의 뜻: 선 하나의 굵기이고, 경계를 가운데로 양쪽에 반씩 덮는다. (지금까지는 실루엣 바깥쪽에만 그 굵기) 기본 1.5 → 2 픽셀. 옛 모습의 바깥 두께를 맞추려면 두 배를 준다. 선 전체의 모습(덮는 몫의 합)을 맞추려면 두 배가 아니라 0.9 배쯤이다. (옛 셰이더를 같은 선의 판에 돌려 견줌, 애버런트의 옛 값 0.022 m, 꺾임 60 도 .5 2 px 는 setWidth(0.020, world), setCrease(60, 0.016, 0.5), setDepthThreshold(0.08) 가 가장 가깝다, toonstyle 장면 1280 x 720 에서 덮는 몫 합의 차이 1 %)
     - setSampleCount, TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES 는 없어졌다. (점프 플러딩은 굵기에 따라 걸음 수가 스스로 정해진다) 가벼운 길은 setResolutionScale 만 낮춘다
     - getOutlineRadius() → getLineWidths() ([바깥 선, 꺾임 선] 의 그리는 영역 픽셀)
     - 선 번호 상한 65535 → TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID (16383). 선의 판의 a 칸 위 두 비트에 모형마다의 꼴을 쓴다
