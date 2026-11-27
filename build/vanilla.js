@@ -13430,6 +13430,8 @@ var COMPATIBILITY_MOUSE_MILLISECONDS = 800;
 var MOUSE_DEVICE_MOVE_THRESHOLD = 6;
 var DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
 var CAPTURE_FRAME_MILLISECONDS = 1e3 / 60;
+var GPU_THROUGHPUT_WARMUP_FRAME_COUNT = 10;
+var GPU_THROUGHPUT_CHUNK_FRAME_COUNT = 30;
 var PageEvent = System33.Object.freeze({ hidden: "hidden", visible: "visible", blurred: "blurred", focused: "focused", pointerDown: "pointerDown" });
 var EngineConfiguration = class extends Object2 {
   static {
@@ -13500,6 +13502,7 @@ var Engine = class extends Object2 {
   #isExitRequested;
   #isPageHidden;
   #pageEventListeners;
+  #gpuThroughputMeasurement;
   constructor(engineConfiguration) {
     super();
     if (engineConfiguration === null || engineConfiguration === void 0 || engineConfiguration instanceof EngineConfiguration === false) {
@@ -13537,6 +13540,7 @@ var Engine = class extends Object2 {
     this.#isExitRequested = false;
     this.#isPageHidden = System33.document.visibilityState === "hidden";
     this.#pageEventListeners = [];
+    this.#gpuThroughputMeasurement = null;
     System33.vanillaEngine = this;
     this.setupAllDocumentEvents();
     this.resize();
@@ -14020,6 +14024,11 @@ var Engine = class extends Object2 {
     drawStatisticsText(`culledNodes: ${culledNodeCount}`);
   }
   updateEngine(timestamp) {
+    if (this.#gpuThroughputMeasurement !== null) {
+      this.#runGpuThroughputChunk();
+      System33.window.requestAnimationFrame(this.#updateEngineCallback);
+      return;
+    }
     const engineConfiguration = this.getEngineConfiguration();
     const maximumFramePerSecond = engineConfiguration.maximumFramePerSecond;
     if (maximumFramePerSecond > 0 && !this.#isCaptureTimeStepFixed) {
@@ -14073,6 +14082,23 @@ var Engine = class extends Object2 {
     if (isModalDialogOpen) {
       this.#tickModalDialog(graphic, timeDelta);
     }
+    this.#tickAndDrawScenes(graphic, timeDelta, !isModalDialogOpen);
+    const pointerCursor = PointerCursor.getInstance();
+    pointerCursor.apply();
+    inputManager.setTouchPressed(false);
+    inputManager.setTouchReleased(false);
+    inputManager.setTouchCancelled(false);
+    inputManager.clearWheelDelta();
+    inputManager.updateFrameSnapshot();
+    this.captureFrameIfRequested();
+    const sceneManager = this.getSceneManager();
+    const isCaptureFrameHeld = this.#isCaptureTimeStepFixed && sceneManager.getAllLoadedScenes().some((loadedScene) => !loadedScene.isLoaded() && loadedScene.isCaptureFrameHeld());
+    if (!isCaptureFrameHeld) {
+      ++this.#frameNumber;
+    }
+    System33.window.requestAnimationFrame(this.#updateEngineCallback);
+  }
+  #tickAndDrawScenes(graphic, timeDelta, isTickEnabled) {
     graphic.beginFrameStatistics();
     const sceneManager = this.getSceneManager();
     const viewManager = this.getViewManager();
@@ -14084,7 +14110,7 @@ var Engine = class extends Object2 {
           loadedScene.drawOnLoad(graphic);
           continue;
         }
-        if (!isModalDialogOpen) {
+        if (isTickEnabled) {
           loadedScene.tick(timeDelta);
         }
         viewManager.applyViewRect(graphic);
@@ -14099,6 +14125,7 @@ var Engine = class extends Object2 {
         console.error(error);
       }
     }
+    const engineConfiguration = this.getEngineConfiguration();
     if (engineConfiguration.useStatistics) {
       this.drawStatistics(graphic);
     }
@@ -14107,19 +14134,75 @@ var Engine = class extends Object2 {
       this.#modalDialogList[0].draw(graphic, viewManager.getCanvasNativeSize());
     }
     graphic.flushBatch();
-    const pointerCursor = PointerCursor.getInstance();
-    pointerCursor.apply();
-    inputManager.setTouchPressed(false);
-    inputManager.setTouchReleased(false);
-    inputManager.setTouchCancelled(false);
-    inputManager.clearWheelDelta();
-    inputManager.updateFrameSnapshot();
-    this.captureFrameIfRequested();
-    const isCaptureFrameHeld = this.#isCaptureTimeStepFixed && sceneManager.getAllLoadedScenes().some((loadedScene) => !loadedScene.isLoaded() && loadedScene.isCaptureFrameHeld());
-    if (!isCaptureFrameHeld) {
-      ++this.#frameNumber;
+  }
+  measureGpuThroughput(frameCount = 120) {
+    if (!System33.Number.isInteger(frameCount) || frameCount < 1) {
+      return System33.Promise.reject(new System33.Error(`frameCount is invalid: ${frameCount}`));
     }
-    System33.window.requestAnimationFrame(this.#updateEngineCallback);
+    if (this.#gpuThroughputMeasurement !== null) {
+      return System33.Promise.reject(new System33.Error("measureGpuThroughput is already running."));
+    }
+    if (this.#frameNumber === 0) {
+      return System33.Promise.reject(new System33.Error("measureGpuThroughput needs a running engine loop. (call run first)"));
+    }
+    const webGL2RenderingContext = this.getGraphic().getWebGL2RenderingContext();
+    if (webGL2RenderingContext === null || webGL2RenderingContext === void 0 || webGL2RenderingContext.isContextLost()) {
+      return System33.Promise.reject(new System33.Error("measureGpuThroughput needs a WebGL2 context."));
+    }
+    return new System33.Promise((resolve, reject) => {
+      this.#gpuThroughputMeasurement = { frameCount, warmupFrameCount: GPU_THROUGHPUT_WARMUP_FRAME_COUNT, measuredFrameCount: 0, totalMilliseconds: 0, chunkMillisecondsPerFrame: [], pixel: new System33.Uint8Array(4), resolve, reject };
+    });
+  }
+  #runGpuThroughputChunk() {
+    const measurement = this.#gpuThroughputMeasurement;
+    try {
+      const graphic = this.getGraphic();
+      const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+      if (webGL2RenderingContext.isContextLost()) {
+        throw new System33.Error("WebGL2 context lost while measureGpuThroughput.");
+      }
+      graphic.applySettings(this);
+      const timeDelta = this.getTimeManager().getTimeDelta();
+      const isWarmup = measurement.warmupFrameCount > 0;
+      const chunkFrameCount = isWarmup ? measurement.warmupFrameCount : System33.Math.min(GPU_THROUGHPUT_CHUNK_FRAME_COUNT, measurement.frameCount - measurement.measuredFrameCount);
+      const startMilliseconds = System33.performance.now();
+      for (let index = 0; index < chunkFrameCount; ++index) {
+        this.#tickAndDrawScenes(graphic, timeDelta, false);
+      }
+      this.#waitGpuForGpuThroughput(webGL2RenderingContext, measurement.pixel);
+      const chunkMilliseconds = System33.performance.now() - startMilliseconds;
+      if (isWarmup) {
+        measurement.warmupFrameCount = 0;
+        return;
+      }
+      measurement.measuredFrameCount += chunkFrameCount;
+      measurement.totalMilliseconds += chunkMilliseconds;
+      measurement.chunkMillisecondsPerFrame.push(chunkMilliseconds / chunkFrameCount);
+      if (measurement.measuredFrameCount >= measurement.frameCount) {
+        this.#gpuThroughputMeasurement = null;
+        measurement.resolve({ frameCount: measurement.measuredFrameCount, chunkFrameCount: GPU_THROUGHPUT_CHUNK_FRAME_COUNT, millisecondsPerFrame: measurement.totalMilliseconds / measurement.measuredFrameCount, chunkMillisecondsPerFrame: measurement.chunkMillisecondsPerFrame });
+      }
+    } catch (error) {
+      this.#gpuThroughputMeasurement = null;
+      measurement.reject(error);
+    }
+  }
+  #waitGpuForGpuThroughput(webGL2RenderingContext, pixel) {
+    const previousReadFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.READ_FRAMEBUFFER_BINDING);
+    const previousPixelPackBuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.PIXEL_PACK_BUFFER_BINDING);
+    if (previousReadFramebuffer !== null) {
+      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, null);
+    }
+    if (previousPixelPackBuffer !== null) {
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.PIXEL_PACK_BUFFER, null);
+    }
+    webGL2RenderingContext.readPixels(0, 0, 1, 1, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, pixel);
+    if (previousPixelPackBuffer !== null) {
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.PIXEL_PACK_BUFFER, previousPixelPackBuffer);
+    }
+    if (previousReadFramebuffer !== null) {
+      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, previousReadFramebuffer);
+    }
   }
   setVisibleCursor(visibled) {
     if (visibled) {

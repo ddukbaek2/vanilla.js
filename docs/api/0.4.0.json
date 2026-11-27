@@ -10330,6 +10330,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "measureGpuThroughput",
+							"signature": "measureGpuThroughput(frameCount = 120)",
+							"params": [
+								{
+									"name": "frameCount",
+									"type": "number",
+									"description": {
+										"ko": "잴 프레임 수. (1 이상의 정수, 데움은 빼고 센다)",
+										"en": "Number of frames to measure. (Integer of 1 or more, counted without the warm-up)"
+									}
+								}
+							],
+							"returns": {
+								"type": "Promise<{ frameCount: number, chunkFrameCount: number, millisecondsPerFrame: number, chunkMillisecondsPerFrame: number[] }>",
+								"description": {
+									"ko": "잰 프레임 수, 덩이 프레임 수, 프레임당 시간(밀리초, 모든 덩이 시간의 합 / 프레임 수), 덩이마다 프레임당 시간(밀리초).",
+									"en": "Measured frame count, chunk frame count, time per frame (milliseconds, sum of all chunk times / frame count), and time per frame for each chunk (milliseconds)."
+								}
+							},
+							"description": {
+								"ko": "GPU 처리량 재기. (지금 장면을 갱신 없이 그리기만 잇달아 하고 GPU 가 다 그리길 기다린 프레임당 시간)\n- 지금 장면을 씬 갱신(tick) 없이 엔진 프레임과 같은 그리기 길로 frameCount 번 잇달아 그리고, 1 화소 readPixels 로 GPU 가 다 그리길 기다린 벽시계 시간을 프레임 수로 나눈다.\n  렌더러(스크립트와 GL 명령 쓰기), GPU 프로세스(명령 풀기), GPU 실행 가운데 가장 느린 단의 몫이다. GPU 가 가장 느리면 GPU 가 실제로 한 프레임을 그리는 시간이다.\n  (크롬 트레이스의 GPU 프로세스 메인 스레드 시간은 명령을 푸는 CPU 시간이라 GPU 가 그리는 양이 바뀌어도 거의 움직이지 않는다)\n- 다음 rAF 부터 시작한다. 데움 10 프레임 뒤 30 프레임씩 덩이로 나눠 rAF 하나에 한 덩이를 그리고 덩이마다 GPU 를 기다린다. (한 번에 길게 막지 않는다, 덩이 사이는 재지 않는다)\n- 재는 동안 엔진 시간, 입력, 엔진 프레임 함수, 프레임 번호, 화면 크기 맞추기, 찍기는 서 있고 씬의 tick 을 부르지 않는다. 씬의 draw 가 게임 상태를 바꾸지 않으면 게임 상태는 그대로다.\n  다 재면 엔진 루프가 그대로 이어 돈다. (이어 도는 첫 프레임 간격은 탭을 숨겼다 돌아올 때처럼 TimeManager 의 간격 상한 안이다, 기본 0.25 초)\n- 같은 상태를 되풀이해 그리므로 바뀐 것만 다시 그리는 캐시(그림자 onChange 같은)는 다시 굽지 않는다. 움직이는 장면에서 프레임마다 다시 굽는 비용은 들지 않는다.\n- 캔버스의 기본 프레임 버퍼에 잇달아 그려 화면에 내는 것(합성)은 덩이마다 마지막 프레임만 한다. 합성 비용은 들지 않는다.\n- 페이지가 가려져 rAF 가 서면 기다린다. 재는 중에 또 부르거나 엔진 루프가 돌기 전이면 거부한다.",
+								"en": "Measures GPU throughput. (Time per frame for drawing the current scene repeatedly without updates and waiting until the GPU finishes drawing)\n- Draws the current scene frameCount times in a row through the same drawing path as an engine frame without scene updates (tick), waits with a 1-pixel readPixels until the GPU finishes drawing, and divides the wall-clock time by the frame count.\n  It is the share of the slowest stage among the renderer (script and writing GL commands), the GPU process (decoding commands) and GPU execution. When the GPU is the slowest, it is the time the GPU actually takes to draw a frame.\n  (The GPU process main thread time in a Chrome trace is CPU time for decoding commands, so it barely moves even when the amount the GPU draws changes)\n- Starts from the next rAF. After 10 warm-up frames, it splits the frames into chunks of 30, draws one chunk per rAF and waits for the GPU after each chunk. (It does not block for long at once, and the time between chunks is not measured)\n- While measuring, engine time, input, engine frame callbacks, the frame number, canvas resizing and capture stand still, and the scenes' tick is not called. If the scenes' draw does not change game state, game state stays the same.\n  When it finishes, the engine loop continues as it was. (The first frame interval after resuming is within the TimeManager interval limit, as when a hidden tab comes back, 0.25 seconds by default)\n- Because the same state is drawn repeatedly, caches that redraw only what changed (such as onChange shadows) do not rebake. The cost of rebaking every frame in a moving scene is not included.\n- Drawing to the canvas default framebuffer repeatedly presents (composites) only the last frame of each chunk. Compositing cost is not included.\n- If the page is hidden and rAF stops, it waits. Calling it again while measuring, or before the engine loop runs, is rejected."
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "지금 장면의 GPU 처리량 재기",
+										"en": "Measuring the GPU throughput of the current scene"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Rect, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tgraphic.setFillColor(\"#203040\");\n\t\tgraphic.drawRect(Rect.create(0, 0, 640, 360));\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());\nconst timeBefore = engine.getTimeManager().getTime();\nconst result = await Engine.getEngine().measureGpuThroughput(60);\nconst timeAfter = engine.getTimeManager().getTime();\nconsole.log(result.frameCount, result.chunkMillisecondsPerFrame.length, result.millisecondsPerFrame > 0, timeBefore === timeAfter);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "setVisibleCursor",
 							"signature": "setVisibleCursor(visibled)",
 							"params": [
