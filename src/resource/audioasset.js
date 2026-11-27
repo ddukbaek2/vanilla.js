@@ -30,8 +30,8 @@ export const AUTOMATIC_STREAMING_BYTE_THRESHOLD = 1024 * 1024;
  * console.log(musicAsset.isStreaming(), musicAsset.getAudioBuffer(), effectAsset.isStreaming(), effectAsset.getDuration());
  */
 export const AudioLoadType = System.Object.freeze({
-	automatic: "automatic", // 크기를 보고 고른다. (AUTOMATIC_STREAMING_BYTE_THRESHOLD 보다 큰 파일은 스트리밍, 아니면 통째로 풀기, 기본)
-	decompressOnLoad: "decompressOnLoad", // 읽을 때 PCM 으로 통째로 푼다. (효과음처럼 짧고 자주 겹쳐 트는 소리, 시작이 바로이고 겹쳐 틀어도 싸다)
+	automatic: "automatic", // 크기를 보고 고른다. (AUTOMATIC_STREAMING_BYTE_THRESHOLD 보다 큰 파일은 스트리밍, 아니면 통째로 풀기, 고른 애셋만)
+	decompressOnLoad: "decompressOnLoad", // 읽을 때 PCM 으로 통째로 푼다. (효과음처럼 짧고 자주 겹쳐 트는 소리, 시작이 바로이고 겹쳐 틀어도 싸다, 기본)
 	streaming: "streaming", // 풀지 않고 미디어 요소(HTMLAudioElement)가 조금씩 풀어 흘린다. (배경음처럼 긴 소리, 메모리는 압축된 파일 크기 이하)
 });
 
@@ -69,7 +69,7 @@ export class AudioAsset extends Asset {
 		this.setAssetType(AssetType.audio);
 		this.#audioBuffer = null;
 		this.#loadError = null;
-		this.#loadType = AudioLoadType.automatic;
+		this.#loadType = AudioLoadType.decompressOnLoad;
 		this.#streamUrl = null;
 		this.#isStreamUrlOwned = false;
 		this.#streamDuration = 0;
@@ -79,7 +79,7 @@ export class AudioAsset extends Asset {
 	// 읽기 방식 설정. (다음 load, loadFromBytes 부터, 이미 읽혔으면 unload 뒤에 다시 읽어야 바뀐다)
 	//==============================================================================
 	/**
-	 * @param { string } loadType 읽기 방식. (AudioLoadType 의 값, 모르는 값이면 automatic)
+	 * @param { string } loadType 읽기 방식. (AudioLoadType 의 값, 모르는 값이면 decompressOnLoad)
 	 * @example <caption>긴 배경음을 스트리밍으로 읽기</caption>
 	 * import { AudioAsset, AudioLoadType } from "./build/vanilla.js";
 	 *
@@ -90,14 +90,14 @@ export class AudioAsset extends Asset {
 	 */
 	setLoadType(loadType) {
 		const isKnown = System.Object.values(AudioLoadType).includes(loadType);
-		this.#loadType = isKnown ? loadType : AudioLoadType.automatic;
+		this.#loadType = isKnown ? loadType : AudioLoadType.decompressOnLoad;
 	}
 
 	//==============================================================================
 	// 읽기 방식 반환.
 	//==============================================================================
 	/**
-	 * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 automatic)
+	 * @returns { string } 읽기 방식. (AudioLoadType 의 값, 기본 decompressOnLoad, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
 	 */
 	getLoadType() {
 		return this.#loadType;

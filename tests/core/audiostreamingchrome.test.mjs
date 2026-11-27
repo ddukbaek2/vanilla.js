@@ -234,6 +234,7 @@ try {
 			unloadStreaming: unloadAsset.isStreaming(),
 			unloadLoaded: unloadAsset.isLoaded(),
 			unknownLoadType: unknownAsset.getLoadType(),
+			defaultLoadType: new AudioAsset().getLoadType(),
 			musicPeak,
 			musicPeakAfter,
 			musicPeakResumed,
@@ -275,7 +276,8 @@ for (let index = 0; index < result.mixedPeakList.length; index += 2) {
 check(result.automaticLongStreaming === true, "자동: 1 MiB 넘는 소리는 스트리밍");
 check(result.automaticShortStreaming === false, "자동: 작은 소리는 통째로 풀기");
 check(result.unloadStreaming === false && result.unloadLoaded === false, "내리면 스트리밍 주소를 놓음");
-check(result.unknownLoadType === "automatic", "모르는 읽기 방식은 automatic");
+check(result.unknownLoadType === "decompressOnLoad", "모르는 읽기 방식은 decompressOnLoad");
+check(result.defaultLoadType === "decompressOnLoad", "기본 읽기 방식은 decompressOnLoad");
 check(near(result.musicPeak, 0.5, 0.06), "SoundSystem 스트리밍 배경음악 진폭 " + result.musicPeak);
 check(result.musicPeakAfter < 0.01, "SoundSystem 배경음악을 끄면 조용 " + result.musicPeakAfter);
 check(near(result.musicPeakResumed, 0.5, 0.06), "SoundSystem 배경음악 이어 틀기 " + result.musicPeakResumed);

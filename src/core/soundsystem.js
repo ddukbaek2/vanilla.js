@@ -17,7 +17,7 @@ import { AudioPlayer } from "./audioplayer.js";
 //   maximumVoices: 같은 소리가 한꺼번에 날 수 있는 수. (넘으면 가장 오래된 것을 끊음, 없으면 효과음 전체의 수까지)
 //   pitchVariation: 낼 때마다 음 높이를 흔드는 비. (0.05 면 ±5%, 없으면 0)
 //   playSeconds, fadeOutSeconds: 효과음을 앞의 playSeconds 초만 틀고 fadeOutSeconds 초 동안 줄여 끈다. (긴 파일, 없거나 0 이면 끝까지)
-//   loadType: 읽기 방식. (AudioLoadType, 없으면 배경음악은 streaming, 효과음은 decompressOnLoad, 효과음은 겹쳐 트므로 통째로 풀어야 난다)
+//   loadType: 읽기 방식. (AudioLoadType, 없으면 decompressOnLoad, 효과음은 겹쳐 트므로 통째로 풀어야 난다, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
 //
 // 크기: 배경음악 = 설정의 음악 크기 × 음악의 비(멈춤 창의 반 크기 등) × 소리의 크기, 효과음 = 설정의 효과음 크기 × 소리의 크기 × 부를 때의 크기(거리에 따른 줄임 등).
 // 배경음악은 겹쳐 바꿀 수 있고(fadeSeconds), 멈췄던 자리를 소리마다 기억해 이어 틀 수 있다. (isResumed)
@@ -1030,7 +1030,7 @@ function readSoundPaths(soundRow) {
 }
 
 //==============================================================================
-// 소리 줄의 읽기 방식. (loadType 이 있으면 그것, 없으면 배경음악은 스트리밍, 효과음은 통째로 풀기)
+// 소리 줄의 읽기 방식. (loadType 이 있으면 그것, 없으면 통째로 풀기, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
 //==============================================================================
 /**
  * @param { object } soundRow
@@ -1040,7 +1040,7 @@ function readSoundRowLoadType(soundRow) {
 	if (System.Object.values(AudioLoadType).includes(soundRow.loadType)) {
 		return soundRow.loadType;
 	}
-	return soundRow.isMusic ? AudioLoadType.streaming : AudioLoadType.decompressOnLoad;
+	return AudioLoadType.decompressOnLoad;
 }
 
 //==============================================================================
