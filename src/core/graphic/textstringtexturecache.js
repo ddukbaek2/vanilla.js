@@ -26,6 +26,9 @@ const MAXIMUM_ATLAS_PAGE_COUNT = 8; // 아틀라스 장 수 상한. (넘으면 �
 const SUBPIXEL_SLOT_COUNT = 8; // 글리프 가로 자리 칸 수. (스키아 서브픽셀 4 칸의 경계 1/8, 3/8, 5/8, 7/8 과 정수 반올림 경계 1/2 를 모두 담는 1/8 칸)
 const MAXIMUM_ATLAS_FONT_SIZE = 256; // 이보다 큰 글꼴은 스키아가 글리프를 패스로 칠해 자리를 칸으로 묶지 않으므로 문자열째 굽는다. (SkStrikeSpec::ShouldDrawAsPath)
 const STROKE_MITER_LIMIT = 10; // 캔버스 miterLimit 기본값. (바깥선 글리프 칸의 여유)
+const MAXIMUM_GLYPH_INK_COUNT = 16384; // 잉크 경계를 기억하는 글자 덩어리 수 상한. (넘으면 비운다, 러스트 판과 같다)
+const INK_MEASURE_CHUNK_COUNT = 64; // 잉크 캔버스에 한 번에 그려 읽는 덩어리 수 상한.
+const INK_CANVAS_ROW_WIDTH = 4096; // 잉크 재기 캔버스 한 줄의 너비 상한. (덩어리 칸을 줄에 이어 놓고 한 번에 읽는다, 캔버스는 쓴 만큼만 잡는다)
 const RIGHT_TO_LEFT_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u; // 오른쪽에서 왼쪽 글자. (히브리, 아랍, 시리아 같은)
 const JOINING_CLUSTER_PATTERN = /^[\p{L}\p{M}]/u; // 글자 덩어리가 낱말 안에서 합자, 이어진 꼴로 이웃과 엮일 수 있는지. (글자, 결합 부호로 시작)
 const STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}]/u; // 글자 덩어리마다 따로 그려도 되는 글자. (한글, 한자, 가나)
@@ -291,6 +294,9 @@ function hasCharacterInRanges(text, ranges) {
 //   서브픽셀 자리가 꺼진 기계(정수 반올림, 경계 1/2)도 1/8 칸이 경계를 담아 같다.
 // - 글자 덩어리(Intl.Segmenter 의 grapheme)마다 하나씩 굽는다. 합자나 이어진 꼴이 생길 수 있는 글자(라틴, 키릴 같은 글자의 낱말)는
 //   낱말째 한 덩어리로 굽는다. 한글, 한자, 가나, 숫자, 문장 부호, 이모지는 덩어리마다 따로다.
+// - 잉크가 가로로 빈 열 하나 없이 닿는 덩어리들은 한 칸에 묶어 굽는다. (바깥선은 그은 띠까지 잉크로 본다, 러스트 판과 같은 규칙)
+//   빈 열이 있으면 선형 거르기의 이웃 텍셀에 두 덩어리가 함께 들지 않아, 칸마다 그려도 문자열을 통째로 구워 그린 것과 화소가 같다.
+//   닿는 덩어리를 따로 그리면 거르기와 겹친 잉크 섞기가 달라진다. 잉크가 없는 덩어리(공백)는 굽지 않는다.
 // - 오른쪽에서 왼쪽 글(아랍어, 히브리어), 아주 큰 글꼴, Intl.Segmenter 가 없는 곳은 문자열째 한 덩어리로 굽는다. (예전과 같다)
 // - 아틀라스 장이 차면 새 장을 열고, 장 수가 상한이면 가장 오래 안 쓴 장을 비워 다시 쓴다.
 //==============================================================================
@@ -302,6 +308,7 @@ export class TextStringTextureCache extends Object {
 	/** @private @type { Map<string, object> } */ #entries; // 글 배치 엔트리. (LRU)
 	/** @private @type { Map<string, object[]> } */ #entriesByText; // 문자열마다 그 문자열의 엔트리 목록. (찾을 때 열쇠 문자열을 만들지 않으려고)
 	/** @private @type { Map<string, object> } */ #glyphs; // 구운 글리프. (열쇠: 글꼴 열쇠, 글자 덩어리, 자리 열쇠)
+	/** @private @type { Map<string, object | null> } */ #glyphInks; // 글자 덩어리마다 잉크 경계. (열쇠는 글리프 열쇠, 값은 자리 기준 { left, right } 텍셀 열, 잉크가 없으면 null)
 	/** @private @type { object[] } */ #atlasPages; // 아틀라스 장 목록.
 	/** @private @type { number } */ #useSerial; // 엔트리를 줄 때마다 늘리는 번호. (장의 LRU)
 	/** @private @type { number } */ #bakedGlyphCount; // 지금까지 구운 글리프 수. (통계)
@@ -310,6 +317,8 @@ export class TextStringTextureCache extends Object {
 	/** @private @type { HTMLCanvasElement } */ #bakeCanvas;
 	/** @private @type { CanvasRenderingContext2D } */ #bakeCanvasRenderingContext;
 	/** @private @type { CanvasRenderingContext2D } */ #measurementCanvasRenderingContext;
+	/** @private @type { HTMLCanvasElement } */ #inkCanvas; // 잉크 재기용. (화소를 읽으므로 willReadFrequently)
+	/** @private @type { CanvasRenderingContext2D } */ #inkCanvasRenderingContext;
 	/** @private @type { CanvasRenderingContext2D } */ #layoutCanvasRenderingContext; // 글 배치 재기용. (글꼴을 바꿀 때만 다시 건다)
 	/** @private @type { ((texture: WebGLTexture) => void) | null } */ #textureBinder; // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
 	/** @private @type { (() => void) | null } */ #beforeTextureOverwrite; // 아틀라스 장을 비워 덮어쓰기 전에 부르는 함수. (주인 Graphic 이 쌓아 둔 묶음을 먼저 그린다)
@@ -330,6 +339,7 @@ export class TextStringTextureCache extends Object {
 		this.#entries = new Map();
 		this.#entriesByText = new Map();
 		this.#glyphs = new Map();
+		this.#glyphInks = new Map();
 		this.#atlasPages = [];
 		this.#useSerial = 0;
 		this.#bakedGlyphCount = 0;
@@ -344,6 +354,10 @@ export class TextStringTextureCache extends Object {
 
 		const measurementCanvas = System.document.createElement("canvas");
 		this.#measurementCanvasRenderingContext = measurementCanvas.getContext("2d");
+
+		const inkCanvas = System.document.createElement("canvas");
+		this.#inkCanvas = inkCanvas;
+		this.#inkCanvasRenderingContext = inkCanvas.getContext("2d", { willReadFrequently: true });
 
 		const layoutCanvas = System.document.createElement("canvas");
 		this.#layoutCanvasRenderingContext = layoutCanvas.getContext("2d");
@@ -552,25 +566,21 @@ export class TextStringTextureCache extends Object {
 		const strikeKey = `${mode}|${lineWidth * scale}|${isNearest ? 1 : 0}|${textDirection}|${scaledFontString}\u0002`;
 		const useSerial = this.#useSerial;
 
+		// 잉크가 닿는 덩어리끼리 한 칸으로 묶는다. (덩어리가 하나면 그대로)
+		const drawChunks = chunks.length > 1 ? this.mergeTouchingChunks(text, chunks, strikeKey, mode, colorString, lineWidth * scale, textDirection, scaledFontString, cellPadding, bakeHeight, scaledBaselineY) : chunks;
+		if (drawChunks === chunks) {
+			for (const chunk of chunks) {
+				this.placeChunk(chunk, strikeKey);
+			}
+		}
+
 		// 글리프 찾기. (없으면 굽기 목록에 모은다)
 		const glyphList = [];
 		const missingGlyphList = [];
-		for (const chunk of chunks) {
-			const startPosition = chunk.positions[0];
-			const anchorX = Math.floor(startPosition);
-			const fractionX = startPosition - anchorX;
-			let positionKey;
-			if (chunk.isExactPosition) {
-				positionKey = "x" + fractionX;
-			}
-			else {
-				positionKey = "";
-				for (const position of chunk.positions) {
-					const slotIndex = Math.floor(position * SUBPIXEL_SLOT_COUNT);
-					positionKey += System.String.fromCharCode(97 + (((slotIndex % SUBPIXEL_SLOT_COUNT) + SUBPIXEL_SLOT_COUNT) % SUBPIXEL_SLOT_COUNT));
-				}
-			}
-			const glyphKey = strikeKey + chunk.text + "\u0001" + positionKey;
+		for (const chunk of drawChunks) {
+			const anchorX = chunk.anchorX;
+			const fractionX = chunk.fractionX;
+			const glyphKey = chunk.glyphKey;
 			let glyph = this.#glyphs.get(glyphKey);
 			if (glyph === undefined && missingGlyphList.length > 0) {
 				glyph = missingGlyphList.find((missingGlyph) => missingGlyph.glyphKey === glyphKey);
@@ -587,8 +597,9 @@ export class TextStringTextureCache extends Object {
 					fractionX: fractionX,
 					originX: originX,
 					width: originX + 1 + chunkRight + cellPadding,
-					height: bakeHeight,
-					baselineY: scaledBaselineY,
+					height: bakeHeight + 2,
+					baselineY: scaledBaselineY + 1,
+					ink: chunk.ink,
 					atlasPage: null,
 					atlasX: 0,
 					atlasY: 0,
@@ -698,6 +709,244 @@ export class TextStringTextureCache extends Object {
 	}
 
 	//==============================================================================
+	// 덩어리의 정수 자리, 소수 자리, 글리프 열쇠 적기. (anchorX, fractionX, glyphKey)
+	// - 자리를 1/8 칸으로 묶을 수 있으면 덩어리 안 글자 덩어리마다의 칸 번호가 열쇠에 든다. 못 묶으면 정확한 소수 자리.
+	//==============================================================================
+	/**
+	 * @param { object } chunk
+	 * @param { string } strikeKey
+	 */
+	placeChunk(chunk, strikeKey) {
+		const startPosition = chunk.positions[0];
+		const anchorX = Math.floor(startPosition);
+		const fractionX = startPosition - anchorX;
+		let positionKey;
+		if (chunk.isExactPosition) {
+			positionKey = "x" + fractionX;
+		}
+		else {
+			positionKey = "";
+			for (const position of chunk.positions) {
+				const slotIndex = Math.floor(position * SUBPIXEL_SLOT_COUNT);
+				positionKey += System.String.fromCharCode(97 + (((slotIndex % SUBPIXEL_SLOT_COUNT) + SUBPIXEL_SLOT_COUNT) % SUBPIXEL_SLOT_COUNT));
+			}
+		}
+		chunk.anchorX = anchorX;
+		chunk.fractionX = fractionX;
+		chunk.glyphKey = strikeKey + chunk.text + "\u0001" + positionKey;
+	}
+
+	//==============================================================================
+	// 잉크가 닿는 덩어리끼리 한 덩어리로 묶기. (러스트 판 글리프 묶기와 같은 규칙)
+	// - 덩어리마다 잉크 경계(가로 텍셀 열)를 재어, 가로로 빈 열이 하나도 없이 닿으면 묶는다. 바깥선은 그은 띠가 잉크다.
+	// - fillText 는 이어진 글만 그리므로 묶음은 처음 덩어리부터 끝 덩어리까지 이어진 글이다. (사이의 덩어리도 함께 굽는다)
+	// - 잉크가 없는 덩어리(공백)는 묶음 사이에 들지 않으면 뺀다. (그릴 화소가 없다)
+	// - 잉크 경계는 글리프 열쇠마다 한 번 재어 기억한다. (처음 보는 덩어리는 잉크 캔버스에 한 번에 그려 읽는다)
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @param { object[] } chunks
+	 * @param { string } strikeKey
+	 * @param { string } mode
+	 * @param { string } colorString
+	 * @param { number } scaledLineWidth
+	 * @param { string } textDirection
+	 * @param { string } scaledFontString
+	 * @param { number } cellPadding
+	 * @param { number } cellHeight
+	 * @param { number } baselineY
+	 * @returns { object[] } 그릴 덩어리 목록. (덩어리마다 anchorX, fractionX, glyphKey, ink)
+	 */
+	mergeTouchingChunks(text, chunks, strikeKey, mode, colorString, scaledLineWidth, textDirection, scaledFontString, cellPadding, cellHeight, baselineY) {
+		// 덩어리마다 잉크 경계. (기억한 것이 없으면 모아 한 번에 잰다)
+		const glyphInks = this.#glyphInks;
+		const unknownChunks = [];
+		for (const chunk of chunks) {
+			this.placeChunk(chunk, strikeKey);
+			let ink = glyphInks.get(chunk.glyphKey);
+			if (ink === undefined) {
+				const glyph = this.#glyphs.get(chunk.glyphKey);
+				if (glyph !== undefined && glyph.ink !== undefined) {
+					ink = glyph.ink;
+				}
+			}
+			if (ink === undefined) {
+				unknownChunks.push(chunk);
+			}
+			else {
+				chunk.ink = ink;
+			}
+		}
+		// 큰 글꼴의 긴 글에서 잉크 캔버스가 너무 커지지 않게 나눠 잰다.
+		for (let startIndex = 0; startIndex < unknownChunks.length; startIndex += INK_MEASURE_CHUNK_COUNT) {
+			this.measureChunkInks(unknownChunks.slice(startIndex, startIndex + INK_MEASURE_CHUNK_COUNT), mode, colorString, scaledLineWidth, textDirection, scaledFontString, cellPadding, cellHeight, baselineY);
+		}
+
+		// 닿는 덩어리 묶기. (묶음은 이어진 덩어리 차례 구간이고, 서로 닿지 않게 둔다, 잉크 열은 [left, right) 로 끝이 같으면 빈 열 없이 닿은 것)
+		const groups = [];
+		for (let chunkIndex = 0; chunkIndex < chunks.length; ++chunkIndex) {
+			const chunk = chunks[chunkIndex];
+			if (chunk.ink === null) {
+				continue;
+			}
+			const group = { firstIndex: chunkIndex, lastIndex: chunkIndex, left: chunk.anchorX + chunk.ink.left, right: chunk.anchorX + chunk.ink.right };
+			let mergeIndex = groups.length;
+			for (;;) {
+				let left = group.left;
+				let right = group.right;
+				for (let groupIndex = mergeIndex; groupIndex < groups.length; ++groupIndex) {
+					left = Math.min(left, groups[groupIndex].left);
+					right = Math.max(right, groups[groupIndex].right);
+				}
+				let touchingIndex = -1;
+				for (let groupIndex = 0; groupIndex < mergeIndex; ++groupIndex) {
+					if (left <= groups[groupIndex].right && groups[groupIndex].left <= right) {
+						touchingIndex = groupIndex;
+						break;
+					}
+				}
+				if (touchingIndex < 0) {
+					group.left = left;
+					group.right = right;
+					break;
+				}
+				mergeIndex = touchingIndex;
+			}
+			if (mergeIndex < groups.length) {
+				group.firstIndex = groups[mergeIndex].firstIndex;
+				groups.length = mergeIndex;
+			}
+			groups.push(group);
+		}
+
+		// 묶음마다 그릴 덩어리. (하나면 그 덩어리, 여럿이면 이어진 글 한 덩어리)
+		const drawChunks = [];
+		for (const group of groups) {
+			if (group.firstIndex === group.lastIndex) {
+				drawChunks.push(chunks[group.firstIndex]);
+				continue;
+			}
+			const mergedChunk = { text: "", start: chunks[group.firstIndex].start, clusterEnds: [], isExactPosition: false, isWholeText: false, positions: [] };
+			for (let chunkIndex = group.firstIndex; chunkIndex <= group.lastIndex; ++chunkIndex) {
+				const chunk = chunks[chunkIndex];
+				mergedChunk.clusterEnds.push(...chunk.clusterEnds);
+				mergedChunk.positions.push(...chunk.positions);
+				mergedChunk.isExactPosition = mergedChunk.isExactPosition || chunk.isExactPosition;
+			}
+			mergedChunk.text = text.substring(mergedChunk.start, mergedChunk.clusterEnds[mergedChunk.clusterEnds.length - 1]);
+			this.placeChunk(mergedChunk, strikeKey);
+			mergedChunk.ink = { left: group.left - mergedChunk.anchorX, right: group.right - mergedChunk.anchorX };
+			drawChunks.push(mergedChunk);
+		}
+		return drawChunks;
+	}
+
+	//==============================================================================
+	// 덩어리들의 잉크 경계 재기. (굽기와 같은 칸, 같은 자리로 잉크 캔버스 줄에 이어 그리고 한 번에 읽는다)
+	// - 경계는 알파가 0 이 아닌 가로 텍셀 열이다. 덩어리 정수 자리 기준 [left, right), 잉크가 없으면 null.
+	//==============================================================================
+	/**
+	 * @param { object[] } chunks
+	 * @param { string } mode
+	 * @param { string } colorString
+	 * @param { number } scaledLineWidth
+	 * @param { string } textDirection
+	 * @param { string } scaledFontString
+	 * @param { number } cellPadding
+	 * @param { number } cellHeight
+	 * @param { number } baselineY
+	 */
+	measureChunkInks(chunks, mode, colorString, scaledLineWidth, textDirection, scaledFontString, cellPadding, cellHeight, baselineY) {
+		// 칸 자리 잡기. (줄에 이어 놓고, 줄이 차면 아래 줄)
+		const cells = [];
+		let cursorX = 0;
+		let rowIndex = 0;
+		let canvasWidth = 1;
+		for (const chunk of chunks) {
+			const chunkMetrics = this.measureLayoutText(scaledFontString, chunk.text);
+			const chunkLeft = Math.ceil(Math.max(chunkMetrics.actualBoundingBoxLeft || 0, 0));
+			const chunkRight = Math.ceil(Math.max(chunkMetrics.actualBoundingBoxRight || chunkMetrics.width, 0));
+			const originX = cellPadding + chunkLeft;
+			const width = originX + 1 + chunkRight + cellPadding;
+			if (cursorX > 0 && cursorX + width > INK_CANVAS_ROW_WIDTH) {
+				cursorX = 0;
+				rowIndex += 1;
+			}
+			cells.push(cursorX, rowIndex * cellHeight, originX, width);
+			cursorX += width;
+			canvasWidth = Math.max(canvasWidth, cursorX);
+		}
+		const canvasHeight = (rowIndex + 1) * cellHeight;
+
+		// 그리기. (캔버스는 키우기만 하고 쓴 자리만 비우고 읽는다, 크기를 바꾸면 상태가 초기화되므로 그 뒤에 글꼴을 건다)
+		const inkCanvas = this.#inkCanvas;
+		const inkCanvasRenderingContext = this.#inkCanvasRenderingContext;
+		if (inkCanvas.width < canvasWidth || inkCanvas.height < canvasHeight) {
+			inkCanvas.width = Math.max(inkCanvas.width, canvasWidth);
+			inkCanvas.height = Math.max(inkCanvas.height, canvasHeight);
+		}
+		else {
+			inkCanvasRenderingContext.clearRect(0, 0, canvasWidth, canvasHeight);
+		}
+		inkCanvasRenderingContext.font = scaledFontString;
+		inkCanvasRenderingContext.direction = textDirection;
+		inkCanvasRenderingContext.textAlign = "left";
+		inkCanvasRenderingContext.textBaseline = "alphabetic";
+		if (mode === "stroke") {
+			inkCanvasRenderingContext.strokeStyle = colorString;
+			inkCanvasRenderingContext.lineWidth = scaledLineWidth;
+		}
+		else {
+			inkCanvasRenderingContext.fillStyle = colorString;
+		}
+		for (let chunkIndex = 0; chunkIndex < chunks.length; ++chunkIndex) {
+			const chunk = chunks[chunkIndex];
+			const penX = cells[chunkIndex * 4] + cells[chunkIndex * 4 + 2] + chunk.fractionX;
+			const penY = cells[chunkIndex * 4 + 1] + baselineY;
+			if (mode === "stroke") {
+				inkCanvasRenderingContext.strokeText(chunk.text, penX, penY);
+			}
+			else {
+				inkCanvasRenderingContext.fillText(chunk.text, penX, penY);
+			}
+		}
+
+		// 읽어 칸마다 잉크 열 찾기.
+		const pixels = inkCanvasRenderingContext.getImageData(0, 0, canvasWidth, canvasHeight).data;
+		const glyphInks = this.#glyphInks;
+		if (glyphInks.size + chunks.length > MAXIMUM_GLYPH_INK_COUNT) {
+			glyphInks.clear();
+		}
+		for (let chunkIndex = 0; chunkIndex < chunks.length; ++chunkIndex) {
+			const chunk = chunks[chunkIndex];
+			const cellX = cells[chunkIndex * 4];
+			const cellY = cells[chunkIndex * 4 + 1];
+			const originX = cells[chunkIndex * 4 + 2];
+			const width = cells[chunkIndex * 4 + 3];
+			let inkLeft = width;
+			let inkRight = -1;
+			for (let y = cellY; y < cellY + cellHeight; ++y) {
+				const rowOffset = (y * canvasWidth + cellX) * 4 + 3;
+				for (let x = 0; x < inkLeft; ++x) {
+					if (pixels[rowOffset + x * 4] !== 0) {
+						inkLeft = x;
+						break;
+					}
+				}
+				for (let x = width - 1; x > inkRight; --x) {
+					if (pixels[rowOffset + x * 4] !== 0) {
+						inkRight = x;
+						break;
+					}
+				}
+			}
+			const ink = inkRight < inkLeft ? null : { left: inkLeft - originX, right: inkRight + 1 - originX };
+			chunk.ink = ink;
+			glyphInks.set(chunk.glyphKey, ink);
+		}
+	}
+
+	//==============================================================================
 	// 덩어리 안 글자 덩어리마다 펜에서의 가로 자리 재기. (굽는 배율 텍셀)
 	// - 자리(k) = 자리(k-1) + (앞 글자 덩어리와 이 글자 덩어리를 붙인 너비) - (이 글자 덩어리만의 너비).
 	//   붙인 너비에서 뒤 덩어리 너비를 빼면 앞 덩어리의 커닝까지 든 전진폭이다. 크롬이 셈한 자리와 같다.
@@ -799,6 +1048,11 @@ export class TextStringTextureCache extends Object {
 			else {
 				bakeCanvasRenderingContext.fillStyle = colorString;
 			}
+			// 문자열 사각형 줄만 그린다. (위아래 한 줄은 비워 두고 아래에서 채운다)
+			bakeCanvasRenderingContext.save();
+			bakeCanvasRenderingContext.beginPath();
+			bakeCanvasRenderingContext.rect(0, 1, span.width, span.height - 2);
+			bakeCanvasRenderingContext.clip();
 			for (const glyph of span.glyphs) {
 				const penX = glyph.atlasX - span.atlasX + glyph.originX + glyph.fractionX;
 				if (mode === "stroke") {
@@ -808,6 +1062,12 @@ export class TextStringTextureCache extends Object {
 					bakeCanvasRenderingContext.fillText(glyph.text, penX, glyph.baselineY);
 				}
 			}
+
+			bakeCanvasRenderingContext.restore();
+
+			// 칸의 맨 위와 맨 아래 한 줄은 문자열 사각형의 가장자리 줄을 되풀이한다. (문자열 사각형 밖 잉크는 잘리고, 소수 자리에서 선형 거르기가 사각형 밖 한 줄을 뽑을 때 예전 문자열 텍스처의 CLAMP_TO_EDGE 와 같게)
+			bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, 1, span.width, 1, 0, 0, span.width, 1);
+			bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, span.height - 2, span.width, 1, 0, span.height - 1, span.width, 1);
 
 			// 안티앨리어싱을 끈 경우: 알파를 문턱값으로 갈라 가장자리의 반투명 픽셀을 없앤다.
 			if (isNearest) {
@@ -1019,6 +1279,7 @@ export class TextStringTextureCache extends Object {
 		}
 		this.#atlasPages.length = 0;
 		this.#glyphs.clear();
+		this.#glyphInks.clear();
 		this.getEntries().clear();
 		this.#entriesByText.clear();
 	}
@@ -1081,6 +1342,7 @@ export class TextStringTextureCache extends Object {
 				this.#glyphs.delete(glyphKey);
 			}
 		}
+		this.#glyphInks.clear();
 		const entries = this.getEntries();
 		let removedCount = 0;
 		for (const [entryKey, entry] of System.Array.from(entries)) {

@@ -3,7 +3,9 @@
 // - 원본은 글리프를 (글자 덩어리, 1/8 자리 칸) 열쇠로 아틀라스에 한 번만 굽고 문자열은 글리프 사각형으로 그린다.
 //   헤드리스 크롬(창을 띄우지 않는다)에서 엔진이 그린 글자와, 예전 길(fillText 로 문자열을 통째로 구운 텍스처 한 장을 같은 그리기 길로)로 그린 것을 화소로 견준다.
 //   (한글, 영어, 숫자, 섞인 글, 이모지, 합자, 아랍어, 태국어, 여러 크기와 굵기)
-// - 같은 글자로 된 새 문자열은 굽지 않고(올린 수가 늘지 않고), 글자 많은 화면이 드로 콜 하나로 묶이는지 본다.
+//   정수 자리(화소 맞추기)와 소수 자리(맞추기 끔, 가로 세로 소수 자리) 둘 다 다른 화소가 하나도 없어야 한다.
+//   (잉크가 빈 열 없이 닿는 덩어리는 한 칸에 묶여, 칸마다 따로 선형 거르기가 걸리지 않는다)
+// - 이미 구운 덩어리로만 된 새 문자열은 굽지 않고(올린 수가 늘지 않고), 글자 많은 화면이 드로 콜 하나로 묶이는지 본다.
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 const System = globalThis;
@@ -68,6 +70,14 @@ try {
 		];
 		let frame = 0;
 		let phase = "lines";
+		// 줄마다 그릴 자리. (소수 자리 단계에서는 가로 세로에 줄마다 다른 소수 자리를 더한다)
+		let isFractionPhase = false;
+		const readLineOrigin = (lineIndex) => {
+			if (!isFractionPhase) {
+				return [8, 40 + lineIndex * 50];
+			}
+			return [8 + 0.13 + lineIndex * 0.11, 40 + lineIndex * 50 + 0.3 + lineIndex * 0.05];
+		};
 		const referenceTextureList = [];
 		const statistics = {};
 		class MainScene extends Scene {
@@ -89,8 +99,9 @@ try {
 				graphic.setTextBaseline("alphabetic");
 				if (phase === "lines") {
 					lineList.forEach(([fontString, text], lineIndex) => {
+						const [x, y] = readLineOrigin(lineIndex);
 						graphic.setFontString(fontString);
-						graphic.drawFillText(text, 8, 40 + lineIndex * 50);
+						graphic.drawFillText(text, x, y);
 					});
 				}
 				else if (phase === "reference") {
@@ -124,14 +135,25 @@ try {
 							referenceTextureList[lineIndex] = { texture: texture, penX: penX, baselineY: baselineY, width: bakeCanvas.width, height: bakeCanvas.height };
 						}
 						const reference = referenceTextureList[lineIndex];
-						const left = 8 - reference.penX;
-						const top = 40 + lineIndex * 50 - reference.baselineY;
+						const [x, y] = readLineOrigin(lineIndex);
+						const left = x - reference.penX;
+						const top = y - reference.baselineY;
 						const floatCount = graphic.writeQuad(0, left, top, left + reference.width, top + reference.height, 0, 0, 1, 1);
 						graphic.drawVertices(floatCount / 4, reference.texture, graphic.getWhiteColor());
 					});
 				}
+				else if (phase === "tokens") {
+					// 글자 많은 화면. (줄 50 개, 이미 구운 낱말과 숫자 덩어리를 공백으로 이어 프레임마다 다른 새 문자열)
+					graphic.setFontString("14px sans-serif");
+					const tokenList = ["HP", "12", "345", "가격", "6789", "원", "MP", "0"];
+					for (let lineIndex = 0; lineIndex < 50; ++lineIndex) {
+						const tokenIndex = lineIndex * 3 + frame;
+						const text = `${tokenList[tokenIndex % 8]} ${tokenList[(tokenIndex * 5 + 1) % 8]} ${tokenList[(tokenIndex * 7 + 2) % 8]}`;
+						graphic.drawFillText(text, 8 + (lineIndex % 5) * 120, 20 + System.Math.floor(lineIndex / 5) * 20);
+					}
+				}
 				else {
-					// 글자 많은 화면. (줄 50 개, 숫자만 바뀌는 새 문자열)
+					// 숫자만 바뀌는 새 문자열. (잉크가 닿는 숫자는 한 칸에 묶여 새로 굽는다, 올린 수는 적어 보기만 한다)
 					graphic.setFontString("14px sans-serif");
 					for (let lineIndex = 0; lineIndex < 50; ++lineIndex) {
 						graphic.drawFillText(`${(lineIndex * 7919 + frame * 104729) % 100000}`, 8 + (lineIndex % 5) * 120, 20 + System.Math.floor(lineIndex / 5) * 20);
@@ -162,6 +184,9 @@ try {
 			webGL2RenderingContext.readPixels(0, 0, width, height, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, pixels);
 			return pixels;
 		};
+		const compareLines = async () => {
+		phase = "lines";
+		await waitFrames(3);
 		const enginePixels = readFrame();
 		// 찍은 것이 글이 그려진 장면인지(전부 검정이 아닌지) 센다. 로딩 화면이나 빈 화면끼리 견주면 아무것도 확인하지 못한다.
 		let litPixelCount = 0;
@@ -181,35 +206,51 @@ try {
 				for (let channel = 0; channel < 4; ++channel) {
 					const pixelOffset = ((height - 1 - y) * width + x) * 4 + channel;
 					const difference = System.Math.abs(enginePixels[pixelOffset] - referencePixels[pixelOffset]);
-					if (difference > 1 && lineIndex >= 0) {
+					if (difference > 0 && lineIndex >= 0) {
 						lineDifferenceList[lineIndex].count += 1;
 						lineDifferenceList[lineIndex].maximum = System.Math.max(lineDifferenceList[lineIndex].maximum, difference);
 					}
 				}
 			}
 		}
+		return lineDifferenceList;
+		};
+		const lineDifferenceList = await compareLines();
+		// 소수 자리. (화소 맞추기를 끄고 줄마다 다른 소수 자리에 그린다)
+		isFractionPhase = true;
+		graphic.setTextPixelSnapEnabled(false);
+		const fractionLineDifferenceList = await compareLines();
 
-		// 숫자만 바뀌는 새 문자열은 처음 몇 프레임 뒤로 굽지 않고, 50 줄이 드로 콜 하나다.
+		// 이미 구운 덩어리로만 된 새 문자열은 처음 몇 프레임 뒤로 굽지 않고, 50 줄이 드로 콜 하나다.
 		const textStringTextureCache = graphic.getTextStringTextureCache();
-		phase = "numbers";
-		await waitFrames(3);
+		phase = "tokens";
+		await waitFrames(8);
 		const uploadCountBefore = textStringTextureCache.readAtlasStatistics().uploadCount;
 		await waitFrames(3);
 		statistics.uploadCountGrowth = textStringTextureCache.readAtlasStatistics().uploadCount - uploadCountBefore;
 		statistics.drawCallCount = graphic.getLastFrameDrawCallCount();
+		phase = "numbers";
+		await waitFrames(3);
+		const numberUploadCountBefore = textStringTextureCache.readAtlasStatistics().uploadCount;
+		await waitFrames(3);
+		statistics.numberUploadCountGrowth = textStringTextureCache.readAtlasStatistics().uploadCount - numberUploadCountBefore;
+		statistics.numberDrawCallCount = graphic.getLastFrameDrawCallCount();
 		statistics.atlasPageCount = textStringTextureCache.readAtlasStatistics().atlasPageCount;
-		return { lineDifferenceList, statistics };
+		return { lineDifferenceList, fractionLineDifferenceList, statistics };
 	});
 	checkEqual(pageErrorList.length, 0, "페이지 오류 " + pageErrorList.join(" / "));
 	check(result.statistics.litPixelCount >= 2000, `글이 그려진 장면을 찍었다 (검정이 아닌 화소 ${result.statistics.litPixelCount})`);
 	result.lineDifferenceList.forEach((lineDifference, lineIndex) => {
-		// 글리프 잉크가 겹치는 화소(기울임, 이모지)는 8 비트 겹치기 반올림으로 1, 2 단계 다를 수 있다.
-		check(lineDifference.count <= 4 && lineDifference.maximum <= 6, `줄 ${lineIndex} 예전 길과 다른 화소 ${lineDifference.count} 개, 최대 ${lineDifference.maximum}`);
+		checkEqual(lineDifference.count, 0, `줄 ${lineIndex} 정수 자리에서 예전 길과 다른 화소 수 (최대 ${lineDifference.maximum})`);
 	});
-	checkEqual(result.statistics.uploadCountGrowth, 0, "아는 숫자로 된 새 문자열은 굽지 않음");
+	result.fractionLineDifferenceList.forEach((lineDifference, lineIndex) => {
+		checkEqual(lineDifference.count, 0, `줄 ${lineIndex} 소수 자리에서 예전 길과 다른 화소 수 (최대 ${lineDifference.maximum})`);
+	});
+	checkEqual(result.statistics.uploadCountGrowth, 0, "구운 덩어리로 된 새 문자열은 굽지 않음");
 	check(result.statistics.drawCallCount <= 2, "글자 50 줄 드로 콜 " + result.statistics.drawCallCount);
+	check(result.statistics.numberDrawCallCount <= 2, "숫자 50 줄 드로 콜 " + result.statistics.numberDrawCallCount);
 	checkEqual(result.statistics.atlasPageCount, 1, "아틀라스 장 수");
-	console.log("줄마다 예전 길과 다른 화소(2 단계 넘게): " + result.lineDifferenceList.map((lineDifference) => lineDifference.count + "/" + lineDifference.maximum).join(", ") + ", 드로 콜 " + result.statistics.drawCallCount);
+	console.log("줄마다 예전 길과 다른 화소: 정수 자리 " + result.lineDifferenceList.map((lineDifference) => lineDifference.count).join(", ") + ", 소수 자리 " + result.fractionLineDifferenceList.map((lineDifference) => lineDifference.count).join(", ") + ", 드로 콜 " + result.statistics.drawCallCount + ", 새 숫자 50 줄 세 프레임 올린 수 " + result.statistics.numberUploadCountGrowth);
 }
 finally {
 	await browser.close();
