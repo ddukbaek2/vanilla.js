@@ -31245,6 +31245,54 @@
 			"vanilla-engine": {
 				"module": "resource/audioasset",
 				"class": "AudioAsset",
+				"name": "set_load_type"
+			},
+			"vanilla.js": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
+				"name": "setLoadType"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
+				"name": "get_load_type"
+			},
+			"vanilla.js": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
+				"name": "getLoadType"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
+				"name": "is_streaming"
+			},
+			"vanilla.js": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
+				"name": "isStreaming"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
+				"name": "get_stream_url"
+			},
+			"vanilla.js": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
+				"name": "getStreamUrl"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "resource/audioasset",
+				"class": "AudioAsset",
 				"name": "get_audio_buffer"
 			},
 			"vanilla.js": {
@@ -31263,6 +31311,26 @@
 				"module": "resource/audioasset",
 				"class": "AudioAsset",
 				"name": "getDuration"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "resource/audioasset",
+				"class": "AudioLoadType"
+			},
+			"vanilla.js": {
+				"module": "resource/audioasset",
+				"class": "AudioLoadType"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "resource/audioasset",
+				"name": "AUTOMATIC_STREAMING_BYTE_THRESHOLD"
+			},
+			"vanilla.js": {
+				"module": "resource/audioasset",
+				"name": "AUTOMATIC_STREAMING_BYTE_THRESHOLD"
 			}
 		},
 		{

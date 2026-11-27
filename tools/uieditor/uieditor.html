@@ -231,6 +231,7 @@
     ToastPhase: () => ToastPhase,
     ToonBlendMode: () => ToonBlendMode,
     ToonBufferUsage: () => ToonBufferUsage,
+    ToonDrawItem: () => ToonDrawItem,
     ToonDrawQueue: () => ToonDrawQueue,
     ToonDrawStage: () => ToonDrawStage,
     ToonInstanceLayout: () => ToonInstanceLayout,
@@ -356,6 +357,7 @@
     sliceGraphemes: () => sliceGraphemes,
     splitGraphemes: () => splitGraphemes,
     splitWords: () => splitWords,
+    writeInstanceBufferSphere: () => writeInstanceBufferSphere,
     writeSkinPose: () => writeSkinPose
   });
 
@@ -2199,6 +2201,32 @@
 
   // src/base/matrix4.js
   var System6 = globalThis;
+  var MULTIPLY_RESULT = new System6.Float32Array(16);
+  var OPERAND_ELEMENTS = new System6.Float32Array(16);
+  function multiplyElements(elements, otherElements) {
+    const resultElements = MULTIPLY_RESULT;
+    for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
+      for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
+        let sum = 0;
+        for (let termIndex = 0; termIndex < 4; ++termIndex) {
+          sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
+        }
+        resultElements[columnIndex * 4 + rowIndex] = sum;
+      }
+    }
+    elements.set(resultElements);
+  }
+  __name(multiplyElements, "multiplyElements");
+  function readIdentityOperand() {
+    const elements = OPERAND_ELEMENTS;
+    elements.fill(0);
+    elements[0] = 1;
+    elements[5] = 1;
+    elements[10] = 1;
+    elements[15] = 1;
+    return elements;
+  }
+  __name(readIdentityOperand, "readIdentityOperand");
   var Matrix4 = class _Matrix4 extends Object2 {
     static {
       __name(this, "Matrix4");
@@ -2263,19 +2291,7 @@
      * @param { Matrix4 } other 오른쪽에 곱할 행렬.
      */
     multiply(other) {
-      const elements = this.getElements();
-      const otherElements = other.getElements();
-      const resultElements = new System6.Float32Array(16);
-      for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
-        for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
-          let sum = 0;
-          for (let termIndex = 0; termIndex < 4; ++termIndex) {
-            sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
-          }
-          resultElements[columnIndex * 4 + rowIndex] = sum;
-        }
-      }
-      elements.set(resultElements);
+      multiplyElements(this.getElements(), other.getElements());
     }
     //==============================================================================
     // 이동 변환 누적. (로컬 공간 우측 곱)
@@ -2286,8 +2302,11 @@
      * @param { number } z Z 이동량.
      */
     translate(x, y, z) {
-      const translationMatrix = _Matrix4.createTranslation(x, y, z);
-      this.multiply(translationMatrix);
+      const operand = readIdentityOperand();
+      operand[12] = x;
+      operand[13] = y;
+      operand[14] = z;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // X축 회전 변환 누적. (로컬 공간 우측 곱)
@@ -2296,8 +2315,14 @@
      * @param { number } radian 회전 각도. (라디안)
      */
     rotateX(radian) {
-      const rotationMatrix = _Matrix4.createRotationX(radian);
-      this.multiply(rotationMatrix);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const operand = readIdentityOperand();
+      operand[5] = cosRadian;
+      operand[6] = sinRadian;
+      operand[9] = -sinRadian;
+      operand[10] = cosRadian;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // Y축 회전 변환 누적. (로컬 공간 우측 곱)
@@ -2306,8 +2331,14 @@
      * @param { number } radian 회전 각도. (라디안)
      */
     rotateY(radian) {
-      const rotationMatrix = _Matrix4.createRotationY(radian);
-      this.multiply(rotationMatrix);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const operand = readIdentityOperand();
+      operand[0] = cosRadian;
+      operand[2] = -sinRadian;
+      operand[8] = sinRadian;
+      operand[10] = cosRadian;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // Z축 회전 변환 누적. (로컬 공간 우측 곱)
@@ -2316,8 +2347,14 @@
      * @param { number } radian 회전 각도. (라디안)
      */
     rotateZ(radian) {
-      const rotationMatrix = _Matrix4.createRotationZ(radian);
-      this.multiply(rotationMatrix);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const operand = readIdentityOperand();
+      operand[0] = cosRadian;
+      operand[1] = sinRadian;
+      operand[4] = -sinRadian;
+      operand[5] = cosRadian;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // 크기 변환 누적. (로컬 공간 우측 곱)
@@ -2328,8 +2365,11 @@
      * @param { number } z Z 배율.
      */
     scale(x, y, z) {
-      const scaleMatrix = _Matrix4.createScale(x, y, z);
-      this.multiply(scaleMatrix);
+      const operand = readIdentityOperand();
+      operand[0] = x;
+      operand[5] = y;
+      operand[10] = z;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // 점 변환. (w 성분 포함, 원근 분할은 호출자가 수행)
@@ -6466,6 +6506,7 @@
 
   // src/core/node/transformnode.js
   var System14 = globalThis;
+  var PARENT_SCALE = Vector2.create(0, 1);
   var DRAW_BOUNDS_DIRTY = 0;
   var DRAW_BOUNDS_KNOWN = 1;
   var DRAW_BOUNDS_UNKNOWN = 2;
@@ -6483,6 +6524,26 @@
   var visibleChildRect = new Rect();
   var visibleChildFirstIndex = 0;
   var visibleChildLastIndex = 0;
+  function readNodePosition(node, out) {
+    if (typeof node.readPosition === "function") {
+      node.readPosition(out);
+      return;
+    }
+    const position = node.getPosition();
+    out.x = position.x;
+    out.y = position.y;
+  }
+  __name(readNodePosition, "readNodePosition");
+  function readNodeScale(node, out) {
+    if (typeof node.readScale === "function") {
+      node.readScale(out);
+      return;
+    }
+    const scale = node.getScale();
+    out.x = scale.x;
+    out.y = scale.y;
+  }
+  __name(readNodeScale, "readNodeScale");
   var TransformNode = class _TransformNode extends ComponentNode {
     static {
       __name(this, "TransformNode");
@@ -6844,6 +6905,149 @@
       const rx = sx * cosRadian - sy * sinRadian;
       const ry = sx * sinRadian + sy * cosRadian;
       return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
+    }
+    //==============================================================================
+    // 글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 값, 새 벡터를 짓지 않는다)
+    // - getPosition 이나 부모의 위치, 회전, 크기 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다. (그때는 그 함수가 짓는 만큼 할당한다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>프레임마다 같은 벡터에 글로벌 위치 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const parentNode = new TransformNode();
+     * parentNode.setLocalPosition(Vector2.create(10, 20));
+     * const childNode = new TransformNode();
+     * childNode.setParent(parentNode);
+     * childNode.setLocalPosition(Vector2.create(5, 0));
+     * const position = Vector2.create(0, 0);
+     * childNode.readPosition(position);
+     * if (position.x !== 15 || position.y !== 20) {
+     * 	throw new Error("position failed");
+     * }
+     */
+    readPosition(out) {
+      if (this.getPosition !== _TransformNode.prototype.getPosition) {
+        const position = this.getPosition();
+        out.x = position.x;
+        out.y = position.y;
+        return out;
+      }
+      const parent = this.getParent();
+      this.readLocalPosition(out);
+      if (!parent) {
+        return out;
+      }
+      const localX = out.x;
+      const localY = out.y;
+      readNodePosition(parent, out);
+      const parentPositionX = out.x;
+      const parentPositionY = out.y;
+      const parentRotation = parent.getRotation();
+      readNodeScale(parent, PARENT_SCALE);
+      const parentScaleX = PARENT_SCALE.x;
+      const parentScaleY = PARENT_SCALE.y;
+      const radian = degreeToRadian(parentRotation);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const sx = localX * parentScaleX;
+      const sy = localY * parentScaleY;
+      const rx = sx * cosRadian - sy * sinRadian;
+      const ry = sx * sinRadian + sy * cosRadian;
+      out.x = parentPositionX + rx;
+      out.y = parentPositionY + ry;
+      return out;
+    }
+    //==============================================================================
+    // 글로벌 크기를 주어진 벡터에 쓰기. (getScale 과 같은 값, 새 벡터를 짓지 않는다)
+    // - getScale 이나 getLocalScale 을 덮어쓴 하위 클래스면 그 함수로 읽는다.
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>프레임마다 같은 벡터에 글로벌 크기 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const parentNode = new TransformNode();
+     * parentNode.setLocalScale(Vector2.create(2, 2));
+     * const childNode = new TransformNode();
+     * childNode.setParent(parentNode);
+     * childNode.setLocalScale(Vector2.create(0.5, 3));
+     * const scale = Vector2.create(0, 0);
+     * childNode.readScale(scale);
+     * if (scale.x !== 1 || scale.y !== 6) {
+     * 	throw new Error("scale failed");
+     * }
+     */
+    readScale(out) {
+      if (this.getScale !== _TransformNode.prototype.getScale) {
+        const scale = this.getScale();
+        out.x = scale.x;
+        out.y = scale.y;
+        return out;
+      }
+      const parent = this.getParent();
+      this.readLocalScale(out);
+      if (!parent) {
+        return out;
+      }
+      const localX = out.x;
+      const localY = out.y;
+      readNodeScale(parent, out);
+      out.x = out.x * localX;
+      out.y = out.y * localY;
+      return out;
+    }
+    //==============================================================================
+    // 로컬 위치를 주어진 벡터에 쓰기. (getLocalPosition 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>로컬 위치 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const node = new TransformNode();
+     * node.setLocalPositionXY(3, 4);
+     * const position = node.readLocalPosition(Vector2.create(0, 0));
+     * if (position.x !== 3 || position.y !== 4) {
+     * 	throw new Error("local position failed");
+     * }
+     */
+    readLocalPosition(out) {
+      if (this.getLocalPosition !== _TransformNode.prototype.getLocalPosition) {
+        const position = this.getLocalPosition();
+        out.x = position.x;
+        out.y = position.y;
+        return out;
+      }
+      out.x = this.#localPosition.x;
+      out.y = this.#localPosition.y;
+      return out;
+    }
+    //==============================================================================
+    // 로컬 크기를 주어진 벡터에 쓰기. (getLocalScale 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>로컬 크기 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const node = new TransformNode();
+     * node.setLocalScaleXY(2, 0.5);
+     * const scale = node.readLocalScale(Vector2.create(0, 0));
+     * if (scale.x !== 2 || scale.y !== 0.5) {
+     * 	throw new Error("local scale failed");
+     * }
+     */
+    readLocalScale(out) {
+      if (this.getLocalScale !== _TransformNode.prototype.getLocalScale) {
+        const scale = this.getLocalScale();
+        out.x = scale.x;
+        out.y = scale.y;
+        return out;
+      }
+      out.x = this.#localScale.x;
+      out.y = this.#localScale.y;
+      return out;
     }
     //==============================================================================
     // 글로벌 크기 설정.
@@ -17406,6 +17610,7 @@ void main() {
   var NINTENDO_GAMEPAD_ID_PARTS = ["057e", "nintendo", "joy-con", "pro controller"];
   var XBOX_GAMEPAD_ID_PARTS = ["045e", "xbox", "xinput", "microsoft"];
   var GAMEPAD_ACTIVE_AXIS_THRESHOLD = 0.5;
+  var GAMEPAD_RESCAN_INTERVAL = 1;
   function readGamepadKind(gamepadId) {
     if (typeof gamepadId !== "string") {
       return GamepadKind.other;
@@ -17448,6 +17653,9 @@ void main() {
     /**@private @type { string } */
     #activeGamepadId;
     // 마지막 갱신에 단추를 누르거나 축을 크게 기울인 패드의 이름. (없으면 빈 글)
+    /**@private @type { number } */
+    #rescanTime;
+    // 붙은 패드가 없을 때 다음에 훑기까지 남은 시간. (초, 0 이하면 이번 갱신에 훑는다)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -17462,6 +17670,7 @@ void main() {
       this.#inputEventCallback = null;
       this.#isInputLogEnabled = false;
       this.#activeGamepadId = "";
+      this.#rescanTime = 0;
     }
     //==============================================================================
     // 갱신.
@@ -17470,6 +17679,13 @@ void main() {
      * @param { number } timeDelta 지난 프레임부터의 시간. (초)
      */
     tick(timeDelta) {
+      if (this.#connectedGamepadIndices.length === 0) {
+        this.#rescanTime -= timeDelta;
+        if (this.#rescanTime > 0) {
+          return;
+        }
+        this.#rescanTime = GAMEPAD_RESCAN_INTERVAL;
+      }
       this.updateAllGamepads();
     }
     //==============================================================================
@@ -19503,6 +19719,10 @@ void main() {
   var cullRect = new Rect();
   var cullDrawnRect = new Rect();
   var convertContentSize = Vector2.zero();
+  var containsCorners = [Vector2.zero(), Vector2.zero(), Vector2.zero(), Vector2.zero()];
+  var containsObb = new OBB();
+  var containsScale = Vector2.zero();
+  var containsVector = Vector2.zero();
   var WorldNode = class _WorldNode extends TransformNode {
     static {
       __name(this, "WorldNode");
@@ -19832,6 +20052,32 @@ void main() {
       return this.#pivot.clone();
     }
     //==============================================================================
+    // 기준점을 주어진 벡터에 쓰기. (getPivot 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>기준점 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setPivot(Vector2.create(0.5, 1));
+     * const pivot = node.readPivot(Vector2.create(0, 0));
+     * if (pivot.x !== 0.5 || pivot.y !== 1) {
+     * 	throw new Error("pivot failed");
+     * }
+     */
+    readPivot(out) {
+      if (this.getPivot !== _WorldNode.prototype.getPivot) {
+        const pivot = this.getPivot();
+        out.x = pivot.x;
+        out.y = pivot.y;
+        return out;
+      }
+      out.x = this.#pivot.x;
+      out.y = this.#pivot.y;
+      return out;
+    }
+    //==============================================================================
     // 실제 내용 크기 설정.
     //==============================================================================
     /**
@@ -19899,6 +20145,32 @@ void main() {
      */
     getContentSize() {
       return this.#contentSize.clone();
+    }
+    //==============================================================================
+    // 내용 크기를 주어진 벡터에 쓰기. (getContentSize 와 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>내용 크기 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setContentSize(Vector2.create(120, 40));
+     * const contentSize = node.readContentSize(Vector2.create(0, 0));
+     * if (contentSize.x !== 120 || contentSize.y !== 40) {
+     * 	throw new Error("content size failed");
+     * }
+     */
+    readContentSize(out) {
+      if (this.getContentSize !== _WorldNode.prototype.getContentSize) {
+        const contentSize = this.getContentSize();
+        out.x = contentSize.x;
+        out.y = contentSize.y;
+        return out;
+      }
+      out.x = this.#contentSize.x;
+      out.y = this.#contentSize.y;
+      return out;
     }
     //==============================================================================
     // 실제 내용 크기를 target 에 적는다. (복제본을 만들지 않는다, Paint 가 그릴 때마다 쓴다)
@@ -20029,6 +20301,49 @@ void main() {
       return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
     }
     //==============================================================================
+    // 글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    // - getPosition 이나 부모의 내용 크기, 기준점 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out. (기준점의 자리)
+     */
+    readPosition(out) {
+      const parent = this.getParent();
+      if (this.getPosition !== _WorldNode.prototype.getPosition || !(parent instanceof _WorldNode)) {
+        return super.readPosition(out);
+      }
+      this.readLocalPosition(out);
+      const localX = out.x;
+      const localY = out.y;
+      parent.readPosition(out);
+      const parentPositionX = out.x;
+      const parentPositionY = out.y;
+      parent.readContentSize(out);
+      const parentContentSizeX = out.x;
+      const parentContentSizeY = out.y;
+      parent.readPivot(out);
+      const parentPivotX = out.x;
+      const parentPivotY = out.y;
+      const parentRotation = parent.getRotation();
+      parent.readScale(out);
+      const parentScaleX = out.x;
+      const parentScaleY = out.y;
+      const totalLocalX = localX - parentContentSizeX * parentPivotX;
+      const totalLocalY = localY - parentContentSizeY * parentPivotY;
+      const radian = degreeToRadian(parentRotation);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const sx = totalLocalX * parentScaleX;
+      const sy = totalLocalY * parentScaleY;
+      const rx = sx * cosRadian - sy * sinRadian;
+      const ry = sx * sinRadian + sy * cosRadian;
+      out.x = parentPositionX + rx;
+      out.y = parentPositionY + ry;
+      return out;
+    }
+    //==============================================================================
     // 글로벌 위치 설정. (getPosition 의 거꾸로)
     // - parent.getPosition() (= 부모 pivot 점의 월드 좌표) 에서 본 차이를 부모 회전/스케일을 풀어 부모 pivot 점 기준 오프셋으로 되돌린 뒤
     //   부모 content top-left 기준(localPosition)으로 옮긴다. 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다.
@@ -20126,11 +20441,54 @@ void main() {
       if (viewPosition === null || viewPosition === void 0) {
         return false;
       }
-      const worldCorners = this.getWorldCorners();
-      const obb = new OBB();
-      obb.setEdges(worldCorners);
-      const inside = obb.contains(viewPosition);
-      return inside;
+      if (this.getWorldCorners !== _WorldNode.prototype.getWorldCorners) {
+        const worldCorners = this.getWorldCorners();
+        const obb = new OBB();
+        obb.setEdges(worldCorners);
+        return obb.contains(viewPosition);
+      }
+      this.writeWorldCorners(containsCorners);
+      containsObb.setEdges(containsCorners);
+      return containsObb.contains(viewPosition);
+    }
+    //==============================================================================
+    // 네 귀퉁이를 주어진 벡터 넷에 쓰기. (getWorldCorners 와 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2[] } corners 쓸 벡터 넷. (왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래 차례)
+     * @returns { Vector2[] } corners.
+     * @private
+     */
+    writeWorldCorners(corners) {
+      const position = this.readPosition(containsVector);
+      const positionX = position.x;
+      const positionY = position.y;
+      const scale = this.readScale(containsScale);
+      const rotation = this.getRotation();
+      const contentSize = this.readContentSize(corners[0]);
+      const contentSizeX = contentSize.x;
+      const contentSizeY = contentSize.y;
+      const pivot = this.readPivot(corners[1]);
+      const pivotX = pivot.x;
+      const pivotY = pivot.y;
+      const width = contentSizeX * abs(scale.x);
+      const height = contentSizeY * abs(scale.y);
+      const left = -(width * pivotX);
+      const right = width * (1 - pivotX);
+      const top = -(height * pivotY);
+      const bottom = height * (1 - pivotY);
+      const radian = degreeToRadian(rotation);
+      const cosR = cos(radian);
+      const sinR = sin(radian);
+      corners[0].x = left * cosR - top * sinR + positionX;
+      corners[0].y = left * sinR + top * cosR + positionY;
+      corners[1].x = right * cosR - top * sinR + positionX;
+      corners[1].y = right * sinR + top * cosR + positionY;
+      corners[2].x = right * cosR - bottom * sinR + positionX;
+      corners[2].y = right * sinR + bottom * cosR + positionY;
+      corners[3].x = left * cosR - bottom * sinR + positionX;
+      corners[3].y = left * sinR + bottom * cosR + positionY;
+      return corners;
     }
     //==============================================================================
     // 뷰 좌표 → 이 노드의 로컬 좌표. (내용 영역의 왼쪽 위가 원점, 오른쪽 아래가 내용 크기)
@@ -37951,6 +38309,7 @@ void main() {
 
   // src/ui/uinode.js
   var System53 = globalThis;
+  var LOCAL_SCALE = Vector2.create(1, 1);
   var NO_INTRINSIC_METRIC = -1;
   var UINode = class _UINode extends TransformNode {
     static {
@@ -38066,7 +38425,7 @@ void main() {
         }
         const localRotation = this.getLocalRotation();
         const radian = degreeToRadian(localRotation);
-        const localScale = this.getLocalScale();
+        const localScale = this.readLocalScale(LOCAL_SCALE);
         graphic.translate(translateX, translateY);
         graphic.rotate(radian);
         graphic.scale(localScale.x, localScale.y);
@@ -54758,7 +55117,7 @@ void main() {
     }, "combine");
     const planes = [combine(row3, row0, 1), combine(row3, row0, -1), combine(row3, row1, 1), combine(row3, row1, -1), combine(row3, row2, 1), combine(row3, row2, -1)];
     for (const plane of planes) {
-      const length = System80.Math.hypot(plane[0], plane[1], plane[2]);
+      const length = readHypot(plane[0], plane[1], plane[2]);
       if (length > 0) {
         plane[0] /= length;
         plane[1] /= length;
@@ -54773,8 +55132,47 @@ void main() {
     return first[0] * (second[1] * third[2] - second[2] * third[1]) - first[1] * (second[0] * third[2] - second[2] * third[0]) + first[2] * (second[0] * third[1] - second[1] * third[0]);
   }
   __name(readDeterminant, "readDeterminant");
+  function readHypot(x, y, z) {
+    const absoluteX = System80.Math.abs(x);
+    const absoluteY = System80.Math.abs(y);
+    const absoluteZ = System80.Math.abs(z);
+    if (absoluteX === System80.Infinity || absoluteY === System80.Infinity || absoluteZ === System80.Infinity) {
+      return System80.Infinity;
+    }
+    if (absoluteX !== absoluteX || absoluteY !== absoluteY || absoluteZ !== absoluteZ) {
+      return System80.NaN;
+    }
+    let maximum = absoluteX;
+    if (absoluteY > maximum) {
+      maximum = absoluteY;
+    }
+    if (absoluteZ > maximum) {
+      maximum = absoluteZ;
+    }
+    if (maximum === 0) {
+      return 0;
+    }
+    let sum = 0;
+    let compensation = 0;
+    let normalized = absoluteX / maximum;
+    let summand = normalized * normalized - compensation;
+    let preliminary = sum + summand;
+    compensation = preliminary - sum - summand;
+    sum = preliminary;
+    normalized = absoluteY / maximum;
+    summand = normalized * normalized - compensation;
+    preliminary = sum + summand;
+    compensation = preliminary - sum - summand;
+    sum = preliminary;
+    normalized = absoluteZ / maximum;
+    summand = normalized * normalized - compensation;
+    preliminary = sum + summand;
+    sum = preliminary;
+    return System80.Math.sqrt(sum) * maximum;
+  }
+  __name(readHypot, "readHypot");
   function readMatrixDeterminant(elements) {
-    return readDeterminant([elements[0], elements[1], elements[2]], [elements[4], elements[5], elements[6]], [elements[8], elements[9], elements[10]]);
+    return elements[0] * (elements[5] * elements[10] - elements[6] * elements[9]) - elements[1] * (elements[4] * elements[10] - elements[6] * elements[8]) + elements[2] * (elements[4] * elements[9] - elements[5] * elements[8]);
   }
   __name(readMatrixDeterminant, "readMatrixDeterminant");
   function readFrameCamera(elements) {
@@ -54787,7 +55185,7 @@ void main() {
     const row3 = readRow(3);
     const isMirrored = readDeterminant(row0, row1, row2) > 0;
     let forward = [row0[1] * row1[2] - row0[2] * row1[1], row0[2] * row1[0] - row0[0] * row1[2], row0[0] * row1[1] - row0[1] * row1[0]];
-    const forwardLength = System80.Math.hypot(forward[0], forward[1], forward[2]);
+    const forwardLength = readHypot(forward[0], forward[1], forward[2]);
     if (forwardLength > 0) {
       forward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
     }
@@ -54809,7 +55207,7 @@ void main() {
     const rowX = [elements[0], elements[4], elements[8]];
     const along = rowX[0] * forward[0] + rowX[1] * forward[1] + rowX[2] * forward[2];
     let right = [rowX[0] - forward[0] * along, rowX[1] - forward[1] * along, rowX[2] - forward[2] * along];
-    const rightLength = System80.Math.hypot(right[0], right[1], right[2]);
+    const rightLength = readHypot(right[0], right[1], right[2]);
     right = rightLength > 1e-6 ? [right[0] / rightLength, right[1] / rightLength, right[2] / rightLength] : [1, 0, 0];
     const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
     return [right[0], up[0], -forward[0], right[1], up[1], -forward[1], right[2], up[2], -forward[2]];
@@ -54820,8 +55218,8 @@ void main() {
     const forward = [-viewRotationElements[2], -viewRotationElements[5], -viewRotationElements[8]];
     const axisSign = isMirrored ? -1 : 1;
     const rightAxis = [-forward[2] * axisSign, 0, forward[0] * axisSign];
-    const axisLength = System80.Math.hypot(rightAxis[0], rightAxis[1], rightAxis[2]);
-    const rightLength = System80.Math.hypot(right[0], right[1], right[2]);
+    const axisLength = readHypot(rightAxis[0], rightAxis[1], rightAxis[2]);
+    const rightLength = readHypot(right[0], right[1], right[2]);
     if (axisLength < 1e-6 || rightLength < 1e-6) {
       return 0;
     }
@@ -54833,8 +55231,8 @@ void main() {
   __name(readCameraRoll, "readCameraRoll");
   function readShadowBias(lightViewProjectionMatrix, resolution, depthBias, normalBias) {
     const elements = lightViewProjectionMatrix.getElements();
-    const widthScale = System80.Math.hypot(elements[0], elements[4], elements[8]);
-    const depthScale = System80.Math.hypot(elements[2], elements[6], elements[10]) * 0.5;
+    const widthScale = readHypot(elements[0], elements[4], elements[8]);
+    const depthScale = readHypot(elements[2], elements[6], elements[10]) * 0.5;
     const texelWorldSize = 2 / (System80.Math.max(widthScale, 1e-6) * System80.Math.max(1, resolution));
     return [depthBias * SHADOW_FILTER_RADIUS * texelWorldSize * depthScale, normalBias * SHADOW_FILTER_RADIUS * texelWorldSize, SHADOW_SLOPE_BIAS * texelWorldSize * depthScale, SHADOW_MAXIMUM_SLOPE];
   }
@@ -54874,7 +55272,7 @@ void main() {
   }
   __name(readOutlineVertexData, "readOutlineVertexData");
   function createReflectionMatrix(planePoint, planeNormal) {
-    const length = System80.Math.hypot(planeNormal[0], planeNormal[1], planeNormal[2]);
+    const length = readHypot(planeNormal[0], planeNormal[1], planeNormal[2]);
     const normalX = length > 0 ? planeNormal[0] / length : 0;
     const normalY = length > 0 ? planeNormal[1] / length : 1;
     const normalZ = length > 0 ? planeNormal[2] / length : 0;
@@ -54897,9 +55295,9 @@ void main() {
   }
   __name(createReflectionMatrix, "createReflectionMatrix");
   function readMaximumScale(elements) {
-    const scaleX = System80.Math.hypot(elements[0], elements[1], elements[2]);
-    const scaleY = System80.Math.hypot(elements[4], elements[5], elements[6]);
-    const scaleZ = System80.Math.hypot(elements[8], elements[9], elements[10]);
+    const scaleX = readHypot(elements[0], elements[1], elements[2]);
+    const scaleY = readHypot(elements[4], elements[5], elements[6]);
+    const scaleZ = readHypot(elements[8], elements[9], elements[10]);
     return System80.Math.max(scaleX, scaleY, scaleZ);
   }
   __name(readMaximumScale, "readMaximumScale");
@@ -54934,23 +55332,33 @@ void main() {
     let radius = 0;
     for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
       const offset = instanceIndex * floatCount + matrixOffset;
-      radius = System80.Math.max(radius, System80.Math.hypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
+      radius = System80.Math.max(radius, readHypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
     }
     return { center, radius, scale };
   }
   __name(readInstanceBounds, "readInstanceBounds");
   function readInstanceBufferSphere(mesh, instanceBuffer) {
-    const bounds = instanceBuffer.bounds;
-    if (bounds === null) {
-      return null;
-    }
-    const center = mesh.boundingCenter;
-    const meshReach = System80.Math.hypot(center[0], center[1], center[2]) + mesh.boundingRadius;
-    return [bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius + bounds.scale * meshReach];
+    const sphere = [0, 0, 0, 0];
+    return writeInstanceBufferSphere(sphere, mesh, instanceBuffer) ? sphere : null;
   }
   __name(readInstanceBufferSphere, "readInstanceBufferSphere");
+  function writeInstanceBufferSphere(sphere, mesh, instanceBuffer) {
+    const bounds = instanceBuffer.bounds;
+    if (bounds === null) {
+      return false;
+    }
+    const center = mesh.boundingCenter;
+    const meshReach = readHypot(center[0], center[1], center[2]) + mesh.boundingRadius;
+    sphere[0] = bounds.center[0];
+    sphere[1] = bounds.center[1];
+    sphere[2] = bounds.center[2];
+    sphere[3] = bounds.radius + bounds.scale * meshReach;
+    return true;
+  }
+  __name(writeInstanceBufferSphere, "writeInstanceBufferSphere");
   function isSphereInFrustum(frustumPlanes, sphere) {
-    for (const plane of frustumPlanes) {
+    for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+      const plane = frustumPlanes[planeIndex];
       if (plane[0] * sphere[0] + plane[1] * sphere[1] + plane[2] * sphere[2] + plane[3] < -sphere[3]) {
         return false;
       }
@@ -54973,7 +55381,7 @@ void main() {
     const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
     let radius = 0;
     for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
-      radius = System80.Math.max(radius, System80.Math.hypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
+      radius = System80.Math.max(radius, readHypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
     }
     return { center, radius };
   }
@@ -54999,6 +55407,8 @@ void main() {
   var WHITE_COLOR = System80.Object.freeze([1, 1, 1, 1]);
   var BLACK_COLOR = System80.Object.freeze([0, 0, 0]);
   var IDENTITY_UV_TRANSFORM = System80.Object.freeze([0, 0, 1, 1]);
+  var IDENTITY_ELEMENTS = new Matrix4().getElements();
+  var INSTANCE_BUFFER_SPHERE = [0, 0, 0, 0];
   var EMPTY_OPTIONS = System80.Object.freeze({});
   function writeMaterialBlockValues(values, options) {
     const tintColor = options.tintColor !== void 0 ? options.tintColor : WHITE_COLOR;
@@ -55371,6 +55781,18 @@ void main() {
     /** @private @type { WeakMap<object, object> } */
     #drawEntryOfOptions;
     // 그리기 꼴 객체 → { keys, values, numbers (얕은 사본), state (푼 칸), materialBlock, outlineBlock, outlineStates }
+    /** @private @type { number } */
+    #drawEntryGeneration;
+    // 블록 갈래를 지운 판 번호. (그리기 줄의 칸과 ToonDrawItem 이 쥔 기억 칸의 블록이 지운 것을 가리키지 않게, clearBlockCache 마다 오른다)
+    /** @private @type { object | null } */
+    #hintOptions;
+    // 그리기 줄이 지금 그리는 담은 칸의 꼴 객체. (readDrawEntry 가 #hintEntry 를 바로 쓴다, 맡긴 판에서만)
+    /** @private @type { object | null } */
+    #hintEntry;
+    // 그 칸이 푼 기억 칸.
+    /** @private @type { Float32Array } */
+    #batchModelElements;
+    // drawMeshBatch 의 첫 인스턴스 행렬 칸. (다시 쓴다)
     /** @private @type { object } */
     #materialBlocks;
     // 몸의 재질 블록 갈래. (createBlockCache)
@@ -55400,6 +55822,10 @@ void main() {
       this.#slotTableProgram = null;
       this.#slotTable = null;
       this.#drawEntryOfOptions = new System80.WeakMap();
+      this.#drawEntryGeneration = 1;
+      this.#hintOptions = null;
+      this.#hintEntry = null;
+      this.#batchModelElements = new System80.Float32Array(16);
       this.#trustSerial = 1;
       this.#isTrusting = false;
       this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
@@ -56612,7 +57038,9 @@ void main() {
       const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
       const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
       const radius = mesh.boundingRadius * readMaximumScale(modelElements);
-      for (const plane of this.#frustumPlanes) {
+      const frustumPlanes = this.#frustumPlanes;
+      for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+        const plane = frustumPlanes[planeIndex];
         if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
           return false;
         }
@@ -56762,12 +57190,12 @@ void main() {
       if (count <= 0) {
         return;
       }
-      if (options.isCulled !== false && instanceBuffer.bounds !== null && !isSphereInFrustum(this.#frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+      if (options.isCulled !== false && writeInstanceBufferSphere(INSTANCE_BUFFER_SPHERE, mesh, instanceBuffer) && !isSphereInFrustum(this.#frustumPlanes, INSTANCE_BUFFER_SPHERE)) {
         this.#frameStatistics.culledObjectCount += count;
         return;
       }
       this.#frameStatistics.drawnObjectCount += count;
-      this.drawWithCount(mesh, Matrix4.createIdentity().getElements(), count, options, instanceBuffer);
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, options, instanceBuffer);
     }
     //==============================================================================
     // 모형 하나의 바깥선만 그리기. (거르지도 세지도 않는다, 껍데기가 없거나 hasOutline 이 false 면 그리지 않는다)
@@ -56808,7 +57236,18 @@ void main() {
      * @private
      */
     readMaterialBlock(options) {
-      const drawEntry = this.readDrawEntry(options);
+      return this.readEntryMaterialBlock(this.readDrawEntry(options), options);
+    }
+    //==============================================================================
+    // 기억 칸의 재질 블록 읽기. (readMaterialBlock 과 같다, 그리기 줄이 이미 푼 기억 칸으로)
+    //==============================================================================
+    /**
+     * @param { object } drawEntry - readDrawEntry 나 writeHeldDrawEntry 의 결과.
+     * @param { object } options - 그 칸을 푼 꼴.
+     * @returns { object } 재질 블록.
+     * @private
+     */
+    readEntryMaterialBlock(drawEntry, options) {
       if (drawEntry.materialBlock === null) {
         writeMaterialBlockValues(this.#materialBlocks.values, options);
         drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
@@ -56877,10 +57316,13 @@ void main() {
         if (slot.values.length < floatCount) {
           slot.values = new System80.Float32Array(floatCount);
         }
-        slot.values.set(instanceData.subarray(0, floatCount));
+        const values = slot.values;
+        for (let index = 0; index < floatCount; ++index) {
+          values[index] = instanceData[index];
+        }
         slot.count = count;
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
-        webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+        webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount);
       }
       let vertexArrays = slot.vertexArrays.get(mesh);
       if (vertexArrays === void 0) {
@@ -56890,7 +57332,11 @@ void main() {
         vertexArrays = this.createBatchVertexArrays(mesh, slot.buffer);
         slot.vertexArrays.set(mesh, vertexArrays);
       }
-      this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts, vertexArrays);
+      const batchElements = this.#batchModelElements;
+      for (let index = 0; index < 16; ++index) {
+        batchElements[index] = instanceData[index];
+      }
+      this.drawWithCount(mesh, batchElements, count, options, null, parts, vertexArrays);
     }
     //==============================================================================
     // 모형과 묶음 자리의 버퍼를 함께 묶은 버텍스 어레이 짓기. (모형의 버텍스 어레이와 같은 꼴, 인스턴스 어트리뷰트만 자리의 버퍼에서)
@@ -57276,9 +57722,12 @@ void main() {
      * @private
      */
     readDrawEntry(options) {
+      if (options === this.#hintOptions) {
+        return this.readHeldDrawEntry(this.#hintEntry);
+      }
       let entry = this.#drawEntryOfOptions.get(options);
       if (entry === void 0) {
-        entry = { keys: [], values: [], numbers: [], state: new System80.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0 };
+        entry = this.createDrawEntry();
         this.#drawEntryOfOptions.set(options, entry);
       } else if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
         return entry;
@@ -57292,6 +57741,86 @@ void main() {
       entry.outlineBlock = null;
       entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
       return entry;
+    }
+    //==============================================================================
+    // 꼴 객체마다 기억한 칸 찾기. (readDrawEntry 와 같은데 기억한 것이 없으면 짓지 않고 null)
+    // - 그리기 줄이 처음 보는 꼴 객체(게임이 프레임마다 새로 짓는 꼴)는 꼴 객체마다 기억하지 않고 담은 칸이 쥔 기억 칸에 푼다. (writeHeldDrawEntry)
+    //==============================================================================
+    /**
+     * @param { object } options - 그리기 꼴.
+     * @returns { object | null } 기억 칸이나 null.
+     * @private
+     */
+    findDrawEntry(options) {
+      if (!this.#drawEntryOfOptions.has(options)) {
+        return null;
+      }
+      return this.readDrawEntry(options);
+    }
+    //==============================================================================
+    // 기억 칸 짓기. (readDrawEntry 의 칸과 같은 꼴, 아직 푼 것이 없다)
+    //==============================================================================
+    /**
+     * @returns { object } 기억 칸.
+     * @private
+     */
+    createDrawEntry() {
+      return { keys: [], values: [], numbers: [], state: new System80.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0, options: null, generation: this.#drawEntryGeneration };
+    }
+    //==============================================================================
+    // 쥔 기억 칸 맞추기. (그리기 줄의 담은 칸과 ToonDrawItem 이 꼴 객체와 상관없이 쥐는 칸, 꼴 객체마다 기억하지 않는다)
+    // - entry 가 null 이면 짓는다. isChanged 면 견주지 않고 다시 푼다. (ToonDrawItem 의 바뀜 표시)
+    //   아니면 얕은 사본과 견주어 다를 때만 다시 푼다. 같으면 푼 칸과 재질 블록을 그대로 쓴다. (게임이 프레임마다 값이 같은 새 꼴 객체를 지어도 할당 없음)
+    //==============================================================================
+    /**
+     * @param { object | null } entry - 쥔 기억 칸이나 null.
+     * @param { object } options - 그리기 꼴.
+     * @param { boolean } isChanged - 꼴이 바뀐 것을 알면 true. (견주지 않는다)
+     * @returns { object } 기억 칸. (entry 가 null 이면 새 칸)
+     * @private
+     */
+    writeHeldDrawEntry(entry, options, isChanged) {
+      if (entry === null) {
+        entry = this.createDrawEntry();
+        isChanged = true;
+      }
+      this.readHeldDrawEntry(entry);
+      if (isChanged || !isSameOptionsSnapshot(entry, options)) {
+        writeOptionsSnapshot(entry, options);
+        writeDrawState(entry.state, options);
+        entry.materialBlock = null;
+        entry.outlineBlock = null;
+      }
+      entry.options = options;
+      return entry;
+    }
+    //==============================================================================
+    // 쥔 기억 칸 그대로 쓰기. (블록 갈래를 지운 뒤면 블록만 잊는다)
+    //==============================================================================
+    /**
+     * @param { object } entry - 쥔 기억 칸.
+     * @returns { object } entry.
+     * @private
+     */
+    readHeldDrawEntry(entry) {
+      if (entry.generation !== this.#drawEntryGeneration) {
+        entry.materialBlock = null;
+        entry.outlineBlock = null;
+        entry.generation = this.#drawEntryGeneration;
+      }
+      return entry;
+    }
+    //==============================================================================
+    // 그리기 줄이 지금 그리는 칸 알리기. (맡긴 판에서 그 꼴 객체의 readDrawEntry 가 칸의 기억을 바로 쓴다, null 이면 푼다)
+    //==============================================================================
+    /**
+     * @param { object | null } options - 담은 칸의 꼴 객체.
+     * @param { object | null } entry - 그 칸이 이번 프레임에 푼 기억 칸.
+     * @private
+     */
+    setDrawEntryHint(options, entry) {
+      this.#hintOptions = this.#isTrusting ? options : null;
+      this.#hintEntry = this.#isTrusting ? entry : null;
     }
     //==============================================================================
     // 꼴을 고치지 않는 판 맡기 시작과 끝. (그리기 줄이 draw, drawShadows 동안 부른다, 맡긴 판에서는 꼴 객체마다 한 번만 견준다)
@@ -57312,6 +57841,8 @@ void main() {
      */
     endTrustedOptions() {
       this.#isTrusting = false;
+      this.#hintOptions = null;
+      this.#hintEntry = null;
     }
     //==============================================================================
     // 맡긴 판 멈추기와 다시. (단계 콜백이 렌더러로 바로 그리는 동안 멈춘다)
@@ -57322,6 +57853,8 @@ void main() {
      */
     pauseTrustedOptions(isPaused) {
       this.#isTrusting = !isPaused;
+      this.#hintOptions = null;
+      this.#hintEntry = null;
     }
     //==============================================================================
     // 블록 묶기. (그 바인딩 자리에 이미 묶였으면 건너뛴다)
@@ -57393,6 +57926,7 @@ void main() {
       blockCache.count = 0;
       blockCache.boundBlock = null;
       this.#drawEntryOfOptions = new System80.WeakMap();
+      this.#drawEntryGeneration += 1;
     }
     //==============================================================================
     // 한 프로그램의 기억한 유니폼 값 잊기. (onBeforeDraw 뒤)
@@ -73004,7 +73538,8 @@ void main() {
     // 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)
   });
   var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
-  var IDENTITY_ELEMENTS = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  var IDENTITY_ELEMENTS2 = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  var INSTANCE_BUFFER_SPHERE2 = [0, 0, 0, 0];
   var LINE_TEXTURE_UNIT = 5;
   var DEPTH_TEXTURE_UNIT = 6;
   var LINE_COLOR_TEXTURE_UNIT = 4;
@@ -73398,6 +73933,10 @@ void main() {
     return steps;
   }
   __name(readJumpFloodSteps, "readJumpFloodSteps");
+  function readColorByte(value) {
+    return System109.Math.round(System109.Math.max(0, System109.Math.min(1, value)) * 255);
+  }
+  __name(readColorByte, "readColorByte");
   var ToonScreenOutline = class {
     static {
       __name(this, "ToonScreenOutline");
@@ -73485,6 +74024,12 @@ void main() {
     /** @private @type { boolean } */
     #isLineColorTableDirty;
     // 표를 텍스처에 다시 올릴지.
+    /** @private @type { Uint32Array } */
+    #lineColorWords;
+    // #lineColorTable 을 4 바이트씩 본 것. (올린 표와 견줄 때)
+    /** @private @type { Uint32Array | null } */
+    #uploadedLineColorTable;
+    // 텍스처에 마지막으로 올린 표. (처음 올리기 전에는 null)
     //==============================================================================
     // 생성. (다섯 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
     //==============================================================================
@@ -73522,6 +74067,8 @@ void main() {
       this.#drawnDistanceCount = 0;
       this.#lineWidths = [2, 1];
       this.#lineColorTable = new System109.Uint8Array((TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1) * 4);
+      this.#lineColorWords = new System109.Uint32Array(this.#lineColorTable.buffer);
+      this.#uploadedLineColorTable = null;
       this.#lineColorCount = 0;
       this.#lineColorTexture = null;
       this.#isLineColorTableDirty = false;
@@ -73592,14 +74139,20 @@ void main() {
       }
       const table = this.#lineColorTable;
       const offset = lineId * 4;
+      const red = readColorByte(color[0]);
+      const green = readColorByte(color[1]);
+      const blue = readColorByte(color[2]);
+      const alpha = System109.Math.max(1, readColorByte(color.length > 3 ? color[3] : 1));
+      if (table[offset] === red && table[offset + 1] === green && table[offset + 2] === blue && table[offset + 3] === alpha) {
+        return;
+      }
       if (table[offset + 3] === 0) {
         this.#lineColorCount += 1;
       }
-      const toByte = /* @__PURE__ */ __name((value) => System109.Math.round(System109.Math.max(0, System109.Math.min(1, value)) * 255), "toByte");
-      table[offset] = toByte(color[0]);
-      table[offset + 1] = toByte(color[1]);
-      table[offset + 2] = toByte(color[2]);
-      table[offset + 3] = System109.Math.max(1, toByte(color.length > 3 ? color[3] : 1));
+      table[offset] = red;
+      table[offset + 1] = green;
+      table[offset + 2] = blue;
+      table[offset + 3] = alpha;
       this.#isLineColorTableDirty = true;
     }
     //==============================================================================
@@ -73905,8 +74458,8 @@ void main() {
         instanceData[offset + 19] = 1;
       }
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, count * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
-      this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
+      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, count * TOON_INSTANCE_FLOAT_COUNT);
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
     }
     //==============================================================================
     // 모형 하나의 번호 그리기. (ToonRenderer.drawMesh 와 같은 행렬과 자세, 화면 밖이면 건너뛴다)
@@ -74000,8 +74553,8 @@ void main() {
         return;
       }
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, instanceCount * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
-      this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, 1, options.isMirrored === true, options, mesh.bodyVertexArray);
+      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, instanceCount * TOON_INSTANCE_FLOAT_COUNT);
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS2, instanceCount, lineId, 1, options.isMirrored === true, options, mesh.bodyVertexArray);
     }
     //==============================================================================
     // 영구 인스턴스 버퍼로 번호 그리기. (몸과 같은 GPU 버퍼를 쓰고 다시 올리지 않는다, 버퍼 전체의 경계로 통째 거른다)
@@ -74053,7 +74606,7 @@ void main() {
         return;
       }
       const isCulled = options.isCulled !== false;
-      if (isCulled && !isSphereInFrustum(this.#frame.frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+      if (isCulled && writeInstanceBufferSphere(INSTANCE_BUFFER_SPHERE2, mesh, instanceBuffer) && !isSphereInFrustum(this.#frame.frustumPlanes, INSTANCE_BUFFER_SPHERE2)) {
         return;
       }
       if (this.#widthUnit === ToonOutlineWidthUnit.world && this.#focusDistance <= 0 && this.#frame.isPerspective && instanceBuffer.data !== null) {
@@ -74072,7 +74625,7 @@ void main() {
         }
       }
       const vertexArrays = instanceBuffer.renderer.readInstanceVertexArrays(mesh, instanceBuffer);
-      this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineId, instanceLayout.hasLineId() ? 2 : 0, options.isMirrored === true, options, vertexArrays.body);
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineId, instanceLayout.hasLineId() ? 2 : 0, options.isMirrored === true, options, vertexArrays.body);
     }
     //==============================================================================
     // 번호 그리기 본체.
@@ -74281,9 +74834,28 @@ void main() {
           return false;
         }
         this.#isLineColorTableDirty = true;
+        this.#uploadedLineColorTable = null;
       }
       if (!this.#isLineColorTableDirty) {
         return true;
+      }
+      this.#isLineColorTableDirty = false;
+      const uploadedTable = this.#uploadedLineColorTable;
+      if (uploadedTable !== null) {
+        const words = this.#lineColorWords;
+        let isSame = true;
+        for (let index = 0; index < words.length; ++index) {
+          if (words[index] !== uploadedTable[index]) {
+            isSame = false;
+            break;
+          }
+        }
+        if (isSame) {
+          return true;
+        }
+        uploadedTable.set(words);
+      } else {
+        this.#uploadedLineColorTable = this.#lineColorWords.slice();
       }
       const isFlipped = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL);
       const isPremultiplied = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
@@ -74359,11 +74931,13 @@ void main() {
       const centerX = modelElements[0] * center[0] + modelElements[4] * center[1] + modelElements[8] * center[2] + modelElements[12];
       const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
       const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
-      const scaleX = System109.Math.hypot(modelElements[0], modelElements[1], modelElements[2]);
-      const scaleY = System109.Math.hypot(modelElements[4], modelElements[5], modelElements[6]);
-      const scaleZ = System109.Math.hypot(modelElements[8], modelElements[9], modelElements[10]);
+      const scaleX = readHypot(modelElements[0], modelElements[1], modelElements[2]);
+      const scaleY = readHypot(modelElements[4], modelElements[5], modelElements[6]);
+      const scaleZ = readHypot(modelElements[8], modelElements[9], modelElements[10]);
       const radius = mesh.boundingRadius * System109.Math.max(scaleX, scaleY, scaleZ);
-      for (const plane of this.#frame.frustumPlanes) {
+      const frustumPlanes = this.#frame.frustumPlanes;
+      for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+        const plane = frustumPlanes[planeIndex];
         if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
           return false;
         }
@@ -86693,6 +87267,7 @@ void main() {
   var DRAW_PART_OUTLINE2 = 1;
   var DRAW_PART_BODY2 = 2;
   var DRAW_PART_ALL2 = 3;
+  var INSTANCE_BUFFER_SPHERE3 = [0, 0, 0, 0];
   function writeCasterRecord(record, item) {
     const state = item.state;
     const material = state[DRAW_STATE_MATERIAL];
@@ -86711,44 +87286,63 @@ void main() {
       isChanged = true;
     }
     const values = record.values;
-    let index = 0;
-    const write = /* @__PURE__ */ __name((value) => {
-      const rounded = System140.Math.fround(value);
-      if (values[index] !== rounded) {
-        values[index] = rounded;
-        isChanged = true;
-      }
-      index += 1;
-    }, "write");
-    write(matrixCount);
-    write(state[DRAW_STATE_INDEX_START]);
-    write(state[DRAW_STATE_INDEX_COUNT]);
-    write(state[DRAW_STATE_IS_CULLED] ? 1 : 0);
-    write(state[DRAW_STATE_IS_MIRRORED]);
-    write(jointMatrices !== null ? jointMatrices.length : -1);
+    isChanged = writeRecordValue(values, 0, matrixCount) || isChanged;
+    isChanged = writeRecordValue(values, 1, state[DRAW_STATE_INDEX_START]) || isChanged;
+    isChanged = writeRecordValue(values, 2, state[DRAW_STATE_INDEX_COUNT]) || isChanged;
+    isChanged = writeRecordValue(values, 3, state[DRAW_STATE_IS_CULLED] ? 1 : 0) || isChanged;
+    isChanged = writeRecordValue(values, 4, state[DRAW_STATE_IS_MIRRORED]) || isChanged;
+    isChanged = writeRecordValue(values, 5, jointMatrices !== null ? jointMatrices.length : -1) || isChanged;
+    let index = 6;
     if (instanceBuffer !== null) {
-      write(item.instanceCount);
+      isChanged = writeRecordValue(values, index, item.instanceCount) || isChanged;
+      index += 1;
     } else if (item.instances !== null) {
-      for (const instance of item.instances) {
-        const elements = instance.modelMatrix.getElements();
-        for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
-          write(elements[elementIndex]);
-        }
+      const instances = item.instances;
+      for (let instanceIndex = 0; instanceIndex < instances.length; ++instanceIndex) {
+        isChanged = writeRecordValues(values, index, instances[instanceIndex].modelMatrix.getElements(), 16) || isChanged;
+        index += 16;
       }
     } else {
-      const elements = item.modelMatrix.getElements();
-      for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
-        write(elements[elementIndex]);
-      }
+      isChanged = writeRecordValues(values, index, item.modelMatrix.getElements(), 16) || isChanged;
+      index += 16;
     }
     if (jointMatrices !== null) {
-      for (let jointIndex = 0; jointIndex < jointMatrices.length; ++jointIndex) {
-        write(jointMatrices[jointIndex]);
-      }
+      isChanged = writeRecordValues(values, index, jointMatrices, jointMatrices.length) || isChanged;
     }
     return isChanged;
   }
   __name(writeCasterRecord, "writeCasterRecord");
+  function writeRecordValue(values, index, value) {
+    const rounded = System140.Math.fround(value);
+    if (values[index] !== rounded) {
+      values[index] = rounded;
+      return true;
+    }
+    return false;
+  }
+  __name(writeRecordValue, "writeRecordValue");
+  function writeRecordValues(values, offset, source, count) {
+    let isChanged = false;
+    for (let index = 0; index < count; ++index) {
+      const rounded = System140.Math.fround(source[index]);
+      if (values[offset + index] !== rounded) {
+        values[offset + index] = rounded;
+        isChanged = true;
+      }
+    }
+    return isChanged;
+  }
+  __name(writeRecordValues, "writeRecordValues");
+  function compareTransparentEntry(entry, other) {
+    return other.averageDepth - entry.averageDepth;
+  }
+  __name(compareTransparentEntry, "compareTransparentEntry");
+  function setListLength(list, length) {
+    if (list.length !== length) {
+      list.length = length;
+    }
+  }
+  __name(setListLength, "setListLength");
   function isBatchableItem(item, other) {
     return other.mesh === item.mesh && other.modelMatrix !== null && other.instances === null && other.instanceBuffer === null && other.materialBlock === item.materialBlock && other.mirrorSign === item.mirrorSign && isSameBatchState(item.state, other.state);
   }
@@ -86775,6 +87369,204 @@ void main() {
     afterTransparent: "afterTransparent"
     // 비치는 것 뒤.
   });
+  var ToonDrawItem = class {
+    static {
+      __name(this, "ToonDrawItem");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { object | null } */
+    #mesh;
+    // ToonRenderer.createMesh 의 결과.
+    /** @private @type { Matrix4 } */
+    #modelMatrix;
+    // 모형 행렬. (복사해 쥔 것)
+    /** @private @type { object } */
+    #options;
+    // 그리기 꼴. (쥔 것)
+    /** @private @type { boolean } */
+    #isDirty;
+    // 꼴을 다시 풀어야 하는지.
+    /** @private @type { number } */
+    #changeSerial;
+    // 모형, 행렬, 꼴이 바뀔 때마다 오르는 번호. (그림자 캐시가 견주지 않을 때 쓴다)
+    /** @private @type { object | null } */
+    #entry;
+    // 렌더러가 푼 기억 칸. (꼴 객체마다 기억하지 않고 이 항목이 쥔다)
+    /** @private @type { object | null } */
+    #renderer;
+    // 기억 칸을 푼 렌더러.
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
+     * @param { Matrix4 } modelMatrix - 모형 행렬. (복사한다)
+     * @param { object } [options] - ToonDrawQueue.addMesh 와 같은 꼴.
+     */
+    constructor(mesh, modelMatrix, options = {}) {
+      this.#mesh = mesh;
+      this.#modelMatrix = new Matrix4();
+      this.#modelMatrix.copyFrom(modelMatrix);
+      this.#options = options;
+      this.#isDirty = true;
+      this.#changeSerial = 0;
+      this.#entry = null;
+      this.#renderer = null;
+    }
+    //==============================================================================
+    // 모형 반환.
+    //==============================================================================
+    /**
+     * @returns { object | null } 모형.
+     */
+    getMesh() {
+      return this.#mesh;
+    }
+    //==============================================================================
+    // 모형 바꾸기. (꼴은 그대로)
+    //==============================================================================
+    /**
+     * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
+     * @example <caption>모형 바꾸기</caption>
+     * import { ToonDrawItem, Matrix4 } from "./vanilla.js";
+     * const drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), {});
+     * drawItem.setMesh(null);
+     */
+    setMesh(mesh) {
+      this.#mesh = mesh;
+      this.#changeSerial += 1;
+    }
+    //==============================================================================
+    // 모형 행렬 반환. (쥔 것, 읽기만 한다, 바꾸려면 setModelMatrix)
+    //==============================================================================
+    /**
+     * @returns { Matrix4 } 모형 행렬.
+     */
+    getModelMatrix() {
+      return this.#modelMatrix;
+    }
+    //==============================================================================
+    // 모형 행렬 바꾸기. (값을 복사해 쥔다, 같은 값이면 바뀐 것으로 치지 않는다)
+    //==============================================================================
+    /**
+     * @param { Matrix4 } modelMatrix - 모형 행렬. (복사한다)
+     * @example <caption>모형 행렬 바꾸기</caption>
+     * import { ToonDrawItem, Matrix4 } from "./vanilla.js";
+     * const drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), {});
+     * drawItem.setModelMatrix(Matrix4.createTranslation(1, 0, 0));
+     */
+    setModelMatrix(modelMatrix) {
+      const elements = this.#modelMatrix.getElements();
+      const otherElements = modelMatrix.getElements();
+      for (let index = 0; index < 16; ++index) {
+        if (elements[index] !== otherElements[index]) {
+          elements.set(otherElements);
+          this.#changeSerial += 1;
+          return;
+        }
+      }
+    }
+    //==============================================================================
+    // 꼴 반환. (쥔 객체, 그 자리에서 고쳤으면 markDirty)
+    //==============================================================================
+    /**
+     * @returns { object } 그리기 꼴.
+     */
+    getOptions() {
+      return this.#options;
+    }
+    //==============================================================================
+    // 꼴 바꾸기. (새 꼴 객체를 쥐고 바뀜 표시)
+    //==============================================================================
+    /**
+     * @param { object } options - ToonDrawQueue.addMesh 와 같은 꼴.
+     * @example <caption>꼴 통째로 바꾸기</caption>
+     * import { ToonDrawItem, Matrix4 } from "./vanilla.js";
+     * const drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), { lineId: 1 });
+     * drawItem.setOptions({ lineId: 1, alpha: 0.5 });
+     */
+    setOptions(options) {
+      this.#options = options;
+      this.markDirty();
+    }
+    //==============================================================================
+    // 꼴의 칸 하나 바꾸기. (쥔 꼴 객체의 칸을 고치고 바뀜 표시, undefined 면 칸을 지운다)
+    //==============================================================================
+    /**
+     * @param { string } name - 꼴의 칸 이름. (tintColor, emissiveIntensity, alpha 같은 것)
+     * @param { any } value - 값. (undefined 면 칸을 지워 기본값으로)
+     * @example <caption>틴트 바꾸기</caption>
+     * import { ToonDrawItem, Matrix4 } from "./vanilla.js";
+     * const drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), { lineId: 1 });
+     * drawItem.setOption("tintColor", [1, 0.6, 0.6, 1]);
+     */
+    setOption(name, value) {
+      if (value === void 0) {
+        delete this.#options[name];
+      } else {
+        this.#options[name] = value;
+      }
+      this.markDirty();
+    }
+    //==============================================================================
+    // 바뀜 표시. (꼴 객체의 값을 그 자리에서 고친 뒤 부른다, 다음에 담을 때 다시 푼다)
+    //==============================================================================
+    /**
+     * @example <caption>그 자리에서 고친 뒤 표시</caption>
+     * import { ToonDrawItem, Matrix4 } from "./vanilla.js";
+     * const options = { tintColor: [1, 1, 1, 1] };
+     * const drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), options);
+     * options.tintColor[1] = 0.5;
+     * drawItem.markDirty();
+     */
+    markDirty() {
+      this.#isDirty = true;
+      this.#changeSerial += 1;
+    }
+    //==============================================================================
+    // 바뀜 표시가 있는지.
+    //==============================================================================
+    /**
+     * @returns { boolean } 다음에 담을 때 꼴을 다시 풀면 true.
+     */
+    isDirty() {
+      return this.#isDirty;
+    }
+    //==============================================================================
+    // 바뀜 번호 반환. (모형, 행렬, 꼴이 바뀔 때마다 오른다, 그림자 캐시가 견주지 않을 때 쓴다)
+    //==============================================================================
+    /**
+     * @returns { number } 바뀜 번호.
+     * @private
+     */
+    getChangeSerial() {
+      return this.#changeSerial;
+    }
+    //==============================================================================
+    // 기억 칸 읽기. (그리기 줄이 부른다, 바뀜 표시나 렌더러가 바뀌었을 때만 다시 푼다)
+    //==============================================================================
+    /**
+     * @param { object } renderer - ToonRenderer.
+     * @returns { object } 기억 칸.
+     * @private
+     */
+    readDrawEntry(renderer) {
+      if (this.#renderer !== renderer) {
+        this.#renderer = renderer;
+        this.#entry = null;
+        this.#isDirty = true;
+      }
+      if (this.#isDirty) {
+        this.#entry = renderer.writeHeldDrawEntry(this.#entry, this.#options, true);
+        this.#isDirty = false;
+        return this.#entry;
+      }
+      return renderer.readHeldDrawEntry(this.#entry);
+    }
+  };
   var ToonDrawQueue = class {
     static {
       __name(this, "ToonDrawQueue");
@@ -86784,7 +87576,7 @@ void main() {
     //==============================================================================
     /** @private @type { Array<object> } */
     #itemList;
-    // { mesh, modelMatrix, instances, instanceBuffer, instanceCount, options, isTransparent, depthPosition, depth }
+    // 담은 칸. ({ mesh, modelMatrix, instances, instanceBuffer, instanceCount, options, isTransparent, depthPosition, depth }, 앞의 #itemCount 칸, 칸은 프레임마다 다시 쓴다)
     /** @private @type { Array<object> } */
     #passList;
     // { stage, callback }
@@ -86797,9 +87589,18 @@ void main() {
     /** @private @type { Array<object> | null } */
     #opaqueItemList;
     // 정렬한 불투명한 것. (담거나 비우면 null, 처음 그릴 때 만든다)
-    /** @private @type { Array<object> } */
-    #itemPool;
-    // 담은 것 칸을 프레임마다 다시 쓴다. (clear 뒤에도 남는다)
+    /** @private @type { number } */
+    #itemCount;
+    // 담은 수. (#itemList 의 앞 칸만 쓴다, 뒤 칸은 다시 쓸 칸이다)
+    /** @private @type { number } */
+    #batchMatrixCount;
+    // #batchMatrices 의 쓴 수. (배열 길이를 줄이지 않아 프레임마다 다시 잡지 않는다)
+    /** @private @type { number } */
+    #outlineBatchCount;
+    // #outlineBatches 의 쓴 수.
+    /** @private @type { number } */
+    #lineMatrixCount;
+    // #lineMatrices, #lineIds 의 쓴 수.
     /** @private @type { Int32Array } */
     #sortKeys;
     // 앞의 정렬의 불투명한 것 열쇠. (하나에 재질, 모형, 텍스처 번호 셋, 담은 차례대로)
@@ -86827,16 +87628,58 @@ void main() {
     /** @private @type { Array<object> } */
     #lineMatrices;
     // 선의 판의 묶은 행렬.
+    /** @private @type { Array<object> } */
+    #opaqueStorage;
+    // 정렬한 불투명한 것을 담는 칸. (프레임마다 다시 쓴다, #opaqueItemList 가 가리킨다)
+    /** @private @type { Array<number> } */
+    #sortIndexList;
+    // 정렬할 차례 번호. (다시 쓴다)
+    /** @private @type { Array<object> } */
+    #casterList;
+    // 그림자를 드리우는 것. (프레임마다 다시 쓴다)
+    /** @private @type { Array<object> } */
+    #staticCasterList;
+    // 구울 드리우개.
+    /** @private @type { Array<object> } */
+    #dynamicCasterList;
+    // 덧그릴 드리우개.
+    /** @private @type { Float32Array } */
+    #lightKey;
+    // 해 그림자의 빛 열쇠. (빛의 보기 투영 행렬 16 과 해상도, 다시 쓴다)
+    /** @private @type { Float32Array } */
+    #localLightKey;
+    // 점광과 스포트라이트 그림자의 빛 열쇠. (칸 수가 늘 때만 다시 짓는다)
+    /** @private @type { Array<object> } */
+    #lineGroupPool;
+    // 선의 판 묶음 칸. ({ item, lineFlags, indexStart, indexCount, itemIndexList, nextIndex }, 다시 쓴다)
+    /** @private @type { number } */
+    #lineGroupCount;
+    // 지금 쓰는 묶음 칸 수.
+    /** @private @type { number } */
+    #lineGroupSerial;
+    // 묶음을 비울 때마다 오르는 번호. (모형마다 기억한 첫 묶음이 지금 것인지)
+    /** @private @type { WeakMap<object, object> } */
+    #lineGroupOfMesh;
+    // 모형 → { serial, firstIndex, lastIndex } (모형마다 한 번 짓는다)
+    /** @private @type { Array<object> } */
+    #transparentPool;
+    // 비치는 것 덩어리 칸. ({ depthSum, itemList, isDepthPrepassed, group }, 다시 쓴다)
+    /** @private @type { Array<object> } */
+    #transparentList;
+    // 이번 프레임의 덩어리.
     //==============================================================================
     // 생성.
     //==============================================================================
     constructor() {
       this.#itemList = [];
+      this.#itemCount = 0;
+      this.#batchMatrixCount = 0;
+      this.#outlineBatchCount = 0;
+      this.#lineMatrixCount = 0;
       this.#passList = [];
       this.#screenOutline = null;
       this.#postProcess = null;
       this.#opaqueItemList = null;
-      this.#itemPool = [];
       this.#sortKeys = new System140.Int32Array(0);
       this.#sortOrder = new System140.Int32Array(0);
       this.#sortCount = -1;
@@ -86846,6 +87689,19 @@ void main() {
       this.#outlineBatches = [];
       this.#lineIds = [];
       this.#lineMatrices = [];
+      this.#opaqueStorage = [];
+      this.#sortIndexList = [];
+      this.#casterList = [];
+      this.#staticCasterList = [];
+      this.#dynamicCasterList = [];
+      this.#lightKey = new System140.Float32Array(17);
+      this.#localLightKey = new System140.Float32Array(0);
+      this.#lineGroupPool = [];
+      this.#lineGroupCount = 0;
+      this.#lineGroupSerial = 0;
+      this.#lineGroupOfMesh = new System140.WeakMap();
+      this.#transparentPool = [];
+      this.#transparentList = [];
     }
     //==============================================================================
     // 담은 것마다 꼴 풀기. (렌더러가 꼴 객체마다 기억한 푼 칸을 쓴다, 담은 뒤 처음 그릴 때 한 번)
@@ -86859,20 +87715,53 @@ void main() {
       if (this.#isResolved) {
         return;
       }
-      for (const item of this.#itemList) {
-        const state = renderer.readDrawEntry(item.options).state;
+      const itemList = this.#itemList;
+      for (let index = 0; index < this.#itemCount; ++index) {
+        const item = itemList[index];
+        const entry = this.readItemEntry(renderer, item);
+        const state = entry.state;
+        item.entry = entry;
         item.state = state;
         item.isTransparent = state[DRAW_STATE_IS_TRANSPARENT];
         item.materialBlock = null;
         item.mirrorSign = 0;
         if (!item.isTransparent && item.modelMatrix !== null) {
-          item.materialBlock = renderer.readMaterialBlock(item.options);
+          item.materialBlock = renderer.readEntryMaterialBlock(entry, item.options);
           const isMirrored = state[DRAW_STATE_IS_MIRRORED];
           item.mirrorSign = isMirrored >= 0 ? isMirrored : readMatrixDeterminant(item.modelMatrix.getElements()) < 0 ? 1 : 0;
         }
       }
       this.#isResolved = true;
       this.#opaqueItemList = null;
+    }
+    //==============================================================================
+    // 담은 칸 하나의 기억 칸 읽기. (ToonDrawItem 은 바뀜 표시가 있을 때만 다시 푼다, 꼴 객체는 렌더러가 꼴마다 기억한 칸, 처음 보는 꼴 객체는 담은 칸이 쥔 칸)
+    // - 게임이 프레임마다 새로 짓는 꼴 객체는 꼴 객체마다 기억하지 않는다. 담은 칸이 쥔 기억 칸의 얕은 사본과 견주어 값이 같으면 그대로 쓴다. (할당 없음)
+    // - 같은 꼴 객체가 같은 칸에 다시 오면 (게임이 지어 둔 꼴을 다시 쓰면) 렌더러가 꼴 객체마다 기억하게 한다. (맡긴 판에서 한 번만 견준다)
+    //==============================================================================
+    /**
+     * @param { object } renderer - ToonRenderer.
+     * @param { object } item - 담은 칸.
+     * @returns { object } 기억 칸.
+     * @private
+     */
+    readItemEntry(renderer, item) {
+      const options = item.options;
+      if (item.drawItem !== null) {
+        return item.drawItem.readDrawEntry(renderer);
+      }
+      const entry = renderer.findDrawEntry(options);
+      if (entry !== null) {
+        return entry;
+      }
+      const heldEntry = item.heldRenderer === renderer ? item.heldEntry : null;
+      if (heldEntry !== null && heldEntry.options === options) {
+        heldEntry.options = null;
+        return renderer.readDrawEntry(options);
+      }
+      item.heldEntry = renderer.writeHeldDrawEntry(heldEntry, options, false);
+      item.heldRenderer = renderer;
+      return item.heldEntry;
     }
     //==============================================================================
     // 담을 칸 하나 꺼내기. (풀에서 다시 쓴다, 담은 것 목록에 넣는다)
@@ -86889,10 +87778,11 @@ void main() {
      */
     pushItem(mesh, modelMatrix, instances, instanceBuffer, instanceCount, options) {
       const itemList = this.#itemList;
-      let item = this.#itemPool[itemList.length];
+      const itemCount = this.#itemCount;
+      let item = itemList[itemCount];
       if (item === void 0) {
-        item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
-        this.#itemPool.push(item);
+        item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, drawItem: null, entry: null, heldEntry: null, heldRenderer: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
+        itemList.push(item);
       }
       item.mesh = mesh;
       item.modelMatrix = modelMatrix;
@@ -86900,28 +87790,34 @@ void main() {
       item.instanceBuffer = instanceBuffer;
       item.instanceCount = instanceCount;
       item.options = options;
+      item.drawItem = null;
+      item.entry = null;
       item.state = null;
       item.isTransparent = false;
       item.depth = 0;
       this.#opaqueItemList = null;
       this.#isResolved = false;
-      itemList.push(item);
+      this.#itemCount = itemCount + 1;
       return item;
     }
     //==============================================================================
     // 비우기. (프레임마다 담기 전에, 단계 콜백도 비운다, 화면 공간 바깥선은 그대로)
     //==============================================================================
     clear() {
-      for (const item of this.#itemList) {
+      const itemList = this.#itemList;
+      for (let index = 0; index < this.#itemCount; ++index) {
+        const item = itemList[index];
         item.mesh = null;
         item.modelMatrix = null;
         item.instances = null;
         item.instanceBuffer = null;
         item.options = null;
+        item.drawItem = null;
+        item.entry = null;
         item.state = null;
         item.materialBlock = null;
       }
-      this.#itemList.length = 0;
+      this.#itemCount = 0;
       this.#passList.length = 0;
       this.#opaqueItemList = null;
     }
@@ -86932,7 +87828,7 @@ void main() {
      * @returns { number } 담은 모형과 인스턴스 묶음 수.
      */
     getItemCount() {
-      return this.#itemList.length;
+      return this.#itemCount;
     }
     //==============================================================================
     // 화면 공간 바깥선 맡기기. (draw 가 선의 판을 그리고 바깥선 껍데기 뒤에 섞는다, null 이면 맡기지 않음)
@@ -87054,6 +87950,56 @@ void main() {
       depthPosition.z = elements[2] * center[0] + elements[6] * center[1] + elements[10] * center[2] + elements[14];
     }
     //==============================================================================
+    // 남겨 두는 그리기 항목 짓기. (한 번 짓고 쥐어 두었다가 프레임마다 addItem 으로 담는다, new ToonDrawItem 과 같다)
+    //==============================================================================
+    /**
+     * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
+     * @param { Matrix4 } modelMatrix - 모형 행렬. (복사해 쥔다, 바꾸면 그 항목의 setModelMatrix)
+     * @param { object } [options] - addMesh 와 같은 꼴. (쥐어 둔다, 고치면 markDirty 나 setOption)
+     * @returns { ToonDrawItem } 그리기 항목.
+     * @example <caption>부품마다 항목을 한 번 짓고 프레임마다 담기</caption>
+     * import { ToonRenderer, ToonDrawQueue, MeshBuilder, createBoxGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+     * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+     * const renderer = new ToonRenderer(webGL2RenderingContext);
+     * const builder = new MeshBuilder();
+     * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#c08060");
+     * const boxMesh = renderer.createMesh(builder.readArrays());
+     * const camera = new Camera3D();
+     * camera.setPerspective(0.8, 0.1, 100);
+     * camera.lookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+     * const queue = new ToonDrawQueue();
+     * const boxItem = queue.createItem(boxMesh, Matrix4.createTranslation(0, 0.5, 0), { tintColor: [1, 0.8, 0.8, 1], lineId: 1 });
+     * queue.clear();
+     * queue.addItem(boxItem);
+     * queue.draw(renderer, camera);
+     * boxItem.setOption("tintColor", [0.8, 1, 0.8, 1]);
+     */
+    createItem(mesh, modelMatrix, options = {}) {
+      return new ToonDrawItem(mesh, modelMatrix, options);
+    }
+    //==============================================================================
+    // 남겨 두는 그리기 항목 담기. (addMesh 와 같은 자리, 바뀜 표시가 없으면 앞서 푼 꼴을 그대로 쓴다)
+    // - 꼴 객체를 프레임마다 견주거나 풀지 않는다. 꼴을 고쳤으면 그 항목의 markDirty 나 setOption, setOptions 를 부른다. (유니티 MeshRenderer, 언리얼 프리미티브 컴포넌트 꼴)
+    // - 바뀐 것이 없는 항목은 그림자 캐시(onChange)도 견주지 않는다. 행렬을 바꾸면 setModelMatrix 로 넘긴다.
+    //==============================================================================
+    /**
+     * @param { ToonDrawItem } drawItem - createItem 이나 new ToonDrawItem 의 결과.
+     * @example <caption>남겨 두는 항목 담기</caption>
+     * import { ToonDrawQueue, ToonDrawItem, Matrix4 } from "./vanilla.js";
+     * const queue = new ToonDrawQueue();
+     * const drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), { lineId: 3 });
+     * queue.clear();
+     * queue.addItem(drawItem);
+     */
+    addItem(drawItem) {
+      const mesh = drawItem.getMesh();
+      if (mesh === null || mesh === void 0) {
+        return;
+      }
+      this.addMesh(mesh, drawItem.getModelMatrix(), drawItem.getOptions());
+      this.#itemList[this.#itemCount - 1].drawItem = drawItem;
+    }
+    //==============================================================================
     // 같은 모형 여럿 담기. (GPU 인스턴싱, 비어 있거나 null 이면 담지 않는다)
     //==============================================================================
     /**
@@ -87122,11 +88068,12 @@ void main() {
       if (mesh === null || mesh === void 0 || instanceBuffer === null || instanceBuffer === void 0 || instanceCount <= 0) {
         return;
       }
-      const sphere = readInstanceBufferSphere(mesh, instanceBuffer);
+      const sphere = INSTANCE_BUFFER_SPHERE3;
+      const hasSphere = writeInstanceBufferSphere(sphere, mesh, instanceBuffer);
       const item = this.pushItem(mesh, null, null, instanceBuffer, instanceCount, options);
-      item.depthPosition.x = sphere !== null ? sphere[0] : 0;
-      item.depthPosition.y = sphere !== null ? sphere[1] : 0;
-      item.depthPosition.z = sphere !== null ? sphere[2] : 0;
+      item.depthPosition.x = hasSphere ? sphere[0] : 0;
+      item.depthPosition.y = hasSphere ? sphere[1] : 0;
+      item.depthPosition.z = hasSphere ? sphere[2] : 0;
     }
     //==============================================================================
     // 그릴 꼴이 비치는지. (alpha 나 틴트의 알파가 1 보다 작거나 섞는 방식이 곧은 알파가 아님)
@@ -87149,16 +88096,12 @@ void main() {
      * @param { object } shadowMap - ShadowMap.
      */
     drawShadows(renderer, shadowMap) {
-      const lightKey = new System140.Float32Array(17);
+      const lightKey = this.#lightKey;
       lightKey.set(shadowMap.getLightViewProjectionMatrix().getElements());
       lightKey[16] = shadowMap.getResolution();
       renderer.beginTrustedOptions();
       try {
-        this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, () => {
-          renderer.beginShadowPass(shadowMap);
-        }, (casterList) => {
-          this.drawCasterList(renderer, casterList);
-        });
+        this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, shadowMap, null);
       } finally {
         renderer.endTrustedOptions();
       }
@@ -87191,7 +88134,10 @@ void main() {
      */
     drawLocalShadows(renderer, shadowAtlas) {
       const tileCount = shadowAtlas.getTileCount();
-      const lightKey = new System140.Float32Array(1 + tileCount * 19);
+      if (this.#localLightKey.length !== 1 + tileCount * 19) {
+        this.#localLightKey = new System140.Float32Array(1 + tileCount * 19);
+      }
+      const lightKey = this.#localLightKey;
       lightKey[0] = shadowAtlas.getResolution();
       for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
         const tile = shadowAtlas.getTile(tileIndex);
@@ -87203,14 +88149,7 @@ void main() {
       }
       renderer.beginTrustedOptions();
       try {
-        this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, () => {
-          renderer.beginShadowAtlasPass(shadowAtlas);
-        }, (casterList) => {
-          for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
-            renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-            this.drawCasterList(renderer, casterList);
-          }
-        });
+        this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, null, shadowAtlas);
       } finally {
         renderer.endTrustedOptions();
       }
@@ -87229,30 +88168,29 @@ void main() {
      * @param { object } renderer - ToonRenderer.
      * @param { object } shadowCache - ShadowMap 이나 ShadowAtlas 의 getShadowCache().
      * @param { Float32Array } lightKey - 빛 행렬과 판의 꼴. (다르면 다시 굽는다)
-     * @param { Function } beginPass - 깊이 패스를 시작한다. (endShadowPass 로 끝낸다)
-     * @param { Function } drawCasters - (드리우개 목록) 을 그린다.
+     * @param { object | null } shadowMap - 해 그림자의 ShadowMap. (아니면 null)
+     * @param { object | null } shadowAtlas - 점광과 스포트라이트 그림자의 ShadowAtlas. (아니면 null, 칸마다 그린다)
      * @private
      */
-    drawShadowCasters(renderer, shadowCache, lightKey, beginPass, drawCasters) {
+    drawShadowCasters(renderer, shadowCache, lightKey, shadowMap, shadowAtlas) {
       this.resolveItems(renderer);
-      const casterList = [];
-      for (const item of this.readOpaqueItemList()) {
+      const casterList = this.#casterList;
+      const opaqueItemList = this.readOpaqueItemList();
+      let casterCount = 0;
+      for (let index = 0; index < opaqueItemList.length; ++index) {
+        const item = opaqueItemList[index];
         if (item.state[DRAW_STATE_CASTS_SHADOW]) {
-          casterList.push(item);
+          casterList[casterCount] = item;
+          casterCount += 1;
         }
       }
-      const drawPass = /* @__PURE__ */ __name((renderTarget, itemList) => {
-        shadowCache.renderTarget = renderTarget;
-        beginPass();
-        drawCasters(itemList);
-        renderer.endShadowPass();
-      }, "drawPass");
+      setListLength(casterList, casterCount);
       const updateMode = shadowCache.updateMode;
       if (updateMode === ShadowUpdateMode.everyFrame) {
         shadowCache.casterRecords.length = 0;
         shadowCache.lightKey = null;
         shadowCache.hasCache = false;
-        drawPass("live", casterList);
+        this.drawShadowPass(renderer, shadowCache, "live", casterList, shadowMap, shadowAtlas);
         return;
       }
       if (updateMode === ShadowUpdateMode.interval) {
@@ -87261,14 +88199,18 @@ void main() {
         if (isDue) {
           shadowCache.isUpdateRequested = false;
           shadowCache.hasCache = false;
-          drawPass("live", casterList);
+          this.drawShadowPass(renderer, shadowCache, "live", casterList, shadowMap, shadowAtlas);
         }
         return;
       }
       const isLightChanged = !isSameValues(shadowCache.lightKey, lightKey);
       let isCacheStale = shadowCache.isUpdateRequested;
       shadowCache.isUpdateRequested = false;
-      shadowCache.lightKey = lightKey;
+      if (shadowCache.lightKey !== null && shadowCache.lightKey.length === lightKey.length) {
+        shadowCache.lightKey.set(lightKey);
+      } else {
+        shadowCache.lightKey = lightKey.slice();
+      }
       const recordList = shadowCache.casterRecords;
       for (let recordIndex = casterList.length; recordIndex < recordList.length; ++recordIndex) {
         isCacheStale = isCacheStale || recordList[recordIndex].isStatic;
@@ -87276,17 +88218,19 @@ void main() {
       if (recordList.length > casterList.length) {
         recordList.length = casterList.length;
       }
-      const staticList = [];
-      const dynamicList = [];
+      const staticList = this.#staticCasterList;
+      const dynamicList = this.#dynamicCasterList;
+      let staticCount = 0;
+      let dynamicCount = 0;
       for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
         const item = casterList[casterIndex];
         if (casterIndex >= recordList.length) {
-          recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System140.Float32Array(0), stableFrameCount: 0, isStatic: false });
+          recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System140.Float32Array(0), stableFrameCount: 0, isStatic: false, drawItem: null, changeSerial: -1 });
         }
         const record = recordList[casterIndex];
         const material = item.state[DRAW_STATE_MATERIAL];
         const isVertexAnimated = material !== void 0 && material !== null && material.getVertexChunk() !== "";
-        if (writeCasterRecord(record, item) || isVertexAnimated) {
+        if (this.isCasterChanged(record, item) || isVertexAnimated) {
           isCacheStale = isCacheStale || record.isStatic;
           record.isStatic = false;
           record.stableFrameCount = 0;
@@ -87298,31 +88242,81 @@ void main() {
           }
         }
         if (record.isStatic) {
-          staticList.push(item);
+          staticList[staticCount] = item;
+          staticCount += 1;
         } else {
-          dynamicList.push(item);
+          dynamicList[dynamicCount] = item;
+          dynamicCount += 1;
         }
       }
+      setListLength(staticList, staticCount);
+      setListLength(dynamicList, dynamicCount);
       if (isLightChanged) {
         shadowCache.hasCache = false;
-        drawPass("live", casterList);
+        this.drawShadowPass(renderer, shadowCache, "live", casterList, shadowMap, shadowAtlas);
         return;
       }
       if (isCacheStale || !shadowCache.hasCache && staticList.length > 0) {
         shadowCache.hasCache = staticList.length > 0;
         if (shadowCache.hasCache) {
-          drawPass("cache", staticList);
+          this.drawShadowPass(renderer, shadowCache, "cache", staticList, shadowMap, shadowAtlas);
         }
         shadowCache.isDepthCurrent = false;
       }
       if (dynamicList.length > 0) {
-        drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+        this.drawShadowPass(renderer, shadowCache, shadowCache.hasCache ? "copy" : "live", dynamicList, shadowMap, shadowAtlas);
         return;
       }
       if (!shadowCache.isDepthCurrent) {
-        drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+        this.drawShadowPass(renderer, shadowCache, shadowCache.hasCache ? "copy" : "live", dynamicList, shadowMap, shadowAtlas);
         shadowCache.isDepthCurrent = true;
       }
+    }
+    //==============================================================================
+    // 그림자 깊이 패스 하나. (renderTarget 은 그림자 캐시의 판: live, cache, copy, 해 그림자면 판 하나, 아틀라스면 칸마다)
+    //==============================================================================
+    /**
+     * @param { object } renderer - ToonRenderer.
+     * @param { object } shadowCache - 그림자 캐시.
+     * @param { string } renderTarget - "live", "cache", "copy".
+     * @param { Array<object> } itemList - 그릴 드리우개.
+     * @param { object | null } shadowMap - 해 그림자의 ShadowMap.
+     * @param { object | null } shadowAtlas - 점광과 스포트라이트 그림자의 ShadowAtlas.
+     * @private
+     */
+    drawShadowPass(renderer, shadowCache, renderTarget, itemList, shadowMap, shadowAtlas) {
+      shadowCache.renderTarget = renderTarget;
+      if (shadowAtlas !== null) {
+        renderer.beginShadowAtlasPass(shadowAtlas);
+        const tileCount = shadowAtlas.getTileCount();
+        for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+          renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
+          this.drawCasterList(renderer, itemList);
+        }
+      } else {
+        renderer.beginShadowPass(shadowMap);
+        this.drawCasterList(renderer, itemList);
+      }
+      renderer.endShadowPass();
+    }
+    //==============================================================================
+    // 드리우개가 앞의 프레임과 다른지. (바뀐 것이 없는 ToonDrawItem 은 견주지 않는다, 뼈대 행렬이 있으면 견준다)
+    //==============================================================================
+    /**
+     * @param { object } record - 드리우개 기록.
+     * @param { object } item - 담은 것.
+     * @returns { boolean } 다르면 true.
+     * @private
+     */
+    isCasterChanged(record, item) {
+      const drawItem = item.drawItem;
+      if (drawItem !== null && record.drawItem === drawItem && record.changeSerial === drawItem.getChangeSerial() && item.state[DRAW_STATE_JOINT_MATRICES] === null) {
+        return false;
+      }
+      const isChanged = writeCasterRecord(record, item);
+      record.drawItem = drawItem;
+      record.changeSerial = drawItem !== null ? drawItem.getChangeSerial() : -1;
+      return isChanged;
     }
     //==============================================================================
     // 담은 것 그리기. (화면 공간 바깥선이 있으면 선의 판부터, beginFrameWithCamera 와 endFrame 을 스스로 부른다)
@@ -87401,42 +88395,29 @@ void main() {
       if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
         const lineMatrices = this.#lineMatrices;
         const lineIds = this.#lineIds;
-        const groupList = [];
-        const groupTable = /* @__PURE__ */ new Map();
-        const flushGroups = /* @__PURE__ */ __name(() => {
-          for (const group of groupList) {
-            const start = lineMatrices.length;
-            for (const index of group.itemIndexList) {
-              lineMatrices.push(lineMatrices[index]);
-              lineIds.push(lineIds[index]);
-            }
-            screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, lineMatrices.length - start, group.item.options);
-          }
-          groupList.length = 0;
-          groupTable.clear();
-          lineMatrices.length = 0;
-          lineIds.length = 0;
-        }, "flushGroups");
-        let itemIndex = 0;
-        for (const item of this.#itemList) {
-          itemIndex += 1;
+        this.#lineMatrixCount = 0;
+        this.#lineGroupCount = 0;
+        this.#lineGroupSerial += 1;
+        const itemList = this.#itemList;
+        for (let itemIndex = 1; itemIndex <= this.#itemCount; ++itemIndex) {
+          const item = itemList[itemIndex - 1];
           if (item.isTransparent) {
             continue;
           }
           const stateLineId = item.state[DRAW_STATE_LINE_ID];
           const lineId = stateLineId !== null ? stateLineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
           if (item.instanceBuffer !== null) {
-            flushGroups();
+            this.flushLineGroups(screenOutline);
             screenOutline.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, lineId, item.options);
             continue;
           }
           if (item.instances !== null) {
-            flushGroups();
+            this.flushLineGroups(screenOutline);
             screenOutline.drawMeshInstanced(item.mesh, item.instances, lineId, item.options);
             continue;
           }
           if (item.mirrorSign === 1 || item.state[DRAW_STATE_JOINT_MATRICES] !== null) {
-            flushGroups();
+            this.flushLineGroups(screenOutline);
             screenOutline.drawMesh(item.mesh, item.modelMatrix, lineId, item.options);
             continue;
           }
@@ -87447,31 +88428,93 @@ void main() {
           const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
           const indexStart = options.indexStart;
           const indexCount = options.indexCount;
-          let groups = groupTable.get(item.mesh);
-          if (groups === void 0) {
-            groups = [];
-            groupTable.set(item.mesh, groups);
+          let meshGroups = this.#lineGroupOfMesh.get(item.mesh);
+          if (meshGroups === void 0) {
+            meshGroups = { serial: -1, firstIndex: -1, lastIndex: -1 };
+            this.#lineGroupOfMesh.set(item.mesh, meshGroups);
           }
+          if (meshGroups.serial !== this.#lineGroupSerial) {
+            meshGroups.serial = this.#lineGroupSerial;
+            meshGroups.firstIndex = -1;
+            meshGroups.lastIndex = -1;
+          }
+          const groupPool = this.#lineGroupPool;
           let group = null;
-          for (const candidate of groups) {
+          for (let groupIndex = meshGroups.firstIndex; groupIndex >= 0; groupIndex = groupPool[groupIndex].nextIndex) {
+            const candidate = groupPool[groupIndex];
             if (candidate.lineFlags === lineFlags && candidate.indexStart === indexStart && candidate.indexCount === indexCount) {
               group = candidate;
               break;
             }
           }
           if (group === null) {
-            group = { item, lineFlags, indexStart, indexCount, itemIndexList: [] };
-            groups.push(group);
-            groupList.push(group);
+            const groupIndex = this.#lineGroupCount;
+            group = groupPool[groupIndex];
+            if (group === void 0) {
+              group = { item: null, lineFlags: 0, indexStart: void 0, indexCount: void 0, itemIndexList: [], itemIndexCount: 0, nextIndex: -1 };
+              groupPool.push(group);
+            }
+            group.item = item;
+            group.lineFlags = lineFlags;
+            group.indexStart = indexStart;
+            group.indexCount = indexCount;
+            group.itemIndexCount = 0;
+            group.nextIndex = -1;
+            this.#lineGroupCount = groupIndex + 1;
+            if (meshGroups.lastIndex >= 0) {
+              groupPool[meshGroups.lastIndex].nextIndex = groupIndex;
+            } else {
+              meshGroups.firstIndex = groupIndex;
+            }
+            meshGroups.lastIndex = groupIndex;
           }
-          group.itemIndexList.push(lineMatrices.length);
-          lineMatrices.push(item.modelMatrix);
-          lineIds.push(lineId);
+          group.itemIndexList[group.itemIndexCount] = this.#lineMatrixCount;
+          group.itemIndexCount += 1;
+          this.pushLineMatrix(item.modelMatrix, lineId);
         }
-        flushGroups();
+        this.flushLineGroups(screenOutline);
         screenOutline.endLineIds();
       }
       webGL2RenderingContext.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    }
+    //==============================================================================
+    // 선의 판 묶음 그리기. (모은 묶음마다 행렬과 번호를 뒤쪽 자리에 이어 옮겨 담아 인스턴스 그리기 한 번, 묶음과 쓴 수를 비운다)
+    //==============================================================================
+    /**
+     * @param { object } screenOutline - ToonScreenOutline.
+     * @private
+     */
+    flushLineGroups(screenOutline) {
+      const lineMatrices = this.#lineMatrices;
+      const lineIds = this.#lineIds;
+      const groupPool = this.#lineGroupPool;
+      for (let groupIndex = 0; groupIndex < this.#lineGroupCount; ++groupIndex) {
+        const group = groupPool[groupIndex];
+        const start = this.#lineMatrixCount;
+        for (let index = 0; index < group.itemIndexCount; ++index) {
+          const sourceIndex = group.itemIndexList[index];
+          this.pushLineMatrix(lineMatrices[sourceIndex], lineIds[sourceIndex]);
+        }
+        screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options);
+        group.item = null;
+      }
+      this.#lineGroupCount = 0;
+      this.#lineGroupSerial += 1;
+      this.#lineMatrixCount = 0;
+    }
+    //==============================================================================
+    // 선의 판 행렬과 번호 하나 더하기. (쓴 수 자리에, 배열 길이를 줄이지 않는다)
+    //==============================================================================
+    /**
+     * @param { Matrix4 } matrix - 모형 행렬.
+     * @param { number } lineId - 선 번호.
+     * @private
+     */
+    pushLineMatrix(matrix, lineId) {
+      const index = this.#lineMatrixCount;
+      this.#lineMatrices[index] = matrix;
+      this.#lineIds[index] = lineId;
+      this.#lineMatrixCount = index + 1;
     }
     //==============================================================================
     // 한 단계의 콜백 부르기. (부른 뒤 프레임의 그리기 상태를 다시 건다)
@@ -87512,8 +88555,8 @@ void main() {
       this.runPasses(renderer, ToonDrawStage.beforeOpaque);
       const outlineBatches = this.#outlineBatches;
       const batchMatrices = this.#batchMatrices;
-      outlineBatches.length = 0;
-      batchMatrices.length = 0;
+      this.#outlineBatchCount = 0;
+      this.#batchMatrixCount = 0;
       const opaqueItemList = this.readOpaqueItemList();
       let itemIndex = 0;
       let slotIndex = 0;
@@ -87528,79 +88571,110 @@ void main() {
           this.drawItem(renderer, item, item.options);
           continue;
         }
-        const start = batchMatrices.length;
-        batchMatrices.push(item.modelMatrix);
-        itemIndex = this.collectBatch(renderer, opaqueItemList, itemIndex, item, batchMatrices);
-        const count = batchMatrices.length - start;
+        const start = this.#batchMatrixCount;
+        this.pushBatchMatrix(item.modelMatrix);
+        itemIndex = this.collectBatch(renderer, opaqueItemList, itemIndex, item);
+        const count = this.#batchMatrixCount - start;
+        renderer.setDrawEntryHint(item.options, item.entry);
         if (count === 1) {
           renderer.drawMeshBody(item.mesh, item.modelMatrix, item.options);
         } else {
           renderer.drawMeshBatch(item.mesh, batchMatrices, start, count, item.options, DRAW_PART_BODY2, slotIndex);
         }
         if (item.state[DRAW_STATE_HAS_OUTLINE] && item.mesh.outlineVertexArray !== null) {
-          outlineBatches.push(item, start, count, slotIndex);
+          const offset = this.#outlineBatchCount;
+          outlineBatches[offset] = item;
+          outlineBatches[offset + 1] = start;
+          outlineBatches[offset + 2] = count;
+          outlineBatches[offset + 3] = slotIndex;
+          this.#outlineBatchCount = offset + 4;
         }
         if (count > 1) {
           slotIndex += 1;
         }
       }
       this.runPasses(renderer, ToonDrawStage.afterOpaque);
-      for (let batchIndex = 0; batchIndex < outlineBatches.length; batchIndex += 4) {
+      for (let batchIndex = 0; batchIndex < this.#outlineBatchCount; batchIndex += 4) {
         const item = outlineBatches[batchIndex];
         const count = outlineBatches[batchIndex + 2];
+        renderer.setDrawEntryHint(item.options, item.entry);
         if (count === 1) {
           renderer.drawMeshOutline(item.mesh, item.modelMatrix, item.options);
         } else {
           renderer.drawMeshBatch(item.mesh, batchMatrices, outlineBatches[batchIndex + 1], count, item.options, DRAW_PART_OUTLINE2, outlineBatches[batchIndex + 3]);
         }
       }
-      outlineBatches.length = 0;
+      for (let batchIndex = 0; batchIndex < this.#outlineBatchCount; batchIndex += 4) {
+        outlineBatches[batchIndex] = null;
+      }
+      this.#outlineBatchCount = 0;
       if (this.#screenOutline !== null) {
         this.#screenOutline.drawOutline();
         renderer.applyFrameState();
       }
       this.runPasses(renderer, ToonDrawStage.afterOutline);
-      const entryList = [];
-      const groupTable = /* @__PURE__ */ new Map();
-      for (const item of itemList) {
+      const entryList = this.#transparentList;
+      const entryPool = this.#transparentPool;
+      let entryCount = 0;
+      for (let index = 0; index < this.#itemCount; ++index) {
+        const item = itemList[index];
         if (!item.isTransparent) {
           continue;
         }
         item.depth = readDepth(item.depthPosition);
         const group = item.state[DRAW_STATE_GROUP];
         const isDepthPrepassed = item.state[DRAW_STATE_IS_DEPTH_PREPASSED];
-        if (group === null) {
-          entryList.push({ depthSum: item.depth, itemList: [item], isDepthPrepassed });
-          continue;
+        let entry = null;
+        if (group !== null) {
+          for (let entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
+            if (entryList[entryIndex].group === group) {
+              entry = entryList[entryIndex];
+              break;
+            }
+          }
         }
-        let entry = groupTable.get(group);
-        if (entry === void 0) {
-          entry = { depthSum: 0, itemList: [], isDepthPrepassed: false };
-          groupTable.set(group, entry);
-          entryList.push(entry);
+        if (entry === null) {
+          entry = entryPool[entryCount];
+          if (entry === void 0) {
+            entry = { depthSum: 0, itemList: [], itemCount: 0, isDepthPrepassed: false, group: null, averageDepth: 0 };
+            entryPool.push(entry);
+          }
+          entry.depthSum = 0;
+          entry.itemCount = 0;
+          entry.isDepthPrepassed = false;
+          entry.group = group;
+          entryList[entryCount] = entry;
+          entryCount += 1;
         }
         entry.depthSum += item.depth;
-        entry.itemList.push(item);
+        entry.itemList[entry.itemCount] = item;
+        entry.itemCount += 1;
         entry.isDepthPrepassed = entry.isDepthPrepassed || isDepthPrepassed;
       }
+      setListLength(entryList, entryCount);
       if (entryList.length > 0) {
-        entryList.sort((entry, other) => {
-          return other.depthSum / other.itemList.length - entry.depthSum / entry.itemList.length;
-        });
+        for (const entry of entryList) {
+          entry.averageDepth = entry.depthSum / entry.itemCount;
+        }
+        entryList.sort(compareTransparentEntry);
         webGL2RenderingContext.depthMask(false);
         for (const entry of entryList) {
           if (entry.isDepthPrepassed) {
             webGL2RenderingContext.colorMask(false, false, false, false);
             webGL2RenderingContext.depthMask(true);
-            for (const item of entry.itemList) {
+            for (let index = 0; index < entry.itemCount; ++index) {
+              const item = entry.itemList[index];
               this.drawItem(renderer, item, item.options);
             }
             webGL2RenderingContext.colorMask(true, true, true, true);
             webGL2RenderingContext.depthMask(false);
           }
-          for (const item of entry.itemList) {
+          for (let index = 0; index < entry.itemCount; ++index) {
+            const item = entry.itemList[index];
             this.drawItem(renderer, item, item.options);
+            entry.itemList[index] = null;
           }
+          entry.group = null;
         }
         webGL2RenderingContext.depthMask(true);
       }
@@ -87618,13 +88692,16 @@ void main() {
         return this.#opaqueItemList;
       }
       const scratch = this.#opaqueScratch;
-      scratch.length = 0;
-      for (const item of this.#itemList) {
+      const itemList = this.#itemList;
+      let count = 0;
+      for (let index = 0; index < this.#itemCount; ++index) {
+        const item = itemList[index];
         if (!item.isTransparent) {
-          scratch.push(item);
+          scratch[count] = item;
+          count += 1;
         }
       }
-      const count = scratch.length;
+      setListLength(scratch, count);
       let keys = this.#sortKeys;
       let isSame = count === this.#sortCount;
       if (keys.length < count * 4) {
@@ -87650,36 +88727,37 @@ void main() {
       }
       const order = this.#sortOrder;
       if (!isSame) {
-        const indexList = [];
+        const indexList = this.#sortIndexList;
         for (let index = 0; index < count; ++index) {
-          indexList.push(index);
+          indexList[index] = index;
         }
+        setListLength(indexList, count);
         indexList.sort((index, other) => {
           return keys[index * 4] - keys[other * 4] || keys[index * 4 + 1] - keys[other * 4 + 1] || keys[index * 4 + 2] - keys[other * 4 + 2] || keys[index * 4 + 3] - keys[other * 4 + 3] || index - other;
         });
         order.set(indexList);
         this.#sortCount = count;
       }
-      const opaqueItemList = [];
+      const opaqueItemList = this.#opaqueStorage;
       for (let index = 0; index < count; ++index) {
-        opaqueItemList.push(scratch[order[index]]);
+        opaqueItemList[index] = scratch[order[index]];
       }
+      setListLength(opaqueItemList, count);
       this.#opaqueItemList = opaqueItemList;
       return opaqueItemList;
     }
     //==============================================================================
-    // 자동 인스턴싱으로 묶을 것 모으기. (item 뒤에 이어진 같은 것의 행렬을 matrices 에 더한다, 화면 밖인 것은 drawItem 이 걸러 센다)
+    // 자동 인스턴싱으로 묶을 것 모으기. (item 뒤에 이어진 같은 것의 행렬을 #batchMatrices 에 더한다, 화면 밖인 것은 drawItem 이 걸러 센다)
     //==============================================================================
     /**
      * @param { object } renderer - ToonRenderer.
      * @param { Array<object> } itemList - 정렬한 담은 것 목록.
      * @param { number } itemIndex - item 다음 자리.
      * @param { object } item - 묶음의 첫 것. (보통 모형 하나, 걸러 그릴 것)
-     * @param { Array<object> } matrices - 행렬을 더할 목록.
      * @returns { number } 묶지 않은 첫 자리.
      * @private
      */
-    collectBatch(renderer, itemList, itemIndex, item, matrices) {
+    collectBatch(renderer, itemList, itemIndex, item) {
       if (item.materialBlock === null) {
         return itemIndex;
       }
@@ -87693,7 +88771,7 @@ void main() {
           this.drawItem(renderer, other, other.options);
           continue;
         }
-        matrices.push(other.modelMatrix);
+        this.pushBatchMatrix(other.modelMatrix);
       }
       return itemIndex;
     }
@@ -87716,17 +88794,29 @@ void main() {
           this.drawItem(renderer, item, item.options);
           continue;
         }
-        batchMatrices.length = 0;
-        batchMatrices.push(item.modelMatrix);
-        itemIndex = this.collectBatch(renderer, casterList, itemIndex, item, batchMatrices);
-        if (batchMatrices.length === 1) {
+        this.#batchMatrixCount = 0;
+        this.pushBatchMatrix(item.modelMatrix);
+        itemIndex = this.collectBatch(renderer, casterList, itemIndex, item);
+        if (this.#batchMatrixCount === 1) {
           this.drawItem(renderer, item, item.options);
         } else {
-          renderer.drawMeshBatch(item.mesh, batchMatrices, 0, batchMatrices.length, item.options, DRAW_PART_ALL2, slotIndex);
+          renderer.setDrawEntryHint(item.options, item.entry);
+          renderer.drawMeshBatch(item.mesh, batchMatrices, 0, this.#batchMatrixCount, item.options, DRAW_PART_ALL2, slotIndex);
           slotIndex += 1;
         }
       }
-      batchMatrices.length = 0;
+      this.#batchMatrixCount = 0;
+    }
+    //==============================================================================
+    // 자동 인스턴싱 행렬 하나 더하기. (#batchMatrices 의 쓴 수 자리에, 배열 길이를 줄이지 않는다)
+    //==============================================================================
+    /**
+     * @param { Matrix4 } matrix - 모형 행렬.
+     * @private
+     */
+    pushBatchMatrix(matrix) {
+      this.#batchMatrices[this.#batchMatrixCount] = matrix;
+      this.#batchMatrixCount += 1;
     }
     //==============================================================================
     // 하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced, 인스턴스 버퍼는 drawMeshInstanceBuffer)
@@ -87737,6 +88827,7 @@ void main() {
      * @param { object } options - 이번에 쓸 그리기 꼴.
      */
     drawItem(renderer, item, options) {
+      renderer.setDrawEntryHint(options, item.entry);
       if (item.instanceBuffer !== null) {
         renderer.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, options);
       } else if (item.instances !== null) {

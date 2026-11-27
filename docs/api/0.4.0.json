@@ -25946,6 +25946,158 @@
 						},
 						{
 							"kind": "method",
+							"name": "readPosition",
+							"signature": "readPosition(out)",
+							"params": [
+								{
+									"name": "out",
+									"type": "Vector2",
+									"description": {
+										"ko": "쓸 벡터.",
+										"en": "Vector to write."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "out.",
+									"en": "out."
+								}
+							},
+							"description": {
+								"ko": "글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 값, 새 벡터를 짓지 않는다)\n- getPosition 이나 부모의 위치, 회전, 크기 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다. (그때는 그 함수가 짓는 만큼 할당한다)",
+								"en": "Writes the global position into a given vector. (Same value as getPosition, no new vector)\n- Subclasses that override getPosition or the parent's position, rotation or scale readers are read through those functions. (Then it allocates as much as they do)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "프레임마다 같은 벡터에 글로벌 위치 읽기",
+										"en": "Read the global position into the same vector every frame"
+									},
+									"code": "import { TransformNode, Vector2 } from \"./vanilla.js\";\nconst parentNode = new TransformNode();\nparentNode.setLocalPosition(Vector2.create(10, 20));\nconst childNode = new TransformNode();\nchildNode.setParent(parentNode);\nchildNode.setLocalPosition(Vector2.create(5, 0));\nconst position = Vector2.create(0, 0);\nchildNode.readPosition(position);\nif (position.x !== 15 || position.y !== 20) {\n\tthrow new Error(\"position failed\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "readScale",
+							"signature": "readScale(out)",
+							"params": [
+								{
+									"name": "out",
+									"type": "Vector2",
+									"description": {
+										"ko": "쓸 벡터.",
+										"en": "Vector to write."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "out.",
+									"en": "out."
+								}
+							},
+							"description": {
+								"ko": "글로벌 크기를 주어진 벡터에 쓰기. (getScale 과 같은 값, 새 벡터를 짓지 않는다)\n- getScale 이나 getLocalScale 을 덮어쓴 하위 클래스면 그 함수로 읽는다.",
+								"en": "Writes the global scale into a given vector. (Same value as getScale, no new vector)\n- Subclasses that override getScale or getLocalScale are read through those functions."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "프레임마다 같은 벡터에 글로벌 크기 읽기",
+										"en": "Read the global scale into the same vector every frame"
+									},
+									"code": "import { TransformNode, Vector2 } from \"./vanilla.js\";\nconst parentNode = new TransformNode();\nparentNode.setLocalScale(Vector2.create(2, 2));\nconst childNode = new TransformNode();\nchildNode.setParent(parentNode);\nchildNode.setLocalScale(Vector2.create(0.5, 3));\nconst scale = Vector2.create(0, 0);\nchildNode.readScale(scale);\nif (scale.x !== 1 || scale.y !== 6) {\n\tthrow new Error(\"scale failed\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "readLocalPosition",
+							"signature": "readLocalPosition(out)",
+							"params": [
+								{
+									"name": "out",
+									"type": "Vector2",
+									"description": {
+										"ko": "쓸 벡터.",
+										"en": "Vector to write."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "out.",
+									"en": "out."
+								}
+							},
+							"description": {
+								"ko": "로컬 위치를 주어진 벡터에 쓰기. (getLocalPosition 과 같은 값, 복제하지 않는다)",
+								"en": "Writes the local position into a given vector. (Same value as getLocalPosition, no clone)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "로컬 위치 읽기",
+										"en": "Read the local position"
+									},
+									"code": "import { TransformNode, Vector2 } from \"./vanilla.js\";\nconst node = new TransformNode();\nnode.setLocalPositionXY(3, 4);\nconst position = node.readLocalPosition(Vector2.create(0, 0));\nif (position.x !== 3 || position.y !== 4) {\n\tthrow new Error(\"local position failed\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "readLocalScale",
+							"signature": "readLocalScale(out)",
+							"params": [
+								{
+									"name": "out",
+									"type": "Vector2",
+									"description": {
+										"ko": "쓸 벡터.",
+										"en": "Vector to write."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "out.",
+									"en": "out."
+								}
+							},
+							"description": {
+								"ko": "로컬 크기를 주어진 벡터에 쓰기. (getLocalScale 과 같은 값, 복제하지 않는다)",
+								"en": "Writes the local scale into a given vector. (Same value as getLocalScale, no clone)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "로컬 크기 읽기",
+										"en": "Read the local scale"
+									},
+									"code": "import { TransformNode, Vector2 } from \"./vanilla.js\";\nconst node = new TransformNode();\nnode.setLocalScaleXY(2, 0.5);\nconst scale = node.readLocalScale(Vector2.create(0, 0));\nif (scale.x !== 2 || scale.y !== 0.5) {\n\tthrow new Error(\"local scale failed\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "setScale",
 							"signature": "setScale(scale)",
 							"params": [
@@ -27274,6 +27426,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "readPivot",
+							"signature": "readPivot(out)",
+							"params": [
+								{
+									"name": "out",
+									"type": "Vector2",
+									"description": {
+										"ko": "쓸 벡터.",
+										"en": "Vector to write."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "out.",
+									"en": "out."
+								}
+							},
+							"description": {
+								"ko": "기준점을 주어진 벡터에 쓰기. (getPivot 과 같은 값, 복제하지 않는다)",
+								"en": "Writes the pivot into a given vector. (Same value as getPivot, no clone)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/worldnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "기준점 읽기",
+										"en": "Read the pivot"
+									},
+									"code": "import { WorldNode, Vector2 } from \"./vanilla.js\";\nconst node = new WorldNode();\nnode.setPivot(Vector2.create(0.5, 1));\nconst pivot = node.readPivot(Vector2.create(0, 0));\nif (pivot.x !== 0.5 || pivot.y !== 1) {\n\tthrow new Error(\"pivot failed\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "setContentSize",
 							"signature": "setContentSize(contentSize)",
 							"params": [
@@ -27409,6 +27599,44 @@
 								"class": "WorldNode",
 								"name": "get_content_size"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "readContentSize",
+							"signature": "readContentSize(out)",
+							"params": [
+								{
+									"name": "out",
+									"type": "Vector2",
+									"description": {
+										"ko": "쓸 벡터.",
+										"en": "Vector to write."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "out.",
+									"en": "out."
+								}
+							},
+							"description": {
+								"ko": "내용 크기를 주어진 벡터에 쓰기. (getContentSize 와 같은 값, 복제하지 않는다)",
+								"en": "Writes the content size into a given vector. (Same value as getContentSize, no clone)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/worldnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "내용 크기 읽기",
+										"en": "Read the content size"
+									},
+									"code": "import { WorldNode, Vector2 } from \"./vanilla.js\";\nconst node = new WorldNode();\nnode.setContentSize(Vector2.create(120, 40));\nconst contentSize = node.readContentSize(Vector2.create(0, 0));\nif (contentSize.x !== 120 || contentSize.y !== 40) {\n\tthrow new Error(\"content size failed\");\n}",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -27563,6 +27791,34 @@
 								"class": "NodeTree",
 								"name": "get_position"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "readPosition",
+							"signature": "readPosition(out)",
+							"params": [
+								{
+									"name": "out",
+									"type": "Vector2",
+									"description": {
+										"ko": "쓸 벡터.",
+										"en": "Vector to write."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "out. (기준점의 자리)",
+									"en": "out. (Position of the pivot)"
+								}
+							},
+							"description": {
+								"ko": "글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 셈과 차례, 새 벡터를 짓지 않는다)\n- getPosition 이나 부모의 내용 크기, 기준점 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다.",
+								"en": "Writes the global position into a given vector. (Same arithmetic in the same order as getPosition, no new vector)\n- Subclasses that override getPosition or the parent's content size or pivot readers are read through those functions."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/worldnode.js"
 						},
 						{
 							"kind": "method",
@@ -51878,6 +52134,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/resource/audioasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "resource/audioasset",
+								"class": "AudioAsset",
+								"name": "set_load_type"
+							},
 							"examples": [
 								{
 									"title": {
@@ -51906,7 +52168,13 @@
 								"en": "Returns the load type."
 							},
 							"since": "0.4.0",
-							"source": "src/resource/audioasset.js"
+							"source": "src/resource/audioasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "resource/audioasset",
+								"class": "AudioAsset",
+								"name": "get_load_type"
+							}
 						},
 						{
 							"kind": "method",
@@ -51925,7 +52193,13 @@
 								"en": "Whether it was loaded as streaming. (with the automatic load type this is decided after loading)"
 							},
 							"since": "0.4.0",
-							"source": "src/resource/audioasset.js"
+							"source": "src/resource/audioasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "resource/audioasset",
+								"class": "AudioAsset",
+								"name": "is_streaming"
+							}
 						},
 						{
 							"kind": "method",
@@ -51944,7 +52218,13 @@
 								"en": "URL of the streaming sound. (used as the media element's src)"
 							},
 							"since": "0.4.0",
-							"source": "src/resource/audioasset.js"
+							"source": "src/resource/audioasset.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "resource/audioasset",
+								"class": "AudioAsset",
+								"name": "get_stream_url"
+							}
 						},
 						{
 							"kind": "method",
@@ -52139,7 +52419,12 @@
 						"en": "File size above which automatic (AudioLoadType.automatic) picks streaming. (bytes, larger files stream)\n- Full decoding holds 44100 float32 values per channel per second. (about 345 KiB per stereo second, about 61 MiB for 3 minutes)\n  1 MiB of 128 kbps MP3 is about 65 seconds, about 22 MiB when decoded. Sound effects are almost always smaller, and a WAV larger than this is still only around 6 seconds, so streaming it is fine."
 					},
 					"since": "0.4.0",
-					"source": "src/resource/audioasset.js"
+					"source": "src/resource/audioasset.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "resource/audioasset",
+						"name": "AUTOMATIC_STREAMING_BYTE_THRESHOLD"
+					}
 				}
 			],
 			"enums": [
@@ -52148,6 +52433,11 @@
 					"summary": {
 						"ko": "소리 읽기 방식. (유니티 AudioClip 의 Load Type, 언리얼 사운드 웨이브의 스트리밍과 같은 갈래)",
 						"en": "Sound load type. (the same kind of choice as Unity AudioClip's Load Type and Unreal sound wave streaming)"
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "resource/audioasset",
+						"class": "AudioLoadType"
 					},
 					"values": [
 						{
@@ -68610,6 +68900,60 @@
 								"en": "See whether a whole tree buffer is on screen"
 							},
 							"code": "import { ToonRenderer, MeshBuilder, createCylinderGeometry, readInstanceBufferSphere, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createCylinderGeometry(0.02, 0.4, 1, 8), Matrix4.createTranslation(0, 0.5, 0), \"#4a8040\");\nconst treeMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceMatrix\", size: 16 }]);\nconst data = new Float32Array(16 * 2);\ndata.set(Matrix4.createTranslation(-3, 0, 0).getElements(), 0);\ndata.set(Matrix4.createTranslation(3, 0, 0).getElements(), 16);\nconst sphere = readInstanceBufferSphere(treeMesh, renderer.createInstanceBuffer(instanceLayout, data));\nif (sphere === null || sphere[0] !== 0 || sphere[3] < 3) {\n\tthrow new Error(\"bounds failed\");\n}",
+							"language": "javascript"
+						}
+					]
+				},
+				{
+					"kind": "method",
+					"name": "writeInstanceBufferSphere",
+					"signature": "writeInstanceBufferSphere(sphere, mesh, instanceBuffer)",
+					"params": [
+						{
+							"name": "sphere",
+							"type": "Array<number> | Float32Array | Float64Array",
+							"description": {
+								"ko": "쓸 칸. ([x, y, z, 반지름], 넷 이상)",
+								"en": "Array to write. ([x, y, z, radius], four or more)"
+							}
+						},
+						{
+							"name": "mesh",
+							"type": "object",
+							"description": {
+								"ko": "createMesh 의 결과.",
+								"en": "Result of createMesh."
+							}
+						},
+						{
+							"name": "instanceBuffer",
+							"type": "object",
+							"description": {
+								"ko": "createInstanceBuffer 의 결과.",
+								"en": "Result of createInstanceBuffer."
+							}
+						}
+					],
+					"returns": {
+						"type": "boolean",
+						"description": {
+							"ko": "행렬이 없어 경계가 없으면 false. (그때는 sphere 를 고치지 않는다)",
+							"en": "false when there is no bounds because there are no matrices. (sphere is left unchanged then)"
+						}
+					},
+					"description": {
+						"ko": "인스턴스 버퍼를 모형으로 그릴 때의 경계 구를 주어진 배열에 쓰기. (readInstanceBufferSphere 와 같은 값, 새 배열을 짓지 않는다)",
+						"en": "Writes the bounding sphere of an instance buffer drawn with a mesh into a given array. (Same value as readInstanceBufferSphere, no new array)"
+					},
+					"since": "0.4.0",
+					"source": "src/graphics3d/toon/toonrenderer.js",
+					"examples": [
+						{
+							"title": {
+								"ko": "프레임마다 같은 칸에 경계 구 쓰기",
+								"en": "Write the bounding sphere into the same array every frame"
+							},
+							"code": "import { ToonRenderer, MeshBuilder, createBoxGeometry, writeInstanceBufferSphere, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#808080\");\nconst boxMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceMatrix\", size: 16 }]);\nconst data = new Float32Array(16 * 2);\ndata.set(Matrix4.createTranslation(-2, 0, 0).getElements(), 0);\ndata.set(Matrix4.createTranslation(2, 0, 0).getElements(), 16);\nconst sphere = [0, 0, 0, 0];\nif (!writeInstanceBufferSphere(sphere, boxMesh, renderer.createInstanceBuffer(instanceLayout, data)) || sphere[3] < 2) {\n\tthrow new Error(\"bounds failed\");\n}",
 							"language": "javascript"
 						}
 					]
@@ -99608,6 +99952,292 @@
 			],
 			"classes": [
 				{
+					"name": "ToonDrawItem",
+					"summary": {
+						"ko": "남겨 두는 그리기 항목. (모형, 모형 행렬, 꼴을 쥐고 꼴을 푼 것을 기억한다, 프레임마다 ToonDrawQueue.addItem 으로 담는다)\n- 유니티 MeshRenderer, 언리얼 프리미티브 컴포넌트 꼴이다. 한 번 짓고 쥐어 두면 그리기 줄이 꼴 객체를 프레임마다 견주거나 풀지 않는다.\n  부품이 많은 모형은 부품마다 하나씩 짓는다. (재질 범위의 indexStart, indexCount 를 꼴에)\n- 꼴은 넘긴 객체를 그대로 쥔다. (복사하지 않는다) 꼴을 고치면 바뀜 표시가 있어야 다시 푼다:\n  setOption(이름, 값) 이나 setOptions(새 꼴) 은 스스로 표시한다. 꼴 객체의 값(틴트 배열의 수까지)을 그 자리에서 고쳤으면 markDirty() 를 부른다.\n- 모형 행렬은 복사해 쥔다. 바꾸면 setModelMatrix 로 넘긴다. (그 자리에서 고친 행렬도 다시 넘긴다, 쥔 행렬을 고치지 않는다)\n  바뀐 것(모형, 행렬, 꼴)이 없는 항목은 그림자 캐시(ShadowUpdateMode.onChange)도 견주지 않는다. (뼈대 행렬이 있으면 견준다)\n- addMesh 와 화면이 같다. 꼴은 addMesh 의 꼴과 같다. (ToonRenderer.drawMesh 의 꼴과 castsShadow, group, isDepthPrepassed, lineId, hasScreenOutline, hasCreaseLine)",
+						"en": "A retained draw item. (Holds the mesh, model matrix and options and remembers the resolved options; add it with ToonDrawQueue.addItem every frame)\n- Same shape as Unity's MeshRenderer and Unreal's primitive component. Once built and held, the draw queue does not compare or resolve the options object every frame.\n  Build one per part for models with many parts. (indexStart, indexCount of the material range in the options)\n- The options object is held as given. (Not copied) After changing options, the item needs a dirty mark to resolve again:\n  setOption(name, value) and setOptions(newOptions) mark it themselves. Call markDirty() after changing values of the options object in place (including numbers of a tint array).\n- The model matrix is copied. Pass changes with setModelMatrix. (Pass a matrix changed in place again, do not change the held matrix)\n  Items with no change (mesh, matrix, options) are not compared by the shadow cache (ShadowUpdateMode.onChange) either. (Compared when there are joint matrices)\n- Draws the same image as addMesh. The options are the same as addMesh's. (ToonRenderer.drawMesh options plus castsShadow, group, isDepthPrepassed, lineId, hasScreenOutline, hasCreaseLine)"
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "꼴을 바꿀 때만 표시하기",
+								"en": "Mark only when the options change"
+							},
+							"code": "import { ToonDrawItem, Matrix4 } from \"./vanilla.js\";\nconst options = { tintColor: [1, 1, 1, 1], lineId: 7 };\nconst drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), options);\ndrawItem.setOption(\"emissiveIntensity\", 0.5);\noptions.tintColor[0] = 0.5;\ndrawItem.markDirty();",
+							"language": "javascript"
+						}
+					],
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor(mesh, modelMatrix, options = {})",
+							"params": [
+								{
+									"name": "mesh",
+									"type": "object | null",
+									"description": {
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
+									}
+								},
+								{
+									"name": "modelMatrix",
+									"type": "Matrix4",
+									"description": {
+										"ko": "모형 행렬. (복사한다)",
+										"en": "Model matrix. (Copied)"
+									}
+								},
+								{
+									"name": "options",
+									"type": "object",
+									"description": {
+										"ko": "ToonDrawQueue.addMesh 와 같은 꼴.",
+										"en": "Options, same as ToonDrawQueue.addMesh."
+									}
+								}
+							],
+							"description": {
+								"ko": "생성.",
+								"en": "Constructor."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js"
+						},
+						{
+							"kind": "method",
+							"name": "getMesh",
+							"signature": "getMesh()",
+							"params": [],
+							"returns": {
+								"type": "object | null",
+								"description": {
+									"ko": "모형.",
+									"en": "Mesh."
+								}
+							},
+							"description": {
+								"ko": "모형 반환.",
+								"en": "Returns the mesh."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js"
+						},
+						{
+							"kind": "method",
+							"name": "setMesh",
+							"signature": "setMesh(mesh)",
+							"params": [
+								{
+									"name": "mesh",
+									"type": "object | null",
+									"description": {
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
+									}
+								}
+							],
+							"description": {
+								"ko": "모형 바꾸기. (꼴은 그대로)",
+								"en": "Changes the mesh. (Options unchanged)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "모형 바꾸기",
+										"en": "Change the mesh"
+									},
+									"code": "import { ToonDrawItem, Matrix4 } from \"./vanilla.js\";\nconst drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), {});\ndrawItem.setMesh(null);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getModelMatrix",
+							"signature": "getModelMatrix()",
+							"params": [],
+							"returns": {
+								"type": "Matrix4",
+								"description": {
+									"ko": "모형 행렬.",
+									"en": "Model matrix."
+								}
+							},
+							"description": {
+								"ko": "모형 행렬 반환. (쥔 것, 읽기만 한다, 바꾸려면 setModelMatrix)",
+								"en": "Returns the model matrix. (The held one, read only, use setModelMatrix to change it)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js"
+						},
+						{
+							"kind": "method",
+							"name": "setModelMatrix",
+							"signature": "setModelMatrix(modelMatrix)",
+							"params": [
+								{
+									"name": "modelMatrix",
+									"type": "Matrix4",
+									"description": {
+										"ko": "모형 행렬. (복사한다)",
+										"en": "Model matrix. (Copied)"
+									}
+								}
+							],
+							"description": {
+								"ko": "모형 행렬 바꾸기. (값을 복사해 쥔다, 같은 값이면 바뀐 것으로 치지 않는다)",
+								"en": "Changes the model matrix. (Copies the values, the same values do not count as a change)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "모형 행렬 바꾸기",
+										"en": "Change the model matrix"
+									},
+									"code": "import { ToonDrawItem, Matrix4 } from \"./vanilla.js\";\nconst drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), {});\ndrawItem.setModelMatrix(Matrix4.createTranslation(1, 0, 0));",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getOptions",
+							"signature": "getOptions()",
+							"params": [],
+							"returns": {
+								"type": "object",
+								"description": {
+									"ko": "그리기 꼴.",
+									"en": "Draw options."
+								}
+							},
+							"description": {
+								"ko": "꼴 반환. (쥔 객체, 그 자리에서 고쳤으면 markDirty)",
+								"en": "Returns the options. (The held object, call markDirty after changing it in place)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js"
+						},
+						{
+							"kind": "method",
+							"name": "setOptions",
+							"signature": "setOptions(options)",
+							"params": [
+								{
+									"name": "options",
+									"type": "object",
+									"description": {
+										"ko": "ToonDrawQueue.addMesh 와 같은 꼴.",
+										"en": "Options, same as ToonDrawQueue.addMesh."
+									}
+								}
+							],
+							"description": {
+								"ko": "꼴 바꾸기. (새 꼴 객체를 쥐고 바뀜 표시)",
+								"en": "Changes the options. (Holds the new options object and marks dirty)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "꼴 통째로 바꾸기",
+										"en": "Replace the options"
+									},
+									"code": "import { ToonDrawItem, Matrix4 } from \"./vanilla.js\";\nconst drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), { lineId: 1 });\ndrawItem.setOptions({ lineId: 1, alpha: 0.5 });",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "setOption",
+							"signature": "setOption(name, value)",
+							"params": [
+								{
+									"name": "name",
+									"type": "string",
+									"description": {
+										"ko": "꼴의 칸 이름. (tintColor, emissiveIntensity, alpha 같은 것)",
+										"en": "Name of the option. (tintColor, emissiveIntensity, alpha and the like)"
+									}
+								},
+								{
+									"name": "value",
+									"type": "any",
+									"description": {
+										"ko": "값. (undefined 면 칸을 지워 기본값으로)",
+										"en": "Value. (undefined removes the option to use the default)"
+									}
+								}
+							],
+							"description": {
+								"ko": "꼴의 칸 하나 바꾸기. (쥔 꼴 객체의 칸을 고치고 바뀜 표시, undefined 면 칸을 지운다)",
+								"en": "Changes one option. (Sets the option on the held options object and marks dirty, undefined removes it)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "틴트 바꾸기",
+										"en": "Change the tint"
+									},
+									"code": "import { ToonDrawItem, Matrix4 } from \"./vanilla.js\";\nconst drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), { lineId: 1 });\ndrawItem.setOption(\"tintColor\", [1, 0.6, 0.6, 1]);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "markDirty",
+							"signature": "markDirty()",
+							"params": [],
+							"description": {
+								"ko": "바뀜 표시. (꼴 객체의 값을 그 자리에서 고친 뒤 부른다, 다음에 담을 때 다시 푼다)",
+								"en": "Marks dirty. (Call after changing values of the options object in place, the options are resolved again the next time it is added)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "그 자리에서 고친 뒤 표시",
+										"en": "Mark after changing in place"
+									},
+									"code": "import { ToonDrawItem, Matrix4 } from \"./vanilla.js\";\nconst options = { tintColor: [1, 1, 1, 1] };\nconst drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), options);\noptions.tintColor[1] = 0.5;\ndrawItem.markDirty();",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isDirty",
+							"signature": "isDirty()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "다음에 담을 때 꼴을 다시 풀면 true.",
+									"en": "true when the options will be resolved again the next time it is added."
+								}
+							},
+							"description": {
+								"ko": "바뀜 표시가 있는지.",
+								"en": "Whether it is marked dirty."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js"
+						}
+					]
+				},
+				{
 					"name": "ToonDrawQueue",
 					"summary": {
 						"ko": "툰 그리기 줄. (한 프레임에 그릴 모형을 담아 두었다가 ToonRenderer 로 차례를 맞춰 그린다)\n- 차례: (화면 공간 바깥선의 선의 판) → 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 껍데기 → 화면 공간 바깥선 → afterOutline\n  → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.\n  몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.\n- 불투명한 것(몸, 바깥선 껍데기, 그림자 깊이)은 재질, 모형, 바탕색 텍스처로 정렬해 그린다. (같은 것끼리는 담은 차례, 유니티 SRP Batcher 처럼 상태를 덜 바꾼다)\n  깊이 시험(LEQUAL)으로 가장 가까운 것이 남으므로 화면은 담은 차례와 같다. 깊이가 꼭 같은 면(겹친 평면)만 나중에 그린 것이 이겨 차례가 드러난다.\n  그런 것은 한 모형으로 합치거나 깊이를 띄운다. 비치는 것은 지금처럼 먼 것부터 담은 차례로 그린다.\n- 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선 껍데기도 함께(hasOutline) 그린다.\n- 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.\n  options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.\n  여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.\n- 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.\n  번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId, 인스턴스 버퍼는 꼴의 instanceLineId 칸이 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.\n  비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.\n- 모서리 어둠: setPostProcess(ToonPostProcess) 를 주고 후처리에서 setAmbientOcclusion 을 켜면 선의 판 뒤, 몸 앞에 셈해 렌더러에 걸고 endFrame 뒤에 푼다. (바깥선이 없으면 선 없이 선의 판만 그린다)\n- 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.\n- 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.\n  인스턴스마다 걸러 그릴 때마다 올린다. (몸, 그림자, 선의 판이 같은 배열을 따로 올림) 오래 두는 것은 addMeshInstanceBuffer 로 한 번 올린 버퍼를 같이 쓴다.\n- 인스턴스 버퍼(addMeshInstanceBuffer)는 유니티 Graphics.RenderMeshInstanced 와 GraphicsBuffer, 고도 MultiMesh 꼴이다. 버퍼 전체의 경계로 통째 거르고 다시 올리지 않는다.\n- 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.\n  그림자 판의 setUpdateMode(ShadowUpdateMode) 를 따른다. 기본 onChange 는 빛과 드리우개가 그대로면 다시 그리지 않고, 오래 그대로인 것은 구워 두고 움직이는 것만 덧그린다. (화면은 매 프레임 그린 것과 같다)\n  점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)\n- 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addMeshInstanceBuffer / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)\n  draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)\n  화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)\n- 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.",
@@ -99873,6 +100503,91 @@
 								"class": "ToonDrawQueue",
 								"name": "add_mesh"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "createItem",
+							"signature": "createItem(mesh, modelMatrix, options = {})",
+							"params": [
+								{
+									"name": "mesh",
+									"type": "object | null",
+									"description": {
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
+									}
+								},
+								{
+									"name": "modelMatrix",
+									"type": "Matrix4",
+									"description": {
+										"ko": "모형 행렬. (복사해 쥔다, 바꾸면 그 항목의 setModelMatrix)",
+										"en": "Model matrix. (Copied and held, change it with the item's setModelMatrix)"
+									}
+								},
+								{
+									"name": "options",
+									"type": "object",
+									"description": {
+										"ko": "addMesh 와 같은 꼴. (쥐어 둔다, 고치면 markDirty 나 setOption)",
+										"en": "Options, same as addMesh. (Held, call markDirty or setOption after changing)"
+									}
+								}
+							],
+							"returns": {
+								"type": "ToonDrawItem",
+								"description": {
+									"ko": "그리기 항목.",
+									"en": "Draw item."
+								}
+							},
+							"description": {
+								"ko": "남겨 두는 그리기 항목 짓기. (한 번 짓고 쥐어 두었다가 프레임마다 addItem 으로 담는다, new ToonDrawItem 과 같다)",
+								"en": "Builds a retained draw item. (Build once, hold it and add it with addItem every frame, same as new ToonDrawItem)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "부품마다 항목을 한 번 짓고 프레임마다 담기",
+										"en": "Build an item per part once and add it every frame"
+									},
+									"code": "import { ToonRenderer, ToonDrawQueue, MeshBuilder, createBoxGeometry, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), \"#c08060\");\nconst boxMesh = renderer.createMesh(builder.readArrays());\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 100);\ncamera.lookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nconst boxItem = queue.createItem(boxMesh, Matrix4.createTranslation(0, 0.5, 0), { tintColor: [1, 0.8, 0.8, 1], lineId: 1 });\nqueue.clear();\nqueue.addItem(boxItem);\nqueue.draw(renderer, camera);\nboxItem.setOption(\"tintColor\", [0.8, 1, 0.8, 1]);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "addItem",
+							"signature": "addItem(drawItem)",
+							"params": [
+								{
+									"name": "drawItem",
+									"type": "ToonDrawItem",
+									"description": {
+										"ko": "createItem 이나 new ToonDrawItem 의 결과.",
+										"en": "Result of createItem or new ToonDrawItem."
+									}
+								}
+							],
+							"description": {
+								"ko": "남겨 두는 그리기 항목 담기. (addMesh 와 같은 자리, 바뀜 표시가 없으면 앞서 푼 꼴을 그대로 쓴다)\n- 꼴 객체를 프레임마다 견주거나 풀지 않는다. 꼴을 고쳤으면 그 항목의 markDirty 나 setOption, setOptions 를 부른다. (유니티 MeshRenderer, 언리얼 프리미티브 컴포넌트 꼴)\n- 바뀐 것이 없는 항목은 그림자 캐시(onChange)도 견주지 않는다. 행렬을 바꾸면 setModelMatrix 로 넘긴다.",
+								"en": "Adds a retained draw item. (Same place as addMesh, uses the options resolved before when not marked dirty)\n- Does not compare or resolve the options object every frame. After changing options call the item's markDirty, setOption or setOptions. (Unity MeshRenderer, Unreal primitive component shape)\n- Items with no change are not compared by the shadow cache (onChange) either. Pass a changed matrix with setModelMatrix."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "남겨 두는 항목 담기",
+										"en": "Add a retained item"
+									},
+									"code": "import { ToonDrawQueue, ToonDrawItem, Matrix4 } from \"./vanilla.js\";\nconst queue = new ToonDrawQueue();\nconst drawItem = new ToonDrawItem(null, Matrix4.createIdentity(), { lineId: 3 });\nqueue.clear();\nqueue.addItem(drawItem);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",

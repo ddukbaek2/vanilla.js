@@ -972,6 +972,32 @@ var Vector3 = class _Vector3 extends Object2 {
   }
 };
 var System6 = globalThis;
+var MULTIPLY_RESULT = new System6.Float32Array(16);
+var OPERAND_ELEMENTS = new System6.Float32Array(16);
+function multiplyElements(elements, otherElements) {
+  const resultElements = MULTIPLY_RESULT;
+  for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
+    for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
+      let sum = 0;
+      for (let termIndex = 0; termIndex < 4; ++termIndex) {
+        sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
+      }
+      resultElements[columnIndex * 4 + rowIndex] = sum;
+    }
+  }
+  elements.set(resultElements);
+}
+__name(multiplyElements, "multiplyElements");
+function readIdentityOperand() {
+  const elements = OPERAND_ELEMENTS;
+  elements.fill(0);
+  elements[0] = 1;
+  elements[5] = 1;
+  elements[10] = 1;
+  elements[15] = 1;
+  return elements;
+}
+__name(readIdentityOperand, "readIdentityOperand");
 var Matrix4 = class _Matrix4 extends Object2 {
   static {
     __name(this, "Matrix4");
@@ -1001,39 +1027,51 @@ var Matrix4 = class _Matrix4 extends Object2 {
     return matrix;
   }
   multiply(other) {
-    const elements = this.getElements();
-    const otherElements = other.getElements();
-    const resultElements = new System6.Float32Array(16);
-    for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
-      for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
-        let sum = 0;
-        for (let termIndex = 0; termIndex < 4; ++termIndex) {
-          sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
-        }
-        resultElements[columnIndex * 4 + rowIndex] = sum;
-      }
-    }
-    elements.set(resultElements);
+    multiplyElements(this.getElements(), other.getElements());
   }
   translate(x, y, z) {
-    const translationMatrix = _Matrix4.createTranslation(x, y, z);
-    this.multiply(translationMatrix);
+    const operand = readIdentityOperand();
+    operand[12] = x;
+    operand[13] = y;
+    operand[14] = z;
+    multiplyElements(this.getElements(), operand);
   }
   rotateX(radian) {
-    const rotationMatrix = _Matrix4.createRotationX(radian);
-    this.multiply(rotationMatrix);
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const operand = readIdentityOperand();
+    operand[5] = cosRadian;
+    operand[6] = sinRadian;
+    operand[9] = -sinRadian;
+    operand[10] = cosRadian;
+    multiplyElements(this.getElements(), operand);
   }
   rotateY(radian) {
-    const rotationMatrix = _Matrix4.createRotationY(radian);
-    this.multiply(rotationMatrix);
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const operand = readIdentityOperand();
+    operand[0] = cosRadian;
+    operand[2] = -sinRadian;
+    operand[8] = sinRadian;
+    operand[10] = cosRadian;
+    multiplyElements(this.getElements(), operand);
   }
   rotateZ(radian) {
-    const rotationMatrix = _Matrix4.createRotationZ(radian);
-    this.multiply(rotationMatrix);
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const operand = readIdentityOperand();
+    operand[0] = cosRadian;
+    operand[1] = sinRadian;
+    operand[4] = -sinRadian;
+    operand[5] = cosRadian;
+    multiplyElements(this.getElements(), operand);
   }
   scale(x, y, z) {
-    const scaleMatrix = _Matrix4.createScale(x, y, z);
-    this.multiply(scaleMatrix);
+    const operand = readIdentityOperand();
+    operand[0] = x;
+    operand[5] = y;
+    operand[10] = z;
+    multiplyElements(this.getElements(), operand);
   }
   transformPoint(x, y, z) {
     const elements = this.getElements();
@@ -3170,6 +3208,7 @@ var ComponentNode = class extends Node {
   }
 };
 var System14 = globalThis;
+var PARENT_SCALE = Vector2.create(0, 1);
 var DRAW_BOUNDS_DIRTY = 0;
 var DRAW_BOUNDS_KNOWN = 1;
 var DRAW_BOUNDS_UNKNOWN = 2;
@@ -3187,6 +3226,26 @@ var CHILD_RANGE_PREFIX_COUNT = 4;
 var visibleChildRect = new Rect();
 var visibleChildFirstIndex = 0;
 var visibleChildLastIndex = 0;
+function readNodePosition(node, out) {
+  if (typeof node.readPosition === "function") {
+    node.readPosition(out);
+    return;
+  }
+  const position = node.getPosition();
+  out.x = position.x;
+  out.y = position.y;
+}
+__name(readNodePosition, "readNodePosition");
+function readNodeScale(node, out) {
+  if (typeof node.readScale === "function") {
+    node.readScale(out);
+    return;
+  }
+  const scale = node.getScale();
+  out.x = scale.x;
+  out.y = scale.y;
+}
+__name(readNodeScale, "readNodeScale");
 var TransformNode = class _TransformNode extends ComponentNode {
   static {
     __name(this, "TransformNode");
@@ -3395,6 +3454,79 @@ var TransformNode = class _TransformNode extends ComponentNode {
     const rx = sx * cosRadian - sy * sinRadian;
     const ry = sx * sinRadian + sy * cosRadian;
     return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
+  }
+  readPosition(out) {
+    if (this.getPosition !== _TransformNode.prototype.getPosition) {
+      const position = this.getPosition();
+      out.x = position.x;
+      out.y = position.y;
+      return out;
+    }
+    const parent = this.getParent();
+    this.readLocalPosition(out);
+    if (!parent) {
+      return out;
+    }
+    const localX = out.x;
+    const localY = out.y;
+    readNodePosition(parent, out);
+    const parentPositionX = out.x;
+    const parentPositionY = out.y;
+    const parentRotation = parent.getRotation();
+    readNodeScale(parent, PARENT_SCALE);
+    const parentScaleX = PARENT_SCALE.x;
+    const parentScaleY = PARENT_SCALE.y;
+    const radian = degreeToRadian(parentRotation);
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const sx = localX * parentScaleX;
+    const sy = localY * parentScaleY;
+    const rx = sx * cosRadian - sy * sinRadian;
+    const ry = sx * sinRadian + sy * cosRadian;
+    out.x = parentPositionX + rx;
+    out.y = parentPositionY + ry;
+    return out;
+  }
+  readScale(out) {
+    if (this.getScale !== _TransformNode.prototype.getScale) {
+      const scale = this.getScale();
+      out.x = scale.x;
+      out.y = scale.y;
+      return out;
+    }
+    const parent = this.getParent();
+    this.readLocalScale(out);
+    if (!parent) {
+      return out;
+    }
+    const localX = out.x;
+    const localY = out.y;
+    readNodeScale(parent, out);
+    out.x = out.x * localX;
+    out.y = out.y * localY;
+    return out;
+  }
+  readLocalPosition(out) {
+    if (this.getLocalPosition !== _TransformNode.prototype.getLocalPosition) {
+      const position = this.getLocalPosition();
+      out.x = position.x;
+      out.y = position.y;
+      return out;
+    }
+    out.x = this.#localPosition.x;
+    out.y = this.#localPosition.y;
+    return out;
+  }
+  readLocalScale(out) {
+    if (this.getLocalScale !== _TransformNode.prototype.getLocalScale) {
+      const scale = this.getLocalScale();
+      out.x = scale.x;
+      out.y = scale.y;
+      return out;
+    }
+    out.x = this.#localScale.x;
+    out.y = this.#localScale.y;
+    return out;
   }
   setScale(scale) {
     const parent = this.getParent();
@@ -9883,6 +10015,7 @@ var PLAYSTATION_GAMEPAD_ID_PARTS = ["054c", "playstation", "dualshock", "dualsen
 var NINTENDO_GAMEPAD_ID_PARTS = ["057e", "nintendo", "joy-con", "pro controller"];
 var XBOX_GAMEPAD_ID_PARTS = ["045e", "xbox", "xinput", "microsoft"];
 var GAMEPAD_ACTIVE_AXIS_THRESHOLD = 0.5;
+var GAMEPAD_RESCAN_INTERVAL = 1;
 function readGamepadKind(gamepadId) {
   if (typeof gamepadId !== "string") {
     return GamepadKind.other;
@@ -9908,6 +10041,7 @@ var GamepadManager = class extends Object2 {
   #inputEventCallback;
   #isInputLogEnabled;
   #activeGamepadId;
+  #rescanTime;
   constructor(engine) {
     super();
     this.#connectedGamepadIndices = [];
@@ -9915,8 +10049,16 @@ var GamepadManager = class extends Object2 {
     this.#inputEventCallback = null;
     this.#isInputLogEnabled = false;
     this.#activeGamepadId = "";
+    this.#rescanTime = 0;
   }
   tick(timeDelta) {
+    if (this.#connectedGamepadIndices.length === 0) {
+      this.#rescanTime -= timeDelta;
+      if (this.#rescanTime > 0) {
+        return;
+      }
+      this.#rescanTime = GAMEPAD_RESCAN_INTERVAL;
+    }
     this.updateAllGamepads();
   }
   connect(gamepad) {
@@ -10872,6 +11014,10 @@ var cullContentSize = Vector2.zero();
 var cullRect = new Rect();
 var cullDrawnRect = new Rect();
 var convertContentSize = Vector2.zero();
+var containsCorners = [Vector2.zero(), Vector2.zero(), Vector2.zero(), Vector2.zero()];
+var containsObb = new OBB();
+var containsScale = Vector2.zero();
+var containsVector = Vector2.zero();
 var WorldNode = class _WorldNode extends TransformNode {
   static {
     __name(this, "WorldNode");
@@ -11072,6 +11218,17 @@ var WorldNode = class _WorldNode extends TransformNode {
   getPivot() {
     return this.#pivot.clone();
   }
+  readPivot(out) {
+    if (this.getPivot !== _WorldNode.prototype.getPivot) {
+      const pivot = this.getPivot();
+      out.x = pivot.x;
+      out.y = pivot.y;
+      return out;
+    }
+    out.x = this.#pivot.x;
+    out.y = this.#pivot.y;
+    return out;
+  }
   setContentSize(contentSize) {
     const isChanged = this.#contentSize.x !== contentSize.x || this.#contentSize.y !== contentSize.y;
     this.#contentSize.x = contentSize.x;
@@ -11107,6 +11264,17 @@ var WorldNode = class _WorldNode extends TransformNode {
   }
   getContentSize() {
     return this.#contentSize.clone();
+  }
+  readContentSize(out) {
+    if (this.getContentSize !== _WorldNode.prototype.getContentSize) {
+      const contentSize = this.getContentSize();
+      out.x = contentSize.x;
+      out.y = contentSize.y;
+      return out;
+    }
+    out.x = this.#contentSize.x;
+    out.y = this.#contentSize.y;
+    return out;
   }
   copyContentSizeTo(target) {
     const isContentSizeOverridden = this.getContentSize !== _WorldNode.prototype.getContentSize;
@@ -11178,6 +11346,40 @@ var WorldNode = class _WorldNode extends TransformNode {
     const ry = sx * sinRadian + sy * cosRadian;
     return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
   }
+  readPosition(out) {
+    const parent = this.getParent();
+    if (this.getPosition !== _WorldNode.prototype.getPosition || !(parent instanceof _WorldNode)) {
+      return super.readPosition(out);
+    }
+    this.readLocalPosition(out);
+    const localX = out.x;
+    const localY = out.y;
+    parent.readPosition(out);
+    const parentPositionX = out.x;
+    const parentPositionY = out.y;
+    parent.readContentSize(out);
+    const parentContentSizeX = out.x;
+    const parentContentSizeY = out.y;
+    parent.readPivot(out);
+    const parentPivotX = out.x;
+    const parentPivotY = out.y;
+    const parentRotation = parent.getRotation();
+    parent.readScale(out);
+    const parentScaleX = out.x;
+    const parentScaleY = out.y;
+    const totalLocalX = localX - parentContentSizeX * parentPivotX;
+    const totalLocalY = localY - parentContentSizeY * parentPivotY;
+    const radian = degreeToRadian(parentRotation);
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const sx = totalLocalX * parentScaleX;
+    const sy = totalLocalY * parentScaleY;
+    const rx = sx * cosRadian - sy * sinRadian;
+    const ry = sx * sinRadian + sy * cosRadian;
+    out.x = parentPositionX + rx;
+    out.y = parentPositionY + ry;
+    return out;
+  }
   setPosition(position) {
     const parent = this.getParent();
     if (!(parent instanceof _WorldNode)) {
@@ -11243,11 +11445,46 @@ var WorldNode = class _WorldNode extends TransformNode {
     if (viewPosition === null || viewPosition === void 0) {
       return false;
     }
-    const worldCorners = this.getWorldCorners();
-    const obb = new OBB();
-    obb.setEdges(worldCorners);
-    const inside = obb.contains(viewPosition);
-    return inside;
+    if (this.getWorldCorners !== _WorldNode.prototype.getWorldCorners) {
+      const worldCorners = this.getWorldCorners();
+      const obb = new OBB();
+      obb.setEdges(worldCorners);
+      return obb.contains(viewPosition);
+    }
+    this.writeWorldCorners(containsCorners);
+    containsObb.setEdges(containsCorners);
+    return containsObb.contains(viewPosition);
+  }
+  writeWorldCorners(corners) {
+    const position = this.readPosition(containsVector);
+    const positionX = position.x;
+    const positionY = position.y;
+    const scale = this.readScale(containsScale);
+    const rotation = this.getRotation();
+    const contentSize = this.readContentSize(corners[0]);
+    const contentSizeX = contentSize.x;
+    const contentSizeY = contentSize.y;
+    const pivot = this.readPivot(corners[1]);
+    const pivotX = pivot.x;
+    const pivotY = pivot.y;
+    const width = contentSizeX * abs(scale.x);
+    const height = contentSizeY * abs(scale.y);
+    const left = -(width * pivotX);
+    const right = width * (1 - pivotX);
+    const top = -(height * pivotY);
+    const bottom = height * (1 - pivotY);
+    const radian = degreeToRadian(rotation);
+    const cosR = cos(radian);
+    const sinR = sin(radian);
+    corners[0].x = left * cosR - top * sinR + positionX;
+    corners[0].y = left * sinR + top * cosR + positionY;
+    corners[1].x = right * cosR - top * sinR + positionX;
+    corners[1].y = right * sinR + top * cosR + positionY;
+    corners[2].x = right * cosR - bottom * sinR + positionX;
+    corners[2].y = right * sinR + bottom * cosR + positionY;
+    corners[3].x = left * cosR - bottom * sinR + positionX;
+    corners[3].y = left * sinR + bottom * cosR + positionY;
+    return corners;
   }
   convertViewToLocal(viewPosition) {
     const worldCorners = this.getWorldCorners();
@@ -21645,6 +21882,7 @@ var LayoutPriority = class {
 var System52 = globalThis;
 var LayoutConstraintAxis = System52.Object.freeze({ horizontal: "horizontal", vertical: "vertical" });
 var System53 = globalThis;
+var LOCAL_SCALE = Vector2.create(1, 1);
 var NO_INTRINSIC_METRIC = -1;
 var UINode = class _UINode extends TransformNode {
   static {
@@ -21717,7 +21955,7 @@ var UINode = class _UINode extends TransformNode {
       }
       const localRotation = this.getLocalRotation();
       const radian = degreeToRadian(localRotation);
-      const localScale = this.getLocalScale();
+      const localScale = this.readLocalScale(LOCAL_SCALE);
       graphic.translate(translateX, translateY);
       graphic.rotate(radian);
       graphic.scale(localScale.x, localScale.y);
@@ -31901,7 +32139,7 @@ function extractFrustumPlanes(matrix) {
   }, "combine");
   const planes = [combine(row3, row0, 1), combine(row3, row0, -1), combine(row3, row1, 1), combine(row3, row1, -1), combine(row3, row2, 1), combine(row3, row2, -1)];
   for (const plane of planes) {
-    const length = System80.Math.hypot(plane[0], plane[1], plane[2]);
+    const length = readHypot(plane[0], plane[1], plane[2]);
     if (length > 0) {
       plane[0] /= length;
       plane[1] /= length;
@@ -31916,8 +32154,47 @@ function readDeterminant(first, second, third) {
   return first[0] * (second[1] * third[2] - second[2] * third[1]) - first[1] * (second[0] * third[2] - second[2] * third[0]) + first[2] * (second[0] * third[1] - second[1] * third[0]);
 }
 __name(readDeterminant, "readDeterminant");
+function readHypot(x, y, z) {
+  const absoluteX = System80.Math.abs(x);
+  const absoluteY = System80.Math.abs(y);
+  const absoluteZ = System80.Math.abs(z);
+  if (absoluteX === System80.Infinity || absoluteY === System80.Infinity || absoluteZ === System80.Infinity) {
+    return System80.Infinity;
+  }
+  if (absoluteX !== absoluteX || absoluteY !== absoluteY || absoluteZ !== absoluteZ) {
+    return System80.NaN;
+  }
+  let maximum = absoluteX;
+  if (absoluteY > maximum) {
+    maximum = absoluteY;
+  }
+  if (absoluteZ > maximum) {
+    maximum = absoluteZ;
+  }
+  if (maximum === 0) {
+    return 0;
+  }
+  let sum = 0;
+  let compensation = 0;
+  let normalized = absoluteX / maximum;
+  let summand = normalized * normalized - compensation;
+  let preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  normalized = absoluteY / maximum;
+  summand = normalized * normalized - compensation;
+  preliminary = sum + summand;
+  compensation = preliminary - sum - summand;
+  sum = preliminary;
+  normalized = absoluteZ / maximum;
+  summand = normalized * normalized - compensation;
+  preliminary = sum + summand;
+  sum = preliminary;
+  return System80.Math.sqrt(sum) * maximum;
+}
+__name(readHypot, "readHypot");
 function readMatrixDeterminant(elements) {
-  return readDeterminant([elements[0], elements[1], elements[2]], [elements[4], elements[5], elements[6]], [elements[8], elements[9], elements[10]]);
+  return elements[0] * (elements[5] * elements[10] - elements[6] * elements[9]) - elements[1] * (elements[4] * elements[10] - elements[6] * elements[8]) + elements[2] * (elements[4] * elements[9] - elements[5] * elements[8]);
 }
 __name(readMatrixDeterminant, "readMatrixDeterminant");
 function readFrameCamera(elements) {
@@ -31930,7 +32207,7 @@ function readFrameCamera(elements) {
   const row3 = readRow(3);
   const isMirrored = readDeterminant(row0, row1, row2) > 0;
   let forward = [row0[1] * row1[2] - row0[2] * row1[1], row0[2] * row1[0] - row0[0] * row1[2], row0[0] * row1[1] - row0[1] * row1[0]];
-  const forwardLength = System80.Math.hypot(forward[0], forward[1], forward[2]);
+  const forwardLength = readHypot(forward[0], forward[1], forward[2]);
   if (forwardLength > 0) {
     forward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
   }
@@ -31952,7 +32229,7 @@ function readViewRotation(elements, forward) {
   const rowX = [elements[0], elements[4], elements[8]];
   const along = rowX[0] * forward[0] + rowX[1] * forward[1] + rowX[2] * forward[2];
   let right = [rowX[0] - forward[0] * along, rowX[1] - forward[1] * along, rowX[2] - forward[2] * along];
-  const rightLength = System80.Math.hypot(right[0], right[1], right[2]);
+  const rightLength = readHypot(right[0], right[1], right[2]);
   right = rightLength > 1e-6 ? [right[0] / rightLength, right[1] / rightLength, right[2] / rightLength] : [1, 0, 0];
   const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
   return [right[0], up[0], -forward[0], right[1], up[1], -forward[1], right[2], up[2], -forward[2]];
@@ -31963,8 +32240,8 @@ function readCameraRoll(viewRotationElements, isMirrored) {
   const forward = [-viewRotationElements[2], -viewRotationElements[5], -viewRotationElements[8]];
   const axisSign = isMirrored ? -1 : 1;
   const rightAxis = [-forward[2] * axisSign, 0, forward[0] * axisSign];
-  const axisLength = System80.Math.hypot(rightAxis[0], rightAxis[1], rightAxis[2]);
-  const rightLength = System80.Math.hypot(right[0], right[1], right[2]);
+  const axisLength = readHypot(rightAxis[0], rightAxis[1], rightAxis[2]);
+  const rightLength = readHypot(right[0], right[1], right[2]);
   if (axisLength < 1e-6 || rightLength < 1e-6) {
     return 0;
   }
@@ -31976,8 +32253,8 @@ function readCameraRoll(viewRotationElements, isMirrored) {
 __name(readCameraRoll, "readCameraRoll");
 function readShadowBias(lightViewProjectionMatrix, resolution, depthBias, normalBias) {
   const elements = lightViewProjectionMatrix.getElements();
-  const widthScale = System80.Math.hypot(elements[0], elements[4], elements[8]);
-  const depthScale = System80.Math.hypot(elements[2], elements[6], elements[10]) * 0.5;
+  const widthScale = readHypot(elements[0], elements[4], elements[8]);
+  const depthScale = readHypot(elements[2], elements[6], elements[10]) * 0.5;
   const texelWorldSize = 2 / (System80.Math.max(widthScale, 1e-6) * System80.Math.max(1, resolution));
   return [depthBias * SHADOW_FILTER_RADIUS * texelWorldSize * depthScale, normalBias * SHADOW_FILTER_RADIUS * texelWorldSize, SHADOW_SLOPE_BIAS * texelWorldSize * depthScale, SHADOW_MAXIMUM_SLOPE];
 }
@@ -32017,7 +32294,7 @@ function readOutlineVertexData(outlineVertexData, outlineBaseData) {
 }
 __name(readOutlineVertexData, "readOutlineVertexData");
 function createReflectionMatrix(planePoint, planeNormal) {
-  const length = System80.Math.hypot(planeNormal[0], planeNormal[1], planeNormal[2]);
+  const length = readHypot(planeNormal[0], planeNormal[1], planeNormal[2]);
   const normalX = length > 0 ? planeNormal[0] / length : 0;
   const normalY = length > 0 ? planeNormal[1] / length : 1;
   const normalZ = length > 0 ? planeNormal[2] / length : 0;
@@ -32040,9 +32317,9 @@ function createReflectionMatrix(planePoint, planeNormal) {
 }
 __name(createReflectionMatrix, "createReflectionMatrix");
 function readMaximumScale(elements) {
-  const scaleX = System80.Math.hypot(elements[0], elements[1], elements[2]);
-  const scaleY = System80.Math.hypot(elements[4], elements[5], elements[6]);
-  const scaleZ = System80.Math.hypot(elements[8], elements[9], elements[10]);
+  const scaleX = readHypot(elements[0], elements[1], elements[2]);
+  const scaleY = readHypot(elements[4], elements[5], elements[6]);
+  const scaleZ = readHypot(elements[8], elements[9], elements[10]);
   return System80.Math.max(scaleX, scaleY, scaleZ);
 }
 __name(readMaximumScale, "readMaximumScale");
@@ -32077,23 +32354,33 @@ function readInstanceBounds(instanceLayout, data) {
   let radius = 0;
   for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
     const offset = instanceIndex * floatCount + matrixOffset;
-    radius = System80.Math.max(radius, System80.Math.hypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
+    radius = System80.Math.max(radius, readHypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
   }
   return { center, radius, scale };
 }
 __name(readInstanceBounds, "readInstanceBounds");
 function readInstanceBufferSphere(mesh, instanceBuffer) {
-  const bounds = instanceBuffer.bounds;
-  if (bounds === null) {
-    return null;
-  }
-  const center = mesh.boundingCenter;
-  const meshReach = System80.Math.hypot(center[0], center[1], center[2]) + mesh.boundingRadius;
-  return [bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius + bounds.scale * meshReach];
+  const sphere = [0, 0, 0, 0];
+  return writeInstanceBufferSphere(sphere, mesh, instanceBuffer) ? sphere : null;
 }
 __name(readInstanceBufferSphere, "readInstanceBufferSphere");
+function writeInstanceBufferSphere(sphere, mesh, instanceBuffer) {
+  const bounds = instanceBuffer.bounds;
+  if (bounds === null) {
+    return false;
+  }
+  const center = mesh.boundingCenter;
+  const meshReach = readHypot(center[0], center[1], center[2]) + mesh.boundingRadius;
+  sphere[0] = bounds.center[0];
+  sphere[1] = bounds.center[1];
+  sphere[2] = bounds.center[2];
+  sphere[3] = bounds.radius + bounds.scale * meshReach;
+  return true;
+}
+__name(writeInstanceBufferSphere, "writeInstanceBufferSphere");
 function isSphereInFrustum(frustumPlanes, sphere) {
-  for (const plane of frustumPlanes) {
+  for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+    const plane = frustumPlanes[planeIndex];
     if (plane[0] * sphere[0] + plane[1] * sphere[1] + plane[2] * sphere[2] + plane[3] < -sphere[3]) {
       return false;
     }
@@ -32116,7 +32403,7 @@ function readBoundingSphere(positions, stride) {
   const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
   let radius = 0;
   for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
-    radius = System80.Math.max(radius, System80.Math.hypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
+    radius = System80.Math.max(radius, readHypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
   }
   return { center, radius };
 }
@@ -32142,6 +32429,8 @@ var DRAW_PART_ALL = 3;
 var WHITE_COLOR = System80.Object.freeze([1, 1, 1, 1]);
 var BLACK_COLOR = System80.Object.freeze([0, 0, 0]);
 var IDENTITY_UV_TRANSFORM = System80.Object.freeze([0, 0, 1, 1]);
+var IDENTITY_ELEMENTS = new Matrix4().getElements();
+var INSTANCE_BUFFER_SPHERE = [0, 0, 0, 0];
 var EMPTY_OPTIONS = System80.Object.freeze({});
 function writeMaterialBlockValues(values, options) {
   const tintColor = options.tintColor !== void 0 ? options.tintColor : WHITE_COLOR;
@@ -32424,6 +32713,10 @@ var ToonRenderer = class {
   #trustSerial;
   #isTrusting;
   #drawEntryOfOptions;
+  #drawEntryGeneration;
+  #hintOptions;
+  #hintEntry;
+  #batchModelElements;
   #materialBlocks;
   #outlineBlocks;
   #lastProgramKey;
@@ -32437,6 +32730,10 @@ var ToonRenderer = class {
     this.#slotTableProgram = null;
     this.#slotTable = null;
     this.#drawEntryOfOptions = new System80.WeakMap();
+    this.#drawEntryGeneration = 1;
+    this.#hintOptions = null;
+    this.#hintEntry = null;
+    this.#batchModelElements = new System80.Float32Array(16);
     this.#trustSerial = 1;
     this.#isTrusting = false;
     this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
@@ -33117,7 +33414,9 @@ var ToonRenderer = class {
     const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
     const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
     const radius = mesh.boundingRadius * readMaximumScale(modelElements);
-    for (const plane of this.#frustumPlanes) {
+    const frustumPlanes = this.#frustumPlanes;
+    for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+      const plane = frustumPlanes[planeIndex];
       if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
         return false;
       }
@@ -33186,12 +33485,12 @@ var ToonRenderer = class {
     if (count <= 0) {
       return;
     }
-    if (options.isCulled !== false && instanceBuffer.bounds !== null && !isSphereInFrustum(this.#frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+    if (options.isCulled !== false && writeInstanceBufferSphere(INSTANCE_BUFFER_SPHERE, mesh, instanceBuffer) && !isSphereInFrustum(this.#frustumPlanes, INSTANCE_BUFFER_SPHERE)) {
       this.#frameStatistics.culledObjectCount += count;
       return;
     }
     this.#frameStatistics.drawnObjectCount += count;
-    this.drawWithCount(mesh, Matrix4.createIdentity().getElements(), count, options, instanceBuffer);
+    this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, options, instanceBuffer);
   }
   drawMeshOutline(mesh, modelMatrix, options = EMPTY_OPTIONS) {
     if (mesh === null || mesh.outlineVertexArray === null || options.hasOutline === false || this.#isShadowPass) {
@@ -33207,7 +33506,9 @@ var ToonRenderer = class {
     this.drawWithCount(mesh, modelMatrix.getElements(), 0, options, null, DRAW_PART_BODY);
   }
   readMaterialBlock(options) {
-    const drawEntry = this.readDrawEntry(options);
+    return this.readEntryMaterialBlock(this.readDrawEntry(options), options);
+  }
+  readEntryMaterialBlock(drawEntry, options) {
     if (drawEntry.materialBlock === null) {
       writeMaterialBlockValues(this.#materialBlocks.values, options);
       drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
@@ -33259,10 +33560,13 @@ var ToonRenderer = class {
       if (slot.values.length < floatCount) {
         slot.values = new System80.Float32Array(floatCount);
       }
-      slot.values.set(instanceData.subarray(0, floatCount));
+      const values = slot.values;
+      for (let index = 0; index < floatCount; ++index) {
+        values[index] = instanceData[index];
+      }
       slot.count = count;
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
-      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount);
     }
     let vertexArrays = slot.vertexArrays.get(mesh);
     if (vertexArrays === void 0) {
@@ -33272,7 +33576,11 @@ var ToonRenderer = class {
       vertexArrays = this.createBatchVertexArrays(mesh, slot.buffer);
       slot.vertexArrays.set(mesh, vertexArrays);
     }
-    this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts, vertexArrays);
+    const batchElements = this.#batchModelElements;
+    for (let index = 0; index < 16; ++index) {
+      batchElements[index] = instanceData[index];
+    }
+    this.drawWithCount(mesh, batchElements, count, options, null, parts, vertexArrays);
   }
   createBatchVertexArrays(mesh, buffer) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -33535,9 +33843,12 @@ var ToonRenderer = class {
     this.#frameBlocks.boundBlock = null;
   }
   readDrawEntry(options) {
+    if (options === this.#hintOptions) {
+      return this.readHeldDrawEntry(this.#hintEntry);
+    }
     let entry = this.#drawEntryOfOptions.get(options);
     if (entry === void 0) {
-      entry = { keys: [], values: [], numbers: [], state: new System80.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0 };
+      entry = this.createDrawEntry();
       this.#drawEntryOfOptions.set(options, entry);
     } else if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
       return entry;
@@ -33552,15 +33863,55 @@ var ToonRenderer = class {
     entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
     return entry;
   }
+  findDrawEntry(options) {
+    if (!this.#drawEntryOfOptions.has(options)) {
+      return null;
+    }
+    return this.readDrawEntry(options);
+  }
+  createDrawEntry() {
+    return { keys: [], values: [], numbers: [], state: new System80.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0, options: null, generation: this.#drawEntryGeneration };
+  }
+  writeHeldDrawEntry(entry, options, isChanged) {
+    if (entry === null) {
+      entry = this.createDrawEntry();
+      isChanged = true;
+    }
+    this.readHeldDrawEntry(entry);
+    if (isChanged || !isSameOptionsSnapshot(entry, options)) {
+      writeOptionsSnapshot(entry, options);
+      writeDrawState(entry.state, options);
+      entry.materialBlock = null;
+      entry.outlineBlock = null;
+    }
+    entry.options = options;
+    return entry;
+  }
+  readHeldDrawEntry(entry) {
+    if (entry.generation !== this.#drawEntryGeneration) {
+      entry.materialBlock = null;
+      entry.outlineBlock = null;
+      entry.generation = this.#drawEntryGeneration;
+    }
+    return entry;
+  }
+  setDrawEntryHint(options, entry) {
+    this.#hintOptions = this.#isTrusting ? options : null;
+    this.#hintEntry = this.#isTrusting ? entry : null;
+  }
   beginTrustedOptions() {
     this.#trustSerial += 1;
     this.#isTrusting = true;
   }
   endTrustedOptions() {
     this.#isTrusting = false;
+    this.#hintOptions = null;
+    this.#hintEntry = null;
   }
   pauseTrustedOptions(isPaused) {
     this.#isTrusting = !isPaused;
+    this.#hintOptions = null;
+    this.#hintEntry = null;
   }
   bindBlock(blockCache, block) {
     if (block !== blockCache.boundBlock) {
@@ -33609,6 +33960,7 @@ var ToonRenderer = class {
     blockCache.count = 0;
     blockCache.boundBlock = null;
     this.#drawEntryOfOptions = new System80.WeakMap();
+    this.#drawEntryGeneration += 1;
   }
   forgetUniformValues(shaderProgram) {
     const slotTable = this.#uniformSlotTable.get(shaderProgram);
@@ -43006,7 +43358,8 @@ var MultiLevelBloomEffect = class extends Object2 {
 var System109 = globalThis;
 var ToonOutlineWidthUnit = System109.Object.freeze({ world: "world", pixel: "pixel" });
 var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
-var IDENTITY_ELEMENTS = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+var IDENTITY_ELEMENTS2 = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+var INSTANCE_BUFFER_SPHERE2 = [0, 0, 0, 0];
 var LINE_TEXTURE_UNIT = 5;
 var DEPTH_TEXTURE_UNIT = 6;
 var LINE_COLOR_TEXTURE_UNIT = 4;
@@ -43400,6 +43753,10 @@ function readJumpFloodSteps(reach) {
   return steps;
 }
 __name(readJumpFloodSteps, "readJumpFloodSteps");
+function readColorByte(value) {
+  return System109.Math.round(System109.Math.max(0, System109.Math.min(1, value)) * 255);
+}
+__name(readColorByte, "readColorByte");
 var ToonScreenOutline = class {
   static {
     __name(this, "ToonScreenOutline");
@@ -43435,6 +43792,8 @@ var ToonScreenOutline = class {
   #lineColorCount;
   #lineColorTexture;
   #isLineColorTableDirty;
+  #lineColorWords;
+  #uploadedLineColorTable;
   constructor(webGL2RenderingContext, options = null) {
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#colorSpace = options !== null && options.colorSpace !== void 0 ? readColorSpace(options.colorSpace) : readEngineColorSpace();
@@ -43464,6 +43823,8 @@ var ToonScreenOutline = class {
     this.#drawnDistanceCount = 0;
     this.#lineWidths = [2, 1];
     this.#lineColorTable = new System109.Uint8Array((TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1) * 4);
+    this.#lineColorWords = new System109.Uint32Array(this.#lineColorTable.buffer);
+    this.#uploadedLineColorTable = null;
     this.#lineColorCount = 0;
     this.#lineColorTexture = null;
     this.#isLineColorTableDirty = false;
@@ -43480,14 +43841,20 @@ var ToonScreenOutline = class {
     }
     const table = this.#lineColorTable;
     const offset = lineId * 4;
+    const red = readColorByte(color[0]);
+    const green = readColorByte(color[1]);
+    const blue = readColorByte(color[2]);
+    const alpha = System109.Math.max(1, readColorByte(color.length > 3 ? color[3] : 1));
+    if (table[offset] === red && table[offset + 1] === green && table[offset + 2] === blue && table[offset + 3] === alpha) {
+      return;
+    }
     if (table[offset + 3] === 0) {
       this.#lineColorCount += 1;
     }
-    const toByte = __name((value) => System109.Math.round(System109.Math.max(0, System109.Math.min(1, value)) * 255), "toByte");
-    table[offset] = toByte(color[0]);
-    table[offset + 1] = toByte(color[1]);
-    table[offset + 2] = toByte(color[2]);
-    table[offset + 3] = System109.Math.max(1, toByte(color.length > 3 ? color[3] : 1));
+    table[offset] = red;
+    table[offset + 1] = green;
+    table[offset + 2] = blue;
+    table[offset + 3] = alpha;
     this.#isLineColorTableDirty = true;
   }
   removeLineColor(lineId) {
@@ -43617,8 +43984,8 @@ var ToonScreenOutline = class {
       instanceData[offset + 19] = 1;
     }
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, count * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
-    this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
+    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, count * TOON_INSTANCE_FLOAT_COUNT);
+    this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
   }
   drawMesh(mesh, modelMatrix, lineId, options = {}) {
     if (mesh === null || mesh === void 0 || this.#savedState === null) {
@@ -43661,8 +44028,8 @@ var ToonScreenOutline = class {
       return;
     }
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, instanceCount * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
-    this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, 1, options.isMirrored === true, options, mesh.bodyVertexArray);
+    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, instanceCount * TOON_INSTANCE_FLOAT_COUNT);
+    this.drawWithCount(mesh, IDENTITY_ELEMENTS2, instanceCount, lineId, 1, options.isMirrored === true, options, mesh.bodyVertexArray);
   }
   drawMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, lineId, options = {}) {
     if (mesh === null || mesh === void 0 || this.#savedState === null || instanceBuffer.buffer === null) {
@@ -43678,7 +44045,7 @@ var ToonScreenOutline = class {
       return;
     }
     const isCulled = options.isCulled !== false;
-    if (isCulled && !isSphereInFrustum(this.#frame.frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+    if (isCulled && writeInstanceBufferSphere(INSTANCE_BUFFER_SPHERE2, mesh, instanceBuffer) && !isSphereInFrustum(this.#frame.frustumPlanes, INSTANCE_BUFFER_SPHERE2)) {
       return;
     }
     if (this.#widthUnit === ToonOutlineWidthUnit.world && this.#focusDistance <= 0 && this.#frame.isPerspective && instanceBuffer.data !== null) {
@@ -43697,7 +44064,7 @@ var ToonScreenOutline = class {
       }
     }
     const vertexArrays = instanceBuffer.renderer.readInstanceVertexArrays(mesh, instanceBuffer);
-    this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineId, instanceLayout.hasLineId() ? 2 : 0, options.isMirrored === true, options, vertexArrays.body);
+    this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineId, instanceLayout.hasLineId() ? 2 : 0, options.isMirrored === true, options, vertexArrays.body);
   }
   drawWithCount(mesh, modelElements, instanceCount, lineId, lineIdSource, isMirrored, options, vertexArray) {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -43880,9 +44247,28 @@ var ToonScreenOutline = class {
         return false;
       }
       this.#isLineColorTableDirty = true;
+      this.#uploadedLineColorTable = null;
     }
     if (!this.#isLineColorTableDirty) {
       return true;
+    }
+    this.#isLineColorTableDirty = false;
+    const uploadedTable = this.#uploadedLineColorTable;
+    if (uploadedTable !== null) {
+      const words = this.#lineColorWords;
+      let isSame = true;
+      for (let index = 0; index < words.length; ++index) {
+        if (words[index] !== uploadedTable[index]) {
+          isSame = false;
+          break;
+        }
+      }
+      if (isSame) {
+        return true;
+      }
+      uploadedTable.set(words);
+    } else {
+      this.#uploadedLineColorTable = this.#lineColorWords.slice();
     }
     const isFlipped = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL);
     const isPremultiplied = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
@@ -43937,11 +44323,13 @@ var ToonScreenOutline = class {
     const centerX = modelElements[0] * center[0] + modelElements[4] * center[1] + modelElements[8] * center[2] + modelElements[12];
     const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
     const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
-    const scaleX = System109.Math.hypot(modelElements[0], modelElements[1], modelElements[2]);
-    const scaleY = System109.Math.hypot(modelElements[4], modelElements[5], modelElements[6]);
-    const scaleZ = System109.Math.hypot(modelElements[8], modelElements[9], modelElements[10]);
+    const scaleX = readHypot(modelElements[0], modelElements[1], modelElements[2]);
+    const scaleY = readHypot(modelElements[4], modelElements[5], modelElements[6]);
+    const scaleZ = readHypot(modelElements[8], modelElements[9], modelElements[10]);
     const radius = mesh.boundingRadius * System109.Math.max(scaleX, scaleY, scaleZ);
-    for (const plane of this.#frame.frustumPlanes) {
+    const frustumPlanes = this.#frame.frustumPlanes;
+    for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+      const plane = frustumPlanes[planeIndex];
       if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
         return false;
       }
@@ -51680,6 +52068,7 @@ var SHADOW_STATIC_FRAME_COUNT = 30;
 var DRAW_PART_OUTLINE2 = 1;
 var DRAW_PART_BODY2 = 2;
 var DRAW_PART_ALL2 = 3;
+var INSTANCE_BUFFER_SPHERE3 = [0, 0, 0, 0];
 function writeCasterRecord(record, item) {
   const state = item.state;
   const material = state[DRAW_STATE_MATERIAL];
@@ -51698,44 +52087,63 @@ function writeCasterRecord(record, item) {
     isChanged = true;
   }
   const values = record.values;
-  let index = 0;
-  const write = __name((value) => {
-    const rounded = System140.Math.fround(value);
-    if (values[index] !== rounded) {
-      values[index] = rounded;
-      isChanged = true;
-    }
-    index += 1;
-  }, "write");
-  write(matrixCount);
-  write(state[DRAW_STATE_INDEX_START]);
-  write(state[DRAW_STATE_INDEX_COUNT]);
-  write(state[DRAW_STATE_IS_CULLED] ? 1 : 0);
-  write(state[DRAW_STATE_IS_MIRRORED]);
-  write(jointMatrices !== null ? jointMatrices.length : -1);
+  isChanged = writeRecordValue(values, 0, matrixCount) || isChanged;
+  isChanged = writeRecordValue(values, 1, state[DRAW_STATE_INDEX_START]) || isChanged;
+  isChanged = writeRecordValue(values, 2, state[DRAW_STATE_INDEX_COUNT]) || isChanged;
+  isChanged = writeRecordValue(values, 3, state[DRAW_STATE_IS_CULLED] ? 1 : 0) || isChanged;
+  isChanged = writeRecordValue(values, 4, state[DRAW_STATE_IS_MIRRORED]) || isChanged;
+  isChanged = writeRecordValue(values, 5, jointMatrices !== null ? jointMatrices.length : -1) || isChanged;
+  let index = 6;
   if (instanceBuffer !== null) {
-    write(item.instanceCount);
+    isChanged = writeRecordValue(values, index, item.instanceCount) || isChanged;
+    index += 1;
   } else if (item.instances !== null) {
-    for (const instance of item.instances) {
-      const elements = instance.modelMatrix.getElements();
-      for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
-        write(elements[elementIndex]);
-      }
+    const instances = item.instances;
+    for (let instanceIndex = 0; instanceIndex < instances.length; ++instanceIndex) {
+      isChanged = writeRecordValues(values, index, instances[instanceIndex].modelMatrix.getElements(), 16) || isChanged;
+      index += 16;
     }
   } else {
-    const elements = item.modelMatrix.getElements();
-    for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
-      write(elements[elementIndex]);
-    }
+    isChanged = writeRecordValues(values, index, item.modelMatrix.getElements(), 16) || isChanged;
+    index += 16;
   }
   if (jointMatrices !== null) {
-    for (let jointIndex = 0; jointIndex < jointMatrices.length; ++jointIndex) {
-      write(jointMatrices[jointIndex]);
-    }
+    isChanged = writeRecordValues(values, index, jointMatrices, jointMatrices.length) || isChanged;
   }
   return isChanged;
 }
 __name(writeCasterRecord, "writeCasterRecord");
+function writeRecordValue(values, index, value) {
+  const rounded = System140.Math.fround(value);
+  if (values[index] !== rounded) {
+    values[index] = rounded;
+    return true;
+  }
+  return false;
+}
+__name(writeRecordValue, "writeRecordValue");
+function writeRecordValues(values, offset, source, count) {
+  let isChanged = false;
+  for (let index = 0; index < count; ++index) {
+    const rounded = System140.Math.fround(source[index]);
+    if (values[offset + index] !== rounded) {
+      values[offset + index] = rounded;
+      isChanged = true;
+    }
+  }
+  return isChanged;
+}
+__name(writeRecordValues, "writeRecordValues");
+function compareTransparentEntry(entry, other) {
+  return other.averageDepth - entry.averageDepth;
+}
+__name(compareTransparentEntry, "compareTransparentEntry");
+function setListLength(list, length) {
+  if (list.length !== length) {
+    list.length = length;
+  }
+}
+__name(setListLength, "setListLength");
 function isBatchableItem(item, other) {
   return other.mesh === item.mesh && other.modelMatrix !== null && other.instances === null && other.instanceBuffer === null && other.materialBlock === item.materialBlock && other.mirrorSign === item.mirrorSign && isSameBatchState(item.state, other.state);
 }
@@ -51753,6 +52161,87 @@ function isSameValues(values, other) {
 }
 __name(isSameValues, "isSameValues");
 var ToonDrawStage = System140.Object.freeze({ beforeOpaque: "beforeOpaque", afterOpaque: "afterOpaque", afterOutline: "afterOutline", afterTransparent: "afterTransparent" });
+var ToonDrawItem = class {
+  static {
+    __name(this, "ToonDrawItem");
+  }
+  #mesh;
+  #modelMatrix;
+  #options;
+  #isDirty;
+  #changeSerial;
+  #entry;
+  #renderer;
+  constructor(mesh, modelMatrix, options = {}) {
+    this.#mesh = mesh;
+    this.#modelMatrix = new Matrix4();
+    this.#modelMatrix.copyFrom(modelMatrix);
+    this.#options = options;
+    this.#isDirty = true;
+    this.#changeSerial = 0;
+    this.#entry = null;
+    this.#renderer = null;
+  }
+  getMesh() {
+    return this.#mesh;
+  }
+  setMesh(mesh) {
+    this.#mesh = mesh;
+    this.#changeSerial += 1;
+  }
+  getModelMatrix() {
+    return this.#modelMatrix;
+  }
+  setModelMatrix(modelMatrix) {
+    const elements = this.#modelMatrix.getElements();
+    const otherElements = modelMatrix.getElements();
+    for (let index = 0; index < 16; ++index) {
+      if (elements[index] !== otherElements[index]) {
+        elements.set(otherElements);
+        this.#changeSerial += 1;
+        return;
+      }
+    }
+  }
+  getOptions() {
+    return this.#options;
+  }
+  setOptions(options) {
+    this.#options = options;
+    this.markDirty();
+  }
+  setOption(name, value) {
+    if (value === void 0) {
+      delete this.#options[name];
+    } else {
+      this.#options[name] = value;
+    }
+    this.markDirty();
+  }
+  markDirty() {
+    this.#isDirty = true;
+    this.#changeSerial += 1;
+  }
+  isDirty() {
+    return this.#isDirty;
+  }
+  getChangeSerial() {
+    return this.#changeSerial;
+  }
+  readDrawEntry(renderer) {
+    if (this.#renderer !== renderer) {
+      this.#renderer = renderer;
+      this.#entry = null;
+      this.#isDirty = true;
+    }
+    if (this.#isDirty) {
+      this.#entry = renderer.writeHeldDrawEntry(this.#entry, this.#options, true);
+      this.#isDirty = false;
+      return this.#entry;
+    }
+    return renderer.readHeldDrawEntry(this.#entry);
+  }
+};
 var ToonDrawQueue = class {
   static {
     __name(this, "ToonDrawQueue");
@@ -51762,7 +52251,10 @@ var ToonDrawQueue = class {
   #screenOutline;
   #postProcess;
   #opaqueItemList;
-  #itemPool;
+  #itemCount;
+  #batchMatrixCount;
+  #outlineBatchCount;
+  #lineMatrixCount;
   #sortKeys;
   #sortOrder;
   #sortCount;
@@ -51772,13 +52264,29 @@ var ToonDrawQueue = class {
   #outlineBatches;
   #lineIds;
   #lineMatrices;
+  #opaqueStorage;
+  #sortIndexList;
+  #casterList;
+  #staticCasterList;
+  #dynamicCasterList;
+  #lightKey;
+  #localLightKey;
+  #lineGroupPool;
+  #lineGroupCount;
+  #lineGroupSerial;
+  #lineGroupOfMesh;
+  #transparentPool;
+  #transparentList;
   constructor() {
     this.#itemList = [];
+    this.#itemCount = 0;
+    this.#batchMatrixCount = 0;
+    this.#outlineBatchCount = 0;
+    this.#lineMatrixCount = 0;
     this.#passList = [];
     this.#screenOutline = null;
     this.#postProcess = null;
     this.#opaqueItemList = null;
-    this.#itemPool = [];
     this.#sortKeys = new System140.Int32Array(0);
     this.#sortOrder = new System140.Int32Array(0);
     this.#sortCount = -1;
@@ -51788,19 +52296,36 @@ var ToonDrawQueue = class {
     this.#outlineBatches = [];
     this.#lineIds = [];
     this.#lineMatrices = [];
+    this.#opaqueStorage = [];
+    this.#sortIndexList = [];
+    this.#casterList = [];
+    this.#staticCasterList = [];
+    this.#dynamicCasterList = [];
+    this.#lightKey = new System140.Float32Array(17);
+    this.#localLightKey = new System140.Float32Array(0);
+    this.#lineGroupPool = [];
+    this.#lineGroupCount = 0;
+    this.#lineGroupSerial = 0;
+    this.#lineGroupOfMesh = new System140.WeakMap();
+    this.#transparentPool = [];
+    this.#transparentList = [];
   }
   resolveItems(renderer) {
     if (this.#isResolved) {
       return;
     }
-    for (const item of this.#itemList) {
-      const state = renderer.readDrawEntry(item.options).state;
+    const itemList = this.#itemList;
+    for (let index = 0; index < this.#itemCount; ++index) {
+      const item = itemList[index];
+      const entry = this.readItemEntry(renderer, item);
+      const state = entry.state;
+      item.entry = entry;
       item.state = state;
       item.isTransparent = state[DRAW_STATE_IS_TRANSPARENT];
       item.materialBlock = null;
       item.mirrorSign = 0;
       if (!item.isTransparent && item.modelMatrix !== null) {
-        item.materialBlock = renderer.readMaterialBlock(item.options);
+        item.materialBlock = renderer.readEntryMaterialBlock(entry, item.options);
         const isMirrored = state[DRAW_STATE_IS_MIRRORED];
         item.mirrorSign = isMirrored >= 0 ? isMirrored : readMatrixDeterminant(item.modelMatrix.getElements()) < 0 ? 1 : 0;
       }
@@ -51808,12 +52333,31 @@ var ToonDrawQueue = class {
     this.#isResolved = true;
     this.#opaqueItemList = null;
   }
+  readItemEntry(renderer, item) {
+    const options = item.options;
+    if (item.drawItem !== null) {
+      return item.drawItem.readDrawEntry(renderer);
+    }
+    const entry = renderer.findDrawEntry(options);
+    if (entry !== null) {
+      return entry;
+    }
+    const heldEntry = item.heldRenderer === renderer ? item.heldEntry : null;
+    if (heldEntry !== null && heldEntry.options === options) {
+      heldEntry.options = null;
+      return renderer.readDrawEntry(options);
+    }
+    item.heldEntry = renderer.writeHeldDrawEntry(heldEntry, options, false);
+    item.heldRenderer = renderer;
+    return item.heldEntry;
+  }
   pushItem(mesh, modelMatrix, instances, instanceBuffer, instanceCount, options) {
     const itemList = this.#itemList;
-    let item = this.#itemPool[itemList.length];
+    const itemCount = this.#itemCount;
+    let item = itemList[itemCount];
     if (item === void 0) {
-      item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
-      this.#itemPool.push(item);
+      item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, drawItem: null, entry: null, heldEntry: null, heldRenderer: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
+      itemList.push(item);
     }
     item.mesh = mesh;
     item.modelMatrix = modelMatrix;
@@ -51821,30 +52365,36 @@ var ToonDrawQueue = class {
     item.instanceBuffer = instanceBuffer;
     item.instanceCount = instanceCount;
     item.options = options;
+    item.drawItem = null;
+    item.entry = null;
     item.state = null;
     item.isTransparent = false;
     item.depth = 0;
     this.#opaqueItemList = null;
     this.#isResolved = false;
-    itemList.push(item);
+    this.#itemCount = itemCount + 1;
     return item;
   }
   clear() {
-    for (const item of this.#itemList) {
+    const itemList = this.#itemList;
+    for (let index = 0; index < this.#itemCount; ++index) {
+      const item = itemList[index];
       item.mesh = null;
       item.modelMatrix = null;
       item.instances = null;
       item.instanceBuffer = null;
       item.options = null;
+      item.drawItem = null;
+      item.entry = null;
       item.state = null;
       item.materialBlock = null;
     }
-    this.#itemList.length = 0;
+    this.#itemCount = 0;
     this.#passList.length = 0;
     this.#opaqueItemList = null;
   }
   getItemCount() {
-    return this.#itemList.length;
+    return this.#itemCount;
   }
   setScreenOutline(screenOutline) {
     this.#screenOutline = screenOutline;
@@ -51893,6 +52443,17 @@ var ToonDrawQueue = class {
     depthPosition.y = elements[1] * center[0] + elements[5] * center[1] + elements[9] * center[2] + elements[13];
     depthPosition.z = elements[2] * center[0] + elements[6] * center[1] + elements[10] * center[2] + elements[14];
   }
+  createItem(mesh, modelMatrix, options = {}) {
+    return new ToonDrawItem(mesh, modelMatrix, options);
+  }
+  addItem(drawItem) {
+    const mesh = drawItem.getMesh();
+    if (mesh === null || mesh === void 0) {
+      return;
+    }
+    this.addMesh(mesh, drawItem.getModelMatrix(), drawItem.getOptions());
+    this.#itemList[this.#itemCount - 1].drawItem = drawItem;
+  }
   addMeshInstanced(mesh, instances, options = EMPTY_OPTIONS) {
     if (mesh === null || mesh === void 0 || instances.length === 0) {
       return;
@@ -51916,11 +52477,12 @@ var ToonDrawQueue = class {
     if (mesh === null || mesh === void 0 || instanceBuffer === null || instanceBuffer === void 0 || instanceCount <= 0) {
       return;
     }
-    const sphere = readInstanceBufferSphere(mesh, instanceBuffer);
+    const sphere = INSTANCE_BUFFER_SPHERE3;
+    const hasSphere = writeInstanceBufferSphere(sphere, mesh, instanceBuffer);
     const item = this.pushItem(mesh, null, null, instanceBuffer, instanceCount, options);
-    item.depthPosition.x = sphere !== null ? sphere[0] : 0;
-    item.depthPosition.y = sphere !== null ? sphere[1] : 0;
-    item.depthPosition.z = sphere !== null ? sphere[2] : 0;
+    item.depthPosition.x = hasSphere ? sphere[0] : 0;
+    item.depthPosition.y = hasSphere ? sphere[1] : 0;
+    item.depthPosition.z = hasSphere ? sphere[2] : 0;
   }
   isTransparentOptions(options) {
     const alpha = options.alpha !== void 0 ? options.alpha : 1;
@@ -51929,23 +52491,22 @@ var ToonDrawQueue = class {
     return alpha < 1 || tintAlpha < 1 || blendMode !== ToonBlendMode.alpha;
   }
   drawShadows(renderer, shadowMap) {
-    const lightKey = new System140.Float32Array(17);
+    const lightKey = this.#lightKey;
     lightKey.set(shadowMap.getLightViewProjectionMatrix().getElements());
     lightKey[16] = shadowMap.getResolution();
     renderer.beginTrustedOptions();
     try {
-      this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, () => {
-        renderer.beginShadowPass(shadowMap);
-      }, (casterList) => {
-        this.drawCasterList(renderer, casterList);
-      });
+      this.drawShadowCasters(renderer, shadowMap.getShadowCache(), lightKey, shadowMap, null);
     } finally {
       renderer.endTrustedOptions();
     }
   }
   drawLocalShadows(renderer, shadowAtlas) {
     const tileCount = shadowAtlas.getTileCount();
-    const lightKey = new System140.Float32Array(1 + tileCount * 19);
+    if (this.#localLightKey.length !== 1 + tileCount * 19) {
+      this.#localLightKey = new System140.Float32Array(1 + tileCount * 19);
+    }
+    const lightKey = this.#localLightKey;
     lightKey[0] = shadowAtlas.getResolution();
     for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
       const tile = shadowAtlas.getTile(tileIndex);
@@ -51957,38 +52518,30 @@ var ToonDrawQueue = class {
     }
     renderer.beginTrustedOptions();
     try {
-      this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, () => {
-        renderer.beginShadowAtlasPass(shadowAtlas);
-      }, (casterList) => {
-        for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
-          renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-          this.drawCasterList(renderer, casterList);
-        }
-      });
+      this.drawShadowCasters(renderer, shadowAtlas.getShadowCache(), lightKey, null, shadowAtlas);
     } finally {
       renderer.endTrustedOptions();
     }
   }
-  drawShadowCasters(renderer, shadowCache, lightKey, beginPass, drawCasters) {
+  drawShadowCasters(renderer, shadowCache, lightKey, shadowMap, shadowAtlas) {
     this.resolveItems(renderer);
-    const casterList = [];
-    for (const item of this.readOpaqueItemList()) {
+    const casterList = this.#casterList;
+    const opaqueItemList = this.readOpaqueItemList();
+    let casterCount = 0;
+    for (let index = 0; index < opaqueItemList.length; ++index) {
+      const item = opaqueItemList[index];
       if (item.state[DRAW_STATE_CASTS_SHADOW]) {
-        casterList.push(item);
+        casterList[casterCount] = item;
+        casterCount += 1;
       }
     }
-    const drawPass = __name((renderTarget, itemList) => {
-      shadowCache.renderTarget = renderTarget;
-      beginPass();
-      drawCasters(itemList);
-      renderer.endShadowPass();
-    }, "drawPass");
+    setListLength(casterList, casterCount);
     const updateMode = shadowCache.updateMode;
     if (updateMode === ShadowUpdateMode.everyFrame) {
       shadowCache.casterRecords.length = 0;
       shadowCache.lightKey = null;
       shadowCache.hasCache = false;
-      drawPass("live", casterList);
+      this.drawShadowPass(renderer, shadowCache, "live", casterList, shadowMap, shadowAtlas);
       return;
     }
     if (updateMode === ShadowUpdateMode.interval) {
@@ -51997,14 +52550,18 @@ var ToonDrawQueue = class {
       if (isDue) {
         shadowCache.isUpdateRequested = false;
         shadowCache.hasCache = false;
-        drawPass("live", casterList);
+        this.drawShadowPass(renderer, shadowCache, "live", casterList, shadowMap, shadowAtlas);
       }
       return;
     }
     const isLightChanged = !isSameValues(shadowCache.lightKey, lightKey);
     let isCacheStale = shadowCache.isUpdateRequested;
     shadowCache.isUpdateRequested = false;
-    shadowCache.lightKey = lightKey;
+    if (shadowCache.lightKey !== null && shadowCache.lightKey.length === lightKey.length) {
+      shadowCache.lightKey.set(lightKey);
+    } else {
+      shadowCache.lightKey = lightKey.slice();
+    }
     const recordList = shadowCache.casterRecords;
     for (let recordIndex = casterList.length; recordIndex < recordList.length; ++recordIndex) {
       isCacheStale = isCacheStale || recordList[recordIndex].isStatic;
@@ -52012,17 +52569,19 @@ var ToonDrawQueue = class {
     if (recordList.length > casterList.length) {
       recordList.length = casterList.length;
     }
-    const staticList = [];
-    const dynamicList = [];
+    const staticList = this.#staticCasterList;
+    const dynamicList = this.#dynamicCasterList;
+    let staticCount = 0;
+    let dynamicCount = 0;
     for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
       const item = casterList[casterIndex];
       if (casterIndex >= recordList.length) {
-        recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System140.Float32Array(0), stableFrameCount: 0, isStatic: false });
+        recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System140.Float32Array(0), stableFrameCount: 0, isStatic: false, drawItem: null, changeSerial: -1 });
       }
       const record = recordList[casterIndex];
       const material = item.state[DRAW_STATE_MATERIAL];
       const isVertexAnimated = material !== void 0 && material !== null && material.getVertexChunk() !== "";
-      if (writeCasterRecord(record, item) || isVertexAnimated) {
+      if (this.isCasterChanged(record, item) || isVertexAnimated) {
         isCacheStale = isCacheStale || record.isStatic;
         record.isStatic = false;
         record.stableFrameCount = 0;
@@ -52034,31 +52593,60 @@ var ToonDrawQueue = class {
         }
       }
       if (record.isStatic) {
-        staticList.push(item);
+        staticList[staticCount] = item;
+        staticCount += 1;
       } else {
-        dynamicList.push(item);
+        dynamicList[dynamicCount] = item;
+        dynamicCount += 1;
       }
     }
+    setListLength(staticList, staticCount);
+    setListLength(dynamicList, dynamicCount);
     if (isLightChanged) {
       shadowCache.hasCache = false;
-      drawPass("live", casterList);
+      this.drawShadowPass(renderer, shadowCache, "live", casterList, shadowMap, shadowAtlas);
       return;
     }
     if (isCacheStale || !shadowCache.hasCache && staticList.length > 0) {
       shadowCache.hasCache = staticList.length > 0;
       if (shadowCache.hasCache) {
-        drawPass("cache", staticList);
+        this.drawShadowPass(renderer, shadowCache, "cache", staticList, shadowMap, shadowAtlas);
       }
       shadowCache.isDepthCurrent = false;
     }
     if (dynamicList.length > 0) {
-      drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+      this.drawShadowPass(renderer, shadowCache, shadowCache.hasCache ? "copy" : "live", dynamicList, shadowMap, shadowAtlas);
       return;
     }
     if (!shadowCache.isDepthCurrent) {
-      drawPass(shadowCache.hasCache ? "copy" : "live", dynamicList);
+      this.drawShadowPass(renderer, shadowCache, shadowCache.hasCache ? "copy" : "live", dynamicList, shadowMap, shadowAtlas);
       shadowCache.isDepthCurrent = true;
     }
+  }
+  drawShadowPass(renderer, shadowCache, renderTarget, itemList, shadowMap, shadowAtlas) {
+    shadowCache.renderTarget = renderTarget;
+    if (shadowAtlas !== null) {
+      renderer.beginShadowAtlasPass(shadowAtlas);
+      const tileCount = shadowAtlas.getTileCount();
+      for (let tileIndex = 0; tileIndex < tileCount; ++tileIndex) {
+        renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
+        this.drawCasterList(renderer, itemList);
+      }
+    } else {
+      renderer.beginShadowPass(shadowMap);
+      this.drawCasterList(renderer, itemList);
+    }
+    renderer.endShadowPass();
+  }
+  isCasterChanged(record, item) {
+    const drawItem = item.drawItem;
+    if (drawItem !== null && record.drawItem === drawItem && record.changeSerial === drawItem.getChangeSerial() && item.state[DRAW_STATE_JOINT_MATRICES] === null) {
+      return false;
+    }
+    const isChanged = writeCasterRecord(record, item);
+    record.drawItem = drawItem;
+    record.changeSerial = drawItem !== null ? drawItem.getChangeSerial() : -1;
+    return isChanged;
   }
   draw(renderer, camera) {
     renderer.beginTrustedOptions();
@@ -52114,42 +52702,29 @@ var ToonDrawQueue = class {
     if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
       const lineMatrices = this.#lineMatrices;
       const lineIds = this.#lineIds;
-      const groupList = [];
-      const groupTable = /* @__PURE__ */ new Map();
-      const flushGroups = __name(() => {
-        for (const group of groupList) {
-          const start = lineMatrices.length;
-          for (const index of group.itemIndexList) {
-            lineMatrices.push(lineMatrices[index]);
-            lineIds.push(lineIds[index]);
-          }
-          screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, lineMatrices.length - start, group.item.options);
-        }
-        groupList.length = 0;
-        groupTable.clear();
-        lineMatrices.length = 0;
-        lineIds.length = 0;
-      }, "flushGroups");
-      let itemIndex = 0;
-      for (const item of this.#itemList) {
-        itemIndex += 1;
+      this.#lineMatrixCount = 0;
+      this.#lineGroupCount = 0;
+      this.#lineGroupSerial += 1;
+      const itemList = this.#itemList;
+      for (let itemIndex = 1; itemIndex <= this.#itemCount; ++itemIndex) {
+        const item = itemList[itemIndex - 1];
         if (item.isTransparent) {
           continue;
         }
         const stateLineId = item.state[DRAW_STATE_LINE_ID];
         const lineId = stateLineId !== null ? stateLineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
         if (item.instanceBuffer !== null) {
-          flushGroups();
+          this.flushLineGroups(screenOutline);
           screenOutline.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, lineId, item.options);
           continue;
         }
         if (item.instances !== null) {
-          flushGroups();
+          this.flushLineGroups(screenOutline);
           screenOutline.drawMeshInstanced(item.mesh, item.instances, lineId, item.options);
           continue;
         }
         if (item.mirrorSign === 1 || item.state[DRAW_STATE_JOINT_MATRICES] !== null) {
-          flushGroups();
+          this.flushLineGroups(screenOutline);
           screenOutline.drawMesh(item.mesh, item.modelMatrix, lineId, item.options);
           continue;
         }
@@ -52160,31 +52735,78 @@ var ToonDrawQueue = class {
         const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
         const indexStart = options.indexStart;
         const indexCount = options.indexCount;
-        let groups = groupTable.get(item.mesh);
-        if (groups === void 0) {
-          groups = [];
-          groupTable.set(item.mesh, groups);
+        let meshGroups = this.#lineGroupOfMesh.get(item.mesh);
+        if (meshGroups === void 0) {
+          meshGroups = { serial: -1, firstIndex: -1, lastIndex: -1 };
+          this.#lineGroupOfMesh.set(item.mesh, meshGroups);
         }
+        if (meshGroups.serial !== this.#lineGroupSerial) {
+          meshGroups.serial = this.#lineGroupSerial;
+          meshGroups.firstIndex = -1;
+          meshGroups.lastIndex = -1;
+        }
+        const groupPool = this.#lineGroupPool;
         let group = null;
-        for (const candidate of groups) {
+        for (let groupIndex = meshGroups.firstIndex; groupIndex >= 0; groupIndex = groupPool[groupIndex].nextIndex) {
+          const candidate = groupPool[groupIndex];
           if (candidate.lineFlags === lineFlags && candidate.indexStart === indexStart && candidate.indexCount === indexCount) {
             group = candidate;
             break;
           }
         }
         if (group === null) {
-          group = { item, lineFlags, indexStart, indexCount, itemIndexList: [] };
-          groups.push(group);
-          groupList.push(group);
+          const groupIndex = this.#lineGroupCount;
+          group = groupPool[groupIndex];
+          if (group === void 0) {
+            group = { item: null, lineFlags: 0, indexStart: void 0, indexCount: void 0, itemIndexList: [], itemIndexCount: 0, nextIndex: -1 };
+            groupPool.push(group);
+          }
+          group.item = item;
+          group.lineFlags = lineFlags;
+          group.indexStart = indexStart;
+          group.indexCount = indexCount;
+          group.itemIndexCount = 0;
+          group.nextIndex = -1;
+          this.#lineGroupCount = groupIndex + 1;
+          if (meshGroups.lastIndex >= 0) {
+            groupPool[meshGroups.lastIndex].nextIndex = groupIndex;
+          } else {
+            meshGroups.firstIndex = groupIndex;
+          }
+          meshGroups.lastIndex = groupIndex;
         }
-        group.itemIndexList.push(lineMatrices.length);
-        lineMatrices.push(item.modelMatrix);
-        lineIds.push(lineId);
+        group.itemIndexList[group.itemIndexCount] = this.#lineMatrixCount;
+        group.itemIndexCount += 1;
+        this.pushLineMatrix(item.modelMatrix, lineId);
       }
-      flushGroups();
+      this.flushLineGroups(screenOutline);
       screenOutline.endLineIds();
     }
     webGL2RenderingContext.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+  }
+  flushLineGroups(screenOutline) {
+    const lineMatrices = this.#lineMatrices;
+    const lineIds = this.#lineIds;
+    const groupPool = this.#lineGroupPool;
+    for (let groupIndex = 0; groupIndex < this.#lineGroupCount; ++groupIndex) {
+      const group = groupPool[groupIndex];
+      const start = this.#lineMatrixCount;
+      for (let index = 0; index < group.itemIndexCount; ++index) {
+        const sourceIndex = group.itemIndexList[index];
+        this.pushLineMatrix(lineMatrices[sourceIndex], lineIds[sourceIndex]);
+      }
+      screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options);
+      group.item = null;
+    }
+    this.#lineGroupCount = 0;
+    this.#lineGroupSerial += 1;
+    this.#lineMatrixCount = 0;
+  }
+  pushLineMatrix(matrix, lineId) {
+    const index = this.#lineMatrixCount;
+    this.#lineMatrices[index] = matrix;
+    this.#lineIds[index] = lineId;
+    this.#lineMatrixCount = index + 1;
   }
   runPasses(renderer, stage) {
     let isRun = false;
@@ -52211,8 +52833,8 @@ var ToonDrawQueue = class {
     this.runPasses(renderer, ToonDrawStage.beforeOpaque);
     const outlineBatches = this.#outlineBatches;
     const batchMatrices = this.#batchMatrices;
-    outlineBatches.length = 0;
-    batchMatrices.length = 0;
+    this.#outlineBatchCount = 0;
+    this.#batchMatrixCount = 0;
     const opaqueItemList = this.readOpaqueItemList();
     let itemIndex = 0;
     let slotIndex = 0;
@@ -52227,79 +52849,110 @@ var ToonDrawQueue = class {
         this.drawItem(renderer, item, item.options);
         continue;
       }
-      const start = batchMatrices.length;
-      batchMatrices.push(item.modelMatrix);
-      itemIndex = this.collectBatch(renderer, opaqueItemList, itemIndex, item, batchMatrices);
-      const count = batchMatrices.length - start;
+      const start = this.#batchMatrixCount;
+      this.pushBatchMatrix(item.modelMatrix);
+      itemIndex = this.collectBatch(renderer, opaqueItemList, itemIndex, item);
+      const count = this.#batchMatrixCount - start;
+      renderer.setDrawEntryHint(item.options, item.entry);
       if (count === 1) {
         renderer.drawMeshBody(item.mesh, item.modelMatrix, item.options);
       } else {
         renderer.drawMeshBatch(item.mesh, batchMatrices, start, count, item.options, DRAW_PART_BODY2, slotIndex);
       }
       if (item.state[DRAW_STATE_HAS_OUTLINE] && item.mesh.outlineVertexArray !== null) {
-        outlineBatches.push(item, start, count, slotIndex);
+        const offset = this.#outlineBatchCount;
+        outlineBatches[offset] = item;
+        outlineBatches[offset + 1] = start;
+        outlineBatches[offset + 2] = count;
+        outlineBatches[offset + 3] = slotIndex;
+        this.#outlineBatchCount = offset + 4;
       }
       if (count > 1) {
         slotIndex += 1;
       }
     }
     this.runPasses(renderer, ToonDrawStage.afterOpaque);
-    for (let batchIndex = 0; batchIndex < outlineBatches.length; batchIndex += 4) {
+    for (let batchIndex = 0; batchIndex < this.#outlineBatchCount; batchIndex += 4) {
       const item = outlineBatches[batchIndex];
       const count = outlineBatches[batchIndex + 2];
+      renderer.setDrawEntryHint(item.options, item.entry);
       if (count === 1) {
         renderer.drawMeshOutline(item.mesh, item.modelMatrix, item.options);
       } else {
         renderer.drawMeshBatch(item.mesh, batchMatrices, outlineBatches[batchIndex + 1], count, item.options, DRAW_PART_OUTLINE2, outlineBatches[batchIndex + 3]);
       }
     }
-    outlineBatches.length = 0;
+    for (let batchIndex = 0; batchIndex < this.#outlineBatchCount; batchIndex += 4) {
+      outlineBatches[batchIndex] = null;
+    }
+    this.#outlineBatchCount = 0;
     if (this.#screenOutline !== null) {
       this.#screenOutline.drawOutline();
       renderer.applyFrameState();
     }
     this.runPasses(renderer, ToonDrawStage.afterOutline);
-    const entryList = [];
-    const groupTable = /* @__PURE__ */ new Map();
-    for (const item of itemList) {
+    const entryList = this.#transparentList;
+    const entryPool = this.#transparentPool;
+    let entryCount = 0;
+    for (let index = 0; index < this.#itemCount; ++index) {
+      const item = itemList[index];
       if (!item.isTransparent) {
         continue;
       }
       item.depth = readDepth(item.depthPosition);
       const group = item.state[DRAW_STATE_GROUP];
       const isDepthPrepassed = item.state[DRAW_STATE_IS_DEPTH_PREPASSED];
-      if (group === null) {
-        entryList.push({ depthSum: item.depth, itemList: [item], isDepthPrepassed });
-        continue;
+      let entry = null;
+      if (group !== null) {
+        for (let entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
+          if (entryList[entryIndex].group === group) {
+            entry = entryList[entryIndex];
+            break;
+          }
+        }
       }
-      let entry = groupTable.get(group);
-      if (entry === void 0) {
-        entry = { depthSum: 0, itemList: [], isDepthPrepassed: false };
-        groupTable.set(group, entry);
-        entryList.push(entry);
+      if (entry === null) {
+        entry = entryPool[entryCount];
+        if (entry === void 0) {
+          entry = { depthSum: 0, itemList: [], itemCount: 0, isDepthPrepassed: false, group: null, averageDepth: 0 };
+          entryPool.push(entry);
+        }
+        entry.depthSum = 0;
+        entry.itemCount = 0;
+        entry.isDepthPrepassed = false;
+        entry.group = group;
+        entryList[entryCount] = entry;
+        entryCount += 1;
       }
       entry.depthSum += item.depth;
-      entry.itemList.push(item);
+      entry.itemList[entry.itemCount] = item;
+      entry.itemCount += 1;
       entry.isDepthPrepassed = entry.isDepthPrepassed || isDepthPrepassed;
     }
+    setListLength(entryList, entryCount);
     if (entryList.length > 0) {
-      entryList.sort((entry, other) => {
-        return other.depthSum / other.itemList.length - entry.depthSum / entry.itemList.length;
-      });
+      for (const entry of entryList) {
+        entry.averageDepth = entry.depthSum / entry.itemCount;
+      }
+      entryList.sort(compareTransparentEntry);
       webGL2RenderingContext.depthMask(false);
       for (const entry of entryList) {
         if (entry.isDepthPrepassed) {
           webGL2RenderingContext.colorMask(false, false, false, false);
           webGL2RenderingContext.depthMask(true);
-          for (const item of entry.itemList) {
+          for (let index = 0; index < entry.itemCount; ++index) {
+            const item = entry.itemList[index];
             this.drawItem(renderer, item, item.options);
           }
           webGL2RenderingContext.colorMask(true, true, true, true);
           webGL2RenderingContext.depthMask(false);
         }
-        for (const item of entry.itemList) {
+        for (let index = 0; index < entry.itemCount; ++index) {
+          const item = entry.itemList[index];
           this.drawItem(renderer, item, item.options);
+          entry.itemList[index] = null;
         }
+        entry.group = null;
       }
       webGL2RenderingContext.depthMask(true);
     }
@@ -52310,13 +52963,16 @@ var ToonDrawQueue = class {
       return this.#opaqueItemList;
     }
     const scratch = this.#opaqueScratch;
-    scratch.length = 0;
-    for (const item of this.#itemList) {
+    const itemList = this.#itemList;
+    let count = 0;
+    for (let index = 0; index < this.#itemCount; ++index) {
+      const item = itemList[index];
       if (!item.isTransparent) {
-        scratch.push(item);
+        scratch[count] = item;
+        count += 1;
       }
     }
-    const count = scratch.length;
+    setListLength(scratch, count);
     let keys = this.#sortKeys;
     let isSame = count === this.#sortCount;
     if (keys.length < count * 4) {
@@ -52342,24 +52998,26 @@ var ToonDrawQueue = class {
     }
     const order = this.#sortOrder;
     if (!isSame) {
-      const indexList = [];
+      const indexList = this.#sortIndexList;
       for (let index = 0; index < count; ++index) {
-        indexList.push(index);
+        indexList[index] = index;
       }
+      setListLength(indexList, count);
       indexList.sort((index, other) => {
         return keys[index * 4] - keys[other * 4] || keys[index * 4 + 1] - keys[other * 4 + 1] || keys[index * 4 + 2] - keys[other * 4 + 2] || keys[index * 4 + 3] - keys[other * 4 + 3] || index - other;
       });
       order.set(indexList);
       this.#sortCount = count;
     }
-    const opaqueItemList = [];
+    const opaqueItemList = this.#opaqueStorage;
     for (let index = 0; index < count; ++index) {
-      opaqueItemList.push(scratch[order[index]]);
+      opaqueItemList[index] = scratch[order[index]];
     }
+    setListLength(opaqueItemList, count);
     this.#opaqueItemList = opaqueItemList;
     return opaqueItemList;
   }
-  collectBatch(renderer, itemList, itemIndex, item, matrices) {
+  collectBatch(renderer, itemList, itemIndex, item) {
     if (item.materialBlock === null) {
       return itemIndex;
     }
@@ -52373,7 +53031,7 @@ var ToonDrawQueue = class {
         this.drawItem(renderer, other, other.options);
         continue;
       }
-      matrices.push(other.modelMatrix);
+      this.pushBatchMatrix(other.modelMatrix);
     }
     return itemIndex;
   }
@@ -52388,19 +53046,25 @@ var ToonDrawQueue = class {
         this.drawItem(renderer, item, item.options);
         continue;
       }
-      batchMatrices.length = 0;
-      batchMatrices.push(item.modelMatrix);
-      itemIndex = this.collectBatch(renderer, casterList, itemIndex, item, batchMatrices);
-      if (batchMatrices.length === 1) {
+      this.#batchMatrixCount = 0;
+      this.pushBatchMatrix(item.modelMatrix);
+      itemIndex = this.collectBatch(renderer, casterList, itemIndex, item);
+      if (this.#batchMatrixCount === 1) {
         this.drawItem(renderer, item, item.options);
       } else {
-        renderer.drawMeshBatch(item.mesh, batchMatrices, 0, batchMatrices.length, item.options, DRAW_PART_ALL2, slotIndex);
+        renderer.setDrawEntryHint(item.options, item.entry);
+        renderer.drawMeshBatch(item.mesh, batchMatrices, 0, this.#batchMatrixCount, item.options, DRAW_PART_ALL2, slotIndex);
         slotIndex += 1;
       }
     }
-    batchMatrices.length = 0;
+    this.#batchMatrixCount = 0;
+  }
+  pushBatchMatrix(matrix) {
+    this.#batchMatrices[this.#batchMatrixCount] = matrix;
+    this.#batchMatrixCount += 1;
   }
   drawItem(renderer, item, options) {
+    renderer.setDrawEntryHint(options, item.entry);
     if (item.instanceBuffer !== null) {
       renderer.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, options);
     } else if (item.instances !== null) {
@@ -55796,6 +56460,7 @@ export {
   ToastPhase,
   ToonBlendMode,
   ToonBufferUsage,
+  ToonDrawItem,
   ToonDrawQueue,
   ToonDrawStage,
   ToonInstanceLayout,
@@ -55921,6 +56586,7 @@ export {
   sliceGraphemes,
   splitGraphemes,
   splitWords,
+  writeInstanceBufferSphere,
   writeSkinPose
 };
 //# sourceMappingURL=vanilla.js.map

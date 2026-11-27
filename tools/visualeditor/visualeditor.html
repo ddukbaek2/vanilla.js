@@ -1673,6 +1673,32 @@
 
   // src/base/matrix4.js
   var System5 = globalThis;
+  var MULTIPLY_RESULT = new System5.Float32Array(16);
+  var OPERAND_ELEMENTS = new System5.Float32Array(16);
+  function multiplyElements(elements, otherElements) {
+    const resultElements = MULTIPLY_RESULT;
+    for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
+      for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
+        let sum = 0;
+        for (let termIndex = 0; termIndex < 4; ++termIndex) {
+          sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
+        }
+        resultElements[columnIndex * 4 + rowIndex] = sum;
+      }
+    }
+    elements.set(resultElements);
+  }
+  __name(multiplyElements, "multiplyElements");
+  function readIdentityOperand() {
+    const elements = OPERAND_ELEMENTS;
+    elements.fill(0);
+    elements[0] = 1;
+    elements[5] = 1;
+    elements[10] = 1;
+    elements[15] = 1;
+    return elements;
+  }
+  __name(readIdentityOperand, "readIdentityOperand");
   var Matrix4 = class _Matrix4 extends Object2 {
     static {
       __name(this, "Matrix4");
@@ -1737,19 +1763,7 @@
      * @param { Matrix4 } other 오른쪽에 곱할 행렬.
      */
     multiply(other) {
-      const elements = this.getElements();
-      const otherElements = other.getElements();
-      const resultElements = new System5.Float32Array(16);
-      for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
-        for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
-          let sum = 0;
-          for (let termIndex = 0; termIndex < 4; ++termIndex) {
-            sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
-          }
-          resultElements[columnIndex * 4 + rowIndex] = sum;
-        }
-      }
-      elements.set(resultElements);
+      multiplyElements(this.getElements(), other.getElements());
     }
     //==============================================================================
     // 이동 변환 누적. (로컬 공간 우측 곱)
@@ -1760,8 +1774,11 @@
      * @param { number } z Z 이동량.
      */
     translate(x, y, z) {
-      const translationMatrix = _Matrix4.createTranslation(x, y, z);
-      this.multiply(translationMatrix);
+      const operand = readIdentityOperand();
+      operand[12] = x;
+      operand[13] = y;
+      operand[14] = z;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // X축 회전 변환 누적. (로컬 공간 우측 곱)
@@ -1770,8 +1787,14 @@
      * @param { number } radian 회전 각도. (라디안)
      */
     rotateX(radian) {
-      const rotationMatrix = _Matrix4.createRotationX(radian);
-      this.multiply(rotationMatrix);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const operand = readIdentityOperand();
+      operand[5] = cosRadian;
+      operand[6] = sinRadian;
+      operand[9] = -sinRadian;
+      operand[10] = cosRadian;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // Y축 회전 변환 누적. (로컬 공간 우측 곱)
@@ -1780,8 +1803,14 @@
      * @param { number } radian 회전 각도. (라디안)
      */
     rotateY(radian) {
-      const rotationMatrix = _Matrix4.createRotationY(radian);
-      this.multiply(rotationMatrix);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const operand = readIdentityOperand();
+      operand[0] = cosRadian;
+      operand[2] = -sinRadian;
+      operand[8] = sinRadian;
+      operand[10] = cosRadian;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // Z축 회전 변환 누적. (로컬 공간 우측 곱)
@@ -1790,8 +1819,14 @@
      * @param { number } radian 회전 각도. (라디안)
      */
     rotateZ(radian) {
-      const rotationMatrix = _Matrix4.createRotationZ(radian);
-      this.multiply(rotationMatrix);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const operand = readIdentityOperand();
+      operand[0] = cosRadian;
+      operand[1] = sinRadian;
+      operand[4] = -sinRadian;
+      operand[5] = cosRadian;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // 크기 변환 누적. (로컬 공간 우측 곱)
@@ -1802,8 +1837,11 @@
      * @param { number } z Z 배율.
      */
     scale(x, y, z) {
-      const scaleMatrix = _Matrix4.createScale(x, y, z);
-      this.multiply(scaleMatrix);
+      const operand = readIdentityOperand();
+      operand[0] = x;
+      operand[5] = y;
+      operand[10] = z;
+      multiplyElements(this.getElements(), operand);
     }
     //==============================================================================
     // 점 변환. (w 성분 포함, 원근 분할은 호출자가 수행)
@@ -5679,6 +5717,7 @@
 
   // src/core/node/transformnode.js
   var System13 = globalThis;
+  var PARENT_SCALE = Vector2.create(0, 1);
   var DRAW_BOUNDS_DIRTY = 0;
   var DRAW_BOUNDS_KNOWN = 1;
   var DRAW_BOUNDS_UNKNOWN = 2;
@@ -5696,6 +5735,26 @@
   var visibleChildRect = new Rect();
   var visibleChildFirstIndex = 0;
   var visibleChildLastIndex = 0;
+  function readNodePosition(node, out) {
+    if (typeof node.readPosition === "function") {
+      node.readPosition(out);
+      return;
+    }
+    const position = node.getPosition();
+    out.x = position.x;
+    out.y = position.y;
+  }
+  __name(readNodePosition, "readNodePosition");
+  function readNodeScale(node, out) {
+    if (typeof node.readScale === "function") {
+      node.readScale(out);
+      return;
+    }
+    const scale = node.getScale();
+    out.x = scale.x;
+    out.y = scale.y;
+  }
+  __name(readNodeScale, "readNodeScale");
   var TransformNode = class _TransformNode extends ComponentNode {
     static {
       __name(this, "TransformNode");
@@ -6057,6 +6116,149 @@
       const rx = sx * cosRadian - sy * sinRadian;
       const ry = sx * sinRadian + sy * cosRadian;
       return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
+    }
+    //==============================================================================
+    // 글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 값, 새 벡터를 짓지 않는다)
+    // - getPosition 이나 부모의 위치, 회전, 크기 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다. (그때는 그 함수가 짓는 만큼 할당한다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>프레임마다 같은 벡터에 글로벌 위치 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const parentNode = new TransformNode();
+     * parentNode.setLocalPosition(Vector2.create(10, 20));
+     * const childNode = new TransformNode();
+     * childNode.setParent(parentNode);
+     * childNode.setLocalPosition(Vector2.create(5, 0));
+     * const position = Vector2.create(0, 0);
+     * childNode.readPosition(position);
+     * if (position.x !== 15 || position.y !== 20) {
+     * 	throw new Error("position failed");
+     * }
+     */
+    readPosition(out) {
+      if (this.getPosition !== _TransformNode.prototype.getPosition) {
+        const position = this.getPosition();
+        out.x = position.x;
+        out.y = position.y;
+        return out;
+      }
+      const parent = this.getParent();
+      this.readLocalPosition(out);
+      if (!parent) {
+        return out;
+      }
+      const localX = out.x;
+      const localY = out.y;
+      readNodePosition(parent, out);
+      const parentPositionX = out.x;
+      const parentPositionY = out.y;
+      const parentRotation = parent.getRotation();
+      readNodeScale(parent, PARENT_SCALE);
+      const parentScaleX = PARENT_SCALE.x;
+      const parentScaleY = PARENT_SCALE.y;
+      const radian = degreeToRadian(parentRotation);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const sx = localX * parentScaleX;
+      const sy = localY * parentScaleY;
+      const rx = sx * cosRadian - sy * sinRadian;
+      const ry = sx * sinRadian + sy * cosRadian;
+      out.x = parentPositionX + rx;
+      out.y = parentPositionY + ry;
+      return out;
+    }
+    //==============================================================================
+    // 글로벌 크기를 주어진 벡터에 쓰기. (getScale 과 같은 값, 새 벡터를 짓지 않는다)
+    // - getScale 이나 getLocalScale 을 덮어쓴 하위 클래스면 그 함수로 읽는다.
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>프레임마다 같은 벡터에 글로벌 크기 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const parentNode = new TransformNode();
+     * parentNode.setLocalScale(Vector2.create(2, 2));
+     * const childNode = new TransformNode();
+     * childNode.setParent(parentNode);
+     * childNode.setLocalScale(Vector2.create(0.5, 3));
+     * const scale = Vector2.create(0, 0);
+     * childNode.readScale(scale);
+     * if (scale.x !== 1 || scale.y !== 6) {
+     * 	throw new Error("scale failed");
+     * }
+     */
+    readScale(out) {
+      if (this.getScale !== _TransformNode.prototype.getScale) {
+        const scale = this.getScale();
+        out.x = scale.x;
+        out.y = scale.y;
+        return out;
+      }
+      const parent = this.getParent();
+      this.readLocalScale(out);
+      if (!parent) {
+        return out;
+      }
+      const localX = out.x;
+      const localY = out.y;
+      readNodeScale(parent, out);
+      out.x = out.x * localX;
+      out.y = out.y * localY;
+      return out;
+    }
+    //==============================================================================
+    // 로컬 위치를 주어진 벡터에 쓰기. (getLocalPosition 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>로컬 위치 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const node = new TransformNode();
+     * node.setLocalPositionXY(3, 4);
+     * const position = node.readLocalPosition(Vector2.create(0, 0));
+     * if (position.x !== 3 || position.y !== 4) {
+     * 	throw new Error("local position failed");
+     * }
+     */
+    readLocalPosition(out) {
+      if (this.getLocalPosition !== _TransformNode.prototype.getLocalPosition) {
+        const position = this.getLocalPosition();
+        out.x = position.x;
+        out.y = position.y;
+        return out;
+      }
+      out.x = this.#localPosition.x;
+      out.y = this.#localPosition.y;
+      return out;
+    }
+    //==============================================================================
+    // 로컬 크기를 주어진 벡터에 쓰기. (getLocalScale 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>로컬 크기 읽기</caption>
+     * import { TransformNode, Vector2 } from "./vanilla.js";
+     * const node = new TransformNode();
+     * node.setLocalScaleXY(2, 0.5);
+     * const scale = node.readLocalScale(Vector2.create(0, 0));
+     * if (scale.x !== 2 || scale.y !== 0.5) {
+     * 	throw new Error("local scale failed");
+     * }
+     */
+    readLocalScale(out) {
+      if (this.getLocalScale !== _TransformNode.prototype.getLocalScale) {
+        const scale = this.getLocalScale();
+        out.x = scale.x;
+        out.y = scale.y;
+        return out;
+      }
+      out.x = this.#localScale.x;
+      out.y = this.#localScale.y;
+      return out;
     }
     //==============================================================================
     // 글로벌 크기 설정.
@@ -16609,6 +16811,7 @@ void main() {
   var NINTENDO_GAMEPAD_ID_PARTS = ["057e", "nintendo", "joy-con", "pro controller"];
   var XBOX_GAMEPAD_ID_PARTS = ["045e", "xbox", "xinput", "microsoft"];
   var GAMEPAD_ACTIVE_AXIS_THRESHOLD = 0.5;
+  var GAMEPAD_RESCAN_INTERVAL = 1;
   function readGamepadKind(gamepadId) {
     if (typeof gamepadId !== "string") {
       return GamepadKind.other;
@@ -16651,6 +16854,9 @@ void main() {
     /**@private @type { string } */
     #activeGamepadId;
     // 마지막 갱신에 단추를 누르거나 축을 크게 기울인 패드의 이름. (없으면 빈 글)
+    /**@private @type { number } */
+    #rescanTime;
+    // 붙은 패드가 없을 때 다음에 훑기까지 남은 시간. (초, 0 이하면 이번 갱신에 훑는다)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -16665,6 +16871,7 @@ void main() {
       this.#inputEventCallback = null;
       this.#isInputLogEnabled = false;
       this.#activeGamepadId = "";
+      this.#rescanTime = 0;
     }
     //==============================================================================
     // 갱신.
@@ -16673,6 +16880,13 @@ void main() {
      * @param { number } timeDelta 지난 프레임부터의 시간. (초)
      */
     tick(timeDelta) {
+      if (this.#connectedGamepadIndices.length === 0) {
+        this.#rescanTime -= timeDelta;
+        if (this.#rescanTime > 0) {
+          return;
+        }
+        this.#rescanTime = GAMEPAD_RESCAN_INTERVAL;
+      }
       this.updateAllGamepads();
     }
     //==============================================================================
@@ -18492,6 +18706,10 @@ void main() {
   var cullRect = new Rect();
   var cullDrawnRect = new Rect();
   var convertContentSize = Vector2.zero();
+  var containsCorners = [Vector2.zero(), Vector2.zero(), Vector2.zero(), Vector2.zero()];
+  var containsObb = new OBB();
+  var containsScale = Vector2.zero();
+  var containsVector = Vector2.zero();
   var WorldNode = class _WorldNode extends TransformNode {
     static {
       __name(this, "WorldNode");
@@ -18821,6 +19039,32 @@ void main() {
       return this.#pivot.clone();
     }
     //==============================================================================
+    // 기준점을 주어진 벡터에 쓰기. (getPivot 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>기준점 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setPivot(Vector2.create(0.5, 1));
+     * const pivot = node.readPivot(Vector2.create(0, 0));
+     * if (pivot.x !== 0.5 || pivot.y !== 1) {
+     * 	throw new Error("pivot failed");
+     * }
+     */
+    readPivot(out) {
+      if (this.getPivot !== _WorldNode.prototype.getPivot) {
+        const pivot = this.getPivot();
+        out.x = pivot.x;
+        out.y = pivot.y;
+        return out;
+      }
+      out.x = this.#pivot.x;
+      out.y = this.#pivot.y;
+      return out;
+    }
+    //==============================================================================
     // 실제 내용 크기 설정.
     //==============================================================================
     /**
@@ -18888,6 +19132,32 @@ void main() {
      */
     getContentSize() {
       return this.#contentSize.clone();
+    }
+    //==============================================================================
+    // 내용 크기를 주어진 벡터에 쓰기. (getContentSize 와 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>내용 크기 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setContentSize(Vector2.create(120, 40));
+     * const contentSize = node.readContentSize(Vector2.create(0, 0));
+     * if (contentSize.x !== 120 || contentSize.y !== 40) {
+     * 	throw new Error("content size failed");
+     * }
+     */
+    readContentSize(out) {
+      if (this.getContentSize !== _WorldNode.prototype.getContentSize) {
+        const contentSize = this.getContentSize();
+        out.x = contentSize.x;
+        out.y = contentSize.y;
+        return out;
+      }
+      out.x = this.#contentSize.x;
+      out.y = this.#contentSize.y;
+      return out;
     }
     //==============================================================================
     // 실제 내용 크기를 target 에 적는다. (복제본을 만들지 않는다, Paint 가 그릴 때마다 쓴다)
@@ -19018,6 +19288,49 @@ void main() {
       return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
     }
     //==============================================================================
+    // 글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    // - getPosition 이나 부모의 내용 크기, 기준점 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out. (기준점의 자리)
+     */
+    readPosition(out) {
+      const parent = this.getParent();
+      if (this.getPosition !== _WorldNode.prototype.getPosition || !(parent instanceof _WorldNode)) {
+        return super.readPosition(out);
+      }
+      this.readLocalPosition(out);
+      const localX = out.x;
+      const localY = out.y;
+      parent.readPosition(out);
+      const parentPositionX = out.x;
+      const parentPositionY = out.y;
+      parent.readContentSize(out);
+      const parentContentSizeX = out.x;
+      const parentContentSizeY = out.y;
+      parent.readPivot(out);
+      const parentPivotX = out.x;
+      const parentPivotY = out.y;
+      const parentRotation = parent.getRotation();
+      parent.readScale(out);
+      const parentScaleX = out.x;
+      const parentScaleY = out.y;
+      const totalLocalX = localX - parentContentSizeX * parentPivotX;
+      const totalLocalY = localY - parentContentSizeY * parentPivotY;
+      const radian = degreeToRadian(parentRotation);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const sx = totalLocalX * parentScaleX;
+      const sy = totalLocalY * parentScaleY;
+      const rx = sx * cosRadian - sy * sinRadian;
+      const ry = sx * sinRadian + sy * cosRadian;
+      out.x = parentPositionX + rx;
+      out.y = parentPositionY + ry;
+      return out;
+    }
+    //==============================================================================
     // 글로벌 위치 설정. (getPosition 의 거꾸로)
     // - parent.getPosition() (= 부모 pivot 점의 월드 좌표) 에서 본 차이를 부모 회전/스케일을 풀어 부모 pivot 점 기준 오프셋으로 되돌린 뒤
     //   부모 content top-left 기준(localPosition)으로 옮긴다. 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다.
@@ -19115,11 +19428,54 @@ void main() {
       if (viewPosition === null || viewPosition === void 0) {
         return false;
       }
-      const worldCorners = this.getWorldCorners();
-      const obb = new OBB();
-      obb.setEdges(worldCorners);
-      const inside = obb.contains(viewPosition);
-      return inside;
+      if (this.getWorldCorners !== _WorldNode.prototype.getWorldCorners) {
+        const worldCorners = this.getWorldCorners();
+        const obb = new OBB();
+        obb.setEdges(worldCorners);
+        return obb.contains(viewPosition);
+      }
+      this.writeWorldCorners(containsCorners);
+      containsObb.setEdges(containsCorners);
+      return containsObb.contains(viewPosition);
+    }
+    //==============================================================================
+    // 네 귀퉁이를 주어진 벡터 넷에 쓰기. (getWorldCorners 와 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2[] } corners 쓸 벡터 넷. (왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래 차례)
+     * @returns { Vector2[] } corners.
+     * @private
+     */
+    writeWorldCorners(corners) {
+      const position = this.readPosition(containsVector);
+      const positionX = position.x;
+      const positionY = position.y;
+      const scale = this.readScale(containsScale);
+      const rotation = this.getRotation();
+      const contentSize = this.readContentSize(corners[0]);
+      const contentSizeX = contentSize.x;
+      const contentSizeY = contentSize.y;
+      const pivot = this.readPivot(corners[1]);
+      const pivotX = pivot.x;
+      const pivotY = pivot.y;
+      const width = contentSizeX * abs(scale.x);
+      const height = contentSizeY * abs(scale.y);
+      const left = -(width * pivotX);
+      const right = width * (1 - pivotX);
+      const top = -(height * pivotY);
+      const bottom = height * (1 - pivotY);
+      const radian = degreeToRadian(rotation);
+      const cosR = cos(radian);
+      const sinR = sin(radian);
+      corners[0].x = left * cosR - top * sinR + positionX;
+      corners[0].y = left * sinR + top * cosR + positionY;
+      corners[1].x = right * cosR - top * sinR + positionX;
+      corners[1].y = right * sinR + top * cosR + positionY;
+      corners[2].x = right * cosR - bottom * sinR + positionX;
+      corners[2].y = right * sinR + bottom * cosR + positionY;
+      corners[3].x = left * cosR - bottom * sinR + positionX;
+      corners[3].y = left * sinR + bottom * cosR + positionY;
+      return corners;
     }
     //==============================================================================
     // 뷰 좌표 → 이 노드의 로컬 좌표. (내용 영역의 왼쪽 위가 원점, 오른쪽 아래가 내용 크기)
@@ -45748,7 +46104,7 @@ void main() {
     }, "combine");
     const planes = [combine(row3, row0, 1), combine(row3, row0, -1), combine(row3, row1, 1), combine(row3, row1, -1), combine(row3, row2, 1), combine(row3, row2, -1)];
     for (const plane of planes) {
-      const length = System67.Math.hypot(plane[0], plane[1], plane[2]);
+      const length = readHypot(plane[0], plane[1], plane[2]);
       if (length > 0) {
         plane[0] /= length;
         plane[1] /= length;
@@ -45763,8 +46119,47 @@ void main() {
     return first[0] * (second[1] * third[2] - second[2] * third[1]) - first[1] * (second[0] * third[2] - second[2] * third[0]) + first[2] * (second[0] * third[1] - second[1] * third[0]);
   }
   __name(readDeterminant, "readDeterminant");
+  function readHypot(x, y, z) {
+    const absoluteX = System67.Math.abs(x);
+    const absoluteY = System67.Math.abs(y);
+    const absoluteZ = System67.Math.abs(z);
+    if (absoluteX === System67.Infinity || absoluteY === System67.Infinity || absoluteZ === System67.Infinity) {
+      return System67.Infinity;
+    }
+    if (absoluteX !== absoluteX || absoluteY !== absoluteY || absoluteZ !== absoluteZ) {
+      return System67.NaN;
+    }
+    let maximum = absoluteX;
+    if (absoluteY > maximum) {
+      maximum = absoluteY;
+    }
+    if (absoluteZ > maximum) {
+      maximum = absoluteZ;
+    }
+    if (maximum === 0) {
+      return 0;
+    }
+    let sum = 0;
+    let compensation = 0;
+    let normalized = absoluteX / maximum;
+    let summand = normalized * normalized - compensation;
+    let preliminary = sum + summand;
+    compensation = preliminary - sum - summand;
+    sum = preliminary;
+    normalized = absoluteY / maximum;
+    summand = normalized * normalized - compensation;
+    preliminary = sum + summand;
+    compensation = preliminary - sum - summand;
+    sum = preliminary;
+    normalized = absoluteZ / maximum;
+    summand = normalized * normalized - compensation;
+    preliminary = sum + summand;
+    sum = preliminary;
+    return System67.Math.sqrt(sum) * maximum;
+  }
+  __name(readHypot, "readHypot");
   function readMatrixDeterminant(elements) {
-    return readDeterminant([elements[0], elements[1], elements[2]], [elements[4], elements[5], elements[6]], [elements[8], elements[9], elements[10]]);
+    return elements[0] * (elements[5] * elements[10] - elements[6] * elements[9]) - elements[1] * (elements[4] * elements[10] - elements[6] * elements[8]) + elements[2] * (elements[4] * elements[9] - elements[5] * elements[8]);
   }
   __name(readMatrixDeterminant, "readMatrixDeterminant");
   function readFrameCamera(elements) {
@@ -45777,7 +46172,7 @@ void main() {
     const row3 = readRow(3);
     const isMirrored = readDeterminant(row0, row1, row2) > 0;
     let forward = [row0[1] * row1[2] - row0[2] * row1[1], row0[2] * row1[0] - row0[0] * row1[2], row0[0] * row1[1] - row0[1] * row1[0]];
-    const forwardLength = System67.Math.hypot(forward[0], forward[1], forward[2]);
+    const forwardLength = readHypot(forward[0], forward[1], forward[2]);
     if (forwardLength > 0) {
       forward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
     }
@@ -45799,7 +46194,7 @@ void main() {
     const rowX = [elements[0], elements[4], elements[8]];
     const along = rowX[0] * forward[0] + rowX[1] * forward[1] + rowX[2] * forward[2];
     let right = [rowX[0] - forward[0] * along, rowX[1] - forward[1] * along, rowX[2] - forward[2] * along];
-    const rightLength = System67.Math.hypot(right[0], right[1], right[2]);
+    const rightLength = readHypot(right[0], right[1], right[2]);
     right = rightLength > 1e-6 ? [right[0] / rightLength, right[1] / rightLength, right[2] / rightLength] : [1, 0, 0];
     const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
     return [right[0], up[0], -forward[0], right[1], up[1], -forward[1], right[2], up[2], -forward[2]];
@@ -45810,8 +46205,8 @@ void main() {
     const forward = [-viewRotationElements[2], -viewRotationElements[5], -viewRotationElements[8]];
     const axisSign = isMirrored ? -1 : 1;
     const rightAxis = [-forward[2] * axisSign, 0, forward[0] * axisSign];
-    const axisLength = System67.Math.hypot(rightAxis[0], rightAxis[1], rightAxis[2]);
-    const rightLength = System67.Math.hypot(right[0], right[1], right[2]);
+    const axisLength = readHypot(rightAxis[0], rightAxis[1], rightAxis[2]);
+    const rightLength = readHypot(right[0], right[1], right[2]);
     if (axisLength < 1e-6 || rightLength < 1e-6) {
       return 0;
     }
@@ -45823,8 +46218,8 @@ void main() {
   __name(readCameraRoll, "readCameraRoll");
   function readShadowBias(lightViewProjectionMatrix, resolution, depthBias, normalBias) {
     const elements = lightViewProjectionMatrix.getElements();
-    const widthScale = System67.Math.hypot(elements[0], elements[4], elements[8]);
-    const depthScale = System67.Math.hypot(elements[2], elements[6], elements[10]) * 0.5;
+    const widthScale = readHypot(elements[0], elements[4], elements[8]);
+    const depthScale = readHypot(elements[2], elements[6], elements[10]) * 0.5;
     const texelWorldSize = 2 / (System67.Math.max(widthScale, 1e-6) * System67.Math.max(1, resolution));
     return [depthBias * SHADOW_FILTER_RADIUS * texelWorldSize * depthScale, normalBias * SHADOW_FILTER_RADIUS * texelWorldSize, SHADOW_SLOPE_BIAS * texelWorldSize * depthScale, SHADOW_MAXIMUM_SLOPE];
   }
@@ -45864,9 +46259,9 @@ void main() {
   }
   __name(readOutlineVertexData, "readOutlineVertexData");
   function readMaximumScale(elements) {
-    const scaleX = System67.Math.hypot(elements[0], elements[1], elements[2]);
-    const scaleY = System67.Math.hypot(elements[4], elements[5], elements[6]);
-    const scaleZ = System67.Math.hypot(elements[8], elements[9], elements[10]);
+    const scaleX = readHypot(elements[0], elements[1], elements[2]);
+    const scaleY = readHypot(elements[4], elements[5], elements[6]);
+    const scaleZ = readHypot(elements[8], elements[9], elements[10]);
     return System67.Math.max(scaleX, scaleY, scaleZ);
   }
   __name(readMaximumScale, "readMaximumScale");
@@ -45901,23 +46296,28 @@ void main() {
     let radius = 0;
     for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
       const offset = instanceIndex * floatCount + matrixOffset;
-      radius = System67.Math.max(radius, System67.Math.hypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
+      radius = System67.Math.max(radius, readHypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
     }
     return { center, radius, scale };
   }
   __name(readInstanceBounds, "readInstanceBounds");
-  function readInstanceBufferSphere(mesh, instanceBuffer) {
+  function writeInstanceBufferSphere(sphere, mesh, instanceBuffer) {
     const bounds = instanceBuffer.bounds;
     if (bounds === null) {
-      return null;
+      return false;
     }
     const center = mesh.boundingCenter;
-    const meshReach = System67.Math.hypot(center[0], center[1], center[2]) + mesh.boundingRadius;
-    return [bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius + bounds.scale * meshReach];
+    const meshReach = readHypot(center[0], center[1], center[2]) + mesh.boundingRadius;
+    sphere[0] = bounds.center[0];
+    sphere[1] = bounds.center[1];
+    sphere[2] = bounds.center[2];
+    sphere[3] = bounds.radius + bounds.scale * meshReach;
+    return true;
   }
-  __name(readInstanceBufferSphere, "readInstanceBufferSphere");
+  __name(writeInstanceBufferSphere, "writeInstanceBufferSphere");
   function isSphereInFrustum(frustumPlanes, sphere) {
-    for (const plane of frustumPlanes) {
+    for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+      const plane = frustumPlanes[planeIndex];
       if (plane[0] * sphere[0] + plane[1] * sphere[1] + plane[2] * sphere[2] + plane[3] < -sphere[3]) {
         return false;
       }
@@ -45940,7 +46340,7 @@ void main() {
     const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
     let radius = 0;
     for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
-      radius = System67.Math.max(radius, System67.Math.hypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
+      radius = System67.Math.max(radius, readHypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
     }
     return { center, radius };
   }
@@ -45966,6 +46366,8 @@ void main() {
   var WHITE_COLOR = System67.Object.freeze([1, 1, 1, 1]);
   var BLACK_COLOR = System67.Object.freeze([0, 0, 0]);
   var IDENTITY_UV_TRANSFORM = System67.Object.freeze([0, 0, 1, 1]);
+  var IDENTITY_ELEMENTS = new Matrix4().getElements();
+  var INSTANCE_BUFFER_SPHERE = [0, 0, 0, 0];
   var EMPTY_OPTIONS = System67.Object.freeze({});
   function writeMaterialBlockValues(values, options) {
     const tintColor = options.tintColor !== void 0 ? options.tintColor : WHITE_COLOR;
@@ -46320,6 +46722,18 @@ void main() {
     /** @private @type { WeakMap<object, object> } */
     #drawEntryOfOptions;
     // 그리기 꼴 객체 → { keys, values, numbers (얕은 사본), state (푼 칸), materialBlock, outlineBlock, outlineStates }
+    /** @private @type { number } */
+    #drawEntryGeneration;
+    // 블록 갈래를 지운 판 번호. (그리기 줄의 칸과 ToonDrawItem 이 쥔 기억 칸의 블록이 지운 것을 가리키지 않게, clearBlockCache 마다 오른다)
+    /** @private @type { object | null } */
+    #hintOptions;
+    // 그리기 줄이 지금 그리는 담은 칸의 꼴 객체. (readDrawEntry 가 #hintEntry 를 바로 쓴다, 맡긴 판에서만)
+    /** @private @type { object | null } */
+    #hintEntry;
+    // 그 칸이 푼 기억 칸.
+    /** @private @type { Float32Array } */
+    #batchModelElements;
+    // drawMeshBatch 의 첫 인스턴스 행렬 칸. (다시 쓴다)
     /** @private @type { object } */
     #materialBlocks;
     // 몸의 재질 블록 갈래. (createBlockCache)
@@ -46349,6 +46763,10 @@ void main() {
       this.#slotTableProgram = null;
       this.#slotTable = null;
       this.#drawEntryOfOptions = new System67.WeakMap();
+      this.#drawEntryGeneration = 1;
+      this.#hintOptions = null;
+      this.#hintEntry = null;
+      this.#batchModelElements = new System67.Float32Array(16);
       this.#trustSerial = 1;
       this.#isTrusting = false;
       this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
@@ -47561,7 +47979,9 @@ void main() {
       const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
       const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
       const radius = mesh.boundingRadius * readMaximumScale(modelElements);
-      for (const plane of this.#frustumPlanes) {
+      const frustumPlanes = this.#frustumPlanes;
+      for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
+        const plane = frustumPlanes[planeIndex];
         if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
           return false;
         }
@@ -47711,12 +48131,12 @@ void main() {
       if (count <= 0) {
         return;
       }
-      if (options.isCulled !== false && instanceBuffer.bounds !== null && !isSphereInFrustum(this.#frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+      if (options.isCulled !== false && writeInstanceBufferSphere(INSTANCE_BUFFER_SPHERE, mesh, instanceBuffer) && !isSphereInFrustum(this.#frustumPlanes, INSTANCE_BUFFER_SPHERE)) {
         this.#frameStatistics.culledObjectCount += count;
         return;
       }
       this.#frameStatistics.drawnObjectCount += count;
-      this.drawWithCount(mesh, Matrix4.createIdentity().getElements(), count, options, instanceBuffer);
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, options, instanceBuffer);
     }
     //==============================================================================
     // 모형 하나의 바깥선만 그리기. (거르지도 세지도 않는다, 껍데기가 없거나 hasOutline 이 false 면 그리지 않는다)
@@ -47757,7 +48177,18 @@ void main() {
      * @private
      */
     readMaterialBlock(options) {
-      const drawEntry = this.readDrawEntry(options);
+      return this.readEntryMaterialBlock(this.readDrawEntry(options), options);
+    }
+    //==============================================================================
+    // 기억 칸의 재질 블록 읽기. (readMaterialBlock 과 같다, 그리기 줄이 이미 푼 기억 칸으로)
+    //==============================================================================
+    /**
+     * @param { object } drawEntry - readDrawEntry 나 writeHeldDrawEntry 의 결과.
+     * @param { object } options - 그 칸을 푼 꼴.
+     * @returns { object } 재질 블록.
+     * @private
+     */
+    readEntryMaterialBlock(drawEntry, options) {
       if (drawEntry.materialBlock === null) {
         writeMaterialBlockValues(this.#materialBlocks.values, options);
         drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
@@ -47826,10 +48257,13 @@ void main() {
         if (slot.values.length < floatCount) {
           slot.values = new System67.Float32Array(floatCount);
         }
-        slot.values.set(instanceData.subarray(0, floatCount));
+        const values = slot.values;
+        for (let index = 0; index < floatCount; ++index) {
+          values[index] = instanceData[index];
+        }
         slot.count = count;
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
-        webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+        webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount);
       }
       let vertexArrays = slot.vertexArrays.get(mesh);
       if (vertexArrays === void 0) {
@@ -47839,7 +48273,11 @@ void main() {
         vertexArrays = this.createBatchVertexArrays(mesh, slot.buffer);
         slot.vertexArrays.set(mesh, vertexArrays);
       }
-      this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts, vertexArrays);
+      const batchElements = this.#batchModelElements;
+      for (let index = 0; index < 16; ++index) {
+        batchElements[index] = instanceData[index];
+      }
+      this.drawWithCount(mesh, batchElements, count, options, null, parts, vertexArrays);
     }
     //==============================================================================
     // 모형과 묶음 자리의 버퍼를 함께 묶은 버텍스 어레이 짓기. (모형의 버텍스 어레이와 같은 꼴, 인스턴스 어트리뷰트만 자리의 버퍼에서)
@@ -48225,9 +48663,12 @@ void main() {
      * @private
      */
     readDrawEntry(options) {
+      if (options === this.#hintOptions) {
+        return this.readHeldDrawEntry(this.#hintEntry);
+      }
       let entry = this.#drawEntryOfOptions.get(options);
       if (entry === void 0) {
-        entry = { keys: [], values: [], numbers: [], state: new System67.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0 };
+        entry = this.createDrawEntry();
         this.#drawEntryOfOptions.set(options, entry);
       } else if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
         return entry;
@@ -48241,6 +48682,86 @@ void main() {
       entry.outlineBlock = null;
       entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
       return entry;
+    }
+    //==============================================================================
+    // 꼴 객체마다 기억한 칸 찾기. (readDrawEntry 와 같은데 기억한 것이 없으면 짓지 않고 null)
+    // - 그리기 줄이 처음 보는 꼴 객체(게임이 프레임마다 새로 짓는 꼴)는 꼴 객체마다 기억하지 않고 담은 칸이 쥔 기억 칸에 푼다. (writeHeldDrawEntry)
+    //==============================================================================
+    /**
+     * @param { object } options - 그리기 꼴.
+     * @returns { object | null } 기억 칸이나 null.
+     * @private
+     */
+    findDrawEntry(options) {
+      if (!this.#drawEntryOfOptions.has(options)) {
+        return null;
+      }
+      return this.readDrawEntry(options);
+    }
+    //==============================================================================
+    // 기억 칸 짓기. (readDrawEntry 의 칸과 같은 꼴, 아직 푼 것이 없다)
+    //==============================================================================
+    /**
+     * @returns { object } 기억 칸.
+     * @private
+     */
+    createDrawEntry() {
+      return { keys: [], values: [], numbers: [], state: new System67.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0, options: null, generation: this.#drawEntryGeneration };
+    }
+    //==============================================================================
+    // 쥔 기억 칸 맞추기. (그리기 줄의 담은 칸과 ToonDrawItem 이 꼴 객체와 상관없이 쥐는 칸, 꼴 객체마다 기억하지 않는다)
+    // - entry 가 null 이면 짓는다. isChanged 면 견주지 않고 다시 푼다. (ToonDrawItem 의 바뀜 표시)
+    //   아니면 얕은 사본과 견주어 다를 때만 다시 푼다. 같으면 푼 칸과 재질 블록을 그대로 쓴다. (게임이 프레임마다 값이 같은 새 꼴 객체를 지어도 할당 없음)
+    //==============================================================================
+    /**
+     * @param { object | null } entry - 쥔 기억 칸이나 null.
+     * @param { object } options - 그리기 꼴.
+     * @param { boolean } isChanged - 꼴이 바뀐 것을 알면 true. (견주지 않는다)
+     * @returns { object } 기억 칸. (entry 가 null 이면 새 칸)
+     * @private
+     */
+    writeHeldDrawEntry(entry, options, isChanged) {
+      if (entry === null) {
+        entry = this.createDrawEntry();
+        isChanged = true;
+      }
+      this.readHeldDrawEntry(entry);
+      if (isChanged || !isSameOptionsSnapshot(entry, options)) {
+        writeOptionsSnapshot(entry, options);
+        writeDrawState(entry.state, options);
+        entry.materialBlock = null;
+        entry.outlineBlock = null;
+      }
+      entry.options = options;
+      return entry;
+    }
+    //==============================================================================
+    // 쥔 기억 칸 그대로 쓰기. (블록 갈래를 지운 뒤면 블록만 잊는다)
+    //==============================================================================
+    /**
+     * @param { object } entry - 쥔 기억 칸.
+     * @returns { object } entry.
+     * @private
+     */
+    readHeldDrawEntry(entry) {
+      if (entry.generation !== this.#drawEntryGeneration) {
+        entry.materialBlock = null;
+        entry.outlineBlock = null;
+        entry.generation = this.#drawEntryGeneration;
+      }
+      return entry;
+    }
+    //==============================================================================
+    // 그리기 줄이 지금 그리는 칸 알리기. (맡긴 판에서 그 꼴 객체의 readDrawEntry 가 칸의 기억을 바로 쓴다, null 이면 푼다)
+    //==============================================================================
+    /**
+     * @param { object | null } options - 담은 칸의 꼴 객체.
+     * @param { object | null } entry - 그 칸이 이번 프레임에 푼 기억 칸.
+     * @private
+     */
+    setDrawEntryHint(options, entry) {
+      this.#hintOptions = this.#isTrusting ? options : null;
+      this.#hintEntry = this.#isTrusting ? entry : null;
     }
     //==============================================================================
     // 꼴을 고치지 않는 판 맡기 시작과 끝. (그리기 줄이 draw, drawShadows 동안 부른다, 맡긴 판에서는 꼴 객체마다 한 번만 견준다)
@@ -48261,6 +48782,8 @@ void main() {
      */
     endTrustedOptions() {
       this.#isTrusting = false;
+      this.#hintOptions = null;
+      this.#hintEntry = null;
     }
     //==============================================================================
     // 맡긴 판 멈추기와 다시. (단계 콜백이 렌더러로 바로 그리는 동안 멈춘다)
@@ -48271,6 +48794,8 @@ void main() {
      */
     pauseTrustedOptions(isPaused) {
       this.#isTrusting = !isPaused;
+      this.#hintOptions = null;
+      this.#hintEntry = null;
     }
     //==============================================================================
     // 블록 묶기. (그 바인딩 자리에 이미 묶였으면 건너뛴다)
@@ -48342,6 +48867,7 @@ void main() {
       blockCache.count = 0;
       blockCache.boundBlock = null;
       this.#drawEntryOfOptions = new System67.WeakMap();
+      this.#drawEntryGeneration += 1;
     }
     //==============================================================================
     // 한 프로그램의 기억한 유니폼 값 잊기. (onBeforeDraw 뒤)
