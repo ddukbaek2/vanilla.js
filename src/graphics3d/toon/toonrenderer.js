@@ -5,6 +5,7 @@ const System = globalThis;
 import { Matrix4 } from "../../base/matrix4.js";
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
 import { WebGLStateCache } from "../../core/graphic/webglstatecache.js";
+import { ColorSpace, readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../../core/graphic/colorspace.js";
 import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
 import { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./toonlightset.js";
 import { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME } from "./toonmaterial.js";
@@ -348,8 +349,27 @@ struct ToonLighting {
 	float shadow;
 	float sunLevel;
 };
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+vec3 toLinear(vec3 color) {
+	vec3 value = max(color, vec3(0.0));
+	return mix(value / 12.92, pow((value + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), value));
+}
+vec3 toSurfaceColor(vec3 color) {
+	return toLinear(color);
+}
+vec3 toOutput(vec3 color) {
+	if (hdrOutput > 0.5) {
+		return max(color, vec3(0.0));
+	}
+	vec3 value = clamp(color, 0.0, 1.0);
+	return mix(value * 12.92, 1.055 * pow(value, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), value));
+}
+#else
 vec3 toLinear(vec3 color) {
 	return pow(color, vec3(2.2));
+}
+vec3 toSurfaceColor(vec3 color) {
+	return color;
 }
 vec3 toOutput(vec3 color) {
 	if (hdrOutput > 0.5) {
@@ -357,6 +377,7 @@ vec3 toOutput(vec3 color) {
 	}
 	return pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.2));
 }
+#endif
 float readLuminance(vec3 color) {
 	return dot(color, vec3(0.2126, 0.7152, 0.0722));
 }
@@ -453,7 +474,11 @@ float readToonCoordinate(float cosine, float offset) {
 }
 vec3 readShadeRamp(float coordinate) {
 	if (rampTextureEnabled > 0.5) {
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+		return textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb;
+#else
 		return toLinear(textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb);
+#endif
 	}
 	if (shadeStopCount < 2) {
 		return vec3(clamp(coordinate, 0.0, 1.0));
@@ -473,8 +498,13 @@ float readShadeLevel(vec3 rampColor, float cosine) {
 	float bottom;
 	float top;
 	if (rampTextureEnabled > 0.5) {
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+		bottom = readLuminance(textureLod(rampTexture, vec2(0.0, 0.5), 0.0).rgb);
+		top = readLuminance(textureLod(rampTexture, vec2(1.0, 0.5), 0.0).rgb);
+#else
 		bottom = readLuminance(toLinear(textureLod(rampTexture, vec2(0.0, 0.5), 0.0).rgb));
 		top = readLuminance(toLinear(textureLod(rampTexture, vec2(1.0, 0.5), 0.0).rgb));
+#endif
 	}
 	else if (shadeStopCount < 2) {
 		return clamp(cosine, 0.0, 1.0);
@@ -502,7 +532,11 @@ vec3 readViewDirection() {
 // 몸을 그리는 조각 셰이더의 몸통. (표면 → 표면 조각 → 틴트 → 빛 → 빛 조각 → 합치기)
 const SOLID_FRAGMENT_BODY = `ToonSurface readSurface() {
 	ToonSurface surface;
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	vec3 color = toLinear(surfaceColor) * toLinear(surfaceTint.rgb);
+#else
 	vec3 color = surfaceColor * surfaceTint.rgb;
+#endif
 	float opacity = alpha * tintColor.a * surfaceTint.a;
 	vec2 uv = surfaceUv * uvTransform.zw + uvTransform.xy;
 	if (textureEnabled.x > 0.5) {
@@ -511,6 +545,17 @@ const SOLID_FRAGMENT_BODY = `ToonSurface readSurface() {
 		opacity *= texel.a;
 	}
 	vec3 emission = toLinear(emissiveColor.rgb) * emissiveColor.a;
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	if (textureEnabled.y > 0.5) {
+		emission *= texture(emissiveTexture, uv).rgb;
+	}
+	if (textureEnabled.z > 0.5) {
+		vec4 decal = texture(decalTexture, surfaceUv * decalUvTransform.zw + decalUvTransform.xy);
+		vec3 decalTint = decal.rgb * toLinear(decalColor.rgb);
+		color = mix(color, decalTint, decal.a);
+		emission += decalTint * decal.a * decalColor.a;
+	}
+#else
 	if (textureEnabled.y > 0.5) {
 		emission *= toLinear(texture(emissiveTexture, uv).rgb);
 	}
@@ -520,6 +565,7 @@ const SOLID_FRAGMENT_BODY = `ToonSurface readSurface() {
 		color = mix(color, decalTint, decal.a);
 		emission += toLinear(decalTint) * decal.a * decalColor.a;
 	}
+#endif
 	surface.baseColor = color;
 	surface.alpha = opacity;
 	surface.emission = emission + toLinear(surfaceEmissive.rgb) * surfaceEmissive.a;
@@ -617,8 +663,13 @@ void main() {
 	if (alphaCutoff > 0.0 && surface.alpha < alphaCutoff) {
 		discard;
 	}
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	vec3 tintLinear = toLinear(tintColor.rgb);
+	vec3 albedo = tintAmount < 0.0 ? surface.baseColor * tintLinear : mix(surface.baseColor, tintLinear, tintAmount);
+#else
 	vec3 tintedColor = tintAmount < 0.0 ? surface.baseColor * tintColor.rgb : mix(surface.baseColor, tintColor.rgb, tintAmount);
 	vec3 albedo = toLinear(tintedColor);
+#endif
 	vec3 emission = surface.emission + albedo * surface.glow * glowScale;
 	vec3 color;
 	if (surface.isUnlit) {
@@ -633,7 +684,11 @@ void main() {
 	vec3 viewNormal = normalize(viewRotation * surface.normal);
 	vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
 	if (matcapSettings.x > 0.5) {
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+		vec3 matcap = texture(matcapTexture, vec2(viewNormal.x * 0.5 + 0.5, 0.5 - viewNormal.y * 0.5)).rgb * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.y);
+#else
 		vec3 matcap = toLinear(texture(matcapTexture, vec2(viewNormal.x * 0.5 + 0.5, 0.5 - viewNormal.y * 0.5)).rgb) * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.y);
+#endif
 		color = matcapSettings.z > 0.5 ? color + matcap * matcapSettings.y : color * mix(vec3(1.0), matcap, matcapSettings.y);
 	}
 	if (angelRingSettings.x > 0.5) {
@@ -641,7 +696,11 @@ void main() {
 		vec2 ringNormal = vec2(ringOffset.x * cameraRoll.x + ringOffset.y * cameraRoll.y, ringOffset.y * cameraRoll.x - ringOffset.x * cameraRoll.y) + 0.5;
 		vec2 ringUv = vec2(ringNormal.x, 1.0 - mix(1.0 - surface.uv1.y, ringNormal.y, angelRingSettings.z));
 		vec4 ring = texture(angelRingTexture, ringUv);
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+		vec3 ringColor = ring.rgb * angelRingColor * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.z);
+#else
 		vec3 ringColor = toLinear(ring.rgb) * angelRingColor * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.z);
+#endif
 		color = angelRingSettings.w > 0.5 ? color * (1.0 - ring.a) + ringColor * ring.a : color + ringColor;
 	}
 	float opacity = surface.alpha;
@@ -697,8 +756,18 @@ layout(std140) uniform ToonDrawOutline {
 	float premultipliedOutput;
 };
 out vec4 fragmentColor;
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+vec3 toLinear(vec3 color) {
+	vec3 value = max(color, vec3(0.0));
+	return mix(value / 12.92, pow((value + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), value));
+}
+#endif
 void main() {
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	vec3 color = (hdrOutput > 0.5 ? toLinear(outlineColor.rgb) : outlineColor.rgb) * outlineLightColor;
+#else
 	vec3 color = (hdrOutput > 0.5 ? pow(outlineColor.rgb, vec3(2.2)) : outlineColor.rgb) * outlineLightColor;
+#endif
 	float outputAlpha = outlineColor.a * alpha * outlineTint;
 	if (premultipliedOutput > 0.5) {
 		color *= outputAlpha;
@@ -727,6 +796,7 @@ void main() {
 /**
  * @param { ToonMaterial | null } material - 셰이더 조각을 끼울 머티리얼. (null 이면 빈 조각)
  * @param { ToonInstanceLayout | null } instanceLayout - 사용자 어트리뷰트를 선언할 인스턴스 꼴. (null 이면 없음)
+ * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, linear 면 소스마다 #define VANILLA_COLOR_SPACE_LINEAR 1 이 들어간다)
  * @returns { object } 세 프로그램의 소스와 어트리뷰트 자리. ({ solidVertexShader, solidFragmentShader, outlineVertexShader, outlineFragmentShader, depthVertexShader, depthFragmentShader, attributeLocationTable })
  * @example <caption>머티리얼과 인스턴스 꼴로 지은 몸 프로그램을 직접 컴파일해 보기</caption>
  * import { composeToonProgramSources, ToonMaterial, ToonInstanceLayout } from "./vanilla.js";
@@ -742,7 +812,7 @@ void main() {
  * }
  * context.deleteShader(shader);
  */
-export function composeToonProgramSources(material, instanceLayout) {
+export function composeToonProgramSources(material, instanceLayout, colorSpace = readEngineColorSpace()) {
 	const vertexChunk = material !== null && material.getVertexChunk() !== "" ? material.getVertexChunk() : DEFAULT_VERTEX_CHUNK;
 	const uniformChunk = material !== null ? material.getUniformChunk() : "";
 	const surfaceChunk = material !== null && material.getSurfaceChunk() !== "" ? material.getSurfaceChunk() : DEFAULT_SURFACE_CHUNK;
@@ -758,12 +828,12 @@ export function composeToonProgramSources(material, instanceLayout) {
 		}
 	}
 	return {
-		solidVertexShader: vertexHead + SOLID_VERTEX_BODY,
-		solidFragmentShader: SOLID_FRAGMENT_HEAD + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY,
-		outlineVertexShader: vertexHead + OUTLINE_VERTEX_BODY,
-		outlineFragmentShader: OUTLINE_FRAGMENT_SHADER,
-		depthVertexShader: vertexHead + DEPTH_VERTEX_BODY,
-		depthFragmentShader: DEPTH_FRAGMENT_SHADER,
+		solidVertexShader: addColorSpaceDefine(vertexHead + SOLID_VERTEX_BODY, colorSpace),
+		solidFragmentShader: addColorSpaceDefine(SOLID_FRAGMENT_HEAD + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY, colorSpace),
+		outlineVertexShader: addColorSpaceDefine(vertexHead + OUTLINE_VERTEX_BODY, colorSpace),
+		outlineFragmentShader: addColorSpaceDefine(OUTLINE_FRAGMENT_SHADER, colorSpace),
+		depthVertexShader: addColorSpaceDefine(vertexHead + DEPTH_VERTEX_BODY, colorSpace),
+		depthFragmentShader: addColorSpaceDefine(DEPTH_FRAGMENT_SHADER, colorSpace),
 		attributeLocationTable: attributeLocationTable,
 	};
 }
@@ -1591,7 +1661,7 @@ function isSameOptionsSnapshot(entry, options) {
 // - 노멀: 모형 행렬과 본 행렬의 왼쪽 위 3x3 의 역행렬의 전치로 옮긴다. (늘이고 줄인 모형도 빛이 맞다, 정점 조각이 고친 행렬도 같다)
 // - 재질: 꼭짓점의 색(sRGB), 빛남(바탕색에 곱해 더함), 빛을 받지 않음. 꼭짓점 UV(arrays.uvData, 2 씩)가 있으면 텍스처를 읽는다.
 // - 그리기 꼴(options, 기본값이면 지금까지와 같은 화면):
-//   tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강)
+//   tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강, 선형 색 공간은 선형으로 섞는다)
 //   glowScale 꼭짓점 빛남의 배(기본 1), colorScale 마지막 선형 색의 배(기본 1, 거울에 비친 모습을 어둡게), emissiveColor [r, g, b] sRGB 와 emissiveIntensity(선형 배, 기본 1, 색 기본 검정).
 //   baseColorTexture(바탕색에 곱함, 알파는 불투명도에), emissiveTexture(빛남 색에 곱함), uvTransform [u 옮김, v 옮김, u 배, v 배] (KHR_texture_transform 의 offset, scale).
 //   decalTexture 는 바탕색 위에 알파로 덮는다(색 = 텍스처 x decalColor). decalEmission 만큼 그 색으로 빛난다. decalUvTransform 은 묶음 그림의 한 칸을 고를 때.
@@ -1636,7 +1706,12 @@ function isSameOptionsSnapshot(entry, options) {
 //   화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)
 // - beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.
 // - drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)
-// - 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)
+// - 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered, isColorData }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)
+// - 색 공간: 생성의 options.colorSpace(기본은 엔진의 EngineConfiguration.colorSpace, 엔진이 없으면 gamma)로 정하고 바뀌지 않는다. (getColorSpace)
+//   gamma(기본): 넘기는 색(꼭짓점 색, 틴트, 빛남 색, 데칼 색, 바깥선 색)과 색 텍스처는 sRGB 이고 바탕색, 틴트, 데칼은 sRGB 로 곱하고 섞은 뒤 pow(색, 2.2) 로 선형으로 바꿔 빛을 셈한다.
+//     화면에 낼 때 pow(1 / 2.2) 를 건다. (HDR 출력이면 선형 그대로)
+//   linear: 색 텍스처를 sRGB 형식으로 올려 GPU 가 선형으로 풀고, 넘기는 색은 sRGB 표준 곡선(IEC 61966-2-1)으로 선형으로 바꿔 곱하고 섞는다. 화면에 낼 때 같은 곡선으로 sRGB 로 바꾼다.
+//     셰이더 소스마다 #define VANILLA_COLOR_SPACE_LINEAR 1 이 들어간다. (ToonPostProcess, ToonScreenOutline 도 같은 값으로 짓는다)
 // - 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.
 // - 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))
 // - 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.
@@ -1718,6 +1793,7 @@ export class ToonRenderer {
 	/** @private @type { object } */ #materialBlocks; // 몸의 재질 블록 갈래. (createBlockCache)
 	/** @private @type { object } */ #outlineBlocks; // 바깥선 껍데기의 블록 갈래.
 	/** @private @type { object | null } */ #lastProgramKey; // 마지막으로 찾은 프로그램 셋의 머티리얼과 인스턴스 꼴. ({ material, instanceLayout, programSet })
+	/** @private @type { string } */ #colorSpace; // 색 공간. (ColorSpace, 생성 때 정함, 프로그램의 정의와 색 텍스처 형식을 가른다)
 
 	//==============================================================================
 	// 생성.
@@ -1725,9 +1801,11 @@ export class ToonRenderer {
 	/**
 	 * @constructor
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 그릴 WebGL2 렌더링 컨텍스트.
+	 * @param { object | null } [options] - { colorSpace (ColorSpace, 기본은 엔진의 색 공간 EngineConfiguration.colorSpace, 엔진이 없으면 gamma) }
 	 */
-	constructor(webGL2RenderingContext) {
+	constructor(webGL2RenderingContext, options = null) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
+		this.#colorSpace = options !== null && options.colorSpace !== undefined ? readColorSpace(options.colorSpace) : readEngineColorSpace();
 		this.#stateCache = WebGLStateCache.attach(webGL2RenderingContext);
 		this.#uniformSlotTable = new System.WeakMap();
 		this.#uniformSerial = 1;
@@ -1788,6 +1866,7 @@ export class ToonRenderer {
 	 * @static
 	 * @param { ToonMaterial | null } [material] - 셰이더 조각을 끼울 머티리얼. (기본 null)
 	 * @param { ToonInstanceLayout | null } [instanceLayout] - 인스턴스 꼴. (기본 null)
+	 * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, 렌더러가 짓는 것과 같은 값을 준다)
 	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 의 배열. (몸, 바깥선, 그림자 깊이)
 	 * @example <caption>로딩 동안 기본과 머티리얼의 프로그램을 뒤에서 링크해 두기</caption>
 	 * import { ToonRenderer, ToonMaterial, ShaderWarmer } from "./vanilla.js";
@@ -1798,8 +1877,8 @@ export class ToonRenderer {
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
 	 * renderer.prepareMaterial(material);
 	 */
-	static readProgramSources(material = null, instanceLayout = null) {
-		const sources = composeToonProgramSources(material, instanceLayout);
+	static readProgramSources(material = null, instanceLayout = null, colorSpace = readEngineColorSpace()) {
+		const sources = composeToonProgramSources(material, instanceLayout, colorSpace);
 		return [
 			{ vertexShader: sources.solidVertexShader, fragmentShader: sources.solidFragmentShader, attributeLocationTable: sources.attributeLocationTable },
 			{ vertexShader: sources.outlineVertexShader, fragmentShader: sources.outlineFragmentShader, attributeLocationTable: sources.attributeLocationTable },
@@ -1818,7 +1897,7 @@ export class ToonRenderer {
 	 */
 	createProgramSet(material, instanceLayout) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const sources = composeToonProgramSources(material, instanceLayout);
+		const sources = composeToonProgramSources(material, instanceLayout, this.#colorSpace);
 		const programList = [];
 		try {
 			programList.push(new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable));
@@ -2130,10 +2209,14 @@ export class ToonRenderer {
 
 	//==============================================================================
 	// 텍스처 짓기. (ImageBitmap, 캔버스, 이미지, ImageData 나 { width, height, data: Uint8Array RGBA })
+	// - 선형 색 공간(ColorSpace.linear)이면 색 텍스처(바탕색, 빛남, 데칼, 매트캡, 천사 고리, 램프)를 sRGB 형식(SRGB8_ALPHA8)으로 올린다.
+	//   GPU 가 읽을 때 선형으로 풀어 거르기와 밉맵이 선형 공간에서 일어나고, 셰이더는 받은 값을 선형 색으로 그대로 쓴다. (유니티, 언리얼의 sRGB 텍스처와 같음)
+	//   노멀, 마스크, 번호 같은 자료 텍스처는 isColorData: false 로 RGBA8 에 그대로 올린다. (머티리얼 조각이 읽는 자료)
+	// - 감마 색 공간(기본)은 isColorData 와 상관없이 RGBA 로 올리고 셰이더가 색 텍스처를 pow 2.2 로 선형으로 바꾼다. (지금까지와 같음)
 	//==============================================================================
 	/**
 	 * @param { object } source - ImageBitmap, 캔버스, 이미지, ImageData 나 { width, height, data }.
-	 * @param { object } [options] - { isMipmapped (기본 true), isRepeated (기본 true, false 면 가장자리 붙임), isFiltered (기본 true, false 면 가까운 화소) }
+	 * @param { object } [options] - { isMipmapped (기본 true), isRepeated (기본 true, false 면 가장자리 붙임), isFiltered (기본 true, false 면 가까운 화소), isColorData (기본 true 면 색, false 면 노멀이나 마스크 같은 자료, 선형 색 공간에서만 가른다) }
 	 * @returns { WebGLTexture } 지은 RGBA 텍스처.
 	 * @example <caption>캔버스에 그린 무늬를 바탕색 텍스처로 쓰기</caption>
 	 * import { ToonRenderer, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
@@ -2160,6 +2243,11 @@ export class ToonRenderer {
 		const isMipmapped = options.isMipmapped !== false;
 		const isRepeated = options.isRepeated !== false;
 		const isFiltered = options.isFiltered !== false;
+		// 선형 색 공간의 색 텍스처는 sRGB 형식으로 올려 GPU 가 선형으로 풀어 읽게 한다. (감마 색 공간은 지금까지처럼 RGBA)
+		let internalFormat = webGL2RenderingContext.RGBA;
+		if (this.#colorSpace === ColorSpace.linear) {
+			internalFormat = options.isColorData !== false ? webGL2RenderingContext.SRGB8_ALPHA8 : webGL2RenderingContext.RGBA8;
+		}
 		const texture = webGL2RenderingContext.createTexture();
 		const isPremultiplied = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
 		const isFlipped = webGL2RenderingContext.getParameter(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL);
@@ -2168,10 +2256,10 @@ export class ToonRenderer {
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + BASE_COLOR_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 		if (System.ArrayBuffer.isView(source.data) && typeof source.width === "number" && typeof source.height === "number") {
-			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, source.width, source.height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System.Uint8Array(source.data.buffer, source.data.byteOffset, source.data.byteLength));
+			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, source.width, source.height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System.Uint8Array(source.data.buffer, source.data.byteOffset, source.data.byteLength));
 		}
 		else {
-			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, source);
+			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, source);
 		}
 		const wrap = isRepeated ? webGL2RenderingContext.REPEAT : webGL2RenderingContext.CLAMP_TO_EDGE;
 		const magnifyFilter = isFiltered ? webGL2RenderingContext.LINEAR : webGL2RenderingContext.NEAREST;
@@ -4505,6 +4593,25 @@ export class ToonRenderer {
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
+	}
+
+	//==============================================================================
+	// 색 공간 반환. (생성 때 정한 값, 바뀌지 않는다)
+	//==============================================================================
+	/**
+	 * @returns { string } ColorSpace.gamma 나 ColorSpace.linear.
+	 * @example <caption>선형 색 공간 렌더러를 짓고 같은 값으로 후처리와 화면 바깥선 짓기</caption>
+	 * import { ToonRenderer, ToonPostProcess, ToonScreenOutline, ColorSpace } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext, { colorSpace: ColorSpace.linear });
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, 320, 180, { colorSpace: renderer.getColorSpace() });
+	 * const screenOutline = new ToonScreenOutline(webGL2RenderingContext, { colorSpace: renderer.getColorSpace() });
+	 * if (renderer.getColorSpace() !== ColorSpace.linear || postProcess.getColorSpace() !== ColorSpace.linear || screenOutline.getColorSpace() !== ColorSpace.linear) {
+	 * 	throw new Error("color space is not linear");
+	 * }
+	 */
+	getColorSpace() {
+		return this.#colorSpace;
 	}
 
 	//==============================================================================

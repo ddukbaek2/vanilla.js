@@ -15,6 +15,7 @@ import { ImageTextureCache } from "./graphic/imagetexturecache.js";
 import { DecodedImageStore } from "./graphic/decodedimagestore.js";
 import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
 import { WebGLStateCache } from "./graphic/webglstatecache.js";
+import { ColorSpace, readColorSpace } from "./graphic/colorspace.js";
 import * as Math from "../base/math.js";
 
 
@@ -820,6 +821,7 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #lastFrameGeometryCacheHitCount; // 지난 프레임에 캐시로 그린 컴포넌트 수.
 	/** @private @type { number } */ #lastFrameGeometryRebuildCount; // 지난 프레임에 다시 셈한 컴포넌트 수.
 	/** @private @type { WebGLStateCache } */ #webGLStateCache; // 컨텍스트의 GL 상태 기억. (getParameter, isEnabled 를 GL 에 묻지 않고 답한다, Graphic 은 묶음과 상태를 따로 기억하지 않고 이것에 견준다)
+	/** @private @type { string } */ #colorSpace; // 3D 색 공간. (ColorSpace, 생성 때 정함, 2D 묶음은 어느 값이든 감마 공간에서 합성한다)
 
 	//==============================================================================
 	// 생성.
@@ -829,9 +831,11 @@ export class Graphic extends Object {
 	 * @param { HTMLCanvasElement } canvas 그릴 캔버스. (WebGL2 컨텍스트를 얻지 못하면 오류를 던진다)
 	 * @param { boolean } preserveDrawingBuffer 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. (true 일 때만 남긴다)
 	 * @param { boolean } [antialias] 캔버스의 멀티샘플 안티에일리어싱을 켤지. (기본 true, false 일 때만 끈다)
+	 * @param { string } [colorSpace] 3D 색 공간. (ColorSpace, 기본 ColorSpace.gamma, 엔진은 EngineConfiguration.colorSpace 를 넘긴다)
 	 */
-	constructor(canvas, preserveDrawingBuffer, antialias = true) {
+	constructor(canvas, preserveDrawingBuffer, antialias = true, colorSpace = ColorSpace.gamma) {
 		super();
+		this.#colorSpace = readColorSpace(colorSpace);
 
 		// preserveDrawingBuffer 를 켜면 프레임이 끝난 뒤에도 그린 것이 캔버스에 남는다.
 		// 캔버스 위에 후처리를 얹는 프로젝트가 그 그림을 읽어 쓴다. (엔진 설정에서 켠다)
@@ -5711,6 +5715,22 @@ export class Graphic extends Object {
 	 */
 	getCanvas() {
 		return this.#canvas;
+	}
+
+	//==============================================================================
+	// 3D 색 공간 반환. (ColorSpace, 툰 렌더러와 후처리가 엔진에서 읽는 기본값, 이 묶음의 2D 는 어느 값이든 감마 공간에서 합성한다)
+	//==============================================================================
+	/**
+	 * @returns { string } ColorSpace.gamma 나 ColorSpace.linear.
+	 * @example <caption>캔버스로 지은 Graphic 의 색 공간</caption>
+	 * import { Graphic, ColorSpace } from "./vanilla.js";
+	 * const graphic = new Graphic(document.createElement("canvas"), false, true, ColorSpace.linear);
+	 * if (graphic.getColorSpace() !== ColorSpace.linear) {
+	 * 	throw new Error("color space is not linear");
+	 * }
+	 */
+	getColorSpace() {
+		return this.#colorSpace;
 	}
 
 	//==============================================================================

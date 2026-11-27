@@ -12,6 +12,7 @@ import { ViewManager, ViewScaleMode } from "./viewmanager.js";
 import { InputManager, InputDevice, MouseButton } from "./inputmanager.js";
 import { Platform, PlatformType, BrowserType, SYSTEM_FONT_STRING } from "../base/platform.js";
 import { Graphic } from "./graphic.js";
+import { ColorSpace, readColorSpace } from "./graphic/colorspace.js";
 import { Scene } from "./scene.js";
 import { Rect } from "../base/rect.js";
 import { SceneManager } from "./scenemanager.js";
@@ -57,7 +58,7 @@ export const PageEvent = System.Object.freeze({
 //==============================================================================
 /**
  * @example <caption>설정을 채워 엔진 만들기</caption>
- * import { Engine, EngineConfiguration, Scene, Vector2, ViewScaleMode } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Scene, Vector2, ViewScaleMode, ColorSpace } from "./build/vanilla.js";
  *
  * const engineConfiguration = new EngineConfiguration();
  * engineConfiguration.canvasId = "gameCanvas";
@@ -69,6 +70,7 @@ export const PageEvent = System.Object.freeze({
  * engineConfiguration.antialias = true;
  * engineConfiguration.useStatistics = true;
  * engineConfiguration.useDevTools = false;
+ * engineConfiguration.colorSpace = ColorSpace.gamma;
  * const engine = new Engine(engineConfiguration);
  * engine.run(new Scene());
  */
@@ -118,6 +120,9 @@ export class EngineConfiguration extends Object {
 	// iOS WebKit 에서 앱 전환이나 전면 광고로 멈춘(suspended, interrupted) 컨텍스트를 화면을 끌기만 하는 게임이 다시 깨우지 못했다.
 	// (캔버스를 끄는 조작이 기본 동작을 막아 click 이 생기지 않는 게임이 켠다)
 	/** @type { boolean } */ resumeAudioOnTouchEnd;
+	// 3D 색 공간. (ColorSpace.gamma 가 기본, 지금까지와 같은 화면. ColorSpace.linear 면 sRGB 텍스처와 sRGB 표준 곡선으로 선형 공간에서 빛을 셈한다)
+	// 생성 때 정한다. 툰 렌더러, 후처리, 화면 바깥선, GLB 읽기가 따로 받지 않으면 이 값을 따른다. 2D 는 어느 값이든 감마 공간에서 합성한다. (유니티 Player Settings 의 Color Space)
+	/** @type { string } */ colorSpace;
 
 	//==============================================================================
 	// 생성.
@@ -140,6 +145,7 @@ export class EngineConfiguration extends Object {
 		this.useDevTools = true;
 		this.maxCanvasAspectRatio = 0;
 		this.resumeAudioOnTouchEnd = false;
+		this.colorSpace = ColorSpace.gamma;
 	}
 }
 
@@ -221,7 +227,7 @@ export class Engine extends Object {
 		const canvas = this.#platform.getOrAddCanvas(canvasId);
 		
 
-		this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true, engineConfiguration.antialias !== false);
+		this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true, engineConfiguration.antialias !== false, readColorSpace(engineConfiguration.colorSpace));
 		this.#sceneManager = new SceneManager(this);
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this);
@@ -1274,6 +1280,23 @@ export class Engine extends Object {
 	 */
 	getGraphic() {
 		return this.#graphic;
+	}
+
+	//==============================================================================
+	// 3D 색 공간 반환. (생성 때 EngineConfiguration.colorSpace 로 정한 값, 툰 렌더러와 후처리의 기본값)
+	//==============================================================================
+	/**
+	 * @returns { string } ColorSpace.gamma 나 ColorSpace.linear.
+	 * @example <caption>엔진의 색 공간을 보고 색 공간마다 다른 값 고르기</caption>
+	 * import { Engine, EngineConfiguration, ColorSpace } from "./vanilla.js";
+	 * const engine = new Engine(new EngineConfiguration());
+	 * const exposure = engine.getColorSpace() === ColorSpace.linear ? 1.2 : 1;
+	 * if (engine.getColorSpace() !== ColorSpace.gamma || exposure !== 1) {
+	 * 	throw new Error("default color space is not gamma");
+	 * }
+	 */
+	getColorSpace() {
+		return this.#graphic.getColorSpace();
 	}
 
 	//==============================================================================

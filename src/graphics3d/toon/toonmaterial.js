@@ -17,7 +17,7 @@ const System = globalThis;
  * 		surface.baseColor *= mix(0.5, 1.0, stripe);
  * 	}`,
  * });
- * const stripeTexture = renderer.createTexture({ width: 2, height: 1, data: new Uint8Array([255, 255, 255, 255, 0, 0, 0, 255]) }, { isMipmapped: false });
+ * const stripeTexture = renderer.createTexture({ width: 2, height: 1, data: new Uint8Array([255, 255, 255, 255, 0, 0, 0, 255]) }, { isMipmapped: false, isColorData: false });
  * const builder = new MeshBuilder();
  * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#80c0e0", { hasOutline: true });
  * const mesh = renderer.createMesh(builder.readArrays());
@@ -120,7 +120,7 @@ const SHADER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // - 엔진의 표준 기능(텍스처, 빛, 틴트, 섞기)으로 되지 않는 무늬나 연출만 조각으로 넣는다. 조각이 없는 칸은 엔진의 빈 함수가 들어간다.
 // - uniformChunk: 조각 셰이더의 맨 위 칸에 들어간다. 유니폼, 상수, 함수, 정점 조각이 내보낸 in 을 적는다.
 // - surfaceChunk: void applySurface(inout ToonSurface surface) 를 정의한다. 엔진이 꼭짓점 색, 텍스처, 데칼을 셈한 뒤, 틴트와 빛 전에 부른다.
-//   ToonSurface { vec3 baseColor (sRGB), float alpha, vec3 emission (선형), vec3 normal (월드, 단위), float glow (꼭짓점 빛남), bool isUnlit,
+//   ToonSurface { vec3 baseColor (감마 색 공간은 sRGB, 선형 색 공간은 선형, sRGB 색을 섞을 때는 toSurfaceColor 로 바꿔 넣는다), float alpha, vec3 emission (선형), vec3 normal (월드, 단위), float glow (꼭짓점 빛남), bool isUnlit,
 //                 vec4 detail (꼭짓점 무늬 번호와 무늬 색), vec2 uv, vec2 uv1 (2 번 UV, 없으면 (0, 1)), vec3 localPosition (모형 좌표), vec3 worldPosition, vec3 viewDirection (면에서 카메라 쪽, 단위),
 //                 float shadeOffset (빛을 받는 몫에 더할 값, 그늘 경계를 옮김), float specularMask (하이라이트 배), float rimMask (림 빛 배) }
 // - lightChunk: void applyLight(ToonSurface surface, inout ToonLighting lighting) 를 정의한다. 엔진이 해, 바탕빛, 채움, 점광과 스포트라이트, 하이라이트, 림을 모은 뒤 합치기 전에 부른다.
@@ -130,7 +130,8 @@ const SHADER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 //   ToonVertex { vec3 localPosition, vec3 localNormal, vec3 color, vec2 material, vec4 detail, vec2 uv, vec2 uv1, vec4 tint, vec4 emissive, mat4 modelMatrix }
 //   인스턴스 꼴(ToonInstanceLayout)의 사용자 어트리뷰트는 그 이름의 in 으로 읽는다. 셋 모두에 들어가므로 몸에만 있는 out 은 쓰지 않는다. (꼭짓점 어트리뷰트 이름 대신 vertex 의 칸을 쓴다)
 //   노멀은 mat3(modelMatrix) 로 옮긴다. 크기가 고르지 않으면 localNormal 을 그 크기의 제곱으로 나눠 둔다.
-// - 셰이더에는 엔진의 toLinear(vec3) 와 RECIPROCAL_PI 가 있다.
+// - 셰이더에는 엔진의 toLinear(vec3) (sRGB 를 선형으로, 감마 색 공간은 pow 2.2, 선형 색 공간은 sRGB 표준 곡선), toSurfaceColor(vec3) (sRGB 를 baseColor 의 공간으로) 와 RECIPROCAL_PI 가 있다.
+//   선형 색 공간(ColorSpace.linear)이면 소스에 #define VANILLA_COLOR_SPACE_LINEAR 1 이 있고 엔진이 묶는 색 텍스처는 GPU 가 선형으로 풀어 준다. (ToonRenderer.createTexture 의 isColorData)
 // - 텍스처는 그리기의 options.textures({ 유니폼 이름: 텍스처 })로 넘긴다. 엔진이 쓰지 않는 유닛(8 부터, TOON_MAXIMUM_MATERIAL_TEXTURES 개까지)을 차례로 묶고 그 이름의 sampler2D 유니폼에 유닛을 넣는다.
 // - 그리기마다 다른 유니폼은 options.onBeforeDraw(program, webGL2RenderingContext) 에서 쓴다. 엔진의 유니폼은 엔진이 다시 쓰므로 머티리얼의 것만 쓴다.
 //==============================================================================
