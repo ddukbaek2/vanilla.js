@@ -80,3 +80,7 @@ node tools/apidoc.cjs <버전> --check-examples [--only <경로 앞>] [--exclude
 - 크롬 단계: 노드 내장 http 로 저장소를 루트로 하는 정적 서버를 띄우고, 크롬 하나를 창 없이(--headless=new) 임시 프로필로 띄운다. 실행 페이지가 예제마다 iframe(640x360, 저장소 루트 기준 주소)을 만들어 4 개씩 돌리고, 모듈이 다 돈 뒤 1 초 동안 오류, 처리되지 않은 거부, console.error 를 모은다. 10 초 안에 모듈이 끝나지 않으면 실패다. 결과를 받으면 크롬과 서버를 바로 끄고 임시 프로필을 지운다. 크롬은 --chrome, 환경 변수 CHROME_PATH, 흔한 설치 자리 차례로 찾고, 없거나 --no-chrome 이면 크롬 단계를 건너뛰고 "돌리지 못함" 으로 센다. (외부 npm 의존 없음)
 - --no-run 은 문법과 이름만 본다. 실패가 하나라도 있으면 끝 코드가 1 이다.
 - 가이드(docs/guide/<버전>/ko, en)와 업데이트(docs/update/<버전>.ko.md, .en.md)는 손으로 옮긴다. 업데이트 ko 는 UPDATE.md 의 그 판 절이다.
+
+## 크롬 트레이스로 프레임 전체 시간을 재는 도구. (헤드리스 크롬, 전역 puppeteer-core 를 씀: NODE_PATH=$(npm root -g))
+node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--out 결과.json] [--chrome 크롬 경로]
+- 렌더러 메인 스레드 바쁜 시간, 그 안의 명령 버퍼 기다림, GPU 프로세스 메인 스레드 바쁜 시간, rAF 콜백 시간, 프레임 간격을 프레임마다 재어 가운데 값, 평균, p95 로 찍는다. 뜻과 셈은 파일 머리 주석.
