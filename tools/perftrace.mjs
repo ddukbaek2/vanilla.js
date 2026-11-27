@@ -5,14 +5,14 @@
 //   (가) 주소 열기: 새 헤드리스 크롬을 띄워 주소를 열고 잰다.
 //   (나) 열린 페이지에 붙기(--attach): 이미 떠 있는 크롬(원격 디버깅)의 페이지에 붙어, 그 페이지를 그대로(해상도, dpr 안 바꿈, 데움 기본 0) 잰다. 찍개가 페이지 안에서 장면(로비, 매칭, 판)까지 데려간 뒤 재는 데 쓴다. 끝나면 떨어질 뿐 크롬은 끄지 않는다.
 //       크롬 띄우기 예: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --remote-debugging-port=9222 --user-data-dir=/tmp/perfprofile <주소>
-//       NODE_PATH=$(npm root -g) node tools/perftrace.mjs --attach http://127.0.0.1:9222 [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--out 결과.json] [--keep-trace 트레이스.json]
+//       NODE_PATH=$(npm root -g) node tools/perftrace.mjs --attach http://127.0.0.1:9222 [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--throughput [프레임 수 120]] [--out 결과.json] [--keep-trace 트레이스.json]
 //       --target 은 주소에 그 글이 든 첫 페이지를 고른다(없으면 첫 페이지). ws:// 주소(브라우저 웹소켓)도 받는다.
 //   (다) 모듈로 부르기(게임 찍개 안에서): 이미 puppeteer 를 쥔 스크립트가 page(또는 browser)를 넘긴다. 같은 결과 객체를 돌려준다.
 //       import { measureAttached } from "<엔진 저장소>/tools/perftrace.mjs";
-//       const result = await measureAttached(page, { seconds: 4, warmup: 0, keepTrace: null, silent: false });  // browser 를 넘기면 options.target 으로 페이지를 고른다
-//       옵션: seconds(4), warmup(0), target(browser 일 때만), keepTrace(트레이스 파일 경로), out(결과 json 경로), silent(true 면 표를 찍지 않음). 프레임이 모자라거나 rAF 가 안 잡히면 오류를 던진다. 부르는 쪽 puppeteer 를 쓰므로 puppeteer-core 를 따로 읽지 않는다.
+//       const result = await measureAttached(page, { seconds: 4, warmup: 0, throughput: 120, keepTrace: null, silent: false });  // browser 를 넘기면 options.target 으로 페이지를 고른다
+//       옵션: seconds(4), warmup(0), throughput(0 이면 안 잼, 프레임 수면 트레이스 뒤에 (6) 을 잰다), target(browser 일 때만), keepTrace(트레이스 파일 경로), out(결과 json 경로), silent(true 면 표를 찍지 않음). 프레임이 모자라거나 rAF 가 안 잡히면 오류를 던진다. 부르는 쪽 puppeteer 를 쓰므로 puppeteer-core 를 따로 읽지 않는다.
 //   (가) 의 명령:
-//   NODE_PATH=$(npm root -g) node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--out 결과.json] [--chrome 크롬 실행 파일] [--root 서버 뿌리 폴더] [--keep-trace 트레이스.json]
+//   NODE_PATH=$(npm root -g) node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--throughput [프레임 수 120]] [--out 결과.json] [--chrome 크롬 실행 파일] [--root 서버 뿌리 폴더] [--keep-trace 트레이스.json]
 //   - 주소(http, https)는 그대로 연다. 게임의 ?perfScene=mid 같은 값은 주소에 붙여 그대로 넘긴다. (로컬 경로도 "경로?값" 꼴이면 값을 넘긴다)
 //   - 로컬 html 경로를 주면 작은 서버를 띄워 연다. 서버는 교차 출처 격리(COOP, COEP) 머리를 단다. 서버 뿌리는 그 html 이 든 저장소 뿌리(이 파일의 한 칸 위 폴더) 안이면 그 뿌리, 아니면 html 이 든 폴더. --root 로 바꾼다.
 //   - 크롬은 헤드리스(창이 뜨지 않음). 기본 경로는 맥의 /Applications/Google Chrome.app. 다른 운영체제는 --chrome 으로 준다.
@@ -25,10 +25,16 @@
 //   (3) GPU 프로세스 메인 스레드 바쁜 시간: GPU 프로세스 CrGpuMain 의 최상위 작업이 간격과 겹친 시간의 합. 명령을 풀어 실제 GL 을 부르는 몫.
 //   (4) rAF 콜백 시간: 렌더러의 FireAnimationFrame 이벤트 길이(스크립트가 한 프레임에 쓴 시간. 그리기 호출이 GL 명령을 쓰는 시간은 여기 든다).
 //   (5) 프레임 간격: 이어진 두 콜백 시작의 차. (화면 주사율에 묶이면 16.7 ms 근처에 붙는다. 그래서 일의 양은 (1) 과 (3) 을 본다)
+//   (6) GPU 처리량(--throughput, 트레이스를 다 잰 뒤): 페이지 안의 전역 엔진(Engine.getEngine(), globalThis.vanillaEngine)의 measureGpuThroughput(프레임 수)를 불러,
+//       지금 장면을 씬 갱신 없이 엔진 프레임과 같은 그리기 길로 잇달아 그리고 1 화소 readPixels 로 GPU 를 기다린 프레임당 벽시계 시간. 렌더러, GPU 프로세스, GPU 실행 가운데 가장 느린 단의 몫이라
+//       GPU 가 가장 느리면 GPU 가 실제로 그리는 시간이다. (3) 은 GPU 프로세스가 명령을 푸는 CPU 시간이라 GPU 가 그리는 양(바깥선, 그림자, MSAA 같은)이 바뀌어도 거의 움직이지 않으니 GPU 과녁은 (6) 으로 본다.
+//       재는 동안 게임의 시간, 입력, 씬 갱신은 서 있고(엔진이 30 프레임씩 rAF 마다 나눠 그린다), 다 재면 엔진 루프가 이어 돈다. 가운데와 p95 는 30 프레임 덩이마다의 값, 평균은 전체 시간 / 프레임 수.
+//       엔진이 없거나 measureGpuThroughput 이 없는 엔진(0.4.0 앞 판)이면 '모름' 이고 까닭을 찍는다. 화면에 내는 합성 비용은 들지 않는다.
 //   값은 프레임마다 모은 가운데 값(중앙값), 평균, 95 번째(p95)로 찍는다. 간격 첫 프레임과 마지막은 버린다.
 //   읽는 법: 렌더러가 병목이면 (1) 이 크고 (2) 가 작다. GPU 프로세스가 병목이면 (3) 이 크고 (1) 안의 (2) 가 크다. 합치기, 호출 수 줄이기를 비교할 때 (1) 과 (3) 이 같이 내려가는지 본다.
 //
-// 결과 json: { url, width, height, dpr, seconds, frameCount, rows: { 이름: { median, mean, p95 } }, threads: { renderer, gpu } }
+// 결과 json: { url, width, height, dpr, seconds, frameCount, rows: { 이름: { median, mean, p95 } }, threads: { renderer, gpu }, throughput }
+//   throughput 은 --throughput 을 주었을 때만: { frameCount, chunkFrameCount, millisecondsPerFrame, chunkMillisecondsPerFrame } 또는 모르면 { unknown: 까닭 }. 값이 있으면 rows.gpuThroughput 도 든다.
 // 트레이스 갈래: devtools.timeline, gpu, gpu.service, cc, blink, toplevel, disabled-by-default-devtools.timeline.frame
 //==============================================================================
 import fs from "node:fs";
@@ -124,13 +130,45 @@ function printResult(result) {
 		const row = result.rows[name];
 		console.log(labels[name].padEnd(40) + row.median.toFixed(2).padStart(10) + row.mean.toFixed(2).padStart(10) + row.p95.toFixed(2).padStart(10));
 	}
+	if (result.throughput !== undefined) {
+		const row = result.rows.gpuThroughput;
+		if (row === undefined) console.log(THROUGHPUT_LABEL.padEnd(40) + "모름".padStart(10) + "  (" + result.throughput.unknown + ")");
+		else console.log(THROUGHPUT_LABEL.padEnd(40) + row.median.toFixed(2).padStart(10) + row.mean.toFixed(2).padStart(10) + row.p95.toFixed(2).padStart(10) + "  (" + result.throughput.frameCount + " 프레임, " + result.throughput.chunkFrameCount + " 프레임 덩이 " + result.throughput.chunkMillisecondsPerFrame.length + " 개)");
+	}
+}
+
+//==============================================================================
+// (6) GPU 처리량. 페이지 안의 전역 엔진에 measureGpuThroughput 을 불러 결과에 넣는다. (엔진이 없으면 { unknown: 까닭 })
+//==============================================================================
+const THROUGHPUT_LABEL = "(6) GPU 처리량(그리기만, GPU 기다림)";
+async function measureThroughput(page, frameCount, result) {
+	const throughput = await page.evaluate(async (count) => {
+		const engine = globalThis.vanillaEngine;
+		if (engine === undefined || engine === null) return { unknown: "페이지에 엔진이 없다(Engine.getEngine() 이 비었다)" };
+		if (typeof engine.measureGpuThroughput !== "function") return { unknown: "엔진에 measureGpuThroughput 이 없다(0.4.0 앞 판)" };
+		// 페이지가 가려져 rAF 가 서면 엔진이 기다리므로 시간 한도를 둔다. (30 초 + 프레임마다 0.1 초)
+		const timeoutMilliseconds = 30000 + count * 100;
+		try {
+			return await Promise.race([engine.measureGpuThroughput(count), new Promise((resolve) => setTimeout(() => resolve({ unknown: (timeoutMilliseconds / 1000) + " 초 안에 끝나지 않았다(페이지가 가려져 rAF 가 서 있나)" }), timeoutMilliseconds))]);
+		}
+		catch (error) {
+			return { unknown: "measureGpuThroughput 이 거부했다: " + error.message };
+		}
+	}, frameCount);
+	result.throughput = throughput;
+	if (throughput.unknown === undefined) {
+		const sorted = [...throughput.chunkMillisecondsPerFrame].sort((a, b) => a - b);
+		const pick = (ratio) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))];
+		result.rows.gpuThroughput = { median: pick(0.5), mean: throughput.millisecondsPerFrame, p95: pick(0.95) };
+	}
+	return result;
 }
 
 //==============================================================================
 // 열린 페이지에 붙어 재기. browserOrPage 는 puppeteer 의 Browser 나 Page.
 //==============================================================================
 export async function measureAttached(browserOrPage, options = {}) {
-	const settings = { seconds: 4, warmup: 0, target: null, keepTrace: null, out: null, silent: false, ...options };
+	const settings = { seconds: 4, warmup: 0, throughput: 0, target: null, keepTrace: null, out: null, silent: false, ...options };
 	let page = browserOrPage;
 	if (typeof browserOrPage.pages === "function") {
 		const pages = await browserOrPage.pages();
@@ -150,6 +188,7 @@ export async function measureAttached(browserOrPage, options = {}) {
 	finally {
 		if (settings.keepTrace === null) fs.unlinkSync(tracePath);
 	}
+	if (settings.throughput > 0) await measureThroughput(page, settings.throughput, result);
 	if (!settings.silent) printResult(result);
 	if (settings.out !== null) fs.writeFileSync(settings.out, JSON.stringify(result, null, "\t"));
 	return result;
@@ -160,13 +199,15 @@ export async function measureAttached(browserOrPage, options = {}) {
 //==============================================================================
 async function main() {
 	const argumentList = process.argv.slice(2);
-	const options = { seconds: 4, warmup: null, width: 1280, height: 720, dpr: 1, out: null, chrome: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", root: null, keepTrace: null, attach: null, target: null };
+	const options = { seconds: 4, warmup: null, width: 1280, height: 720, dpr: 1, throughput: 0, out: null, chrome: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", root: null, keepTrace: null, attach: null, target: null };
 	let positional = null;
 	for (let index = 0; index < argumentList.length; ++index) {
 		const argument = argumentList[index];
 		if (argument.startsWith("--")) {
 			const name = argument.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 			if (!(name in options)) { console.error("모르는 인자: " + argument); process.exit(1); }
+			// --throughput 은 프레임 수를 빼면 120.
+			if (name === "throughput" && !/^\d+$/.test(argumentList[index + 1] ?? "")) { options.throughput = 120; continue; }
 			const value = argumentList[++index];
 			options[name] = typeof options[name] === "number" || name === "warmup" ? Number(value) : value;
 		}
@@ -175,8 +216,8 @@ async function main() {
 		}
 	}
 	if (positional === null && options.attach === null) {
-		console.error("쓰는 법: node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--out 결과.json] [--chrome 경로] [--root 폴더] [--keep-trace 트레이스.json]");
-		console.error("       node tools/perftrace.mjs --attach <http://127.0.0.1:9222 또는 ws://...> [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--out 결과.json] [--keep-trace 트레이스.json]");
+		console.error("쓰는 법: node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--throughput [프레임 수 120]] [--out 결과.json] [--chrome 경로] [--root 폴더] [--keep-trace 트레이스.json]");
+		console.error("       node tools/perftrace.mjs --attach <http://127.0.0.1:9222 또는 ws://...> [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--throughput [프레임 수 120]] [--out 결과.json] [--keep-trace 트레이스.json]");
 		process.exit(1);
 	}
 	const require = createRequire(import.meta.url);
@@ -186,7 +227,7 @@ async function main() {
 			const connectOptions = /^wss?:/.test(options.attach) ? { browserWSEndpoint: options.attach, defaultViewport: null } : { browserURL: options.attach, defaultViewport: null };
 			const browser = await puppeteer.connect(connectOptions);
 			try {
-				await measureAttached(browser, { seconds: options.seconds, warmup: options.warmup ?? 0, target: options.target, keepTrace: options.keepTrace, out: options.out });
+				await measureAttached(browser, { seconds: options.seconds, warmup: options.warmup ?? 0, throughput: options.throughput, target: options.target, keepTrace: options.keepTrace, out: options.out });
 			}
 			finally {
 				await browser.disconnect();
@@ -236,6 +277,7 @@ if (!/^https?:\/\//.test(target)) {
 }
 
 	const tracePath = options.keepTrace ?? path.join(process.env.TMPDIR ?? "/tmp", "perftrace_" + process.pid + ".json");
+	const throughputHolder = { rows: {} };
 	const browser = await puppeteer.launch({ executablePath: options.chrome, headless: true, defaultViewport: { width: options.width, height: options.height, deviceScaleFactor: options.dpr } });
 	try {
 		const page = await browser.newPage();
@@ -245,12 +287,17 @@ if (!/^https?:\/\//.test(target)) {
 		await page.tracing.start({ path: tracePath, categories: TRACE_CATEGORIES });
 		await new Promise((resolve) => setTimeout(resolve, options.seconds * 1000));
 		await page.tracing.stop();
+		if (options.throughput > 0) await measureThroughput(page, options.throughput, throughputHolder);
 	}
 	finally {
 		await browser.close();
 		if (server !== null) server.close();
 	}
 	const result = computeResult(tracePath, { url: pageUrl, width: options.width, height: options.height, dpr: options.dpr, seconds: options.seconds });
+	if (throughputHolder.throughput !== undefined) {
+		result.throughput = throughputHolder.throughput;
+		if (throughputHolder.rows.gpuThroughput !== undefined) result.rows.gpuThroughput = throughputHolder.rows.gpuThroughput;
+	}
 	printResult(result);
 	if (options.out !== null) fs.writeFileSync(options.out, JSON.stringify(result, null, "\t"));
 	if (options.keepTrace === null) fs.unlinkSync(tracePath);

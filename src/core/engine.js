@@ -39,6 +39,10 @@ const DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
 // 찍기 모드(주소 쿼리 capture)의 한 프레임 간격. (밀리초, 1/60 초. 러스트 판 찍기 모드와 같은 셈)
 const CAPTURE_FRAME_MILLISECONDS = 1000 / 60;
 
+// GPU 처리량 재기(measureGpuThroughput)의 데움 프레임 수와 한 덩이의 프레임 수. (덩이마다 1 화소 readPixels 로 GPU 를 기다리고 다음 rAF 로 넘겨 한 번에 길게 막지 않는다)
+const GPU_THROUGHPUT_WARMUP_FRAME_COUNT = 10;
+const GPU_THROUGHPUT_CHUNK_FRAME_COUNT = 30;
+
 
 //==============================================================================
 // 페이지 이벤트. (엔진이 리스너에 넘긴다, addPageEventListener)
@@ -200,6 +204,7 @@ export class Engine extends Object {
 	/** @private @type { boolean } */ #isExitRequested; // 종료를 요청했는지.
 	/** @private @type { boolean } */ #isPageHidden; // 페이지가 가려져 있는지.
 	/** @private @type { Array<Function> } */ #pageEventListeners; // 페이지 이벤트 리스너. ((pageEvent) => void)
+	/** @private @type { object | null } */ #gpuThroughputMeasurement; // 재고 있는 GPU 처리량. (없으면 null, measureGpuThroughput)
 
 	//==============================================================================
 	// 생성.
@@ -255,6 +260,7 @@ export class Engine extends Object {
 		this.#isExitRequested = false;
 		this.#isPageHidden = System.document.visibilityState === "hidden";
 		this.#pageEventListeners = [];
+		this.#gpuThroughputMeasurement = null;
 
 		// 현재 엔진 인스턴스 글로벌 등록. (루트 노드 등 컨텍스트 없는 객체에서 ViewManager 등 접근용)
 		System.vanillaEngine = this;
@@ -1030,6 +1036,13 @@ export class Engine extends Object {
 	 */
 	updateEngine(timestamp) {
 
+		// GPU 처리량을 재는 중이면 이 rAF 는 씬을 갱신하지 않고 그리기만 한 덩이 잇달아 한다. (시간, 입력, 엔진 프레임 함수, 프레임 번호를 건드리지 않는다)
+		if (this.#gpuThroughputMeasurement !== null) {
+			this.#runGpuThroughputChunk();
+			System.window.requestAnimationFrame(this.#updateEngineCallback);
+			return;
+		}
+
 		// 최대 FPS 제한. (세기 시작한 때부터 처리한 프레임 수로 다음 프레임의 차례를 정하고, 차례보다 일찍 온 프레임은 건너뛴다.
 		//  밀린 것은 다음 프레임에 처리하므로 주사율이 최대 FPS 로 나누어떨어지지 않아도(90 Hz 에서 60 FPS 등) 평균이 최대 FPS 가 된다)
 		const engineConfiguration = this.getEngineConfiguration();
@@ -1109,6 +1122,43 @@ export class Engine extends Object {
     	// this.CanvasContext.imageSmoothingQuality = "high";
 		// this.canvasRenderingContext.canvas.style.textRendering = "optimizeLegibility";
 
+		// 씬 갱신과 그리기.
+		this.#tickAndDrawScenes(graphic, timeDelta, !isModalDialogOpen);
+
+		// 마우스 커서. (켜져 있을 때만 캔버스의 커서를 정한다)
+		const pointerCursor = PointerCursor.getInstance();
+		pointerCursor.apply();
+		
+		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
+		inputManager.setTouchPressed(false);
+		inputManager.setTouchReleased(false);
+		inputManager.setTouchCancelled(false);
+		inputManager.clearWheelDelta();
+		inputManager.updateFrameSnapshot();
+
+		// 검증용 화면 저장. (요청한 프레임이면 그린 캔버스를 PNG 로 넘긴다)
+		this.captureFrameIfRequested();
+
+		// 다음 프레임 호출 요청.
+		// 찍기 모드에서 실제 시간이 드는 불러오기(애셋 받기) 중인 씬이 있으면 프레임 번호를 올리지 않는다. (시계도 서고, 다 받은 뒤부터 센다)
+		const sceneManager = this.getSceneManager();
+		const isCaptureFrameHeld = this.#isCaptureTimeStepFixed && sceneManager.getAllLoadedScenes().some((loadedScene) => !loadedScene.isLoaded() && loadedScene.isCaptureFrameHeld());
+		if (!isCaptureFrameHeld) {
+			++this.#frameNumber;
+		}
+		System.window.requestAnimationFrame(this.#updateEngineCallback);
+	}
+
+	//==============================================================================
+	// 씬 갱신과 그리기. (엔진 프레임과 GPU 처리량 재기가 같은 길로 그린다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { Graphic } graphic 엔진 그래픽.
+	 * @param { number } timeDelta 이번 프레임 간격. (초)
+	 * @param { boolean } isTickEnabled 거짓이면 씬을 갱신하지 않고 그리기만 한다.
+	 */
+	#tickAndDrawScenes(graphic, timeDelta, isTickEnabled) {
 		// 그리기 통계. (지난 프레임 값을 넘겨 두고 이번 프레임을 새로 센다)
 		graphic.beginFrameStatistics();
 
@@ -1127,8 +1177,8 @@ export class Engine extends Object {
 					continue;
 				}
 
-				// 갱신. (질문 창이 떠 있으면 멈춘 화면 그대로 그리기만 한다)
-				if (!isModalDialogOpen) {
+				// 갱신. (질문 창이 떠 있거나 GPU 처리량을 재는 중이면 멈춘 화면 그대로 그리기만 한다)
+				if (isTickEnabled) {
 					loadedScene.tick(timeDelta);
 				}
 
@@ -1149,6 +1199,7 @@ export class Engine extends Object {
 		}
 
 		// 개발 정보 출력.
+		const engineConfiguration = this.getEngineConfiguration();
 		if (engineConfiguration.useStatistics) {
 			this.drawStatistics(graphic);
 		}
@@ -1161,28 +1212,144 @@ export class Engine extends Object {
 
 		// 묶어 그리기로 쌓여 남은 것을 그린다.
 		graphic.flushBatch();
+	}
 
-		// 마우스 커서. (켜져 있을 때만 캔버스의 커서를 정한다)
-		const pointerCursor = PointerCursor.getInstance();
-		pointerCursor.apply();
-		
-		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
-		inputManager.setTouchPressed(false);
-		inputManager.setTouchReleased(false);
-		inputManager.setTouchCancelled(false);
-		inputManager.clearWheelDelta();
-		inputManager.updateFrameSnapshot();
-
-		// 검증용 화면 저장. (요청한 프레임이면 그린 캔버스를 PNG 로 넘긴다)
-		this.captureFrameIfRequested();
-
-		// 다음 프레임 호출 요청.
-		// 찍기 모드에서 실제 시간이 드는 불러오기(애셋 받기) 중인 씬이 있으면 프레임 번호를 올리지 않는다. (시계도 서고, 다 받은 뒤부터 센다)
-		const isCaptureFrameHeld = this.#isCaptureTimeStepFixed && sceneManager.getAllLoadedScenes().some((loadedScene) => !loadedScene.isLoaded() && loadedScene.isCaptureFrameHeld());
-		if (!isCaptureFrameHeld) {
-			++this.#frameNumber;
+	//==============================================================================
+	// GPU 처리량 재기. (지금 장면을 갱신 없이 그리기만 잇달아 하고 GPU 가 다 그리길 기다린 프레임당 시간)
+	// - 지금 장면을 씬 갱신(tick) 없이 엔진 프레임과 같은 그리기 길로 frameCount 번 잇달아 그리고, 1 화소 readPixels 로 GPU 가 다 그리길 기다린 벽시계 시간을 프레임 수로 나눈다.
+	//   렌더러(스크립트와 GL 명령 쓰기), GPU 프로세스(명령 풀기), GPU 실행 가운데 가장 느린 단의 몫이다. GPU 가 가장 느리면 GPU 가 실제로 한 프레임을 그리는 시간이다.
+	//   (크롬 트레이스의 GPU 프로세스 메인 스레드 시간은 명령을 푸는 CPU 시간이라 GPU 가 그리는 양이 바뀌어도 거의 움직이지 않는다)
+	// - 다음 rAF 부터 시작한다. 데움 10 프레임 뒤 30 프레임씩 덩이로 나눠 rAF 하나에 한 덩이를 그리고 덩이마다 GPU 를 기다린다. (한 번에 길게 막지 않는다, 덩이 사이는 재지 않는다)
+	// - 재는 동안 엔진 시간, 입력, 엔진 프레임 함수, 프레임 번호, 화면 크기 맞추기, 찍기는 서 있고 씬의 tick 을 부르지 않는다. 씬의 draw 가 게임 상태를 바꾸지 않으면 게임 상태는 그대로다.
+	//   다 재면 엔진 루프가 그대로 이어 돈다. (이어 도는 첫 프레임 간격은 탭을 숨겼다 돌아올 때처럼 TimeManager 의 간격 상한 안이다, 기본 0.25 초)
+	// - 같은 상태를 되풀이해 그리므로 바뀐 것만 다시 그리는 캐시(그림자 onChange 같은)는 다시 굽지 않는다. 움직이는 장면에서 프레임마다 다시 굽는 비용은 들지 않는다.
+	// - 캔버스의 기본 프레임 버퍼에 잇달아 그려 화면에 내는 것(합성)은 덩이마다 마지막 프레임만 한다. 합성 비용은 들지 않는다.
+	// - 페이지가 가려져 rAF 가 서면 기다린다. 재는 중에 또 부르거나 엔진 루프가 돌기 전이면 거부한다.
+	//==============================================================================
+	/**
+	 * @param { number } [frameCount=120] 잴 프레임 수. (1 이상의 정수, 데움은 빼고 센다)
+	 * @returns { Promise<{ frameCount: number, chunkFrameCount: number, millisecondsPerFrame: number, chunkMillisecondsPerFrame: number[] }> } 잰 프레임 수, 덩이 프레임 수, 프레임당 시간(밀리초, 모든 덩이 시간의 합 / 프레임 수), 덩이마다 프레임당 시간(밀리초).
+	 * @example <caption>지금 장면의 GPU 처리량 재기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.setFillColor("#203040");
+	 * 		graphic.drawRect(Rect.create(0, 0, 640, 360));
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 * const timeBefore = engine.getTimeManager().getTime();
+	 * const result = await Engine.getEngine().measureGpuThroughput(60);
+	 * const timeAfter = engine.getTimeManager().getTime();
+	 * console.log(result.frameCount, result.chunkMillisecondsPerFrame.length, result.millisecondsPerFrame > 0, timeBefore === timeAfter);
+	 */
+	measureGpuThroughput(frameCount = 120) {
+		if (!System.Number.isInteger(frameCount) || frameCount < 1) {
+			return System.Promise.reject(new System.Error(`frameCount is invalid: ${frameCount}`));
 		}
-		System.window.requestAnimationFrame(this.#updateEngineCallback);
+		if (this.#gpuThroughputMeasurement !== null) {
+			return System.Promise.reject(new System.Error("measureGpuThroughput is already running."));
+		}
+		if (this.#frameNumber === 0) {
+			return System.Promise.reject(new System.Error("measureGpuThroughput needs a running engine loop. (call run first)"));
+		}
+		const webGL2RenderingContext = this.getGraphic().getWebGL2RenderingContext();
+		if (webGL2RenderingContext === null || webGL2RenderingContext === undefined || webGL2RenderingContext.isContextLost()) {
+			return System.Promise.reject(new System.Error("measureGpuThroughput needs a WebGL2 context."));
+		}
+		return new System.Promise((resolve, reject) => {
+			this.#gpuThroughputMeasurement = {
+				frameCount: frameCount,
+				warmupFrameCount: GPU_THROUGHPUT_WARMUP_FRAME_COUNT,
+				measuredFrameCount: 0,
+				totalMilliseconds: 0,
+				chunkMillisecondsPerFrame: [],
+				pixel: new System.Uint8Array(4),
+				resolve: resolve,
+				reject: reject,
+			};
+		});
+	}
+
+	//==============================================================================
+	// GPU 처리량 재기의 한 덩이.
+	//==============================================================================
+	/**
+	 * @private
+	 * GPU 처리량 재기의 한 덩이. (데움이 남았으면 데움 덩이, 다 재면 Promise 를 풀고 재기를 끝낸다)
+	 */
+	#runGpuThroughputChunk() {
+		const measurement = this.#gpuThroughputMeasurement;
+		try {
+			const graphic = this.getGraphic();
+			const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+			if (webGL2RenderingContext.isContextLost()) {
+				throw new System.Error("WebGL2 context lost while measureGpuThroughput.");
+			}
+			graphic.applySettings(this);
+			const timeDelta = this.getTimeManager().getTimeDelta();
+			const isWarmup = measurement.warmupFrameCount > 0;
+			const chunkFrameCount = isWarmup ? measurement.warmupFrameCount : System.Math.min(GPU_THROUGHPUT_CHUNK_FRAME_COUNT, measurement.frameCount - measurement.measuredFrameCount);
+			const startMilliseconds = System.performance.now();
+			for (let index = 0; index < chunkFrameCount; ++index) {
+				this.#tickAndDrawScenes(graphic, timeDelta, false);
+			}
+			this.#waitGpuForGpuThroughput(webGL2RenderingContext, measurement.pixel);
+			const chunkMilliseconds = System.performance.now() - startMilliseconds;
+			if (isWarmup) {
+				measurement.warmupFrameCount = 0;
+				return;
+			}
+			measurement.measuredFrameCount += chunkFrameCount;
+			measurement.totalMilliseconds += chunkMilliseconds;
+			measurement.chunkMillisecondsPerFrame.push(chunkMilliseconds / chunkFrameCount);
+			if (measurement.measuredFrameCount >= measurement.frameCount) {
+				this.#gpuThroughputMeasurement = null;
+				measurement.resolve({
+					frameCount: measurement.measuredFrameCount,
+					chunkFrameCount: GPU_THROUGHPUT_CHUNK_FRAME_COUNT,
+					millisecondsPerFrame: measurement.totalMilliseconds / measurement.measuredFrameCount,
+					chunkMillisecondsPerFrame: measurement.chunkMillisecondsPerFrame,
+				});
+			}
+		}
+		catch (error) {
+			this.#gpuThroughputMeasurement = null;
+			measurement.reject(error);
+		}
+	}
+
+	//==============================================================================
+	// GPU 처리량 재기의 GPU 기다리기.
+	//==============================================================================
+	/**
+	 * @private
+	 * 캔버스의 1 화소를 읽어 GPU 가 앞의 명령을 다 그리길 기다린다. (읽는 프레임 버퍼와 픽셀 팩 버퍼를 잠깐 바꿨다가 되돌린다)
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext 엔진의 GL 컨텍스트.
+	 * @param { Uint8Array } pixel 읽을 4 바이트.
+	 */
+	#waitGpuForGpuThroughput(webGL2RenderingContext, pixel) {
+		const previousReadFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.READ_FRAMEBUFFER_BINDING);
+		const previousPixelPackBuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.PIXEL_PACK_BUFFER_BINDING);
+		if (previousReadFramebuffer !== null) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, null);
+		}
+		if (previousPixelPackBuffer !== null) {
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.PIXEL_PACK_BUFFER, null);
+		}
+		webGL2RenderingContext.readPixels(0, 0, 1, 1, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, pixel);
+		if (previousPixelPackBuffer !== null) {
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.PIXEL_PACK_BUFFER, previousPixelPackBuffer);
+		}
+		if (previousReadFramebuffer !== null) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, previousReadFramebuffer);
+		}
 	}
 
 	//==============================================================================

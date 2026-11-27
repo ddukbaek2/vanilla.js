@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>toonlobbyengine</title>
+<link rel="icon" href="data:,">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+//==============================================================================
+// 애버런트 로비 꼴 툰 장면(toonlobbyscene.mjs)을 엔진 루프로 돌리는 재기 페이지. (시험이 아니다, tests/run.mjs 가 돌리지 않는다)
+// - 씬의 tick 이 프레임 번호를 올리고(열이 돈다), draw 가 runExternalPass 안에서 그 번호의 장면을 그린다. 그래서 엔진의 measureGpuThroughput 은 지금 프레임을 그리기만 되풀이한다.
+// - 쿼리: post=0 이면 후처리 없이 캔버스에 바로(기본은 ToonPostProcess RGBA16F, MSAA 4, 블룸 다섯 단), outline=0 이면 화면 바깥선을 끈다.
+// - 재기: NODE_PATH=$(npm root -g) node tools/perftrace.mjs tests/graphics3d/toonlobbyengine.html?outline=0 --throughput 120
+//==============================================================================
+import * as vanilla from "../../import.js";
+import { createLobbyScene } from "./toonlobbyscene.mjs";
+const { Engine, EngineConfiguration, Scene, Vector2, ToonPostProcess } = vanilla;
+const query = new URLSearchParams(location.search);
+const isPostEnabled = query.get("post") !== "0";
+const isOutlineEnabled = query.get("outline") !== "0";
+
+class LobbyScene extends Scene {
+	/** @type { object | null } */ #lobby = null;
+	/** @type { ToonPostProcess | null } */ #postProcess = null;
+	/** @type { number } */ #frame = 0;
+
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#frame += 1;
+	}
+
+	draw(graphic) {
+		super.draw(graphic);
+		graphic.runExternalPass((webGL2RenderingContext) => {
+			const width = webGL2RenderingContext.drawingBufferWidth;
+			const height = webGL2RenderingContext.drawingBufferHeight;
+			if (this.#lobby === null) {
+				this.#lobby = createLobbyScene(vanilla, webGL2RenderingContext, width, height);
+				if (isPostEnabled) {
+					this.#postProcess = new ToonPostProcess(webGL2RenderingContext, width, height, { sampleCount: 4, useFloatColor: true });
+					this.#postProcess.setBloomLevels(5, 1, 0.25);
+					this.#postProcess.setBloom(true, 0.6, 0.9, 1.6);
+				}
+				const isHdr = this.#postProcess !== null && this.#postProcess.getUseFloatColor();
+				this.#lobby.renderer.setHdrOutput(isHdr);
+				const screenOutline = this.#lobby.queue.getScreenOutline();
+				if (screenOutline !== null) {
+					screenOutline.setHdrOutput(isHdr);
+				}
+				if (!isOutlineEnabled) {
+					this.#lobby.queue.setScreenOutline(null);
+				}
+			}
+			if (this.#postProcess !== null) {
+				this.#postProcess.begin([0.05, 0.05, 0.08]);
+				this.#lobby.drawFrame(this.#frame);
+				this.#postProcess.end(null, [0, 0, width, height]);
+			}
+			else {
+				webGL2RenderingContext.viewport(0, 0, width, height);
+				webGL2RenderingContext.clearColor(0.05, 0.05, 0.08, 1);
+				webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+				this.#lobby.drawFrame(this.#frame);
+			}
+		});
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new LobbyScene());
+</script>
+</body>
+</html>
