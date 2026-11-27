@@ -1344,7 +1344,7 @@ export class ToonRenderer {
 		}
 		const solidProgram = programList[0];
 		const previousProgram = webGL2RenderingContext.getParameter(webGL2RenderingContext.CURRENT_PROGRAM);
-		solidProgram.use();
+		solidProgram.useProgram();
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("shadowTexture"), SHADOW_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("baseColorTexture"), BASE_COLOR_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("emissiveTexture"), EMISSIVE_TEXTURE_UNIT);
@@ -3034,7 +3034,7 @@ export class ToonRenderer {
 		// 그림자 패스. (몸의 깊이만)
 		if (this.#isShadowPass) {
 			const depthEntry = programSet.depth;
-			depthEntry.program.use();
+			depthEntry.program.useProgram();
 			this.uploadFrameUniforms(depthEntry);
 			this.uploadDrawUniforms(depthEntry.program, modelElements, isSkinned, instancedMode, jointMatrices);
 			if (onBeforeDraw !== null) {
@@ -3073,7 +3073,7 @@ export class ToonRenderer {
 		if (hasOutline) {
 			const outlineEntry = programSet.outline;
 			const outlineProgram = outlineEntry.program;
-			outlineProgram.use();
+			outlineProgram.useProgram();
 			this.uploadFrameUniforms(outlineEntry);
 			this.uploadDrawUniforms(outlineProgram, modelElements, isSkinned, instancedMode, jointMatrices);
 			const outlineColor = options.outlineColor !== undefined && options.outlineColor !== null ? options.outlineColor : this.#outlineColor;
@@ -3105,7 +3105,7 @@ export class ToonRenderer {
 		// 몸.
 		const solidEntry = programSet.solid;
 		const solidProgram = solidEntry.program;
-		solidProgram.use();
+		solidProgram.useProgram();
 		this.uploadFrameUniforms(solidEntry);
 		const lightSet = options.lightSet !== undefined && options.lightSet !== null ? options.lightSet : this.#lightSet;
 		this.uploadLightUniforms(solidEntry, lightSet);

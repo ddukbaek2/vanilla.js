@@ -5811,7 +5811,7 @@ export class Graphic extends Object {
 		if (shaderProgram === this.#boundShaderProgram) {
 			return;
 		}
-		shaderProgram.use();
+		shaderProgram.useProgram();
 		this.#boundShaderProgram = shaderProgram;
 	}
 

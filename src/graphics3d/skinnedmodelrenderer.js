@@ -422,7 +422,7 @@ export class SkinnedModelRenderer extends Object {
 	draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
-		shaderProgram.use();
+		shaderProgram.useProgram();
 		const viewProjectionLocation = shaderProgram.getUniformLocation("viewProjectionMatrix");
 		webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
 		const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
@@ -489,7 +489,7 @@ export class SkinnedModelRenderer extends Object {
 	drawDepth(skinnedModel, lightViewProjectionElements, modelMatrixElements) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const depthShaderProgram = this.getDepthShaderProgram();
-		depthShaderProgram.use();
+		depthShaderProgram.useProgram();
 		const lightViewProjectionLocation = depthShaderProgram.getUniformLocation("lightViewProjectionMatrix");
 		webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
 		const modelMatrixLocation = depthShaderProgram.getUniformLocation("modelMatrix");
@@ -553,7 +553,7 @@ export class SkinnedModelRenderer extends Object {
 	drawWireframe(skinnedModel, viewProjectionElements, modelMatrixElements, red, green, blue, alpha) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const wireframeShaderProgram = this.getWireframeShaderProgram();
-		wireframeShaderProgram.use();
+		wireframeShaderProgram.useProgram();
 		const viewProjectionLocation = wireframeShaderProgram.getUniformLocation("viewProjectionMatrix");
 		webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
 		const modelMatrixLocation = wireframeShaderProgram.getUniformLocation("modelMatrix");

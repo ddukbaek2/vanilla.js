@@ -2544,7 +2544,7 @@ export class ToonVfx {
 	 */
 	useProgram(shaderProgram, frame) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
-		shaderProgram.use();
+		shaderProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
 		webGL2RenderingContext.uniform1i(shaderProgram.getUniformLocation("vfxAtlas"), VFX_TEXTURE_UNIT);
 	}
@@ -2907,7 +2907,7 @@ export class ToonVfx {
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const flashProgram = this.#flashProgram;
-		flashProgram.use();
+		flashProgram.useProgram();
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.bindVertexArray(this.#decalVertexArray);
 		for (const flash of this.#flashes) {

@@ -87,7 +87,7 @@ export class FullscreenPass extends Object {
 	useProgram() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
-		shaderProgram.use();
+		shaderProgram.useProgram();
 		const vertexArray = this.getVertexArray();
 		webGL2RenderingContext.bindVertexArray(vertexArray);
 	}
