@@ -11,14 +11,14 @@ import { RenderTarget } from "../rendertarget.js";
 
 /**
  * @example <caption>노드 사각형 안에 툰 3D 장면 그리기</caption>
- * import { WorldNode, ToonView3D, ToonDrawQueue, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { WorldNode, ToonView3D, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const node = new WorldNode();
  * node.setContentSizeXY(320, 240);
  * const view = node.addComponent(ToonView3D);
  * view.getCamera().setPerspective(0.8, 0.1, 100);
  * view.getCamera().lookAt(Vector3.create(0, 1.5, 3), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0b080");
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0b080");
  * const arrays = builder.readArrays();
  * const queue = new ToonDrawQueue();
  * let mesh = null;
@@ -284,7 +284,7 @@ export class ToonView3D extends Component {
 		if (this.#renderer !== null || this.#isRendererFailed) {
 			return this.#renderer;
 		}
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 		try {
 			const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 			this.#renderer = new ToonRenderer(webGL2RenderingContext);

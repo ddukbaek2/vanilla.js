@@ -8,14 +8,14 @@ import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUN
 
 /**
  * @example <caption>툰 화면 공간 바깥선을 한 프레임에 긋기</caption>
- * import { ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * const outline = new ToonScreenOutline(webGL2RenderingContext);
  * outline.setWidth(2, ToonOutlineWidthUnit.pixel);
  * outline.setCrease(50, 1, 0.8);
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#e0c8a8", { hasOutline: false });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#e0c8a8", { hasOutline: false });
  * const mesh = renderer.createMesh(builder.readArrays());
  * const viewMatrix = Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
  * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
@@ -432,7 +432,7 @@ export function readJumpFloodSteps(reach) {
 // - 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.
 // - 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().
 //   beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.
-//   ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)
+//   ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)
 //==============================================================================
 /**
  * @example <caption>꺾임 선 없이 실루엣만 굵게</caption>
@@ -690,15 +690,15 @@ export class ToonScreenOutline {
 	 * @param { number } lineId - 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID. (0 은 빈 곳이라 쓰지 않는다, 같은 번호끼리 맞닿은 곳은 긋지 않는다)
 	 * @param { object } [options] - { jointMatrices Float32Array, isCulled (기본 true), indexStart, indexCount (몸 번호 버퍼의 일부만), isMirrored (주지 않으면 행렬식으로), hasScreenOutline (기본 true, false 면 선은 내지 않고 가리기만), hasCreaseLine (기본 true) }
 	 * @example <caption>바닥은 선 없이 가리기만, 결정은 꺾임 선 없이</caption>
-	 * import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, ToonScreenOutline, MeshBuilder, createBoxGeometry, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
 	 * const outline = new ToonScreenOutline(webGL2RenderingContext);
-	 * const floorBuilder = new ToonMesh.MeshBuilder();
-	 * floorBuilder.addPart(ToonMesh.createBoxGeometry(6, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), "#506070", { hasOutline: false });
+	 * const floorBuilder = new MeshBuilder();
+	 * floorBuilder.addPart(createBoxGeometry(6, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), "#506070", { hasOutline: false });
 	 * const floorMesh = renderer.createMesh(floorBuilder.readArrays());
-	 * const crystalBuilder = new ToonMesh.MeshBuilder();
-	 * crystalBuilder.addPart(ToonMesh.createOctahedronGeometry(0.5), Matrix4.createTranslation(0, 0.5, 0), "#90d0ff", { hasOutline: false });
+	 * const crystalBuilder = new MeshBuilder();
+	 * crystalBuilder.addPart(createOctahedronGeometry(0.5), Matrix4.createTranslation(0, 0.5, 0), "#90d0ff", { hasOutline: false });
 	 * const crystalMesh = renderer.createMesh(crystalBuilder.readArrays());
 	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(3, 3, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
 	 * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
@@ -730,12 +730,12 @@ export class ToonScreenOutline {
 	 * @param { number } lineId - 공통 번호.
 	 * @param { object } [options] - drawMesh 와 같다. (꼴은 모든 인스턴스에 같다)
 	 * @example <caption>돌마다 다른 번호로 맞닿은 곳에도 선</caption>
-	 * import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * import { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
 	 * const renderer = new ToonRenderer(webGL2RenderingContext);
 	 * const outline = new ToonScreenOutline(webGL2RenderingContext);
-	 * const builder = new ToonMesh.MeshBuilder();
-	 * builder.addPart(ToonMesh.createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
 	 * const rockMesh = renderer.createMesh(builder.readArrays());
 	 * const instances = [0, 1, 2].map((index) => ({ modelMatrix: Matrix4.createTranslation(index * 0.5, 0, 0), lineId: 10 + index }));
 	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));
