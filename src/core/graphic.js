@@ -92,6 +92,8 @@ void main() {
 }
 `;
 
+// 하위 트리 그리기 경계를 읽어 두는 칸. (drawNode 가 읽은 바로 뒤에 견주고 버린다)
+const subtreeCullRect = new Rect();
 // 스프라이트 묶어 그리기의 자르기 사각형 표 칸 수. (0 번은 자르지 않는 칸, 차면 그때까지 쌓인 것을 그린다)
 const BATCH_CLIP_SLOT_CAPACITY = 32;
 
@@ -796,6 +798,10 @@ export class Graphic extends Object {
 	/** @private @type { boolean } */ #isCullingEnabled; // 화면 밖 노드의 컴포넌트 그리기를 건너뛸지.
 	/** @private @type { number } */ #culledNodeCount; // 이번 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
 	/** @private @type { number } */ #lastFrameCulledNodeCount; // 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
+	/** @private @type { number } */ #drawFrameNumber; // 그리기 프레임 번호. (beginFrameStatistics 마다 하나씩 오른다, 노드가 지난 프레임에 그려졌는지 본다)
+	/** @private @type { boolean } */ #isSubtreeCullingEnabled; // 화면 밖 하위 트리의 그리기 순회를 통째로 건너뛸지. (화면 밖 거르기가 켜졌을 때만, 기본 켜짐)
+	/** @private @type { number } */ #culledSubtreeCount; // 이번 프레임에 화면 밖이라 그리기를 통째로 건너뛴 하위 트리 수.
+	/** @private @type { number } */ #lastFrameCulledSubtreeCount; // 지난 프레임에 그 수.
 	/** @private @type { boolean } */ #isGeometryCachingEnabled; // 컴포넌트가 그린 정점을 캐시해 두고 바뀐 것만 다시 셈할지. (기본 켜짐)
 	/** @private @type { WeakMap<Component, object> } */ #geometryCacheMap; // 컴포넌트마다의 기하 캐시.
 	/** @private @type { object | null } */ #geometryActiveCache; // 지금 적거나 다시 옮기는 기하 캐시.
@@ -999,6 +1005,10 @@ export class Graphic extends Object {
 		this.#isCullingEnabled = false;
 		this.#culledNodeCount = 0;
 		this.#lastFrameCulledNodeCount = 0;
+		this.#drawFrameNumber = 0;
+		this.#isSubtreeCullingEnabled = true;
+		this.#culledSubtreeCount = 0;
+		this.#lastFrameCulledSubtreeCount = 0;
 		this.#isGeometryCachingEnabled = true;
 		this.#geometryCacheMap = new WeakMap();
 		this.#geometryActiveCache = null;
@@ -2197,12 +2207,15 @@ export class Graphic extends Object {
 		this.#lastFrameDrawCallCount = this.#drawCallCount;
 		this.#lastFrameDrawVertexCount = this.#drawVertexCount;
 		this.#lastFrameCulledNodeCount = this.#culledNodeCount;
+		this.#lastFrameCulledSubtreeCount = this.#culledSubtreeCount;
+		this.#drawFrameNumber += 1;
 		this.#lastFrameGeometryCacheHitCount = this.#geometryCacheHitCount;
 		this.#lastFrameGeometryRebuildCount = this.#geometryRebuildCount;
 		this.#lastFrameRetainedBatchCount = this.#retainedBatchCount;
 		this.#drawCallCount = 0;
 		this.#drawVertexCount = 0;
 		this.#culledNodeCount = 0;
+		this.#culledSubtreeCount = 0;
 		this.#geometryCacheHitCount = 0;
 		this.#geometryRebuildCount = 0;
 		this.#retainedBatchCount = 0;
@@ -2246,6 +2259,8 @@ export class Graphic extends Object {
 	//   내용 영역이 화면 밖일 때 그 노드의 컴포넌트 그리기를 건너뛴다. 자식은 저마다 따로 보고 그대로 그린다.
 	// - 판정은 그릴 때의 지금 변환(부모의 위치, 배율, 회전과 pushState 로 건 것 모두)으로 옮긴 영역의 경계 상자로 한다.
 	// - 알리지 않는 컴포넌트(기본, 글자, 파티클, 직접 만든 컴포넌트)가 하나라도 켜져 있으면 그 노드는 거르지 않는다. draw 를 덮어쓴 노드도 거르지 않는다.
+	// - 하위 트리 거르기(setSubtreeCullingEnabled, 기본 켜짐)를 켜 두면 노드의 하위 트리 그리기 경계(TransformNode.readSubtreeDrawBounds)가 화면 밖일 때
+	//   그 노드와 자손의 그리기 순회를 통째로 건너뛴다. (갱신 tick 은 그대로 돈다)
 	//==============================================================================
 	/**
 	 * @param { boolean } isCullingEnabled 화면 밖 거르기를 켤지. (true 일 때만 켠다)
@@ -2262,6 +2277,76 @@ export class Graphic extends Object {
 	 */
 	isCullingEnabled() {
 		return this.#isCullingEnabled;
+	}
+
+	//==============================================================================
+	// 화면 밖 하위 트리 거르기 설정. (기본 true, 화면 밖 거르기 setCullingEnabled 가 켜졌을 때만 거른다)
+	// - 켜면 drawNode 가 노드에 변환을 건 뒤 그 노드의 하위 트리 그리기 경계(TransformNode.readSubtreeDrawBounds)를 지금 변환으로 옮겨,
+	//   화면과 걸린 자르기(beginClipRect) 밖이면 그 노드와 자손의 그리기 순회를 통째로 건너뛴다. (스크롤 목록의 보이지 않는 줄을 돌지 않는다)
+	// - 경계는 변환, 내용 크기, 자식, 켜짐, 보임, 컴포넌트가 바뀐 때만 다시 셈한다. 어디에 그리는지 모르는 것이 든 하위 트리는 건너뛰지 않는다.
+	// - 갱신(tick)은 그대로 돈다. 기즈모를 모두 그리게 했으면(setForceGizmosVisible) 건너뛰지 않는다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isSubtreeCullingEnabled 화면 밖 하위 트리 거르기를 켤지. (true 일 때만 켠다)
+	 * @example <caption>스크롤 목록에서 건너뛴 줄 수 보기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		graphic.setSubtreeCullingEnabled(true);
+	 * 		super.draw(graphic);
+	 * 		console.log(graphic.isSubtreeCullingEnabled(), graphic.getLastFrameCulledSubtreeCount());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	setSubtreeCullingEnabled(isSubtreeCullingEnabled) {
+		this.#isSubtreeCullingEnabled = isSubtreeCullingEnabled === true;
+	}
+
+	//==============================================================================
+	// 화면 밖 하위 트리 거르기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 켜졌으면 참. (화면 밖 거르기가 꺼져 있으면 켜져 있어도 거르지 않는다)
+	 */
+	isSubtreeCullingEnabled() {
+		return this.#isSubtreeCullingEnabled;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 화면 밖이라 그리기를 통째로 건너뛴 하위 트리 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 지난 프레임에 건너뛴 하위 트리 수.
+	 */
+	getLastFrameCulledSubtreeCount() {
+		return this.#lastFrameCulledSubtreeCount;
+	}
+
+	//==============================================================================
+	// 노드의 하위 트리를 화면 밖이라 건너뛸지 반환. (drawNode 가 노드에 변환을 건 뒤 부른다)
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node 그릴 노드.
+	 * @param { boolean } isForceGizmosVisible 기즈모를 모두 그리는지.
+	 * @returns { boolean } 건너뛰면 참.
+	 */
+	#isNodeSubtreeCulled(node, isForceGizmosVisible) {
+		if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || isForceGizmosVisible || typeof node.readSubtreeDrawBounds !== "function") {
+			return false;
+		}
+		const drawBounds = subtreeCullRect;
+		if (!node.readSubtreeDrawBounds(drawBounds)) {
+			return false;
+		}
+		if (!(drawBounds.size.x > 0 && drawBounds.size.y > 0)) {
+			return true;
+		}
+		return !this.isLocalRectVisible(drawBounds);
 	}
 
 	//==============================================================================
@@ -4825,6 +4910,7 @@ export class Graphic extends Object {
 	// 노드의 변환 배율이 지난 프레임과 달라 움직이는 중인지 셈하고 기억하기. (drawNode 가 pushTransform 뒤에 부른다)
 	// - 양자화 단위가 0 이 아니면 늘 묶어 굽으므로 셈하지 않는다.
 	// - 처음 그리는 노드는 움직이지 않는 것으로 본다. (첫 프레임에 두 번 굽지 않게)
+	// - 지난 프레임에 그리지 않은 노드(숨겼거나 화면 밖이라 하위 트리를 건너뛴 노드)도 처음 그리는 것처럼 본다. (건너뛴 사이에 배율이 바뀌어도 건너뛰지 않은 때와 같은 화면)
 	//==============================================================================
 	/**
 	 * @param { TransformNode } node 그리는 노드. (지금 배율을 노드에 적어 둔다)
@@ -4836,8 +4922,10 @@ export class Graphic extends Object {
 		}
 		const maximumScale = this.#transformMatrix.getMaximumScale();
 		const lastDrawnMaximumScale = node.getLastDrawnMaximumScale();
-		node.setLastDrawnMaximumScale(maximumScale);
-		return lastDrawnMaximumScale > 0 && lastDrawnMaximumScale !== maximumScale;
+		const lastDrawnFrameNumber = (typeof node.getLastDrawnFrameNumber === "function") ? node.getLastDrawnFrameNumber() : this.#drawFrameNumber;
+		node.setLastDrawnMaximumScale(maximumScale, this.#drawFrameNumber);
+		const isDrawnLastFrame = lastDrawnFrameNumber >= this.#drawFrameNumber - 1;
+		return isDrawnLastFrame && lastDrawnMaximumScale > 0 && lastDrawnMaximumScale !== maximumScale;
 	}
 
 	//==============================================================================
@@ -5130,10 +5218,16 @@ export class Graphic extends Object {
 		try {
 			// 배율이 움직이는 노드의 글은 묶은 배율로 굽는다. (자식은 저마다 다시 정한다, 다 그리면 푼다)
 			this.#isTextBakeScaleMoving = this.readNodeTextBakeScaleMoving(node);
-			node.draw(this);
+			const isForceGizmosVisible = this.isForceGizmosVisible();
+			// 하위 트리 그리기 경계가 화면과 자르기 밖이면 이 노드와 자손의 그리기를 통째로 건너뛴다.
+			if (this.#isNodeSubtreeCulled(node, isForceGizmosVisible)) {
+				this.#culledSubtreeCount += 1;
+			}
+			else {
+				node.draw(this);
+			}
 			this.#isTextBakeScaleMoving = false;
 
-			const isForceGizmosVisible = this.isForceGizmosVisible();
 			const isGizmoVisible = isForceGizmosVisible || node.isGizmoVisible();
 			if (isGizmoVisible) {
 				node.drawGizmos(this);

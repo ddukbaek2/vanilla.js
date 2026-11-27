@@ -8,7 +8,7 @@
 //   invalidateFramebuffer 는 버려도 된다는 알림이라 드라이버가 무시해도 된다. 크롬(ANGLE)은 버린 깊이를 1 로 다시 채워 드러나지 않으므로,
 //   페이지에서 invalidateFramebuffer 를 아무것도 하지 않게 바꿔 무시하는 드라이버를 흉내 낸다. (지난 프레임의 깊이 0.5 가 남는다)
 // - 바꿔 끼운 셰이더와 셰이더 섞기는 덧그림 칸에 먼저 그리고 옮겨 섞는다. 옮길 때 자르기 밖을 덮지 않는지(바탕색이 남는지) 본다.
-// - 셰이더 길이 드로 콜이 더 적고, 스크롤 칸 밖 줄의 컴포넌트를 거르는지(getLastFrameCulledNodeCount) 본다.
+// - 셰이더 길이 드로 콜이 더 적고, 스크롤 칸 밖 줄을 거르는지(줄째 건너뛴 getLastFrameCulledSubtreeCount 와 컴포넌트만 거른 getLastFrameCulledNodeCount 의 합) 본다.
 // - 씬이 그려진 다섯째 프레임을 찍는다. (씬은 불러온 뒤 로딩 화면을 0.3 초 더 보여서, 정한 프레임 번호로 찍으면 로딩 화면끼리 견주거나 한쪽만 로딩 화면이 된다)
 //   찍은 화면이 로딩 화면(검정)이 아닌지도 본다.
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
@@ -202,7 +202,7 @@ class BatchClipScene extends Scene {
 		}, { clearDepth: false });
 		graphic.endOpacityLayer();
 		window.drawCallCountList.push(graphic.getLastFrameDrawCallCount());
-		window.culledNodeCountList.push(graphic.getLastFrameCulledNodeCount());
+		window.culledNodeCountList.push(graphic.getLastFrameCulledNodeCount() + graphic.getLastFrameCulledSubtreeCount());
 	}
 }
 window.drawCallCountList = [];
