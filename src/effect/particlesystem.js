@@ -265,6 +265,9 @@ export class ParticleSystem extends Component {
 	stop(isClearing = false) {
 		this.#isPlaying = false;
 		if (isClearing) {
+			if (this.#particleList.length > 0) {
+				this.markDrawnRectDirty();
+			}
 			this.#particleList.length = 0;
 			this.#emissionAccumulator = 0;
 			if (this.#random) {
@@ -283,6 +286,9 @@ export class ParticleSystem extends Component {
 	emit(count, worldOffset = null) {
 		for (let emitIndex = 0; emitIndex < count; ++emitIndex) {
 			this.spawnParticle(worldOffset);
+		}
+		if (count > 0) {
+			this.markDrawnRectDirty();
 		}
 	}
 
@@ -307,6 +313,9 @@ export class ParticleSystem extends Component {
 	 * @param { number } timeDelta 진행할 시간. (초)
 	 */
 	simulate(timeDelta) {
+		// 파티클이 움직이면 그리는 사각형이 바뀐다. (앞이나 뒤에 하나라도 있으면 노드에 알린다, 유니티처럼 프레임마다 경계를 다시 셈한다)
+		const isAnyParticleBefore = this.#particleList.length > 0;
+
 		// 방출.
 		if (this.#isPlaying) {
 			const previousElapsed = this.#playElapsedSeconds;
@@ -369,6 +378,9 @@ export class ParticleSystem extends Component {
 			particle.rotation += particle.angularVelocity * timeDelta;
 		}
 		particleList.length = aliveCount;
+		if (isAnyParticleBefore || aliveCount > 0) {
+			this.markDrawnRectDirty();
+		}
 	}
 
 	//==============================================================================
@@ -528,6 +540,78 @@ export class ParticleSystem extends Component {
 		if (this.#blendMode !== "source-over") {
 			graphic.setBlendMode("source-over");
 		}
+	}
+
+	//==============================================================================
+	// 그리는 사각형 셈하기. (오버라이드: 살아 있는 파티클이 그리는 쿼드를 모두 품는 사각형, 노드 내용 좌표)
+	// - 파티클마다 그리는 크기의 반에 √2 를 곱한 만큼(돌린 사각형, 그림), 꼬리 쿼드면 머리와 꼬리를 품고 굵기의 반만큼, 흔들림 폭만큼 좌우를 넓히고 한 단위 여유를 둔다.
+	// - 시뮬레이션(simulate)이 돌 때마다, 방출(emit)과 지움(stop)에, 그리는 꼴을 바꾸는 세터에 다시 셈하게 알린다. (그리는 것이 화면 밖이면 그리기를 건너뛰고 시뮬레이션은 tick 이라 그대로 돈다)
+	// - 파티클이 없으면 크기 0 (그리지 않는다).
+	// - 월드 공간이면서 수동 틱이면 모른다. (노드를 옮기면 그리는 자리가 바뀌는데 그때 다시 셈할 길이 없다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 알면 참.
+	 * @example <caption>방출한 파티클을 품는 사각형</caption>
+	 * import { WorldNode, ParticleSystem, Rect } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * const particleSystem = node.addComponent(ParticleSystem);
+	 * particleSystem.setStartSpeed(0);
+	 * particleSystem.setStartSize(10);
+	 * particleSystem.emit(3);
+	 * const drawnRect = Rect.zero();
+	 * console.log(particleSystem.calculateDrawnRect(drawnRect), drawnRect.size.x > 0);
+	 */
+	calculateDrawnRect(rect) {
+		const particleList = this.#particleList;
+		if (particleList.length === 0) {
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
+		}
+		let baseOffsetX = 0;
+		let baseOffsetY = 0;
+		if (this.#isWorldSpace) {
+			const node = this.getNode();
+			if (this.#isManualTick || node === null || node === undefined) {
+				return false;
+			}
+			const nodePosition = node.getLocalPosition();
+			baseOffsetX = -nodePosition.x;
+			baseOffsetY = -nodePosition.y;
+		}
+		const isStreak = this.#renderShape === ParticleRenderShape.streak;
+		const wobbleExtent = System.Math.abs(this.#wobbleAmplitude);
+		let minimumX = System.Number.POSITIVE_INFINITY;
+		let minimumY = System.Number.POSITIVE_INFINITY;
+		let maximumX = System.Number.NEGATIVE_INFINITY;
+		let maximumY = System.Number.NEGATIVE_INFINITY;
+		for (const particle of particleList) {
+			const lifeRatio = particle.age / particle.lifetime;
+			const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
+			const drawSize = System.Math.max(0.1, particle.size * sizeScale);
+			const headX = particle.x + baseOffsetX;
+			const headY = particle.y + baseOffsetY;
+			let tailX = headX;
+			let tailY = headY;
+			let extent = drawSize * 0.5 * System.Math.SQRT2;
+			if (isStreak) {
+				tailX = headX - particle.velocityX * this.#streakScale;
+				tailY = headY - particle.velocityY * this.#streakScale;
+				extent = drawSize * 0.5;
+			}
+			const extentX = extent + wobbleExtent + 1;
+			const extentY = extent + 1;
+			minimumX = System.Math.min(minimumX, headX - extentX, tailX - extentX);
+			minimumY = System.Math.min(minimumY, headY - extentY, tailY - extentY);
+			maximumX = System.Math.max(maximumX, headX + extentX, tailX + extentX);
+			maximumY = System.Math.max(maximumY, headY + extentY, tailY + extentY);
+		}
+		rect.position.set(minimumX, minimumY);
+		rect.size.set(maximumX - minimumX, maximumY - minimumY);
+		return true;
 	}
 
 	//==============================================================================
@@ -842,6 +926,7 @@ export class ParticleSystem extends Component {
 	setSizeOverLifetime(startScale, endScale) {
 		this.#sizeOverLifetimeStart = startScale;
 		this.#sizeOverLifetimeEnd = endScale;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -885,6 +970,7 @@ export class ParticleSystem extends Component {
 	 */
 	setRenderShape(renderShape) {
 		this.#renderShape = renderShape;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -895,6 +981,7 @@ export class ParticleSystem extends Component {
 	 */
 	setImage(image) {
 		this.#image = image;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -947,6 +1034,7 @@ export class ParticleSystem extends Component {
 	setWobble(amplitude, frequency = 4) {
 		this.#wobbleAmplitude = amplitude;
 		this.#wobbleFrequency = frequency;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -957,6 +1045,7 @@ export class ParticleSystem extends Component {
 	 */
 	setStreakScale(streakScale) {
 		this.#streakScale = streakScale;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -967,6 +1056,7 @@ export class ParticleSystem extends Component {
 	 */
 	setWorldSpace(isWorldSpace) {
 		this.#isWorldSpace = isWorldSpace;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
@@ -1188,6 +1278,7 @@ export class ParticleSystem extends Component {
 	 */
 	setManualTick(isManualTick) {
 		this.#isManualTick = isManualTick;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
