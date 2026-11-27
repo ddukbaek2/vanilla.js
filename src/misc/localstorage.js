@@ -92,6 +92,23 @@ export class LocalStorage extends Object {
 	}
 
 	//==============================================================================
+	// 저장 폴더 직접 설정. (러스트 판 데스크탑이 localstorage.json 을 둘 폴더, 원본은 브라우저가 페이지 주소마다 정해 아무것도 하지 않는다)
+	// - 같은 게임 코드가 두 엔진에서 돌게 두는 자리다. 러스트 판 웹도 아무것도 하지 않는다.
+	//==============================================================================
+	/**
+	 * @param { string | null } storageDirectoryPath localstorage.json 을 둘 폴더. (null 이면 앱 이름으로 정한 기본 폴더)
+	 * @example <caption>저장 폴더를 정해도 원본 저장은 그대로 브라우저 저장소에 간다</caption>
+	 * import { LocalStorage } from "./build/vanilla.js";
+	 *
+	 * LocalStorage.setStorageDirectory("saves");
+	 * LocalStorage.setString("profile.name", "Player");
+	 * console.log(LocalStorage.getString("profile.name"));
+	 */
+	static setStorageDirectory(storageDirectoryPath) {
+		// 원본은 브라우저 저장소를 써 폴더를 고를 수 없다.
+	}
+
+	//==============================================================================
 	// 저장소를 못 써서 메모리로 대신한 적이 있는지.
 	//==============================================================================
 	/**

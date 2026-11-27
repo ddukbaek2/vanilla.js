@@ -129,10 +129,7 @@ export class ViewManager extends Object {
 			return;
 		}
 		this.#isViewRectPending = false;
-		let devicePixelRatio = System.window.devicePixelRatio || 1;
-		if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
-			devicePixelRatio = this.#maxRenderPixelRatio;
-		}
+		const devicePixelRatio = this.limitRenderPixelRatio(System.window.devicePixelRatio || 1);
 		const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
 		const canvasNativeRect = canvas.getBoundingClientRect();
 		const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
@@ -592,6 +589,28 @@ export class ViewManager extends Object {
 	 */
 	getMaxRenderPixelRatio() {
 		return this.#maxRenderPixelRatio;
+	}
+
+	//==============================================================================
+	// 상한을 건 배율.
+	// - 상한이 0 보다 크고 장치 배율이 상한을 넘으면 상한을, 아니면 장치 배율을 그대로 돌려준다. (calculateViewRect 가 쓰는 셈)
+	//==============================================================================
+	/**
+	 * @param { number } devicePixelRatio 장치 화면 배율. (window.devicePixelRatio 꼴)
+	 * @returns { number } 상한을 건 배율.
+	 * @example <caption>상한 2 를 걸면 배율 3 은 2 로</caption>
+	 * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * const viewManager = engine.getViewManager();
+	 * viewManager.setMaxRenderPixelRatio(2);
+	 * console.log(viewManager.limitRenderPixelRatio(3), viewManager.limitRenderPixelRatio(1.5));
+	 */
+	limitRenderPixelRatio(devicePixelRatio) {
+		if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
+			return this.#maxRenderPixelRatio;
+		}
+		return devicePixelRatio;
 	}
 
 	//==============================================================================

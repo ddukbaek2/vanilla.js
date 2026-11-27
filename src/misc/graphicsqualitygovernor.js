@@ -23,7 +23,7 @@ export const GraphicsQuality = System.Object.freeze({
 //   한 번 처지는 기기로 재면 다시 재지 않는다. (FrameProbe 와 같다)
 // - 렌더 배율 상한: setRenderPixelRatioLimits(보통, 가벼운 길) 로 주고 applyRenderPixelRatio(viewManager) 가 바뀔 때만 건다. (0 이면 제한 없음)
 // - 가벼운 길에서 무엇을 줄일지(그림자, 바깥선, 효과, 그리는 수)는 게임이 isLite 를 읽어 정한다.
-// - 엔진과 브라우저를 들여오지 않는다. 주소 글은 부르는 쪽이 applySearchText(location.search) 로 넘긴다.
+// - 엔진과 브라우저를 들여오지 않는다. 주소 글은 applyPageQuery 가 지금 페이지에서 읽거나, 부르는 쪽이 applySearchText(location.search) 로 넘긴다.
 //==============================================================================
 /**
  * @example <caption>설정과 프레임 재기로 가벼운 길 정하기</caption>
@@ -131,6 +131,27 @@ export class GraphicsQualityGovernor {
 		}
 		const value = searchParameters.get(liteKey);
 		this.#liteOverride = value !== "0" && value !== "false";
+	}
+
+	//==============================================================================
+	// 페이지 주소의 쿼리로 덮어쓰기. (지금 페이지의 location.search 를 applySearchText 로 넘긴다, 주소가 없는 곳이면 그대로)
+	// - 러스트 판은 웹에서 주소의 쿼리, 데스크탑에서 환경 변수 VANILLA_<이름> 을 읽는다. 원본은 크롬 위에서만 돌아 주소만 본다.
+	//==============================================================================
+	/**
+	 * @param { string } [liteKey] 볼 쿼리 이름. (처음은 "light")
+	 * @example <caption>페이지 주소의 쿼리로 가벼운 길 덮어쓰기</caption>
+	 * import { GraphicsQualityGovernor } from "./build/vanilla.js";
+	 *
+	 * const governor = new GraphicsQualityGovernor();
+	 * governor.applyPageQuery("light");
+	 * console.log(governor.getLiteOverride());
+	 */
+	applyPageQuery(liteKey = "light") {
+		const location = System.location;
+		if (!location || typeof location.search !== "string") {
+			return;
+		}
+		this.applySearchText(location.search, liteKey);
 	}
 
 	//==============================================================================

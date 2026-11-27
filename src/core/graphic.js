@@ -4725,6 +4725,26 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 문자열 측정. (주어진 폰트 문자열 기준, 현재 폰트 문자열은 바꾸지 않는다)
+	//==============================================================================
+	/**
+	 * @param { string } fontString 잴 때 쓸 폰트 문자열. (Canvas2D font 꼴)
+	 * @param { string } text 잴 글.
+	 * @returns { TextMetrics } 그 글꼴로 잰 치수. (캐시가 나눠 쓰므로 고치지 않는다, 지금 변환은 보지 않는다)
+	 * @example <caption>지금 글꼴을 바꾸지 않고 큰 글꼴로 재기</caption>
+	 * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * const graphic = engine.getGraphic();
+	 * const metrics = graphic.measureTextWithFontString("32px sans-serif", "Vanilla");
+	 * console.log(metrics.width > 0, graphic.getFontString());
+	 */
+	measureTextWithFontString(fontString, text) {
+		const textStringTextureCache = this.getTextStringTextureCache();
+		return textStringTextureCache.measureText(fontString, text);
+	}
+
+	//==============================================================================
 	// 텍스트 베이크 스케일 양자화 단위 설정.
 	// - 기본 0.25. 확대 축소가 잦은 글자가 스케일마다 새로 구워지지 않게 묶는다.
 	// - 0 이면 양자화하지 않고 실제 스케일 그대로 굽는다. (스케일이 고정된 UI 글자를 늘리지 않고 1:1 로 그릴 때)
