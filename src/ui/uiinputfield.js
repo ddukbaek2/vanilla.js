@@ -189,6 +189,7 @@ export class UIInputField extends WorldNode {
 	/** @private @type { string | null } */ #caretRevealRequest; // 다음 배치에서 커서가 보이게 스크롤할지. ("ifNeeded", "always", null)
 	/** @private @type { TextAreaLayout | null } */ #textAreaLayout; // 여러 줄 배치.
 	/** @private @type { string | null } */ #textAreaLayoutKey; // 여러 줄 배치의 열쇠. (보인 글, 폰트, 폭, 줄 높이, 탭 크기)
+	/** @private @type { object | null } */ #scrollbarDragStart; // 썸을 끄는 중이면 { startY, startScrollTop }. (노드 좌표 y 와 그때 scrollTop)
 	/** @private @type { number } */ #textAreaScrollbarGutter; // 클래식 스크롤 막대가 차지한 폭. (여러 줄 필드, 얹는 막대거나 넘치지 않으면 0)
 	/** @private @type { Component | null } */ #textAreaWheelReceiver; // 여러 줄일 때만 붙는 휠 받기 컴포넌트. (TextAreaWheelReceiver)
 
@@ -261,6 +262,7 @@ export class UIInputField extends WorldNode {
 		this.#textAreaLayoutKey = null;
 		this.#textAreaWheelReceiver = null;
 		this.#textAreaScrollbarGutter = 0;
+		this.#scrollbarDragStart = null;
 
 		// 1) 배경 (드로 순서: 가장 먼저).
 		this.#bgPaint = this.addComponent(Paint);
@@ -981,25 +983,70 @@ export class UIInputField extends WorldNode {
 			}
 		}
 		graphic.endClipRect();
-		// 썸. (넘칠 때, 클래식 막대면 막대 칸 안 양끝 단추 사이의 크롬 치수 썸, 아니면 얹는 막대)
+		// 썸. (넘칠 때)
 		if (isOverlay) {
-			const scrollHeight = layout.getContentHeight() + padding * 2;
-			const metrics = this.#textAreaScrollbarGutter > 0 ? readClassicScrollbarMetrics() : null;
-			const classicThumbSpan = metrics ? calculateClassicThumbSpan(metrics, contentSize.y, contentSize.y, scrollHeight, this.#scrollTop) : null;
-			if (classicThumbSpan) {
-				const trackLeft = contentSize.x - this.#textAreaScrollbarGutter;
+			const thumbRect = this.#calculateTextAreaThumbRect();
+			if (thumbRect) {
 				graphic.setFillColor(new Color(121 / 255, 121 / 255, 121 / 255, 0.4).toHEXString());
-				graphic.drawRect(Rect.create(trackLeft + metrics.thumbCrossOffset, classicThumbSpan.start + metrics.thumbLengthInset, metrics.thumbThickness, System.Math.max(0, classicThumbSpan.length - metrics.thumbLengthInset * 2)));
-			}
-			else if (!metrics && scrollHeight > contentSize.y + 0.5) {
-				const thumbLength = System.Math.min(contentSize.y, System.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / scrollHeight));
-				const maximumScrollTop = scrollHeight - contentSize.y;
-				const thumbTop = (contentSize.y - thumbLength) * System.Math.max(0, System.Math.min(1, this.#scrollTop / maximumScrollTop));
-				graphic.setFillColor(new Color(121 / 255, 121 / 255, 121 / 255, 0.4).toHEXString());
-				graphic.drawRect(Rect.create(contentSize.x - TEXT_AREA_SCROLLBAR_THICKNESS, thumbTop, TEXT_AREA_SCROLLBAR_THICKNESS, thumbLength));
+				graphic.drawRect(thumbRect);
 			}
 		}
 		graphic.popState();
+	}
+	//==============================================================================
+	// 여러 줄 필드의 스크롤 막대 썸 자리. (노드 좌표, 넘치지 않으면 null, 러스트 판 calculate_text_area_thumb_rect)
+	// - 클래식 막대면 막대 칸 안, 양끝 단추 사이의 크롬 치수 썸이고, 아니면 오른쪽 끝의 얹는 썸이다.
+	//==============================================================================
+	/**
+	 * @returns { Rect | null } 썸 사각형.
+	 * @private
+	 */
+	#calculateTextAreaThumbRect() {
+		const contentSize = this.getContentSize();
+		const layout = this.#ensureTextAreaLayout();
+		const scrollHeight = layout.getContentHeight() + this.#padding * 2;
+		if (scrollHeight <= contentSize.y + 0.5 || contentSize.y <= 0) {
+			return null;
+		}
+		if (this.#textAreaScrollbarGutter > 0) {
+			const metrics = readClassicScrollbarMetrics();
+			const thumbSpan = metrics ? calculateClassicThumbSpan(metrics, contentSize.y, contentSize.y, scrollHeight, this.#scrollTop) : null;
+			if (!thumbSpan) {
+				return null;
+			}
+			const trackLeft = contentSize.x - this.#textAreaScrollbarGutter;
+			return Rect.create(trackLeft + metrics.thumbCrossOffset, thumbSpan.start + metrics.thumbLengthInset, metrics.thumbThickness, System.Math.max(0, thumbSpan.length - metrics.thumbLengthInset * 2));
+		}
+		const thumbLength = System.Math.min(contentSize.y, System.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / scrollHeight));
+		const maximumScrollTop = scrollHeight - contentSize.y;
+		const thumbTop = (contentSize.y - thumbLength) * System.Math.max(0, System.Math.min(1, this.#scrollTop / maximumScrollTop));
+		return Rect.create(contentSize.x - TEXT_AREA_SCROLLBAR_THICKNESS, thumbTop, TEXT_AREA_SCROLLBAR_THICKNESS, thumbLength);
+	}
+	//==============================================================================
+	// 썸 끌기. (썸을 옮긴 만큼을 글 높이의 비로 넘긴다, 러스트 판 touch_move 의 scrollbar_drag_start 갈래)
+	//==============================================================================
+	/**
+	 * @param { number } localY 지금 노드 좌표 y.
+	 * @private
+	 */
+	#dragTextAreaThumb(localY) {
+		const contentSize = this.getContentSize();
+		const layout = this.#ensureTextAreaLayout();
+		const scrollHeight = layout.getContentHeight() + this.#padding * 2;
+		const metrics = this.#textAreaScrollbarGutter > 0 ? readClassicScrollbarMetrics() : null;
+		let trackRoom = 1;
+		if (metrics) {
+			const thumbRoom = System.Math.max(1, contentSize.y - metrics.buttonLength * 2);
+			const thumbLength = System.Math.min(thumbRoom, System.Math.max(metrics.thumbMinimumLength, System.Math.round(thumbRoom * contentSize.y / System.Math.max(1, scrollHeight))));
+			trackRoom = System.Math.max(1, thumbRoom - thumbLength);
+		}
+		else {
+			const thumbLength = System.Math.min(contentSize.y, System.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / System.Math.max(1, scrollHeight)));
+			trackRoom = System.Math.max(1, contentSize.y - thumbLength);
+		}
+		const maximumScrollTop = this.#getMaximumScrollTop(contentSize.y);
+		const dragStart = this.#scrollbarDragStart;
+		this.#scrollTop = System.Math.max(0, System.Math.min(maximumScrollTop, dragStart.startScrollTop + (localY - dragStart.startY) / trackRoom * maximumScrollTop));
 	}
 
 	//==============================================================================
@@ -1440,6 +1487,16 @@ export class UIInputField extends WorldNode {
 	touchPress(viewInputPosition) {
 		this.focus();
 		this.hideContextMenu();
+		this.#scrollbarDragStart = null;
+		if (this.#isMultilineEnabled) {
+			// 썸을 누르면 끌어 스크롤한다. (선택은 그대로)
+			const thumbRect = this.#calculateTextAreaThumbRect();
+			const localPosition = Vector2.create(viewInputPosition.x - this.getPosition().x, viewInputPosition.y - this.getPosition().y);
+			if (thumbRect && localPosition.x >= thumbRect.position.x && localPosition.y >= thumbRect.position.y && localPosition.y <= thumbRect.position.y + thumbRect.size.y) {
+				this.#scrollbarDragStart = { startY: localPosition.y, startScrollTop: this.#scrollTop };
+				return;
+			}
+		}
 		let index = 0;
 		this.#openEditKind = null;
 		this.#preferredCaretX = null;
@@ -1484,6 +1541,10 @@ export class UIInputField extends WorldNode {
 	 * @param { Vector2 } viewInputPosition 옮긴 자리. (뷰 좌표)
 	 */
 	touchMove(viewInputPosition) {
+		if (this.#scrollbarDragStart) {
+			this.#dragTextAreaThumb(viewInputPosition.y - this.getPosition().y);
+			return;
+		}
 		if (this.#dragStartIndex < 0) return;
 		let index = 0;
 		if (this.#isMultilineEnabled) {
@@ -1524,11 +1585,17 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 터치 뗌. (끌어 선택하기를 끝낸다)
 	//==============================================================================
-	touchRelease() { this.#dragStartIndex = -1; }
+	touchRelease() {
+		this.#dragStartIndex = -1;
+		this.#scrollbarDragStart = null;
+	}
 	//==============================================================================
 	// 터치 취소. (끌어 선택하기를 끝낸다)
 	//==============================================================================
-	touchCancel() { this.#dragStartIndex = -1; }
+	touchCancel() {
+		this.#dragStartIndex = -1;
+		this.#scrollbarDragStart = null;
+	}
 
 	//==============================================================================
 	// localX(노드 로컬 X) → 문자 인덱스. 측정은 오프스크린 2D ctx 로.

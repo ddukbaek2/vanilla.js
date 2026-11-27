@@ -284,12 +284,24 @@ try {
 		receiver.wheel(globalThis.Vanilla.Vector2.create(0, 100000));
 		const maximumScrollTop = field.getScrollTop();
 		const expectedMaximum = field.getLineHeight() * 30 + 16 * 2 - field.getContentSize().y;
+		// 썸 끌기: 맨 위 썸을 트랙 남는 길이의 반만큼 끌면 끝의 반을 넘기고, 선택은 그대로다. (러스트 판 scrollbar_drag_start)
+		field.setScrollTop(0);
+		field.moveCursor(3, false);
+		const position = field.getPosition();
+		const contentSize = field.getContentSize();
+		const scrollHeight = field.getLineHeight() * 30 + 16 * 2;
+		const thumbLength = Math.min(contentSize.y, Math.max(20, contentSize.y * contentSize.y / scrollHeight));
+		const trackRoom = contentSize.y - thumbLength;
+		field.touchPress(globalThis.Vanilla.Vector2.create(position.x + contentSize.x - 4, position.y + 5));
+		field.touchMove(globalThis.Vanilla.Vector2.create(position.x + contentSize.x - 4, position.y + 5 + trackRoom * 0.5));
+		field.touchRelease(globalThis.Vanilla.Vector2.create(position.x + contentSize.x - 4, position.y + 5 + trackRoom * 0.5));
+		const isThumbDragRight = Math.abs(field.getScrollTop() - expectedMaximum * 0.5) < 0.001 && field.getCursorIndex() === 3 && !field.hasSelection();
 		field.setMultiline(false);
 		const hasReceiverWhenSingle = findReceiver(field) !== undefined;
 		field.setMultiline(true);
-		return { afterWheel, isMaximumRight: Math.abs(maximumScrollTop - expectedMaximum) < 0.001, hasReceiverWhenSingle };
+		return { afterWheel, isMaximumRight: Math.abs(maximumScrollTop - expectedMaximum) < 0.001, hasReceiverWhenSingle, isThumbDragRight };
 	});
-	checkJson(wheelResult, { afterWheel: 50, isMaximumRight: true, hasReceiverWhenSingle: false }, "휠 넘기기와 끝, 한 줄은 휠을 받지 않는다");
+	checkJson(wheelResult, { afterWheel: 50, isMaximumRight: true, hasReceiverWhenSingle: false, isThumbDragRight: true }, "휠 넘기기와 끝, 썸 끌기, 한 줄은 휠을 받지 않는다");
 	await page.evaluate(() => (globalThis.canvasField.detach(), globalThis.canvasField.getParent().removeChild(globalThis.canvasField)));
 
 	// 5) 한 줄 Enter 는 제출한다.
