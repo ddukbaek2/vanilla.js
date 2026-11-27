@@ -1082,6 +1082,111 @@ function readMaximumScale(elements) {
 
 
 //==============================================================================
+// 인스턴스 버퍼 전체의 경계. (꼴에 행렬이 있을 때만, 자리들의 상자 가운데와 가장 먼 자리까지의 거리, 가장 큰 크기)
+// - 어느 모형으로 그려도 쓰도록 모형의 경계 구는 그릴 때 더한다. (readInstanceBufferSphere)
+//==============================================================================
+/**
+ * @param { ToonInstanceLayout } instanceLayout - 버퍼의 인스턴스 꼴.
+ * @param { Float32Array } data - 꼴의 수 개수씩 인스턴스를 이어 담은 수.
+ * @returns { object | null } { center: [x, y, z], radius, scale }. (행렬이 없거나 인스턴스가 없으면 null)
+ */
+function readInstanceBounds(instanceLayout, data) {
+	if (!instanceLayout.hasMatrix()) {
+		return null;
+	}
+	const floatCount = instanceLayout.getFloatCount();
+	const instanceCount = System.Math.floor(data.length / floatCount);
+	if (instanceCount <= 0) {
+		return null;
+	}
+	let matrixOffset = 0;
+	for (const attribute of instanceLayout.getAttributes()) {
+		if (attribute.name === TOON_INSTANCE_MATRIX_NAME) {
+			matrixOffset = attribute.offset;
+		}
+	}
+	const minimum = [System.Infinity, System.Infinity, System.Infinity];
+	const maximum = [-System.Infinity, -System.Infinity, -System.Infinity];
+	let scale = 0;
+	for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
+		const offset = instanceIndex * floatCount + matrixOffset;
+		for (let axis = 0; axis < 3; ++axis) {
+			const value = data[offset + 12 + axis];
+			minimum[axis] = System.Math.min(minimum[axis], value);
+			maximum[axis] = System.Math.max(maximum[axis], value);
+		}
+		scale = System.Math.max(scale, readMaximumScale(data.subarray(offset, offset + 16)));
+	}
+	const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
+	let radius = 0;
+	for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
+		const offset = instanceIndex * floatCount + matrixOffset;
+		radius = System.Math.max(radius, System.Math.hypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
+	}
+	return { center: center, radius: radius, scale: scale };
+}
+
+
+//==============================================================================
+// 모형을 인스턴스 버퍼로 그릴 때의 월드 경계 구. (버퍼의 경계에 모형의 경계 구를 가장 큰 크기로 더한 것, 걸러도 빠지는 화소가 없다)
+//==============================================================================
+/**
+ * @param { object } mesh - ToonRenderer.createMesh 의 결과.
+ * @param { object } instanceBuffer - ToonRenderer.createInstanceBuffer 의 결과.
+ * @returns { Array<number> | null } [x, y, z, 반지름]. (꼴에 행렬이 없어 경계를 모르면 null)
+ * @example <caption>나무 버퍼 전체가 화면에 드는지 보기</caption>
+ * import { ToonRenderer, MeshBuilder, createCylinderGeometry, readInstanceBufferSphere, Matrix4 } from "./vanilla.js";
+ * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+ * const builder = new MeshBuilder();
+ * builder.addPart(createCylinderGeometry(0.02, 0.4, 1, 8), Matrix4.createTranslation(0, 0.5, 0), "#4a8040");
+ * const treeMesh = renderer.createMesh(builder.readArrays());
+ * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }]);
+ * const data = new Float32Array(16 * 2);
+ * data.set(Matrix4.createTranslation(-3, 0, 0).getElements(), 0);
+ * data.set(Matrix4.createTranslation(3, 0, 0).getElements(), 16);
+ * const sphere = readInstanceBufferSphere(treeMesh, renderer.createInstanceBuffer(instanceLayout, data));
+ * if (sphere === null || sphere[0] !== 0 || sphere[3] < 3) {
+ * 	throw new Error("bounds failed");
+ * }
+ */
+export function readInstanceBufferSphere(mesh, instanceBuffer) {
+	const bounds = instanceBuffer.bounds;
+	if (bounds === null) {
+		return null;
+	}
+	const center = mesh.boundingCenter;
+	const meshReach = System.Math.hypot(center[0], center[1], center[2]) + mesh.boundingRadius;
+	return [bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius + bounds.scale * meshReach];
+}
+
+
+//==============================================================================
+// 구가 절두체 안에 드는지. (extractFrustumPlanes 의 면 여섯)
+//==============================================================================
+/**
+ * @param { Array<Array<number>> } frustumPlanes - extractFrustumPlanes 의 결과.
+ * @param { Array<number> } sphere - [x, y, z, 반지름].
+ * @returns { boolean } 절두체 안에 들거나 걸치면 true.
+ * @example <caption>카메라 앞뒤의 구 가르기</caption>
+ * import { extractFrustumPlanes, isSphereInFrustum, Matrix4, Vector3 } from "./vanilla.js";
+ * const viewProjectionMatrix = Matrix4.createPerspective(0.8, 1, 0.1, 50);
+ * viewProjectionMatrix.multiply(Matrix4.createLookAt(Vector3.create(0, 0, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)));
+ * const planes = extractFrustumPlanes(viewProjectionMatrix);
+ * if (!isSphereInFrustum(planes, [0, 0, 0, 1]) || isSphereInFrustum(planes, [0, 0, 20, 1])) {
+ * 	throw new Error("unexpected culling");
+ * }
+ */
+export function isSphereInFrustum(frustumPlanes, sphere) {
+	for (const plane of frustumPlanes) {
+		if (plane[0] * sphere[0] + plane[1] * sphere[1] + plane[2] * sphere[2] + plane[3] < -sphere[3]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+//==============================================================================
 // 꼭짓점 배열의 경계 구. (stride 마다 앞 셋이 자리, 가운데는 상자의 가운데)
 //==============================================================================
 /**
@@ -1159,7 +1264,8 @@ function isSameNumber(value, other) {
 //   껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)
 // - 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)
 // - GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)
-//   오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (거르지 않음, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)
+//   오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (버퍼 전체의 경계로 통째 거름, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)
+//   고칠 때는 updateInstanceBuffer(전체) 나 updateInstanceBufferRange(일부, bufferSubData). 몸, 바깥선 껍데기, 그림자, 화면 공간 바깥선의 선의 판이 같은 GPU 버퍼를 같이 쓴다.
 // - 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)
 // - 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF)
 //   점광과 스포트라이트 그림자는 ShadowAtlas 에 beginShadowAtlasPass, 칸마다 setShadowAtlasTile 과 drawMesh 로 드리우고, setLocalShadows 로 받는다. (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)
@@ -1521,7 +1627,9 @@ export class ToonRenderer {
 	 * @param { ToonInstanceLayout } instanceLayout - 인스턴스 하나의 꼴.
 	 * @param { Float32Array } data - 꼴의 수 개수씩 인스턴스를 이어 담은 수.
 	 * @param { string } [usage] - ToonBufferUsage 의 값. (기본 static)
-	 * @returns { object } 인스턴스 버퍼. ({ layout, buffer, usage, floatCount, vertexArrays })
+	 * @returns { object } 인스턴스 버퍼. ({ layout, buffer, usage, floatCount, vertexArrays, generation, bounds, data, renderer })
+	 * generation 은 고치거나 지울 때마다 1 씩 는다. (그림자 캐시가 버퍼 바뀜을 안다) bounds 는 버퍼 전체의 경계다. (꼴에 행렬이 있을 때만, 아니면 null)
+	 * data 는 경계를 다시 셀 사본이다. (행렬이 있을 때만, 고치지 않는다) 그리는 길(drawMeshInstanceBuffer, ToonScreenOutline.drawMeshInstanceBuffer, ToonDrawQueue.addMeshInstanceBuffer)이 모두 이 한 GPU 버퍼를 같이 쓰고 다시 올리지 않는다.
 	 * @example <caption>나무 아홉 그루의 행렬과 틴트를 한 번 올리기</caption>
 	 * import { ToonRenderer, Matrix4 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
@@ -1538,7 +1646,8 @@ export class ToonRenderer {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const glUsage = usage === ToonBufferUsage.dynamic ? webGL2RenderingContext.DYNAMIC_DRAW : webGL2RenderingContext.STATIC_DRAW;
 		const buffer = this.createArrayBuffer(data, glUsage);
-		return { layout: instanceLayout, buffer: buffer, usage: glUsage, floatCount: data.length, vertexArrays: new Map() };
+		const copy = instanceLayout.hasMatrix() ? new System.Float32Array(data) : null;
+		return { layout: instanceLayout, buffer: buffer, usage: glUsage, floatCount: data.length, vertexArrays: new Map(), generation: 0, bounds: readInstanceBounds(instanceLayout, data), data: copy, renderer: this };
 	}
 
 	//==============================================================================
@@ -1553,10 +1662,63 @@ export class ToonRenderer {
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer.buffer);
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, data, instanceBuffer.usage);
 		instanceBuffer.floatCount = data.length;
+		instanceBuffer.data = instanceBuffer.layout.hasMatrix() ? new System.Float32Array(data) : null;
+		instanceBuffer.bounds = readInstanceBounds(instanceBuffer.layout, data);
+		instanceBuffer.generation += 1;
 	}
 
 	//==============================================================================
-	// 인스턴스 버퍼 지우기. (그 버퍼로 지은 버텍스 어레이도, 모형보다 먼저 지운다)
+	// 인스턴스 버퍼의 일부 고치기. (firstInstance 번째부터 data 의 인스턴스 수만큼만 올림, bufferSubData)
+	//==============================================================================
+	/**
+	 * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
+	 * @param { number } firstInstance - 고칠 첫 인스턴스 번호. (0 부터)
+	 * @param { Float32Array } data - 꼴의 수 개수씩 고칠 인스턴스를 이어 담은 수. (버퍼에 든 인스턴스 수를 넘으면 던진다, 늘리려면 updateInstanceBuffer)
+	 * @example <caption>바위 하나만 옮기고 다시 올리지 않고 그리기</caption>
+	 * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#909098");
+	 * const rockMesh = renderer.createMesh(builder.readArrays());
+	 * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }]);
+	 * const data = new Float32Array(20 * 3);
+	 * for (let index = 0; index < 3; ++index) {
+	 * 	data.set(Matrix4.createTranslation(index - 1, 0, 0).getElements(), index * 20);
+	 * 	data.set([1, 1, 1, 1], index * 20 + 16);
+	 * }
+	 * const instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data, "dynamic");
+	 * const moved = new Float32Array(20);
+	 * moved.set(Matrix4.createTranslation(0, 0.5, 0).getElements(), 0);
+	 * moved.set([1, 0.6, 0.6, 1], 16);
+	 * renderer.updateInstanceBufferRange(instanceBuffer, 1, moved);
+	 * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));
+	 * renderer.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3);
+	 * renderer.endFrame();
+	 * if (instanceBuffer.generation !== 1) {
+	 * 	throw new Error("generation failed");
+	 * }
+	 */
+	updateInstanceBufferRange(instanceBuffer, firstInstance, data) {
+		const layoutFloatCount = instanceBuffer.layout.getFloatCount();
+		const floatOffset = firstInstance * layoutFloatCount;
+		if (!System.Number.isInteger(firstInstance) || firstInstance < 0 || data.length % layoutFloatCount !== 0 || floatOffset + data.length > instanceBuffer.floatCount) {
+			throw new System.Error(`인스턴스 버퍼의 고칠 자리가 맞지 않습니다: ${firstInstance} 번부터 수 ${data.length} 개 (버퍼의 수 ${instanceBuffer.floatCount} 개)`);
+		}
+		if (data.length === 0) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer.buffer);
+		webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, floatOffset * 4, data);
+		if (instanceBuffer.data !== null) {
+			instanceBuffer.data.set(data, floatOffset);
+			instanceBuffer.bounds = readInstanceBounds(instanceBuffer.layout, instanceBuffer.data);
+		}
+		instanceBuffer.generation += 1;
+	}
+
+	//==============================================================================
+	// 인스턴스 버퍼 지우기. (그 버퍼로 지은 버텍스 어레이도, 모형보다 먼저 지운다, 지운 버퍼로 그리면 아무것도 그리지 않는다)
 	//==============================================================================
 	/**
 	 * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
@@ -1571,6 +1733,11 @@ export class ToonRenderer {
 		}
 		instanceBuffer.vertexArrays.clear();
 		webGL2RenderingContext.deleteBuffer(instanceBuffer.buffer);
+		instanceBuffer.buffer = null;
+		instanceBuffer.floatCount = 0;
+		instanceBuffer.data = null;
+		instanceBuffer.bounds = null;
+		instanceBuffer.generation += 1;
 	}
 
 	//==============================================================================
@@ -2500,13 +2667,13 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
-	// 영구 인스턴스 버퍼로 그리기. (거르지 않음, instanceCount 개, 꼴에 행렬이 없으면 정점 조각이 자리를 정한다)
+	// 영구 인스턴스 버퍼로 그리기. (버퍼 전체의 경계로 통째 거른다, instanceCount 개, 꼴에 행렬이 없으면 정점 조각이 자리를 정하고 거르지 않는다)
 	//==============================================================================
 	/**
 	 * @param { object } mesh - createMesh 의 결과.
 	 * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
 	 * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다)
-	 * @param { object } [options] - drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다)
+	 * @param { object } [options] - drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다, isCulled 가 false 면 거르지 않는다)
 	 * @example <caption>자리만 담은 영구 버퍼로 풀숲 그리기</caption>
 	 * import { ToonRenderer, MeshBuilder, createCylinderGeometry, Matrix4, Vector3 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
@@ -2532,6 +2699,10 @@ export class ToonRenderer {
 		const maximumCount = System.Math.floor(instanceBuffer.floatCount / System.Math.max(1, instanceBuffer.layout.getFloatCount()));
 		const count = System.Math.min(instanceCount, maximumCount);
 		if (count <= 0) {
+			return;
+		}
+		if (options.isCulled !== false && instanceBuffer.bounds !== null && !isSphereInFrustum(this.#frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+			this.#frameStatistics.culledObjectCount += count;
 			return;
 		}
 		this.#frameStatistics.drawnObjectCount += count;

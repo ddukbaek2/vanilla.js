@@ -47,6 +47,12 @@ export const TOON_INSTANCE_MATRIX_NAME = "instanceMatrix";
 // 인스턴스 꼴에서 엔진이 곱하는 색으로 읽는 이름. (수 4)
 export const TOON_INSTANCE_TINT_NAME = "instanceTint";
 
+// 인스턴스 꼴에서 화면 공간 바깥선이 인스턴스마다의 선 번호로 읽는 이름. (수 1, 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID)
+export const TOON_INSTANCE_LINE_ID_NAME = "instanceLineId";
+
+// 선 번호 어트리뷰트의 자리. (사용자 어트리뷰트의 마지막 자리, 선의 판 셰이더가 이 자리에서 읽는다)
+export const TOON_INSTANCE_LINE_ID_LOCATION = TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION + TOON_MAXIMUM_INSTANCE_ATTRIBUTES - 1;
+
 /**
  * 섞는 방식. (alpha 는 곧은 알파 SRC_ALPHA, premultiplied 는 미리 곱한 알파 ONE, additive 는 더하기 ONE, ONE)
  * @example <caption>빛나는 고리를 더하기로 섞기</caption>
@@ -235,6 +241,8 @@ export class ToonMaterial {
 // 인스턴스 꼴. (인스턴스 하나의 어트리뷰트 차례, ToonRenderer.createInstanceBuffer 와 drawMeshInstanceBuffer 가 쓴다)
 // - 어트리뷰트마다 { name, size }. 이름이 instanceMatrix(16) 면 모형 행렬, instanceTint(4) 면 곱하는 색으로 엔진이 읽는다.
 //   instanceMatrix 는 아핀 3x4 로 읽고 아래 줄 네 칸(원소 3, 7, 11, 15)은 그 인스턴스의 빛남(sRGB r, g, b 와 선형 세기, vertex.emissive)이다. Matrix4 원소를 그대로 담으면 빛남이 없다.
+// - instanceLineId(1) 는 화면 공간 바깥선의 인스턴스마다 선 번호다. (ToonScreenOutline.drawMeshInstanceBuffer, ToonDrawQueue.addMeshInstanceBuffer)
+//   사용자 어트리뷰트의 마지막 자리(TOON_INSTANCE_LINE_ID_LOCATION)를 쓰므로 이것이 있으면 사용자 어트리뷰트는 하나 적게 넣는다. 정점 조각도 그 이름으로 읽을 수 있다.
 // - 그 밖의 이름은 사용자 어트리뷰트다. TOON_MAXIMUM_INSTANCE_ATTRIBUTES 개까지, 크기 1 ~ 4. 정점 조각이 그 이름의 in 으로 읽는다. (자리 13 부터)
 // - instanceMatrix 가 없으면 모형 행렬은 단위 행렬이다. 정점 조각이 vertex.modelMatrix 를 지어 넣는다. (자리, 돌림, 크기를 몇 수로만 담을 때)
 // - instanceTint 가 없으면 틴트는 1 이다.
@@ -258,10 +266,11 @@ export class ToonInstanceLayout {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { number } */ #id;
-	/** @private @type { Array<object> } */ #attributes; // { name, size, offset (수 단위), location (사용자 어트리뷰트만, 아니면 -1) }
+	/** @private @type { Array<object> } */ #attributes; // { name, size, offset (수 단위), location (사용자 어트리뷰트와 선 번호만, 아니면 -1) }
 	/** @private @type { number } */ #floatCount;
 	/** @private @type { boolean } */ #hasMatrix;
 	/** @private @type { boolean } */ #hasTint;
+	/** @private @type { boolean } */ #hasLineId;
 
 	//==============================================================================
 	// 생성. (이름이 겹치거나, 크기가 맞지 않거나, 사용자 어트리뷰트가 너무 많으면 던진다)
@@ -277,8 +286,14 @@ export class ToonInstanceLayout {
 		this.#floatCount = 0;
 		this.#hasMatrix = false;
 		this.#hasTint = false;
+		this.#hasLineId = false;
 		const names = new System.Set();
 		let customCount = 0;
+		const hasLineId = attributes.some((attribute) => {
+			return attribute.name === TOON_INSTANCE_LINE_ID_NAME;
+		});
+		const maximumCustomCount = hasLineId ? TOON_MAXIMUM_INSTANCE_ATTRIBUTES - 1 : TOON_MAXIMUM_INSTANCE_ATTRIBUTES;
+		this.#hasLineId = hasLineId;
 		for (const attribute of attributes) {
 			const name = attribute.name;
 			const size = attribute.size;
@@ -299,12 +314,18 @@ export class ToonInstanceLayout {
 				}
 				this.#hasTint = true;
 			}
+			else if (name === TOON_INSTANCE_LINE_ID_NAME) {
+				if (size !== 1) {
+					throw new System.Error("instanceLineId 의 크기는 1 입니다.");
+				}
+				location = TOON_INSTANCE_LINE_ID_LOCATION;
+			}
 			else {
 				if (!System.Number.isInteger(size) || size < 1 || size > 4) {
 					throw new System.Error(`인스턴스 어트리뷰트 ${name} 의 크기는 1 ~ 4 입니다.`);
 				}
-				if (customCount >= TOON_MAXIMUM_INSTANCE_ATTRIBUTES) {
-					throw new System.Error(`사용자 인스턴스 어트리뷰트는 ${TOON_MAXIMUM_INSTANCE_ATTRIBUTES} 개까지입니다.`);
+				if (customCount >= maximumCustomCount) {
+					throw new System.Error(`사용자 인스턴스 어트리뷰트는 ${maximumCustomCount} 개까지입니다. (instanceLineId 가 있으면 하나 적다)`);
 				}
 				location = TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION + customCount;
 				customCount += 1;
@@ -328,7 +349,7 @@ export class ToonInstanceLayout {
 	// 어트리뷰트 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { Array<object> } { name, size, offset, location } 의 배열. (offset 은 수 단위, location 은 사용자 어트리뷰트만, 아니면 -1)
+	 * @returns { Array<object> } { name, size, offset, location } 의 배열. (offset 은 수 단위, location 은 사용자 어트리뷰트와 instanceLineId 만, 아니면 -1)
 	 */
 	getAttributes() {
 		return this.#attributes;
@@ -362,6 +383,22 @@ export class ToonInstanceLayout {
 	 */
 	hasTint() {
 		return this.#hasTint;
+	}
+
+	//==============================================================================
+	// 인스턴스마다의 선 번호가 있는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } instanceLineId 가 있으면 true.
+	 * @example <caption>행렬, 틴트, 선 번호를 담는 꼴</caption>
+	 * import { ToonInstanceLayout } from "./vanilla.js";
+	 * const instanceLayout = new ToonInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }, { name: "instanceLineId", size: 1 }]);
+	 * if (!instanceLayout.hasLineId() || instanceLayout.getFloatCount() !== 21) {
+	 * 	throw new Error("line id layout failed");
+	 * }
+	 */
+	hasLineId() {
+		return this.#hasLineId;
 	}
 
 	//==============================================================================
