@@ -413,6 +413,7 @@ const PARTICLE_VERTEX_CAPACITY = 8192;
 const BATCH_FLOATS_PER_VERTEX = 14; // x, y, u, v, r, g, b, a, tintR, tintG, tintB, tintA, textureSlot, clipSlot
 const GEOMETRY_COMMAND_SPRITE = 0; // 기하 캐시 명령: 스크래치 정점을 묶음에 넣은 것. (지역 정점, 색, 틴트)
 const GEOMETRY_COMMAND_TEXT = 1; // 기하 캐시 명령: 글 배치 엔트리를 그린 것. (엔트리, 자리, 색, 정렬)
+const GEOMETRY_COPY_LOOP_VERTEX_COUNT = 12; // 기하 캐시가 이 수 이하의 정점은 하나씩, 넘으면 TypedArray.set 으로 옮긴다. (사각형 둘까지)
 const BATCH_VERTEX_CAPACITY = 6 * 8192; // 사각형 8192 개. (러스트 판과 같은 값)
 
 // 스크래치 버텍스 버퍼 용량. (버텍스 수)
@@ -2958,8 +2959,13 @@ export class Graphic extends Object {
 		const startOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
 		const worldVertexData = subAppend.worldVertexData;
 		const batchVertexData = this.#batchVertexData;
-		for (let floatIndex = 0; floatIndex < worldFloatCount; ++floatIndex) {
-			worldVertexData[floatIndex] = batchVertexData[startOffset + floatIndex];
+		if (vertexCount > GEOMETRY_COPY_LOOP_VERTEX_COUNT) {
+			worldVertexData.set(batchVertexData.subarray(startOffset, startOffset + worldFloatCount));
+		}
+		else {
+			for (let floatIndex = 0; floatIndex < worldFloatCount; ++floatIndex) {
+				worldVertexData[floatIndex] = batchVertexData[startOffset + floatIndex];
+			}
 		}
 		subAppend.texture = texture;
 		subAppend.vertexCount = vertexCount;
@@ -3018,11 +3024,17 @@ export class Graphic extends Object {
 					subAppend.textureSlot = textureSlot;
 					subAppend.clipSlot = clipSlot;
 				}
+				// 정점이 많으면 한 번에 옮기고(memcpy), 적으면 부르는 값이 더 커 하나씩 옮긴다.
 				const batchVertexData = this.#batchVertexData;
 				const startOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
-				const floatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
-				for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
-					batchVertexData[startOffset + floatIndex] = worldVertexData[floatIndex];
+				if (vertexCount > GEOMETRY_COPY_LOOP_VERTEX_COUNT) {
+					batchVertexData.set(worldVertexData, startOffset);
+				}
+				else {
+					const floatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
+					for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
+						batchVertexData[startOffset + floatIndex] = worldVertexData[floatIndex];
+					}
 				}
 				this.#batchVertexCount += vertexCount;
 			}

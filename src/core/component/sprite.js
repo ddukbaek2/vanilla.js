@@ -9,6 +9,8 @@ import { Graphic } from "../graphic.js";
 import { Paint } from "./paint.js";
 import { Color } from "../../base/color.js";
 
+const geometryKeyContentSize = Vector2.zero(); // writeGeometryKey 가 노드의 내용 크기를 복제본 없이 받는 곳.
+
 
 //==============================================================================
 // 스프라이트 모드.
@@ -362,7 +364,14 @@ export class Sprite extends Paint {
 			geometryKey.add(nineSlice.size.x);
 			geometryKey.add(nineSlice.size.y);
 		}
-		const contentSize = node.getContentSize();
+		const contentSize = geometryKeyContentSize;
+		if (typeof node.copyContentSizeTo === "function") {
+			node.copyContentSizeTo(contentSize);
+		}
+		else {
+			const nodeContentSize = node.getContentSize();
+			contentSize.set(nodeContentSize.x, nodeContentSize.y);
+		}
 		geometryKey.add(contentSize.x);
 		geometryKey.add(contentSize.y);
 		return true;

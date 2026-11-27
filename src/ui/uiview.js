@@ -11,6 +11,8 @@ import { Engine } from "../core/engine.js";
 import { Graphic } from "../core/graphic.js";
 import { WorldNode } from "../core/node/worldnode.js";
 
+const geometryKeyContentSize = Vector2.zero(); // writeGeometryKey 가 노드의 내용 크기를 복제본 없이 받는 곳.
+
 
 //==============================================================================
 // 뷰 컴포넌트.
@@ -170,7 +172,14 @@ export class UIView extends Component {
 		geometryKey.add(backgroundColor.green);
 		geometryKey.add(backgroundColor.blue);
 		geometryKey.add(backgroundColor.alpha);
-		const contentSize = node.getContentSize();
+		const contentSize = geometryKeyContentSize;
+		if (typeof node.copyContentSizeTo === "function") {
+			node.copyContentSizeTo(contentSize);
+		}
+		else {
+			const nodeContentSize = node.getContentSize();
+			contentSize.set(nodeContentSize.x, nodeContentSize.y);
+		}
 		geometryKey.add(contentSize.x);
 		geometryKey.add(contentSize.y);
 		return true;

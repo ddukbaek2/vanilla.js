@@ -11,6 +11,8 @@ import { Graphic } from "../graphic.js";
 import { FontAsset } from "../../resource/fontasset.js";
 import { measureTextMetrics } from "../graphic/textstringtexturecache.js";
 
+const geometryKeyContentSize = Vector2.zero(); // writeGeometryKey 가 노드의 내용 크기를 복제본 없이 받는 곳.
+
 
 //==============================================================================
 // 텍스트 수평 설정. (CanvasTextAlign)
@@ -909,7 +911,8 @@ export class Text extends Component {
 	}
 
 	//==============================================================================
-	// 그리기 입력을 기하 캐시 열쇠에 적기. (글, 글꼴, 크기, 색, 정렬, 줄바꿈, 표시 글자 수, 맞춤 너비, 내용 크기, 받아진 웹 글꼴 수)
+	// 그리기 입력을 기하 캐시 열쇠에 적기. (글, 글꼴, 크기, 색, 정렬, 줄바꿈, 표시 글자 수, 맞춤 너비, 내용 크기)
+	// - 웹 글꼴이 받아져 다시 구울 글은 글 캐시가 엔트리를 버리므로 Graphic 이 알아채 다시 셈한다.
 	// - draw 나 그 아래 그리기 함수를 덮어쓴 하위 클래스(RichText 등)는 무엇을 읽는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
 	//==============================================================================
 	/**
@@ -944,10 +947,16 @@ export class Text extends Component {
 		geometryKey.add(this.#visibleCharacterCount);
 		geometryKey.add(this.#fitWidth);
 		geometryKey.add(this.#fitMinimumRatio);
-		const contentSize = node.getContentSize();
+		const contentSize = geometryKeyContentSize;
+		if (typeof node.copyContentSizeTo === "function") {
+			node.copyContentSizeTo(contentSize);
+		}
+		else {
+			const nodeContentSize = node.getContentSize();
+			contentSize.set(nodeContentSize.x, nodeContentSize.y);
+		}
 		geometryKey.add(contentSize.x);
 		geometryKey.add(contentSize.y);
-		geometryKey.add(readFontFaceCount());
 		return true;
 	}
 
