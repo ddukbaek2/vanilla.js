@@ -105,7 +105,8 @@ try {
 		const state = await readState();
 		return [Math.min(state.anchor, state.focus), Math.max(state.anchor, state.focus)];
 	}
-	for (const [offset, expectedRange] of [[1, [0, 5]], [5, [5, 7]], [7, [7, 12]], [12, [12, 13]], [22, [18, 22]]]) {
+	// 윈도우 크롬은 두 번 누른 낱말에 뒤 공백을 붙인다. (selectTrailingWhitespaceEnabled, 러스트 판 skip_trailing_whitespace 와 같은 갈래)
+	for (const [offset, expectedRange] of [[1, [0, isWindows ? 7 : 5]], [5, [5, 7]], [7, [7, 12]], [12, [12, 13]], [22, [18, 22]]]) {
 		await page.mouse.click(590, 190);
 		await new Promise((resolve) => setTimeout(resolve, 600));
 		checkJson(await clickAt(offset, 2), expectedRange, "두 번 누르기 " + offset);
