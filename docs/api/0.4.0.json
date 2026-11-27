@@ -74300,6 +74300,56 @@
 						},
 						{
 							"kind": "method",
+							"name": "setFocusStep",
+							"signature": "setFocusStep(worldStep)",
+							"params": [
+								{
+									"name": "worldStep",
+									"type": "number",
+									"description": {
+										"ko": "월드 칸. (월드 단위, 0 이하면 끔)",
+										"en": "World step. (in world units, 0 or less turns it off)"
+									}
+								}
+							],
+							"description": {
+								"ko": "초점을 끊어 옮기는 월드 칸 정하기. (해 그림자 캐시용, 기본 0 은 끊지 않고 텍셀 맞춤만)\n- 카메라를 따라 초점이 움직이면 텍셀 하나만 넘어도 빛 행렬이 바뀌어 ShadowUpdateMode.onChange 캐시가 프레임마다 다시 그린다.\n- 칸을 주면 초점을 월드 칸(x, y, z 각각)의 배수에 맞춰 옮겨, 한 칸 안에서는 행렬이 같아 구운 판을 다시 쓴다. 덮는 너비와 깊이에 칸만큼 여유를 더해 초점 둘레가 판 밖으로 나가지 않는다.\n- 유니티와 언리얼의 캐시드 섀도, 가상 섀도 맵의 고정 칸에 초점을 붙이는 꼴과 같은 생각이다. (원문은 읽지 못해 짐작)\n- 텍셀 맞춤은 그 위에 그대로 걸린다. 여유가 늘어 텍셀 하나의 월드 크기는 조금 커진다.",
+								"en": "Set the world step the focus moves in. (for the sun shadow cache, the default 0 does not snap and only snaps to texels)\n- When the focus follows a camera, passing a single texel changes the light matrix, so the ShadowUpdateMode.onChange cache redraws every frame.\n- With a step, the focus is moved to multiples of the world step on each of x, y and z, so the matrix stays the same inside one cell and the baked map is reused. The covered width and depth get the step as margin so the area around the focus never leaves the map.\n- This is the same idea as pinning the focus to a fixed cell in the cached shadows of Unity and Unreal and in virtual shadow maps. (the originals were not read, so this is a guess)\n- Texel snapping still applies on top. With the extra margin, one texel covers slightly more world space."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/shadowmap.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "초점을 1 미터 칸으로 끊어 옮기기",
+										"en": "Moving the focus in one meter steps"
+									},
+									"code": "import { ShadowMap, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 1024);\nshadowMap.setFocusStep(1);\nshadowMap.updateLightMatrix(Vector3.create(0.2, 0, 0), Vector3.create(-0.4, -1, -0.3), 20, 0.5, 100);\nconsole.log(shadowMap.getFocusStep());\nshadowMap.destroy();",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getFocusStep",
+							"signature": "getFocusStep()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "월드 칸. (0 이면 끔)",
+									"en": "World step. (0 means off)"
+								}
+							},
+							"description": {
+								"ko": "초점을 끊어 옮기는 월드 칸 반환.",
+								"en": "Return the world step the focus moves in."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/shadowmap.js"
+						},
+						{
+							"kind": "method",
 							"name": "getLightViewProjectionMatrix",
 							"signature": "getLightViewProjectionMatrix()",
 							"params": [],

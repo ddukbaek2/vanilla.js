@@ -47562,6 +47562,7 @@ var ShadowMap = class extends Object2 {
   #shadowCache;
   #depthBias;
   #normalBias;
+  #focusStep;
   constructor(webGL2RenderingContext, resolution = 2048) {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
@@ -47573,13 +47574,21 @@ var ShadowMap = class extends Object2 {
     this.#shadowCache = createShadowCache(resolution);
     this.#depthBias = DEFAULT_SHADOW_DEPTH_BIAS;
     this.#normalBias = DEFAULT_SHADOW_NORMAL_BIAS;
+    this.#focusStep = 0;
   }
   updateLightMatrix(focusPosition, lightDirection, extent, nearDistance, farDistance) {
     const normalizedDirection = lightDirection.normalize();
     const eyeDistance = (nearDistance + farDistance) * 0.5;
+    const upDirection = System114.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
+    const focusStep = this.#focusStep;
+    if (focusStep > 0) {
+      focusPosition = Vector3.create(System114.Math.round(focusPosition.x / focusStep) * focusStep, System114.Math.round(focusPosition.y / focusStep) * focusStep, System114.Math.round(focusPosition.z / focusStep) * focusStep);
+      extent += focusStep;
+      farDistance += focusStep;
+      nearDistance = System114.Math.max(nearDistance - focusStep, nearDistance * 0.1);
+    }
     const eyeOffset = normalizedDirection.multiply(-eyeDistance);
     const eyePosition = focusPosition.add(eyeOffset);
-    const upDirection = System114.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
     const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
     const worldUnitsPerTexel = extent * 2 / this.getResolution();
     const viewElements = viewMatrix.getElements();
@@ -47623,6 +47632,12 @@ var ShadowMap = class extends Object2 {
   }
   getResolution() {
     return this.#resolution;
+  }
+  setFocusStep(worldStep) {
+    this.#focusStep = worldStep > 0 ? worldStep : 0;
+  }
+  getFocusStep() {
+    return this.#focusStep;
   }
   getLightViewProjectionMatrix() {
     return this.#lightViewProjectionMatrix;
