@@ -2,8 +2,9 @@
 // 보이는 사각형 안에 다 든 하위 트리 크롬 시험. (NODE_PATH=$(npm root -g) node tests/ui/subtreecullinsidechrome.test.mjs)
 // - 그리기 순회가 노드의 하위 트리 경계가 보이는 사각형(화면과 걸린 자르기) 안에 다 든다고 보면 그 아래 자손은 화면 밖 견주기 없이 그리고(Graphic.isInsideVisibleBounds 가 참),
 //   그 아래에서 자르기를 새로 걸면 그 자르기 안에서 다시 견주는지 본다. (절두체 거르기의 '다 안' 표시)
-// - 왼쪽: 화면 안에 다 드는 판 아래 칸 여섯, 스크롤 목록(새 자르기, 줄 30 개, 줄마다 위와 아래 반쪽 칸), 둥근 마스크(새 자르기, 마스크 밖에 놓인 칸). 프레임마다 소수 픽셀만큼 스크롤한다.
-// - 오른쪽: 30 도 돌린 판(화면 안에 다 든다, 부모 좌표 경계 상자가 아니라 디바이스 좌표로 본다) 아래 칸 열여섯과 돌린 스크롤 목록(스텐실 자르기, 줄 20 개).
+// - 왼쪽: 화면 안에 다 드는 판(스크롤 내용까지 화면 안) 아래 칸 여섯, 스크롤 목록(새 자르기, 줄 9 개, 줄마다 위와 아래 반쪽 칸, 칸 밖 줄도 화면 안), 둥근 마스크(새 자르기, 마스크 밖이지만 판 안에 놓인 칸).
+//   프레임마다 소수 픽셀만큼 스크롤한다.
+// - 오른쪽: 30 도 돌린 판(화면 밖 칸이 하나 있어 다 안이 아니다) 아래 판(돌린 부모 좌표라 변환을 건 뒤 디바이스 좌표로 다 안을 본다)의 칸 열여섯과 돌린 스크롤 목록(스텐실 자르기, 줄 8 개).
 // - 칸마다 그린 수를 세어, 하위 트리 거르기를 켠 길과 끈 길(노드마다 컴포넌트만 거름)이 프레임마다 같은 칸을 그리는지 본다. (새 자르기 밖 칸은 켠 길도 그리지 않는다)
 //   켬, 끔, 거르기를 모두 끈 길(setCullingEnabled(false))의 찍은 화면 화소가 모두 같은지 본다.
 // - 켠 길에서 판 아래 칸은 '다 안'으로 그려지고, 스크롤 목록 가장자리에 걸친 줄의 칸은 '다 안'이 아니며, 변환 뒤 화면 견주기(isLocalRectVisible)가 끈 길보다 적은지 센다.
@@ -86,43 +87,46 @@ class InsideCullScene extends Scene {
 		leftScrollView = leftScrollNode.addComponent(UIScrollView);
 		leftScrollView.setBackgroundColor(Color.createFromHEX("#151a24"));
 		leftScrollView.setHorizontal(false);
-		leftScrollView.setScrollContentSize(Vector2.create(280, 30 * 26));
-		for (let rowIndex = 0; rowIndex < 30; ++rowIndex) {
+		leftScrollView.setScrollContentSize(Vector2.create(280, 9 * 26));
+		for (let rowIndex = 0; rowIndex < 9; ++rowIndex) {
 			const rowNode = createBoxNode(leftScrollView.getContent(), Vector2.create(4, rowIndex * 26), Vector2.create(260, 24));
 			rowNode.addComponent(Paint).setColor(rowIndex % 2 === 0 ? "#4a3c30" : "#5a4a3c");
 			createCountedBox(rowNode, Vector2.create(8, 0), Vector2.create(120, 11), "#c89b3c", "줄 위 " + rowIndex);
 			createCountedBox(rowNode, Vector2.create(8, 13), Vector2.create(120, 11), "#9bc83c", "줄 아래 " + rowIndex);
 		}
-		// 둥근 마스크. (새 자르기, 왼쪽과 오른쪽 칸은 마스크 밖이다)
-		const maskNode = createBoxNode(panelNode, Vector2.create(10, 235), Vector2.create(280, 70));
+		// 둥근 마스크. (새 자르기, 오른쪽 두 칸은 마스크 밖이지만 판 안이다)
+		const maskNode = createBoxNode(panelNode, Vector2.create(10, 262), Vector2.create(200, 50));
 		maskNode.addComponent(Paint).setColor("#303848");
 		maskNode.addComponent(Mask).setRoundSize(16);
 		for (let boxIndex = 0; boxIndex < 9; ++boxIndex) {
-			createCountedBox(maskNode, Vector2.create(-70 + boxIndex * 50, 15), Vector2.create(40, 40), "#a53a6e", "마스크 칸 " + boxIndex);
+			createCountedBox(maskNode, Vector2.create(-5 + boxIndex * 30, 5), Vector2.create(25, 40), "#a53a6e", "마스크 칸 " + boxIndex);
 		}
 
-		// 오른쪽 돌린 판: 화면 안에 다 든다. (부모 좌표 경계 상자로는 다 안인지 알 수 없어 변환을 건 뒤 디바이스 좌표로 본다)
+		// 오른쪽 돌린 판: 화면 밖 칸이 있어 다 안이 아니다. 그 아래 판은 돌린 부모 좌표라 변환을 건 뒤 디바이스 좌표로 다 안을 본다.
 		const rotatedNode = createBoxNode(root, Vector2.create(480, 180), Vector2.create(200, 200));
 		rotatedNode.setPivot(Pivot.middleCenter);
 		rotatedNode.setLocalRotation(30);
-		rotatedNode.addComponent(Paint).setColor("#283820");
+		createBoxNode(rotatedNode, Vector2.create(900, 0), Vector2.create(20, 20)).addComponent(Paint).setColor("#ffffff");
+		const innerNode = createBoxNode(rotatedNode, Vector2.create(0, 0), Vector2.create(200, 200));
+		innerNode.addComponent(Paint).setColor("#283820");
 		for (let tileIndex = 0; tileIndex < 16; ++tileIndex) {
-			createCountedBox(rotatedNode, Vector2.create(8 + (tileIndex % 8) * 23, 8 + System.Math.floor(tileIndex / 8) * 23), Vector2.create(20, 20), "#6ea53a", "돌린 판 칸 " + tileIndex);
+			createCountedBox(innerNode, Vector2.create(8 + (tileIndex % 8) * 23, 8 + System.Math.floor(tileIndex / 8) * 23), Vector2.create(20, 20), "#6ea53a", "돌린 판 칸 " + tileIndex);
 		}
-		const rotatedScrollNode = createBoxNode(rotatedNode, Vector2.create(10, 60), Vector2.create(180, 120));
+		// 돌린 자르기의 경계 상자는 넉넉하므로 좁은 칸으로 둔다. (넓으면 칸 밖 줄도 경계 상자에 걸쳐 두 길 모두 그린다)
+		const rotatedScrollNode = createBoxNode(innerNode, Vector2.create(10, 60), Vector2.create(40, 50));
 		rotatedScrollView = rotatedScrollNode.addComponent(UIScrollView);
 		rotatedScrollView.setBackgroundColor(Color.createFromHEX("#151a24"));
 		rotatedScrollView.setHorizontal(false);
-		rotatedScrollView.setScrollContentSize(Vector2.create(180, 20 * 22));
-		for (let rowIndex = 0; rowIndex < 20; ++rowIndex) {
-			createCountedBox(rotatedScrollView.getContent(), Vector2.create(4, rowIndex * 22), Vector2.create(160, 18), "#3ca5c8", "돌린 줄 " + rowIndex);
+		rotatedScrollView.setScrollContentSize(Vector2.create(40, 8 * 22));
+		for (let rowIndex = 0; rowIndex < 8; ++rowIndex) {
+			createCountedBox(rotatedScrollView.getContent(), Vector2.create(4, rowIndex * 22), Vector2.create(30, 18), "#3ca5c8", "돌린 줄 " + rowIndex);
 		}
 	}
 	applyFrameEvent(frameNumber) {
 		// 21 ~ 66: 프레임마다 소수 픽셀만큼 스크롤. (줄이 자르기 가장자리에 걸쳤다 나간다)
 		if (frameNumber > 20) {
-			leftScrollView.setScrollOffset(Vector2.create(0, -(frameNumber - 20) * 5.37));
-			rotatedScrollView.setScrollOffset(Vector2.create(0, -(frameNumber - 20) * 3.13));
+			leftScrollView.setScrollOffset(Vector2.create(0, -(frameNumber - 20) * 1.37));
+			rotatedScrollView.setScrollOffset(Vector2.create(0, -(frameNumber - 20) * 1.13));
 		}
 	}
 	draw(graphic) {
@@ -278,7 +282,7 @@ try {
 
 	// 칸마다 그린 수가 켬과 끔에서 프레임마다 같다. (새 자르기 밖 칸은 켠 길도 그리지 않고, 들어오는 칸은 그 프레임에 그린다)
 	const counterNameList = onResult.counterNameList;
-	checkEqual(counterNameList.length, 6 + 60 + 9 + 16 + 20, "칸 수");
+	checkEqual(counterNameList.length, 6 + 18 + 9 + 16 + 8, "칸 수");
 	const offFrameTable = new Map(offResult.frameList.map((frame) => [frame.frameNumber, frame]));
 	const onFrameTable = new Map(onResult.frameList.map((frame) => [frame.frameNumber, frame]));
 	// 돌린 스크롤 목록의 줄은 두 길 모두 넉넉한 경계 상자로 보되 견주는 좌표가 달라(켬은 부모 좌표, 끔은 디바이스 좌표) 켠 길이 더 적게 그릴 수 있다. 켠 길이 그린 줄은 끈 길도 그린다. (화소는 위에서 같다)
@@ -305,18 +309,19 @@ try {
 	checkEqual(mismatchText, "", "칸마다 그린 수가 켬과 끔에서 프레임마다 같음");
 	checkEqual(rotatedMismatchText, "", "돌린 스크롤 목록에서 켠 길이 그린 줄은 끈 길도 그림");
 
-	// 새 자르기 밖 칸은 그리지 않는다. (스크롤 목록 줄 30 개 가운데 보이는 것만, 마스크 밖 칸)
+	// 새 자르기 밖 칸은 그리지 않는다. (마지막 프레임에 그린 칸, 스크롤 목록은 보이는 것만, 마스크 밖 칸은 없음)
 	const lastOnFrame = onResult.frameList[onResult.frameList.length - 1];
+	const beforeLastOnFrame = onResult.frameList[onResult.frameList.length - 2];
+	const isDrawnInLastFrame = (counterIndex) => lastOnFrame.drawCountList[counterIndex] > beforeLastOnFrame.drawCountList[counterIndex];
 	const rowIndexList = findCounterIndexList(counterNameList, "줄 ");
-	const drawnRowCount = rowIndexList.filter((counterIndex) => lastOnFrame.drawCountList[counterIndex] > 0).length;
-	check(drawnRowCount > 6 && drawnRowCount < 60, `스크롤 목록 칸은 보인 것만 그림 (${drawnRowCount} / 60)`);
+	const drawnRowCount = rowIndexList.filter(isDrawnInLastFrame).length;
+	check(drawnRowCount > 6 && drawnRowCount < 18, `스크롤 목록 칸은 보이는 것만 그림 (${drawnRowCount} / 18)`);
 	const maskIndexList = findCounterIndexList(counterNameList, "마스크 칸 ");
-	checkEqual(lastOnFrame.drawCountList[maskIndexList[0]], 0, "마스크 밖 왼쪽 칸은 그리지 않음");
-	checkEqual(lastOnFrame.drawCountList[maskIndexList[8]], 0, "마스크 밖 오른쪽 칸은 그리지 않음");
-	check(lastOnFrame.drawCountList[maskIndexList[4]] > 0, "마스크 안 칸은 그림");
+	check(!isDrawnInLastFrame(maskIndexList[7]) && !isDrawnInLastFrame(maskIndexList[8]), "마스크 밖 오른쪽 두 칸은 그리지 않음");
+	check(isDrawnInLastFrame(maskIndexList[0]) && isDrawnInLastFrame(maskIndexList[4]), "마스크에 걸친 칸과 안 칸은 그림");
 	const rotatedRowIndexList = findCounterIndexList(counterNameList, "돌린 줄 ");
-	const drawnRotatedRowCount = rotatedRowIndexList.filter((counterIndex) => lastOnFrame.drawCountList[counterIndex] > 0).length;
-	check(drawnRotatedRowCount > 3 && drawnRotatedRowCount < 20, `돌린 스크롤 목록 칸은 보인 것만 그림 (${drawnRotatedRowCount} / 20)`);
+	const drawnRotatedRowCount = rotatedRowIndexList.filter(isDrawnInLastFrame).length;
+	check(drawnRotatedRowCount >= 2 && drawnRotatedRowCount < 8, `돌린 스크롤 목록 칸은 보이는 것만 그림 (${drawnRotatedRowCount} / 8)`);
 	check(onFrameTable.get(30).culledSubtreeCount > 0, `켠 길은 '다 안' 아래 새 자르기 밖 하위 트리를 건너뜀 (${onFrameTable.get(30).culledSubtreeCount})`);
 
 	// '다 안'으로 그린 칸. (판 아래 칸은 프레임마다, 가장자리에 걸친 줄의 칸은 아님)
