@@ -20,7 +20,9 @@ const GLB_CHUNKTYPE_BINARY = 0x004e4942;
 
 // 컴포넌트 타입별 배열 생성자.
 const COMPONENT_ARRAY_TABLE = {
+	5120: System.Int8Array,
 	5121: System.Uint8Array,
+	5122: System.Int16Array,
 	5123: System.Uint16Array,
 	5125: System.Uint32Array,
 	5126: System.Float32Array,
@@ -33,6 +35,25 @@ const TYPE_COMPONENT_COUNT_TABLE = {
 	VEC3: 3,
 	VEC4: 4,
 	MAT4: 16,
+};
+
+// 정규화 정수(normalized 접근자)를 실수로 바꿀 때 나눌 수. (glTF 명세의 공식, 부호 있는 것은 max(c / 127, -1) 처럼 -1 아래를 자름)
+const NORMALIZED_DIVISOR_TABLE = {
+	5120: 127,
+	5121: 255,
+	5122: 32767,
+	5123: 65535,
+};
+
+// 읽을 줄 아는 glTF 확장. (extensionsRequired 에 이 밖의 것이 있으면 읽지 않고 오류를 던진다)
+// - KHR_mesh_quantization: 꼭짓점 속성을 정수로 담은 것. (위치는 노드 변환이나 inverseBindMatrices 가, 텍스처 좌표는 KHR_texture_transform 이 되풀이를 맡는다)
+// - KHR_texture_transform: 텍스처 좌표의 offset, rotation, scale. (재질의 바탕 텍스처 것을 텍스처 좌표에 구워 넣는다)
+const SUPPORTED_EXTENSION_LIST = ["KHR_mesh_quantization", "KHR_texture_transform"];
+
+// 아직 읽지 못하는 필수 압축 확장의 오류 글.
+const UNSUPPORTED_EXTENSION_MESSAGE_TABLE = {
+	EXT_meshopt_compression: "SkinnedModel: required extension EXT_meshopt_compression (meshopt compression) is not supported yet. (KHR_mesh_quantization without compression is supported)",
+	KHR_draco_mesh_compression: "SkinnedModel: required extension KHR_draco_mesh_compression (Draco compression) is not supported. (KHR_mesh_quantization without compression is supported)",
 };
 
 // 모프 타깃 텍스처 가로 크기. (정점 델타를 실수 텍스처에 행 단위로 적재, 버텍스 셰이더가 gl_VertexID 로 조회)
@@ -189,6 +210,9 @@ export function readAccessorArray(json, binaryBuffer, accessorIndex) {
 	}
 	else {
 		const bufferView = json.bufferViews[accessor.bufferView];
+		if ((bufferView.buffer || 0) !== 0) {
+			throw new Error(`SkinnedModel: external buffer buffers[${bufferView.buffer}] is not supported. (only the GLB binary chunk buffers[0] is read, this includes the EXT_meshopt_compression fallback buffer)`);
+		}
 		const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
 		const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
 		const byteStride = bufferView.byteStride || 0;
@@ -225,6 +249,80 @@ export function readAccessorArray(json, binaryBuffer, accessorIndex) {
 	return resultArray;
 }
 
+
+//==============================================================================
+// 실수로 쓰는 접근자 CPU 읽기. (위치, 노멀, 텍스처 좌표, 모프 델타, 애니메이션 값, KHR_mesh_quantization 의 정수 속성을 실수로 되풀이)
+// - 정규화(normalized) 정수는 glTF 명세의 공식으로 나눈다. (부호 없는 것은 c / 255, c / 65535, 부호 있는 것은 max(c / 127, -1), max(c / 32767, -1))
+// - 정규화가 아닌 정수는 값 그대로 실수로 옮긴다. (위치의 크기와 자리는 노드 변환이나 inverseBindMatrices 가, 텍스처 좌표의 것은 KHR_texture_transform 이 맡는다)
+//==============================================================================
+/**
+ * @param { object } json glTF JSON.
+ * @param { ArrayBuffer } binaryBuffer GLB 의 BIN 청크.
+ * @param { number } accessorIndex
+ * @returns { Float32Array } 실수 값. (실수 접근자도 새 배열)
+ */
+export function readFloatAccessorArray(json, binaryBuffer, accessorIndex) {
+	const accessor = json.accessors[accessorIndex];
+	const sourceArray = readAccessorArray(json, binaryBuffer, accessorIndex);
+	const divisor = NORMALIZED_DIVISOR_TABLE[accessor.componentType];
+	if (accessor.normalized !== true || divisor === undefined) {
+		return new System.Float32Array(sourceArray);
+	}
+	const resultArray = new System.Float32Array(sourceArray.length);
+	for (let valueIndex = 0; valueIndex < sourceArray.length; ++valueIndex) {
+		resultArray[valueIndex] = System.Math.max(sourceArray[valueIndex] / divisor, -1);
+	}
+	return resultArray;
+}
+
+//==============================================================================
+// 텍스처 정보의 KHR_texture_transform 을 텍스처 좌표에 구워 넣기. (변환이 없거나 다른 좌표 묶음의 것이면 그대로 둔다)
+// - 명세의 차례대로 크기, 돌림(시계 반대, 라디안), 자리를 건다. uv' = offset + R(rotation) x (scale x uv)
+//   R 은 명세의 GLSL mat3(cos, sin, 0, -sin, cos, 0, 0, 0, 1) 이다. (열 차례)
+//==============================================================================
+/**
+ * @param { Float32Array } textureCoordinates 꼭짓점마다 둘. (그 자리에서 바꾼다)
+ * @param { object | undefined } textureInfo 재질의 텍스처 정보. { index, texCoord, extensions }
+ * @param { number } texCoordIndex textureCoordinates 가 몇 번 텍스처 좌표(TEXCOORD_n)인지.
+ */
+function applyTextureTransform(textureCoordinates, textureInfo, texCoordIndex) {
+	const transform = textureInfo && textureInfo.extensions ? textureInfo.extensions.KHR_texture_transform : undefined;
+	if (!transform) {
+		return;
+	}
+	const baseTexCoord = textureInfo.texCoord !== undefined ? textureInfo.texCoord : 0;
+	const transformTexCoord = transform.texCoord !== undefined ? transform.texCoord : baseTexCoord;
+	if (transformTexCoord !== texCoordIndex) {
+		return;
+	}
+	const offset = transform.offset || [0, 0];
+	const scale = transform.scale || [1, 1];
+	const rotation = transform.rotation || 0;
+	const cosine = System.Math.cos(rotation);
+	const sine = System.Math.sin(rotation);
+	for (let valueIndex = 0; valueIndex + 1 < textureCoordinates.length; valueIndex += 2) {
+		const scaledU = textureCoordinates[valueIndex] * scale[0];
+		const scaledV = textureCoordinates[valueIndex + 1] * scale[1];
+		textureCoordinates[valueIndex] = offset[0] + cosine * scaledU - sine * scaledV;
+		textureCoordinates[valueIndex + 1] = offset[1] + sine * scaledU + cosine * scaledV;
+	}
+}
+
+//==============================================================================
+// glTF 필수 확장 확인. (extensionsRequired 에 읽지 못하는 확장이 있으면 오류를 던진다)
+//==============================================================================
+/**
+ * @param { object } json glTF JSON.
+ */
+function checkRequiredExtensions(json) {
+	for (const extensionName of json.extensionsRequired || []) {
+		if (SUPPORTED_EXTENSION_LIST.includes(extensionName)) {
+			continue;
+		}
+		const message = UNSUPPORTED_EXTENSION_MESSAGE_TABLE[extensionName];
+		throw new Error(message !== undefined ? message : `SkinnedModel: required extension ${extensionName} is not supported.`);
+	}
+}
 
 //==============================================================================
 // 스킨드 모델. (모델 인스턴스, 메시/본/스킨/머티리얼/애니메이션 데이터 + 포즈 상태)
@@ -633,6 +731,7 @@ export class SkinnedModel extends Object {
 	 * @returns { { meshDescriptionList: object[], materialDescriptionList: object[] } } 중립 메시 서술 목록과 중립 머티리얼 서술 목록. (uploadMeshesAndMaterials 에 넘긴다)
 	 */
 	interpretContent(json, binaryBuffer) {
+		checkRequiredExtensions(json);
 
 		// 노드 구성.
 		this.#nodeList = json.nodes.map((node) => {
@@ -656,7 +755,7 @@ export class SkinnedModel extends Object {
 
 		// 스킨 구성.
 		this.#skinList = (json.skins || []).map((skin) => {
-			const inverseBindArray = skin.inverseBindMatrices !== undefined ? readAccessorArray(json, binaryBuffer, skin.inverseBindMatrices) : null;
+			const inverseBindArray = skin.inverseBindMatrices !== undefined ? readFloatAccessorArray(json, binaryBuffer, skin.inverseBindMatrices) : null;
 			const inverseBindMatrices = [];
 			for (let jointIndex = 0; jointIndex < skin.joints.length; ++jointIndex) {
 				const matrix = Matrix4.createIdentity();
@@ -732,10 +831,16 @@ export class SkinnedModel extends Object {
 			const nodeValue = json.nodes[nodeIndex];
 			const baseMorphWeights = nodeValue.weights ? nodeValue.weights : (mesh.weights ? mesh.weights : []);
 			for (const primitive of mesh.primitives) {
-				const positions = new System.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.POSITION));
+				const positions = readFloatAccessorArray(json, binaryBuffer, primitive.attributes.POSITION);
 				const vertexCount = positions.length / 3;
-				const normals = primitive.attributes.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.NORMAL)) : null;
-				const textureCoordinates = primitive.attributes.TEXCOORD_0 !== undefined ? new System.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.TEXCOORD_0)) : null;
+				const normals = primitive.attributes.NORMAL !== undefined ? readFloatAccessorArray(json, binaryBuffer, primitive.attributes.NORMAL) : null;
+				const textureCoordinates = primitive.attributes.TEXCOORD_0 !== undefined ? readFloatAccessorArray(json, binaryBuffer, primitive.attributes.TEXCOORD_0) : null;
+				const primitiveMaterial = primitive.material !== undefined && json.materials ? json.materials[primitive.material] : undefined;
+				if (textureCoordinates !== null && primitiveMaterial) {
+					const pbrMetallicRoughness = primitiveMaterial.pbrMetallicRoughness || {};
+					const transformedTextureInfo = pbrMetallicRoughness.baseColorTexture || primitiveMaterial.normalTexture || primitiveMaterial.emissiveTexture;
+					applyTextureTransform(textureCoordinates, transformedTextureInfo, 0);
+				}
 				let joints = null;
 				let weights = null;
 				if (isStaticMesh) {
@@ -774,8 +879,8 @@ export class SkinnedModel extends Object {
 					if (target.POSITION === undefined) {
 						continue;
 					}
-					const positionDeltas = new System.Float32Array(readAccessorArray(json, binaryBuffer, target.POSITION));
-					const normalDeltas = target.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(json, binaryBuffer, target.NORMAL)) : null;
+					const positionDeltas = readFloatAccessorArray(json, binaryBuffer, target.POSITION);
+					const normalDeltas = target.NORMAL !== undefined ? readFloatAccessorArray(json, binaryBuffer, target.NORMAL) : null;
 					const targetName = targetNameList[targetIndex] !== undefined ? targetNameList[targetIndex] : `target${targetIndex}`;
 					morphTargets.push({ name: targetName, positionDeltas: positionDeltas, normalDeltas: normalDeltas });
 				}
@@ -784,7 +889,6 @@ export class SkinnedModel extends Object {
 					morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== undefined ? baseMorphWeights[weightIndex] : 0;
 				}
 
-				const primitiveMaterial = primitive.material !== undefined && json.materials ? json.materials[primitive.material] : undefined;
 				const materialName = primitiveMaterial && primitiveMaterial.name ? primitiveMaterial.name : "";
 				meshDescriptionList.push({
 					positions: positions,
@@ -809,8 +913,8 @@ export class SkinnedModel extends Object {
 			const channels = [];
 			for (const channel of animation.channels) {
 				const sampler = animation.samplers[channel.sampler];
-				const times = readAccessorArray(json, binaryBuffer, sampler.input);
-				const values = readAccessorArray(json, binaryBuffer, sampler.output);
+				const times = readFloatAccessorArray(json, binaryBuffer, sampler.input);
+				const values = readFloatAccessorArray(json, binaryBuffer, sampler.output);
 				if (times.length > 0) {
 					duration = System.Math.max(duration, times[times.length - 1]);
 				}

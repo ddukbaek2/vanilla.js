@@ -44,6 +44,8 @@ import { MeshBuilder } from "./meshbuilder.js";
 //   - 부품을 따로 숨기거나 칠하는 모형(무더기의 결정 여럿처럼)은 readGlbNodeArrays 로 노드마다 따로 읽는다.
 //     노드 extras(문과 다리가 도는 자리 pivot 등)는 그 부품의 extras 로 함께 담는다.
 //   - 한 덩이로 읽은 뼈대 모형(탈것 같은)의 노드 extras 와 부품의 자리, 따르는 본은 readGlbNodeInfos 로 따로 읽는다.
+//   - 꼭짓점 속성을 정수로 담은 GLB(KHR_mesh_quantization)도 읽는다. 정규화 정수는 glTF 명세의 공식으로 나누고, 텍스처 좌표는 재질 텍스처의 KHR_texture_transform 을 구워 넣는다.
+//     이름 없는 메시 노드는 이름 있는 부모 노드의 부품에 든다. (양자화 도구가 되풀이 변환을 맡기는 잎 노드) extensionsRequired 에 읽지 못하는 확장(meshopt 압축 등)이 있으면 오류를 던진다.
 // 엔진의 GLB 읽기는 엔진의 PBR 모형(SkinnedModel) 안에 묶여 있어, 툰 그리기에 쓸 꼭짓점 배열만 여기서 뽑는다.
 //==============================================================================
 
@@ -60,10 +62,23 @@ const COMPONENT_ARRAYS = System.Object.freeze({
 	5125: System.Uint32Array,
 	5126: System.Float32Array,
 });
-// 정수로 담긴 무게를 0 ~ 1 로 바꿀 때 나눌 수. (normalized 접근자)
+// 실수 접근자의 수 종류.
+const FLOAT_COMPONENT_TYPE = 5126;
+// 정규화 정수(normalized 접근자)를 실수로 바꿀 때 나눌 수. (glTF 명세의 공식, 부호 있는 것은 max(c / 127, -1) 처럼 -1 아래를 자름)
 const NORMALIZED_DIVISORS = System.Object.freeze({
+	5120: 127,
 	5121: 255,
+	5122: 32767,
 	5123: 65535,
+});
+// 읽을 줄 아는 glTF 확장. (extensionsRequired 에 이 밖의 것이 있으면 읽지 않고 오류를 던진다)
+//   - KHR_mesh_quantization: 꼭짓점 속성을 정수로 담은 것. (위치는 노드 변환이나 inverseBindMatrices 가, 텍스처 좌표는 KHR_texture_transform 이 되풀이를 맡는다)
+//   - KHR_texture_transform: 텍스처 좌표의 offset, rotation, scale. (재질 텍스처의 것을 읽을 때 텍스처 좌표에 구워 넣는다)
+const SUPPORTED_EXTENSIONS = System.Object.freeze(["KHR_mesh_quantization", "KHR_texture_transform"]);
+// 아직 읽지 못하는 필수 압축 확장의 오류 글.
+const UNSUPPORTED_EXTENSION_MESSAGES = System.Object.freeze({
+	EXT_meshopt_compression: "GLB 의 필수 확장 EXT_meshopt_compression(meshopt 압축)은 아직 읽지 못합니다. (압축 없이 양자화만 한 KHR_mesh_quantization 은 읽는다)",
+	KHR_draco_mesh_compression: "GLB 의 필수 확장 KHR_draco_mesh_compression(Draco 압축)은 읽지 못합니다. (압축 없이 양자화만 한 KHR_mesh_quantization 은 읽는다)",
 });
 const TYPE_COMPONENT_COUNTS = System.Object.freeze({
 	SCALAR: 1,
@@ -94,6 +109,9 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
 	const componentCount = TYPE_COMPONENT_COUNTS[accessor.type];
 	const ArrayConstructor = COMPONENT_ARRAYS[accessor.componentType];
 	const bufferView = json.bufferViews[accessor.bufferView];
+	if ((bufferView.buffer || 0) !== 0) {
+		throw new System.Error(`GLB 의 바깥 버퍼(buffers[${bufferView.buffer}])는 읽지 못합니다. (바이너리 덩어리 buffers[0] 만 읽는다, EXT_meshopt_compression 의 fallback 버퍼도 여기 든다)`);
+	}
 	const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
 	const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
 	const byteStride = bufferView.byteStride || 0;
@@ -109,7 +127,35 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
 }
 
 //==============================================================================
-// 무게 접근자 읽기. (정수로 담겼으면 0 ~ 1 로)
+// 실수로 쓰는 접근자 읽기. (위치, 노멀, 텍스처 좌표, 움직임 값, KHR_mesh_quantization 의 정수 속성을 실수로 되풀이)
+//   - 정규화(normalized) 정수는 glTF 명세의 공식으로 나눈다. (부호 없는 것은 c / 255, c / 65535, 부호 있는 것은 max(c / 127, -1), max(c / 32767, -1))
+//   - 정규화가 아닌 정수는 값 그대로 실수로 옮긴다. (위치의 크기와 자리는 노드 변환이, 텍스처 좌표의 것은 KHR_texture_transform 이 맡는다)
+//==============================================================================
+/**
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @param { number } accessorIndex - 접근자 차례.
+ * @param { boolean } [isAlwaysNormalized] - 정수면 normalized 표시가 없어도 정규화로 읽을지. (명세가 늘 정규화로 정한 무게)
+ * @returns { ArrayLike<number> } 실수 값. (실수 접근자는 읽은 Float32Array 그대로, 정수 접근자는 새 Float32Array)
+ */
+function readFloatAccessor(json, binaryBuffer, accessorIndex, isAlwaysNormalized = false) {
+	const accessor = json.accessors[accessorIndex];
+	const values = readAccessor(json, binaryBuffer, accessorIndex);
+	if (accessor.componentType === FLOAT_COMPONENT_TYPE) {
+		return values;
+	}
+	const divisor = NORMALIZED_DIVISORS[accessor.componentType];
+	const isNormalized = divisor !== undefined && (accessor.normalized === true || isAlwaysNormalized);
+	if (!isNormalized) {
+		return System.Float32Array.from(values);
+	}
+	return System.Float32Array.from(values, (value) => {
+		return System.Math.max(value / divisor, -1);
+	});
+}
+
+//==============================================================================
+// 무게 접근자 읽기. (정수로 담겼으면 0 ~ 1 로, glTF 명세가 무게의 정수는 늘 정규화로 정함)
 //==============================================================================
 /**
  * @param { object } json - glTF 의 JSON 덩어리.
@@ -118,14 +164,64 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
  * @returns { ArrayLike<number> } 무게. (정수로 담겼으면 0 ~ 1 로 나눈 Float32Array)
  */
 function readWeightAccessor(json, binaryBuffer, accessorIndex) {
-	const values = readAccessor(json, binaryBuffer, accessorIndex);
-	const divisor = NORMALIZED_DIVISORS[json.accessors[accessorIndex].componentType];
-	if (divisor === undefined) {
-		return values;
+	return readFloatAccessor(json, binaryBuffer, accessorIndex, true);
+}
+
+//==============================================================================
+// 재질 텍스처의 KHR_texture_transform 을 텍스처 좌표에 구워 넣기. (변환이 없으면 받은 좌표 그대로)
+//   - 명세의 차례대로 크기, 돌림(시계 반대, 라디안), 자리를 건다. uv' = offset + R(rotation) x (scale x uv)
+//     R 은 명세의 GLSL mat3(cos, sin, 0, -sin, cos, 0, 0, 0, 1) 이다. (열 차례)
+//   - 프리미티브의 텍스처 좌표는 재질의 모든 텍스처가 함께 쓰므로, 바탕 텍스처(없으면 빛남 텍스처)의 변환을 건다. (gltfpack 같은 양자화 도구는 한 재질의 텍스처에 같은 변환을 준다)
+//==============================================================================
+/**
+ * @param { ArrayLike<number> | null } uvs - 꼭짓점마다 텍스처 좌표 둘. (없으면 null)
+ * @param { object | undefined } textureInfo - 재질의 텍스처 정보. { index, texCoord, extensions }
+ * @param { number } texCoordIndex - uvs 가 몇 번 텍스처 좌표(TEXCOORD_n)인지.
+ * @returns { ArrayLike<number> | null } 변환을 건 새 Float32Array. (변환이 없거나 다른 좌표 묶음의 것이면 받은 uvs)
+ */
+function applyTextureTransform(uvs, textureInfo, texCoordIndex) {
+	if (uvs === null || textureInfo === undefined || textureInfo === null || textureInfo.extensions === undefined) {
+		return uvs;
 	}
-	return System.Float32Array.from(values, (value) => {
-		return value / divisor;
-	});
+	const transform = textureInfo.extensions.KHR_texture_transform;
+	if (transform === undefined) {
+		return uvs;
+	}
+	const baseTexCoord = typeof textureInfo.texCoord === "number" ? textureInfo.texCoord : 0;
+	const transformTexCoord = typeof transform.texCoord === "number" ? transform.texCoord : baseTexCoord;
+	if (transformTexCoord !== texCoordIndex) {
+		return uvs;
+	}
+	const offset = System.Array.isArray(transform.offset) ? transform.offset : [0, 0];
+	const scale = System.Array.isArray(transform.scale) ? transform.scale : [1, 1];
+	const rotation = typeof transform.rotation === "number" ? transform.rotation : 0;
+	const cosine = System.Math.cos(rotation);
+	const sine = System.Math.sin(rotation);
+	const result = new System.Float32Array(uvs.length);
+	for (let valueIndex = 0; valueIndex + 1 < uvs.length; valueIndex += 2) {
+		const scaledU = uvs[valueIndex] * scale[0];
+		const scaledV = uvs[valueIndex + 1] * scale[1];
+		result[valueIndex] = offset[0] + cosine * scaledU - sine * scaledV;
+		result[valueIndex + 1] = offset[1] + sine * scaledU + cosine * scaledV;
+	}
+	return result;
+}
+
+//==============================================================================
+// 필수 확장 확인. (extensionsRequired 에 읽지 못하는 확장이 있으면 오류를 던진다)
+//==============================================================================
+/**
+ * @param { object } json - glTF 의 JSON 덩어리.
+ */
+function checkRequiredExtensions(json) {
+	const requiredExtensions = System.Array.isArray(json.extensionsRequired) ? json.extensionsRequired : [];
+	for (const extensionName of requiredExtensions) {
+		if (SUPPORTED_EXTENSIONS.includes(extensionName)) {
+			continue;
+		}
+		const message = UNSUPPORTED_EXTENSION_MESSAGES[extensionName];
+		throw new System.Error(message !== undefined ? message : `GLB 의 필수 확장 ${extensionName} 은 읽지 못합니다.`);
+	}
 }
 
 //==============================================================================
@@ -166,6 +262,58 @@ function readNodeMatrix(node) {
 }
 
 //==============================================================================
+// 뼈대 메시의 쉬는 자세 크기. (본마다 본의 쉬는 월드 행렬 x inverseBindMatrices 의 균일 크기, 그 가운데값)
+//   - 정수 위치(KHR_mesh_quantization)의 뼈대 메시는 되풀이 크기가 inverseBindMatrices 에 들어 있어, 메시 좌표 1 이 모형 좌표로 이만큼이다.
+//   - 쉬는 자세가 묶은 자세와 같은 보통 모형에서 실수 위치면 1 에 가깝다.
+//==============================================================================
+/**
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @param { object } skin - glTF skin.
+ * @returns { number } 메시 좌표 1 의 모형 좌표 크기. (셀 수 없으면 1)
+ */
+function readSkinBindScale(json, binaryBuffer, skin) {
+	const parentIndices = json.nodes.map(() => {
+		return -1;
+	});
+	json.nodes.forEach((node, nodeIndex) => {
+		if (System.Array.isArray(node.children)) {
+			for (const childIndex of node.children) {
+				parentIndices[childIndex] = nodeIndex;
+			}
+		}
+	});
+	const inverseBindMatrices = skin.inverseBindMatrices !== undefined ? readFloatAccessor(json, binaryBuffer, skin.inverseBindMatrices) : null;
+	const scales = [];
+	skin.joints.forEach((jointNodeIndex, jointIndex) => {
+		const worldMatrix = Matrix4.createIdentity();
+		for (let nodeIndex = jointNodeIndex; nodeIndex >= 0; nodeIndex = parentIndices[nodeIndex]) {
+			const parentMatrix = readNodeMatrix(json.nodes[nodeIndex]);
+			parentMatrix.multiply(worldMatrix);
+			worldMatrix.getElements().set(parentMatrix.getElements());
+		}
+		if (inverseBindMatrices !== null) {
+			const inverseBindMatrix = Matrix4.createIdentity();
+			inverseBindMatrix.getElements().set(inverseBindMatrices.subarray(jointIndex * 16, jointIndex * 16 + 16));
+			worldMatrix.multiply(inverseBindMatrix);
+		}
+		const elements = worldMatrix.getElements();
+		const determinant = elements[0] * (elements[5] * elements[10] - elements[6] * elements[9]) - elements[4] * (elements[1] * elements[10] - elements[2] * elements[9]) + elements[8] * (elements[1] * elements[6] - elements[2] * elements[5]);
+		const scale = System.Math.cbrt(System.Math.abs(determinant));
+		if (scale > 0 && System.Number.isFinite(scale)) {
+			scales.push(scale);
+		}
+	});
+	if (scales.length === 0) {
+		return 1;
+	}
+	scales.sort((first, second) => {
+		return first - second;
+	});
+	return scales[System.Math.floor(scales.length / 2)];
+}
+
+//==============================================================================
 // 프리미티브 하나 담기. (바깥선 껍데기는 바깥선 배열에, 나머지는 색과 빛남과 함께)
 //   - 뼈대로 움직이는 프리미티브는 노드 행렬을 쓰지 않는다. (glTF 의 약속, 자리는 본이 정함)
 //==============================================================================
@@ -177,14 +325,15 @@ function readNodeMatrix(node) {
  * @param { object } primitive - glTF 프리미티브.
  * @param { Matrix4 } matrix - 부모까지 곱한 노드 행렬. (뼈대 프리미티브는 쓰지 않음)
  * @param { boolean } [isOutlineRebuilt] 바깥선 껍데기를 몸으로 새로 지으면 GLB 의 껍데기는 담지 않는다.
+ * @param { object } [partNode] - 재질 범위의 nodeName 으로 쓸 부품 노드. (visitMeshNodes 가 넘긴 것, 없으면 node)
  */
-function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt = false) {
+function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt = false, partNode = node) {
 	const mode = primitive.mode !== undefined ? primitive.mode : TRIANGLES_MODE;
 	const attributes = primitive.attributes;
 	if (mode !== TRIANGLES_MODE || attributes.POSITION === undefined) {
 		return;
 	}
-	const positions = readAccessor(json, binaryBuffer, attributes.POSITION);
+	const positions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
 	let indices = null;
 	if (primitive.indices !== undefined) {
 		indices = readAccessor(json, binaryBuffer, primitive.indices);
@@ -210,10 +359,13 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 	if (attributes.NORMAL === undefined) {
 		return;
 	}
-	const normals = readAccessor(json, binaryBuffer, attributes.NORMAL);
-	const uvs = attributes.TEXCOORD_0 !== undefined ? readWeightAccessor(json, binaryBuffer, attributes.TEXCOORD_0) : null;
-	const uvs1 = attributes.TEXCOORD_1 !== undefined ? readWeightAccessor(json, binaryBuffer, attributes.TEXCOORD_1) : null;
+	const normals = readFloatAccessor(json, binaryBuffer, attributes.NORMAL);
 	const pbrMetallicRoughness = material.pbrMetallicRoughness !== undefined ? material.pbrMetallicRoughness : {};
+	const transformedTextureInfo = pbrMetallicRoughness.baseColorTexture !== undefined ? pbrMetallicRoughness.baseColorTexture : material.emissiveTexture;
+	const sourceUvs = attributes.TEXCOORD_0 !== undefined ? readFloatAccessor(json, binaryBuffer, attributes.TEXCOORD_0) : null;
+	const sourceUvs1 = attributes.TEXCOORD_1 !== undefined ? readFloatAccessor(json, binaryBuffer, attributes.TEXCOORD_1) : null;
+	const uvs = applyTextureTransform(sourceUvs, transformedTextureInfo, 0);
+	const uvs1 = applyTextureTransform(sourceUvs1, transformedTextureInfo, 1);
 	const baseColor = pbrMetallicRoughness.baseColorFactor !== undefined ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
 	const color = [0, 1, 2].map((channelIndex) => {
 		return System.Math.pow(System.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
@@ -232,7 +384,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 	builder.addMaterialRange({
 		name: typeof material.name === "string" ? material.name : "",
 		materialIndex: primitive.material !== undefined ? primitive.material : -1,
-		nodeName: typeof node.name === "string" ? node.name : "",
+		nodeName: typeof partNode.name === "string" ? partNode.name : "",
 		indexStart: indexStart,
 		indexCount: builder.getIndexCount() - indexStart,
 		extras: extras,
@@ -295,7 +447,7 @@ function readRebuiltOutlineWidth(node, nodeNames, outlineOptions) {
  * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
  * @param { object } node - 껍데기를 지을 메시 노드.
  * @param { Matrix4 } matrix - 부모까지 곱한 노드 행렬. (뼈대 노드는 쓰지 않음)
- * @param { number } outlineWidth - 껍데기 굵기. (모형 좌표)
+ * @param { number } outlineWidth - 껍데기 굵기. (모형 좌표, 정수 위치 뼈대 메시는 readSkinBindScale 로 나눠 메시 좌표로 바꿈)
  */
 function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWidth) {
 	const positions = [];
@@ -304,6 +456,7 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 	const isSkinned = node.skin !== undefined;
 	const joints = isSkinned ? [] : null;
 	const weights = isSkinned ? [] : null;
+	let hasIntegerPositions = false;
 	for (const primitive of json.meshes[node.mesh].primitives) {
 		const mode = primitive.mode !== undefined ? primitive.mode : TRIANGLES_MODE;
 		const attributes = primitive.attributes;
@@ -317,8 +470,9 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 			continue;
 		}
 		const startIndex = positions.length / 3;
-		const primitivePositions = readAccessor(json, binaryBuffer, attributes.POSITION);
-		const primitiveNormals = readAccessor(json, binaryBuffer, attributes.NORMAL);
+		hasIntegerPositions = hasIntegerPositions || json.accessors[attributes.POSITION].componentType !== FLOAT_COMPONENT_TYPE;
+		const primitivePositions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
+		const primitiveNormals = readFloatAccessor(json, binaryBuffer, attributes.NORMAL);
 		for (let valueIndex = 0; valueIndex < primitivePositions.length; ++valueIndex) {
 			positions.push(primitivePositions[valueIndex]);
 			normals.push(primitiveNormals[valueIndex]);
@@ -347,7 +501,9 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 		return;
 	}
 	const partMatrix = isSkinned ? Matrix4.createIdentity() : matrix;
-	builder.addTriangleShell(positions, normals, indices, partMatrix, outlineWidth, joints, weights);
+	// 정수 위치 뼈대 메시는 메시 좌표가 양자화 칸이라, 굵기를 쉬는 자세의 모형 좌표로 맞춘다. (실수 위치는 메시 좌표 그대로)
+	const shellWidth = isSkinned && hasIntegerPositions ? outlineWidth / readSkinBindScale(json, binaryBuffer, json.skins[node.skin]) : outlineWidth;
+	builder.addTriangleShell(positions, normals, indices, partMatrix, shellWidth, joints, weights);
 }
 
 //==============================================================================
@@ -400,7 +556,7 @@ function readSkeleton(json, binaryBuffer) {
 	});
 	let inverseBindMatrices = null;
 	if (skin.inverseBindMatrices !== undefined) {
-		inverseBindMatrices = System.Float32Array.from(readAccessor(json, binaryBuffer, skin.inverseBindMatrices));
+		inverseBindMatrices = System.Float32Array.from(readFloatAccessor(json, binaryBuffer, skin.inverseBindMatrices));
 	}
 	else {
 		inverseBindMatrices = new System.Float32Array(skin.joints.length * 16);
@@ -416,8 +572,8 @@ function readSkeleton(json, binaryBuffer) {
 		let duration = 0;
 		for (const channel of animation.channels) {
 			const sampler = animation.samplers[channel.sampler];
-			const times = readAccessor(json, binaryBuffer, sampler.input);
-			const values = readAccessor(json, binaryBuffer, sampler.output);
+			const times = readFloatAccessor(json, binaryBuffer, sampler.input);
+			const values = readFloatAccessor(json, binaryBuffer, sampler.output);
 			duration = System.Math.max(duration, times[times.length - 1]);
 			channels.push({ nodeIndex: channel.target.node, path: channel.target.path, times: times, values: values, isStep: sampler.interpolation === "STEP" });
 		}
@@ -459,37 +615,43 @@ function readGlbChunks(arrayBuffer) {
 	if (json === null || binaryBuffer === null) {
 		throw new System.Error("GLB 의 덩어리가 모자랍니다.");
 	}
+	checkRequiredExtensions(json);
 	return { json: json, binaryBuffer: binaryBuffer };
 }
 
 //==============================================================================
-// 장면의 메시 노드를 차례로 돌기. (노드마다 부모까지 곱한 행렬과 함께 visitEvent(node, matrix) 를 부름)
+// 장면의 메시 노드를 차례로 돌기. (노드마다 부모까지 곱한 행렬, 부품 노드와 함께 visitEvent(node, matrix, partNode) 를 부름)
+//   - 부품 노드는 자신부터 위로 올라가 처음 만나는 이름 있는 노드이다. (이름 있는 조상이 없으면 메시 노드 자신)
+//     이름 없는 메시 노드는 이름 있는 부모 노드의 부품에 든다. (KHR_mesh_quantization 의 되풀이 변환을 맡는 잎 노드처럼)
 //==============================================================================
 /**
  * @param { object } json - glTF 의 JSON 덩어리.
- * @param { Function } visitEvent - (node, matrix) => void. 메시가 있는 노드마다 부른다.
+ * @param { Function } visitEvent - (node, matrix, partNode) => void. 메시가 있는 노드마다 부른다.
  */
 function visitMeshNodes(json, visitEvent) {
 	const sceneIndex = json.scene !== undefined ? json.scene : 0;
 	const rootNodes = json.scenes !== undefined && json.scenes[sceneIndex] !== undefined ? json.scenes[sceneIndex].nodes : json.nodes.map((node, nodeIndex) => {
 		return nodeIndex;
 	});
-	const visit = (nodeIndex, parentMatrix) => {
+	const visit = (nodeIndex, parentMatrix, parentPartNode) => {
 		const node = json.nodes[nodeIndex];
 		const matrix = parentMatrix.clone();
 		const nodeMatrix = readNodeMatrix(node);
 		matrix.multiply(nodeMatrix);
+		const isNamed = typeof node.name === "string" && node.name !== "";
+		const namedNode = isNamed ? node : parentPartNode;
 		if (node.mesh !== undefined) {
-			visitEvent(node, matrix);
+			const partNode = namedNode !== null ? namedNode : node;
+			visitEvent(node, matrix, partNode);
 		}
 		if (System.Array.isArray(node.children)) {
 			for (const childIndex of node.children) {
-				visit(childIndex, matrix);
+				visit(childIndex, matrix, namedNode);
 			}
 		}
 	};
 	for (const nodeIndex of rootNodes) {
-		visit(nodeIndex, Matrix4.createIdentity());
+		visit(nodeIndex, Matrix4.createIdentity(), null);
 	}
 }
 
@@ -533,19 +695,19 @@ export function readGlbArrays(arrayBuffer, outlineOptions = null) {
 	const innerOverParts = isOutlineRebuilt && outlineOptions.innerOverParts !== undefined ? outlineOptions.innerOverParts : [];
 	const innerNodes = [];
 	const innerBodyRanges = [];
-	visitMeshNodes(json, (node, matrix) => {
+	visitMeshNodes(json, (node, matrix, partNode) => {
 		const bodyStart = builder.getIndexCount();
 		for (const primitive of json.meshes[node.mesh].primitives) {
-			addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt);
+			addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt, partNode);
 		}
 		if (!isOutlineRebuilt) {
 			return;
 		}
-		const outlineWidth = readRebuiltOutlineWidth(node, nodeNames, outlineOptions);
+		const outlineWidth = readRebuiltOutlineWidth(partNode, nodeNames, outlineOptions);
 		if (outlineWidth !== null) {
 			addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWidth);
 		}
-		const nodeName = typeof node.name === "string" ? node.name : "";
+		const nodeName = typeof partNode.name === "string" ? partNode.name : "";
 		if (innerParts.includes(nodeName)) {
 			innerNodes.push({ node: node, matrix: matrix });
 		}
@@ -677,17 +839,17 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 	const partAlphas = {};
 	const isOutlineRebuilt = outlineOptions !== null;
 	const nodeNames = readNodeNames(json);
-	visitMeshNodes(json, (node, matrix) => {
-		const nodeName = typeof node.name === "string" ? node.name : "";
+	visitMeshNodes(json, (node, matrix, partNode) => {
+		const nodeName = typeof partNode.name === "string" ? partNode.name : "";
 		const partName = nodeName.endsWith(OUTLINE_NODE_SUFFIX) ? nodeName.slice(0, nodeName.length - OUTLINE_NODE_SUFFIX.length) : nodeName;
 		if (builders[partName] === undefined) {
 			builders[partName] = new MeshBuilder();
 		}
-		if (partName === nodeName && node.extras !== undefined && node.extras !== null) {
-			partExtras[partName] = node.extras;
+		if (partName === nodeName && partNode.extras !== undefined && partNode.extras !== null) {
+			partExtras[partName] = partNode.extras;
 		}
 		for (const primitive of json.meshes[node.mesh].primitives) {
-			addPrimitive(builders[partName], json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt);
+			addPrimitive(builders[partName], json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt, partNode);
 			const material = primitive.material !== undefined && json.materials !== undefined ? json.materials[primitive.material] : {};
 			if (material.alphaMode === "BLEND") {
 				const pbrMetallicRoughness = material.pbrMetallicRoughness !== undefined ? material.pbrMetallicRoughness : {};
@@ -699,7 +861,7 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 		if (!isOutlineRebuilt) {
 			return;
 		}
-		const outlineWidth = readRebuiltOutlineWidth(node, nodeNames, outlineOptions);
+		const outlineWidth = readRebuiltOutlineWidth(partNode, nodeNames, outlineOptions);
 		if (outlineWidth !== null) {
 			addRebuiltOutline(builders[partName], json, binaryBuffer, node, matrix, outlineWidth);
 		}
@@ -715,7 +877,7 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 }
 
 //==============================================================================
-// GLB 의 메시 노드마다의 extras, 가운데, 따르는 본. ({ 이름: { extras, center, jointIndex } }, 이름 끝이 ".outline" 인 노드와 바깥선 재질은 뺌)
+// GLB 의 메시 노드마다의 extras, 가운데, 따르는 본. ({ 이름: { extras, center, jointIndex } }, 이름 끝이 ".outline" 인 노드와 바깥선 재질은 뺌, 이름 없는 메시 노드는 이름 있는 부모 부품에 모음)
 //   - readGlbArrays 로 한 덩이에 읽은 뼈대 모형에서 노드 extras(body 의 height 등)와 부품의 자리(헬멧 불 등)를 따로 읽을 때 쓴다.
 //   - center 는 꼭짓점이 놓인 범위의 가운데이다. (모형 좌표, 뼈대로 움직이는 노드는 쉬는 자세의 자리, 꼭짓점이 없으면 원점)
 //   - jointIndex 는 그 노드의 꼭짓점이 가장 무겁게 딸린 본의 skin 안 차례이다. (writeSkinPose 가 쓴 본 행렬의 차례, 뼈대가 없으면 -1)
@@ -741,15 +903,19 @@ export function readGlbNodeInfos(arrayBuffer) {
 	const chunks = readGlbChunks(arrayBuffer);
 	const json = chunks.json;
 	const binaryBuffer = chunks.binaryBuffer;
-	const nodeInfos = {};
-	visitMeshNodes(json, (node, matrix) => {
-		const nodeName = typeof node.name === "string" ? node.name : "";
+	const partBounds = new System.Map();
+	visitMeshNodes(json, (node, matrix, partNode) => {
+		const nodeName = typeof partNode.name === "string" ? partNode.name : "";
 		if (nodeName.endsWith(OUTLINE_NODE_SUFFIX)) {
 			return;
 		}
-		const minimum = [System.Infinity, System.Infinity, System.Infinity];
-		const maximum = [-System.Infinity, -System.Infinity, -System.Infinity];
-		const jointWeights = new System.Map();
+		if (!partBounds.has(nodeName)) {
+			partBounds.set(nodeName, { partNode: partNode, minimum: [System.Infinity, System.Infinity, System.Infinity], maximum: [-System.Infinity, -System.Infinity, -System.Infinity], jointWeights: new System.Map() });
+		}
+		const bounds = partBounds.get(nodeName);
+		const minimum = bounds.minimum;
+		const maximum = bounds.maximum;
+		const jointWeights = bounds.jointWeights;
 		for (const primitive of json.meshes[node.mesh].primitives) {
 			const attributes = primitive.attributes;
 			if (attributes.POSITION === undefined) {
@@ -761,7 +927,7 @@ export function readGlbNodeInfos(arrayBuffer) {
 				continue;
 			}
 			const isSkinned = node.skin !== undefined && attributes.JOINTS_0 !== undefined && attributes.WEIGHTS_0 !== undefined;
-			const positions = readAccessor(json, binaryBuffer, attributes.POSITION);
+			const positions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
 			for (let offset = 0; offset + 3 <= positions.length; offset += 3) {
 				let point = [positions[offset], positions[offset + 1], positions[offset + 2]];
 				if (!isSkinned) {
@@ -783,21 +949,27 @@ export function readGlbNodeInfos(arrayBuffer) {
 				}
 			}
 		}
+	});
+	const nodeInfos = {};
+	for (const [nodeName, bounds] of partBounds) {
+		const minimum = bounds.minimum;
+		const maximum = bounds.maximum;
 		let center = [0, 0, 0];
 		if (minimum[0] <= maximum[0]) {
 			center = [(minimum[0] + maximum[0]) / 2, (minimum[1] + maximum[1]) / 2, (minimum[2] + maximum[2]) / 2];
 		}
 		let heaviestJointIndex = -1;
 		let heaviestWeight = 0;
-		for (const [jointIndex, weight] of jointWeights) {
+		for (const [jointIndex, weight] of bounds.jointWeights) {
 			if (weight > heaviestWeight) {
 				heaviestJointIndex = jointIndex;
 				heaviestWeight = weight;
 			}
 		}
-		const extras = node.extras !== undefined && node.extras !== null ? node.extras : {};
+		const partNode = bounds.partNode;
+		const extras = partNode.extras !== undefined && partNode.extras !== null ? partNode.extras : {};
 		nodeInfos[nodeName] = { extras: extras, center: center, jointIndex: heaviestJointIndex };
-	});
+	}
 	return nodeInfos;
 }
 
