@@ -2,12 +2,15 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../../base/object.js";
+import { DecodedImageStore } from "./decodedimagestore.js";
 
 
 //==============================================================================
 // 이미지 텍스처 캐시.
 // - HTMLImageElement / HTMLCanvasElement / OffscreenCanvas 를 WebGLTexture 로
 //   업로드하고 WeakMap 으로 캐시한다. (원본이 수거되면 엔트리도 함께 수거)
+// - ImageAsset 이 미리 풀어 둔 ImageBitmap 이 있으면 그것을 올리고 닫는다. (DecodedImageStore, 그림 요소를 다시 풀지 않는다)
+//   미리 푼 그림은 미리 곱한 알파, sRGB, 뒤집지 않음으로 지어 그림 요소를 올린 결과와 화소까지 같다.
 //==============================================================================
 export class ImageTextureCache extends Object {
 	//==============================================================================
@@ -57,9 +60,14 @@ export class ImageTextureCache extends Object {
 		if (!entry) {
 			const texture = webGL2RenderingContext.createTexture();
 			this.bindTexture(texture);
+			// 미리 푼 그림이 있으면 그것을 올린다. (ImageBitmap 은 UNPACK 설정을 보지 않고 지을 때의 설정을 따른다)
+			const decodedImage = DecodedImageStore.take(image);
 			webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, image);
+			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, decodedImage !== null ? decodedImage : image);
 			webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+			if (decodedImage !== null) {
+				decodedImage.close();
+			}
 			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
 			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
 			entry = { texture: texture, isSmoothingApplied: !isSmoothingEnabled, isMipmapApplied: isMipmapEnabled, hasMipmap: false };

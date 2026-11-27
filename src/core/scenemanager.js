@@ -8,6 +8,13 @@ import { Scene } from "./scene.js";
 
 
 //==============================================================================
+// 상수 목록.
+//==============================================================================
+// 로딩 화면 동안 프레임마다 그림을 올리는 데 쓰는 시간. (밀리초, 유니티 QualitySettings.asyncUploadTimeSlice 기본값 2 와 같다)
+const IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS = 2;
+
+
+//==============================================================================
 // 씬 매니저.
 //==============================================================================
 /**
@@ -67,10 +74,28 @@ export class SceneManager extends Object {
 			scene.setEngine(engine);
 			loadedScenes.push(scene);
 			await scene.load(engine);
-			// 로딩 완료 후 추가 대기. (로딩 화면을 최소 0.3초 더 노출)
-			await new System.Promise((resolve) => {
+			// 로딩 완료 후 추가 대기. (로딩 화면을 최소 0.3초 더 노출, 그동안 그림을 올린다)
+			const minimumWaitPromise = new System.Promise((resolve) => {
 				System.setTimeout(resolve, 300);
 			});
+			// 씬이 읽은 그림을 로딩 화면 동안 GPU 에 올린다. (첫 그리기 프레임에 풀기와 올리기가 몰리지 않게, 유니티와 언리얼의 로딩 때 올리기)
+			// 프레임마다 시간 한도만큼 나눠 올려 로딩 화면이 멈추지 않게 한다.
+			const graphic = engine ? engine.getGraphic() : null;
+			if (graphic) {
+				while (graphic.prepareLoadedImages(IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS) > 0) {
+					// 다음 프레임까지 기다린다. (탭이 숨어 프레임이 멈추면 50 밀리초 뒤 이어 간다)
+					await new System.Promise((resolve) => {
+						const timeoutIdentifier = System.setTimeout(resolve, 50);
+						if (typeof System.requestAnimationFrame === "function") {
+							System.requestAnimationFrame(() => {
+								System.clearTimeout(timeoutIdentifier);
+								resolve();
+							});
+						}
+					});
+				}
+			}
+			await minimumWaitPromise;
 			scene.setLoaded(true);
 			scene.initialize(engine);
 		}

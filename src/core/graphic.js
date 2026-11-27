@@ -12,6 +12,7 @@ import { TransformNode } from "./node/transformnode.js";
 import { TransformMatrix } from "../base/transformmatrix.js";
 import { ShaderProgram } from "./graphic/shaderprogram.js";
 import { ImageTextureCache } from "./graphic/imagetexturecache.js";
+import { DecodedImageStore } from "./graphic/decodedimagestore.js";
 import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
 import { WebGLStateCache } from "./graphic/webglstatecache.js";
 import * as Math from "../base/math.js";
@@ -3310,6 +3311,102 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 그림을 미리 GPU 에 올리기. (로딩 때 불러, 처음 그리는 프레임에 풀기와 올리기가 몰리지 않게)
+	// - 지금 이미지 스무딩과 밉맵 설정으로 올린다. (그릴 때 설정이 다르면 그때 거르기만 바꾼다)
+	// - 이미 올린 그림이면 아무것도 하지 않는다. 아직 읽히지 않은 그림(크기 0)은 올리지 않는다.
+	// - 코드로 만든 캔버스처럼 ImageAsset 으로 읽지 않은 그림을 씬의 load 에서 올려 둘 때 쓴다.
+	//==============================================================================
+	/**
+	 * @param { HTMLImageElement | HTMLCanvasElement | OffscreenCanvas } image 올릴 그림.
+	 * @returns { boolean } 텍스처가 있으면 true. (null 이거나 아직 읽히지 않은 그림이면 false)
+	 * @example <caption>씬을 불러오는 동안 코드로 만든 그림을 올려 두기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		this.dotImage = new OffscreenCanvas(32, 32);
+	 * 		const context = this.dotImage.getContext("2d");
+	 * 		context.fillStyle = "#ff6600";
+	 * 		context.fillRect(0, 0, 32, 32);
+	 * 		const isPrepared = engine.getGraphic().prepareImage(this.dotImage);
+	 * 		console.log(isPrepared);
+	 * 	}
+	 *
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.drawImage(this.dotImage, Vector2.create(304, 164), Vector2.create(32, 32));
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	prepareImage(image) {
+		if (image === null || image === undefined) {
+			return false;
+		}
+		// 텍스처를 묶기 전에 쌓아 둔 묶음을 먼저 그린다. (묶은 텍스처 기억이 바뀐다)
+		this.flushSpriteBatch();
+		const imageTextureCache = this.getImageTextureCache();
+		const texture = imageTextureCache.getTexture(image, this.isImageSmoothingEnabled(), this.isImageMipmapEnabled());
+		return texture !== null;
+	}
+
+	//==============================================================================
+	// 읽었지만 아직 올리지 않은 그림 올리기. (ImageAsset 이 읽은 그림, 읽은 차례로)
+	// - SceneManager 가 씬의 load 가 끝난 뒤(로딩 화면 동안) 프레임마다 나눠 부른다. 씬이 따로 부를 일은 없다.
+	// - 시간 한도를 주면 그 시간을 넘긴 뒤에는 멈추고 남은 수를 돌려준다. (한 번에 적어도 하나는 올린다, 유니티의 asyncUploadTimeSlice 와 같다)
+	// - 미리 푼 그림(ImageBitmap)은 올린 뒤 닫는다. 미리 풀지 않은 꼴의 그림은 그림 요소를 그대로 올린다.
+	//==============================================================================
+	/**
+	 * @param { number } timeLimitMilliseconds 이번에 쓸 시간 한도. (밀리초, 기본 Infinity 는 모두)
+	 * @returns { number } 아직 올리지 않고 남은 그림 수. (0 이면 다 올렸다)
+	 * @example <caption>그림을 읽은 뒤 바로 올리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, ImageAsset, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		this.imageAsset = new ImageAsset();
+	 * 		await this.imageAsset.load("examples/assets/spritesheet.png");
+	 * 		const remainingCount = engine.getGraphic().prepareLoadedImages();
+	 * 		console.log(remainingCount);
+	 * 	}
+	 *
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.drawImage(this.imageAsset.getImage(), Vector2.create(170, 30), Vector2.create(300, 300));
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	prepareLoadedImages(timeLimitMilliseconds = System.Infinity) {
+		const pendingImageList = DecodedImageStore.getPendingImageList();
+		const startTime = System.performance.now();
+		let imageIndex = 0;
+		while (imageIndex < pendingImageList.length) {
+			const image = pendingImageList[imageIndex];
+			++imageIndex;
+			const isPrepared = this.prepareImage(image);
+			// 크기가 0 인 그림은 올리지 못하므로 맡긴 것에서 뺀다. (그릴 때 다시 본다)
+			if (!isPrepared) {
+				DecodedImageStore.release(image);
+			}
+			if (System.performance.now() - startTime >= timeLimitMilliseconds) {
+				break;
+			}
+		}
+		return pendingImageList.length - imageIndex;
+	}
+
+	//==============================================================================
 	// 이미지 출력.
 	// - setFillColor() Not Supported.
 	//==============================================================================
@@ -4293,6 +4390,9 @@ export class Graphic extends Object {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		// 층 칸의 깊이와 스텐실은 다시 읽지 않으므로 판 끝에 버린다. (모바일 타일 GPU 가 메모리에 쓰지 않는다, 다음 층은 스텐실을 비우고 쓴다)
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
+		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
 
 		// 층 칸을 단위 행렬, 흰색, 틴트 없이 source-over 로 얹는다. (칸은 화면과 같은 크기라 디바이스 픽셀 그대로 짚는다, 텍스처는 아래가 0 행)
