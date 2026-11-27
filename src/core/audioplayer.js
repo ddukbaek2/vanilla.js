@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { AudioAsset, createStreamMediaElement, setStreamMediaElementUrl } from "../resource/audioasset.js";
+import { AudioAsset, createStreamMediaElement, setStreamMediaElementUrl, releaseMediaElement } from "../resource/audioasset.js";
 
 
 //==============================================================================
@@ -198,7 +198,8 @@ export class AudioPlayer {
 	startStreamPlayback(audioAsset, loop) {
 		const audioContext = this.getAudioContext();
 		const streamUrl = audioAsset.getStreamUrl();
-		if (!audioContext || !this.#gainNode || streamUrl === null) {
+		// 미디어 요소를 이을 수 없는 컨텍스트(OfflineAudioContext)는 스트리밍 소리를 내지 않는다.
+		if (!audioContext || !this.#gainNode || streamUrl === null || typeof audioContext.createMediaElementSource !== "function") {
 			return;
 		}
 
@@ -431,10 +432,15 @@ export class AudioPlayer {
 	// 오디오 애셋 설정.
 	//==============================================================================
 	/**
-	 * @param { AudioAsset } audioAsset 재생할 오디오 애셋. (다음 play 부터)
+	 * @param { AudioAsset | null } audioAsset 재생할 오디오 애셋. (다음 play 부터, 스트리밍으로 틀던 것이 멈춰 있으면 그 미디어 요소가 받아 둔 것을 놓는다)
 	 */
 	setAudioAsset(audioAsset) {
 		this.#audioAsset = audioAsset;
+		const streamUrl = audioAsset ? audioAsset.getStreamUrl() : null;
+		if (this.#mediaElement !== null && !this.#isMediaPlaying && this.#mediaUrl !== null && this.#mediaUrl !== streamUrl) {
+			releaseMediaElement(this.#mediaElement);
+			this.#mediaUrl = null;
+		}
 	}
 
 	//==============================================================================

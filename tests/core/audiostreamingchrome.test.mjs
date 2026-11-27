@@ -179,6 +179,21 @@ try {
 			player.stop();
 			modeResult[loadType] = record;
 		}
+		// 한 플레이어에서 스트리밍과 통째로 풀기를 번갈아 튼다. (스트리밍 요소를 놓고 버퍼로, 다시 스트리밍으로)
+		const mixedPlayer = new AudioPlayer(audioContext, tapNode);
+		const mixedStreamAsset = await loadAsset(AudioLoadType.streaming, 2.0);
+		const mixedBufferAsset = await loadAsset(AudioLoadType.decompressOnLoad, 2.0);
+		const mixedPeakList = [];
+		for (const mixedAsset of [mixedStreamAsset, mixedBufferAsset, mixedStreamAsset]) {
+			mixedPlayer.setAudioAsset(mixedAsset);
+			mixedPlayer.setTime(0);
+			mixedPlayer.play(false);
+			await sleep(200);
+			mixedPeakList.push(await readPeak(analyser));
+			mixedPlayer.stop();
+			await sleep(60);
+			mixedPeakList.push(await readPeak(analyser));
+		}
 		const automaticLong = await loadAsset(AudioLoadType.automatic, 13.0); // 모노 16 비트 13 초는 약 1.1 MiB
 		const automaticShort = await loadAsset(AudioLoadType.automatic, 0.6);
 		const unloadAsset = await loadAsset(AudioLoadType.streaming, 0.6);
@@ -213,6 +228,7 @@ try {
 		soundSystem.update();
 		return {
 			modeResult,
+			mixedPeakList,
 			automaticLongStreaming: automaticLong.isStreaming(),
 			automaticShortStreaming: automaticShort.isStreaming(),
 			unloadStreaming: unloadAsset.isStreaming(),
@@ -251,6 +267,10 @@ for (const [loadType, record] of Object.entries(result.modeResult)) {
 	check(record.suspendDrift < 0.06, loadType + " 컨텍스트가 멈추면 위치도 멈춤 " + record.suspendDrift);
 	check(record.resumeAdvance > 0.2 && record.playingAfterResume, loadType + " 다시 돌면 이어 틂 " + record.resumeAdvance);
 	check(record.timeRateTwo > 0.75 && record.timeRateTwo < 1.3, loadType + " 빠르기 2 의 위치 " + record.timeRateTwo);
+}
+for (let index = 0; index < result.mixedPeakList.length; index += 2) {
+	check(near(result.mixedPeakList[index], 0.5, 0.05), "번갈아 틀기 " + index / 2 + " 진폭 " + result.mixedPeakList[index]);
+	check(result.mixedPeakList[index + 1] < 0.01, "번갈아 틀기 " + index / 2 + " 멈춘 뒤 진폭 " + result.mixedPeakList[index + 1]);
 }
 check(result.automaticLongStreaming === true, "자동: 1 MiB 넘는 소리는 스트리밍");
 check(result.automaticShortStreaming === false, "자동: 작은 소리는 통째로 풀기");

@@ -992,9 +992,13 @@ export class SoundSystem {
 		}
 		if (playingMusic.player !== null) {
 			// 미디어 요소는 컨텍스트 시각에 맞춰 멈추게 걸 수 없어, 다 줄어든 뒤에 멈춘다.
+			// 멈춘 뒤 애셋을 떼어 미디어 요소가 받아 둔 것을 놓고, 이 음악의 GainNode 를 그래프에서 뗀다. (음악을 바꿀 때마다 미디어 요소가 쌓이지 않게)
 			const player = playingMusic.player;
+			const gainNode = playingMusic.gain;
 			System.setTimeout(() => {
 				player.stop();
+				player.setAudioAsset(null);
+				gainNode.disconnect();
 			}, (fadeSeconds + VOLUME_SMOOTHING_SECONDS) * 1000);
 			return;
 		}

@@ -108,7 +108,7 @@ export { UISnapScrollView } from "./src/ui/uisnapscrollview.js";
 // 리소스 목록.
 //==============================================================================
 export { AnimationClip } from "./src/resource/animationclip.js";
-export { AudioAsset, AudioLoadType } from "./src/resource/audioasset.js";
+export { AudioAsset, AudioLoadType, AUTOMATIC_STREAMING_BYTE_THRESHOLD } from "./src/resource/audioasset.js";
 export { BlobAsset } from "./src/resource/blobasset.js";
 export { FontAsset } from "./src/resource/fontasset.js";
 export { ImageAsset } from "./src/resource/imageasset.js";
