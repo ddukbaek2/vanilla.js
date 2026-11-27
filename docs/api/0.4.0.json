@@ -43569,8 +43569,8 @@
 				{
 					"name": "UIInputField",
 					"summary": {
-						"ko": "입력 필드 (캔버스 기반).\n- 텍스트 렌더링은 UILabel 자식 노드 두 개로 (값 라벨 + 플레이스홀더 라벨).\n- 클릭/드래그/커서 이동/선택은 모두 캔버스 측에서 직접 처리.\n- DOM <input> 사용 여부는 옵션 (setUseDOMInput, 기본 false). true 일 때만 한글 IME /\n  모바일 소프트 키보드 / 시스템 클립보드가 동작. false 면 ASCII 위주 키보드 직접 처리.\n- 우클릭 시 컨텍스트 메뉴 (잘라내기 / 복사 / 붙여넣기 / 모두 선택). 직접 누름(setUseDirectTouch) 필드도 브라우저 편집 칸 메뉴 대신 같은 메뉴다.\n- 커서 이동과 Delete 는 크롬처럼 글자 묶음 단위, 뒤로 지우기는 블링크 BackspaceStateMachine 처럼 코드 포인트 하나(이모지 묶음은 통째로).\n- DOM 입력은 크롬 입력 칸처럼 마우스로 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체를 고른다. (누름 수는 mousedown 의 detail)\n- 캔버스 모드의 낱말 이동과 지우기는 크롬처럼 윈도우와 리눅스는 Ctrl, 맥은 Option 과 왼쪽, 오른쪽 화살표, Backspace, Delete 다. (블링크 NextWordPosition, PreviousWordPosition)",
-						"en": "Input field (canvas based).\n- Text rendering uses two UILabel child nodes (value label + placeholder label).\n- Click/drag/cursor movement/selection are all handled directly on the canvas side.\n- Using a DOM <input> is optional (setUseDOMInput, default false). Korean IME /\n  mobile soft keyboard / system clipboard work only when true. When false, the keyboard is handled directly, mostly ASCII.\n- Context menu on right click (cut / copy / paste / select all). Direct-touch fields (setUseDirectTouch) also get this menu instead of the browser edit-field menu.\n- Cursor movement and Delete work per grapheme cluster like Chrome, Backspace removes one code point like Blink's BackspaceStateMachine (emoji sequences as a whole).\n- With DOM input, a mouse double click selects a word (with trailing whitespace on Windows) and a triple click selects all text, like a Chrome text field. (The click count is the mousedown detail)\n- In canvas mode, word movement and deletion use Ctrl on Windows and Linux and Option on Mac with the left and right arrows, Backspace and Delete, like Chrome. (Blink NextWordPosition, PreviousWordPosition)"
+						"ko": "입력 필드 (캔버스 기반).\n- 텍스트 렌더링은 UILabel 자식 노드 두 개로 (값 라벨 + 플레이스홀더 라벨).\n- 클릭/드래그/커서 이동/선택은 모두 캔버스 측에서 직접 처리.\n- DOM <input> 사용 여부는 옵션 (setUseDOMInput, 기본 false). true 일 때만 한글 IME /\n  모바일 소프트 키보드 / 시스템 클립보드가 동작. false 면 ASCII 위주 키보드 직접 처리.\n- 우클릭 시 컨텍스트 메뉴 (잘라내기 / 복사 / 붙여넣기 / 모두 선택). 직접 누름(setUseDirectTouch) 필드도 브라우저 편집 칸 메뉴 대신 같은 메뉴다.\n- 커서 이동과 Delete 는 크롬처럼 글자 묶음 단위, 뒤로 지우기는 블링크 BackspaceStateMachine 처럼 코드 포인트 하나(이모지 묶음은 통째로).\n- DOM 입력은 크롬 입력 칸처럼 마우스로 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체를 고른다. (누름 수는 mousedown 의 detail)\n- 캔버스 모드의 낱말 이동과 지우기는 크롬처럼 윈도우와 리눅스는 Ctrl, 맥은 Option 과 왼쪽, 오른쪽 화살표, Backspace, Delete 다. (블링크 NextWordPosition, PreviousWordPosition)\n- 되돌리기와 다시 하기는 두 모드 모두 엔진이 이력을 맡는다. (러스트 판 TextEditBuffer 와 같은 블링크 묶음 규칙: 이어 친 글자는 한 번에, 커서를 옮기거나 선택을 바꾸면 끊긴다,\n  새 편집은 다시 하기 목록을 지운다, setText 는 목록을 비운다) 키는 Ctrl(맥은 Cmd) + Z, Ctrl(맥은 Cmd) + Shift + Z, 윈도우와 리눅스는 Ctrl + Y, 윈도우는 Alt + Backspace 도.\n  DOM 입력은 브라우저의 되돌리기 키와 historyUndo, historyRedo 를 막고 엔진 이력으로 한다. IME 조합 중에는 되돌리지 않는다.\n- setMultiline(true) 면 크롬 textarea 같은 여러 줄 입력이다. (DOM 입력은 숨긴 textarea) 글은 white-space: pre-wrap, overflow-wrap: break-word 처럼\n  줄바꿈 문자와 폭으로 나눈다. 줄 나눔 자리는 크롬 자신의 줄 나누기에서 읽는다. (러스트 판 ui/textarealayout.rs 와 같은 셈)\n  Enter 는 줄을 넣고, 위아래와 page 는 엔진 배치로 옮기고, Home 과 End 는 보이는 줄의 앞과 끝, Ctrl(맥은 Cmd) + Home, End 는 글 앞과 끝이다. 넘치면 커서가 보이게 스크롤한다.",
+						"en": "Input field (canvas based).\n- Text rendering uses two UILabel child nodes (value label + placeholder label).\n- Click/drag/cursor movement/selection are all handled directly on the canvas side.\n- Using a DOM <input> is optional (setUseDOMInput, default false). Korean IME /\n  mobile soft keyboard / system clipboard work only when true. When false, the keyboard is handled directly, mostly ASCII.\n- Context menu on right click (cut / copy / paste / select all). Direct-touch fields (setUseDirectTouch) also get this menu instead of the browser edit-field menu.\n- Cursor movement and Delete work per grapheme cluster like Chrome, Backspace removes one code point like Blink's BackspaceStateMachine (emoji sequences as a whole).\n- With DOM input, a mouse double click selects a word (with trailing whitespace on Windows) and a triple click selects all text, like a Chrome text field. (The click count is the mousedown detail)\n- In canvas mode, word movement and deletion use Ctrl on Windows and Linux and Option on Mac with the left and right arrows, Backspace and Delete, like Chrome. (Blink NextWordPosition, PreviousWordPosition)\n- Undo and redo are handled by an engine history in both modes. (The same Blink grouping rules as TextEditBuffer in the Rust edition: consecutively typed characters undo at once, moving the cursor or changing the selection breaks the group,\n  a new edit clears the redo list, setText clears the lists) Keys are Ctrl (Cmd on Mac) + Z, Ctrl (Cmd on Mac) + Shift + Z, Ctrl + Y on Windows and Linux, and also Alt + Backspace on Windows.\n  DOM input blocks the browser's undo keys and historyUndo, historyRedo and uses the engine history. It does not undo during IME composition.\n- With setMultiline(true) it is a multiline input like a Chrome textarea. (DOM input uses a hidden textarea) Text is split by line break characters and width\n  like white-space: pre-wrap, overflow-wrap: break-word. Line break opportunities are read from Chrome's own line breaking. (the same computation as ui/textarealayout.rs in the Rust edition)\n  Enter inserts a line, up, down and page keys move by the engine layout, Home and End go to the start and end of the visible line, and Ctrl (Cmd on Mac) + Home, End go to the start and end of the text. When it overflows it scrolls to keep the caret visible."
 					},
 					"examples": [
 						{
@@ -43796,6 +43796,224 @@
 						},
 						{
 							"kind": "method",
+							"name": "setMultiline",
+							"signature": "setMultiline(isMultiline)",
+							"params": [
+								{
+									"name": "isMultiline",
+									"type": "boolean",
+									"description": {
+										"ko": "참이면 여러 줄, 거짓이면 한 줄. (처음 거짓)",
+										"en": "True for multiline, false for single line. (false at first)"
+									}
+								}
+							],
+							"description": {
+								"ko": "여러 줄 설정. (크롬 textarea 처럼, DOM 입력은 숨긴 textarea 를 쓴다, 바꾸면 스크롤을 처음으로)\n- 여러 줄이면 Enter 가 줄을 넣고(제출 콜백을 부르지 않는다), 글을 폭에 맞춰 나누고, 위아래로 옮기고, 넘치면 스크롤한다.\n- UI 문서에 적는 원본 필드 속성이 아니다. (러스트 판도 반사에서 뺀다)",
+								"en": "Sets multiline. (Like a Chrome textarea, DOM input uses a hidden textarea, changing it resets the scroll to the top)\n- When multiline, Enter inserts a line (the submit callback is not called), text wraps to the width, the caret moves up and down, and it scrolls when it overflows.\n- It is not an original field property written to UI documents. (the Rust edition also leaves it out of reflection)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "여러 줄 메모 칸",
+										"en": "Multiline memo field"
+									},
+									"code": "import { Engine, EngineConfiguration, UIScene, UIInputField, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends UIScene {\n\tconstructor() {\n\t\tsuper();\n\t\tthis.setLoadingMinDurationMs(0);\n\t}\n\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst inputField = new UIInputField();\n\t\tinputField.setEngine(engine);\n\t\tinputField.setMultiline(true);\n\t\tinputField.setTabSize(4);\n\t\tinputField.setLineHeight(32);\n\t\tinputField.setLocalPosition(Vector2.create(40, 40));\n\t\tinputField.setContentSize(Vector2.create(320, 160));\n\t\tinputField.setPlaceholder(\"Memo\");\n\t\tconst root = this.getRoot();\n\t\troot.addChild(inputField);\n\t\tinputField.attach();\n\t\tinputField.setText(\"first line\\nsecond line\");\n\t\tconsole.log(inputField.isMultiline(), inputField.getLineHeight(), inputField.getTabSize());\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.canvasId = \"mainCanvas\";\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nengineConfiguration.autoResizeOnWindowResize = true;\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isMultiline",
+							"signature": "isMultiline()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "여러 줄이면 참.",
+									"en": "True if multiline."
+								}
+							},
+							"description": {
+								"ko": "여러 줄인지.",
+								"en": "Whether it is multiline."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
+							"name": "setLineHeight",
+							"signature": "setLineHeight(lineHeight)",
+							"params": [
+								{
+									"name": "lineHeight",
+									"type": "number | null",
+									"description": {
+										"ko": "줄 높이. (내용 크기 단위, null 이면 CSS normal)",
+										"en": "Line height. (content size units, null for CSS normal)"
+									}
+								}
+							],
+							"description": {
+								"ko": "줄 높이 설정. (여러 줄 필드, null 이면 CSS normal 이다. 크롬처럼 첫째 글꼴의 위아래 길이와 줄 사이로 셈한다)",
+								"en": "Sets the line height. (Multiline field, null is CSS normal. Like Chrome it is computed from the ascent, descent and line gap of the primary font)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
+							"name": "getLineHeight",
+							"signature": "getLineHeight()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "줄 높이. (정하지 않았으면 CSS normal 로 잰 값, 잴 문서가 없으면 글꼴 크기의 1.2 배를 반올림한 값)",
+									"en": "Line height. (the measured CSS normal value if not set, or the font size times 1.2 rounded when there is no document to measure with)"
+								}
+							},
+							"description": {
+								"ko": "줄 높이 반환. (여러 줄 필드)",
+								"en": "Returns the line height. (multiline field)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
+							"name": "setTabSize",
+							"signature": "setTabSize(tabSize)",
+							"params": [
+								{
+									"name": "tabSize",
+									"type": "number",
+									"description": {
+										"ko": "탭 크기. (공백 몇 개 폭, 음수는 0, 기본 8)",
+										"en": "Tab size. (width in spaces, negative becomes 0, default 8)"
+									}
+								}
+							],
+							"description": {
+								"ko": "탭 크기 설정. (여러 줄 필드, 공백 몇 개 폭, CSS tab-size)",
+								"en": "Sets the tab size. (multiline field, width in spaces, CSS tab-size)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
+							"name": "getTabSize",
+							"signature": "getTabSize()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "탭 크기. (공백 몇 개 폭)",
+									"en": "Tab size. (width in spaces)"
+								}
+							},
+							"description": {
+								"ko": "탭 크기 반환.",
+								"en": "Returns the tab size."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
+							"name": "getScrollTop",
+							"signature": "getScrollTop()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "위로 넘긴 만큼. (내용 크기 단위)",
+									"en": "Amount scrolled up. (content size units)"
+								}
+							},
+							"description": {
+								"ko": "위로 굴려 넘긴 만큼 반환. (여러 줄 필드, textarea scrollTop)",
+								"en": "Returns the amount scrolled up. (multiline field, textarea scrollTop)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
+							"name": "setScrollTop",
+							"signature": "setScrollTop(scrollTop)",
+							"params": [
+								{
+									"name": "scrollTop",
+									"type": "number",
+									"description": {
+										"ko": "위로 넘길 만큼. (내용 크기 단위, 음수는 0)",
+										"en": "Amount to scroll up. (content size units, negative becomes 0)"
+									}
+								}
+							],
+							"description": {
+								"ko": "위로 굴려 넘기기. (여러 줄 필드, 다음 그리기에서 글 끝 안으로 줄인다)",
+								"en": "Scrolls up. (Multiline field, clamped within the end of the text on the next draw)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
+							"name": "canUndo",
+							"signature": "canUndo()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "되돌릴 묶음이 있으면 참.",
+									"en": "True if there is a group to undo."
+								}
+							},
+							"description": {
+								"ko": "되돌릴 것이 있는지.",
+								"en": "Whether there is anything to undo."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "이어 친 글자를 한 번에 되돌리기",
+										"en": "Undo consecutively typed characters at once"
+									},
+									"code": "import { Engine, EngineConfiguration, UIScene, UIInputField, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends UIScene {\n\tconstructor() {\n\t\tsuper();\n\t\tthis.setLoadingMinDurationMs(0);\n\t}\n\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst inputField = new UIInputField();\n\t\tinputField.setEngine(engine);\n\t\tinputField.setLocalPosition(Vector2.create(40, 40));\n\t\tinputField.setContentSize(Vector2.create(320, 56));\n\t\tconst root = this.getRoot();\n\t\troot.addChild(inputField);\n\t\tinputField.attach();\n\t\tinputField.replaceSelection(\"a\");\n\t\tinputField.replaceSelection(\"b\");\n\t\tconsole.log(inputField.getText(), inputField.canUndo(), inputField.canRedo());\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.canvasId = \"mainCanvas\";\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nengineConfiguration.autoResizeOnWindowResize = true;\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "canRedo",
+							"signature": "canRedo()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "다시 할 묶음이 있으면 참.",
+									"en": "True if there is a group to redo."
+								}
+							},
+							"description": {
+								"ko": "다시 할 것이 있는지.",
+								"en": "Whether there is anything to redo."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiinputfield.js"
+						},
+						{
+							"kind": "method",
 							"name": "setText",
 							"signature": "setText(text)",
 							"params": [
@@ -43809,8 +44027,8 @@
 								}
 							],
 							"description": {
-								"ko": "값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다)",
-								"en": "Sets the value. (Cuts it to the maximum length without splitting a surrogate pair and puts the cursor at the end, does not call the change callback)"
+								"ko": "값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다, 되돌리기와 다시 하기 목록을 비운다)",
+								"en": "Sets the value. (Cuts it to the maximum length without splitting a surrogate pair and puts the cursor at the end, does not call the change callback, clears the undo and redo lists)"
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiinputfield.js",
@@ -44971,8 +45189,8 @@
 									"name": "text",
 									"type": "string",
 									"description": {
-										"ko": "넣을 글. (빈 글이면 선택을 지운다)",
-										"en": "Text to insert. (an empty string deletes the selection)"
+										"ko": "넣을 글. (빈 글이면 선택을 지운다, 글자 넣기 되돌리기 묶음이다)",
+										"en": "Text to insert. (an empty string deletes the selection, it is an insert text undo group)"
 									}
 								}
 							],
