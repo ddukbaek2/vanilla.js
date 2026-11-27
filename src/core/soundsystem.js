@@ -2,8 +2,9 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { AudioAsset } from "../resource/audioasset.js";
+import { AudioAsset, AudioLoadType } from "../resource/audioasset.js";
 import { AudioBus } from "./audiobus.js";
+import { AudioPlayer } from "./audioplayer.js";
 
 
 //==============================================================================
@@ -16,6 +17,7 @@ import { AudioBus } from "./audiobus.js";
 //   maximumVoices: 같은 소리가 한꺼번에 날 수 있는 수. (넘으면 가장 오래된 것을 끊음, 없으면 효과음 전체의 수까지)
 //   pitchVariation: 낼 때마다 음 높이를 흔드는 비. (0.05 면 ±5%, 없으면 0)
 //   playSeconds, fadeOutSeconds: 효과음을 앞의 playSeconds 초만 틀고 fadeOutSeconds 초 동안 줄여 끈다. (긴 파일, 없거나 0 이면 끝까지)
+//   loadType: 읽기 방식. (AudioLoadType, 없으면 decompressOnLoad, 효과음은 겹쳐 트므로 통째로 풀어야 난다, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
 //
 // 크기: 배경음악 = 설정의 음악 크기 × 음악의 비(멈춤 창의 반 크기 등) × 소리의 크기, 효과음 = 설정의 효과음 크기 × 소리의 크기 × 부를 때의 크기(거리에 따른 줄임 등).
 // 배경음악은 겹쳐 바꿀 수 있고(fadeSeconds), 멈췄던 자리를 소리마다 기억해 이어 틀 수 있다. (isResumed)
@@ -98,7 +100,7 @@ export class SoundSystem {
 	/** @private @type { string } */ #musicId; // 틀어 달라고 한 배경음악. (없으면 "")
 	/** @private @type { number } */ #musicFadeSeconds; // 그 음악으로 바꿀 때 겹치는 초.
 	/** @private @type { boolean } */ #isMusicResumed; // 그 음악을 멈췄던 자리에서 이어 트는지.
-	/** @private @type { object | null } */ #playingMusic; // 틀고 있는 배경음악. ({ soundId, source, gain, startTime, offset, duration })
+	/** @private @type { object | null } */ #playingMusic; // 틀고 있는 배경음악. ({ soundId, source, player, gain, startTime, offset, duration }, 스트리밍이면 source 대신 player)
 	/** @private @type { Map<string, number> } */ #musicPositions; // 음악마다 멈췄던 자리. (초)
 	/** @private @type { number } */ #musicVolume; // 설정의 음악 크기. (0 ~ 1)
 	/** @private @type { number } */ #musicScale; // 음악의 비. (멈춤 창이 뜨면 반 등, 0 ~ 1)
@@ -472,8 +474,10 @@ export class SoundSystem {
 			return null;
 		});
 		this.#assetsById.set(soundRow.id, assets);
+		const loadType = readSoundRowLoadType(soundRow);
 		const loads = paths.map(async (path, pathIndex) => {
 			const audioAsset = new AudioAsset();
+			audioAsset.setLoadType(loadType);
 			try {
 				await audioAsset.load(path);
 				assets[pathIndex] = audioAsset;
@@ -922,19 +926,18 @@ export class SoundSystem {
 		if (soundRow === undefined || assets === undefined || assets[0] === null) {
 			return;
 		}
-		const audioBuffer = assets[0].getAudioBuffer();
-		if (!audioBuffer) {
+		const musicAsset = assets[0];
+		const isStreaming = musicAsset.isStreaming();
+		const audioBuffer = musicAsset.getAudioBuffer();
+		if (!isStreaming && !audioBuffer) {
 			return;
 		}
 		const musicGainNode = musicBus.getGainNode();
 		const audioContext = musicGainNode.context;
 		const now = audioContext.currentTime;
-		const duration = audioBuffer.duration;
+		const duration = musicAsset.getDuration();
 		const storedPosition = this.#musicPositions.has(musicId) ? this.#musicPositions.get(musicId) : 0;
 		const offset = this.#isMusicResumed && duration > 0 ? storedPosition % duration : 0;
-		const source = audioContext.createBufferSource();
-		source.buffer = audioBuffer;
-		source.loop = true;
 		const gainNode = audioContext.createGain();
 		const rowVolume = clampVolume(readSoundRowVolume(soundRow));
 		if (fadeSeconds > 0) {
@@ -944,17 +947,29 @@ export class SoundSystem {
 		else {
 			gainNode.gain.value = rowVolume;
 		}
-		source.connect(gainNode);
 		gainNode.connect(musicGainNode);
+		// 스트리밍이면 미디어 요소로 트는 플레이어를 이 음악의 GainNode 에 잇는다. (겹쳐 바꾸기와 자리 기억은 버퍼와 같다)
+		if (isStreaming) {
+			const player = new AudioPlayer(audioContext, gainNode);
+			player.setAudioAsset(musicAsset);
+			player.setTime(offset);
+			player.play(true);
+			this.#playingMusic = { soundId: musicId, source: null, player: player, gain: gainNode, startTime: now, offset: offset, duration: duration };
+			return;
+		}
+		const source = audioContext.createBufferSource();
+		source.buffer = audioBuffer;
+		source.loop = true;
+		source.connect(gainNode);
 		source.start(0, offset);
-		this.#playingMusic = { soundId: musicId, source: source, gain: gainNode, startTime: now, offset: offset, duration: duration };
+		this.#playingMusic = { soundId: musicId, source: source, player: null, gain: gainNode, startTime: now, offset: offset, duration: duration };
 	}
 
 	//==============================================================================
 	// 틀던 배경음악을 줄여 끄기. (fadeSeconds 동안, 다 줄어든 때의 자리를 기억)
 	//==============================================================================
 	/**
-	 * @param { object } playingMusic 틀던 배경음악. ({ soundId, source, gain, startTime, offset, duration })
+	 * @param { object } playingMusic 틀던 배경음악. ({ soundId, source, player, gain, startTime, offset, duration })
 	 * @param { number } fadeSeconds 줄이는 시간. (초, 0 이면 바로 끈다)
 	 */
 	fadeOutMusic(playingMusic, fadeSeconds) {
@@ -962,7 +977,9 @@ export class SoundSystem {
 		const now = audioContext.currentTime;
 		const stopTime = now + fadeSeconds;
 		if (playingMusic.duration > 0) {
-			this.#musicPositions.set(playingMusic.soundId, (playingMusic.offset + stopTime - playingMusic.startTime) % playingMusic.duration);
+			// 스트리밍은 미디어 요소의 지금 자리에서, 버퍼는 컨텍스트 시계로 다 줄어든 때의 자리를 셈한다.
+			const position = playingMusic.player !== null ? playingMusic.player.getTime() + fadeSeconds : playingMusic.offset + stopTime - playingMusic.startTime;
+			this.#musicPositions.set(playingMusic.soundId, position % playingMusic.duration);
 		}
 		const gainParameter = playingMusic.gain.gain;
 		gainParameter.cancelScheduledValues(now);
@@ -972,6 +989,18 @@ export class SoundSystem {
 		}
 		else {
 			gainParameter.setValueAtTime(0, now);
+		}
+		if (playingMusic.player !== null) {
+			// 미디어 요소는 컨텍스트 시각에 맞춰 멈추게 걸 수 없어, 다 줄어든 뒤에 멈춘다.
+			// 멈춘 뒤 애셋을 떼어 미디어 요소가 받아 둔 것을 놓고, 이 음악의 GainNode 를 그래프에서 뗀다. (음악을 바꿀 때마다 미디어 요소가 쌓이지 않게)
+			const player = playingMusic.player;
+			const gainNode = playingMusic.gain;
+			System.setTimeout(() => {
+				player.stop();
+				player.setAudioAsset(null);
+				gainNode.disconnect();
+			}, (fadeSeconds + VOLUME_SMOOTHING_SECONDS) * 1000);
+			return;
 		}
 		try {
 			playingMusic.source.stop(stopTime + VOLUME_SMOOTHING_SECONDS);
@@ -998,6 +1027,20 @@ function readSoundPaths(soundRow) {
 		return [soundRow.path];
 	}
 	return [];
+}
+
+//==============================================================================
+// 소리 줄의 읽기 방식. (loadType 이 있으면 그것, 없으면 통째로 풀기, 실기기(아이폰, 아이패드 사파리)에서 확인한 뒤 배경음 기본을 streaming 으로 바꿀 예정)
+//==============================================================================
+/**
+ * @param { object } soundRow
+ * @returns { string } AudioLoadType 의 값.
+ */
+function readSoundRowLoadType(soundRow) {
+	if (System.Object.values(AudioLoadType).includes(soundRow.loadType)) {
+		return soundRow.loadType;
+	}
+	return AudioLoadType.decompressOnLoad;
 }
 
 //==============================================================================

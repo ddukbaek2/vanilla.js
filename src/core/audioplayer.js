@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { AudioAsset } from "../resource/audioasset.js";
+import { AudioAsset, createStreamMediaElement, setStreamMediaElementUrl, releaseMediaElement } from "../resource/audioasset.js";
 
 
 //==============================================================================
@@ -31,6 +31,9 @@ function readPlaybackPosition(startTime, elapsedSeconds, duration, isLoop) {
 // 오디오 플레이어.
 // AudioAsset 에 로드된 오디오 버퍼를 재생한다.
 // 내보낼 노드를 주면(AudioBus.createAudioPlayer) 출력 대신 그 노드로 소리를 낸다.
+// 스트리밍 애셋(AudioLoadType.streaming)은 플레이어마다 미디어 요소 하나를 MediaElementAudioSourceNode 로 같은 GainNode 에 이어 튼다.
+// - 재생, 멈춤, 반복, 음량, 음소거, 빠르기, 위치, 끝(isPlaying 이 거짓이 됨)이 통째로 푼 애셋과 같다.
+// - 오디오 컨텍스트가 멈추면(suspend, 탭이 숨음, 음소거) 미디어 요소도 멈추고, 다시 돌면 이어 튼다. (버퍼 소리가 컨텍스트 시계와 같이 멈추는 것과 같게)
 //==============================================================================
 /**
  * @example <caption>소리 하나를 빠르기와 음량을 바꿔 틀기</caption>
@@ -67,6 +70,11 @@ export class AudioPlayer {
 	/** @private @type { number } */ #startContextTime; // 지금 소리를 시작한 오디오 컨텍스트 시각. (초, currentTime)
 	/** @private @type { number } */ #startPlaybackRate; // 지금 소리를 시작할 때의 재생 빠르기.
 	/** @private @type { number } */ #startDuration; // 지금 소리의 버퍼 길이. (초)
+	/** @private @type { HTMLAudioElement | null } */ #mediaElement; // 스트리밍 애셋을 트는 미디어 요소. (처음 틀 때 만들고 플레이어가 끝까지 쓴다)
+	/** @private @type { MediaElementAudioSourceNode | null } */ #mediaSource; // 그 미디어 요소를 GainNode 에 잇는 노드. (요소 하나에 하나만 만들 수 있다)
+	/** @private @type { string | null } */ #mediaUrl; // 미디어 요소에 건 주소.
+	/** @private @type { boolean } */ #isMediaPlaying; // 미디어 요소로 틀고 있는지.
+	/** @private @type { function(): void } */ #contextStateHandler; // 컨텍스트가 멈추고 돌 때 미디어 요소를 따라 멈추고 트는 함수.
 
 	//==============================================================================
 	// 생성.
@@ -91,6 +99,13 @@ export class AudioPlayer {
 		this.#startContextTime = 0;
 		this.#startPlaybackRate = 1;
 		this.#startDuration = 0;
+		this.#mediaElement = null;
+		this.#mediaSource = null;
+		this.#mediaUrl = null;
+		this.#isMediaPlaying = false;
+		this.#contextStateHandler = () => {
+			this.followContextState();
+		};
 
 		if (audioContext) {
 			this.#gainNode = audioContext.createGain();
@@ -113,17 +128,14 @@ export class AudioPlayer {
 		if (!audioAsset) {
 			return;
 		}
+		const isStreaming = audioAsset.isStreaming();
 		const audioBuffer = audioAsset.getAudioBuffer();
-		if (!audioBuffer) {
+		if (!isStreaming && !audioBuffer) {
 			return;
 		}
 
 		// 재생 중일 경우 정지.
-		if (this.#audioSource) {
-			this.#audioSource.onended = null;
-			this.#audioSource.stop();
-			this.#audioSource = null;
-		}
+		this.stopSource();
 
 		// 이번 요청의 번호. (컨텍스트를 깨우는 동안 stop 이나 다른 play 가 오면 번호가 바뀌어 이 요청은 틀지 않는다)
 		this.#playRequestId += 1;
@@ -135,14 +147,171 @@ export class AudioPlayer {
 				if (playRequestId !== this.#playRequestId) {
 					return;
 				}
-				this.startPlayback(audioBuffer, loop);
+				if (isStreaming) {
+					this.startStreamPlayback(audioAsset, loop);
+				}
+				else {
+					this.startPlayback(audioBuffer, loop);
+				}
 			}, () => {
 				return;
 			});
 			return;
 		}
 
-		this.startPlayback(audioBuffer, loop);
+		if (isStreaming) {
+			this.startStreamPlayback(audioAsset, loop);
+		}
+		else {
+			this.startPlayback(audioBuffer, loop);
+		}
+	}
+
+	//==============================================================================
+	// 틀던 소리 끊기. (버퍼 소리는 멈추고 놓고, 미디어 요소는 멈춰 두고 다음에 다시 쓴다, 재생 상태는 쓰는 쪽이 정한다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	stopSource() {
+		if (this.#audioSource) {
+			this.#audioSource.onended = null;
+			this.#audioSource.stop();
+			this.#audioSource = null;
+		}
+		if (this.#isMediaPlaying) {
+			this.#isMediaPlaying = false;
+			this.#mediaElement.onended = null;
+			this.#mediaElement.pause();
+			this.unwatchContextState();
+		}
+	}
+
+	//==============================================================================
+	// 내부 스트리밍 재생 시작. (미디어 요소를 GainNode 에 잇고 setTime 의 자리부터 튼다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { AudioAsset } audioAsset 스트리밍으로 읽힌 오디오 애셋.
+	 * @param { boolean } loop 반복 재생하면 참.
+	 */
+	startStreamPlayback(audioAsset, loop) {
+		const audioContext = this.getAudioContext();
+		const streamUrl = audioAsset.getStreamUrl();
+		// 미디어 요소를 이을 수 없는 컨텍스트(OfflineAudioContext)는 스트리밍 소리를 내지 않는다.
+		if (!audioContext || !this.#gainNode || streamUrl === null || typeof audioContext.createMediaElementSource !== "function") {
+			return;
+		}
+
+		// 앞의 소리가 남아 있으면 멈춘다. (한 플레이어는 소리 하나)
+		this.stopSource();
+
+		if (this.#mediaElement === null) {
+			this.#mediaElement = createStreamMediaElement();
+			this.#mediaElement.preload = "auto";
+			this.#mediaSource = audioContext.createMediaElementSource(this.#mediaElement);
+			this.#mediaSource.connect(this.#gainNode);
+		}
+		const mediaElement = this.#mediaElement;
+		if (this.#mediaUrl !== streamUrl) {
+			setStreamMediaElementUrl(mediaElement, streamUrl);
+			this.#mediaUrl = streamUrl;
+		}
+
+		this.#isLoop = loop;
+		mediaElement.loop = loop;
+		mediaElement.playbackRate = this.#playbackRate;
+		mediaElement.currentTime = this.#time;
+		const playRequestId = this.#playRequestId;
+		mediaElement.onended = () => {
+			this.#isPlaying = false;
+			this.#isMediaPlaying = false;
+			mediaElement.onended = null;
+			this.unwatchContextState();
+		};
+		this.#isMediaPlaying = true;
+		this.#isPlaying = true;
+		this.#startContextTime = audioContext.currentTime;
+		this.#startPlaybackRate = this.#playbackRate;
+		this.#startDuration = audioAsset.getDuration();
+		this.watchContextState();
+		this.playMediaElement(playRequestId);
+	}
+
+	//==============================================================================
+	// 미디어 요소 틀기. (브라우저가 거부하면 재생을 끝낸 것으로 둔다, 그 사이 다른 요청이 왔으면 건드리지 않는다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } playRequestId 이 재생 요청의 번호.
+	 */
+	playMediaElement(playRequestId) {
+		const mediaElement = this.#mediaElement;
+		const playPromise = mediaElement.play();
+		if (!playPromise) {
+			return;
+		}
+		playPromise.catch((error) => {
+			if (playRequestId !== this.#playRequestId || !this.#isMediaPlaying) {
+				return;
+			}
+			if (error && error.name === "AbortError") {
+				return;
+			}
+			console.warn("[audio] 스트리밍 소리를 틀지 못했습니다.", error);
+			this.#isPlaying = false;
+			this.#isMediaPlaying = false;
+			mediaElement.onended = null;
+			this.unwatchContextState();
+		});
+	}
+
+	//==============================================================================
+	// 컨텍스트가 멈추고 도는 것 따라가기. (스트리밍으로 트는 동안만 듣는다, 버퍼 소리처럼 컨텍스트가 멈추면 같이 멈춘다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	watchContextState() {
+		const audioContext = this.getAudioContext();
+		if (audioContext && typeof audioContext.addEventListener === "function") {
+			audioContext.addEventListener("statechange", this.#contextStateHandler);
+		}
+	}
+
+	//==============================================================================
+	// 컨텍스트가 멈추고 도는 것 그만 듣기. (스트리밍 재생이 멈추거나 끝나면, 플레이어가 컨텍스트에 붙잡혀 남지 않게)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	unwatchContextState() {
+		const audioContext = this.getAudioContext();
+		if (audioContext && typeof audioContext.removeEventListener === "function") {
+			audioContext.removeEventListener("statechange", this.#contextStateHandler);
+		}
+	}
+
+	//==============================================================================
+	// 컨텍스트 상태 따르기. (돌면 멈춰 둔 미디어 요소를 이어 틀고, 멈추면 미디어 요소도 멈춘다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	followContextState() {
+		const audioContext = this.getAudioContext();
+		if (!this.#isMediaPlaying || !audioContext) {
+			return;
+		}
+		const mediaElement = this.#mediaElement;
+		if (audioContext.state === "running") {
+			if (mediaElement.paused) {
+				this.playMediaElement(this.#playRequestId);
+			}
+		}
+		else if (!mediaElement.paused) {
+			mediaElement.pause();
+		}
 	}
 
 	//==============================================================================
@@ -159,11 +328,7 @@ export class AudioPlayer {
 		}
 
 		// 앞의 소리가 남아 있으면 멈춘다. (한 플레이어는 소리 하나)
-		if (this.#audioSource) {
-			this.#audioSource.onended = null;
-			this.#audioSource.stop();
-			this.#audioSource = null;
-		}
+		this.stopSource();
 
 		this.#isLoop = loop;
 		this.#audioSource = audioContext.createBufferSource();
@@ -201,11 +366,7 @@ export class AudioPlayer {
 	stop() {
 		// 컨텍스트를 깨우는 중인 play 요청도 틀지 않게 한다.
 		this.#playRequestId += 1;
-		if (this.#audioSource) {
-			this.#audioSource.onended = null;
-			this.#audioSource.stop();
-			this.#audioSource = null;
-		}
+		this.stopSource();
 		this.#isPlaying = false;
 	}
 
@@ -271,10 +432,15 @@ export class AudioPlayer {
 	// 오디오 애셋 설정.
 	//==============================================================================
 	/**
-	 * @param { AudioAsset } audioAsset 재생할 오디오 애셋. (다음 play 부터)
+	 * @param { AudioAsset | null } audioAsset 재생할 오디오 애셋. (다음 play 부터, 스트리밍으로 틀던 것이 멈춰 있으면 그 미디어 요소가 받아 둔 것을 놓는다)
 	 */
 	setAudioAsset(audioAsset) {
 		this.#audioAsset = audioAsset;
+		const streamUrl = audioAsset ? audioAsset.getStreamUrl() : null;
+		if (this.#mediaElement !== null && !this.#isMediaPlaying && this.#mediaUrl !== null && this.#mediaUrl !== streamUrl) {
+			releaseMediaElement(this.#mediaElement);
+			this.#mediaUrl = null;
+		}
 	}
 
 	//==============================================================================
@@ -319,6 +485,10 @@ export class AudioPlayer {
 		const audioContext = this.getAudioContext();
 		if (!this.#isPlaying || !audioContext) {
 			return this.#time;
+		}
+		// 스트리밍은 미디어 요소의 자리가 곧 재생 위치다. (반복이면 요소가 되감고, 컨텍스트가 멈추면 요소도 멈춰 있다)
+		if (this.#isMediaPlaying) {
+			return this.#mediaElement.currentTime;
 		}
 		const elapsedSeconds = System.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
 		return readPlaybackPosition(this.#time, elapsedSeconds, this.#startDuration, this.#isLoop);
