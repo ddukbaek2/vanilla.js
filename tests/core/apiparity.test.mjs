@@ -11,6 +11,8 @@ import { check, checkEqual, checkJson, checkNear, finish } from "../testcheck.mj
 
 const { Color, Paint, Outline, SoftShade, ShadowText, UIView, UISlider, WorldNode, Vector2, Sprite, ShadowImage, UIImageView, UIDropdown, UIDialog, UIDocument, isViewPositionInsideNode, GameScene, Scene, UIScene } = Vanilla;
 const { readColor } = await import("../../src/core/component/shadowtext.js");
+const { buildFontString } = await import("../../src/core/component/text.js");
+const { DEFAULT_FONT_FAMILY_STRING, SYSTEM_FONT_STRING } = await import("../../src/base/platform.js");
 
 // GameScene 도 맨 위에서 나간다. (러스트 판 vanilla::GameScene)
 {
@@ -82,6 +84,14 @@ const { readColor } = await import("../../src/core/component/shadowtext.js");
 	checkEqual(loadedNode.getComponent(ShadowImage).getImageColor().toHEXString(), "#00ff00", "ShadowImage 의 ImageColor 배열을 Color 로 읽는다");
 	shadowImage.setImageColor(null);
 	checkEqual(shadowImage.getImageColor(), null, "ShadowImage.setImageColor(null)");
+}
+
+// 기본 글꼴: 엔진은 글꼴을 받지 않고(러스트 판 default_font_url 처음 값 빈 글), 글꼴이 없는 글은 글꼴 이름 "default" 사슬이다. (러스트 판 "32px default")
+{
+	checkEqual(new Vanilla.EngineConfiguration().defaultFontUrl, "", "EngineConfiguration.defaultFontUrl 처음 값은 빈 글");
+	checkEqual(DEFAULT_FONT_FAMILY_STRING, "\"default\", " + SYSTEM_FONT_STRING, "기본 글꼴 사슬은 default 다음 시스템 글꼴");
+	checkEqual(buildFontString(null, 32, false, false), "32px " + DEFAULT_FONT_FAMILY_STRING, "buildFontString(null) 은 기본 글꼴 사슬");
+	checkEqual(buildFontString(null, 20, true, true), "italic bold 20px " + DEFAULT_FONT_FAMILY_STRING, "buildFontString 굵게 기울임");
 }
 
 // 보이기 플래그: 켜짐, 투명도와 따로. (러스트 판 active_and_visible_in_hierarchy 의 set_visible 대목)

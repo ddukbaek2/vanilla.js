@@ -45,7 +45,7 @@
 
 - `preDraw` 에서 `applyViewRect` 를 부르면 그다음 그리기가 뷰 좌표로 바뀝니다. 부르지 않으면 좌표가 캔버스의 실제 픽셀(CSS 픽셀에 기기 배율을 곱한 값)입니다. 자세한 것은 "엔진과 씬" 장에서 봅니다.
 - 모듈 스크립트는 `file://` 로 연 페이지에서 브라우저가 막습니다. 로컬 웹 서버로 엽니다. (README 의 개발 환경에 적힌 VSCode Live Server 같은 것)
-- `EngineConfiguration.defaultFontUrl` 의 처음 값은 jsdelivr 에 있는 DOSGothic 글꼴 주소이고, `engine.run` 이 뒤에서 받습니다. 인터넷 없이 도는 곳이면 저장소의 `examples/assets/DOSGothic.woff` 같은 자체 경로를 주거나 빈 글로 두어 받지 않게 합니다. 받지 못해도 경고만 찍고 시스템 글꼴로 계속합니다.
+- `EngineConfiguration.defaultFontUrl` 의 처음 값은 빈 글이라 엔진은 글꼴을 받지 않고 시스템 글꼴로 그립니다(러스트 판 `default_font_url` 과 같다). 주소(예: 저장소의 `examples/assets/DOSGothic.woff`)를 주면 `engine.run` 이 뒤에서 받아 글꼴 이름 `"default"` 로 올리고, 글꼴을 고르지 않은 글자(엔진 기본 글꼴 사슬)가 그 글꼴을 먼저 씁니다. 받지 못해도 경고만 찍고 시스템 글꼴로 계속합니다.
 
 ## 엔진 번들 만들기
 

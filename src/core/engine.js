@@ -95,8 +95,9 @@ export class EngineConfiguration extends Object {
 	// 최대 FPS. 0 이면 제한하지 않는다. (화면 주사율을 따른다) 정하면 그보다 빨리 온 프레임은 건너뛰어
 	// 주사율이 높거나 프레임이 들쭉날쭉한 기기에서도 고른 간격으로 돈다.
 	/** @type { number } */ maximumFramePerSecond;
-	// 기본 폰트(DOSGothic) 주소. run() 이 뒤에서 불러온다. 빈 글이면 불러오지 않는다.
-	// (인터넷 없이 도는 데스크탑 앱이나 외부 요청을 막은 페이지는 비우거나 자체 경로를 준다)
+	// 기본 글꼴 주소. (처음은 빈 글, 러스트 판 default_font_url 과 같다) 주면 run() 이 뒤에서 받아 글꼴 이름 "default" 로 올린다.
+	// - 글꼴 이름 "default"(엔진 기본 글꼴 사슬)의 첫 글꼴이 되고, 그 뒤는 시스템 글꼴 사슬 SYSTEM_FONT_STRING 이다. 비우면 받지 않고 시스템 글꼴로 그린다.
+	// - 엔진은 글꼴을 따로 받지 않는다. 게임 글꼴은 이 주소나 FontAsset 으로 넣는다.
 	/** @type { string } */ defaultFontUrl;
 	// 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈를 무시할지. (모바일의 화면 키보드)
 	// 끄면(기본) iOS 사파리에서 키보드가 뜰 때 visualViewport 의 세로가 줄어 캔버스와 화면 전체가 작아진다. 키보드가 내려가면 다시 맞춘다.
@@ -133,7 +134,7 @@ export class EngineConfiguration extends Object {
 		this.preserveDrawingBuffer = false;
 		this.antialias = true;
 		this.maximumFramePerSecond = 0;
-		this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
+		this.defaultFontUrl = "";
 		this.ignoreVirtualKeyboardResize = false;
 		this.rebakeTextOnFontLoad = false;
 		this.useDevTools = true;
@@ -303,13 +304,12 @@ export class Engine extends Object {
 			});
 		}
 
-		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영) 주소가 비었으면 불러오지 않는다.
+		// 기본 글꼴은 뒤에서 불러와 글꼴 이름 "default" 로 올린다. (성공하면 이후 그리는 글자부터 반영, 러스트 판처럼 "default" 사슬의 첫 글꼴) 주소가 비었으면 불러오지 않는다.
 		const defaultFontUrl = engineConfiguration.defaultFontUrl;
 		if (!defaultFontUrl) {
 			return;
 		}
-		const internalFontFace = new FontFace(`DOSGothic`, `url("${defaultFontUrl}")`);
-		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
+		const internalFontFace = new FontFace("default", `url("${defaultFontUrl}")`);
 		internalFontFace.load().then((loadedFont) => {
 			document.fonts.add(loadedFont);
 		}).catch((error) => {
@@ -904,7 +904,7 @@ export class Engine extends Object {
 		this.#statisticsTextRect.size.y = 0;
 
 		// canvasRenderingContext.letterSpacing = "-1px";
-		graphic.setFontString(`16px DOSGothic`);
+		graphic.setFontString("16px default");
 		graphic.setTextAlign("left");
 		graphic.setTextBaseline("top");
 		graphic.setFillColor(Colors.white);

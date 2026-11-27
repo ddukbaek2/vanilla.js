@@ -409,7 +409,7 @@ engine.run(new ScoreScene());
 
 ## The engine's default font
 
-`engine.run()` fetches the font at `EngineConfiguration.defaultFontUrl` in the background and adds it to the browser's font set as `"DOSGothic"`. The default is the DOSGothic address on jsDelivr (`https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff`). If the fetch fails or is slow, the engine keeps running and only logs a warning. Desktop apps that run offline and pages that block outside requests should leave it as an empty string (`""`) so nothing is fetched, or give their own path.
+When `EngineConfiguration.defaultFontUrl` has an address, `engine.run()` fetches that font in the background and adds it to the browser's font set as `"default"`. The font name `default` (the engine default font chain) is this font followed by the system font chain, so Text, ShadowText and DynamicFont without a chosen font use it first (same as Rust `default_font_url`). The default is an empty string (`""`), so the engine fetches no font. If the fetch fails or is slow, the engine keeps running and only logs a warning.
 
 This font is used by internal engine displays such as the `useStatistics` overlay. Without a font set through `setFont`, `Text` and `UILabel` draw with the system font list (`-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`). To use another font, load it with `FontAsset` and pass it to `setFont`. (See the "Loading Assets" chapter)
 

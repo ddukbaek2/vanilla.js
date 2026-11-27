@@ -15,7 +15,7 @@
 | `useStatistics` | `false` | 화면에 정보창을 그릴지 |
 | `preserveDrawingBuffer` | `false` | 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지 (다른 캔버스가 읽어 갈 때) |
 | `maximumFramePerSecond` | `0` | 최대 FPS. 0 이면 화면 주사율을 따릅니다. 실행 중에는 `engine.setMaximumFramePerSecond` 로 바꿉니다 |
-| `defaultFontUrl` | jsdelivr 의 DOSGothic 주소 | `run` 이 뒤에서 받는 기본 글꼴. 빈 글이면 받지 않습니다 |
+| `defaultFontUrl` | `""` | `run` 이 뒤에서 받아 글꼴 이름 `"default"` 로 올리는 기본 글꼴. 빈 글이면 받지 않고 시스템 글꼴로 그립니다 |
 | `ignoreVirtualKeyboardResize` | `false` | 글자 입력칸에 초점이 있는 동안 세로만 줄어드는 리사이즈(모바일 화면 키보드)를 무시할지 |
 | `rebakeTextOnFontLoad` | `false` | 웹 글꼴이 늦게 받아지면 그 글꼴로 구운 글자 텍스처를 다시 구울지 |
 | `useDevTools` | `true` | 개발자 도구(F2 패널)를 쓸지. 출시 빌드에서 끕니다 |

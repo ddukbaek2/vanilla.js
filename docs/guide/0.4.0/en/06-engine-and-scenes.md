@@ -15,7 +15,7 @@ Create it with `new EngineConfiguration()`, change its fields, and pass it to `n
 | `useStatistics` | `false` | Whether to draw the statistics panel on screen |
 | `preserveDrawingBuffer` | `false` | Whether to keep the drawn image on the canvas after the frame ends (when another canvas reads it) |
 | `maximumFramePerSecond` | `0` | Maximum FPS. 0 follows the display refresh rate. Change it at run time with `engine.setMaximumFramePerSecond` |
-| `defaultFontUrl` | DOSGothic address on jsdelivr | Default font that `run` fetches in the background. An empty string fetches nothing |
+| `defaultFontUrl` | `""` | Default font that `run` fetches in the background and adds under the font name `"default"`. An empty string fetches nothing and draws with the system font |
 | `ignoreVirtualKeyboardResize` | `false` | Whether to ignore resizes that only shrink the height while a text input has focus (mobile on-screen keyboard) |
 | `rebakeTextOnFontLoad` | `false` | Whether to rebake text textures baked with a web font that finished loading late |
 | `useDevTools` | `true` | Whether to use the developer tools (F2 panel). Turn it off in release builds |

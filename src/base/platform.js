@@ -13,6 +13,13 @@ export const SYSTEM_FONT_STRING = "-apple-system, \"Segoe UI\", Roboto, \"Apple 
 
 
 //==============================================================================
+// 엔진 기본 글꼴 사슬. (글꼴 이름 "default" 다음 시스템 글꼴 사슬, 러스트 판 글꼴 이름 "default" 와 같다)
+// - EngineConfiguration.defaultFontUrl 이나 FontAsset 으로 "default" 이름의 글꼴을 올리면 그것이 먼저, 없으면 시스템 글꼴이다.
+//==============================================================================
+export const DEFAULT_FONT_FAMILY_STRING = "\"default\", " + SYSTEM_FONT_STRING;
+
+
+//==============================================================================
 // 플랫폼 타입.
 //==============================================================================
 export const PlatformType = { //System.Object.freeze({
