@@ -31441,6 +31441,7 @@ var FRAME_BLOCK_CHUNK = `layout(std140) uniform ToonFrame {
 	float localShadowTiles[4];
 	float pointLightShadowSlots[8];
 	vec4 shadowBias;
+	float ambientOcclusionDirectLightingStrength;
 };
 `;
 var VERTEX_HEAD_CHUNK = `#version 300 es
@@ -31915,18 +31916,25 @@ ToonLighting readLighting(ToonSurface surface) {
 	float sunCosine = dot(normal, toSun);
 	vec3 sunRamp = readShadeRamp(readToonCoordinate(sunCosine, surface.shadeOffset) * shadow);
 	float sunLevel = readShadeLevel(sunRamp, sunCosine * shadow);
-	vec3 sunLight = sunRamp * mix(readLightColor(sunLightColor, lightColorUsage.y), readLightColor(sunLightColor, lightColorUsage.x), sunLevel);
 #ifdef TOON_AMBIENT_OCCLUSION
-	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5) * readAmbientOcclusion();
+	// \uC9C1\uC811 \uBE5B\uC758 \uAC00\uB9BC. (1 - \uBAAB x (1 - \uBCF4\uC784), \uCE78\uC744 \uACE0\uB978 \uB4A4 \uD574, \uCC44\uC6C0\uBE5B, \uC810\uAD11\uC758 \uD655\uC0B0\uACFC \uBC18\uC0AC\uAD11\uC5D0 \uACF1\uD55C\uB2E4, \uBAAB 0 \uC774\uB098 \uD2B8\uC778 \uACF3\uC740 \uC815\uD655\uD788 1)
+	float ambientOcclusion = readAmbientOcclusion();
+	float directOcclusion = 1.0 - ambientOcclusionDirectLightingStrength * (1.0 - ambientOcclusion);
+#else
+	const float directOcclusion = 1.0;
+#endif
+	vec3 sunLight = sunRamp * directOcclusion * mix(readLightColor(sunLightColor, lightColorUsage.y), readLightColor(sunLightColor, lightColorUsage.x), sunLevel);
+#ifdef TOON_AMBIENT_OCCLUSION
+	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5) * ambientOcclusion;
 #else
 	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5);
 #endif
 	if (hasSpecular) {
-		specularSum += readLightColor(sunLightColor, lightColorUsage.z) * readToonSpecular(normal, toSun, viewDirection) * sunLevel;
+		specularSum += readLightColor(sunLightColor, lightColorUsage.z) * directOcclusion * readToonSpecular(normal, toSun, viewDirection) * sunLevel;
 	}
 	vec3 toFill = -normalize(fillDirection);
 	float fillCosine = dot(normal, toFill);
-	irradiance += readLightColor(readLimitedDirectionalColor(fillColor), lightColorUsage.x) * readShadeLevel(readShadeRamp(readToonCoordinate(fillCosine, surface.shadeOffset)), fillCosine);
+	irradiance += readLightColor(readLimitedDirectionalColor(fillColor), lightColorUsage.x) * directOcclusion * readShadeLevel(readShadeRamp(readToonCoordinate(fillCosine, surface.shadeOffset)), fillCosine);
 	for (int index = 0; index < 8; ++index) {
 		if (index >= pointLightCount) {
 			break;
@@ -31956,9 +31964,9 @@ ToonLighting readLighting(ToonSurface surface) {
 		float cosine = (dot(normal, lightDirection) + shape.z) / (1.0 + shape.z);
 		float level = readShadeLevel(readShadeRamp(readToonCoordinate(cosine, surface.shadeOffset) * lightShadow), cosine * lightShadow);
 		vec3 pointColor = readLimitedLocalColor(pointLightColors[index] * falloff);
-		irradiance += readLightColor(pointColor, lightColorUsage.x) * level;
+		irradiance += readLightColor(pointColor, lightColorUsage.x) * directOcclusion * level;
 		if (hasSpecular) {
-			specularSum += readLightColor(pointColor, lightColorUsage.z) * readToonSpecular(normal, lightDirection, viewDirection) * level;
+			specularSum += readLightColor(pointColor, lightColorUsage.z) * directOcclusion * readToonSpecular(normal, lightDirection, viewDirection) * level;
 		}
 	}
 	lighting.irradiance = irradiance;
@@ -32420,7 +32428,7 @@ var OUTLINE_BLOCK_BINDING = 1;
 var OUTLINE_BLOCK_FLOAT_COUNT = 12;
 var FRAME_BLOCK_NAME = "ToonFrame";
 var FRAME_BLOCK_BINDING = 2;
-var FRAME_BLOCK_FLOAT_COUNT = 168;
+var FRAME_BLOCK_FLOAT_COUNT = 172;
 var MATERIAL_BLOCK_LIMIT = 1024;
 var BATCH_SLOT_MESH_LIMIT = 8;
 var DRAW_PART_OUTLINE = 1;
@@ -33663,6 +33671,7 @@ var ToonRenderer = class {
     const ambientOcclusionInput = this.#ambientOcclusionInput;
     values[62] = ambientOcclusionInput !== null ? ambientOcclusionInput.origin[0] : 0;
     values[63] = ambientOcclusionInput !== null ? ambientOcclusionInput.origin[1] : 0;
+    values[168] = ambientOcclusionInput !== null ? ambientOcclusionInput.directLightingStrength : 0;
     const localShadowInput = this.#localShadowInput;
     values.fill(0, 68, 164);
     if (localShadowInput !== null) {
@@ -34325,10 +34334,13 @@ var ToonRenderer = class {
     const resolution = shadowMap.getResolution();
     this.#shadowInput = { depthTexture: shadowMap.getDepthTexture(), lightViewProjectionMatrix, resolution, strength, bias: readShadowBias(lightViewProjectionMatrix, resolution, shadowMap.getDepthBias(), shadowMap.getNormalBias()) };
   }
-  setAmbientOcclusionTexture(texture) {
+  setAmbientOcclusionTexture(texture, directLightingStrength = 0) {
     this.#frameSerial += 1;
     this.#lastProgramKey = null;
-    this.#ambientOcclusionInput = texture !== null && texture !== void 0 ? { texture, origin: [0, 0] } : null;
+    this.#ambientOcclusionInput = texture !== null && texture !== void 0 ? { texture, origin: [0, 0], directLightingStrength: System80.Math.max(0, System80.Math.min(1, directLightingStrength)) } : null;
+  }
+  getAmbientOcclusionDirectLightingStrength() {
+    return this.#ambientOcclusionInput !== null ? this.#ambientOcclusionInput.directLightingStrength : 0;
   }
   getAmbientOcclusionTexture() {
     return this.#ambientOcclusionInput !== null ? this.#ambientOcclusionInput.texture : null;
@@ -44765,7 +44777,7 @@ var ToonPostProcess = class _ToonPostProcess {
     this.#hazeColor = [0, 0, 0];
     this.#hazeAmount = 0;
     this.#vignetteStrength = 0;
-    this.#ambientOcclusion = { isEnabled: false, intensity: 0.5, radius: 0.5, resolutionScale: 0.5 };
+    this.#ambientOcclusion = { isEnabled: false, intensity: 0.5, radius: 0.5, resolutionScale: 0.5, directLightingStrength: 0 };
     this.#ambientOcclusionPasses = null;
     this.#ambientOcclusionTarget = null;
     this.#ambientOcclusionPrepass = null;
@@ -44973,12 +44985,15 @@ var ToonPostProcess = class _ToonPostProcess {
   setVignette(vignetteStrength) {
     this.#vignetteStrength = System110.Math.max(0, vignetteStrength);
   }
-  setAmbientOcclusion(isEnabled, intensity = 0.5, radius = 0.5, resolutionScale = 0.5) {
-    this.#ambientOcclusion = { isEnabled: isEnabled === true, intensity: System110.Math.max(0, System110.Math.min(1, intensity)), radius: System110.Math.max(1e-4, radius), resolutionScale: System110.Math.max(0.25, System110.Math.min(1, resolutionScale)) };
+  setAmbientOcclusion(isEnabled, intensity = 0.5, radius = 0.5, resolutionScale = 0.5, directLightingStrength = 0) {
+    this.#ambientOcclusion = { isEnabled: isEnabled === true, intensity: System110.Math.max(0, System110.Math.min(1, intensity)), radius: System110.Math.max(1e-4, radius), resolutionScale: System110.Math.max(0.25, System110.Math.min(1, resolutionScale)), directLightingStrength: System110.Math.max(0, System110.Math.min(1, directLightingStrength)) };
   }
   getAmbientOcclusion() {
     const ambientOcclusion = this.#ambientOcclusion;
-    return { isEnabled: ambientOcclusion.isEnabled, intensity: ambientOcclusion.intensity, radius: ambientOcclusion.radius, resolutionScale: ambientOcclusion.resolutionScale };
+    return { isEnabled: ambientOcclusion.isEnabled, intensity: ambientOcclusion.intensity, radius: ambientOcclusion.radius, resolutionScale: ambientOcclusion.resolutionScale, directLightingStrength: ambientOcclusion.directLightingStrength };
+  }
+  getAmbientOcclusionDirectLightingStrength() {
+    return this.#ambientOcclusion.directLightingStrength;
   }
   isAmbientOcclusionEnabled() {
     return this.#ambientOcclusion.isEnabled;
@@ -52425,7 +52440,7 @@ var ToonDrawQueue = class {
     if (texture === null) {
       return false;
     }
-    renderer.setAmbientOcclusionTexture(texture);
+    renderer.setAmbientOcclusionTexture(texture, postProcess.getAmbientOcclusionDirectLightingStrength());
     return true;
   }
   addPass(stage, callback) {
