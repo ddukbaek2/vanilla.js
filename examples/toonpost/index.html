@@ -141,12 +141,12 @@ class PanelDrawer {
 	//==============================================================================
 	// 판 그리기. (ToonView3D 의 그리기 함수)
 	//==============================================================================
-	draw(renderer, camera, screenRect, webGL2RenderingContext) {
+	draw(renderer, camera, screenRect, webGL2RenderingContext, output) {
 		if (this.#meshes === null) {
 			this.#meshes = PanelDrawer.createMeshes(renderer);
 		}
-		const width = System.Math.max(1, System.Math.round(screenRect.width));
-		const height = System.Math.max(1, System.Math.round(screenRect.height));
+		const width = System.Math.max(1, System.Math.round(screenRect.size.x));
+		const height = System.Math.max(1, System.Math.round(screenRect.size.y));
 		if (this.#postProcess === null) {
 			this.#postProcess = this.createPostProcess(webGL2RenderingContext, width, height);
 		}
@@ -182,7 +182,7 @@ class PanelDrawer {
 		vfx.update(this.#frameCount === 0 ? 0 : FRAME_SECONDS);
 		PanelDrawer.emitEffects(vfx, elapsedSeconds);
 		vfx.draw(camera.getViewMatrix(), camera.getProjectionMatrix());
-		postProcess.end(screenRect.outputFramebuffer, screenRect.outputViewport);
+		postProcess.end(output.outputFramebuffer, output.outputViewport);
 		this.#frameCount += 1;
 		if (this.#frameCount === 30) {
 			System.console.log(`toonpost: 판 ${this.#panelMode} 표본 수 ${postProcess.getSampleCount()} 실수 판 ${postProcess.getUseFloatColor()} 블룸 단 ${postProcess.getBloomLevelCount()}`);
@@ -256,8 +256,8 @@ class ToonPostScene extends Scene {
 			const panel = createPanel(root, Rect.create(panelX, 80, 400, 420), "#000000");
 			const panelDrawer = new PanelDrawer(panelMode);
 			const toonView = panel.addComponent(ToonView3D);
-			toonView.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext) => {
-				panelDrawer.draw(renderer, camera, screenRect, webGL2RenderingContext);
+			toonView.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext, output) => {
+				panelDrawer.draw(renderer, camera, screenRect, webGL2RenderingContext, output);
 			});
 			toonView.setFallbackDrawCallback(drawFallback);
 			const camera = toonView.getCamera();

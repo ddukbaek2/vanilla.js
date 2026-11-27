@@ -75,6 +75,7 @@ export class UIListView extends Component {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { object | null } */ #templateData; // 직렬화된 템플릿.
+	/** @private @type { UIDocument | null } */ #templateDocument; // 템플릿을 쓰고 읽는 문서. (항목을 만들 때마다 이 문서로 읽는다)
 	/** @private @type { Function | null } */ #createItemEvent; // () => WorldNode, 템플릿 대신 항목 노드를 만든다.
 	/** @private @type { number } */ #itemCount;
 	/** @private @type { number } */ #itemSize; // 진행 축 방향 항목 크기.
@@ -98,6 +99,7 @@ export class UIListView extends Component {
 		super();
 		this.setComponentType("UIListView");
 		this.#templateData = null;
+		this.#templateDocument = null;
 		this.#createItemEvent = null;
 		this.#itemCount = 0;
 		this.#itemSize = 0;
@@ -127,13 +129,42 @@ export class UIListView extends Component {
 	// 템플릿 설정.
 	// - 노드를 직렬화해 두고 필요할 때 복제한다. 원본은 감춘다.
 	//   항목 크기는 템플릿의 contentSize 진행 축 값에서 읽는다.
+	// - 엔진 기본 종류만 등록한 새 UIDocument 로 복제한다. 게임 컴포넌트가 든 템플릿은 setTemplateNodeWithDocument 를 쓴다.
 	//==============================================================================
 	/**
 	 * @param { import("../core/node/worldnode.js").WorldNode } templateNode 항목의 본이 될 노드. (UIDocument 로 직렬화해 쥐고 이 노드는 끈다, 항목 크기를 정하지 않았으면 이 노드의 contentSize 진행 축 값을 쓴다, 앞서 준 만들기 함수는 지운다)
 	 */
 	setTemplateNode(templateNode) {
+		this.setTemplateNodeWithDocument(templateNode, new UIDocument());
+	}
+
+	//==============================================================================
+	// 템플릿 설정. (게임 컴포넌트를 등록한 UIDocument 로 직렬화하고 복제한다)
+	//==============================================================================
+	/**
+	 * @param { import("../core/node/worldnode.js").WorldNode } templateNode 항목의 본이 될 노드. (setTemplateNode 와 같다)
+	 * @param { UIDocument } uiDocument 템플릿을 쓰고 읽을 문서. (템플릿의 컴포넌트 종류를 등록해 둔 것, 항목을 만들 때마다 이 문서로 읽는다)
+	 * @example <caption>게임 컴포넌트가 든 템플릿으로 목록 짓기</caption>
+	 * import { UIDocument, UIListView, WorldNode, Component, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class Badge extends Component {
+	 * }
+	 *
+	 * const uiDocument = new UIDocument();
+	 * uiDocument.registerComponentType("Badge", Badge);
+	 * const listNode = new WorldNode();
+	 * listNode.setContentSize(Vector2.create(200, 300));
+	 * const listView = listNode.addComponent(UIListView);
+	 * const templateNode = new WorldNode();
+	 * templateNode.setContentSize(Vector2.create(200, 40));
+	 * templateNode.addComponent(Badge);
+	 * listView.setTemplateNodeWithDocument(templateNode, uiDocument);
+	 * console.log(templateNode.isActive(), listView.getItemSize());
+	 */
+	setTemplateNodeWithDocument(templateNode, uiDocument) {
 		this.#createItemEvent = null;
-		this.#templateData = UIDocument.serializeNode(templateNode);
+		this.#templateDocument = uiDocument;
+		this.#templateData = uiDocument.serializeNode(templateNode);
 		this.#templateData.active = true;
 		templateNode.setActive(false);
 		const templateSize = templateNode.getContentSize();
@@ -285,7 +316,7 @@ export class UIListView extends Component {
 		if (freeItemNode) {
 			return freeItemNode;
 		}
-		const itemNode = (this.#createItemEvent !== null) ? this.#createItemEvent() : UIDocument.deserializeNode(this.#templateData);
+		const itemNode = (this.#createItemEvent !== null) ? this.#createItemEvent() : this.#templateDocument.deserializeNode(this.#templateData);
 		if (!itemNode) {
 			return null;
 		}

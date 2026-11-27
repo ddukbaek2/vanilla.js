@@ -6,10 +6,10 @@
 
 | 도구 | 데모 | 만드는 파일 | 엔진에서 읽는 곳 |
 | --- | --- | --- | --- |
-| UI Editor | [열기](https://vanillapunch.com/tools/editor/uieditor/) | `.uiasset.json` (처음 이름 `ui.uiasset.json`) | `UIDocument.fromJsonText` |
+| UI Editor | [열기](https://vanillapunch.com/tools/editor/uieditor/) | `.uiasset.json` (처음 이름 `ui.uiasset.json`) | `new UIDocument().fromJsonText` |
 | Timeline Editor | [열기](https://vanillapunch.com/tools/editor/timelineeditor/) | `.timeline.json` (처음 이름 `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
 | Particle Editor | [열기](https://vanillapunch.com/tools/editor/particleeditor/) | `.vfx.json` (처음 이름 `effect.vfx.json`) | `ParticleSystem.applyDescription` |
-| Visual Editor | [열기](https://vanillapunch.com/tools/editor/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
+| Visual Editor | [열기](https://vanillapunch.com/tools/editor/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `new UIDocument().fromJsonText` |
 
 - 도구마다 `tools/<도구 이름>/<도구 이름>.html` 이 엔진까지 한 파일에 담은 빌드라서, 서버 없이 파일로 열어도 동작합니다. 소스를 고친 뒤에는 `node tools/<도구 이름>/build.mjs` 로 다시 만듭니다.
 - UI Editor, Timeline Editor, Particle Editor 는 저장하면 브라우저 내려받기로 파일을 받습니다. Visual Editor 는 크롬 계열 브라우저에서 폴더 열기로 연 폴더에 바로 쓰고, 그 밖의 브라우저에서는 내려받기로 받습니다.
@@ -48,7 +48,7 @@
 }
 ```
 
-`UIDocument.fromJsonText(jsonText)` 는 이 글을 살아 있는 엔진 노드 트리(`WorldNode`)로 되살려 뿌리를 돌려줍니다. 씬의 루트에 붙이면 그대로 보이고, 이름으로 노드를 찾아 동작을 붙입니다. `UIDocument.findNodeByPath(rootNode, pathText)` 는 문서 뿌리부터 이름을 `/` 로 이은 경로(뿌리 이름은 빼고 `/` 로 시작)로 노드를 찾고, 없으면 `null` 입니다.
+`new UIDocument()` 로 지은 문서의 `fromJsonText(jsonText)` 는 이 글을 살아 있는 엔진 노드 트리(`WorldNode`)로 되살려 뿌리를 돌려줍니다. 문서는 전역 상태가 없는 객체이고, 종류 표와 그림 해석기를 문서마다 따로 듭니다. 씬의 루트에 붙이면 그대로 보이고, 이름으로 노드를 찾아 동작을 붙입니다. `UIDocument.findNodeByPath(rootNode, pathText)` 는 문서 뿌리부터 이름을 `/` 로 이은 경로(뿌리 이름은 빼고 `/` 로 시작)로 노드를 찾고, 없으면 `null` 입니다.
 
 ```javascript
 import { Engine, EngineConfiguration, UIScene, UIDocument, UIButton, UILabel, TextAsset, Vector2 } from "./build/vanilla.js";
@@ -66,7 +66,7 @@ class TitleScene extends UIScene {
 		await super.loadAssets();
 		const textAsset = new TextAsset();
 		await textAsset.load("examples/uisample/assets/title.uiasset.json");
-		this.#documentRoot = UIDocument.fromJsonText(textAsset.text);
+		this.#documentRoot = new UIDocument().fromJsonText(textAsset.text);
 	}
 
 	initialize(engine) {
@@ -99,31 +99,32 @@ engine.run(new TitleScene());
 
 ### 그림 경로 해석
 
-문서에는 그림 원본이 아니라 경로(`imagePath`)만 적힙니다. `Sprite` 와 `UIImageView` 가 이 칸을 씁니다. 되살릴 때 그림을 이으려면 `fromJsonText` 를 부르기 전에 `UIDocument.setImageResolver(resolver)` 로 경로 → `HTMLImageElement` 함수를 겁니다. 이 함수는 바로 돌려줘야 하므로(비동기 불가) 그림은 먼저 받아 둡니다. 해석기가 없거나 `null` 을 돌려주면 그림 없이 되살리고 경로만 컴포넌트의 `imagePath` 에 남깁니다.
+문서에는 그림 원본이 아니라 경로(`imagePath`)만 적힙니다. `Sprite` 와 `UIImageView` 가 이 칸을 씁니다. 되살릴 때 그림을 이으려면 `fromJsonText` 를 부르기 전에 그 문서의 `uiDocument.setImageResolver(resolver)` 로 경로 → `HTMLImageElement` 함수를 겁니다. 이 함수는 바로 돌려줘야 하므로(비동기 불가) 그림은 먼저 받아 둡니다. 해석기 대신 `await Promise.all(uiDocument.loadImages(jsonText))` 로 문서의 그림을 경로대로 받아 둘 수도 있습니다. 아직 읽히는 그림은 문서가 맡아 두었다가 `uiDocument.bindPendingImages()` 가 넣습니다(남은 수를 돌려줍니다). 찾지 못한 그림은 경고를 내고, 그 컴포넌트는 그림 없이 경로만 `imagePath` 에 남깁니다.
 
 ### 컴포넌트와 노드 종류 등록
 
-게임 쪽 `UIDocument` 가 처음부터 아는 컴포넌트는 `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, `ShadowImage` 이고(`UIDocument.getComponentTypeNames()`), 노드 종류는 `WorldNode` 하나입니다. UI Editor 는 엔진이 내보내는 모든 컴포넌트와 `WorldNode` 파생 노드를 문서 형식에 등록해 씁니다. 그래서 편집기에서 쓴 종류가 게임 쪽 표에 없으면, 그 컴포넌트는 읽을 때 경고를 내고 빠지고 그 노드는 경고를 내고 `WorldNode` 로 되살아납니다.
+게임 쪽 `UIDocument` 가 처음부터 아는 컴포넌트는 `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, `ShadowImage` 이고(`new UIDocument().getComponentTypeNames()`), 노드 종류는 `WorldNode` 하나입니다. UI Editor 는 엔진이 내보내는 모든 컴포넌트와 `WorldNode` 파생 노드를 문서 형식에 등록해 씁니다. 그래서 편집기에서 쓴 종류가 게임 쪽 표에 없으면, 그 컴포넌트는 읽을 때 경고를 내고 빠지고 그 노드는 경고를 내고 `WorldNode` 로 되살아납니다.
 
-편집기가 저장한 문서를 읽는 게임은 `fromJsonText` 앞에 `UIDocument.registerEditorTypes()` 를 한 번 부릅니다. 편집기가 등록하는 종류(컴포넌트 35, 노드 종류 12)를 같은 이름으로 모두 등록하고, 이미 등록한 이름은 그대로 둡니다. 하나씩 등록할 때는 `registerNodeType`, `registerComponentType` 을 씁니다. 예를 들어 입력칸(`UIInputField`)과 스크롤 바(`UIScrollBar`)는 `WorldNode` 를 이어받은 노드이고, 스냅 스크롤 뷰(`UISnapScrollView`)는 컴포넌트입니다.
+편집기가 저장한 문서를 읽는 게임은 `fromJsonText` 앞에 `uiDocument.registerEditorTypes()` 를 한 번 부릅니다. 편집기가 등록하는 종류(컴포넌트 35, 노드 종류 12)를 같은 이름으로 모두 등록하고, 이미 등록한 이름은 그대로 둡니다. 하나씩 등록할 때는 `registerNodeType`, `registerComponentType` 을 씁니다. 예를 들어 입력칸(`UIInputField`)과 스크롤 바(`UIScrollBar`)는 `WorldNode` 를 이어받은 노드이고, 스냅 스크롤 뷰(`UISnapScrollView`)는 컴포넌트입니다.
 
 ```javascript
-import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade } from "./build/vanilla.js";
+import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade, WorldNode } from "./build/vanilla.js";
 
-UIDocument.registerNodeType("UIInputField", UIInputField);
-UIDocument.registerNodeType("UIScrollBar", UIScrollBar);
-UIDocument.registerComponentType("UISnapScrollView", UISnapScrollView);
-UIDocument.registerEditorTypes();
+const uiDocument = new UIDocument();
+uiDocument.registerNodeType("UIInputField", UIInputField);
+uiDocument.registerNodeType("UIScrollBar", UIScrollBar);
+uiDocument.registerComponentType("UISnapScrollView", UISnapScrollView);
+uiDocument.registerEditorTypes();
 
-const componentTypeNames = UIDocument.getComponentTypeNames();
-console.log(componentTypeNames.includes("UISnapScrollView"), componentTypeNames.length, UIDocument.getComponentType("SoftShade") === SoftShade);
+const componentTypeNames = uiDocument.getComponentTypeNames();
+console.log(componentTypeNames.includes("UISnapScrollView"), componentTypeNames.length, uiDocument.createComponent(new WorldNode(), "SoftShade") instanceof SoftShade);
 ```
 
 전용 저장 규칙이 없는 컴포넌트는 짝이 맞는 `get`, `set` 메서드로 읽고 쓰는 값(`saveByReflection`, `loadByReflection`)으로 저장되고 되살아납니다.
 
 ### 게임에서 문서 저장하기
 
-`UIDocument.toJsonText(rootNode, isPretty = true)` 는 노드 트리를 같은 꼴의 글로 바꿉니다. 노드와 컴포넌트의 종류 이름은 표에 등록한 이름으로 적으므로, 클래스 이름을 줄이는 번들(esbuild 의 `--minify`)에서도 같은 문서가 됩니다. 표에 등록하지 않은 종류만 자바스크립트 클래스 이름(`constructor.name`)으로 적으므로, 그런 종류까지 저장하려면 클래스 이름을 지키는 번들(`--keep-names`)을 씁니다. README 의 명령과 `tools/project.cjs build` 는 `--keep-names` 를 붙여 줄입니다. 읽기(`fromJsonText`)는 문서의 이름으로 표를 찾으므로 어느 번들에서나 됩니다.
+`uiDocument.toJsonText(rootNode, isPretty = true)` 는 노드 트리를 같은 꼴의 글로 바꿉니다. 노드와 컴포넌트의 종류 이름은 표에 등록한 이름으로 적으므로, 클래스 이름을 줄이는 번들(esbuild 의 `--minify`)에서도 같은 문서가 됩니다. 표에 등록하지 않은 종류만 자바스크립트 클래스 이름(`constructor.name`)으로 적으므로, 그런 종류까지 저장하려면 클래스 이름을 지키는 번들(`--keep-names`)을 씁니다. README 의 명령과 `tools/project.cjs build` 는 `--keep-names` 를 붙여 줄입니다. 읽기(`fromJsonText`)는 문서의 이름으로 표를 찾으므로 어느 번들에서나 됩니다.
 
 ## Timeline Editor 문서 재생하기
 
@@ -256,7 +257,7 @@ engine.run(new EffectScene());
 
 ## Visual Editor 씬 불러오기
 
-Visual Editor 는 씬을 UI 문서와 같은 꼴(`UIDocument`)로 저장합니다. 처음 저장 경로는 `scenes/untitled.scene.json` 이고, 편집기만 쓰는 틀 크기(`frameSize`)를 같은 JSON 에 함께 둡니다. `UIDocument` 는 모르는 키를 건너뛰므로 게임은 `UIDocument.fromJsonText` 로 그대로 읽습니다. 씬 뿌리는 이름이 `sceneRoot` 이고 피벗이 왼쪽 위인 `WorldNode` 입니다.
+Visual Editor 는 씬을 UI 문서와 같은 꼴(`UIDocument`)로 저장합니다. 처음 저장 경로는 `scenes/untitled.scene.json` 이고, 편집기만 쓰는 틀 크기(`frameSize`)를 같은 JSON 에 함께 둡니다. `UIDocument` 는 모르는 키를 건너뛰므로 게임은 `new UIDocument()` 의 `fromJsonText` 로 그대로 읽습니다. 씬 뿌리는 이름이 `sceneRoot` 이고 피벗이 왼쪽 위인 `WorldNode` 입니다.
 
 ![Visual Editor 에 UI Showcase 의 컴포넌트 문서를 씬으로 연 화면: 왼쪽 하이어라키, 가운데 씬 뷰와 이동 핸들, 오른쪽 인스펙터](../images/tool-visual-editor.webp)
 
@@ -307,16 +308,17 @@ class VisualScene extends Scene {
 		const spritesheetAsset = new ImageAsset();
 		await spritesheetAsset.load("examples/assets/spritesheet.png");
 		imageTable.set("images/spritesheet.png", spritesheetAsset.getImage());
-		UIDocument.setImageResolver((imagePath) => {
+		const uiDocument = new UIDocument();
+		uiDocument.setImageResolver((imagePath) => {
 			return imageTable.has(imagePath) ? imageTable.get(imagePath) : null;
 		});
 
 		const root = this.getRoot();
-		const sceneRoot = UIDocument.fromJsonText(sceneJsonText);
+		const sceneRoot = uiDocument.fromJsonText(sceneJsonText);
 		root.addChild(sceneRoot);
 
 		for (let index = 0; index < 3; ++index) {
-			const coinNode = UIDocument.fromJsonText(prefabJsonText);
+			const coinNode = uiDocument.fromJsonText(prefabJsonText);
 			coinNode.setLocalPosition(Vector2.create(200 + index * 120, 120));
 			sceneRoot.addChild(coinNode);
 		}
@@ -363,7 +365,7 @@ node tools/apidoc.cjs 0.4.0 --check-examples
 
 - UI 문서의 그림은 경로만 적힙니다. `fromJsonText` 앞에 그림을 받아 두고 `setImageResolver` 를 겁니다.
 - 편집기에서 쓴 컴포넌트와 노드 종류가 게임 쪽 `UIDocument` 표에 없으면 조용히 빠지거나 `WorldNode` 가 됩니다. 기본 16 컴포넌트 밖의 종류는 등록합니다.
-- 게임에서 `UIDocument.toJsonText` 로 저장하려면 클래스 이름을 지키는 번들을 씁니다.
+- 게임에서 `uiDocument.toJsonText` 로 저장하려면 클래스 이름을 지키는 번들을 씁니다.
 - `Timeline` 은 매 프레임 `tick` 을 불러야 움직입니다. 소리가 있는 문서는 `Timeline.setAudioManager` 를 먼저 부릅니다.
 - `.vfx.json` 의 `imageDataUrl` 은 `applyDescription` 이 읽지 않습니다. 그림은 직접 읽어 `setImage` 로 줍니다.
 - `mangle.cjs` 를 쓰면 실행 중에 읽는 JSON 키를 제외 목록에 넣습니다.

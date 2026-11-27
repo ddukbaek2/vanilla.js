@@ -373,6 +373,7 @@ export class UIEditor {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { UIDocument } */ #uiDocument; // 문서를 쓰고 읽는 UIDocument. (엔진이 내보내는 노드와 컴포넌트를 모두 등록한 것)
 	/** @private @type { WorldNode } */ #documentRootNode;
 	/** @private @type { WorldNode | null } */ #selectedNode;
 	/** @private @type { HTMLCanvasElement } */ #editorCanvas;
@@ -418,6 +419,8 @@ export class UIEditor {
 	// 생성.
 	//==============================================================================
 	constructor() {
+		this.#uiDocument = new UIDocument();
+		registerEngineTypes(this.#uiDocument);
 		this.#documentRootNode = null;
 		this.#selectedNode = null;
 		this.#editorCanvas = null;
@@ -2708,7 +2711,7 @@ export class UIEditor {
 
 		// 붙어 있는 컴포넌트 목록.
 		const componentList = selectedNode.getAllComponents();
-		const generatedTypeSet = UIDocument.collectGeneratedComponentTypes(componentList);
+		const generatedTypeSet = this.#uiDocument.collectGeneratedComponentTypes(componentList);
 		for (const component of componentList) {
 			const componentTypeName = component.constructor.name;
 			if (generatedTypeSet.has(componentTypeName)) {
@@ -3265,7 +3268,7 @@ export class UIEditor {
 	// 되돌리기 스냅샷 저장.
 	//==============================================================================
 	pushUndoSnapshot() {
-		const jsonText = UIDocument.toJsonText(this.#documentRootNode, false);
+		const jsonText = this.#uiDocument.toJsonText(this.#documentRootNode, false);
 		this.#undoStack.push(jsonText);
 		if (this.#undoStack.length > UNDO_LIMIT) {
 			this.#undoStack.shift();
@@ -3280,7 +3283,7 @@ export class UIEditor {
 		if (this.#undoStack.length === 0) {
 			return;
 		}
-		this.#redoStack.push(UIDocument.toJsonText(this.#documentRootNode, false));
+		this.#redoStack.push(this.#uiDocument.toJsonText(this.#documentRootNode, false));
 		this.replaceDocument(this.#undoStack.pop());
 	}
 
@@ -3291,7 +3294,7 @@ export class UIEditor {
 		if (this.#redoStack.length === 0) {
 			return;
 		}
-		this.#undoStack.push(UIDocument.toJsonText(this.#documentRootNode, false));
+		this.#undoStack.push(this.#uiDocument.toJsonText(this.#documentRootNode, false));
 		this.replaceDocument(this.#redoStack.pop());
 	}
 
@@ -3302,7 +3305,7 @@ export class UIEditor {
 	 * @param { string } jsonText
 	 */
 	replaceDocument(jsonText) {
-		this.#documentRootNode = UIDocument.fromJsonText(jsonText);
+		this.#documentRootNode = this.#uiDocument.fromJsonText(jsonText);
 		this.#documentRootNode.setPivot(Pivot.topLeft.clone());
 		this.#documentRootNode.setAnchor(Pivot.topLeft.clone());
 		this.#selectedNode = null;
@@ -3324,7 +3327,7 @@ export class UIEditor {
 			return;
 		}
 		this.pushUndoSnapshot();
-		const copiedNode = UIDocument.deserializeNode(UIDocument.serializeNode(selectedNode));
+		const copiedNode = this.#uiDocument.deserializeNode(this.#uiDocument.serializeNode(selectedNode));
 		this.#nodeSerialNumber += 1;
 		copiedNode.setName(selectedNode.getName() + "_copy" + this.#nodeSerialNumber);
 		const localPosition = selectedNode.getLocalPosition();
@@ -3390,7 +3393,7 @@ export class UIEditor {
 	 * @returns { string }
 	 */
 	saveDocument(fileName) {
-		const jsonText = UIDocument.toJsonText(this.#documentRootNode);
+		const jsonText = this.#uiDocument.toJsonText(this.#documentRootNode);
 		const blob = new System.Blob([jsonText], { type: "application/json" });
 		const objectUrl = System.URL.createObjectURL(blob);
 		const anchorElement = System.document.createElement("a");
@@ -3495,18 +3498,25 @@ export class UIEditor {
 //==============================================================================
 applyEditorTheme();
 
-// 엔진이 내보내는 노드와 컴포넌트를 문서 형식에 등록한다.
-// 엔진을 올리면 새로 들어온 종류가 그대로 저장/복원 대상이 된다.
-for (const exportName of System.Object.keys(Engine)) {
-	const candidateType = Engine[exportName];
-	if (typeof candidateType !== "function" || !candidateType.prototype) {
-		continue;
-	}
-	if (candidateType.prototype instanceof Component) {
-		UIDocument.registerComponentType(exportName, candidateType);
-	}
-	else if (candidateType === WorldNode || candidateType.prototype instanceof WorldNode) {
-		UIDocument.registerNodeType(exportName, candidateType);
+//==============================================================================
+// 엔진이 내보내는 노드와 컴포넌트를 문서에 등록한다. (에디터가 쓰는 UIDocument 하나에)
+// - 엔진을 올리면 새로 들어온 종류가 그대로 저장/복원 대상이 된다.
+//==============================================================================
+/**
+ * @param { UIDocument } uiDocument 등록할 문서.
+ */
+function registerEngineTypes(uiDocument) {
+	for (const exportName of System.Object.keys(Engine)) {
+		const candidateType = Engine[exportName];
+		if (typeof candidateType !== "function" || !candidateType.prototype) {
+			continue;
+		}
+		if (candidateType.prototype instanceof Component) {
+			uiDocument.registerComponentType(exportName, candidateType);
+		}
+		else if (candidateType === WorldNode || candidateType.prototype instanceof WorldNode) {
+			uiDocument.registerNodeType(exportName, candidateType);
+		}
 	}
 }
 

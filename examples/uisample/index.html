@@ -113,7 +113,8 @@
 		async load(engine) {
 			const response = await System.fetch("./assets/title.uiasset.json", { cache: "no-cache" });
 			const jsonText = await response.text();
-			this.#documentRootNode = UIDocument.fromJsonText(jsonText);
+			const uiDocument = new UIDocument();
+			this.#documentRootNode = uiDocument.fromJsonText(jsonText);
 			this.getRoot().addChild(this.#documentRootNode);
 
 			// 불러온 노드에 동작 연결. (이름으로 찾는다)

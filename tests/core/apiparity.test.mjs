@@ -10,6 +10,7 @@ import * as Vanilla from "../../import.js";
 import { check, checkEqual, checkJson, checkNear, finish } from "../testcheck.mjs";
 
 const { Color, Paint, Outline, SoftShade, ShadowText, UIView, UISlider, WorldNode, Vector2, Sprite, ShadowImage, UIImageView, UIDropdown, UIDialog, UIDocument, isViewPositionInsideNode, GameScene, Scene, UIScene } = Vanilla;
+const uiDocument = new UIDocument();
 const { readColor } = await import("../../src/core/component/shadowtext.js");
 const { buildFontString } = await import("../../src/core/component/text.js");
 const { DEFAULT_FONT_FAMILY_STRING, SYSTEM_FONT_STRING } = await import("../../src/base/platform.js");
@@ -78,9 +79,9 @@ const { DEFAULT_FONT_FAMILY_STRING, SYSTEM_FONT_STRING } = await import("../../s
 	const imageNode = new WorldNode();
 	const savedShadowImage = imageNode.addComponent(ShadowImage);
 	savedShadowImage.setImageColor(new Color(0, 1, 0, 1));
-	const imageDocument = UIDocument.serializeNode(imageNode);
+	const imageDocument = uiDocument.serializeNode(imageNode);
 	checkJson(imageDocument.components[0].ImageColor, [0, 1, 0, 1], "ShadowImage 의 ImageColor 는 러스트 판처럼 수 넷 배열로 저장");
-	const loadedNode = UIDocument.deserializeNode(imageDocument);
+	const loadedNode = uiDocument.deserializeNode(imageDocument);
 	checkEqual(loadedNode.getComponent(ShadowImage).getImageColor().toHEXString(), "#00ff00", "ShadowImage 의 ImageColor 배열을 Color 로 읽는다");
 	shadowImage.setImageColor(null);
 	checkEqual(shadowImage.getImageColor(), null, "ShadowImage.setImageColor(null)");
@@ -191,9 +192,9 @@ const { DEFAULT_FONT_FAMILY_STRING, SYSTEM_FONT_STRING } = await import("../../s
 		version: 1,
 		root: { type: "WorldNode", name: "Root", contentSize: [128, 128], components: [{ type: "Sprite", imagePath: "images/coin.png" }], children: [] },
 	};
-	const rootNode = UIDocument.fromJsonText(JSON.stringify(documentData));
+	const rootNode = uiDocument.fromJsonText(JSON.stringify(documentData));
 	checkEqual(rootNode.getComponent(Sprite).getImagePath(), "images/coin.png", "UIDocument 가 읽은 그림 경로");
-	const savedText = UIDocument.toJsonText(rootNode);
+	const savedText = uiDocument.toJsonText(rootNode);
 	check(savedText.includes("\"imagePath\": \"images/coin.png\"") || savedText.includes("\"imagePath\":\"images/coin.png\""), "UIDocument 가 적은 그림 경로");
 }
 

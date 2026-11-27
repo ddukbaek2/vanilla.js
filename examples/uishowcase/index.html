@@ -359,11 +359,12 @@
 				this.#fontFace = null;
 			}
 
+			const uiDocument = new UIDocument();
 			const documentMap = new System.Map();
 			const fetchPromises = ASSET_FILE_NAMES.map(async (fileName) => {
 				const response = await System.fetch("./assets/" + fileName + ".uiasset.json", { cache: "no-cache" });
 				const jsonText = await response.text();
-				documentMap.set(fileName, UIDocument.fromJsonText(jsonText));
+				documentMap.set(fileName, uiDocument.fromJsonText(jsonText));
 			});
 			await System.Promise.all(fetchPromises);
 

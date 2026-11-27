@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Component } from "../../core/component.js";
+import { Rect } from "../../base/rect.js";
 import { Camera3D } from "../camera3d.js";
 import { ToonRenderer } from "./toonrenderer.js";
 import { RenderTarget } from "../rendertarget.js";
@@ -42,9 +43,11 @@ import { RenderTarget } from "../rendertarget.js";
 // - 카메라(getCamera)의 가로 세로 비는 그릴 때마다 사각형의 비로 맞춘다. 3D 점 위의 2D 표시는 같은 카메라의 projectToView 로 셈한다.
 // - 깊이 비우기: 부모 Mask 의 자르기 안이면 Adreno 660 함정(Graphic.clearDepthBuffer 머리말)이 있다. 자르기를 거는 쪽이
 //   beginClipRect 앞에서 clearDepthBuffer 를 부르고 이 컴포넌트는 setDepthCleared(false) 로 둔다.
-// - 그리기 함수: (renderer, camera, screenRect, webGL2RenderingContext) => void. screenRect 는 { x, y, width, height } 드로잉 버퍼 픽셀.
+// - 그리기 함수: (renderer, camera, screenRect, webGL2RenderingContext, output) => void. screenRect 는 지금 프레임 버퍼에서 그릴 사각형(Rect, 픽셀, 왼쪽 위 원점)이다.
+//   output 은 { outputFramebuffer, outputViewport } 다. 지금 묶인 프레임 버퍼(null 이면 캔버스)와 그 안의 GL 뷰포트([x, y, 너비, 높이], 정수, 왼쪽 아래 원점).
 //   보통 ToonDrawQueue 에 담아 queue.draw(renderer, camera) 하거나 renderer.beginFrameWithCamera 와 endFrame 사이에 그린다.
-//   ToonPostProcess 를 쓰면 renderer.clearScreenRect() 를 부르고 실수 렌더 타겟에 그린 뒤 end 의 뷰포트를 사각형으로 준다.
+//   ToonPostProcess 를 쓰면 renderer.clearScreenRect() 를 부르고 실수 렌더 타겟에 그린 뒤 end 에 output 의 프레임 버퍼와 뷰포트를 준다.
+//   (그래야 렌더 스케일, 투명도 층과 상관없이 맞는 자리에 낸다)
 //==============================================================================
 /**
  * @example <caption>3D 점 위에 2D 표시를 띄울 자리 셈하기</caption>
@@ -69,10 +72,11 @@ export class ToonView3D extends Component {
 	/** @private @type { Function | null } */ #drawCallback;
 	/** @private @type { Function | null } */ #fallbackDrawCallback; // (graphic, contentSize) => void
 	/** @private @type { boolean } */ #isDepthCleared;
-	/** @private @type { object } */ #screenRect; // 이번 그리기의 화면 사각형. ({ x, y, width, height })
+	/** @private @type { Rect } */ #screenRect; // 이번 그리기의 화면 사각형. (드로잉 버퍼 픽셀, 왼쪽 위 원점)
 	/** @private @type { number } */ #renderScale; // 3D 를 그리는 판의 배율. (1 이면 화면에 바로, 아니면 그 배율의 판에 그려 선형으로 늘여 얹는다)
 	/** @private @type { RenderTarget | null } */ #renderScaleTarget; // 배율 판. (처음 쓸 때 짓는다)
-	/** @private @type { object } */ #outputScreenRect; // 그리기 함수에 넘기는 사각형. ({ x, y, width, height, outputFramebuffer, outputViewport })
+	/** @private @type { Rect } */ #drawScreenRect; // 그리기 함수에 넘기는 사각형. (배율 판에 그리면 판 전체)
+	/** @private @type { object } */ #output; // 그리기 함수에 넘기는 출력. ({ outputFramebuffer, outputViewport }, 러스트 판 ToonViewOutput)
 
 	//==============================================================================
 	// 생성.
@@ -86,10 +90,11 @@ export class ToonView3D extends Component {
 		this.#drawCallback = null;
 		this.#fallbackDrawCallback = null;
 		this.#isDepthCleared = true;
-		this.#screenRect = { x: 0, y: 0, width: 0, height: 0 };
+		this.#screenRect = Rect.create(0, 0, 0, 0);
 		this.#renderScale = 1;
 		this.#renderScaleTarget = null;
-		this.#outputScreenRect = { x: 0, y: 0, width: 0, height: 0, outputFramebuffer: null, outputViewport: [0, 0, 0, 0] };
+		this.#drawScreenRect = Rect.create(0, 0, 0, 0);
+		this.#output = { outputFramebuffer: null, outputViewport: [0, 0, 0, 0] };
 	}
 
 	//==============================================================================
@@ -97,7 +102,7 @@ export class ToonView3D extends Component {
 	// - 1(기본)이면 지금처럼 화면에 바로 그린다. 1 이 아니면 판(내용 영역의 화면 크기 x 배율, 깊이 포함, 캔버스가 안티에일리어싱이면 멀티샘플 4)에
 	//   투명하게 비운 뒤 그리고, 2D 그리기 길로 source-over 로 얹는다. (2D 자르기를 따르고, 3D 가 덮지 않은 곳은 아래 2D 가 비친다)
 	// - 판은 제 깊이를 쓰므로 setDepthCleared(false) 로 앞의 3D 깊이를 이어 쓰던 것은 배율이 1 일 때만 된다.
-	// - 그리기 함수는 넘겨받은 사각형의 outputFramebuffer, outputViewport 로 내야 배율과 상관없이 맞는 자리에 낸다. (ToonPostProcess.end 같은 것)
+	// - 그리기 함수는 넘겨받은 출력(output)의 프레임 버퍼와 뷰포트로 내야 배율과 상관없이 맞는 자리에 낸다. (ToonPostProcess.end 같은 것)
 	//==============================================================================
 	/**
 	 * @param { number } renderScale - 배율. (0.05 ~ 4, 1 이면 화면에 바로, 수가 아니면 1)
@@ -128,30 +133,31 @@ export class ToonView3D extends Component {
 	}
 
 	//==============================================================================
-	// 그리기 함수 설정. ((renderer, camera, screenRect, webGL2RenderingContext) => void, null 이면 그리지 않음)
-	// - screenRect 는 { x, y, width, height, outputFramebuffer, outputViewport } 다. x, y, width, height 는 지금 프레임 버퍼에서 그릴 사각형(픽셀, 왼쪽 위 원점),
-	//   outputFramebuffer 는 지금 묶인 프레임 버퍼(null 이면 캔버스), outputViewport 는 그 안의 GL 뷰포트([x, y, 너비, 높이], 정수, 왼쪽 아래 원점)다.
+	// 그리기 함수 설정. ((renderer, camera, screenRect, webGL2RenderingContext, output) => void, null 이면 그리지 않음)
+	// - screenRect 는 지금 프레임 버퍼에서 그릴 사각형(Rect, 픽셀, 왼쪽 위 원점, 그리기마다 고쳐 쓰는 같은 객체)이다.
+	// - output 은 { outputFramebuffer, outputViewport } 다. outputFramebuffer 는 지금 묶인 프레임 버퍼(null 이면 캔버스),
+	//   outputViewport 는 그 안의 GL 뷰포트([x, y, 너비, 높이], 정수, 왼쪽 아래 원점)다. (러스트 판 ToonViewOutput 의 output_framebuffer, output_viewport)
 	//   ToonPostProcess.end 처럼 따로 내는 것은 이 둘로 내야 렌더 스케일, 투명도 층과 상관없이 맞는 자리에 낸다.
 	//==============================================================================
 	/**
-	 * @param { Function | null } drawCallback - (renderer, camera, screenRect, webGL2RenderingContext) => void. (null 이면 그리지 않음)
+	 * @param { Function | null } drawCallback - (renderer, camera, screenRect, webGL2RenderingContext, output) => void. (null 이면 그리지 않음)
 	 * @example <caption>노드 사각형 안에 HDR 마무리를 걸어 그리기</caption>
 	 * import { WorldNode, ToonView3D, ToonPostProcess } from "./vanilla.js";
 	 * const node = new WorldNode();
 	 * node.setContentSizeXY(320, 240);
 	 * const view = node.addComponent(ToonView3D);
 	 * let postProcess = null;
-	 * view.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext) => {
+	 * view.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext, output) => {
 	 * 	if (postProcess === null) {
-	 * 		postProcess = new ToonPostProcess(webGL2RenderingContext, screenRect.width, screenRect.height);
+	 * 		postProcess = new ToonPostProcess(webGL2RenderingContext, screenRect.size.x, screenRect.size.y);
 	 * 		renderer.setHdrOutput(postProcess.getUseFloatColor());
 	 * 	}
 	 * 	renderer.clearScreenRect();
-	 * 	postProcess.resize(screenRect.width, screenRect.height);
+	 * 	postProcess.resize(screenRect.size.x, screenRect.size.y);
 	 * 	postProcess.begin([0.05, 0.05, 0.08]);
 	 * 	renderer.beginFrameWithCamera(camera);
 	 * 	renderer.endFrame();
-	 * 	postProcess.end(screenRect.outputFramebuffer, screenRect.outputViewport);
+	 * 	postProcess.end(output.outputFramebuffer, output.outputViewport);
 	 * });
 	 */
 	setDrawCallback(drawCallback) {
@@ -258,13 +264,13 @@ export class ToonView3D extends Component {
 	}
 
 	//==============================================================================
-	// 지난 그리기의 화면 사각형 반환. ({ x, y, width, height } 드로잉 버퍼 픽셀)
+	// 지난 그리기의 화면 사각형 반환. (드로잉 버퍼 픽셀)
 	//==============================================================================
 	/**
-	 * @returns { object } { x, y, width, height } 드로잉 버퍼 픽셀의 사각형. (왼쪽 위가 원점, 그리기마다 고쳐 쓰는 같은 객체)
+	 * @returns { Rect } 드로잉 버퍼 픽셀의 사각형. (왼쪽 위가 원점, 아직 그리지 않았으면 빈 사각형, 복사본)
 	 */
 	getScreenRect() {
-		return this.#screenRect;
+		return this.#screenRect.clone();
 	}
 
 	//==============================================================================
@@ -318,10 +324,10 @@ export class ToonView3D extends Component {
 			maximumY = System.Math.max(maximumY, screenY);
 		}
 		const screenRect = this.#screenRect;
-		screenRect.x = minimumX;
-		screenRect.y = minimumY;
-		screenRect.width = maximumX - minimumX;
-		screenRect.height = maximumY - minimumY;
+		screenRect.position.x = minimumX;
+		screenRect.position.y = minimumY;
+		screenRect.size.x = maximumX - minimumX;
+		screenRect.size.y = maximumY - minimumY;
 	}
 
 	//==============================================================================
@@ -351,21 +357,26 @@ export class ToonView3D extends Component {
 		}
 		this.refreshScreenRect(graphic, contentSize);
 		const screenRect = this.#screenRect;
-		if (screenRect.width <= 0 || screenRect.height <= 0) {
+		const screenX = screenRect.position.x;
+		const screenY = screenRect.position.y;
+		const screenWidth = screenRect.size.x;
+		const screenHeight = screenRect.size.y;
+		if (screenWidth <= 0 || screenHeight <= 0) {
 			return;
 		}
 		const camera = this.#camera;
-		camera.setAspectRatio(screenRect.width / screenRect.height);
+		camera.setAspectRatio(screenWidth / screenHeight);
 		if (this.#renderScale !== 1) {
 			this.drawWithRenderScale(graphic, renderer, drawCallback);
 			return;
 		}
-		const outputScreenRect = this.#outputScreenRect;
+		const drawScreenRect = this.#drawScreenRect;
+		const output = this.#output;
 		graphic.runExternalPass((webGL2RenderingContext) => {
-			this.writeOutputScreenRect(graphic, screenRect.x, screenRect.y, screenRect.width, screenRect.height);
-			renderer.setScreenRect(screenRect.x, screenRect.y, screenRect.width, screenRect.height);
+			this.#writeOutput(graphic, screenX, screenY, screenWidth, screenHeight);
+			renderer.setScreenRect(screenX, screenY, screenWidth, screenHeight);
 			try {
-				drawCallback(renderer, camera, outputScreenRect, webGL2RenderingContext);
+				drawCallback(renderer, camera, drawScreenRect, webGL2RenderingContext, output);
 			}
 			finally {
 				renderer.clearScreenRect();
@@ -374,7 +385,8 @@ export class ToonView3D extends Component {
 	}
 
 	//==============================================================================
-	// 그리기 함수에 넘길 사각형 채우기. (지금 묶인 프레임 버퍼와 그 안의 GL 뷰포트, 왼쪽 아래 원점)
+	// 그리기 함수에 넘길 사각형과 출력 채우기. (출력은 지금 묶인 프레임 버퍼와 그 안의 GL 뷰포트, 왼쪽 아래 원점, 러스트 판 read_output)
+	// - 사각형은 지금 뷰포트 안의 픽셀(왼쪽 위 원점)이다. 뷰포트는 정수 픽셀로 반올림한다. (GL 뷰포트는 정수)
 	//==============================================================================
 	/**
 	 * @private
@@ -384,18 +396,18 @@ export class ToonView3D extends Component {
 	 * @param { number } width - 너비.
 	 * @param { number } height - 높이.
 	 */
-	writeOutputScreenRect(graphic, x, y, width, height) {
-		const outputScreenRect = this.#outputScreenRect;
+	#writeOutput(graphic, x, y, width, height) {
+		const drawScreenRect = this.#drawScreenRect;
+		drawScreenRect.position.x = x;
+		drawScreenRect.position.y = y;
+		drawScreenRect.size.x = width;
+		drawScreenRect.size.y = height;
+		const output = this.#output;
 		const viewport = graphic.getCurrentViewport();
-		outputScreenRect.x = x;
-		outputScreenRect.y = y;
-		outputScreenRect.width = width;
-		outputScreenRect.height = height;
-		outputScreenRect.outputFramebuffer = graphic.getCurrentFramebuffer();
-		// 정수 픽셀로 반올림한다. (GL 뷰포트는 정수)
+		output.outputFramebuffer = graphic.getCurrentFramebuffer();
 		const outputWidth = System.Math.max(1, System.Math.round(width));
 		const outputHeight = System.Math.max(1, System.Math.round(height));
-		const outputViewport = outputScreenRect.outputViewport;
+		const outputViewport = output.outputViewport;
 		outputViewport[0] = viewport.position.x + System.Math.round(x);
 		outputViewport[1] = viewport.position.y + viewport.height - System.Math.round(y) - outputHeight;
 		outputViewport[2] = outputWidth;
@@ -448,9 +460,10 @@ export class ToonView3D extends Component {
 		const screenRect = this.#screenRect;
 		const camera = this.#camera;
 		const renderScale = this.#renderScale;
-		const targetWidth = System.Math.max(1, System.Math.round(screenRect.width * renderScale));
-		const targetHeight = System.Math.max(1, System.Math.round(screenRect.height * renderScale));
-		const outputScreenRect = this.#outputScreenRect;
+		const targetWidth = System.Math.max(1, System.Math.round(screenRect.size.x * renderScale));
+		const targetHeight = System.Math.max(1, System.Math.round(screenRect.size.y * renderScale));
+		const drawScreenRect = this.#drawScreenRect;
+		const output = this.#output;
 		let colorTexture = null;
 		graphic.runExternalPass((webGL2RenderingContext) => {
 			const target = this.readRenderScaleTarget(webGL2RenderingContext, targetWidth, targetHeight);
@@ -471,10 +484,10 @@ export class ToonView3D extends Component {
 			webGL2RenderingContext.clearColor(0, 0, 0, 0);
 			webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
 			webGL2RenderingContext.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-			this.writeOutputScreenRect(graphic, 0, 0, targetWidth, targetHeight);
+			this.#writeOutput(graphic, 0, 0, targetWidth, targetHeight);
 			renderer.setScreenRect(0, 0, targetWidth, targetHeight);
 			try {
-				drawCallback(renderer, camera, outputScreenRect, webGL2RenderingContext);
+				drawCallback(renderer, camera, drawScreenRect, webGL2RenderingContext, output);
 			}
 			finally {
 				renderer.clearScreenRect();
@@ -501,7 +514,7 @@ export class ToonView3D extends Component {
 		graphic.setGlobalAlpha(1);
 		graphic.setImageTintColor(null);
 		graphic.setBlendMode("source-over");
-		const floatCount = graphic.writeQuad(0, screenRect.x, screenRect.y, screenRect.x + screenRect.width, screenRect.y + screenRect.height, 0, 1, 1, 0);
+		const floatCount = graphic.writeQuad(0, screenRect.position.x, screenRect.position.y, screenRect.position.x + screenRect.size.x, screenRect.position.y + screenRect.size.y, 0, 1, 1, 0);
 		graphic.drawVertices(floatCount / 4, colorTexture, graphic.getWhiteColor());
 		graphic.popState();
 	}
