@@ -82,7 +82,10 @@ node tools/apidoc.cjs <버전> --check-examples [--only <경로 앞>] [--exclude
 - 가이드(docs/guide/<버전>/ko, en)와 업데이트(docs/update/<버전>.ko.md, .en.md)는 손으로 옮긴다. 업데이트 ko 는 UPDATE.md 의 그 판 절이다.
 
 ## 크롬 트레이스로 프레임 전체 시간을 재는 도구. (헤드리스 크롬, 전역 puppeteer-core 를 씀: NODE_PATH=$(npm root -g))
-node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--out 결과.json] [--chrome 크롬 경로]
-node tools/perftrace.mjs --attach <http://127.0.0.1:9222 또는 ws://...> [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--out 결과.json] [--keep-trace 트레이스.json]
-- --attach 는 --remote-debugging-port 로 떠 있는 크롬의 열린 페이지에 붙어 해상도 그대로 재고 떨어진다(크롬을 끄지 않음). 모듈로도 부른다: import { measureAttached } from "tools/perftrace.mjs"; await measureAttached(page 또는 browser, { seconds, warmup, target, silent }) 가 같은 결과 객체를 돌려준다. 쓰는 법은 파일 머리 주석.
+node tools/perftrace.mjs <주소 또는 로컬 html 경로> [--seconds 4] [--warmup 2] [--width 1280 --height 720 --dpr 1] [--throughput [프레임 수 120]] [--out 결과.json] [--chrome 크롬 경로]
+node tools/perftrace.mjs --attach <http://127.0.0.1:9222 또는 ws://...> [--target 주소에 든 글] [--seconds 4] [--warmup 0] [--throughput [프레임 수 120]] [--out 결과.json] [--keep-trace 트레이스.json]
+- --attach 는 --remote-debugging-port 로 떠 있는 크롬의 열린 페이지에 붙어 해상도 그대로 재고 떨어진다(크롬을 끄지 않음). 모듈로도 부른다: import { measureAttached } from "tools/perftrace.mjs"; await measureAttached(page 또는 browser, { seconds, warmup, throughput, target, silent }) 가 같은 결과 객체를 돌려준다. 쓰는 법은 파일 머리 주석.
+- --attach 에서 --target 과 맞는 페이지가 없으면 첫 페이지로 붙지 않고 열린 페이지 목록을 찍고 오류로 끝난다(다른 세션의 크롬에 잘못 붙지 않게). --target 이 없으면 첫 페이지.
 - 렌더러 메인 스레드 바쁜 시간, 그 안의 명령 버퍼 기다림, GPU 프로세스 메인 스레드 바쁜 시간, rAF 콜백 시간, 프레임 간격을 프레임마다 재어 가운데 값, 평균, p95 로 찍는다. 뜻과 셈은 파일 머리 주석.
+- --throughput 은 트레이스 뒤에 페이지의 전역 엔진(Engine.getEngine())으로 Engine.measureGpuThroughput(프레임 수)를 불러 '(6) GPU 처리량'(씬 갱신 없이 그리기만 잇달아 하고 1 화소 readPixels 로 GPU 를 기다린 프레임당 ms, 30 프레임 덩이의 가운데, 평균, p95)을 더 찍는다. (3) 은 GPU 프로세스가 명령을 푸는 CPU 시간이라 GPU 가 그리는 양을 보려면 (6) 을 본다. 엔진이 없거나 그 함수가 없는 판이면 '모름'.
+- 로비 꼴 툰 장면을 엔진 루프로 돌리는 재기 페이지: tests/graphics3d/toonlobbyengine.html (?post=0 후처리 없이, ?outline=0 바깥선 끔).
