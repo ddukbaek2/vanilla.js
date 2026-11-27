@@ -267,6 +267,8 @@ index.html?capture=120,240&captureName=shot_{frame}.png&captureExit=1
 
 Each capture logs the file name and canvas size to the console. Use it for verification that compares screens in a headless browser.
 
+Capture mode is deterministic. Time advances by 1/60 second per frame instead of real time, and both the wait that keeps the loading screen up for 0.3 more seconds after a scene loads and the minimum display time of `GameScene` and `UIScene` are counted on this engine clock. While loading takes real time, such as downloading assets, the frame number and the clock stand still, and counting starts once everything has arrived. So capturing the same example twice gives byte-identical images for the same frame number. (Both engines behave the same; only the loading screen frames during the download follow the download speed)
+
 ## Spotting slow devices
 
 `FrameProbe` measures frame intervals during the first few seconds after start to decide whether the device is slow. It is a calculator that does not import the engine or the browser, so the caller passes in the frame interval and the maximum FPS.

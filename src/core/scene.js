@@ -68,6 +68,7 @@ export class Scene extends Object {
 	/** @private @type { VTweeneen[] } */ #tweens;
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 	/** @private @type { boolean } */ #isLoaded; // 비동기 로딩 완료 여부.
+	/** @private @type { boolean } */ #isCaptureFrameHeld; // 찍기 모드에서 실제 시간이 드는 불러오기(애셋 받기) 중이라 엔진 프레임 번호와 시계를 세우는지.
 	/** @private @type { TouchRaycaster | null } */ #touchRaycaster; // 노드에 터치를 넘기는 레이캐스터. (null 이면 넘기지 않는다)
 	/** @private @type { Color } */ #sceneBackgroundColor; // drawSceneBackground 가 캔버스 전체를 칠하는 색. (기본 검정)
 	/** @private @type { boolean } */ #isTouchDispatchEnabled; // 노드에 터치를 넘기는지. (러스트 판 SceneBase 와 같은 스위치)
@@ -90,6 +91,7 @@ export class Scene extends Object {
 		this.#tweens = [];
 		this.#isGizmoVisible = false;
 		this.#isLoaded = false;
+		this.#isCaptureFrameHeld = false;
 		this.#root = new WorldNode();
 		const root = this.getRoot();
 		root.setName("root");
@@ -116,6 +118,29 @@ export class Scene extends Object {
 	 */
 	setLoaded(isLoaded) {
 		this.#isLoaded = isLoaded;
+	}
+
+	//==============================================================================
+	// 찍기 모드의 프레임 세우기 설정. (SceneManager 가 load 동안 참, GameScene 과 UIScene 은 애셋을 다 받으면 거짓)
+	// - 찍기 모드에서 이것이 참인 불러오는 씬이 있으면 엔진이 프레임 번호와 시계를 올리지 않는다. 애셋 받기처럼 실제 시간이 드는 것은 다 받은 뒤부터 센다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { boolean } isCaptureFrameHeld 실제 시간이 드는 불러오기 중이면 참.
+	 */
+	setCaptureFrameHeld(isCaptureFrameHeld) {
+		this.#isCaptureFrameHeld = isCaptureFrameHeld;
+	}
+
+	//==============================================================================
+	// 찍기 모드의 프레임 세우기 여부 반환.
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { boolean } 실제 시간이 드는 불러오기 중이면 참.
+	 */
+	isCaptureFrameHeld() {
+		return this.#isCaptureFrameHeld === true;
 	}
 
 	//==============================================================================
