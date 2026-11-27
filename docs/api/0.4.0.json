@@ -20513,14 +20513,14 @@
 									"name": "fontString",
 									"type": "string",
 									"description": {
-										"ko": "CSS 글꼴 글. (예: \"16px DOSGothic\", 비었으면 바꾸지 않는다)",
-										"en": "CSS font string. (e.g. \"16px DOSGothic\", unchanged if empty)"
+										"ko": "CSS 글꼴 글. (예: \"16px DOSGothic\", 이름 default 는 엔진 기본 글꼴 사슬 SYSTEM_FONT_STRING, 비었으면 바꾸지 않는다)",
+										"en": "CSS font string. (e.g. \"16px DOSGothic\", the family name default is the engine default font chain SYSTEM_FONT_STRING, unchanged if empty)"
 									}
 								}
 							],
 							"description": {
-								"ko": "폰트 문자열 설정. (Canvas2D font 대응, 예: \"16px DOSGothic\")",
-								"en": "Sets the font string. (equivalent to Canvas2D font, e.g. \"16px DOSGothic\")"
+								"ko": "폰트 문자열 설정. (Canvas2D font 대응, 예: \"16px DOSGothic\", 이름 default 는 엔진 기본 글꼴 사슬)",
+								"en": "Sets the font string. (equivalent to Canvas2D font, e.g. \"16px DOSGothic\", the family name default is the engine default font chain)"
 							},
 							"since": "0.3.0",
 							"source": "src/core/graphic.js",

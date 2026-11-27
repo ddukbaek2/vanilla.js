@@ -6808,6 +6808,74 @@ if (System14.document !== void 0 && System14.document.fonts !== void 0) {
     measureFontLoadCount += 1;
   });
 }
+var FONT_SIZE_PATTERN = /^(?:[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?(?:px|pt|pc|in|cm|mm|q|em|rem|ex|ch|vw|vh|vmin|vmax|%)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|larger|smaller)(?:\/.*)?$/i;
+var DEFAULT_FONT_FAMILY = "default";
+function resolveFontString(fontString) {
+  if (!/default/i.test(fontString)) {
+    return fontString;
+  }
+  const wordPattern = /\S+/g;
+  let familyListStart = -1;
+  let wordMatch = wordPattern.exec(fontString);
+  while (wordMatch !== null) {
+    if (wordMatch[0].includes(",") || wordMatch[0].includes('"') || wordMatch[0].includes("'")) {
+      break;
+    }
+    if (FONT_SIZE_PATTERN.test(wordMatch[0])) {
+      familyListStart = wordMatch.index + wordMatch[0].length;
+      const lineHeightMatch = /^\s*\/\s*\S+/.exec(fontString.slice(familyListStart));
+      if (lineHeightMatch !== null && !wordMatch[0].includes("/")) {
+        familyListStart += lineHeightMatch[0].length;
+      }
+      break;
+    }
+    wordMatch = wordPattern.exec(fontString);
+  }
+  if (familyListStart < 0) {
+    return fontString;
+  }
+  const familyListText = fontString.slice(familyListStart);
+  const familyNameList = [];
+  let familyName = "";
+  let quoteCharacter = "";
+  for (const character of familyListText) {
+    if (quoteCharacter !== "") {
+      familyName += character;
+      if (character === quoteCharacter) {
+        quoteCharacter = "";
+      }
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quoteCharacter = character;
+      familyName += character;
+      continue;
+    }
+    if (character === ",") {
+      familyNameList.push(familyName.trim());
+      familyName = "";
+      continue;
+    }
+    familyName += character;
+  }
+  familyNameList.push(familyName.trim());
+  let isDefaultRequested = false;
+  const resolvedFamilyNameList = familyNameList.map((name) => {
+    const unquotedName = /^(["'])(.*)\1$/.exec(name);
+    const bareName = unquotedName !== null ? unquotedName[2] : name;
+    if (bareName.toLowerCase() !== DEFAULT_FONT_FAMILY) {
+      return name;
+    }
+    isDefaultRequested = true;
+    return `"${DEFAULT_FONT_FAMILY}"`;
+  });
+  if (!isDefaultRequested) {
+    return fontString;
+  }
+  resolvedFamilyNameList.push(SYSTEM_FONT_STRING);
+  return fontString.slice(0, familyListStart).trimEnd() + " " + resolvedFamilyNameList.join(", ");
+}
+__name(resolveFontString, "resolveFontString");
 function measureTextMetrics(fontString, text) {
   const document2 = System14.document;
   if (document2 === void 0 || document2 === null) {
@@ -6830,7 +6898,7 @@ function measureTextMetrics(fontString, text) {
     measureCache.set(cacheKey, cachedTextMetrics);
     return cachedTextMetrics;
   }
-  measureCanvasRenderingContext.font = fontString;
+  measureCanvasRenderingContext.font = resolveFontString(fontString);
   const textMetrics = measureCanvasRenderingContext.measureText(text);
   measureCache.set(cacheKey, textMetrics);
   while (measureCache.size > MAXIMUM_MEASURE_COUNT) {
@@ -6967,7 +7035,7 @@ var TextStringTextureCache = class extends Object2 {
       return textMetrics;
     }
     const measurementCanvasRenderingContext2 = this.getMeasurementCanvasRenderingContext();
-    measurementCanvasRenderingContext2.font = fontString;
+    measurementCanvasRenderingContext2.font = resolveFontString(fontString);
     return measurementCanvasRenderingContext2.measureText(text);
   }
   //==============================================================================
@@ -7071,7 +7139,7 @@ var TextStringTextureCache = class extends Object2 {
    * @returns { object | null }
    */
   buildEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
-    const scaledFontString = this.buildScaledFontString(fontString, scale);
+    const scaledFontString = this.buildScaledFontString(resolveFontString(fontString), scale);
     const layoutCanvasRenderingContext = this.#layoutCanvasRenderingContext;
     layoutCanvasRenderingContext.font = scaledFontString;
     layoutCanvasRenderingContext.direction = textDirection;
@@ -7601,7 +7669,7 @@ var TextStringTextureCache = class extends Object2 {
     const entries = this.getEntries();
     let removedCount = 0;
     for (const [entryKey, entry] of System14.Array.from(entries)) {
-      if (!isAffected(entry.fontString, entry.text)) {
+      if (!isAffected(resolveFontString(entry.fontString), entry.text)) {
         continue;
       }
       this.removeEntry(entryKey, entry);
@@ -11866,10 +11934,10 @@ var Graphic = class extends Object2 {
     }
   }
   //==============================================================================
-  // 폰트 문자열 설정. (Canvas2D font 대응, 예: "16px DOSGothic")
+  // 폰트 문자열 설정. (Canvas2D font 대응, 예: "16px DOSGothic", 이름 default 는 엔진 기본 글꼴 사슬)
   //==============================================================================
   /**
-   * @param { string } fontString CSS 글꼴 글. (예: "16px DOSGothic", 비었으면 바꾸지 않는다)
+   * @param { string } fontString CSS 글꼴 글. (예: "16px DOSGothic", 이름 default 는 엔진 기본 글꼴 사슬 SYSTEM_FONT_STRING, 비었으면 바꾸지 않는다)
    */
   setFontString(fontString) {
     if (fontString) {
@@ -81307,7 +81375,7 @@ var DynamicFont = class extends Object2 {
   //==============================================================================
   rebuildAtlas() {
     const document2 = System143.document;
-    const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : "-apple-system, sans-serif";
+    const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : SYSTEM_FONT_STRING;
     const fontSize = this.getFontSize();
     const fontString = `${fontSize}px ${fontFamily}`;
     const measureCanvas = document2.createElement("canvas");
