@@ -143,7 +143,7 @@ export class WorldNode extends TransformNode {
                 continue;
             }
             if (!isComponentDrawCulled) {
-                component.draw(graphic);
+                graphic.drawComponent(component);
             }
             if (component instanceof Mask) {
                 maskComponent = component;

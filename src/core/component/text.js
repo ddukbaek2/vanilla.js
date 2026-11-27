@@ -219,6 +219,23 @@ if (System.document !== undefined && System.document.fonts !== undefined) {
 }
 
 //==============================================================================
+// 색을 기하 캐시 열쇠에 적기. (참조와 칸을 함께, 안의 값이 바뀌어도 알아채게)
+//==============================================================================
+/**
+ * @param { GeometryKey } geometryKey 적을 열쇠.
+ * @param { Color | null } color 적을 색. (null 이면 null 만)
+ */
+function addColorToGeometryKey(geometryKey, color) {
+	geometryKey.add(color);
+	if (color !== null && typeof color === "object" && typeof color.red === "number") {
+		geometryKey.add(color.red);
+		geometryKey.add(color.green);
+		geometryKey.add(color.blue);
+		geometryKey.add(color.alpha);
+	}
+}
+
+//==============================================================================
 // 문서에 올린 글꼴 얼굴 수 반환. (다 받은 얼굴을 나중에 올리면 loadingdone 이 오지 않아 이것으로 안다, 문서가 없으면 0)
 //==============================================================================
 /**
@@ -889,6 +906,49 @@ export class Text extends Component {
 	 */
 	calculateFittedFontSize() {
 		return this.getFittedFontSize();
+	}
+
+	//==============================================================================
+	// 그리기 입력을 기하 캐시 열쇠에 적기. (글, 글꼴, 크기, 색, 정렬, 줄바꿈, 표시 글자 수, 맞춤 너비, 내용 크기, 받아진 웹 글꼴 수)
+	// - draw 나 그 아래 그리기 함수를 덮어쓴 하위 클래스(RichText 등)는 무엇을 읽는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { GeometryKey } geometryKey 입력을 적을 열쇠.
+	 * @returns { boolean } 입력을 적었으면 참.
+	 */
+	writeGeometryKey(geometryKey) {
+		if (this.draw !== Text.prototype.draw || this.drawPlainText !== Text.prototype.drawPlainText || this.drawWrappedText !== Text.prototype.drawWrappedText || this.strokeHorizontalLine !== Text.prototype.strokeHorizontalLine) {
+			return false;
+		}
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		geometryKey.add(this.getText());
+		geometryKey.add(this.#fontFace);
+		geometryKey.add(this.#fontSize);
+		addColorToGeometryKey(geometryKey, this.getTextColor());
+		addColorToGeometryKey(geometryKey, this.getStrokeColor());
+		geometryKey.add(this.#strokeWidth);
+		geometryKey.add(this.#bold);
+		geometryKey.add(this.#italic);
+		geometryKey.add(this.#underline);
+		geometryKey.add(this.#strikethrough);
+		geometryKey.add(this.#textAlign);
+		geometryKey.add(this.#textBaseline);
+		geometryKey.add(this.#textDirection);
+		geometryKey.add(this.#wordWrapWidth);
+		geometryKey.add(this.#wrapMode);
+		geometryKey.add(this.#lineSpacing);
+		geometryKey.add(this.#visibleCharacterCount);
+		geometryKey.add(this.#fitWidth);
+		geometryKey.add(this.#fitMinimumRatio);
+		const contentSize = node.getContentSize();
+		geometryKey.add(contentSize.x);
+		geometryKey.add(contentSize.y);
+		geometryKey.add(readFontFaceCount());
+		return true;
 	}
 
 	//==============================================================================

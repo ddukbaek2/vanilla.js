@@ -411,6 +411,8 @@ const FLOATS_PER_VERTEX = 4;
 const PARTICLE_FLOATS_PER_VERTEX = 8; // x, y, u, v, r, g, b, a
 const PARTICLE_VERTEX_CAPACITY = 8192;
 const BATCH_FLOATS_PER_VERTEX = 14; // x, y, u, v, r, g, b, a, tintR, tintG, tintB, tintA, textureSlot, clipSlot
+const GEOMETRY_COMMAND_SPRITE = 0; // 기하 캐시 명령: 스크래치 정점을 묶음에 넣은 것. (지역 정점, 색, 틴트)
+const GEOMETRY_COMMAND_TEXT = 1; // 기하 캐시 명령: 글 배치 엔트리를 그린 것. (엔트리, 자리, 색, 정렬)
 const BATCH_VERTEX_CAPACITY = 6 * 8192; // 사각형 8192 개. (러스트 판과 같은 값)
 
 // 스크래치 버텍스 버퍼 용량. (버텍스 수)
@@ -493,6 +495,173 @@ function parseColorValue(colorValue) {
 	return Color.white();
 }
 
+
+//==============================================================================
+// 빈 기하 캐시 만들기. (Graphic.drawComponent 가 컴포넌트마다 하나 둔다)
+//==============================================================================
+/**
+ * @returns { object } 기하 캐시.
+ */
+function createGeometryCache() {
+	return {
+		key: new GeometryKey(),
+		isValid: false,
+		isBroken: false,
+		isTranslatable: true,
+		isWorldVertexStale: false,
+		generation: -1,
+		matrixA: 0,
+		matrixB: 0,
+		matrixC: 0,
+		matrixD: 0,
+		matrixE: 0,
+		matrixF: 0,
+		globalAlpha: 0,
+		blendMode: "",
+		textDirection: "",
+		isTextBakeScaleMoving: false,
+		hasTint: false,
+		tintRed: 0,
+		tintGreen: 0,
+		tintBlue: 0,
+		tintAlpha: 0,
+		commandList: [],
+		commandCount: 0,
+		endFillColor: null,
+		endStrokeColor: null,
+		endImageTintColor: null,
+		endFontString: "",
+		endTextAlign: "",
+		endTextBaseline: "",
+		endTextDirection: "",
+	};
+}
+
+//==============================================================================
+// 기하 캐시의 다음 명령 칸 받기. (지난번 칸을 다시 쓴다)
+//==============================================================================
+/**
+ * @param { object } geometryCache 명령을 더할 캐시.
+ * @param { number } commandType GEOMETRY_COMMAND_SPRITE 또는 GEOMETRY_COMMAND_TEXT.
+ * @returns { object } 명령.
+ */
+function acquireGeometryCommand(geometryCache, commandType) {
+	const commandList = geometryCache.commandList;
+	const commandIndex = geometryCache.commandCount;
+	let geometryCommand = commandList[commandIndex];
+	if (geometryCommand === undefined) {
+		geometryCommand = {
+			type: commandType,
+			texture: null,
+			vertexCount: 0,
+			localVertexData: null,
+			color: null,
+			tintColor: null,
+			entry: null,
+			positionX: 0,
+			positionY: 0,
+			textDirection: "",
+			textAlign: "",
+			textBaseline: "",
+			subAppendList: [],
+			subAppendCount: 0,
+		};
+		commandList.push(geometryCommand);
+	}
+	geometryCommand.type = commandType;
+	geometryCommand.entry = null;
+	geometryCommand.subAppendCount = 0;
+	geometryCache.commandCount = commandIndex + 1;
+	return geometryCommand;
+}
+
+//==============================================================================
+// 기하 캐시 열쇠. (Component.writeGeometryKey 가 그리기 입력을 적는 곳)
+// - add 로 적은 값을 지난번에 적은 값과 차례대로 === 로 견준다. 하나라도 다르거나 수가 다르면 바뀐 것으로 본다.
+// - 견주며 바로 덮어 적으므로 프레임마다 배열을 새로 만들지 않는다.
+//==============================================================================
+/**
+ * @example <caption>그리기 입력을 적고 바뀌었는지 보기</caption>
+ * import { GeometryKey } from "./build/vanilla.js";
+ *
+ * const geometryKey = new GeometryKey();
+ * geometryKey.begin();
+ * geometryKey.add(10);
+ * geometryKey.add("#ff0000");
+ * console.log(geometryKey.end());
+ * geometryKey.begin();
+ * geometryKey.add(10);
+ * geometryKey.add("#ff0000");
+ * console.log(geometryKey.end());
+ * geometryKey.begin();
+ * geometryKey.add(12);
+ * geometryKey.add("#ff0000");
+ * console.log(geometryKey.end());
+ */
+export class GeometryKey extends Object {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @private @type { Array } */ #valueList; // 지난번에 적은 값.
+	/** @private @type { number } */ #valueCount; // 이번에 적은 값 수.
+	/** @private @type { boolean } */ #isChanged; // 이번에 적은 값이 지난번과 다른지.
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.#valueList = [];
+		this.#valueCount = 0;
+		this.#isChanged = true;
+	}
+
+	//==============================================================================
+	// 적기 시작. (Graphic 이 writeGeometryKey 앞에 부른다)
+	//==============================================================================
+	begin() {
+		this.#valueCount = 0;
+		this.#isChanged = false;
+	}
+
+	//==============================================================================
+	// 값 하나 적기. (숫자, 문자열, 참거짓, 객체 참조, null)
+	//==============================================================================
+	/**
+	 * @param { * } value 그리기가 읽는 값. (객체는 참조로 견주므로, 안의 값이 바뀔 수 있는 Color 같은 것은 칸을 따로 적는다)
+	 */
+	add(value) {
+		const valueIndex = this.#valueCount;
+		const valueList = this.#valueList;
+		if (valueIndex >= valueList.length) {
+			valueList.push(value);
+			this.#isChanged = true;
+		}
+		else if (valueList[valueIndex] !== value) {
+			valueList[valueIndex] = value;
+			this.#isChanged = true;
+		}
+		this.#valueCount = valueIndex + 1;
+	}
+
+	//==============================================================================
+	// 적기 끝. (지난번과 같으면 true)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 이번에 적은 값이 지난번과 모두 같으면 참. (처음 적은 때는 거짓)
+	 */
+	end() {
+		const valueList = this.#valueList;
+		if (valueList.length !== this.#valueCount) {
+			valueList.length = this.#valueCount;
+			this.#isChanged = true;
+		}
+		return !this.#isChanged;
+	}
+}
 
 //==============================================================================
 // 그래픽.
@@ -622,6 +791,15 @@ export class Graphic extends Object {
 	/** @private @type { boolean } */ #isCullingEnabled; // 화면 밖 노드의 컴포넌트 그리기를 건너뛸지.
 	/** @private @type { number } */ #culledNodeCount; // 이번 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
 	/** @private @type { number } */ #lastFrameCulledNodeCount; // 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
+	/** @private @type { boolean } */ #isGeometryCachingEnabled; // 컴포넌트가 그린 정점을 캐시해 두고 바뀐 것만 다시 셈할지. (기본 켜짐)
+	/** @private @type { WeakMap<Component, object> } */ #geometryCacheMap; // 컴포넌트마다의 기하 캐시.
+	/** @private @type { object | null } */ #geometryActiveCache; // 지금 적거나 다시 옮기는 기하 캐시.
+	/** @private @type { object | null } */ #geometryCaptureTarget; // 묶음에 넣은 정점을 받아 적을 명령. (null 이면 새 명령을 만든다)
+	/** @private @type { number } */ #geometryCacheGeneration; // 정점 셈을 바꾸는 설정이 바뀔 때마다 늘린다. (다르면 캐시를 다시 적는다)
+	/** @private @type { number } */ #geometryCacheHitCount; // 이번 프레임에 캐시로 그린 컴포넌트 수.
+	/** @private @type { number } */ #geometryRebuildCount; // 이번 프레임에 draw 를 불러 다시 셈한 컴포넌트 수. (캐시하는 컴포넌트만)
+	/** @private @type { number } */ #lastFrameGeometryCacheHitCount; // 지난 프레임에 캐시로 그린 컴포넌트 수.
+	/** @private @type { number } */ #lastFrameGeometryRebuildCount; // 지난 프레임에 다시 셈한 컴포넌트 수.
 	/** @private @type { ShaderProgram | null } */ #boundShaderProgram; // 마지막으로 쓰게 한 셰이더 프로그램. (null 이면 모른다)
 	/** @private @type { WebGLTexture | null } */ #boundTexture; // 0 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
 	/** @private @type { WebGLStateCache } */ #webGLStateCache; // 컨텍스트의 GL 상태 기억. (getParameter, isEnabled 를 GL 에 묻지 않고 답한다)
@@ -659,9 +837,10 @@ export class Graphic extends Object {
 		this.#boundShaderProgram = null;
 		this.#boundTexture = null;
 
-		// 컨텍스트를 잃거나 되살리면 GL 의 묶음이 처음으로 돌아가므로 기억을 잊는다.
+		// 컨텍스트를 잃거나 되살리면 GL 의 묶음이 처음으로 돌아가므로 기억을 잊는다. (기하 캐시가 든 텍스처도 다시 적게 한다)
 		const contextChangeCallback = () => {
 			this.invalidateRenderStateCache();
+			this.#geometryCacheGeneration += 1;
 		};
 		canvas.addEventListener("webglcontextlost", contextChangeCallback);
 		canvas.addEventListener("webglcontextrestored", contextChangeCallback);
@@ -796,6 +975,15 @@ export class Graphic extends Object {
 		this.#isCullingEnabled = false;
 		this.#culledNodeCount = 0;
 		this.#lastFrameCulledNodeCount = 0;
+		this.#isGeometryCachingEnabled = true;
+		this.#geometryCacheMap = new WeakMap();
+		this.#geometryActiveCache = null;
+		this.#geometryCaptureTarget = null;
+		this.#geometryCacheGeneration = 0;
+		this.#geometryCacheHitCount = 0;
+		this.#geometryRebuildCount = 0;
+		this.#lastFrameGeometryCacheHitCount = 0;
+		this.#lastFrameGeometryRebuildCount = 0;
 
 		// 블렌드 함수 매핑 테이블. (프리멀티플라이드 알파 기준)
 		// - 고정 블렌딩으로 재현 가능한 모드만 등록. 그 외(SHADER_BLEND_MODE_INDEX_TABLE)는 셰이더로 섞는다.
@@ -906,6 +1094,7 @@ export class Graphic extends Object {
 	 */
 	setImageSmoothingEnabled(value) {
 		this.#isImageSmoothingEnabled = value;
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -929,6 +1118,7 @@ export class Graphic extends Object {
 	 */
 	setImageMipmapEnabled(value) {
 		this.#isImageMipmapEnabled = value;
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -1000,6 +1190,7 @@ export class Graphic extends Object {
 	 */
 	setImageSmoothingQuality(value) {
 		this.#imageSmoothingQuality = value;
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -1257,6 +1448,9 @@ export class Graphic extends Object {
 	 * @exampleImage blend-modes.webp
 	 */
 	setBlendMode(blendMode) {
+		if (blendMode !== this.#blendMode) {
+			this.breakGeometryRecord();
+		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		let blendFunction = this.#blendFunctionTable.get(blendMode);
 		let shaderBlendModeIndex = 0;
@@ -1487,6 +1681,7 @@ export class Graphic extends Object {
 			this.appendSpriteBatch(vertexCount, texture, color);
 			return;
 		}
+		this.breakGeometryRecord();
 		this.flushSpriteBatch();
 
 		// 묶지 않고 그리는 것에는 셰이더 자르기를 가위로 건다. (화소 가운데 기준이 같아 결과가 같다)
@@ -1964,9 +2159,13 @@ export class Graphic extends Object {
 		this.#lastFrameDrawCallCount = this.#drawCallCount;
 		this.#lastFrameDrawVertexCount = this.#drawVertexCount;
 		this.#lastFrameCulledNodeCount = this.#culledNodeCount;
+		this.#lastFrameGeometryCacheHitCount = this.#geometryCacheHitCount;
+		this.#lastFrameGeometryRebuildCount = this.#geometryRebuildCount;
 		this.#drawCallCount = 0;
 		this.#drawVertexCount = 0;
 		this.#culledNodeCount = 0;
+		this.#geometryCacheHitCount = 0;
+		this.#geometryRebuildCount = 0;
 	}
 
 	//==============================================================================
@@ -2324,6 +2523,10 @@ export class Graphic extends Object {
 			sourceOffset += FLOATS_PER_VERTEX;
 			targetOffset += BATCH_FLOATS_PER_VERTEX;
 		}
+		// 기하 캐시를 적는 중이면 넣은 정점을 캐시에도 적는다.
+		if (this.#geometryActiveCache !== null) {
+			this.captureGeometryAppend(vertexCount, texture, color, textureSlot, clipSlot);
+		}
 		this.#batchVertexCount += vertexCount;
 	}
 
@@ -2438,6 +2641,443 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 기하 캐시 켜기 / 끄기. (기본 켜짐)
+	// - 켜져 있으면 writeGeometryKey 로 그리기 입력을 알리는 컴포넌트(Paint, UIView, Text 등)가 그린 정점을 컴포넌트마다 캐시해 둔다.
+	//   입력, 변환, 투명도가 그대로면 draw 를 부르지 않고 캐시를 묶음에 옮기고, 이동(스크롤 등)만 바뀌면 캐시한 지역 정점에 새 행렬만 곱한다.
+	//   (유니티 UGUI 가 Graphic 의 메시를 지역 좌표로 두고 바뀐 것만 다시 짓는 것, 언리얼 Slate Invalidation 과 같은 사상)
+	// - 끄면 지난 판처럼 프레임마다 모든 컴포넌트의 draw 를 부른다. (화면 결과는 같다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isGeometryCachingEnabled 켤지.
+	 * @example <caption>기하 캐시를 끄고 켜며 재사용 수 보기</caption>
+	 * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const boxNode = new WorldNode();
+	 * 		boxNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		boxNode.setContentSize(Vector2.create(200, 100));
+	 * 		boxNode.addComponent(Paint).setColor("#3399ff");
+	 * 		this.getRoot().addChild(boxNode);
+	 * 	}
+	 * 	draw(graphic) {
+	 * 		graphic.setGeometryCachingEnabled(true);
+	 * 		super.draw(graphic);
+	 * 		console.log(graphic.isGeometryCachingEnabled(), graphic.getLastFrameGeometryCacheHitCount());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	setGeometryCachingEnabled(isGeometryCachingEnabled) {
+		const isEnabled = isGeometryCachingEnabled === true;
+		if (this.#isGeometryCachingEnabled === isEnabled) {
+			return;
+		}
+		this.#isGeometryCachingEnabled = isEnabled;
+		this.#geometryCacheGeneration += 1;
+	}
+
+	//==============================================================================
+	// 기하 캐시가 켜져 있는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 켜져 있으면 참.
+	 */
+	isGeometryCachingEnabled() {
+		return this.#isGeometryCachingEnabled;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 기하 캐시로 그린 컴포넌트 수 반환. (draw 를 부르지 않은 것)
+	//==============================================================================
+	/**
+	 * @returns { number } 캐시를 그대로 옮기거나 새 행렬만 곱해 그린 컴포넌트 수.
+	 */
+	getLastFrameGeometryCacheHitCount() {
+		return this.#lastFrameGeometryCacheHitCount;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 기하 캐시를 다시 적은 컴포넌트 수 반환. (캐시하는 컴포넌트 가운데 draw 를 부른 것)
+	//==============================================================================
+	/**
+	 * @returns { number } 입력이나 배율, 회전 등이 바뀌어 draw 를 다시 부른 컴포넌트 수.
+	 */
+	getLastFrameGeometryRebuildCount() {
+		return this.#lastFrameGeometryRebuildCount;
+	}
+
+	//==============================================================================
+	// 컴포넌트 그리기. (노드가 컴포넌트마다 부른다, 기하 캐시를 거친다)
+	// - 컴포넌트가 writeGeometryKey 로 입력을 알리지 않거나, 캐시가 꺼졌거나, 묶어 그리지 않는 상태면 draw 를 그대로 부른다.
+	// - 입력과 그리는 상태(배율, 회전, 섞기, 틴트, 글 방향)가 지난번과 같으면:
+	//   이동과 투명도도 같으면 캐시한 디바이스 정점을 묶음에 그대로 옮기고, 다르면 캐시한 지역 정점에 지금 행렬과 투명도를 다시 건다.
+	//   (스크롤은 부모의 이동만 바뀌므로 자식 컴포넌트는 draw 없이 행렬 곱만 한다, 글은 픽셀 스냅까지 같게 다시 셈한다)
+	// - 그 밖에는 draw 를 불러 캐시를 다시 적는다. 그리기 중에 자르기, 층, 섞기 바꾸기 등 묶음 밖의 일을 하면 그 컴포넌트는 캐시하지 않는다.
+	//==============================================================================
+	/**
+	 * @param { Component } component 그릴 컴포넌트.
+	 */
+	drawComponent(component) {
+		if (!this.#isGeometryCachingEnabled || this.#geometryActiveCache !== null || !this.#isSpriteBatchingEnabled || this.#shaderProgramOverride !== null || this.#isStencilRecording) {
+			component.draw(this);
+			return;
+		}
+		let geometryCache = this.#geometryCacheMap.get(component);
+		if (geometryCache === undefined) {
+			geometryCache = null;
+		}
+		if (geometryCache === null) {
+			// 처음 보는 컴포넌트는 입력을 알리는지부터 본다. (알리지 않으면 열쇠를 빈 채로 두어 다음부터 바로 그린다)
+			geometryCache = createGeometryCache();
+			this.#geometryCacheMap.set(component, geometryCache);
+		}
+		const geometryKey = geometryCache.key;
+		geometryKey.begin();
+		const isKeyWritten = component.writeGeometryKey(geometryKey) === true;
+		const isInputSame = geometryKey.end();
+		if (!isKeyWritten) {
+			component.draw(this);
+			return;
+		}
+
+		const transformMatrix = this.#transformMatrix;
+		const imageTintColor = this.#imageTintColor;
+		let isStateSame = isInputSame && geometryCache.isValid && geometryCache.generation === this.#geometryCacheGeneration;
+		isStateSame = isStateSame && geometryCache.blendMode === this.#blendMode && geometryCache.textDirection === this.#textDirection && geometryCache.isTextBakeScaleMoving === this.#isTextBakeScaleMoving;
+		isStateSame = isStateSame && geometryCache.matrixA === transformMatrix.a && geometryCache.matrixB === transformMatrix.b && geometryCache.matrixC === transformMatrix.c && geometryCache.matrixD === transformMatrix.d;
+		if (isStateSame) {
+			if (imageTintColor === null) {
+				isStateSame = !geometryCache.hasTint;
+			}
+			else {
+				isStateSame = geometryCache.hasTint && geometryCache.tintRed === imageTintColor.red && geometryCache.tintGreen === imageTintColor.green && geometryCache.tintBlue === imageTintColor.blue && geometryCache.tintAlpha === imageTintColor.alpha;
+			}
+		}
+		if (isStateSame) {
+			// 묶음 밖의 일을 해 캐시하지 못한 컴포넌트는 입력이 그대로인 동안 적지 않고 그린다.
+			if (geometryCache.isBroken) {
+				component.draw(this);
+				return;
+			}
+			// 이동이 바뀌는 동안(스크롤 등)은 정점을 떠 두지 않고 셈만 하고, 멈춘 첫 프레임에 한 번 떠 둔 뒤로는 그대로 옮긴다.
+			const isPlacementSame = geometryCache.matrixE === transformMatrix.e && geometryCache.matrixF === transformMatrix.f && geometryCache.globalAlpha === this.#globalAlpha;
+			let isReplayed = false;
+			if (isPlacementSame && !geometryCache.isWorldVertexStale) {
+				isReplayed = this.replayGeometryCache(geometryCache);
+			}
+			else if (geometryCache.isTranslatable) {
+				isReplayed = this.retranslateGeometryCache(geometryCache, isPlacementSame);
+			}
+			if (isReplayed) {
+				this.restoreGeometryEndState(geometryCache);
+				this.#geometryCacheHitCount += 1;
+				return;
+			}
+		}
+		this.recordGeometryCache(geometryCache, component);
+	}
+
+	//==============================================================================
+	// 컴포넌트의 draw 를 불러 기하 캐시를 다시 적기.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } geometryCache
+	 * @param { Component } component
+	 */
+	recordGeometryCache(geometryCache, component) {
+		const transformMatrix = this.#transformMatrix;
+		const imageTintColor = this.#imageTintColor;
+		geometryCache.isValid = false;
+		geometryCache.isBroken = false;
+		geometryCache.isTranslatable = true;
+		geometryCache.isWorldVertexStale = false;
+		geometryCache.commandCount = 0;
+		geometryCache.generation = this.#geometryCacheGeneration;
+		geometryCache.matrixA = transformMatrix.a;
+		geometryCache.matrixB = transformMatrix.b;
+		geometryCache.matrixC = transformMatrix.c;
+		geometryCache.matrixD = transformMatrix.d;
+		geometryCache.matrixE = transformMatrix.e;
+		geometryCache.matrixF = transformMatrix.f;
+		geometryCache.globalAlpha = this.#globalAlpha;
+		geometryCache.blendMode = this.#blendMode;
+		geometryCache.textDirection = this.#textDirection;
+		geometryCache.isTextBakeScaleMoving = this.#isTextBakeScaleMoving;
+		geometryCache.hasTint = imageTintColor !== null;
+		if (imageTintColor !== null) {
+			geometryCache.tintRed = imageTintColor.red;
+			geometryCache.tintGreen = imageTintColor.green;
+			geometryCache.tintBlue = imageTintColor.blue;
+			geometryCache.tintAlpha = imageTintColor.alpha;
+		}
+		this.#geometryRebuildCount += 1;
+		this.#geometryActiveCache = geometryCache;
+		try {
+			component.draw(this);
+		}
+		finally {
+			this.#geometryActiveCache = null;
+			this.#geometryCaptureTarget = null;
+		}
+
+		// 그리기가 변환, 투명도, 섞기를 되돌리지 않았으면 자식에게도 번지므로 캐시하지 않는다.
+		const endMatrix = this.#transformMatrix;
+		const isStateRestored = endMatrix.a === geometryCache.matrixA && endMatrix.b === geometryCache.matrixB && endMatrix.c === geometryCache.matrixC && endMatrix.d === geometryCache.matrixD && endMatrix.e === geometryCache.matrixE && endMatrix.f === geometryCache.matrixF && this.#globalAlpha === geometryCache.globalAlpha && this.#blendMode === geometryCache.blendMode;
+		if (!isStateRestored) {
+			geometryCache.isBroken = true;
+		}
+		geometryCache.endFillColor = this.#fillColor;
+		geometryCache.endStrokeColor = this.#strokeColor;
+		geometryCache.endImageTintColor = this.#imageTintColor;
+		geometryCache.endFontString = this.#fontString;
+		geometryCache.endTextAlign = this.#textAlign;
+		geometryCache.endTextBaseline = this.#textBaseline;
+		geometryCache.endTextDirection = this.#textDirection;
+		geometryCache.isValid = true;
+	}
+
+	//==============================================================================
+	// 그리기가 남긴 상태(채우기 색, 글꼴, 정렬 등) 되돌려 적기. (캐시로 그렸을 때 draw 가 남겼을 상태와 같게)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } geometryCache
+	 */
+	restoreGeometryEndState(geometryCache) {
+		this.#fillColor = geometryCache.endFillColor;
+		this.#strokeColor = geometryCache.endStrokeColor;
+		this.#imageTintColor = geometryCache.endImageTintColor;
+		this.#fontString = geometryCache.endFontString;
+		this.#textAlign = geometryCache.endTextAlign;
+		this.#textBaseline = geometryCache.endTextBaseline;
+		this.#textDirection = geometryCache.endTextDirection;
+	}
+
+	//==============================================================================
+	// 기하 캐시를 적는 중이면 캐시하지 못하는 것으로 표시. (자르기, 층, 섞기 바꾸기, 묶지 않는 그리기 등)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	breakGeometryRecord() {
+		const geometryCache = this.#geometryActiveCache;
+		if (geometryCache !== null) {
+			geometryCache.isBroken = true;
+		}
+	}
+
+	//==============================================================================
+	// 기하 캐시에 글 명령 하나 열기. (drawTextEntry 가 적는 중에 부른다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } entry
+	 * @param { number } x
+	 * @param { number } y
+	 * @param { Color | null } color
+	 * @param { string } textDirection
+	 * @returns { object } 연 명령.
+	 */
+	beginGeometryTextCommand(entry, x, y, color, textDirection) {
+		const geometryCache = this.#geometryActiveCache;
+		const geometryCommand = acquireGeometryCommand(geometryCache, GEOMETRY_COMMAND_TEXT);
+		geometryCommand.entry = entry;
+		geometryCommand.positionX = x;
+		geometryCommand.positionY = y;
+		geometryCommand.color = color ? color.clone() : null;
+		geometryCommand.textDirection = textDirection;
+		geometryCommand.textAlign = this.#textAlign;
+		geometryCommand.textBaseline = this.#textBaseline;
+		geometryCommand.tintColor = this.#imageTintColor ? this.#imageTintColor.clone() : null;
+		this.checkGeometryTranslatable(geometryCache);
+		return geometryCommand;
+	}
+
+	//==============================================================================
+	// 지금 행렬과 투명도가 캐시를 적기 시작한 때와 다르면 이동만으로 다시 옮길 수 없는 것으로 표시. (그리기가 제 변환을 건 때)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } geometryCache
+	 */
+	checkGeometryTranslatable(geometryCache) {
+		const transformMatrix = this.#transformMatrix;
+		const isBeginState = transformMatrix.a === geometryCache.matrixA && transformMatrix.b === geometryCache.matrixB && transformMatrix.c === geometryCache.matrixC && transformMatrix.d === geometryCache.matrixD && transformMatrix.e === geometryCache.matrixE && transformMatrix.f === geometryCache.matrixF && this.#globalAlpha === geometryCache.globalAlpha;
+		if (!isBeginState) {
+			geometryCache.isTranslatable = false;
+		}
+	}
+
+	//==============================================================================
+	// 묶음에 넣은 정점을 기하 캐시에 적기. (appendSpriteBatch 가 적는 중에 부른다)
+	// - 글 명령 안이면 그 명령에, 아니면 새 그림 명령을 열어 지역 정점, 색, 틴트와 함께 적는다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 * @param { Color } color
+	 * @param { number } textureSlot
+	 * @param { number } clipSlot
+	 */
+	captureGeometryAppend(vertexCount, texture, color, textureSlot, clipSlot) {
+		let geometryCommand = this.#geometryCaptureTarget;
+		if (geometryCommand === null) {
+			const geometryCache = this.#geometryActiveCache;
+			geometryCommand = acquireGeometryCommand(geometryCache, GEOMETRY_COMMAND_SPRITE);
+			geometryCommand.texture = texture;
+			geometryCommand.vertexCount = vertexCount;
+			const localFloatCount = vertexCount * FLOATS_PER_VERTEX;
+			if (geometryCommand.localVertexData === null || geometryCommand.localVertexData.length !== localFloatCount) {
+				geometryCommand.localVertexData = new Float32Array(localFloatCount);
+			}
+			geometryCommand.localVertexData.set(this.getVertexData().subarray(0, localFloatCount));
+			geometryCommand.color = color.clone();
+			geometryCommand.tintColor = this.#imageTintColor ? this.#imageTintColor.clone() : null;
+			this.checkGeometryTranslatable(geometryCache);
+		}
+
+		// 넣은 디바이스 정점을 칸 번호까지 그대로 떠 둔다. (같은 묶음 자리면 한 번에 옮긴다)
+		const subAppendIndex = geometryCommand.subAppendCount;
+		let subAppend = geometryCommand.subAppendList[subAppendIndex];
+		if (subAppend === undefined) {
+			subAppend = { texture: null, vertexCount: 0, worldVertexData: null, textureSlot: 0, clipSlot: 0 };
+			geometryCommand.subAppendList.push(subAppend);
+		}
+		const worldFloatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
+		if (subAppend.worldVertexData === null || subAppend.worldVertexData.length !== worldFloatCount) {
+			subAppend.worldVertexData = new Float32Array(worldFloatCount);
+		}
+		const startOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
+		const worldVertexData = subAppend.worldVertexData;
+		const batchVertexData = this.#batchVertexData;
+		for (let floatIndex = 0; floatIndex < worldFloatCount; ++floatIndex) {
+			worldVertexData[floatIndex] = batchVertexData[startOffset + floatIndex];
+		}
+		subAppend.texture = texture;
+		subAppend.vertexCount = vertexCount;
+		subAppend.textureSlot = textureSlot;
+		subAppend.clipSlot = clipSlot;
+		geometryCommand.subAppendCount = subAppendIndex + 1;
+	}
+
+	//==============================================================================
+	// 글 명령의 엔트리를 글 캐시에서 다시 쓴 것으로 적기. (draw 가 getEntry 로 찾았을 때와 같게 LRU 를 갱신한다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } geometryCache
+	 * @returns { boolean } 모든 엔트리가 아직 글 캐시에 있으면 참. (버려졌으면 다시 적어야 한다)
+	 */
+	touchGeometryTextEntries(geometryCache) {
+		const textStringTextureCache = this.getTextStringTextureCache();
+		const commandList = geometryCache.commandList;
+		for (let commandIndex = 0; commandIndex < geometryCache.commandCount; ++commandIndex) {
+			const geometryCommand = commandList[commandIndex];
+			if (geometryCommand.type === GEOMETRY_COMMAND_TEXT && !textStringTextureCache.touchEntry(geometryCommand.entry)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	//==============================================================================
+	// 기하 캐시의 디바이스 정점을 묶음에 그대로 옮기기. (변환과 투명도가 적은 때와 같을 때)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } geometryCache
+	 * @returns { boolean } 옮겼으면 참.
+	 */
+	replayGeometryCache(geometryCache) {
+		if (!this.touchGeometryTextEntries(geometryCache)) {
+			return false;
+		}
+		const commandList = geometryCache.commandList;
+		for (let commandIndex = 0; commandIndex < geometryCache.commandCount; ++commandIndex) {
+			const geometryCommand = commandList[commandIndex];
+			const subAppendList = geometryCommand.subAppendList;
+			for (let subAppendIndex = 0; subAppendIndex < geometryCommand.subAppendCount; ++subAppendIndex) {
+				const subAppend = subAppendList[subAppendIndex];
+				const vertexCount = subAppend.vertexCount;
+				const textureSlot = this.prepareSpriteBatch(vertexCount, subAppend.texture);
+				const clipSlot = this.#shaderClipSlot;
+				const worldVertexData = subAppend.worldVertexData;
+				if (subAppend.textureSlot !== textureSlot || subAppend.clipSlot !== clipSlot) {
+					for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+						worldVertexData[vertexIndex * BATCH_FLOATS_PER_VERTEX + 12] = textureSlot;
+						worldVertexData[vertexIndex * BATCH_FLOATS_PER_VERTEX + 13] = clipSlot;
+					}
+					subAppend.textureSlot = textureSlot;
+					subAppend.clipSlot = clipSlot;
+				}
+				const batchVertexData = this.#batchVertexData;
+				const startOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
+				const floatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
+				for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
+					batchVertexData[startOffset + floatIndex] = worldVertexData[floatIndex];
+				}
+				this.#batchVertexCount += vertexCount;
+			}
+		}
+		return true;
+	}
+
+	//==============================================================================
+	// 기하 캐시의 지역 정점에 지금 행렬과 투명도를 다시 걸어 묶음에 넣기. (배율과 회전은 같고 이동이나 투명도만 바뀐 때, 스크롤 등)
+	// - 그림 명령은 적어 둔 지역 정점으로 appendSpriteBatch 를, 글 명령은 적어 둔 엔트리로 글리프 쿼드 그리기를 다시 부른다. (draw 를 부른 것과 셈이 같다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } geometryCache
+	 * @param { boolean } isCapturing 넣은 디바이스 정점을 캐시에 떠 둘지. (이동이 멈춘 첫 프레임만, 움직이는 동안은 셈만 한다)
+	 * @returns { boolean } 넣었으면 참.
+	 */
+	retranslateGeometryCache(geometryCache, isCapturing) {
+		if (!this.touchGeometryTextEntries(geometryCache)) {
+			return false;
+		}
+		const commandList = geometryCache.commandList;
+		this.#geometryActiveCache = isCapturing ? geometryCache : null;
+		try {
+			for (let commandIndex = 0; commandIndex < geometryCache.commandCount; ++commandIndex) {
+				const geometryCommand = commandList[commandIndex];
+				if (isCapturing) {
+					geometryCommand.subAppendCount = 0;
+					this.#geometryCaptureTarget = geometryCommand;
+				}
+				this.#imageTintColor = geometryCommand.tintColor;
+				if (geometryCommand.type === GEOMETRY_COMMAND_SPRITE) {
+					this.getVertexData().set(geometryCommand.localVertexData);
+					this.appendSpriteBatch(geometryCommand.vertexCount, geometryCommand.texture, geometryCommand.color);
+				}
+				else {
+					this.#textAlign = geometryCommand.textAlign;
+					this.#textBaseline = geometryCommand.textBaseline;
+					this.writeTextEntryQuads(geometryCommand.entry, geometryCommand.positionX, geometryCommand.positionY, geometryCommand.color, geometryCommand.textDirection);
+				}
+			}
+		}
+		finally {
+			this.#geometryActiveCache = null;
+			this.#geometryCaptureTarget = null;
+		}
+		const transformMatrix = this.#transformMatrix;
+		geometryCache.matrixE = transformMatrix.e;
+		geometryCache.matrixF = transformMatrix.f;
+		geometryCache.globalAlpha = this.#globalAlpha;
+		geometryCache.isWorldVertexStale = !isCapturing;
+		return true;
+	}
+
+	//==============================================================================
 	// 파티클 배치 자원 준비. (셰이더 / 버텍스 어레이 / 부드러운 원 텍스처)
 	//==============================================================================
 	/**
@@ -2543,6 +3183,7 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	drawColoredQuads(vertexCount, texture) {
+		this.breakGeometryRecord();
 		if (vertexCount <= 0) {
 			return;
 		}
@@ -2607,6 +3248,7 @@ export class Graphic extends Object {
 	 * @param { WebGLTexture } texture
 	 */
 	drawColoredQuadGroups(vertexCount, texture) {
+		this.breakGeometryRecord();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const framebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
 		const particleVertexData = this.#particleVertexData;
@@ -3641,6 +4283,7 @@ export class Graphic extends Object {
 	 */
 	setTextBakeScaleStep(textBakeScaleStep) {
 		this.#textBakeScaleStep = Math.max(0, textBakeScaleStep);
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -3665,6 +4308,7 @@ export class Graphic extends Object {
 	 */
 	setTextBakeMotionScaleStep(textBakeMotionScaleStep) {
 		this.#textBakeMotionScaleStep = Math.max(0, textBakeMotionScaleStep);
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -3750,6 +4394,7 @@ export class Graphic extends Object {
 	 */
 	setTextPixelSnapEnabled(isTextPixelSnapEnabled) {
 		this.#isTextPixelSnapEnabled = isTextPixelSnapEnabled;
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -3790,6 +4435,32 @@ export class Graphic extends Object {
 	 * @param { string } textDirection - 정렬 "start" / "end" 를 가를 방향. ("ltr" 또는 "rtl", 기본 "ltr")
 	 */
 	drawTextEntry(entry, x, y, color = null, textDirection = "ltr") {
+		// 기하 캐시를 적는 중이면 글 명령 하나로 적는다. (변환만 바뀌면 이 함수를 다시 불러 픽셀 스냅까지 같게 셈한다)
+		if (this.#geometryActiveCache !== null && this.#geometryCaptureTarget === null) {
+			this.#geometryCaptureTarget = this.beginGeometryTextCommand(entry, x, y, color, textDirection);
+			try {
+				this.writeTextEntryQuads(entry, x, y, color, textDirection);
+			}
+			finally {
+				this.#geometryCaptureTarget = null;
+			}
+			return;
+		}
+		this.writeTextEntryQuads(entry, x, y, color, textDirection);
+	}
+
+	//==============================================================================
+	// 글 배치 엔트리의 글리프 쿼드를 그리기. (drawTextEntry 의 몸통, 기하 캐시가 변환만 바뀐 글을 다시 그릴 때도 부른다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } entry
+	 * @param { number } x
+	 * @param { number } y
+	 * @param { Color | null } color
+	 * @param { string } textDirection
+	 */
+	writeTextEntryQuads(entry, x, y, color, textDirection) {
 		// 가로 정렬 오프셋.
 		const textAlign = this.resolveTextAlign(this.getTextAlign(), textDirection);
 		let alignOffset = 0;
@@ -3967,6 +4638,7 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	beginClipRect(rect, roundSize = 0) {
+		this.breakGeometryRecord();
 		// 상태 저장. (Canvas2D save 대응)
 		this.pushState();
 
@@ -4200,9 +4872,9 @@ export class Graphic extends Object {
 		const isShaderClipActive = this.#isShaderClipActive;
 		this.#isShaderClipActive = false;
 		this.pushState();
-		if (isWriting && this.#stencilClipDepth === 0) {
-			webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
-		}
+		// 지울 때도 스텐실 테스트와 쓰기 마스크를 다시 건다. (바깥 패스가 끄거나 바꾸고 돌아오면 DECR 이 스텐실에 닿지 않아 뒤의 스텐실 자르기가 깨진다)
+		webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
+		webGL2RenderingContext.stencilMask(0xFF);
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
 		const stencilOperation = isWriting ? webGL2RenderingContext.INCR : webGL2RenderingContext.DECR;
@@ -4262,6 +4934,7 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	beginOpacityLayer() {
+		this.breakGeometryRecord();
 		this.flushSpriteBatch();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
@@ -4282,6 +4955,7 @@ export class Graphic extends Object {
 	// 투명도 층 끝. (beginOpacityLayer 뒤에 그린 것을 앞 프레임버퍼에 층을 열 때의 전역 알파로 얹는다)
 	//==============================================================================
 	endOpacityLayer() {
+		this.breakGeometryRecord();
 		const opacityLayer = this.#opacityLayerStack.pop();
 		if (opacityLayer === undefined) {
 			return;
@@ -4366,6 +5040,7 @@ export class Graphic extends Object {
 	// 출력 영역 제한 종료.
 	//==============================================================================
 	endClipRect() {
+		this.breakGeometryRecord();
 		const clipEntry = this.#clipStack.pop();
 		if (!clipEntry) {
 			return;
@@ -4588,6 +5263,7 @@ export class Graphic extends Object {
 	 * @param { ShaderProgram | null } shaderProgram 바꿔 끼울 셰이더 프로그램. (null 이면 기본 프로그램)
 	 */
 	setShaderProgramOverride(shaderProgram) {
+		this.breakGeometryRecord();
 		this.flushSpriteBatch();
 		this.#shaderProgramOverride = shaderProgram;
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -4715,6 +5391,7 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	runExternalPass(callback, options = {}) {
+		this.breakGeometryRecord();
 		const isDepthCleared = options.clearDepth !== false;
 		this.flushSpriteBatch();
 		if (isDepthCleared) {
@@ -4732,7 +5409,30 @@ export class Graphic extends Object {
 			if (shaderClipCount > 0) {
 				this.writeShaderClipsToStencil(false);
 			}
+			else {
+				this.restoreStencilClipState();
+			}
 		}
+	}
+
+	//==============================================================================
+	// 스텐실 자르기 상태 되돌리기. (바깥 패스가 스텐실 테스트나 비교, 마스크를 바꾸고 돌아온 때)
+	// - 걸린 스텐실 자르기가 있으면 그 깊이와 같은 화소만 그리게, 없으면 스텐실 테스트를 끈다.
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	restoreStencilClipState() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.stencilMask(0xFF);
+		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
+		const stencilDepth = this.#stencilClipDepth;
+		if (stencilDepth === 0) {
+			webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
+			return;
+		}
+		webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
+		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, stencilDepth, 0xFF);
 	}
 
 	//==============================================================================

@@ -310,6 +310,65 @@ export class Sprite extends Paint {
 	}
 
 	//==============================================================================
+	// 그리기 입력을 기하 캐시 열쇠에 적기. (그림과 그 크기, 색, 뒤집기, 그리기 꼴, 섞기, 그림 사각형, 나인 슬라이스, 모서리 반지름, 내용 크기)
+	// - 그림 크기도 적어, 받는 중이던 그림이 다 받아지면 다시 셈한다.
+	// - draw 를 덮어쓴 하위 클래스는 무엇을 읽는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { GeometryKey } geometryKey 입력을 적을 열쇠.
+	 * @returns { boolean } 입력을 적었으면 참.
+	 */
+	writeGeometryKey(geometryKey) {
+		if (this.draw !== Sprite.prototype.draw) {
+			return false;
+		}
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		const image = this.getImage();
+		geometryKey.add(image);
+		if (image !== null && image !== undefined) {
+			geometryKey.add(image.width);
+			geometryKey.add(image.height);
+		}
+		const color = super.getColor();
+		geometryKey.add(color);
+		if (color !== null && typeof color === "object") {
+			geometryKey.add(color.red);
+			geometryKey.add(color.green);
+			geometryKey.add(color.blue);
+			geometryKey.add(color.alpha);
+		}
+		geometryKey.add(this.getRoundSize());
+		geometryKey.add(this.isHorizontalFlip());
+		geometryKey.add(this.isVerticalFlip());
+		geometryKey.add(this.getSpriteDrawMode());
+		geometryKey.add(this.getSpriteBlendMode());
+		const imageRect = this.getImageRect();
+		geometryKey.add(imageRect);
+		if (imageRect !== null && imageRect !== undefined) {
+			geometryKey.add(imageRect.position.x);
+			geometryKey.add(imageRect.position.y);
+			geometryKey.add(imageRect.size.x);
+			geometryKey.add(imageRect.size.y);
+		}
+		const nineSlice = this.getNineSlice();
+		geometryKey.add(nineSlice);
+		if (nineSlice !== null && nineSlice !== undefined) {
+			geometryKey.add(nineSlice.position.x);
+			geometryKey.add(nineSlice.position.y);
+			geometryKey.add(nineSlice.size.x);
+			geometryKey.add(nineSlice.size.y);
+		}
+		const contentSize = node.getContentSize();
+		geometryKey.add(contentSize.x);
+		geometryKey.add(contentSize.y);
+		return true;
+	}
+
+	//==============================================================================
 	// 스프라이트 출력 모드 설정.
 	//==============================================================================
 	/**

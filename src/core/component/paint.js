@@ -110,6 +110,42 @@ export class Paint extends Component {
 	}
 
 	//==============================================================================
+	// 그리기 입력을 기하 캐시 열쇠에 적기. (색, 모서리 반지름, 내용 크기)
+	// - draw 를 덮어쓴 하위 클래스는 무엇을 읽는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { GeometryKey } geometryKey 입력을 적을 열쇠.
+	 * @returns { boolean } 입력을 적었으면 참.
+	 */
+	writeGeometryKey(geometryKey) {
+		if (this.draw !== Paint.prototype.draw) {
+			return false;
+		}
+		const node = this.getNode();
+		const color = this.getColor();
+		const contentSize = paintRect.size;
+		if (typeof node.copyContentSizeTo === "function") {
+			node.copyContentSizeTo(contentSize);
+		}
+		else {
+			const nodeContentSize = node.getContentSize();
+			contentSize.set(nodeContentSize.x, nodeContentSize.y);
+		}
+		geometryKey.add(color);
+		if (color !== null && typeof color === "object") {
+			geometryKey.add(color.red);
+			geometryKey.add(color.green);
+			geometryKey.add(color.blue);
+			geometryKey.add(color.alpha);
+		}
+		geometryKey.add(this.#roundSize);
+		geometryKey.add(contentSize.x);
+		geometryKey.add(contentSize.y);
+		return true;
+	}
+
+	//==============================================================================
 	// 색상 설정.
 	//==============================================================================
 	/**

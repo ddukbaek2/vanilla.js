@@ -47,6 +47,7 @@ export { PointerCursor } from "./src/core/pointercursor.js";
 export { TouchRaycaster } from "./src/core/touchraycaster.js";
 export { TouchRecognizer } from "./src/ui/touchrecognizer.js";
 export { Graphic } from "./src/core/graphic.js";
+export { GeometryKey } from "./src/core/graphic.js";
 export { Scene } from "./src/core/scene.js";
 export { GameScene } from "./src/game/gamescene.js";
 export { ComponentNode } from "./src/core/node/componentnode.js";

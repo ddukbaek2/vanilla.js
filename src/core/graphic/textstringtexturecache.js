@@ -471,6 +471,29 @@ export class TextStringTextureCache extends Object {
 	}
 
 	//==============================================================================
+	// 받아 둔 엔트리를 다시 쓴 것으로 적기. (getEntry 가 찾았을 때와 같게 LRU 를 갱신한다, Graphic 의 기하 캐시가 draw 없이 글을 그릴 때 부른다)
+	//==============================================================================
+	/**
+	 * @param { object } entry getEntry 로 받은 엔트리.
+	 * @returns { boolean } 엔트리가 아직 캐시에 있으면 참. (버려졌으면 거짓, 다시 getEntry 로 받아야 한다)
+	 */
+	touchEntry(entry) {
+		const entries = this.getEntries();
+		const entryKey = entry.entryKey;
+		if (entries.get(entryKey) !== entry) {
+			return false;
+		}
+		this.#useSerial += 1;
+		const useSerial = this.#useSerial;
+		entries.delete(entryKey);
+		entries.set(entryKey, entry);
+		for (const atlasPage of entry.atlasPages) {
+			atlasPage.lastUseSerial = useSerial;
+		}
+		return true;
+	}
+
+	//==============================================================================
 	// 글을 글자 덩어리로 나눠 배치하고, 처음 보는 글리프를 아틀라스에 굽는다.
 	//==============================================================================
 	/**
