@@ -39,6 +39,8 @@ import { readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../..
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
+// 판을 덮어쓰기 앞에 비울 값. (옛 내용을 읽어 들이지 않게 하는 비우기. invalidateFramebuffer 는 아이패드와 아이폰 사파리에서 프레임마다 수 ~ 수십 ms 가 붙어 쓰지 않는다)
+const ZERO_CLEAR_FLOAT_VALUE = new System.Float32Array(4);
 const COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -1060,9 +1062,9 @@ export class ToonPostProcess {
 		};
 
 		// 1. 반 해상도 GTAO. (빈 칸 유닛 2 에는 결과 판이 아닌 흐림 판을 묶어 둔다)
-		// 세 패스 모두 판을 통째로 덮어쓰므로 앞에 옛 내용을 버린다. (타일 GPU 의 판 불러오기를 없앰)
+		// 세 패스 모두 판을 통째로 덮어쓰므로 앞에 판을 비운다. (타일 GPU 의 판 불러오기를 없앰)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 		webGL2RenderingContext.viewport(0, 0, target.cellWidth, target.cellHeight);
 		const occlusionPass = passes.occlusionPass;
 		bindCommon(occlusionPass, target.blurTexture);
@@ -1074,21 +1076,21 @@ export class ToonPostProcess {
 
 		// 2. 가로 흐림. (반 해상도, GTAO 판에서 흐림 판으로)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.blurFramebuffer);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 		bindCommon(passes.blurPass, target.occlusionTexture);
 		webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 1, 0);
 		passes.blurPass.draw();
 
 		// 3. 세로 흐림. (반 해상도, 흐림 판에서 GTAO 판으로, 판 둘을 돌려 쓴다)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 		bindCommon(passes.blurPass, target.blurTexture);
 		webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 0, 1);
 		passes.blurPass.draw();
 
 		// 4. 키우기. (선의 판 해상도, 세기를 건다)
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.resultFramebuffer);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 		webGL2RenderingContext.viewport(0, 0, width, height);
 		const upsamplePass = passes.upsamplePass;
 		bindCommon(upsamplePass, target.occlusionTexture);

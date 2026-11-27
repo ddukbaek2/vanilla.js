@@ -10,6 +10,8 @@ import { FullscreenPass } from "../core/fullscreenpass.js";
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
+// 판을 덮어쓰기 앞에 비울 값. (옛 내용을 읽어 들이지 않게 하는 비우기. invalidateFramebuffer 는 아이패드와 아이폰 사파리에서 프레임마다 수 ~ 수십 ms 가 붙어 쓰지 않는다)
+const ZERO_CLEAR_FLOAT_VALUE = new System.Float32Array(4);
 // 밝은 영역 추출 패스. (씬 → 하프 해상도)
 const BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -164,9 +166,9 @@ export class BloomEffect extends Object {
 		// 1. 밝은 영역 추출. (씬 → 핑)
 		const pingRenderTarget = this.getPingRenderTarget();
 		const pongRenderTarget = this.getPongRenderTarget();
-		// 밝은 몫 뽑기와 흐림은 판을 통째로 덮어쓰므로 앞에 옛 내용을 버린다. (타일 GPU 의 판 불러오기를 없앰)
+		// 밝은 몫 뽑기와 흐림은 판을 통째로 덮어쓰므로 앞에 판을 비운다. (타일 GPU 의 판 불러오기를 없앰)
 		pingRenderTarget.bind();
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 		const brightPass = this.getBrightPass();
 		brightPass.useProgram();
 		const brightSceneTextureLocation = brightPass.getUniformLocation("sceneTexture");
@@ -186,7 +188,7 @@ export class BloomEffect extends Object {
 		for (let blurIndex = 0; blurIndex < iterationCount; ++blurIndex) {
 			// 가로. (핑 → 퐁)
 			pongRenderTarget.bind();
-			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+			webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 			const pingWidth = pingRenderTarget.getWidth();
 			webGL2RenderingContext.uniform2f(blurDirectionLocation, 1 / pingWidth, 0);
 			const pingColorTexture = pingRenderTarget.getColorTexture();
@@ -195,7 +197,7 @@ export class BloomEffect extends Object {
 
 			// 세로. (퐁 → 핑)
 			pingRenderTarget.bind();
-			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+			webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE);
 			const pongHeight = pongRenderTarget.getHeight();
 			webGL2RenderingContext.uniform2f(blurDirectionLocation, 0, 1 / pongHeight);
 			const pongColorTexture = pongRenderTarget.getColorTexture();

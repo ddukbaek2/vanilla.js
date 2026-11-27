@@ -6195,9 +6195,6 @@ export class Graphic extends Object {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		// 층 칸의 깊이와 스텐실은 다시 읽지 않으므로 판 끝에 버린다. (모바일 타일 GPU 가 메모리에 쓰지 않는다, 다음 층은 깊이와 스텐실을 비우고 쓴다)
-		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
-		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT]);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
 
 		// 층 칸을 단위 행렬, 흰색, 틴트 없이 source-over 로 얹는다. (칸은 화면과 같은 크기라 디바이스 픽셀 그대로 짚는다, 텍스처는 아래가 0 행)

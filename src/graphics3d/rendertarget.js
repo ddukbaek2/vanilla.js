@@ -13,8 +13,7 @@ import { Object } from "../base/object.js";
 // - sampleCount 가 2 이상이면 멀티샘플(MSAA) 렌더버퍼에 그리고 resolve() 가 컬러 텍스처(와 깊이 텍스처)로 푼다.
 //   기기가 받는 수(MAX_SAMPLES, 포맷마다 받는 표본 수)를 넘으면 그 밑의 가장 큰 수로 줄이고, 못 받거나 프레임버퍼가 완성되지 않으면 멀티샘플 없이 짓는다. (getSampleCount)
 //   멀티샘플이면 getFramebuffer 는 그리는 멀티샘플 프레임버퍼, getResolveFramebuffer 는 텍스처가 붙은 프레임버퍼다. 텍스처를 읽기 전에 resolve() 를 부른다.
-// - resolve() 는 그리기를 끝낸 뒤 다시 읽지 않는 첨부(멀티샘플 색과 깊이, 텍스처가 아닌 깊이 렌더버퍼)를 버린다. (invalidateFramebuffer)
-//   모바일 타일 GPU 가 그 첨부를 메모리에 쓰지 않고 넘긴다. 다음에 그릴 때는 비우고 그린다. 풀고 나서 이어 그리려면 resolve(true) 로 남긴다.
+// - resolve() 는 푼 뒤에도 멀티샘플 색과 깊이를 그대로 둔다. (invalidateFramebuffer 로 버리는 것은 아이패드와 아이폰 사파리에서 프레임마다 수 ~ 수십 ms 가 붙고 이득이 재어지지 않아 하지 않는다, 풀고 나서 이어 그리는 것도 된다)
 // - depthBits 는 깊이 렌더버퍼의 비트 수(16 이나 24)다. 깊이 텍스처는 늘 24 비트다. 멀티샘플이면서 깊이 텍스처를 쓰면 멀티샘플 깊이도 24 비트로 지어 그대로 푼다.
 //==============================================================================
 /**
@@ -261,12 +260,10 @@ export class RenderTarget extends Object {
 
 	//==============================================================================
 	// 멀티샘플을 텍스처로 풀기. (컬러 어태치먼트마다와 깊이 텍스처, 묶여 있던 프레임버퍼로 돌림)
-	// - 그리기를 끝낸 판의 다시 읽지 않는 첨부를 버린다. (멀티샘플이면 멀티샘플 색과 깊이, 아니면 텍스처가 아닌 깊이 렌더버퍼)
-	//   유니티, 언리얼이 판 끝에 저장하지 않는 첨부(store action 을 버림으로)와 같다. 모바일 타일 GPU 가 그 첨부를 메모리에 쓰지 않는다.
-	//   버린 첨부의 값은 정해지지 않으므로 다음에 그릴 때는 비우고 그린다. (데스크탑 GPU 에서는 거의 차이가 없다)
+	// - 푼 뒤에도 멀티샘플 색과 깊이는 그대로 남는다. (invalidateFramebuffer 로 버리지 않는다, 아이패드와 아이폰 사파리에서 프레임마다 수 ~ 수십 ms 가 붙고 이득이 재어지지 않았다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isAttachmentKept true 면 버리지 않고 남긴다. (풀고 나서 같은 판에 이어 그릴 때, 기본 false)
+	 * @param { boolean } isAttachmentKept 더는 쓰지 않는다. (옛 꼴과 맞추려고 남김, 어느 쪽이든 푼 뒤에 멀티샘플 색과 깊이를 버리지 않는다)
 	 * @example <caption>풀고 나서 같은 판에 이어 그리기</caption>
 	 * import { RenderTarget } from "./build/vanilla.js";
 	 *
@@ -286,13 +283,6 @@ export class RenderTarget extends Object {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const multisampleFramebuffer = this.#multisampleFramebuffer;
 		if (multisampleFramebuffer === null) {
-			// 멀티샘플이 아니면 텍스처가 아닌 깊이 렌더버퍼만 버린다. (색과 깊이 텍스처는 읽는다)
-			if (!isAttachmentKept && this.#depthRenderbuffer !== null) {
-				const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
-				webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.getFramebuffer());
-				webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.DEPTH_ATTACHMENT]);
-				webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
-			}
 			return;
 		}
 		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
@@ -324,17 +314,6 @@ export class RenderTarget extends Object {
 		const depthTexture = this.getDepthTexture();
 		if (depthTexture !== null) {
 			webGL2RenderingContext.blitFramebuffer(0, 0, width, height, 0, 0, width, height, webGL2RenderingContext.DEPTH_BUFFER_BIT, webGL2RenderingContext.NEAREST);
-		}
-		// 푼 뒤 멀티샘플 색과 깊이를 버린다. (읽기 프레임버퍼가 멀티샘플 프레임버퍼다)
-		if (!isAttachmentKept) {
-			const invalidatedAttachmentList = [];
-			for (let attachmentIndex = 0; attachmentIndex < colorAttachmentCount; ++attachmentIndex) {
-				invalidatedAttachmentList.push(webGL2RenderingContext.COLOR_ATTACHMENT0 + attachmentIndex);
-			}
-			if (this.#multisampleDepthRenderbuffer !== null) {
-				invalidatedAttachmentList.push(webGL2RenderingContext.DEPTH_ATTACHMENT);
-			}
-			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, invalidatedAttachmentList);
 		}
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
 	}
