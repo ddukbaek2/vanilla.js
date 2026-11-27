@@ -69,6 +69,11 @@ const LINE_COLOR_TEXTURE_UNIT = 4;
 const COMPOSITE_LINE_TEXTURE_UNIT = 6;
 const COMPOSITE_DEPTH_TEXTURE_UNIT = 7;
 
+// 가는 선 길의 가장 큰 굵기. (그리는 영역 픽셀, 2 x sqrt(4.5) - 1 = 약 3.24)
+// - 덮는 몫이 0 보다 크려면 거리가 굵기 / 2 + 0.5 보다 작아야 한다. 이 굵기까지는 덮는 토막이 모두 화소 하나 거리(0.5, 0.71)나 두 칸 사이(1.5, 1.58)에 있고,
+//   그 토막은 둘레 3 x 3 화소의 첫 경계(씨앗)에 든다. 섞기가 그 아홉을 점프 플러딩 마지막 걸음과 같은 차례로 본다. 이보다 굵으면 점프 플러딩 길로 간다. (광부 키우기 1.7 ~ 2.7, 기본 2)
+const THIN_LINE_MAXIMUM_WIDTH = 2 * System.Math.sqrt(4.5) - 1;
+
 // 번호 색 표 텍스처의 너비. (선 번호 0 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID 를 128 x 128 칸에 하나씩, 번호 % 128 이 x, 번호 / 128 이 y)
 const LINE_COLOR_TABLE_WIDTH = 128;
 
@@ -142,8 +147,8 @@ void main() {
 //   오차 여유는 이어진 면에서도 생기는 거리의 오차를 잰 것이다: 노멀 8 비트 팔면체의 각 오차 x 두 자리 사이 거리(면이 비스듬할수록 길다), 꺾인 줄을 사이에 둔 두 화소의 화소 한 칸 x 두 노멀이 벌어진 사인, 깊이 24 비트 한 칸.
 //   거기에 여유 배율(setDepthMargin)을 곱한다. 두 면이 나란한 턱은 꺾임 몫이 0 이라 화소 한 칸보다 낮아도 잡힌다.
 // - 꺾임 선: 같은 번호이고 떨어지지 않았는데 두 노멀이 꺾임 각보다 더 벌어짐. (비스듬한 면과 둥근 면은 접평면 안이라 바깥 선으로 잡히지 않는다)
-const SEED_FRAGMENT_SHADER = `#version 300 es
-precision highp float;
+// - 경계를 보는 함수(readPixel, readEdge)는 가는 선의 씨앗 쪽 판 셰이더와 같이 쓴다. (LINE_EDGE_SHADER_PART)
+const LINE_EDGE_SHADER_PART = `precision highp float;
 precision highp int;
 uniform highp sampler2D lineTexture;
 uniform highp sampler2D depthTexture;
@@ -154,8 +159,6 @@ uniform float isPerspective;
 uniform float depthThreshold;
 uniform float depthMargin;
 uniform float creaseCosine;
-out uvec4 fragmentSeed;
-const uint NO_SEED = 65535u;
 const float NORMAL_ERROR = 0.0165;
 const float DEPTH_STEP = 1.0 / 16777215.0;
 const ivec2 SIDES[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
@@ -235,6 +238,10 @@ int readEdge(LinePixel first, LinePixel second) {
 	}
 	return 0;
 }
+`;
+const SEED_FRAGMENT_SHADER = `#version 300 es
+${LINE_EDGE_SHADER_PART}out uvec4 fragmentSeed;
+const uint NO_SEED = 65535u;
 void main() {
 	ivec2 size = textureSize(lineTexture, 0);
 	vec2 sizeValue = vec2(size);
@@ -257,6 +264,34 @@ void main() {
 		}
 	}
 	fragmentSeed = uvec4(contourSeed, creaseSeed);
+}
+`;
+// 가는 선의 씨앗 쪽 판을 고르는 셰이더. (씨앗 셰이더와 같은 차례로 화소마다 바깥 선과 꺾임 선의 첫 경계 쪽을 고르고, 씨앗 자리 대신 쪽 번호만 담는다)
+// - 아래 3 비트는 바깥 선, 그 위 3 비트는 꺾임 선의 쪽이다. 0 은 없음, 1 ~ 4 는 SIDES 차례(오른쪽, 왼쪽, 위, 아래)에서 처음 선이 선 쪽. (R8UI 한 바이트)
+// - 씨앗은 화소 * 2 + 쪽이므로 씨앗 판과 같은 것을 한 바이트에 담는다. (씨앗 판은 RGBA16UI 8 바이트)
+const EDGE_MASK_FRAGMENT_SHADER = `#version 300 es
+${LINE_EDGE_SHADER_PART}out uint fragmentMask;
+void main() {
+	ivec2 size = textureSize(lineTexture, 0);
+	vec2 sizeValue = vec2(size);
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	LinePixel center = readPixel(pixel, sizeValue);
+	uint contourSide = 0u;
+	uint creaseSide = 0u;
+	for (int index = 0; index < 4; ++index) {
+		ivec2 neighborPixel = pixel + SIDES[index];
+		if (neighborPixel.x < 0 || neighborPixel.y < 0 || neighborPixel.x >= size.x || neighborPixel.y >= size.y) {
+			continue;
+		}
+		int edge = readEdge(center, readPixel(neighborPixel, sizeValue));
+		if (edge == 2 && contourSide == 0u) {
+			contourSide = uint(index + 1);
+		}
+		if (edge == 1 && creaseSide == 0u) {
+			creaseSide = uint(index + 1);
+		}
+	}
+	fragmentMask = contourSide | (creaseSide << 3u);
 }
 `;
 // 온 해상도 씨앗을 넓히기 판으로 모으는 셰이더. (넓히기 판 한 칸이 덮는 씨앗 판 칸들 가운데 칸 가운데에 가장 가까운 씨앗을 고른다, 줄이지 않으면 그대로 옮김)
@@ -368,20 +403,19 @@ void main() {
 // - 덮는 몫은 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 이다. (픽셀 상자로 거른 선, 가장자리가 부드럽다)
 // - 번호 색 표를 켜면(lineColorEnabled) 가장 가까운 씨앗의 경계 양쪽 화소에서 앞쪽(깊이가 작은 쪽, 한쪽이 빈 곳이면 다른 쪽) 번호를 읽어 표에서 색을 찾는다.
 //   표의 알파가 0 이면 표에 없는 번호라 선 색 그대로다. 바깥 선과 꺾임 선이 따로 찾고, 더 진한 쪽의 색을 쓴다.
-const COMPOSITE_FRAGMENT_SHADER = `#version 300 es
-precision highp float;
+// - 색 찾기, 거리, 덮는 몫을 색으로 쓰는 앞부분(COMPOSITE_SHADER_PART)은 가는 선 섞기와 같이 쓴다.
+const COMPOSITE_SHADER_PART = `precision highp float;
 precision highp int;
-uniform highp usampler2D seedTexture;
 uniform highp sampler2D lineTexture;
 uniform highp sampler2D depthTexture;
 uniform highp sampler2D lineColorTexture;
 uniform float lineColorEnabled;
 uniform vec4 viewportRect;
-uniform vec2 pointScale;
 uniform vec2 lineWidths;
 uniform float creaseOpacity;
 uniform vec4 outlineColor;
 uniform float hdrOutput;
+uniform vec2 lineScale; // 선의 판 화소 수 / 그리는 영역 화소 수. (1 이면 같은 해상도)
 out vec4 fragmentColor;
 const uint NO_SEED = 65535u;
 float readLineId(ivec2 pixel) {
@@ -415,10 +449,44 @@ float readSeedDistance(vec2 point, uvec2 seed, vec2 toOutput) {
 	}
 	return length(offset * toOutput);
 }
+void writeLineColor(float contourDistance, float creaseDistance, uvec2 contourSeed, uvec2 creaseSeed) {
+	float contour = lineWidths.x > 0.0 ? clamp(lineWidths.x * 0.5 - contourDistance + 0.5, 0.0, 1.0) : 0.0;
+	float crease = lineWidths.y > 0.0 ? clamp(lineWidths.y * 0.5 - creaseDistance + 0.5, 0.0, 1.0) * creaseOpacity : 0.0;
+	vec4 lineColor = outlineColor;
+	float strength = max(contour, crease) * outlineColor.a;
+	if (lineColorEnabled > 0.5 && max(contour, crease) > 0.0) {
+		vec4 contourColor = contour > 0.0 ? readSeedColor(contourSeed) : outlineColor;
+		vec4 creaseColor = crease > 0.0 ? readSeedColor(creaseSeed) : outlineColor;
+		float contourStrength = contour * contourColor.a;
+		float creaseStrength = crease * creaseColor.a;
+		lineColor = contourStrength >= creaseStrength ? contourColor : creaseColor;
+		strength = max(contourStrength, creaseStrength);
+	}
+	if (strength < 0.004) {
+#ifdef VANILLA_COVERAGE_PASS
+		fragmentColor = vec4(0.0);
+		return;
+#else
+		discard;
+#endif
+	}
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	vec3 linearColor = max(lineColor.rgb, vec3(0.0));
+	linearColor = mix(linearColor / 12.92, pow((linearColor + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), linearColor));
+	vec3 color = hdrOutput > 0.5 ? linearColor : lineColor.rgb;
+#else
+	vec3 color = hdrOutput > 0.5 ? pow(lineColor.rgb, vec3(2.2)) : lineColor.rgb;
+#endif
+	fragmentColor = vec4(color * strength, strength);
+}
+`;
+const COMPOSITE_FRAGMENT_SHADER = `#version 300 es
+${COMPOSITE_SHADER_PART}uniform highp usampler2D seedTexture;
+uniform vec2 pointScale;
 void main() {
 	ivec2 size = textureSize(seedTexture, 0);
-	vec2 toOutput = vec2(1.0);
-	vec2 point = gl_FragCoord.xy - viewportRect.xy - 0.5;
+	vec2 toOutput = 1.0 / lineScale;
+	vec2 point = (gl_FragCoord.xy - viewportRect.xy) * lineScale - 0.5;
 	ivec2 basePixel = ivec2(floor((point + 0.5) / pointScale - 0.5));
 	float contourDistance = 1.0e9;
 	float creaseDistance = 1.0e9;
@@ -440,31 +508,81 @@ void main() {
 			}
 		}
 	}
-	float contour = lineWidths.x > 0.0 ? clamp(lineWidths.x * 0.5 - contourDistance + 0.5, 0.0, 1.0) : 0.0;
-	float crease = lineWidths.y > 0.0 ? clamp(lineWidths.y * 0.5 - creaseDistance + 0.5, 0.0, 1.0) * creaseOpacity : 0.0;
-	vec4 lineColor = outlineColor;
-	float strength = max(contour, crease) * outlineColor.a;
-	if (lineColorEnabled > 0.5 && max(contour, crease) > 0.0) {
-		vec4 contourColor = contour > 0.0 ? readSeedColor(contourSeed) : outlineColor;
-		vec4 creaseColor = crease > 0.0 ? readSeedColor(creaseSeed) : outlineColor;
-		float contourStrength = contour * contourColor.a;
-		float creaseStrength = crease * creaseColor.a;
-		lineColor = contourStrength >= creaseStrength ? contourColor : creaseColor;
-		strength = max(contourStrength, creaseStrength);
-	}
-	if (strength < 0.004) {
-		discard;
-	}
-#ifdef VANILLA_COLOR_SPACE_LINEAR
-	vec3 linearColor = max(lineColor.rgb, vec3(0.0));
-	linearColor = mix(linearColor / 12.92, pow((linearColor + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), linearColor));
-	vec3 color = hdrOutput > 0.5 ? linearColor : lineColor.rgb;
-#else
-	vec3 color = hdrOutput > 0.5 ? pow(lineColor.rgb, vec3(2.2)) : lineColor.rgb;
-#endif
-	fragmentColor = vec4(color * strength, strength);
+	writeLineColor(contourDistance, creaseDistance, contourSeed, creaseSeed);
 }
 `;
+// 가는 선을 한 패스로 섞는 셰이더. (점프 플러딩 없이 둘레 3 x 3 화소의 씨앗을 점프 플러딩 마지막 걸음과 같은 차례로 보고 가장 가까운 것까지의 거리로 덮는 몫을 셈한다)
+// - 화소 q 의 씨앗은 q * 2 + 쪽이다. 아래 줄부터, 줄 안은 왼쪽부터 보고 거리가 더 작을 때만 바꾼다. (점프 플러딩 걸음 1 과 같은 차례, 같은 거리면 먼저 본 것)
+//   그래서 선 색이 다른 두 번호가 맞닿아 같은 거리 토막이 여럿인 자리도 점프 플러딩 길과 거의 같은 쪽을 고른다. (앞 걸음에서 씨앗을 넘겨받은 빈 화소만 다를 수 있다)
+// - 씨앗에서 화소까지의 자리는 고리 칸마다 정해진 반 정수라 거리가 정확하다. 거리는 제곱으로 견주고 끝에 한 번 sqrt 한다. 고르기는 갈래 없이 고른다.
+// - 색 찾기와 덮는 몫은 점프 플러딩 길과 같은 함수다.
+const THIN_COMPOSITE_FRAGMENT_SHADER = `#version 300 es
+${COMPOSITE_SHADER_PART}uniform highp usampler2D edgeMaskTexture;
+const vec2 SIDE_OFFSETS[5] = vec2[5](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
+float readSideDistance(vec2 base, vec2 side) {
+	vec2 offset = max(abs(base + side * 0.5) - abs(side.yx) * 0.5, vec2(0.0));
+#ifdef VANILLA_COVERAGE_PASS
+	offset *= 1.0 / lineScale;
+#endif
+	return dot(offset, offset);
+}
+void main() {
+	ivec2 size = textureSize(lineTexture, 0);
+#ifdef VANILLA_COVERAGE_PASS
+	vec2 point = gl_FragCoord.xy - 0.5;
+#else
+	vec2 point = gl_FragCoord.xy - viewportRect.xy - 0.5;
+#endif
+	ivec2 pixel = ivec2(floor(point + 0.5));
+	float contourDistance = 1.0e18;
+	float creaseDistance = 1.0e18;
+	uvec2 contourSeed = uvec2(NO_SEED);
+	uvec2 creaseSeed = uvec2(NO_SEED);
+	for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+		for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+			ivec2 wantedPixel = pixel + ivec2(offsetX, offsetY);
+			ivec2 samplePixel = clamp(wantedPixel, ivec2(0), size - 1);
+			uint sides = texelFetch(edgeMaskTexture, samplePixel, 0).r;
+			sides = samplePixel == wantedPixel ? sides : 0u;
+			uint contourSide = sides & 7u;
+			uint creaseSide = (sides >> 3u) & 7u;
+			vec2 base = vec2(samplePixel) - point;
+			vec2 contourOffset = SIDE_OFFSETS[contourSide];
+			vec2 creaseOffset = SIDE_OFFSETS[creaseSide];
+			float sampleContourDistance = readSideDistance(base, contourOffset);
+			float sampleCreaseDistance = readSideDistance(base, creaseOffset);
+			bool isTaken = contourSide != 0u && sampleContourDistance < contourDistance;
+			contourDistance = isTaken ? sampleContourDistance : contourDistance;
+			contourSeed = isTaken ? uvec2(samplePixel * 2 + ivec2(contourOffset)) : contourSeed;
+			isTaken = creaseSide != 0u && sampleCreaseDistance < creaseDistance;
+			creaseDistance = isTaken ? sampleCreaseDistance : creaseDistance;
+			creaseSeed = isTaken ? uvec2(samplePixel * 2 + ivec2(creaseOffset)) : creaseSeed;
+		}
+	}
+	writeLineColor(sqrt(contourDistance), sqrt(creaseDistance), contourSeed, creaseSeed);
+}
+`;
+
+
+// 줄인 선의 판의 덮는 몫 판(RGBA8, 곱한 색)을 그리는 영역에 쌍선형으로 한 번 읽어 섞는 셰이더. (선의 판을 줄였을 때의 가는 선 길의 마지막 패스, 읽기 한 번)
+const COVERAGE_BLIT_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+uniform highp sampler2D coverageTexture;
+uniform vec4 viewportRect;
+out vec4 fragmentColor;
+void main() {
+	vec4 color = texture(coverageTexture, (gl_FragCoord.xy - viewportRect.xy) / viewportRect.zw);
+	if (color.a < 0.004) {
+		discard;
+	}
+	fragmentColor = color;
+}
+`;
+// 가는 선의 덮는 몫을 줄인 선의 판 해상도에서 한 번 셈하는 프로그램의 소스. (가는 선 섞기 셰이더와 같은 셈, discard 대신 0 을 쓴다)
+function addCoveragePassDefine(source) {
+	const lineEnd = source.indexOf("\n");
+	return source.slice(0, lineEnd + 1) + "#define VANILLA_COVERAGE_PASS\n" + source.slice(lineEnd + 1);
+}
 
 
 //==============================================================================
@@ -506,19 +624,21 @@ function readColorByte(value) {
 
 
 //==============================================================================
-// 툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)
+// 툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 가는 선은 둘레 칸을 바로 보고, 굵은 선은 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)
 // - 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.
 // - 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)
 //   바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유보다 떨어진 곳(가려진 실루엣)이다.
 //   꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.
 //   깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 잰 오차(노멀 8 비트 각 오차 x 두 자리 사이 거리, 꺾임의 화소 한 칸 x 사인, 깊이 24 비트 한 칸) x 배율을 더해 먼 것도 같은 뜻이 되고, 나란한 낮은 턱은 화소 한 칸보다 낮아도 잡힌다.
-// - 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.
+// - 가는 선(굵기 약 3.24 픽셀까지): 씨앗 고르기와 같은 차례로 화소마다 첫 경계 쪽(R8UI 한 바이트)을 고르고, 섞기가 둘레 3 x 3 화소의 씨앗을 점프 플러딩 마지막 걸음과 같은 차례로 보아 가장 가까운 것까지의 거리를 잰다.
+//   화면 전체 패스가 씨앗 쪽 판 하나와 섞기 하나다. (모바일 타일 GPU 에서 패스 수와 판 대역폭이 굵은 선 길의 몇 분의 1)
+// - 넓히기(굵은 선): 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.
 // - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)
 // - 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.
 // - 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)
 // - 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.
 // - 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)
-// - 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.
+// - 값: setResolutionScale 로 섞기 앞의 모든 판(선의 판, 가면, 씨앗, 넓히기 판)을 줄인다. (기본 1 은 그리는 영역 그대로, 줄이면 가는 선은 선의 판 해상도에서 덮는 몫 판 하나를 셈해 쌍선형으로 한 번 읽어 섞는다)
 // - 인스턴스: drawMeshInstanced 는 인스턴스 배열을 걸러 그때 올린다. drawMeshInstanceBuffer 는 ToonRenderer.createInstanceBuffer 의 버퍼를 몸과 같이 쓰고 다시 올리지 않는다.
 //   버퍼의 인스턴스마다 번호는 꼴의 instanceLineId 칸에서 읽는다. (없으면 공통 번호)
 // - 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().
@@ -544,9 +664,13 @@ export class ToonScreenOutline {
 	/** @private @type { ShaderProgram } */ #seedGatherProgram;
 	/** @private @type { ShaderProgram } */ #jumpFloodProgram;
 	/** @private @type { ShaderProgram } */ #compositeProgram;
+	/** @private @type { ShaderProgram } */ #edgeMaskProgram; // 가는 선의 씨앗 쪽 판 고르기.
+	/** @private @type { ShaderProgram } */ #thinCompositeProgram; // 가는 선을 한 패스로 섞기.
+	/** @private @type { ShaderProgram } */ #thinCoverageProgram; // 줄인 선의 판에서 가는 선의 덮는 몫 셈하기.
+	/** @private @type { ShaderProgram } */ #coverageBlitProgram; // 덮는 몫 판을 쌍선형으로 읽어 섞기.
 	/** @private @type { string } */ #colorSpace; // 색 공간. (ColorSpace, 생성 때 정함, HDR 출력에서 선 색을 선형으로 바꾸는 곡선)
 	/** @private @type { WebGLVertexArrayObject } */ #emptyVertexArray; // 화면 세모용 빈 버텍스 어레이.
-	/** @private @type { object | null } */ #lineTarget; // 선의 판. ({ framebuffer, lineTexture, depthTexture, seedFramebuffer, seedTexture, jumpFloodFramebuffers, jumpFloodTextures, jumpFloodIndex, width, height, jumpFloodWidth, jumpFloodHeight })
+	/** @private @type { object | null } */ #lineTarget; // 선의 판. ({ framebuffer, lineTexture, depthTexture, edgeMaskFramebuffer, edgeMaskTexture, seedFramebuffer, seedTexture, jumpFloodFramebuffers, jumpFloodTextures, jumpFloodIndex, outlinePath, width, height, jumpFloodWidth, jumpFloodHeight })
 	/** @private @type { Array<number> } */ #color; // 선 색. (sRGB, 알파)
 	/** @private @type { number } */ #width; // 바깥 선 굵기.
 	/** @private @type { string } */ #widthUnit;
@@ -573,7 +697,7 @@ export class ToonScreenOutline {
 	/** @private @type { Uint32Array | null } */ #uploadedLineColorTable; // 텍스처에 마지막으로 올린 표. (처음 올리기 전에는 null)
 
 	//==============================================================================
-	// 생성. (다섯 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
+	// 생성. (아홉 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
 	//==============================================================================
 	/**
 	 * @constructor
@@ -588,6 +712,10 @@ export class ToonScreenOutline {
 		this.#seedGatherProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_GATHER_FRAGMENT_SHADER, {});
 		this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
 		this.#compositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, this.#colorSpace), {});
+		this.#edgeMaskProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, EDGE_MASK_FRAGMENT_SHADER, {});
+		this.#thinCompositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, this.#colorSpace), {});
+		this.#thinCoverageProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addCoveragePassDefine(addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, this.#colorSpace)), {});
+		this.#coverageBlitProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, COVERAGE_BLIT_FRAGMENT_SHADER, {});
 		this.#emptyVertexArray = webGL2RenderingContext.createVertexArray();
 		this.#lineTarget = null;
 		this.#color = [0.08, 0.07, 0.1, 1];
@@ -622,7 +750,7 @@ export class ToonScreenOutline {
 	/**
 	 * @static
 	 * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, 지을 ToonScreenOutline 과 같은 값을 준다)
-	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 다섯. (번호, 씨앗, 모으기, 넓히기, 섞기)
+	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 아홉. (번호, 씨앗, 모으기, 넓히기, 섞기, 가는 선의 씨앗 쪽 판, 가는 선 섞기, 줄인 판의 가는 선 덮는 몫, 덮는 몫 판 섞기)
 	 * @example <caption>셰이더를 미리 링크할 목록에 넣기</caption>
 	 * import { ToonScreenOutline } from "./vanilla.js";
 	 * const sources = ToonScreenOutline.readProgramSources();
@@ -635,6 +763,10 @@ export class ToonScreenOutline {
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_GATHER_FRAGMENT_SHADER, attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: JUMP_FLOOD_FRAGMENT_SHADER, attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} },
+			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: EDGE_MASK_FRAGMENT_SHADER, attributeLocationTable: {} },
+			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} },
+			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addCoveragePassDefine(addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, colorSpace)), attributeLocationTable: {} },
+			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: COVERAGE_BLIT_FRAGMENT_SHADER, attributeLocationTable: {} },
 		];
 	}
 
@@ -859,12 +991,25 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 넓히기 판의 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춘다)
-	// - 선의 판과 씨앗은 늘 그리는 영역 해상도로 잡는다. 점프 플러딩만 줄인 판에서 하고, 씨앗 자리는 그리는 영역 화소 좌표 그대로 넣어 거리로 섞는다.
-	//   그래서 줄여도 선 자리는 그리는 영역의 화소 경계이고 계단과 점선이 없다. 줄이면 넓히기의 값(걸음 수 x 화소 수)이 몫의 제곱으로 준다.
+	// 선의 판 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 기본 1, 폰과 태블릿의 가벼운 길은 낮춘다)
+	// - 이름대로 섞기 앞의 모든 판(선의 판 = 노멀과 번호와 깊이, 가면, 씨앗, 넓히기 판)을 그리는 영역 x 몫 크기로 잡는다. 선의 판은 몫만큼 작은 해상도로 한 번 더 그려지므로 값이 몫의 제곱으로 준다.
+	//   기본 1 은 그리는 영역과 같은 크기라 화면이 바이트까지 그대로다.
+	// - 몫이 1 보다 작을 때 가는 선(굵기 x 몫이 약 3.24 선의 판 픽셀 이하)은 선의 판 해상도에서 덮는 몫(진하기와 번호 색을 곱한 RGBA8)을 한 번 셈하고, 마지막 섞기가 그것을 쌍선형으로 한 번 읽는다. (읽기 9 에서 1)
+	//   굵은 선은 선의 판 해상도에서 점프 플러딩을 하고 섞을 때 거리를 그리는 영역 픽셀로 곱해 잰다. 어느 길이든 선 굵기는 그리는 영역 픽셀(setWidth)이고 선 자리는 몫이 작을수록 가장자리가 부드러워진다.
+	// - getLineTarget() 의 lineTexture, depthTexture 해상도는 그리는 영역 x 몫이다. (광부의 lineTexture 약속 RGBA8, b 와 a 아래 6 비트 번호, a 위 2 비트 깃발, 굵기 0 이면 선의 판만은 그대로, 해상도만 그리는 영역과 다를 수 있다)
+	// - CSS 화소당 1.5 화소로 맞추려면 몫 = 1.5 / (그리는 버퍼 화소 / CSS 화소) 로 준다. 엔진 해상도 설정이 그리는 버퍼를 묶어 devicePixelRatio 와 다를 수 있어 캔버스의 width / clientWidth 로 센다.
 	//==============================================================================
 	/**
-	 * @param { number } resolutionScale - 0.25 ~ 1.
+	 * @param { number } resolutionScale - 0.25 ~ 1. (1 이면 그리는 영역 해상도 그대로)
+	 * @example <caption>CSS 화소당 선의 판 1.5 화소로 맞추기</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const canvas = document.createElement("canvas");
+	 * canvas.width = 750;
+	 * canvas.height = 990;
+	 * canvas.style.width = "375px";
+	 * const outline = new ToonScreenOutline(canvas.getContext("webgl2"));
+	 * const bufferPixelPerCssPixel = canvas.width / 375;
+	 * outline.setResolutionScale(1.5 / bufferPixelPerCssPixel);
 	 */
 	setResolutionScale(resolutionScale) {
 		this.#resolutionScale = System.Math.max(0.25, System.Math.min(1, resolutionScale));
@@ -912,7 +1057,7 @@ export class ToonScreenOutline {
 	// 선의 판 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null } { lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), seedTexture (온 해상도 씨앗 RGBA16UI), jumpFloodTextures (넓히기 판 RGBA16UI 둘), jumpFloodIndex (넓히기를 마친 쪽), width, height, jumpFloodWidth, jumpFloodHeight }
+	 * @returns { object | null } { lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), edgeMaskTexture (가는 선의 씨앗 쪽 판 R8UI, 아래 3 비트 바깥 선, 위 3 비트 꺾임 선의 첫 경계 쪽 0 없음, 1 오른쪽, 2 왼쪽, 3 위, 4 아래), seedTexture (온 해상도 씨앗 RGBA16UI, 굵은 선을 긋기 전에는 null), jumpFloodTextures (넓히기 판 RGBA16UI 둘, 굵은 선을 긋기 전에는 빔), jumpFloodIndex (넓히기를 마친 쪽, 점프 플러딩을 안 했으면 -1), coverageTexture (선의 판을 줄였을 때 가는 선의 덮는 몫 RGBA8 곱한 색, 줄여 가는 선을 그을 때 짓기 전에는 null), outlinePath (이번 프레임의 길 "none", "thin", "thinScaled", "jumpFlood"), width, height (선의 판 해상도, 그리는 영역 x setResolutionScale 의 몫), jumpFloodWidth, jumpFloodHeight (선의 판과 같다) }
 	 */
 	getLineTarget() {
 		return this.#lineTarget;
@@ -945,7 +1090,9 @@ export class ToonScreenOutline {
 		this.#drawnDistanceCount = 0;
 		const width = System.Math.max(1, viewport[2]);
 		const height = System.Math.max(1, viewport[3]);
-		const lineTarget = this.readLineTarget(width, height, System.Math.max(1, System.Math.ceil(width * this.#resolutionScale)), System.Math.max(1, System.Math.ceil(height * this.#resolutionScale)));
+		const lineWidth = System.Math.max(1, System.Math.ceil(width * this.#resolutionScale));
+		const lineHeight = System.Math.max(1, System.Math.ceil(height * this.#resolutionScale));
+		const lineTarget = this.readLineTarget(lineWidth, lineHeight, lineWidth, lineHeight);
 		if (lineTarget === null) {
 			return false;
 		}
@@ -1263,7 +1410,10 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 번호 그리기 끝. (씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
+	// 번호 그리기 끝. (가는 선은 씨앗 쪽 판 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
+	// - 가는 선(굵기가 THIN_LINE_MAXIMUM_WIDTH 이하, 약 3.24 픽셀까지): 화면 전체 패스가 씨앗 쪽 판 하나다. 섞기가 둘레 3 x 3 화소의 씨앗을 본다. (씨앗, 모으기, 넓히기 없음)
+	// - 굵은 선: 씨앗, 모으기, 넓히기 걸음마다 한 패스. (씨앗 판과 넓히기 판은 처음 굵은 선을 그을 때 짓는다)
+	// - 판을 통째로 덮어쓰는 패스는 앞에 invalidateFramebuffer 를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰)
 	//==============================================================================
 	endLineIds() {
 		if (this.#savedState === null) {
@@ -1271,12 +1421,21 @@ export class ToonScreenOutline {
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const lineTarget = this.#lineTarget;
-		const frame = this.#frame;
 		const lineWidths = this.readLineWidths();
 		this.#lineWidths = lineWidths;
+		lineTarget.jumpFloodIndex = -1;
+		lineTarget.outlinePath = "none";
 		// 바깥 선과 꺾임 선이 모두 0 이면 선의 판(노멀, 번호, 깊이)만 남긴다. (모서리 어둠의 미리 그리기, drawOutline 은 긋지 않는다)
 		if (lineWidths[0] <= 0 && lineWidths[1] <= 0) {
-			lineTarget.jumpFloodIndex = -1;
+			this.restoreState();
+			return;
+		}
+		// 선의 판이 그리는 영역보다 작으면(setResolutionScale) 굵기를 선의 판 화소로 재어 가는 선 길을 가린다.
+		const lineScaleX = lineTarget.width / System.Math.max(1, this.#frame.viewport[2]);
+		const lineScaleY = lineTarget.height / System.Math.max(1, this.#frame.viewport[3]);
+		const isScaled = lineTarget.width !== System.Math.max(1, this.#frame.viewport[2]) || lineTarget.height !== System.Math.max(1, this.#frame.viewport[3]);
+		const isThinLine = System.Math.max(lineWidths[0], lineWidths[1]) * System.Math.min(lineScaleX, lineScaleY) <= THIN_LINE_MAXIMUM_WIDTH;
+		if (!isThinLine && !this.readJumpFloodTarget(lineTarget)) {
 			this.restoreState();
 			return;
 		}
@@ -1286,26 +1445,28 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.depthMask(false);
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		const discardedAttachments = [webGL2RenderingContext.COLOR_ATTACHMENT0];
+
+		// 가는 선: 씨앗 쪽 판 고르기 한 패스.
+		if (isThinLine) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.edgeMaskFramebuffer);
+			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+			this.useEdgeProgram(this.#edgeMaskProgram, lineTarget, lineWidths);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+			lineTarget.outlinePath = "thin";
+			if (isScaled && this.readCoverageTarget(lineTarget)) {
+				this.drawThinCoverage(lineTarget, lineWidths, lineScaleX, lineScaleY);
+				lineTarget.outlinePath = "thinScaled";
+			}
+			this.unbindEndTextures();
+			this.restoreState();
+			return;
+		}
 
 		// 1. 씨앗 고르기.
-		const seedProgram = this.#seedProgram;
-		const projectionElements = frame.projectionElements;
-		const viewElements = frame.viewElements;
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffer);
-		seedProgram.useProgram();
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
-		webGL2RenderingContext.uniform1i(seedProgram.getUniformLocation("lineTexture"), LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(seedProgram.getUniformLocation("depthTexture"), DEPTH_TEXTURE_UNIT);
-		webGL2RenderingContext.uniformMatrix3fv(seedProgram.getUniformLocation("viewRotation"), false, [viewElements[0], viewElements[1], viewElements[2], viewElements[4], viewElements[5], viewElements[6], viewElements[8], viewElements[9], viewElements[10]]);
-		webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionScale"), projectionElements[0], projectionElements[5], projectionElements[8], projectionElements[9]);
-		webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionDepth"), projectionElements[10], projectionElements[14], projectionElements[12], projectionElements[13]);
-		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
-		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthThreshold"), this.#depthThreshold);
-		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthMargin"), this.#depthMargin);
-		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("creaseCosine"), lineWidths[1] > 0 ? this.#creaseCosine : -2);
+		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+		this.useEdgeProgram(this.#seedProgram, lineTarget, lineWidths);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
@@ -1316,6 +1477,7 @@ export class ToonScreenOutline {
 		const seedGatherProgram = this.#seedGatherProgram;
 		webGL2RenderingContext.viewport(0, 0, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[0]);
+		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
 		seedGatherProgram.useProgram();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTexture);
@@ -1328,10 +1490,11 @@ export class ToonScreenOutline {
 		jumpFloodProgram.useProgram();
 		webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform2f(jumpFloodProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
-		const reach = (System.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System.Math.min(pointScaleX, pointScaleY) + 1.5;
+		const reach = (System.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) * System.Math.min(lineScaleX, lineScaleY) / System.Math.min(pointScaleX, pointScaleY) + 1.5;
 		let seedIndex = 0;
 		for (const stepSize of readJumpFloodSteps(reach)) {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[1 - seedIndex]);
+			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[seedIndex]);
 			webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("stepSize"), stepSize);
@@ -1339,22 +1502,147 @@ export class ToonScreenOutline {
 			seedIndex = 1 - seedIndex;
 		}
 		lineTarget.jumpFloodIndex = seedIndex;
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-		webGL2RenderingContext.bindVertexArray(null);
+		lineTarget.outlinePath = "jumpFlood";
+		this.unbindEndTextures();
 		this.restoreState();
 	}
 
 	//==============================================================================
-	// 바깥선 긋기. (넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)
+	// 줄인 선의 판의 가는 선 덮는 몫 판 짓기. (RGBA8 곱한 색, 쌍선형, 처음 줄여 가는 선을 그을 때 한 번)
+	//==============================================================================
+	/**
+	 * @param { object } lineTarget - 선의 판.
+	 * @returns { boolean } 판이 있으면 true. (못 지으면 false, 그때 가는 선은 섞기 한 패스 길로 간다)
+	 * @private
+	 */
+	readCoverageTarget(lineTarget) {
+		if (lineTarget.coverageTexture !== null) {
+			return true;
+		}
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		const texture = this.createTargetTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, lineTarget.width, lineTarget.height);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
+		const framebuffer = this.createTargetFramebuffer(texture, null);
+		const isComplete = this.isFramebufferComplete();
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
+		if (!isComplete) {
+			webGL2RenderingContext.deleteFramebuffer(framebuffer);
+			webGL2RenderingContext.deleteTexture(texture);
+			return false;
+		}
+		lineTarget.coverageFramebuffer = framebuffer;
+		lineTarget.coverageTexture = texture;
+		return true;
+	}
+
+	//==============================================================================
+	// 줄인 선의 판 해상도에서 가는 선의 덮는 몫(곱한 색)을 한 번 셈하기. (섞기와 같은 셈, 거리는 그리는 영역 화소로 잰다)
+	//==============================================================================
+	/**
+	 * @param { object } lineTarget - 선의 판.
+	 * @param { Array<number> } lineWidths - 이번 프레임의 [바깥 선, 꺾임 선] 굵기. (그리는 영역 픽셀)
+	 * @param { number } lineScaleX - 선의 판 너비 / 그리는 영역 너비.
+	 * @param { number } lineScaleY - 선의 판 높이 / 그리는 영역 높이.
+	 * @private
+	 */
+	drawThinCoverage(lineTarget, lineWidths, lineScaleX, lineScaleY) {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const program = this.#thinCoverageProgram;
+		const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.coverageFramebuffer);
+		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+		program.useProgram();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.edgeMaskTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_COLOR_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isLineColorEnabled ? this.#lineColorTexture : null);
+		webGL2RenderingContext.uniform1i(program.getUniformLocation("edgeMaskTexture"), LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(program.getUniformLocation("lineTexture"), COMPOSITE_LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(program.getUniformLocation("depthTexture"), COMPOSITE_DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(program.getUniformLocation("lineColorTexture"), LINE_COLOR_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1f(program.getUniformLocation("lineColorEnabled"), isLineColorEnabled ? 1 : 0);
+		webGL2RenderingContext.uniform2f(program.getUniformLocation("lineScale"), lineScaleX, lineScaleY);
+		webGL2RenderingContext.uniform2f(program.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
+		webGL2RenderingContext.uniform1f(program.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
+		const color = this.#color;
+		webGL2RenderingContext.uniform4f(program.getUniformLocation("outlineColor"), color[0], color[1], color[2], color[3]);
+		webGL2RenderingContext.uniform1f(program.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_COLOR_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+	}
+
+	//==============================================================================
+	// 경계를 보는 프로그램(씨앗, 가는 선의 씨앗 쪽 판)을 쓰고 선의 판, 깊이, 카메라, 문턱을 묶기.
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } program - #seedProgram 이나 #edgeMaskProgram.
+	 * @param { object } lineTarget - 선의 판.
+	 * @param { Array<number> } lineWidths - 이번 프레임의 [바깥 선, 꺾임 선] 굵기.
+	 * @private
+	 */
+	useEdgeProgram(program, lineTarget, lineWidths) {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const frame = this.#frame;
+		const projectionElements = frame.projectionElements;
+		const viewElements = frame.viewElements;
+		program.useProgram();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
+		webGL2RenderingContext.uniform1i(program.getUniformLocation("lineTexture"), LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(program.getUniformLocation("depthTexture"), DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.uniformMatrix3fv(program.getUniformLocation("viewRotation"), false, [viewElements[0], viewElements[1], viewElements[2], viewElements[4], viewElements[5], viewElements[6], viewElements[8], viewElements[9], viewElements[10]]);
+		webGL2RenderingContext.uniform4f(program.getUniformLocation("projectionScale"), projectionElements[0], projectionElements[5], projectionElements[8], projectionElements[9]);
+		webGL2RenderingContext.uniform4f(program.getUniformLocation("projectionDepth"), projectionElements[10], projectionElements[14], projectionElements[12], projectionElements[13]);
+		webGL2RenderingContext.uniform1f(program.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
+		webGL2RenderingContext.uniform1f(program.getUniformLocation("depthThreshold"), this.#depthThreshold);
+		webGL2RenderingContext.uniform1f(program.getUniformLocation("depthMargin"), this.#depthMargin);
+		webGL2RenderingContext.uniform1f(program.getUniformLocation("creaseCosine"), lineWidths[1] > 0 ? this.#creaseCosine : -2);
+	}
+
+	//==============================================================================
+	// endLineIds 가 묶은 텍스처 풀기. (선의 판 유닛과 깊이 유닛, 버텍스 어레이)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	unbindEndTextures() {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		for (const textureUnit of [DEPTH_TEXTURE_UNIT, LINE_TEXTURE_UNIT]) {
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + textureUnit);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		}
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindVertexArray(null);
+	}
+
+	//==============================================================================
+	// 바깥선 긋기. (가는 선은 씨앗 쪽 판, 굵은 선은 넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)
 	//==============================================================================
 	drawOutline() {
 		const lineTarget = this.#lineTarget;
 		const frame = this.#frame;
-		if (lineTarget === null || frame === null || lineTarget.jumpFloodIndex < 0) {
+		if (lineTarget === null || frame === null || lineTarget.outlinePath === "none") {
 			return;
 		}
+		if (lineTarget.outlinePath === "thinScaled") {
+			this.drawCoverageBlit(lineTarget);
+			return;
+		}
+		const isThinLine = lineTarget.outlinePath === "thin";
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		this.saveState();
 		const viewport = frame.viewport;
@@ -1364,11 +1652,11 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
-		const compositeProgram = this.#compositeProgram;
+		const compositeProgram = isThinLine ? this.#thinCompositeProgram : this.#compositeProgram;
 		compositeProgram.useProgram();
 		const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isThinLine ? lineTarget.edgeMaskTexture : lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
@@ -1378,13 +1666,19 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		const color = this.#color;
 		const lineWidths = this.#lineWidths;
-		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
+		if (isThinLine) {
+			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("edgeMaskTexture"), LINE_TEXTURE_UNIT);
+		}
+		else {
+			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
+			webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
+			webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineScale"), lineTarget.width / System.Math.max(1, viewport[2]), lineTarget.height / System.Math.max(1, viewport[3]));
+		}
 		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineTexture"), COMPOSITE_LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("depthTexture"), COMPOSITE_DEPTH_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineColorTexture"), LINE_COLOR_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("lineColorEnabled"), isLineColorEnabled ? 1 : 0);
 		webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System.Math.max(1, viewport[2]), System.Math.max(1, viewport[3]));
-		webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
 		webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
 		webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
 		webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("outlineColor"), color[0], color[1], color[2], color[3]);
@@ -1396,6 +1690,37 @@ export class ToonScreenOutline {
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + textureUnit);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
 		}
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		this.restoreState();
+	}
+
+	//==============================================================================
+	// 줄인 선의 판의 덮는 몫 판을 그리는 영역에 쌍선형으로 한 번 읽어 섞기.
+	//==============================================================================
+	/**
+	 * @param { object } lineTarget - 선의 판. (outlinePath 가 "thinScaled")
+	 * @private
+	 */
+	drawCoverageBlit(lineTarget) {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const viewport = this.#frame.viewport;
+		this.saveState();
+		webGL2RenderingContext.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.depthMask(false);
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		const program = this.#coverageBlitProgram;
+		program.useProgram();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.coverageTexture);
+		webGL2RenderingContext.uniform1i(program.getUniformLocation("coverageTexture"), LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform4f(program.getUniformLocation("viewportRect"), viewport[0], viewport[1], System.Math.max(1, viewport[2]), System.Math.max(1, viewport[3]));
+		webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+		webGL2RenderingContext.bindVertexArray(null);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		this.restoreState();
 	}
@@ -1550,52 +1875,136 @@ export class ToonScreenOutline {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
 		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
-		const createTexture = (internalFormat, format, type, textureWidth, textureHeight) => {
-			const texture = webGL2RenderingContext.createTexture();
-			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, textureWidth, textureHeight, 0, format, type, null);
-			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
-			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
-			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
-			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-			return texture;
-		};
-		const createFramebuffer = (colorTexture, depthTexture) => {
-			const framebuffer = webGL2RenderingContext.createFramebuffer();
-			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
-			webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, colorTexture, 0);
-			if (depthTexture !== null) {
-				webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.TEXTURE_2D, depthTexture, 0);
-			}
-			return framebuffer;
-		};
-		const lineTexture = createTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
-		const depthTexture = createTexture(webGL2RenderingContext.DEPTH_COMPONENT24, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, width, height);
-		const seedTexture = createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, width, height);
-		const jumpFloodTextures = [
-			createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, jumpFloodWidth, jumpFloodHeight),
-			createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, jumpFloodWidth, jumpFloodHeight),
-		];
+		const lineTexture = this.createTargetTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
+		const depthTexture = this.createTargetTexture(webGL2RenderingContext.DEPTH_COMPONENT24, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, width, height);
+		const edgeMaskTexture = this.createTargetTexture(webGL2RenderingContext.R8UI, webGL2RenderingContext.RED_INTEGER, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
-		const isFramebufferComplete = () => {
-			return webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER) === webGL2RenderingContext.FRAMEBUFFER_COMPLETE;
-		};
-		const framebuffer = createFramebuffer(lineTexture, depthTexture);
-		let isComplete = isFramebufferComplete();
-		const seedFramebuffer = createFramebuffer(seedTexture, null);
-		isComplete = isComplete && isFramebufferComplete();
-		const jumpFloodFramebuffers = [];
-		for (const jumpFloodTexture of jumpFloodTextures) {
-			jumpFloodFramebuffers.push(createFramebuffer(jumpFloodTexture, null));
-			isComplete = isComplete && isFramebufferComplete();
-		}
+		const framebuffer = this.createTargetFramebuffer(lineTexture, depthTexture);
+		let isComplete = this.isFramebufferComplete();
+		const edgeMaskFramebuffer = this.createTargetFramebuffer(edgeMaskTexture, null);
+		isComplete = isComplete && this.isFramebufferComplete();
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
-		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, seedFramebuffer: seedFramebuffer, seedTexture: seedTexture, jumpFloodFramebuffers: jumpFloodFramebuffers, jumpFloodTextures: jumpFloodTextures, jumpFloodIndex: 0, width: width, height: height, jumpFloodWidth: jumpFloodWidth, jumpFloodHeight: jumpFloodHeight };
+		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, edgeMaskFramebuffer: edgeMaskFramebuffer, edgeMaskTexture: edgeMaskTexture, seedFramebuffer: null, seedTexture: null, jumpFloodFramebuffers: [], jumpFloodTextures: [], jumpFloodIndex: -1, coverageFramebuffer: null, coverageTexture: null, outlinePath: "none", width: width, height: height, jumpFloodWidth: jumpFloodWidth, jumpFloodHeight: jumpFloodHeight };
 		if (!isComplete) {
 			this.deleteLineTarget();
 			return null;
 		}
 		return this.#lineTarget;
+	}
+
+	//==============================================================================
+	// 굵은 선의 씨앗 판과 넓히기 판 짓기. (처음 굵은 선을 그을 때 한 번, 가는 선만 쓰면 짓지 않는다)
+	//==============================================================================
+	/**
+	 * @param { object } lineTarget - 선의 판.
+	 * @returns { boolean } 판이 있으면 true. (짓지 못하면 false, 그 프레임은 긋지 않는다)
+	 * @private
+	 */
+	readJumpFloodTarget(lineTarget) {
+		if (lineTarget.seedTexture !== null) {
+			return true;
+		}
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		lineTarget.seedTexture = this.createTargetTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, lineTarget.width, lineTarget.height);
+		lineTarget.jumpFloodTextures = [
+			this.createTargetTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight),
+			this.createTargetTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight),
+		];
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
+		lineTarget.seedFramebuffer = this.createTargetFramebuffer(lineTarget.seedTexture, null);
+		let isComplete = this.isFramebufferComplete();
+		for (const jumpFloodTexture of lineTarget.jumpFloodTextures) {
+			lineTarget.jumpFloodFramebuffers.push(this.createTargetFramebuffer(jumpFloodTexture, null));
+			isComplete = isComplete && this.isFramebufferComplete();
+		}
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
+		if (!isComplete) {
+			this.deleteJumpFloodTarget(lineTarget);
+			return false;
+		}
+		return true;
+	}
+
+	//==============================================================================
+	// 선의 판 텍스처 하나 짓기. (가까운 칸 거르기, 가장자리 늘이기, 묶은 채로 둔다)
+	//==============================================================================
+	/**
+	 * @param { number } internalFormat - 내부 형식.
+	 * @param { number } format - 형식.
+	 * @param { number } type - 자료형.
+	 * @param { number } textureWidth - 너비.
+	 * @param { number } textureHeight - 높이.
+	 * @returns { WebGLTexture } 텍스처.
+	 * @private
+	 */
+	createTargetTexture(internalFormat, format, type, textureWidth, textureHeight) {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const texture = webGL2RenderingContext.createTexture();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, textureWidth, textureHeight, 0, format, type, null);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		return texture;
+	}
+
+	//==============================================================================
+	// 선의 판 프레임버퍼 하나 짓기. (색 하나와 깊이, 묶은 채로 둔다)
+	//==============================================================================
+	/**
+	 * @param { WebGLTexture } colorTexture - 색 텍스처.
+	 * @param { WebGLTexture | null } depthTexture - 깊이 텍스처. (없으면 null)
+	 * @returns { WebGLFramebuffer } 프레임버퍼.
+	 * @private
+	 */
+	createTargetFramebuffer(colorTexture, depthTexture) {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const framebuffer = webGL2RenderingContext.createFramebuffer();
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+		webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, colorTexture, 0);
+		if (depthTexture !== null) {
+			webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.TEXTURE_2D, depthTexture, 0);
+		}
+		return framebuffer;
+	}
+
+	//==============================================================================
+	// 묶인 프레임버퍼가 다 됐는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 다 됐으면 true.
+	 * @private
+	 */
+	isFramebufferComplete() {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		return webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER) === webGL2RenderingContext.FRAMEBUFFER_COMPLETE;
+	}
+
+	//==============================================================================
+	// 굵은 선의 씨앗 판과 넓히기 판 지우기.
+	//==============================================================================
+	/**
+	 * @param { object } lineTarget - 선의 판.
+	 * @private
+	 */
+	deleteJumpFloodTarget(lineTarget) {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		webGL2RenderingContext.deleteFramebuffer(lineTarget.seedFramebuffer);
+		for (const jumpFloodFramebuffer of lineTarget.jumpFloodFramebuffers) {
+			webGL2RenderingContext.deleteFramebuffer(jumpFloodFramebuffer);
+		}
+		webGL2RenderingContext.deleteTexture(lineTarget.seedTexture);
+		for (const jumpFloodTexture of lineTarget.jumpFloodTextures) {
+			webGL2RenderingContext.deleteTexture(jumpFloodTexture);
+		}
+		lineTarget.seedFramebuffer = null;
+		lineTarget.seedTexture = null;
+		lineTarget.jumpFloodFramebuffers = [];
+		lineTarget.jumpFloodTextures = [];
+		lineTarget.jumpFloodIndex = -1;
 	}
 
 	//==============================================================================
@@ -1607,16 +2016,15 @@ export class ToonScreenOutline {
 			return;
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		this.deleteJumpFloodTarget(lineTarget);
 		webGL2RenderingContext.deleteFramebuffer(lineTarget.framebuffer);
-		webGL2RenderingContext.deleteFramebuffer(lineTarget.seedFramebuffer);
-		for (const jumpFloodFramebuffer of lineTarget.jumpFloodFramebuffers) {
-			webGL2RenderingContext.deleteFramebuffer(jumpFloodFramebuffer);
-		}
+		webGL2RenderingContext.deleteFramebuffer(lineTarget.edgeMaskFramebuffer);
 		webGL2RenderingContext.deleteTexture(lineTarget.lineTexture);
 		webGL2RenderingContext.deleteTexture(lineTarget.depthTexture);
-		webGL2RenderingContext.deleteTexture(lineTarget.seedTexture);
-		for (const jumpFloodTexture of lineTarget.jumpFloodTextures) {
-			webGL2RenderingContext.deleteTexture(jumpFloodTexture);
+		webGL2RenderingContext.deleteTexture(lineTarget.edgeMaskTexture);
+		if (lineTarget.coverageTexture !== null) {
+			webGL2RenderingContext.deleteFramebuffer(lineTarget.coverageFramebuffer);
+			webGL2RenderingContext.deleteTexture(lineTarget.coverageTexture);
 		}
 		this.#lineTarget = null;
 	}
@@ -1685,7 +2093,7 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 다섯)
+	// 다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 일곱)
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1700,5 +2108,9 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.deleteProgram(this.#seedGatherProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#jumpFloodProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#compositeProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#edgeMaskProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#thinCompositeProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#thinCoverageProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#coverageBlitProgram.getProgram());
 	}
 }

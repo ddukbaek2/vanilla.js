@@ -164,7 +164,9 @@ export class BloomEffect extends Object {
 		// 1. 밝은 영역 추출. (씬 → 핑)
 		const pingRenderTarget = this.getPingRenderTarget();
 		const pongRenderTarget = this.getPongRenderTarget();
+		// 밝은 몫 뽑기와 흐림은 판을 통째로 덮어쓰므로 앞에 옛 내용을 버린다. (타일 GPU 의 판 불러오기를 없앰)
 		pingRenderTarget.bind();
+		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
 		const brightPass = this.getBrightPass();
 		brightPass.useProgram();
 		const brightSceneTextureLocation = brightPass.getUniformLocation("sceneTexture");
@@ -184,6 +186,7 @@ export class BloomEffect extends Object {
 		for (let blurIndex = 0; blurIndex < iterationCount; ++blurIndex) {
 			// 가로. (핑 → 퐁)
 			pongRenderTarget.bind();
+			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
 			const pingWidth = pingRenderTarget.getWidth();
 			webGL2RenderingContext.uniform2f(blurDirectionLocation, 1 / pingWidth, 0);
 			const pingColorTexture = pingRenderTarget.getColorTexture();
@@ -192,6 +195,7 @@ export class BloomEffect extends Object {
 
 			// 세로. (퐁 → 핑)
 			pingRenderTarget.bind();
+			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
 			const pongHeight = pongRenderTarget.getHeight();
 			webGL2RenderingContext.uniform2f(blurDirectionLocation, 0, 1 / pongHeight);
 			const pongColorTexture = pongRenderTarget.getColorTexture();

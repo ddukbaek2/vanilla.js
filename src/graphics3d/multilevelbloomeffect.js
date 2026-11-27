@@ -253,7 +253,9 @@ export class MultiLevelBloomEffect extends Object {
 		// 1. 밝은 몫을 반 크기로 뽑기. (씬 → 첫 단)
 		const extractPass = this.#extractPass;
 		const firstRenderTarget = levelRenderTargetList[0];
+		// 뽑기와 줄이기는 단을 통째로 덮어쓰므로 앞에 옛 내용을 버린다. (타일 GPU 의 판 불러오기를 없앰, 키우기는 위 단에 더하므로 버리지 않는다)
 		firstRenderTarget.bind();
+		webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
 		extractPass.useProgram();
 		webGL2RenderingContext.uniform1i(extractPass.getUniformLocation("sourceTexture"), 0);
 		webGL2RenderingContext.uniform2f(extractPass.getUniformLocation("sourceTexel"), 1 / this.#sceneWidth, 1 / this.#sceneHeight);
@@ -271,6 +273,7 @@ export class MultiLevelBloomEffect extends Object {
 			const sourceRenderTarget = levelRenderTargetList[levelIndex - 1];
 			const targetRenderTarget = levelRenderTargetList[levelIndex];
 			targetRenderTarget.bind();
+			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
 			webGL2RenderingContext.uniform2f(downsampleTexelLocation, 1 / sourceRenderTarget.getWidth(), 1 / sourceRenderTarget.getHeight());
 			const sourceTexture = sourceRenderTarget.getColorTexture(0);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
