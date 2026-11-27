@@ -831,7 +831,7 @@ function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
 // - 영역은 캔버스 픽셀 좌표(왼쪽 위 원점)이며 둥근 모서리 반지름을 주면 그 바깥은 원본을 유지한다.
 // - 사용:
 //     // 씬 load 에서
-//     this.screenEffect = new ScreenEffect(engine.getGraphic());
+//     this.screenEffect = new ScreenEffect();
 //     this.screenEffect.setEnabled(ScreenEffectType.vignette, true);
 //     // preDraw 처음 / postDraw 끝에서
 //     this.screenEffect.begin(graphic);  ...  this.screenEffect.end(graphic);
@@ -846,7 +846,7 @@ function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
  * 	initialize(engine) {
  * 		super.initialize(engine);
  * 		const graphic = engine.getGraphic();
- * 		this.screenEffect = new ScreenEffect(graphic);
+ * 		this.screenEffect = new ScreenEffect();
  * 		this.screenEffect.setRegion(40, 20, 560, 320, 24);
  * 		this.screenEffect.setEnabled(ScreenEffectType.vignette, true);
  * 		this.screenEffect.setColor(ScreenEffectType.vignette, new Color(0.1, 0, 0.2, 1));
@@ -880,7 +880,7 @@ export class ScreenEffect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
+	/** @private @type { WebGL2RenderingContext | null } */ #webGL2RenderingContext; // begin / end 에서 받은 그래픽의 컨텍스트. (처음 그릴 때 받는다)
 	/** @private @type { System.Map } */ #passTable;
 	/** @private @type { System.Map } */ #effectTable;
 	/** @private @type { object | null } */ #sceneTarget;
@@ -894,13 +894,11 @@ export class ScreenEffect extends Object {
 
 	//==============================================================================
 	// 생성.
+	// - 그래픽은 begin / end 에 받는다. (처음 그릴 때 그 WebGL2 컨텍스트를 받는다, 러스트 ScreenEffect::new() 와 같다)
 	//==============================================================================
-	/**
-	 * @param { Graphic } graphic 화면을 떠 올 그래픽. (그 WebGL2 컨텍스트를 쓴다)
-	 */
-	constructor(graphic) {
+	constructor() {
 		super();
-		this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+		this.#webGL2RenderingContext = null;
 		this.#passTable = new System.Map();
 		this.#effectTable = new System.Map();
 		this.#sceneTarget = null;
@@ -978,6 +976,7 @@ export class ScreenEffect extends Object {
 	 * @param { Graphic } graphic 씬의 그래픽.
 	 */
 	begin(graphic) {
+		this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 		this.#isBound = this.hasActiveEffect();
 	}
 
@@ -992,6 +991,7 @@ export class ScreenEffect extends Object {
 			return;
 		}
 		this.#isBound = false;
+		this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 
 		// 묶어 그리기로 쌓인 것을 먼저 화면에 그린다. (그 화면을 떠 온다)
 		graphic.flushSpriteBatch();
@@ -1376,7 +1376,7 @@ export class ScreenEffect extends Object {
 	 * const engineConfiguration = new EngineConfiguration();
 	 * const engine = new Engine(engineConfiguration);
 	 * const graphic = engine.getGraphic();
-	 * const screenEffect = new ScreenEffect(graphic);
+	 * const screenEffect = new ScreenEffect();
 	 * screenEffect.setTimelineProperty("shockwave", 1);
 	 * screenEffect.setTimelineProperty("shockwave.radius", 0.4);
 	 * screenEffect.setTimelineProperty("fade.color", "#ff8800");
@@ -1443,6 +1443,10 @@ export class ScreenEffect extends Object {
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		if (webGL2RenderingContext === null) {
+			super.destroy();
+			return;
+		}
 		for (const pass of this.#passTable.values()) {
 			if (pass === null) {
 				continue;

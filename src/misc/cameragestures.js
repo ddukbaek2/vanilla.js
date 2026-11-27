@@ -248,13 +248,13 @@ export class CameraGestures {
 	}
 
 	//==============================================================================
-	// 모인 밀기 꺼내기. ({ x, y } 뷰 단위, 꺼내면 비웁다)
+	// 모인 밀기 꺼내기. (Vector2 뷰 단위, 꺼내면 비웁다)
 	//==============================================================================
 	/**
-	 * @returns { object } 모인 밀기. ({ x, y }, 뷰 단위)
+	 * @returns { Vector2 } 모인 밀기. (x, y 가 뷰 단위)
 	 */
 	takePan() {
-		const pan = { x: this.#panX, y: this.#panY };
+		const pan = Vector2.create(this.#panX, this.#panY);
 		this.#panX = 0;
 		this.#panY = 0;
 		return pan;

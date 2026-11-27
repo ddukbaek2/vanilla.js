@@ -616,12 +616,8 @@ void main() {
 }
 `;
 
-// 렌더링 컨텍스트별 프로그램 캐시. (컨텍스트 → 효과 이름 → 프로그램)
-const programCacheByContext = new System.WeakMap();
-
-
 //==============================================================================
-// 효과 프로그램 반환. (없으면 컴파일해 캐시. 실패도 담아 두고 한 번만 알린다)
+// 효과 프로그램 반환. (Graphic.resolveShaderProgram 이 컴파일해 캐시한다. 실패도 담아 두고 한 번만 알린다)
 //==============================================================================
 /**
  * @param { Graphic } graphic
@@ -629,31 +625,7 @@ const programCacheByContext = new System.WeakMap();
  * @returns { ShaderProgram | null } 효과 프로그램. (셰이더 짓기에 실패했으면 null)
  */
 function resolveEffectProgram(graphic, effect) {
-	const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
-	let programTable = programCacheByContext.get(webGL2RenderingContext);
-	if (!programTable) {
-		programTable = new System.Map();
-		programCacheByContext.set(webGL2RenderingContext, programTable);
-	}
-	if (programTable.has(effect)) {
-		return programTable.get(effect);
-	}
-	const defaultShaderProgram = graphic.getShaderProgram();
-	const attributeLocationTable = {
-		vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
-		vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate"),
-	};
-	const fragmentShaderSource = FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect]);
-	let shaderProgram = null;
-	try {
-		shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, fragmentShaderSource, attributeLocationTable);
-	}
-	catch (error) {
-		console.error(`Graphic: shader program "ShaderSprite.${effect}" failed: ${error && error.message !== undefined ? error.message : error}`);
-		shaderProgram = null;
-	}
-	programTable.set(effect, shaderProgram);
-	return shaderProgram;
+	return graphic.resolveShaderProgram("ShaderSprite", effect, () => [VERTEXSHADER_SOURCE, FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect])]);
 }
 
 

@@ -352,7 +352,7 @@ A post-processing chain applied to the whole scene. The scene draws to the scree
 
 ![Sprite Effects example: ScreenEffect godRays light shafts over the whole screen](../images/screen-effect.webp)
 
-- Create it with `new ScreenEffect(engine.getGraphic())`, and call `begin(graphic)` at the start of the scene's `preDraw`, `end(graphic)` at the end of `postDraw`, and `tick(timeDelta)` in `tick`.
+- Create it with `new ScreenEffect()`, and call `begin(graphic)` at the start of the scene's `preDraw`, `end(graphic)` at the end of `postDraw`, and `tick(timeDelta)` in `tick`.
 - `setEnabled(type, isEnabled)`, `setStrength(type, strength)` (0 is the same as off), `setParameters(type, x, y, z, w)`, `setParameter(type, name, value)` (names are in `SCREEN_EFFECT_PARAMETER_NAMES`), `setColor(type, color)`, `disableAll()`, and `resetAll()`.
 - `setRegion(x, y, width, height, cornerRadius)` limits effects to a region in canvas pixels (top-left origin). `clearRegion()` returns to the whole screen.
 - Effects are applied in a fixed order (shape distortion, blur, glitch, color, pattern, transition; `ScreenEffect.getEffectOrder()`).
@@ -375,7 +375,7 @@ class ScreenEffectScene extends Scene {
 	async load(engine) {
 		await super.load(engine);
 		const graphic = engine.getGraphic();
-		const screenEffect = new ScreenEffect(graphic);
+		const screenEffect = new ScreenEffect();
 		screenEffect.setEnabled(ScreenEffectType.vignette, true);
 		screenEffect.setColor(ScreenEffectType.vignette, new Color(0, 0, 0, 1));
 		this.#screenEffect = screenEffect;

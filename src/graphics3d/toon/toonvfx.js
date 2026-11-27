@@ -1394,6 +1394,7 @@ export class ToonVfx {
 	 * @param { Float32Array } cornerData - 네 귀퉁이의 (x, y) 여덟 값.
 	 * @param { WebGLBuffer } instanceBuffer - 인스턴스 값을 담을 버퍼.
 	 * @returns { WebGLVertexArrayObject } 지은 버텍스 어레이.
+	 * @private
 	 */
 	createParticleVertexArray(cornerData, instanceBuffer) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1417,6 +1418,7 @@ export class ToonVfx {
 	/**
 	 * @param { Float32Array } cornerData - 네 귀퉁이의 (x, y) 여덟 값.
 	 * @param { number } location - 붙일 어트리뷰트 자리.
+	 * @private
 	 */
 	bindCornerBuffer(cornerData, location) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1434,6 +1436,7 @@ export class ToonVfx {
 	 * @param { object } arrays { positions, indices }
 	 * @param { number } componentCount - 정점 하나의 자리 값 수. (2 나 3)
 	 * @returns { object } { vertexArray, indexCount }.
+	 * @private
 	 */
 	createIndexedMesh(arrays, componentCount) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1479,6 +1482,7 @@ export class ToonVfx {
 	//==============================================================================
 	/**
 	 * @returns { WebGLTexture } 효과 아틀라스 텍스처.
+	 * @private
 	 */
 	readAtlasTexture() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1790,6 +1794,7 @@ export class ToonVfx {
 	/**
 	 * @param { number } count - 처방의 파티클 수.
 	 * @returns { number } 몫을 곱한 수. (count 가 0 보다 크면 1 이상)
+	 * @private
 	 */
 	readCount(count) {
 		if (count <= 0) {
@@ -1965,6 +1970,7 @@ export class ToonVfx {
 	 * @param { Array<number> } look [꼴, 늘임, 돎, 바닥]
 	 * @param { Array<number> } extra [밝기, 알파, 씨앗, 나타나는 몫]
 	 * @param { Array<number> } shape [크기 곡선, 테, 비움, 비움]
+	 * @private
 	 */
 	writeParticle(start, velocity, motion, color, look, extra, shape) {
 		const particleData = this.#particleData;
@@ -2123,6 +2129,7 @@ export class ToonVfx {
 	 * @param { number } defaultAngle - angle 을 주지 않았을 때의 돎. (라디안)
 	 * @param { number } seed - 잡음 씨앗.
 	 * @returns { object } 그릴 자국 값. (heat 와 age 는 0)
+	 * @private
 	 */
 	createDecal(options, defaultAngle, seed) {
 		return {
@@ -2547,6 +2554,7 @@ export class ToonVfx {
 	//==============================================================================
 	/**
 	 * @param { object } frame - readFrame 이 돌려준 그리는 프레임의 카메라.
+	 * @private
 	 */
 	drawDecals(frame) {
 		if (this.#decals.length === 0 && this.#queuedDecals.length === 0) {
@@ -2582,6 +2590,7 @@ export class ToonVfx {
 	 * @param { object } decal - createDecal 이 지은 자국 값.
 	 * @param { number } alpha - 덮는 몫. (0 ~ 1)
 	 * @param { number } heat - 열기. (0 ~ 1, 1 이면 램프의 흰 심)
+	 * @private
 	 */
 	drawDecal(decal, alpha, heat) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -2606,6 +2615,7 @@ export class ToonVfx {
 	//==============================================================================
 	/**
 	 * @param { object } frame - readFrame 이 돌려준 그리는 프레임의 카메라.
+	 * @private
 	 */
 	drawBands(frame) {
 		if (this.#bands.length === 0) {
@@ -2652,6 +2662,7 @@ export class ToonVfx {
 	//==============================================================================
 	/**
 	 * @param { object } frame - readFrame 이 돌려준 그리는 프레임의 카메라.
+	 * @private
 	 */
 	drawPlumes(frame) {
 		if (this.#plumes.length === 0) {
@@ -2684,6 +2695,7 @@ export class ToonVfx {
 	//==============================================================================
 	/**
 	 * @param { object } frame - readFrame 이 돌려준 그리는 프레임의 카메라.
+	 * @private
 	 */
 	drawFireballs(frame) {
 		if (this.#fireballs.length === 0) {
@@ -2724,6 +2736,7 @@ export class ToonVfx {
 	//==============================================================================
 	/**
 	 * @param { object } frame - readFrame 이 돌려준 그리는 프레임의 카메라.
+	 * @private
 	 */
 	drawBeams(frame) {
 		if (this.#queuedBeams.length === 0) {
@@ -2756,6 +2769,7 @@ export class ToonVfx {
 	//==============================================================================
 	/**
 	 * @param { object } frame - readFrame 이 돌려준 그리는 프레임의 카메라.
+	 * @private
 	 */
 	drawRibbons(frame) {
 		const ribbons = this.#queuedRibbons;
@@ -2844,6 +2858,7 @@ export class ToonVfx {
 	/**
 	 * @param { object } frame - readFrame 이 돌려준 그리는 프레임의 카메라.
 	 * @param { boolean } isParticleLive 낸 파티클이 아직 떠 있는지.
+	 * @private
 	 */
 	drawParticles(frame, isParticleLive) {
 		const glintCount = this.#queuedGlintCount;
@@ -2885,6 +2900,7 @@ export class ToonVfx {
 	//==============================================================================
 	// 섬광 그리기. (뷰포트 전체의 네 귀퉁이를 깊이 시험 없이, 섬광마다 처음이 세고 나이로 빠르게 걷힘)
 	//==============================================================================
+	/** @private */
 	drawFlashes() {
 		if (this.#flashes.length === 0) {
 			return;

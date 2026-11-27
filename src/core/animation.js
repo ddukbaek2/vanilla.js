@@ -9,6 +9,23 @@ import { Frame } from "./frame.js";
 
 
 //==============================================================================
+// 시트로 쓸 수 있는 그림인지 본다. (이미지, 캔버스, OffscreenCanvas, ImageBitmap, 그 꼴이 없는 환경이면 그 꼴은 거짓)
+//==============================================================================
+/**
+ * @param { any } image 볼 값.
+ * @returns { boolean } 시트로 쓸 수 있으면 참.
+ */
+function isDrawableSheetSource(image) {
+	if (image === null || image === undefined) {
+		return false;
+	}
+	return (typeof HTMLImageElement !== "undefined" && image instanceof HTMLImageElement) ||
+		(typeof HTMLCanvasElement !== "undefined" && image instanceof HTMLCanvasElement) ||
+		(typeof OffscreenCanvas !== "undefined" && image instanceof OffscreenCanvas) ||
+		(typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap);
+}
+
+//==============================================================================
 // 애니메이션 처리기.
 //==============================================================================
 /**
@@ -172,11 +189,11 @@ export class Animation extends Object {
 	// 프레임 설정. (스프라이트 시트)
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement } image 스프라이트 시트 이미지. (HTMLImageElement 가 아니면 무시한다)
+	 * @param { HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | ImageBitmap } image 스프라이트 시트 그림. (이미지, 캔버스, ImageBitmap 만 받고 그 밖의 값은 무시한다)
 	 * @param { Rect[] } rects 시트 안의 프레임 영역 목록. (픽셀, 비었거나 배열이 아니면 무시한다)
 	 */
 	setFramesFromRects(image, rects) {
-		if (image === null || image === undefined || image instanceof HTMLImageElement === false ||
+		if (isDrawableSheetSource(image) === false ||
 			rects === null || rects === undefined || rects instanceof Array === false || rects.length === 0) {
 			return;
 		}

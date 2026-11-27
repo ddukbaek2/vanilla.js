@@ -390,6 +390,25 @@ export class Color extends Object {
 	}
 
 	//==============================================================================
+	// 생성. (러스트 Color::create 와 같은 이름, new Color 와 같다)
+	//==============================================================================
+	/**
+	 * @param { number } red 빨강. (0 ~ 1, 기본 1)
+	 * @param { number } green 초록. (0 ~ 1, 기본 1)
+	 * @param { number } blue 파랑. (0 ~ 1, 기본 1)
+	 * @param { number } alpha 알파. (0 ~ 1, 기본 1, 범위를 자르지 않는다)
+	 * @returns { Color } 만든 색.
+	 * @example <caption>반투명 빨강 만들기</caption>
+	 * import { Color } from "./build/vanilla.js";
+	 *
+	 * const color = Color.create(1, 0, 0, 0.5);
+	 * console.log(color.red, color.alpha);
+	 */
+	static create(red = 1.0, green = 1.0, blue = 1.0, alpha = 1.0) {
+		return new Color(red, green, blue, alpha);
+	}
+
+	//==============================================================================
 	// 0 ~ 255 정수 성분으로 생성.
 	//==============================================================================
 	/**

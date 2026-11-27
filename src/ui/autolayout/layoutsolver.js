@@ -150,7 +150,7 @@ export class LayoutSolver {
 		else {
 			const leavingSymbol = this.getMarkerLeavingSymbol(marker);
 			if (leavingSymbol.isInvalid()) {
-				throw new System.Error("[LayoutSolver] 제약 제거 실패 — leaving row 없음.");
+				throw new System.Error("[LayoutSolver] 제약 제거 실패: leaving row 없음.");
 			}
 			const leavingRow = this.#rows.get(leavingSymbol);
 			this.#rows.delete(leavingSymbol);
@@ -536,7 +536,7 @@ export class LayoutSolver {
 			}
 			const leavingSymbol = this.getLeavingSymbol(enteringSymbol);
 			if (leavingSymbol.isInvalid()) {
-				throw new System.Error("[LayoutSolver] 목적함수가 무한대 — bound 가 부족함.");
+				throw new System.Error("[LayoutSolver] 목적함수가 무한대: bound 가 부족함.");
 			}
 			const leavingRow = this.#rows.get(leavingSymbol);
 			this.#rows.delete(leavingSymbol);
@@ -566,7 +566,7 @@ export class LayoutSolver {
 			}
 			const enteringSymbol = this.getDualEnteringSymbol(row);
 			if (enteringSymbol.isInvalid()) {
-				throw new System.Error("[LayoutSolver] dual optimize 실패 — entering 없음.");
+				throw new System.Error("[LayoutSolver] dual optimize 실패: entering 없음.");
 			}
 			this.#rows.delete(leavingSymbol);
 			row.solveForPair(leavingSymbol, enteringSymbol);

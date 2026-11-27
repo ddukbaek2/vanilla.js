@@ -352,7 +352,7 @@ engine.run(new DissolveScene());
 
 ![Sprite Effects 예제: ScreenEffect 의 godRays 를 화면 전체에 건 빛줄기](../images/screen-effect.webp)
 
-- `new ScreenEffect(engine.getGraphic())` 로 만들고, 씬의 `preDraw` 첫머리에서 `begin(graphic)`, `postDraw` 끝에서 `end(graphic)`, `tick` 에서 `tick(timeDelta)` 를 부릅니다.
+- `new ScreenEffect()` 로 만들고, 씬의 `preDraw` 첫머리에서 `begin(graphic)`, `postDraw` 끝에서 `end(graphic)`, `tick` 에서 `tick(timeDelta)` 를 부릅니다.
 - `setEnabled(type, isEnabled)`, `setStrength(type, strength)`(0 이면 꺼진 것과 같음), `setParameters(type, x, y, z, w)`, `setParameter(type, name, value)`(이름은 `SCREEN_EFFECT_PARAMETER_NAMES`), `setColor(type, color)`, `disableAll()`, `resetAll()`.
 - `setRegion(x, y, width, height, cornerRadius)` 는 캔버스 픽셀(왼쪽 위 원점) 영역에만 겁니다. `clearRegion()` 으로 화면 전체로 돌아갑니다.
 - 효과를 거는 차례는 정해져 있습니다(형태 왜곡, 흐림, 글리치, 색, 무늬, 전환 차례, `ScreenEffect.getEffectOrder()`).
@@ -375,7 +375,7 @@ class ScreenEffectScene extends Scene {
 	async load(engine) {
 		await super.load(engine);
 		const graphic = engine.getGraphic();
-		const screenEffect = new ScreenEffect(graphic);
+		const screenEffect = new ScreenEffect();
 		screenEffect.setEnabled(ScreenEffectType.vignette, true);
 		screenEffect.setColor(ScreenEffectType.vignette, new Color(0, 0, 0, 1));
 		this.#screenEffect = screenEffect;
