@@ -43081,9 +43081,12 @@ uniform vec4 projectionScale;
 uniform vec4 projectionDepth;
 uniform float isPerspective;
 uniform float depthThreshold;
+uniform float depthMargin;
 uniform float creaseCosine;
 out uvec4 fragmentSeed;
 const uint NO_SEED = 65535u;
+const float NORMAL_ERROR = 0.0165;
+const float DEPTH_STEP = 1.0 / 16777215.0;
 const ivec2 SIDES[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
 struct LinePixel {
 	float id;
@@ -43091,6 +43094,7 @@ struct LinePixel {
 	vec3 normal;
 	vec3 position;
 	float footprint;
+	float depthError;
 };
 vec3 readNormal(vec2 encoded) {
 	vec2 folded = encoded * 2.0 - 1.0;
@@ -43113,11 +43117,13 @@ LinePixel readPixel(ivec2 pixel, vec2 size) {
 		float viewZ = -projectionDepth.y / (clipDepth + projectionDepth.x);
 		result.position = vec3(-viewZ * (clipPoint.x + projectionScale.z) / projectionScale.x, -viewZ * (clipPoint.y + projectionScale.w) / projectionScale.y, viewZ);
 		result.footprint = -viewZ * 2.0 / (projectionScale.y * size.y);
+		result.depthError = DEPTH_STEP * viewZ * viewZ / abs(projectionDepth.y) * length(result.position) / max(-viewZ, 1e-6);
 	}
 	else {
 		float viewZ = (clipDepth - projectionDepth.y) / projectionDepth.x;
 		result.position = vec3((clipPoint.x - projectionDepth.z) / projectionScale.x, (clipPoint.y - projectionDepth.w) / projectionScale.y, viewZ);
 		result.footprint = 2.0 / (projectionScale.y * size.y);
+		result.depthError = DEPTH_STEP / abs(projectionDepth.x);
 	}
 	return result;
 }
@@ -43137,9 +43143,16 @@ int readEdge(LinePixel first, LinePixel second) {
 	if (farId < 0.5) {
 		return hasContour(nearFlags) ? 2 : 0;
 	}
-	vec3 offset = second.position - first.position;
-	float planeDistance = min(abs(dot(offset, first.normal)), abs(dot(offset, second.normal)));
-	bool isSeparated = planeDistance > depthThreshold + 2.0 * max(first.footprint, second.footprint);
+	LinePixel nearPixel = first;
+	LinePixel farPixel = second;
+	if (!isFirstNearer) {
+		nearPixel = second;
+		farPixel = first;
+	}
+	vec3 offset = nearPixel.position - farPixel.position;
+	float planeDistance = abs(dot(offset, farPixel.normal));
+	float pixelError = length(offset) * NORMAL_ERROR + nearPixel.footprint * length(cross(nearPixel.normal, farPixel.normal)) + nearPixel.depthError + farPixel.depthError;
+	bool isSeparated = planeDistance > depthThreshold + depthMargin * pixelError;
 	if (isSeparated) {
 		return hasContour(nearFlags) ? 2 : 0;
 	}
@@ -43405,6 +43418,7 @@ var ToonScreenOutline = class {
   #widthUnit;
   #focusDistance;
   #depthThreshold;
+  #depthMargin;
   #creaseCosine;
   #creaseWidth;
   #creaseOpacity;
@@ -43436,6 +43450,7 @@ var ToonScreenOutline = class {
     this.#widthUnit = ToonOutlineWidthUnit.pixel;
     this.#focusDistance = 0;
     this.#depthThreshold = 0.05;
+    this.#depthMargin = 2;
     this.#creaseCosine = System109.Math.cos(System109.Math.PI / 3);
     this.#creaseWidth = 1;
     this.#creaseOpacity = 1;
@@ -43513,6 +43528,15 @@ var ToonScreenOutline = class {
   }
   setDepthThreshold(depthThreshold) {
     this.#depthThreshold = System109.Math.max(0, depthThreshold);
+  }
+  getDepthThreshold() {
+    return this.#depthThreshold;
+  }
+  setDepthMargin(depthMargin) {
+    this.#depthMargin = System109.Math.max(0, depthMargin);
+  }
+  getDepthMargin() {
+    return this.#depthMargin;
   }
   setResolutionScale(resolutionScale) {
     this.#resolutionScale = System109.Math.max(0.25, System109.Math.min(1, resolutionScale));
@@ -43761,6 +43785,7 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionDepth"), projectionElements[10], projectionElements[14], projectionElements[12], projectionElements[13]);
     webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
     webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthThreshold"), this.#depthThreshold);
+    webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthMargin"), this.#depthMargin);
     webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("creaseCosine"), lineWidths[1] > 0 ? this.#creaseCosine : -2);
     webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);

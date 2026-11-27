@@ -103068,8 +103068,8 @@
 				{
 					"name": "ToonScreenOutline",
 					"summary": {
-						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.\n- 인스턴스: drawMeshInstanced 는 인스턴스 배열을 걸러 그때 올린다. drawMeshInstanceBuffer 는 ToonRenderer.createInstanceBuffer 의 버퍼를 몸과 같이 쓰고 다시 올리지 않는다.\n  버퍼의 인스턴스마다 번호는 꼴의 instanceLineId 칸에서 읽는다. (없으면 공통 번호)\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)",
-						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the two are farther apart than the depth threshold from each other's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. Twice the pixel size at that depth is added to the threshold so distant things mean the same.\n- Widening: the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines even when the widening target is reduced)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Per-ID color: setLineColor gives a line color per ID. (The Unreal Custom Stencil form; a line where two IDs touch takes the color of the nearer ID, and IDs not in the table, or an empty table, keep the setColor color)\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Cost: setResolutionScale reduces the widening (jump flooding) target. (The light path for phones) The line target and seeds stay at drawing area resolution, so line positions do not change when reduced.\n- Instances: drawMeshInstanced culls the instance array and uploads it then. drawMeshInstanceBuffer shares the ToonRenderer.createInstanceBuffer buffer with the body and does not upload it again.\n  The ID of each instance in the buffer is read from the layout's instanceLineId slot. (The common ID if there is none)\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushBatch before it)"
+						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 잰 오차(노멀 8 비트 각 오차 x 두 자리 사이 거리, 꺾임의 화소 한 칸 x 사인, 깊이 24 비트 한 칸) x 배율을 더해 먼 것도 같은 뜻이 되고, 나란한 낮은 턱은 화소 한 칸보다 낮아도 잡힌다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.\n- 인스턴스: drawMeshInstanced 는 인스턴스 배열을 걸러 그때 올린다. drawMeshInstanceBuffer 는 ToonRenderer.createInstanceBuffer 의 버퍼를 몸과 같이 쓰고 다시 올리지 않는다.\n  버퍼의 인스턴스마다 번호는 꼴의 instanceLineId 칸에서 읽는다. (없으면 공통 번호)\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)",
+						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the occluding pixel is farther than the depth threshold plus the error margin from the occluded pixel's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. The measured error (8-bit normal angular error x the distance between the two positions, one pixel x the sine at a crease, one 24-bit depth step) x the factor is added to the threshold, so distant things mean the same, and a low parallel step is caught even when it is lower than one pixel.\n- Widening: the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines even when the widening target is reduced)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Per-ID color: setLineColor gives a line color per ID. (The Unreal Custom Stencil form; a line where two IDs touch takes the color of the nearer ID, and IDs not in the table, or an empty table, keep the setColor color)\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Cost: setResolutionScale reduces the widening (jump flooding) target. (The light path for phones) The line target and seeds stay at drawing area resolution, so line positions do not change when reduced.\n- Instances: drawMeshInstanced culls the instance array and uploads it then. drawMeshInstanceBuffer shares the ToonRenderer.createInstanceBuffer buffer with the body and does not upload it again.\n  The ID of each instance in the buffer is read from the layout's instanceLineId slot. (The common ID if there is none)\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushBatch before it)"
 					},
 					"examples": [
 						{
@@ -103442,14 +103442,14 @@
 									"name": "depthThreshold",
 									"type": "number",
 									"description": {
-										"ko": "접평면 거리 문턱. (월드 길이)",
-										"en": "Tangent plane distance threshold. (World length)"
+										"ko": "접평면 거리 문턱. (월드 길이, 면에 수직, 0 이상)",
+										"en": "Tangent plane distance threshold. (World length, perpendicular to the face, 0 or more)"
 									}
 								}
 							],
 							"description": {
-								"ko": "깊이 문턱 설정. (같은 번호의 이웃 화소가 서로의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)\n- 그 깊이의 화소 크기 두 배를 더해 쓴다. 장면의 크기에 맞춘다. (사람 크기 장면이면 0.02 ~ 0.1)",
-								"en": "Set the depth threshold. (If neighboring pixels with the same ID are farther apart than this from each other's tangent plane, an occluded silhouette is drawn, world length)\n- Twice the pixel size at that depth is added. Match it to the scale of the scene. (0.02 ~ 0.1 for a human-sized scene)"
+								"ko": "깊이 문턱 설정. (같은 번호의 이웃 화소 가운데 가린 쪽이 가려진 쪽의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)\n- depthThreshold 는 면에 수직인 거리이고, 화소 여유가 더해진다. (setDepthMargin 의 배율 x 잰 오차, 오차는 화소 크기와 면의 기울기를 따른다)\n- 장면의 크기에 맞춘다. (사람 크기 장면이면 0.02 ~ 0.1, 0 이면 오차 여유만으로 가른다)",
+								"en": "Set the depth threshold. (If, of two neighboring pixels with the same ID, the occluding one is farther than this from the occluded one's tangent plane, an occluded silhouette is drawn, world length)\n- depthThreshold is a distance perpendicular to the face, and a pixel margin is added to it. (The setDepthMargin factor x the measured error, the error follows the pixel size and the slant of the face)\n- Match it to the scale of the scene. (0.02 ~ 0.1 for a human-sized scene, 0 separates by the error margin alone)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
@@ -103458,7 +103458,106 @@
 								"module": "graphics3d/toon/toonscreenoutline",
 								"class": "ToonScreenOutline",
 								"name": "set_depth_threshold"
-							}
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "낮은 턱까지 실루엣으로 긋기",
+										"en": "Drawing even low steps as silhouettes"
+									},
+									"code": "import { ToonScreenOutline } from \"./vanilla.js\";\nconst outline = new ToonScreenOutline(document.createElement(\"canvas\").getContext(\"webgl2\"));\noutline.setDepthThreshold(0.01);\nconsole.log(outline.getDepthThreshold());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getDepthThreshold",
+							"signature": "getDepthThreshold()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "접평면 거리 문턱. (월드 길이)",
+									"en": "Tangent plane distance threshold. (World length)"
+								}
+							},
+							"description": {
+								"ko": "깊이 문턱 반환. (월드 길이, 면에 수직)",
+								"en": "Returns the depth threshold. (World length, perpendicular to the face)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "기본 깊이 문턱 읽기",
+										"en": "Reading the default depth threshold"
+									},
+									"code": "import { ToonScreenOutline } from \"./vanilla.js\";\nconst outline = new ToonScreenOutline(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconsole.log(outline.getDepthThreshold()); // 0.05",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "setDepthMargin",
+							"signature": "setDepthMargin(depthMargin)",
+							"params": [
+								{
+									"name": "depthMargin",
+									"type": "number",
+									"description": {
+										"ko": "잰 오차에 곱할 배율. (0 이상)",
+										"en": "Factor to multiply the measured error by. (0 or more)"
+									}
+								}
+							],
+							"description": {
+								"ko": "깊이 여유 배율 설정. (깊이 문턱에 더하는 화소 여유가 잰 오차의 몇 배인지, 기본 2)\n- 이어진 면에서도 생기는 접평면 거리의 오차를 화소마다 잰다. 노멀 8 비트 팔면체의 각 오차(0.0165 rad) x 두 화소 자리 사이 거리(면이 비스듬할수록 길다), 꺾인 줄을 사이에 둔 두 화소의 화소 한 칸 x 두 노멀이 벌어진 사인, 깊이 24 비트 한 칸.\n- 두 면이 나란한 낮은 턱은 꺾임 몫이 0 이라 화소 한 칸보다 낮아도 잡힌다. 둥근 면을 굵은 다각형으로 지어 보간 노멀이 면에서 크게 벗어나는 모형에서 깊이 문턱을 아주 낮추면 잔선이 생기니, 그때 배율을 올린다.\n- 0 이면 깊이 문턱만으로 가른다.",
+								"en": "Set the depth margin factor. (How many times the measured error the pixel margin added to the depth threshold is, default 2)\n- The error of the tangent-plane distance that appears even on connected surfaces is measured per pixel: the angular error of the 8-bit octahedral normal (0.0165 rad) x the distance between the two pixel positions (longer the more slanted the face), one pixel x the sine of the angle between the two normals for two pixels on either side of a crease, and one step of the 24-bit depth.\n- A low step between two parallel faces has no crease term, so it is caught even when it is lower than one pixel. On models that build round surfaces from coarse polygons, where the interpolated normal strays far from the face, lowering the depth threshold a lot produces stray lines, so raise the factor then.\n- 0 separates by the depth threshold alone."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "여유를 줄여 낮은 턱을 더 잡기",
+										"en": "Reducing the margin to catch more low steps"
+									},
+									"code": "import { ToonScreenOutline } from \"./vanilla.js\";\nconst outline = new ToonScreenOutline(document.createElement(\"canvas\").getContext(\"webgl2\"));\noutline.setDepthThreshold(0.02);\noutline.setDepthMargin(1);\nconsole.log(outline.getDepthMargin()); // 1",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getDepthMargin",
+							"signature": "getDepthMargin()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "잰 오차에 곱할 배율.",
+									"en": "Factor to multiply the measured error by."
+								}
+							},
+							"description": {
+								"ko": "깊이 여유 배율 반환.",
+								"en": "Returns the depth margin factor."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "기본 깊이 여유 배율 읽기",
+										"en": "Reading the default depth margin factor"
+									},
+									"code": "import { ToonScreenOutline } from \"./vanilla.js\";\nconst outline = new ToonScreenOutline(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconsole.log(outline.getDepthMargin()); // 2",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
