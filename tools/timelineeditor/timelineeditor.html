@@ -1467,6 +1467,31 @@
     /** @private @type { Map } */
     static #hexCache = new System4.Map();
     //==============================================================================
+    // 색 인자 읽기. (정적, 러스트 판 From<&str> for Color 의 짝)
+    // - 색을 받는 설정 함수들이 이것으로 Color 와 색 글("#rrggbb", "#rgb", "rgba(...)" 같은)을 함께 받는다.
+    // - Color 를 주면 그 인스턴스를 그대로 돌려준다. (복사할지는 부른 쪽이 정한다) 색 글이면 fromCache 로 읽은 새 복사본을 준다.
+    //==============================================================================
+    /**
+     * @param { Color | string } value 색이나 색 글. (fromCache 가 읽는 꼴, 그 밖의 글은 흰색)
+     * @returns { Color } Color 면 그것, 색 글이면 새 Color.
+     * @example <caption>색 글과 Color 를 같은 자리에 주기</caption>
+     * import { Color, Paint } from "./build/vanilla.js";
+     *
+     * const fromText = Color.from("#ff8000");
+     * console.log(fromText.toHEXString());
+     * const red = new Color(1, 0, 0, 1);
+     * console.log(Color.from(red) === red);
+     * const paint = new Paint();
+     * paint.setColor("#336699");
+     * console.log(paint.getColor().toHEXString());
+     */
+    static from(value) {
+      if (typeof value === "string") {
+        return _Color.fromCache(value).clone();
+      }
+      return value;
+    }
+    //==============================================================================
     // 색 문자열로 캐시한 색 반환. (정적, "#rgb", "#rgba", "#rrggbb", "#rrggbbaa", "rgb(...)", "rgba(...)", 그 밖은 흰색)
     // - 같은 문자열이면 같은 인스턴스를 준다. 매 프레임 같은 문자열로 색을 정할 때 문자열을 다시 풀지 않는다.
     // - 반환된 인스턴스는 공유되므로 절대 고쳐 쓰지 않는다. 고칠 거면 clone() 한다.
@@ -4074,6 +4099,9 @@
     #localOpacity;
     // 투명도.
     /** @private @type { boolean } */
+    #isVisible;
+    // 보이기 플래그. (켜짐, 투명도와 따로, 거짓이면 이 노드와 자손을 그리지 않고 누름도 받지 않는다)
+    /** @private @type { boolean } */
     #isGizmoVisible;
     // 기즈모 출력 여부.
     /** @private @type { boolean } */
@@ -4097,6 +4125,7 @@
       this.#isGizmoVisible = false;
       this.#isOpacityLayer = false;
       this.#localOpacity = 1;
+      this.#isVisible = true;
       this.#lastDrawnMaximumScale = 0;
     }
     //==============================================================================
@@ -4146,8 +4175,8 @@
      * @param { Graphic } graphic 그릴 그래픽.
      */
     draw(graphic) {
-      const isVisible = this.isVisible();
-      if (isVisible) {
+      const isDrawn = this.isActive() && this.isVisible() && this.getLocalOpacity() > 0;
+      if (isDrawn) {
         const components = this.getAllComponents();
         for (const component of components) {
           if (!component.isEnable()) {
@@ -4398,43 +4427,61 @@
       return this.#localRotation;
     }
     //==============================================================================
-    // 가시 상태 반환.
+    // 보이기 설정. (켜짐, 투명도와 따로 두는 플래그, 러스트 판 WorldNode::set_visible 과 같다)
+    // - 거짓이면 이 노드와 자손을 그리지 않고 TouchRaycaster 의 누름도 받지 않는다. 갱신(tick)은 그대로 돈다.
     //==============================================================================
     /**
-     * @returns { boolean } 켜져 있고 로컬 투명도가 0 보다 크면 참.
+     * @param { boolean } isVisible 거짓이면 숨긴다. (기본 참)
+     * @example <caption>부모를 숨기면 자식도 계층에서 안 보인다</caption>
+     * import { WorldNode } from "./build/vanilla.js";
+     *
+     * const parentNode = new WorldNode();
+     * const childNode = new WorldNode();
+     * parentNode.addChild(childNode);
+     * parentNode.setVisible(false);
+     * console.log(parentNode.isVisible(), parentNode.isActive(), childNode.isVisible(), childNode.isVisibleInHierarchy());
      */
-    isVisible() {
-      const isActive = this.isActive();
-      if (isActive) {
-        const opacity = this.getLocalOpacity();
-        if (opacity > 0) {
-          return true;
-        }
-      }
-      return false;
+    setVisible(isVisible) {
+      this.#isVisible = isVisible;
     }
     //==============================================================================
-    // 현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
+    // 보이기 플래그 반환. (setVisible 로 정한 값, 켜짐과 투명도는 보지 않는다, 계층 판정은 isVisibleInHierarchy)
+    //==============================================================================
+    /**
+     * @returns { boolean } 보이기 플래그. (기본 참)
+     */
+    isVisible() {
+      return this.#isVisible;
+    }
+    //==============================================================================
+    // 현재부터 루트까지 계층 전체의 가시 상태 반환. (자신과 조상 모두 켜져 있고, 보이기 플래그가 참이고, 로컬 투명도가 0 보다 커야 참)
     //==============================================================================
     /**
      * @returns { boolean } 자신과 모든 부모가 보이면 참.
+     * @example <caption>꺼짐, 투명도 0, 숨김 가운데 하나라도 조상에 있으면 거짓</caption>
+     * import { WorldNode } from "./build/vanilla.js";
+     *
+     * const parentNode = new WorldNode();
+     * const childNode = new WorldNode();
+     * parentNode.addChild(childNode);
+     * parentNode.setLocalOpacity(0);
+     * console.log(childNode.isActiveInHierarchy(), childNode.isVisibleInHierarchy());
+     * parentNode.setLocalOpacity(1);
+     * childNode.setVisible(false);
+     * console.log(parentNode.isVisibleInHierarchy(), childNode.isVisibleInHierarchy());
      */
     isVisibleInHierarchy() {
-      const isVisible = this.isVisible();
-      if (isVisible) {
-        let current = this;
-        while (current !== null && current !== void 0) {
-          const isCurrentVisible = current.isVisible();
-          if (isCurrentVisible) {
-            current = current.getParent();
-          } else {
-            return false;
-          }
+      let current = this;
+      while (current !== null && current !== void 0) {
+        const isCurrentActive = typeof current.isActive === "function" ? current.isActive() : true;
+        const isCurrentVisible = typeof current.isVisible === "function" ? current.isVisible() : true;
+        const currentOpacity = typeof current.getLocalOpacity === "function" ? current.getLocalOpacity() : 1;
+        if (!isCurrentActive || !isCurrentVisible || !(currentOpacity > 0)) {
+          return false;
         }
-        return true;
-      } else {
-        return false;
+        current = current.getParent();
       }
+      return true;
     }
     //==============================================================================
     // 글로벌 투명도 반환.
@@ -6704,6 +6751,7 @@ void main() {
      * @param { Color | string } color 채우기 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, 거짓 값이면 바꾸지 않는다)
      */
     setFillColor(color) {
+      color = Color.from(color);
       if (color) {
         this.#fillColor = parseColorValue(color);
       }
@@ -6724,6 +6772,7 @@ void main() {
      * @param { Color | string } color 선 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, 거짓 값이면 바꾸지 않는다)
      */
     setStrokeColor(color) {
+      color = Color.from(color);
       if (color) {
         this.#strokeColor = parseColorValue(color);
       }
@@ -12191,8 +12240,8 @@ void main() {
      * @param { Graphic } graphic 그릴 그래픽.
      */
     draw(graphic) {
-      const isVisible = this.isVisible();
-      if (!isVisible) {
+      const isDrawn = this.isActive() && this.isVisible() && this.getLocalOpacity() > 0;
+      if (!isDrawn) {
         return;
       }
       const isOpacityLayer = this.isOpacityLayer() && graphic.getGlobalAlpha() < 1;
@@ -12696,6 +12745,110 @@ void main() {
       return Vector2.create(ratioX * contentSize.x, ratioY * contentSize.y);
     }
     //==============================================================================
+    // 이 노드에서 뿌리까지 쌓은 월드 변환. (원소 여섯 { a, b, c, d, e, f }, 뷰 x = a * x + c * y + e, 뷰 y = b * x + d * y + f)
+    // - 노드마다 이동, 회전, 크기, 피봇 보정(내용 크기 x 피봇) 차례로 곱한다. (pushTransform, 러스트 판 calculate_local_matrix 와 같은 차례)
+    //==============================================================================
+    /**
+     * @private
+     * @returns { { a: number, b: number, c: number, d: number, e: number, f: number } }
+     */
+    calculateWorldAffine() {
+      let a = 1;
+      let b = 0;
+      let c = 0;
+      let d = 1;
+      let e = 0;
+      let f = 0;
+      let current = this;
+      while (current !== null && current !== void 0) {
+        const localPosition = current.getLocalPosition();
+        const localScale = current.getLocalScale();
+        const radian = degreeToRadian(current.getLocalRotation());
+        const cosRadian = cos(radian);
+        const sinRadian = sin(radian);
+        let pivotOffsetX = 0;
+        let pivotOffsetY = 0;
+        if (typeof current.getContentSize === "function" && typeof current.getPivot === "function") {
+          const contentSize = current.getContentSize();
+          const pivot = current.getPivot();
+          pivotOffsetX = -contentSize.x * pivot.x;
+          pivotOffsetY = -contentSize.y * pivot.y;
+        }
+        const localA = cosRadian * localScale.x;
+        const localB = sinRadian * localScale.x;
+        const localC = -sinRadian * localScale.y;
+        const localD = cosRadian * localScale.y;
+        const localE = localA * pivotOffsetX + localC * pivotOffsetY + localPosition.x;
+        const localF = localB * pivotOffsetX + localD * pivotOffsetY + localPosition.y;
+        const nextA = localA * a + localC * b;
+        const nextB = localB * a + localD * b;
+        const nextC = localA * c + localC * d;
+        const nextD = localB * c + localD * d;
+        const nextE = localA * e + localC * f + localE;
+        const nextF = localB * e + localD * f + localF;
+        a = nextA;
+        b = nextB;
+        c = nextC;
+        d = nextD;
+        e = nextE;
+        f = nextF;
+        const parent = current.getParent();
+        current = parent !== null && parent !== void 0 && typeof parent.getLocalPosition === "function" ? parent : null;
+      }
+      return { a, b, c, d, e, f };
+    }
+    //==============================================================================
+    // 노드 영역 안의 점 → 뷰 좌표. (내용 영역의 왼쪽 위가 원점, 부모들의 변환을 모두 거친다, 러스트 판 NodeTree::convert_node_position_to_view_position)
+    //==============================================================================
+    /**
+     * @param { Vector2 } nodePosition 이 노드 내용 좌표의 점.
+     * @returns { Vector2 } 뷰 좌표의 점.
+     * @example <caption>단추 오른쪽 아래 귀퉁이의 뷰 자리</caption>
+     * import { Vector2, WorldNode } from "./build/vanilla.js";
+     *
+     * const rootNode = new WorldNode();
+     * const buttonNode = new WorldNode();
+     * rootNode.addChild(buttonNode);
+     * buttonNode.setLocalPosition(Vector2.create(100, 100));
+     * buttonNode.setContentSize(Vector2.create(40, 20));
+     * const corner = buttonNode.convertNodePositionToViewPosition(Vector2.create(40, 20));
+     * console.log(corner.x, corner.y);
+     */
+    convertNodePositionToViewPosition(nodePosition) {
+      const affine = this.calculateWorldAffine();
+      return Vector2.create(affine.a * nodePosition.x + affine.c * nodePosition.y + affine.e, affine.b * nodePosition.x + affine.d * nodePosition.y + affine.f);
+    }
+    //==============================================================================
+    // 뷰 좌표 → 노드 영역 안의 점. (행렬을 뒤집을 수 없으면(배율 0) null, 러스트 판 NodeTree::convert_view_position_to_node_position)
+    //==============================================================================
+    /**
+     * @param { Vector2 } viewPosition 뷰 좌표의 점.
+     * @returns { Vector2 | null } 이 노드 내용 좌표의 점. (배율이 0 이라 뒤집을 수 없으면 null)
+     * @example <caption>뷰 자리를 노드 안 자리로 바꾸고 되돌리기</caption>
+     * import { Vector2, WorldNode } from "./build/vanilla.js";
+     *
+     * const rootNode = new WorldNode();
+     * const panelNode = new WorldNode();
+     * rootNode.addChild(panelNode);
+     * panelNode.setLocalPosition(Vector2.create(200, 100));
+     * panelNode.setContentSize(Vector2.create(100, 50));
+     * panelNode.setLocalScale(Vector2.create(2, 2));
+     * const nodePosition = panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100));
+     * console.log(nodePosition.x, nodePosition.y);
+     * panelNode.setLocalScale(Vector2.create(0, 1));
+     * console.log(panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100)));
+     */
+    convertViewPositionToNodePosition(viewPosition) {
+      const affine = this.calculateWorldAffine();
+      const determinant = affine.a * affine.d - affine.b * affine.c;
+      if (determinant === 0 || !System17.Number.isFinite(determinant)) {
+        return null;
+      }
+      const offsetX = viewPosition.x - affine.e;
+      const offsetY = viewPosition.y - affine.f;
+      return Vector2.create((affine.d * offsetX - affine.c * offsetY) / determinant, (affine.a * offsetY - affine.b * offsetX) / determinant);
+    }
+    //==============================================================================
     // 터치 인터랙션 활성화 설정.
     //==============================================================================
     /**
@@ -12780,6 +12933,10 @@ void main() {
     return typeof node.isInteractable === "function" && typeof node.contains === "function";
   }
   __name(isTouchableNode, "isTouchableNode");
+  function isNodeVisible(node) {
+    return typeof node.isVisible === "function" ? node.isVisible() : true;
+  }
+  __name(isNodeVisible, "isNodeVisible");
   var TouchRaycaster = class extends Object2 {
     static {
       __name(this, "TouchRaycaster");
@@ -12905,7 +13062,7 @@ void main() {
       let scrollView = null;
       let scrollViewDrawOrder = -1;
       const traverse = /* @__PURE__ */ __name((node) => {
-        if (!node || !node.isActive()) {
+        if (!node || !node.isActive() || !isNodeVisible(node)) {
           return;
         }
         const currentDrawOrder = drawOrderCounter;
@@ -13008,7 +13165,7 @@ void main() {
           return;
         }
         const isActive = node.isActive();
-        if (!isActive) {
+        if (!isActive || !isNodeVisible(node)) {
           return;
         }
         const currentDrawOrder = drawOrderCounter;
@@ -13611,6 +13768,9 @@ void main() {
     /** @private @type { TouchRaycaster | null } */
     #touchRaycaster;
     // 노드에 터치를 넘기는 레이캐스터. (null 이면 넘기지 않는다)
+    /** @private @type { Color } */
+    #sceneBackgroundColor;
+    // drawSceneBackground 가 캔버스 전체를 칠하는 색. (기본 검정)
     /** @private @type { boolean } */
     #isTouchDispatchEnabled;
     // 노드에 터치를 넘기는지. (러스트 판 SceneBase 와 같은 스위치)
@@ -13619,6 +13779,7 @@ void main() {
     //==============================================================================
     constructor() {
       super();
+      this.#sceneBackgroundColor = Color.black();
     }
     //==============================================================================
     // 생성.
@@ -14153,6 +14314,58 @@ void main() {
      */
     isGizmoVisible() {
       return this.#isGizmoVisible;
+    }
+    //==============================================================================
+    // 배경색 설정. (drawSceneBackground 가 칠한다, Color 나 "#202020" 같은 색 글)
+    //==============================================================================
+    /**
+     * @param { Color | string } color 배경색. (색 글은 Color.from 으로 읽는다, 기본 검정)
+     */
+    setSceneBackgroundColor(color) {
+      this.#sceneBackgroundColor = Color.from(color).clone();
+    }
+    //==============================================================================
+    // 배경색 반환.
+    //==============================================================================
+    /**
+     * @returns { Color } 배경색. (기본 검정)
+     */
+    getSceneBackgroundColor() {
+      return this.#sceneBackgroundColor;
+    }
+    //==============================================================================
+    // 배경 그리기. (캔버스 전체를 배경색으로 칠하고 뷰 좌표계를 건다, 세이프 에어리어 바깥까지)
+    // - GameScene 과 UIScene 은 preDraw 에서 부른다. Scene 을 바로 잇는 씬은 preDraw 에서 불러 쓴다.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic 그릴 그래픽.
+     * @example <caption>Scene 을 바로 이은 씬의 배경을 칠하기</caption>
+     * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+     *
+     * class MainScene extends Scene {
+     * 	create() {
+     * 		super.create();
+     * 		this.setSceneBackgroundColor("#203040");
+     * 	}
+     *
+     * 	preDraw(graphic) {
+     * 		super.preDraw(graphic);
+     * 		this.drawSceneBackground(graphic);
+     * 	}
+     * }
+     * const engineConfiguration = new EngineConfiguration();
+     * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+     * const engine = new Engine(engineConfiguration);
+     * engine.run(new MainScene());
+     */
+    drawSceneBackground(graphic) {
+      const engine = this.getEngine();
+      const viewManager = engine.getViewManager();
+      const canvasNativeSize = viewManager.getCanvasNativeSize();
+      viewManager.applyCanvasNativeRect(graphic);
+      graphic.setFillColor(this.#sceneBackgroundColor);
+      graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+      viewManager.applyViewRect(graphic);
     }
   };
 
@@ -15575,7 +15788,9 @@ void main() {
     /** @type { Vector2 } */
     referenceResolutionSize;
     // 기준 해상도.
-    // /** @type { ViewScaleMode } */ viewScaleMode; // 뷰 모드.
+    // 뷰 스케일 모드. (기본 ViewScaleMode.stretchShort, 엔진이 만들 때 뷰 매니저에 넣는다. UIScene 과 GameScene 은 initialize 에서 저마다의 모드로 바꾼다)
+    /** @type { string } */
+    viewScaleMode;
     // 캔버스 식별자. 문서에 그 id 의 요소가 없으면 캔버스를 새로 만들어 그 id 를 주고 body 끝에 붙인다.
     /** @type { string } */
     canvasId;
@@ -15631,6 +15846,7 @@ void main() {
     constructor() {
       super();
       this.referenceResolutionSize = Vector2.zero();
+      this.viewScaleMode = ViewScaleMode.stretchShort;
       this.canvasId = "";
       this.useStatistics = false;
       this.autoResizeOnWindowResize = false;
@@ -15732,6 +15948,7 @@ void main() {
       this.#timeManager = new TimeManager(this);
       this.#viewManager = new ViewManager(this);
       this.#viewManager.setCanvas(canvas);
+      this.#viewManager.setViewScaleMode(engineConfiguration.viewScaleMode ?? ViewScaleMode.stretchShort);
       this.#inputManager = new InputManager(this);
       this.#audioManager = new AudioManager(this);
       this.#resizeCallback = this.resize.bind(this);
@@ -17861,10 +18078,12 @@ void main() {
     // 시작 색 범위 설정. (기본 흰색)
     //==============================================================================
     /**
-     * @param { Color } colorA 시작 색. (복사해 둔다)
-     * @param { Color } colorB 둘 사이 무작위.
+     * @param { Color | string } colorA 시작 색. (복사해 둔다)
+     * @param { Color | string } colorB 둘 사이 무작위.
      */
     setStartColor(colorA, colorB = colorA) {
+      colorA = Color.from(colorA);
+      colorB = Color.from(colorB);
       this.#startColorA = colorA.clone();
       this.#startColorB = colorB.clone();
     }
@@ -18449,11 +18668,7 @@ void main() {
       if (other === null || other === void 0) {
         this.#color = Color.transparent();
       } else if (typeof other === "string") {
-        if (other.startsWith("#")) {
-          this.#color = Color.createFromHEX(other);
-        } else if (other.startsWith("rgb")) {
-          this.#color = Color.createFromRGBA(other);
-        }
+        this.#color = Color.from(other);
       } else if (other instanceof Color) {
         this.#color = other;
       }
@@ -18574,6 +18789,9 @@ void main() {
     //==============================================================================
     /** @private @type { HTMLImageElement } */
     #image;
+    /** @private @type { string } */
+    #imagePath;
+    // 그림 경로. (UIDocument 가 그림 대신 적고 읽는다, 그리기에는 쓰지 않는다)
     /** @private @type { Rect } */
     #imageRect;
     /** @private @type { boolean } */
@@ -18595,6 +18813,7 @@ void main() {
     constructor() {
       super();
       this.setComponentType("Sprite");
+      this.#imagePath = "";
       this.#image = null;
       this.#imageRect = Rect.zero();
       this.#isHorizontalFlip = false;
@@ -18867,6 +19086,31 @@ void main() {
      */
     getImage() {
       return this.#image;
+    }
+    //==============================================================================
+    // 그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)
+    //==============================================================================
+    /**
+     * @param { string } imagePath 그림 경로.
+     */
+    setImagePath(imagePath) {
+      this.#imagePath = imagePath ?? "";
+    }
+    //==============================================================================
+    // 그림 경로 반환. (정하지 않았으면 빈 글)
+    //==============================================================================
+    /**
+     * @returns { string } 그림 경로. (정하지 않았으면 빈 글)
+     * @example <caption>그림 경로를 적고 다시 읽기</caption>
+     * import { Sprite } from "./build/vanilla.js";
+     *
+     * const sprite = new Sprite();
+     * console.log(sprite.getImagePath() === "");
+     * sprite.setImagePath("images/coin.png");
+     * console.log(sprite.getImagePath());
+     */
+    getImagePath() {
+      return this.#imagePath;
     }
     //==============================================================================
     // 조각 걸기. (Frame 의 그림과 그 안의 영역을 함께 건다, null 이면 그림을 비운다, SpriteAtlas.readFrame)
@@ -19839,9 +20083,10 @@ void main() {
     // 효과 색 설정.
     //==============================================================================
     /**
-     * @param { Color } color 효과 색. (복사해 둔다, null 이면 무시한다)
+     * @param { Color | string } color 효과 색. (복사해 둔다, null 이면 무시한다)
      */
     setEffectColor(color) {
+      color = Color.from(color);
       if (color === null || color === void 0) {
         return;
       }
@@ -21030,6 +21275,7 @@ void main() {
      * @param { Color | string | CanvasGradient | CanvasPattern } color 글 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
      */
     setTextColor(color) {
+      color = Color.from(color);
       if (typeof color === "string" && color === this.#textColorString) {
         const cachedColor = Color.fromCache(color);
         const textColor = this.#textColor;
@@ -21066,6 +21312,7 @@ void main() {
      * @param { Color | string | CanvasGradient | CanvasPattern } color 외곽선 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
      */
     setStrokeColor(color) {
+      color = Color.from(color);
       if (color === null || color === void 0) {
         this.#strokeColor = Color.transparent();
       } else if (typeof color === "string") {

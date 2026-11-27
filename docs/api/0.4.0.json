@@ -2122,6 +2122,44 @@
 						},
 						{
 							"kind": "static",
+							"name": "from",
+							"signature": "static from(value)",
+							"params": [
+								{
+									"name": "value",
+									"type": "Color | string",
+									"description": {
+										"ko": "색이나 색 글. (fromCache 가 읽는 꼴, 그 밖의 글은 흰색)",
+										"en": "A color or color text. (The forms fromCache reads; any other text is white)"
+									}
+								}
+							],
+							"returns": {
+								"type": "Color",
+								"description": {
+									"ko": "Color 면 그것, 색 글이면 새 Color.",
+									"en": "The Color itself if a Color, a new Color if color text."
+								}
+							},
+							"description": {
+								"ko": "색 인자 읽기. (정적, 러스트 판 From<&str> for Color 의 짝)\n- 색을 받는 설정 함수들이 이것으로 Color 와 색 글(\"#rrggbb\", \"#rgb\", \"rgba(...)\" 같은)을 함께 받는다.\n- Color 를 주면 그 인스턴스를 그대로 돌려준다. (복사할지는 부른 쪽이 정한다) 색 글이면 fromCache 로 읽은 새 복사본을 준다.",
+								"en": "Reads a color argument. (static, counterpart of the Rust edition's From<&str> for Color)\n- Setters that take a color use this to accept both a Color and color text (such as \"#rrggbb\", \"#rgb\", \"rgba(...)\").\n- Given a Color, returns that instance as is. (The caller decides whether to copy) Given color text, returns a new copy read with fromCache."
+							},
+							"since": "0.4.0",
+							"source": "src/base/color.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "색 글과 Color 를 같은 자리에 주기",
+										"en": "Passing color text and a Color in the same place"
+									},
+									"code": "import { Color, Paint } from \"./build/vanilla.js\";\n\nconst fromText = Color.from(\"#ff8000\");\nconsole.log(fromText.toHEXString());\nconst red = new Color(1, 0, 0, 1);\nconsole.log(Color.from(red) === red);\nconst paint = new Paint();\npaint.setColor(\"#336699\");\nconsole.log(paint.getColor().toHEXString());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "static",
 							"name": "fromCache",
 							"signature": "static fromCache(colorString)",
 							"params": [
@@ -9617,7 +9655,7 @@
 								"ko": "설정을 채워 엔진 만들기",
 								"en": "Fill in the configuration and create the engine"
 							},
-							"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.canvasId = \"gameCanvas\";\nengineConfiguration.title = \"My Game\";\nengineConfiguration.referenceResolutionSize = Vector2.create(1920, 1080);\nengineConfiguration.autoResizeOnWindowResize = true;\nengineConfiguration.maximumFramePerSecond = 60;\nengineConfiguration.useStatistics = true;\nengineConfiguration.useDevTools = false;\nconst engine = new Engine(engineConfiguration);\nengine.run(new Scene());",
+							"code": "import { Engine, EngineConfiguration, Scene, Vector2, ViewScaleMode } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.canvasId = \"gameCanvas\";\nengineConfiguration.title = \"My Game\";\nengineConfiguration.referenceResolutionSize = Vector2.create(1920, 1080);\nengineConfiguration.viewScaleMode = ViewScaleMode.stretchShortExpandLong;\nengineConfiguration.autoResizeOnWindowResize = true;\nengineConfiguration.maximumFramePerSecond = 60;\nengineConfiguration.useStatistics = true;\nengineConfiguration.useDevTools = false;\nconst engine = new Engine(engineConfiguration);\nengine.run(new Scene());",
 							"language": "javascript"
 						}
 					],
@@ -9652,6 +9690,25 @@
 								"class": "EngineConfiguration",
 								"name": "reference_resolution_size"
 							}
+						},
+						{
+							"kind": "field",
+							"name": "viewScaleMode",
+							"signature": "viewScaleMode",
+							"params": [],
+							"returns": {
+								"type": "string",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "뷰 스케일 모드. (기본 ViewScaleMode.stretchShort, 엔진이 만들 때 뷰 매니저에 넣는다. UIScene 과 GameScene 은 initialize 에서 저마다의 모드로 바꾼다)",
+								"en": "View scale mode. (Default ViewScaleMode.stretchShort, put into the view manager when the engine is created. UIScene and GameScene switch to their own mode in initialize)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js"
 						},
 						{
 							"kind": "field",
@@ -22695,6 +22752,1325 @@
 								"class": "SceneBase",
 								"name": "is_gizmo_visible"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "setSceneBackgroundColor",
+							"signature": "setSceneBackgroundColor(color)",
+							"params": [
+								{
+									"name": "color",
+									"type": "Color | string",
+									"description": {
+										"ko": "배경색. (색 글은 Color.from 으로 읽는다, 기본 검정)",
+										"en": "Background color. (Color text is read with Color.from, default black)"
+									}
+								}
+							],
+							"description": {
+								"ko": "배경색 설정. (drawSceneBackground 가 칠한다, Color 나 \"#202020\" 같은 색 글)",
+								"en": "Sets the background color. (drawSceneBackground fills it, a Color or color text such as \"#202020\")"
+							},
+							"since": "0.4.0",
+							"source": "src/core/scene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getSceneBackgroundColor",
+							"signature": "getSceneBackgroundColor()",
+							"params": [],
+							"returns": {
+								"type": "Color",
+								"description": {
+									"ko": "배경색. (기본 검정)",
+									"en": "Background color. (default black)"
+								}
+							},
+							"description": {
+								"ko": "배경색 반환.",
+								"en": "Returns the background color."
+							},
+							"since": "0.4.0",
+							"source": "src/core/scene.js"
+						},
+						{
+							"kind": "method",
+							"name": "drawSceneBackground",
+							"signature": "drawSceneBackground(graphic)",
+							"params": [
+								{
+									"name": "graphic",
+									"type": "Graphic",
+									"description": {
+										"ko": "그릴 그래픽.",
+										"en": "Graphic to draw with."
+									}
+								}
+							],
+							"description": {
+								"ko": "배경 그리기. (캔버스 전체를 배경색으로 칠하고 뷰 좌표계를 건다, 세이프 에어리어 바깥까지)\n- GameScene 과 UIScene 은 preDraw 에서 부른다. Scene 을 바로 잇는 씬은 preDraw 에서 불러 쓴다.",
+								"en": "Draws the background. (Fills the whole canvas with the background color, including outside the safe area, and applies the view coordinate system)\n- GameScene and UIScene call it in preDraw. A scene that extends Scene directly calls it in its own preDraw."
+							},
+							"since": "0.4.0",
+							"source": "src/core/scene.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "Scene 을 바로 이은 씬의 배경을 칠하기",
+										"en": "Filling the background of a scene that extends Scene directly"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tcreate() {\n\t\tsuper.create();\n\t\tthis.setSceneBackgroundColor(\"#203040\");\n\t}\n\n\tpreDraw(graphic) {\n\t\tsuper.preDraw(graphic);\n\t\tthis.drawSceneBackground(graphic);\n\t}\n}\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						}
+					]
+				}
+			],
+			"functions": [],
+			"enums": []
+		},
+		{
+			"name": "game/gamescene",
+			"summary": {
+				"ko": "게임 공통 베이스 씬.",
+				"en": "Common base scene for games."
+			},
+			"classes": [
+				{
+					"name": "GameScene",
+					"summary": {
+						"ko": "게임 공통 베이스 씬.\n- 로딩 화면 (중앙 이미지 + 게이지 + 터치 단축).\n  색은 setLoadingColors, 그림 전체는 setLoadingDrawer 로 바꾼다. 게이지는 기본으로 최소 노출 시간의 경과를 보이고,\n  setLoadingProgress 나 trackAssetLoader 로 진행률을 알리면 그 진행률을 부드럽게 따라간다. (LoadingProgress)\n- 개발자 도구 (DEVTools).\n- 터치 입력 라우팅 (TouchRecognizer + DEVTools 캡처 시 무시).\n- 세이프 에어리어 노드 + env(safe-area-inset-*) 계산.\n- viewSize 변화 자동 감지 → layout 재호출.\n- 캔버스 배경 클리어.\n- 화면 페이드 (fadeScreen, 어두운 동안 입력을 막음).\n- UI 누름 판정 (isUserInterfaceAt) 과 UI 가 받지 않은 입력만 놀이로 넘기기 (setPlayInputHandler, 게임 영역 좌표).\n  처리기 대신 모아 두고 꺼내 쓸 수도 있다. (setPlayInputEnabled, takePlayInputs)\n- 세이프 에어리어 인셋을 직접 정할 수 있다. (setSafeAreaInsets, CSS 픽셀. 정하지 않으면 뷰 매니저의 값)\n- 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이를 늘 같게 (setPlayAreaReference).\n\n서브클래스 hook:\n- loadAssets(): super 호출 후 자체 자산을 비동기 로드.\n- layout(): super 호출 후 자체 콘텐츠 레이아웃 갱신.",
+						"en": "Common base scene for games.\n- Loading screen (center image + gauge + tap to skip).\n  Change the colors with setLoadingColors and the whole drawing with setLoadingDrawer. By default the gauge shows the elapsed minimum display time,\n  and once progress is reported with setLoadingProgress or trackAssetLoader it smoothly follows that progress. (LoadingProgress)\n- Developer tools (DEVTools).\n- Touch input routing (TouchRecognizer, ignored while DEVTools captures input).\n- Safe area node + env(safe-area-inset-*) calculation.\n- Detects viewSize changes automatically → calls layout again.\n- Clears the canvas background.\n- Screen fade (fadeScreen, blocks input while dark).\n- UI hit test (isUserInterfaceAt) and passing only the input the UI did not take to play (setPlayInputHandler, play area coordinates).\n  Instead of a handler, input can also be collected and taken out later. (setPlayInputEnabled, takePlayInputs)\n- Safe area insets can be set directly. (setSafeAreaInsets, CSS pixels. If not set, the view manager's values)\n- Keeps the fixed-side length of the play area excluding the safe area constant (setPlayAreaReference).\n\nSubclass hooks:\n- loadAssets(): after calling super, loads its own assets asynchronously.\n- layout(): after calling super, updates its own content layout."
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "세이프 에어리어 노드에 글을 붙이고 놀이 입력 받기",
+								"en": "Attaching text to the safe area node and receiving play input"
+							},
+							"code": "import { Engine, EngineConfiguration, GameScene, WorldNode, Text, Pivot, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends GameScene {\n\tconstructor() {\n\t\tsuper();\n\t\tthis.setLoadingMinDurationMs(0);\n\t\tthis.setSceneBackgroundColor(\"#151821\");\n\t}\n\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst titleNode = new WorldNode();\n\t\ttitleNode.setPivot(Pivot.topLeft);\n\t\ttitleNode.setRect(40, 40, 600, 48);\n\t\tconst text = titleNode.addComponent(Text);\n\t\ttext.setText(\"Tap the play area\");\n\t\ttext.setFontSize(32);\n\t\tthis.getSafeAreaNode().addChild(titleNode);\n\n\t\t// Only presses the UI did not take arrive here, in play area coordinates.\n\t\tthis.setPlayInputHandler({\n\t\t\tpress: (position) => {\n\t\t\t\tconsole.log(\"play press\", position.x, position.y);\n\t\t\t\tthis.fadeScreen(() => {\n\t\t\t\t\ttext.setText(\"Faded at \" + Math.round(position.x) + \", \" + Math.round(position.y));\n\t\t\t\t});\n\t\t\t},\n\t\t});\n\t}\n}\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+							"language": "javascript"
+						}
+					],
+					"extends": "Scene",
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor()",
+							"params": [],
+							"description": {
+								"ko": "생성자.",
+								"en": "Constructor."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setViewScaleMode",
+							"signature": "setViewScaleMode(viewScaleMode)",
+							"params": [
+								{
+									"name": "viewScaleMode",
+									"type": "string",
+									"description": {
+										"ko": "뷰 배율 모드. (ViewScaleMode 의 값, 기본 ViewScaleMode.none)",
+										"en": "View scale mode. (a ViewScaleMode value, default ViewScaleMode.none)"
+									}
+								}
+							],
+							"description": {
+								"ko": "ViewScaleMode 설정. 프로젝트별로 자유롭게 지정 가능.\n- 디폴트는 ViewScaleMode.none. 엔진 기동 전 / 후 어디서든 호출 가능.\n- 호출 시점에 엔진이 이미 attach 되어 있으면 즉시 viewManager 에 반영하고,\n  아니면 initialize() 에서 일괄 적용된다.",
+								"en": "Sets the ViewScaleMode. Can be set freely per project.\n- Default is ViewScaleMode.none. Can be called anywhere before / after engine startup.\n- If the engine is already attached at call time, it is applied to viewManager immediately,\n  otherwise it is applied all at once in initialize()."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getViewScaleMode",
+							"signature": "getViewScaleMode()",
+							"params": [],
+							"returns": {
+								"type": "string",
+								"description": {
+									"ko": "지금 뷰 배율 모드. (ViewScaleMode 의 값)",
+									"en": "The current view scale mode. (a ViewScaleMode value)"
+								}
+							},
+							"description": {
+								"ko": "현재 ViewScaleMode 반환.",
+								"en": "Returns the current ViewScaleMode."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setLoadingImageUrl",
+							"signature": "setLoadingImageUrl(url)",
+							"params": [
+								{
+									"name": "url",
+									"type": "string",
+									"description": {
+										"ko": "로딩 화면 가운데에 그릴 그림 주소. (빈 글이면 그림 없이 게이지만 그린다)",
+										"en": "URL of the image drawn at the center of the loading screen. (If empty, only the gauge is drawn without an image)"
+									}
+								}
+							],
+							"description": {
+								"ko": "로딩 화면 중앙 이미지 URL 설정. (빈 문자열이면 이미지 없이 게이지만 노출)",
+								"en": "Sets the loading screen center image URL. (shows only the gauge without an image if empty string)"
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setLoadingMinDurationMs",
+							"signature": "setLoadingMinDurationMs(milliseconds)",
+							"params": [
+								{
+									"name": "milliseconds",
+									"type": "number",
+									"description": {
+										"ko": "로딩 화면을 보여 줄 가장 짧은 시간. (밀리초, 기본 3000, 화면을 누르면 바로 넘긴다)",
+										"en": "Minimum time to show the loading screen. (milliseconds, default 3000, skipped at once when the screen is pressed)"
+									}
+								}
+							],
+							"description": {
+								"ko": "로딩 화면 최소 노출 시간 (ms) 설정.",
+								"en": "Sets the loading screen minimum display time (ms)."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setLoadingDrawer",
+							"signature": "setLoadingDrawer(drawer)",
+							"params": [
+								{
+									"name": "drawer",
+									"type": "((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null",
+									"description": {
+										"ko": "로딩 화면 그리기 함수. (graphic, viewSize, progress, elapsedSeconds 를 받는다, null 이면 기본 그림)",
+										"en": "Loading screen drawing function. (Receives graphic, viewSize, progress, elapsedSeconds, null for the default drawing)"
+									}
+								}
+							],
+							"description": {
+								"ko": "로딩 화면 그리기 함수 설정. (null 이면 기본 그림: 가운데 로딩 이미지 + 아래 게이지)\n- 엔진이 캔버스를 바깥 색으로, 뷰를 바탕색으로 칠하고 뷰 좌표계를 건 뒤 drawer(graphic, viewSize, progress, elapsedSeconds) 를 부른다.\n  progress 는 보이는 진행률(0 ~ 1, 알린 것이 없으면 최소 노출 시간의 경과), elapsedSeconds 는 로딩을 시작한 뒤의 초다.\n- 그림과 글꼴을 받기 전에도 그려지므로 도형과 시스템 글꼴로 그린다.",
+								"en": "Sets the loading screen drawing function. (null for the default drawing: loading image at the center + gauge below)\n- The engine fills the canvas with the outside color and the view with the background color, applies the view coordinate system, then calls drawer(graphic, viewSize, progress, elapsedSeconds).\n  progress is the displayed progress (0 ~ 1, the elapsed minimum display time if nothing was reported), and elapsedSeconds is the seconds since loading started.\n- It is drawn even before images and fonts are loaded, so draw with shapes and system fonts."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getLoadingDrawer",
+							"signature": "getLoadingDrawer()",
+							"params": [],
+							"returns": {
+								"type": "Function | null",
+								"description": {
+									"ko": "로딩 화면 그리기 함수. (정하지 않았으면 null)",
+									"en": "Loading screen drawing function. (null if not set)"
+								}
+							},
+							"description": {
+								"ko": "로딩 화면 그리기 함수 반환. (없으면 null)",
+								"en": "Returns the loading screen drawing function. (null if none)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setLoadingColors",
+							"signature": "setLoadingColors(backgroundColor, barBackColor, barFillColor, outsideColor = backgroundColor)",
+							"params": [
+								{
+									"name": "backgroundColor",
+									"type": "Color | string",
+									"description": {
+										"ko": "뷰 바탕색. (Color 나 색 글, 기본 검정)",
+										"en": "View background color. (A Color or color text, default black)"
+									}
+								},
+								{
+									"name": "barBackColor",
+									"type": "Color | string",
+									"description": {
+										"ko": "게이지 바탕색. (기본 #333333)",
+										"en": "Gauge background color. (default #333333)"
+									}
+								},
+								{
+									"name": "barFillColor",
+									"type": "Color | string",
+									"description": {
+										"ko": "게이지 채움 색. (기본 #ffffff)",
+										"en": "Gauge fill color. (default #ffffff)"
+									}
+								},
+								{
+									"name": "outsideColor",
+									"type": "Color | string",
+									"description": {
+										"ko": "뷰 바깥(캔버스 나머지)의 색. (주지 않으면 바탕색)",
+										"en": "Color outside the view (the rest of the canvas). (The background color if omitted)"
+									}
+								}
+							],
+							"description": {
+								"ko": "로딩 화면 색 설정. (Color 나 \"#rrggbb\" 같은 색 글, 기본은 검은 바탕, #333333 게이지 바탕, #ffffff 게이지)\n- outsideColor 는 뷰 바깥(캔버스 나머지)의 색이다. 주지 않으면 바탕색과 같다.",
+								"en": "Sets the loading screen colors. (A Color or color text such as \"#rrggbb\", defaults are a black background, #333333 gauge background, #ffffff gauge)\n- outsideColor is the color outside the view (the rest of the canvas). If omitted, it is the same as the background color."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setLoadingOutsideColor",
+							"signature": "setLoadingOutsideColor(outsideColor)",
+							"params": [
+								{
+									"name": "outsideColor",
+									"type": "Color | string",
+									"description": {
+										"ko": "뷰 바깥(캔버스 나머지)의 색. (Color 나 색 글)",
+										"en": "Color outside the view (the rest of the canvas). (A Color or color text)"
+									}
+								}
+							],
+							"description": {
+								"ko": "로딩 화면 뷰 바깥(캔버스 나머지)의 색 설정. (setLoadingColors 의 넷째 값만 바꾼다)",
+								"en": "Sets the loading screen color outside the view (the rest of the canvas). (Changes only the fourth value of setLoadingColors)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "hasLoadingDrawer",
+							"signature": "hasLoadingDrawer()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "로딩 화면 그리기 함수를 정했으면 참.",
+									"en": "True if a loading screen drawing function is set."
+								}
+							},
+							"description": {
+								"ko": "로딩 화면 그리기 함수가 있는지.",
+								"en": "Whether a loading screen drawing function is set."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "isLoadTouchedToSkip",
+							"signature": "isLoadTouchedToSkip()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "로딩 화면을 눌러 최소 노출 시간을 건너뛰었으면 참.",
+									"en": "True if the loading screen was tapped to skip the minimum display time."
+								}
+							},
+							"description": {
+								"ko": "로딩 화면을 눌러 건너뛰었는지.",
+								"en": "Whether the loading screen was tapped to skip."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getDevTools",
+							"signature": "getDevTools()",
+							"params": [],
+							"returns": {
+								"type": "DEVTools | null",
+								"description": {
+									"ko": "개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)",
+									"en": "Developer tools. (null before initialize or when EngineConfiguration.useDevTools is off)"
+								}
+							},
+							"description": {
+								"ko": "개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)",
+								"en": "Returns the developer tools. (null before initialize or when EngineConfiguration.useDevTools is off)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setSafeAreaInsets",
+							"signature": "setSafeAreaInsets(insets)",
+							"params": [
+								{
+									"name": "insets",
+									"type": "{ top: number, right: number, bottom: number, left: number } | null",
+									"description": {
+										"ko": "위, 오른쪽, 아래, 왼쪽 인셋. (CSS 픽셀, null 이면 뷰 매니저의 getSafeAreaInsets 를 읽는다)",
+										"en": "Top, right, bottom, left insets. (CSS pixels, if null reads the view manager's getSafeAreaInsets)"
+									}
+								}
+							],
+							"description": {
+								"ko": "세이프 에어리어 인셋 직접 설정. (CSS 픽셀 { top, right, bottom, left }, null 이면 뷰 매니저의 getSafeAreaInsets 를 읽는다)",
+								"en": "Sets the safe area insets directly. (CSS pixels { top, right, bottom, left }, if null reads the view manager's getSafeAreaInsets)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "static",
+							"name": "calculateSafeAreaRect",
+							"signature": "static calculateSafeAreaRect(viewSize, targetResolutionScale, insets)",
+							"params": [
+								{
+									"name": "viewSize",
+									"type": "Vector2",
+									"description": {
+										"ko": "뷰 크기. (뷰 단위)",
+										"en": "View size. (view units)"
+									}
+								},
+								{
+									"name": "targetResolutionScale",
+									"type": "number",
+									"description": {
+										"ko": "뷰 배율. (인셋을 이 값으로 나눠 뷰 단위로 바꾼다, 0 이하면 1)",
+										"en": "View scale. (Insets are divided by this to convert to view units, 1 if 0 or less)"
+									}
+								},
+								{
+									"name": "insets",
+									"type": "{ top: number, right: number, bottom: number, left: number }",
+									"description": {
+										"ko": "CSS 픽셀.",
+										"en": "CSS pixels."
+									}
+								}
+							],
+							"returns": {
+								"type": "Rect",
+								"description": {
+									"ko": "세이프 에어리어 영역. (뷰 좌표, 너비와 높이는 0 이상)",
+									"en": "Safe area rectangle. (view coordinates, width and height are 0 or more)"
+								}
+							},
+							"description": {
+								"ko": "세이프 에어리어 계산. (정적, CSS 픽셀 인셋을 뷰 배율로 나눠 뷰 영역에서 뺀다)",
+								"en": "Calculates the safe area. (static, divides CSS pixel insets by the view scale and subtracts them from the view area)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setLoadingProgress",
+							"signature": "setLoadingProgress(progress)",
+							"params": [
+								{
+									"name": "progress",
+									"type": "number",
+									"description": {
+										"ko": "알릴 진행률. (0 ~ 1, 앞서 알린 것보다 작아지지 않는다)",
+										"en": "Progress to report. (0 ~ 1, never less than what was reported before)"
+									}
+								}
+							],
+							"description": {
+								"ko": "로딩 진행률 알리기. (0 ~ 1, 줄어들지 않는다. 알린 뒤로 게이지가 경과 시간 대신 이 값을 따라간다)",
+								"en": "Reports loading progress. (0 ~ 1, never decreases. After reporting, the gauge follows this value instead of the elapsed time)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getLoadingProgress",
+							"signature": "getLoadingProgress()",
+							"params": [],
+							"returns": {
+								"type": "LoadingProgress",
+								"description": {
+									"ko": "로딩 진행률. (알린 정도와 부드럽게 따라가는 보이는 정도)",
+									"en": "Loading progress. (The reported amount and the displayed amount that smoothly follows it)"
+								}
+							},
+							"description": {
+								"ko": "로딩 진행률 반환. (알린 정도와 부드럽게 따라가는 보이는 정도)",
+								"en": "Returns the loading progress. (The reported amount and the displayed amount that smoothly follows it)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "trackAssetLoader",
+							"signature": "trackAssetLoader(assetLoader)",
+							"params": [
+								{
+									"name": "assetLoader",
+									"type": "AssetLoader",
+									"description": {
+										"ko": "로딩 화면이 진행률을 따라갈 애셋 함께 받기.",
+										"en": "The asset loader whose progress the loading screen follows."
+									}
+								}
+							],
+							"description": {
+								"ko": "애셋 함께 받기 맡기기. (로딩 화면이 프레임마다 맡긴 것들의 끝난 수 / 전체 수를 진행률로 알린다)",
+								"en": "Hands over an asset loader. (Every frame the loading screen reports the finished count / total count of what was handed over as progress)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "updateTrackedAssetLoaderProgress",
+							"signature": "updateTrackedAssetLoaderProgress()",
+							"params": [],
+							"description": {
+								"ko": "맡긴 애셋 함께 받기의 진행률을 알린다. (맡긴 것이 없으면 아무것도 하지 않는다)",
+								"en": "Reports the progress of the handed-over asset loaders. (Does nothing if none were handed over)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getSafeAreaNode",
+							"signature": "getSafeAreaNode()",
+							"params": [],
+							"returns": {
+								"type": "WorldNode",
+								"description": {
+									"ko": "세이프 에어리어 노드. (서브클래스의 콘텐츠를 여기에 붙인다)",
+									"en": "Safe area node. (Attach the subclass's content here)"
+								}
+							},
+							"description": {
+								"ko": "세이프 에어리어 노드 반환. (서브클래스가 자식 콘텐츠를 여기에 붙인다)",
+								"en": "Returns the safe area node. (Subclasses attach child content here)"
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getSafeAreaRect",
+							"signature": "getSafeAreaRect()",
+							"params": [],
+							"returns": {
+								"type": "Rect",
+								"description": {
+									"ko": "마지막으로 계산한 세이프 에어리어 영역. (뷰 좌표)",
+									"en": "The last calculated safe area rect. (view coordinates)"
+								}
+							},
+							"description": {
+								"ko": "마지막으로 계산된 세이프 에어리어 영역 반환.",
+								"en": "Returns the last calculated safe area rect."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "load",
+							"signature": "async load(engine)",
+							"params": [
+								{
+									"name": "engine",
+									"type": "Engine",
+									"description": {
+										"ko": "씬을 불러오는 엔진.",
+										"en": "The engine loading the scene."
+									}
+								}
+							],
+							"description": {
+								"ko": "비동기 로드.\n- loadAssets() hook 호출 + 최소 노출 시간 보장.\n- 시간은 엔진 시계(TimeManager.getRealtimeSinceStartup)로 잰다. 엔진 시계가 아직 돌지 않았으면(첫 프레임 전, 0) 첫 로딩 화면 프레임의 시각부터 잰다.\n- 화면을 누르면 바로 단축한다. 누름은 엔진 입력(InputManager.isTouchPressed)으로 drawOnLoad 가 프레임마다 본다.\n  (러스트 판과 같은 시계, 같은 입력)",
+								"en": "Asynchronous load.\n- Calls the loadAssets() hook + guarantees the minimum display time.\n- Time is measured with the engine clock (TimeManager.getRealtimeSinceStartup). If the engine clock has not started yet (before the first frame, 0), it is measured from the time of the first loading screen frame.\n- Tapping the screen skips right away. drawOnLoad checks the tap every frame through engine input (InputManager.isTouchPressed).\n  (Same clock and same input as the Rust edition)"
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "loadAssets",
+							"signature": "async loadAssets()",
+							"params": [],
+							"description": {
+								"ko": "자산 로드 hook.\n- 서브클래스가 오버라이드해서 자체 자산을 비동기 로드한다. super 호출 필수.",
+								"en": "Asset loading hook.\n- Subclasses override it to load their own assets asynchronously. Calling super is required."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "drawOnLoad",
+							"signature": "drawOnLoad(graphic)",
+							"params": [
+								{
+									"name": "graphic",
+									"type": "Graphic",
+									"description": {
+										"ko": "그릴 그래픽.",
+										"en": "Graphic to draw with."
+									}
+								}
+							],
+							"description": {
+								"ko": "로딩 화면 출력. (엔진이 isLoaded() === false 인 동안 매 프레임 호출)\n- 바깥 색 캔버스 + 바탕색 뷰 + (그리기 함수, 없으면 중앙 로딩 이미지 + 하단 게이지).",
+								"en": "Draws the loading screen. (The engine calls it every frame while isLoaded() === false)\n- Outside-color canvas + background-color view + (the drawing function, or if none, the center loading image + bottom gauge)."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "initialize",
+							"signature": "initialize(engine)",
+							"params": [
+								{
+									"name": "engine",
+									"type": "Engine",
+									"description": {
+										"ko": "씬을 불러온 엔진.",
+										"en": "The engine that loaded the scene."
+									}
+								}
+							],
+							"description": {
+								"ko": "초기화.",
+								"en": "Initialization."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "resize",
+							"signature": "resize(canvasNativeSize)",
+							"params": [
+								{
+									"name": "canvasNativeSize",
+									"type": "Vector2",
+									"description": {
+										"ko": "바뀐 캔버스 요소의 크기. (CSS 픽셀)",
+										"en": "New size of the canvas element. (CSS pixels)"
+									}
+								}
+							],
+							"description": {
+								"ko": "화면 크기 변경됨.",
+								"en": "Screen size changed."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "layout",
+							"signature": "layout()",
+							"params": [],
+							"description": {
+								"ko": "레이아웃.\n- 서브클래스는 super.layout() 호출 후 자체 콘텐츠 레이아웃을 갱신한다.",
+								"en": "Layout.\n- Subclasses call super.layout() and then update their own content layout."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "computeSafeAreaRect",
+							"signature": "computeSafeAreaRect()",
+							"params": [],
+							"returns": {
+								"type": "Rect",
+								"description": {
+									"ko": "세이프 에어리어 영역. (뷰 좌표, 너비와 높이는 0 이상)",
+									"en": "Safe area rectangle. (view coordinates, width and height are 0 or more)"
+								}
+							},
+							"description": {
+								"ko": "세이프 에어리어 계산. (뷰 좌표계 기준)",
+								"en": "Calculates the safe area. (in the view coordinate system)"
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "tick",
+							"signature": "tick(timeDelta)",
+							"params": [
+								{
+									"name": "timeDelta",
+									"type": "number",
+									"description": {
+										"ko": "지난 프레임부터의 시간. (초)",
+										"en": "Time since the last frame. (Seconds)"
+									}
+								}
+							],
+							"description": {
+								"ko": "갱신.\n- viewSize 변화 감지 → 자동 layout 재호출.\n  (모바일 주소창 표시/숨김으로 100vh 가 동적으로 변하는 경우 등에서\n   resize 이벤트만으로는 누락될 수 있어 매 tick 보정.)\n- DEVTools tick 처리.",
+								"en": "Update.\n- Detects viewSize changes → calls layout again automatically.\n  (Corrected every tick because the resize event alone can miss changes,\n   such as when 100vh changes dynamically as the mobile address bar shows or hides.)\n- Handles the DEVTools tick."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "isDevToolsCapturingInput",
+							"signature": "isDevToolsCapturingInput()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "개발자 도구 패널이 보이고 포인터가 그 위에 있으면 참.",
+									"en": "True if the developer tools panel is visible and the pointer is over it."
+								}
+							},
+							"description": {
+								"ko": "디브툴이 입력을 가져가는 중인지 여부.",
+								"en": "Whether DevTools is taking the input."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getTouchRaycaster",
+							"signature": "getTouchRaycaster()",
+							"params": [],
+							"returns": {
+								"type": "TouchRecognizer",
+								"description": {
+									"ko": "터치 훅이 넘기는 TouchRecognizer. (initialize 전에는 undefined)",
+									"en": "The TouchRecognizer that the touch hooks pass to. (undefined before initialize)"
+								}
+							},
+							"description": {
+								"ko": "터치 레이캐스터 반환. (터치 훅에서 노드로 넘기는 TouchRecognizer, 씬 기본 넘기기는 끄고 이것으로 넘긴다)",
+								"en": "Returns the touch raycaster. (the TouchRecognizer that the touch hooks pass to nodes; the scene's default passing is turned off and this one is used)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "touchPress",
+							"signature": "touchPress(viewInputPosition)",
+							"params": [
+								{
+									"name": "viewInputPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "누른 자리. (뷰 좌표)",
+										"en": "Press position. (view coordinates)"
+									}
+								}
+							],
+							"description": {
+								"ko": "touchPress.",
+								"en": "touchPress."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "touchMove",
+							"signature": "touchMove(viewInputPosition)",
+							"params": [
+								{
+									"name": "viewInputPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "옮긴 자리. (뷰 좌표)",
+										"en": "Moved position. (view coordinates)"
+									}
+								}
+							],
+							"description": {
+								"ko": "touchMove.",
+								"en": "touchMove."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "touchRelease",
+							"signature": "touchRelease(viewInputPosition)",
+							"params": [
+								{
+									"name": "viewInputPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "뗀 자리. (뷰 좌표)",
+										"en": "Release position. (view coordinates)"
+									}
+								}
+							],
+							"description": {
+								"ko": "touchRelease.",
+								"en": "touchRelease."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "touchCancel",
+							"signature": "touchCancel(viewInputPosition)",
+							"params": [
+								{
+									"name": "viewInputPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "취소된 때의 자리. (뷰 좌표)",
+										"en": "Position at cancel. (view coordinates)"
+									}
+								}
+							],
+							"description": {
+								"ko": "touchCancel.",
+								"en": "touchCancel."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "touchWheel",
+							"signature": "touchWheel(viewInputPosition, wheelDelta)",
+							"params": [
+								{
+									"name": "viewInputPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "휠을 굴린 자리. (뷰 좌표)",
+										"en": "Position where the wheel was rolled. (view coordinates)"
+									}
+								},
+								{
+									"name": "wheelDelta",
+									"type": "Vector2",
+									"description": {
+										"ko": "이번 프레임에 쌓인 휠 양. (WheelEvent 의 deltaX, deltaY)",
+										"en": "Wheel amount accumulated this frame. (deltaX, deltaY of WheelEvent)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "그 자리의 스크롤 칸이 휠을 받았으면 참.",
+									"en": "True if a scroll view at that position took the wheel."
+								}
+							},
+							"description": {
+								"ko": "touchWheel. (그 자리의 가장 앞 스크롤 칸에 넘긴다, 받은 칸이 있으면 true)\n- 덮어쓴 게임 씬은 super.touchWheel 이 false 일 때만 게임(지도 확대 등)으로 넘기면 창의 스크롤과 겹치지 않는다.",
+								"en": "touchWheel. (Passes it to the frontmost scroll view at that position, true if a view took it)\n- An overriding game scene that passes the wheel to the game (map zoom and so on) only when super.touchWheel is false does not overlap with window scrolling."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "preDraw",
+							"signature": "preDraw(graphic)",
+							"params": [
+								{
+									"name": "graphic",
+									"type": "Graphic",
+									"description": {
+										"ko": "그릴 그래픽.",
+										"en": "Graphic to draw with."
+									}
+								}
+							],
+							"description": {
+								"ko": "preDraw. 캔버스 전체를 sceneBackgroundColor 로 칠한다 (세이프 에어리어 바깥 영역 포함).",
+								"en": "preDraw. Fills the whole canvas with sceneBackgroundColor (including the area outside the safe area)."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "postDraw",
+							"signature": "postDraw(graphic)",
+							"params": [
+								{
+									"name": "graphic",
+									"type": "Graphic",
+									"description": {
+										"ko": "그릴 그래픽.",
+										"en": "Graphic to draw with."
+									}
+								}
+							],
+							"description": {
+								"ko": "postDraw. 어두워지는 막과 DEVTools 를 화면 위에 그린다.",
+								"en": "postDraw. Draws the fade overlay and DEVTools on top of the screen."
+							},
+							"since": "0.2.1",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "fadeScreen",
+							"signature": "fadeScreen(onDark)",
+							"params": [
+								{
+									"name": "onDark",
+									"type": "Function | null",
+									"description": {
+										"ko": "() => void | Promise",
+										"en": "() => void | Promise"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "시작했는지.",
+									"en": "Whether it started."
+								}
+							},
+							"description": {
+								"ko": "어두워졌다 밝아지기.\n- 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도) 어둡게 두었다가 밝힌다.\n- 막이 걸린 동안(어두워지고, 기다리고, 밝아지는 동안)은 누름과 휠을 받지 않는다.\n- 이미 페이드 중이면 무시하고 false.",
+								"en": "Fades to dark and back.\n- Calls onDark once fully dark, and if it returns a Promise, stays dark until it settles (even if it fails), then brightens.\n- While the overlay is up (darkening, waiting, brightening), presses and the wheel are not received.\n- If already fading, ignores the call and returns false."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "isScreenFading",
+							"signature": "isScreenFading()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "어두워지거나, onDark 를 기다리거나, 밝아지는 중이면 참.",
+									"en": "True while darkening, waiting for onDark, or brightening."
+								}
+							},
+							"description": {
+								"ko": "페이드 중인지. (어두워지거나, onDark 를 기다리거나, 밝아지는 중)",
+								"en": "Whether a fade is in progress. (darkening, waiting for onDark, or brightening)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setScreenFadeColor",
+							"signature": "setScreenFadeColor(color)",
+							"params": [
+								{
+									"name": "color",
+									"type": "Color | string",
+									"description": {
+										"ko": "어두워지는 막의 색. (Color 나 색 글, 기본 검정)",
+										"en": "Color of the fade overlay. (A Color or color text, default black)"
+									}
+								}
+							],
+							"description": {
+								"ko": "어두워지는 막의 색 설정. (기본 검정)",
+								"en": "Sets the color of the fade overlay. (default black)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setScreenFadeSeconds",
+							"signature": "setScreenFadeSeconds(seconds)",
+							"params": [
+								{
+									"name": "seconds",
+									"type": "number",
+									"description": {
+										"ko": "어두워지는 시간이자 밝아지는 시간. (초, 기본 0.35, 0 이면 바로)",
+										"en": "Time to darken, and also to brighten. (seconds, default 0.35, immediate if 0)"
+									}
+								}
+							],
+							"description": {
+								"ko": "어두워지는 시간과 밝아지는 시간 설정. (초, 기본 0.35, 0 이면 바로)",
+								"en": "Sets the time to darken and to brighten. (seconds, default 0.35, immediate if 0)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getScreenFadeAlpha",
+							"signature": "getScreenFadeAlpha()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "어두워지는 막의 진하기. (0 ~ 1)",
+									"en": "Opacity of the fade overlay. (0 ~ 1)"
+								}
+							},
+							"description": {
+								"ko": "어두워지는 막의 진하기. (0 ~ 1)",
+								"en": "Opacity of the fade overlay. (0 ~ 1)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "updateScreenFade",
+							"signature": "updateScreenFade()",
+							"params": [],
+							"description": {
+								"ko": "막 갱신. (tick 이 부른다, 배율을 곱하지 않은 시간으로 움직여 놀이를 멈춰도 돈다, 한 프레임은 0.1 초까지)",
+								"en": "Updates the overlay. (Called by tick, advances with unscaled time so it runs even when play is paused, up to 0.1 seconds per frame)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "drawScreenFade",
+							"signature": "drawScreenFade(graphic)",
+							"params": [
+								{
+									"name": "graphic",
+									"type": "Graphic",
+									"description": {
+										"ko": "그릴 그래픽.",
+										"en": "Graphic to draw with."
+									}
+								}
+							],
+							"description": {
+								"ko": "어두워지는 막 그리기. (세이프에어리어까지 캔버스 전체를 덮는다)",
+								"en": "Draws the fade overlay. (Covers the whole canvas including the safe area insets)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "isUserInterfaceAt",
+							"signature": "isUserInterfaceAt(viewPosition)",
+							"params": [
+								{
+									"name": "viewPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "볼 자리. (뷰 좌표)",
+										"en": "Position to test. (View coordinates)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "그 자리에 누를 수 있는 UI 노드가 있으면 참.",
+									"en": "True if there is a pressable UI node at that position."
+								}
+							},
+							"description": {
+								"ko": "그 자리에 UI(누를 수 있는 노드: 단추, 창의 어둠과 판, 스크롤 칸)가 있는지. (뷰 좌표)",
+								"en": "Whether there is UI (a pressable node: a button, a window's dimmer and panel, a scroll view) at that position. (view coordinates)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setPlayInputHandler",
+							"signature": "setPlayInputHandler(playInputHandler)",
+							"params": [
+								{
+									"name": "playInputHandler",
+									"type": "object | null",
+									"description": {
+										"ko": "{ press?(position), move?(position), release?(position), wheel?(position, wheelDelta) }",
+										"en": "{ press?(position), move?(position), release?(position), wheel?(position, wheelDelta) }"
+									}
+								}
+							],
+							"description": {
+								"ko": "놀이 입력 처리기 설정. (UI 가 받지 않은 누름과 그 누름의 이동, 뗌(취소 포함), UI 밖의 휠을 게임 영역 좌표로 넘긴다, null 이면 넘기지 않는다)\n- 게임 영역은 세이프에어리어 영역(getSafeAreaRect)이다. 좌표는 그 왼쪽 위가 0, 0 이다.\n- 페이드 중에는 누름과 휠을 넘기지 않는다. 개발자 도구가 입력을 가져가면 넘기지 않는다.",
+								"en": "Sets the play input handler. (Passes presses the UI did not take, their moves and releases (including cancel), and the wheel outside the UI in play area coordinates, null to pass nothing)\n- The play area is the safe area rect (getSafeAreaRect). Its top left is 0, 0.\n- Presses and the wheel are not passed during a fade. Nothing is passed while the developer tools capture input."
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setPlayInputEnabled",
+							"signature": "setPlayInputEnabled(isPlayInputEnabled)",
+							"params": [
+								{
+									"name": "isPlayInputEnabled",
+									"type": "boolean",
+									"description": {
+										"ko": "참이면 놀이 입력을 모은다. (거짓이면 모은 것을 버린다)",
+										"en": "If true, collects play input. (If false, discards what was collected)"
+									}
+								}
+							],
+							"description": {
+								"ko": "놀이 입력 모으기 켜기. (처리기 대신 모아 두었다가 takePlayInputs 로 꺼낸다, 끄면 모은 것을 버린다)",
+								"en": "Turns on play input collection. (Collects input instead of a handler, to be taken out with takePlayInputs, turning it off discards what was collected)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "takePlayInputs",
+							"signature": "takePlayInputs()",
+							"params": [],
+							"returns": {
+								"type": "Array<{ kind: string, position: Vector2, wheelDelta: Vector2 | null }>",
+								"description": {
+									"ko": "모은 놀이 입력. (온 차례대로, kind 는 press, move, release, wheel, 꺼내면 비운다)",
+									"en": "Collected play input. (In arrival order, kind is press, move, release, wheel, taking empties it)"
+								}
+							},
+							"description": {
+								"ko": "모은 놀이 입력 꺼내기. (온 차례대로 { kind, position, wheelDelta }, 꺼내면 비운다)",
+								"en": "Takes the collected play input. ({ kind, position, wheelDelta } in arrival order, taking empties it)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "convertViewToPlayArea",
+							"signature": "convertViewToPlayArea(viewPosition)",
+							"params": [
+								{
+									"name": "viewPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "바꿀 자리. (뷰 좌표)",
+										"en": "Position to convert. (view coordinates)"
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "게임 영역 좌표. (세이프에어리어 왼쪽 위가 0, 0)",
+									"en": "Play area coordinates. (The safe area's top left is 0, 0)"
+								}
+							},
+							"description": {
+								"ko": "뷰 좌표 → 게임 영역 좌표. (세이프에어리어 왼쪽 위가 0, 0)",
+								"en": "View coordinates → play area coordinates. (The safe area's top left is 0, 0)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "dispatchPlayInput",
+							"signature": "dispatchPlayInput(kind, viewPosition, wheelDelta)",
+							"params": [
+								{
+									"name": "kind",
+									"type": "string",
+									"description": {
+										"ko": "입력 종류. (press, move, release, wheel)",
+										"en": "Input kind. (press, move, release, wheel)"
+									}
+								},
+								{
+									"name": "viewPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "입력 자리. (뷰 좌표)",
+										"en": "Input position. (view coordinates)"
+									}
+								},
+								{
+									"name": "wheelDelta",
+									"type": "Vector2 | null",
+									"description": {
+										"ko": "휠 양. (wheel 이 아니면 null)",
+										"en": "Wheel amount. (null unless wheel)"
+									}
+								}
+							],
+							"description": {
+								"ko": "놀이 입력 넘기기. (kind 는 press, move, release, wheel, 처리기에 그 함수가 없으면 넘기지 않는다)",
+								"en": "Dispatches play input. (kind is press, move, release, wheel, not passed if the handler lacks that function)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "releasePlayPress",
+							"signature": "releasePlayPress(viewPosition)",
+							"params": [
+								{
+									"name": "viewPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "뗀 자리. (뷰 좌표)",
+										"en": "Release position. (view coordinates)"
+									}
+								}
+							],
+							"description": {
+								"ko": "놀이로 간 누름 끝내기. (뗌과 취소)",
+								"en": "Ends a press that went to play. (release and cancel)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "setPlayAreaReference",
+							"signature": "setPlayAreaReference(fixedLength, isLandscape)",
+							"params": [
+								{
+									"name": "fixedLength",
+									"type": "number",
+									"description": {
+										"ko": "세이프에어리어를 뺀 게임 영역의 고정 쪽 길이. (기준 해상도 단위, 0 이면 끈다)",
+										"en": "Fixed-side length of the play area excluding the safe area insets. (reference resolution units, 0 turns it off)"
+									}
+								},
+								{
+									"name": "isLandscape",
+									"type": "boolean",
+									"description": {
+										"ko": "참이면 가로, 거짓이면 세로가 고정 쪽.",
+										"en": "If true the width is the fixed side, if false the height."
+									}
+								}
+							],
+							"description": {
+								"ko": "게임 영역 기준 설정. (세이프에어리어를 뺀 게임 영역의 고정 쪽 길이가 늘 fixedLength 가 되게 기준 해상도를 늘린다)\n- 엔진은 캔버스 전체의 길이를 기준 해상도에 맞추는데 캔버스는 세이프에어리어까지 덮는다. 그만큼 기준 해상도를 늘린다.\n  (캔버스 길이 : 세이프에어리어를 뺀 길이 = 기준 해상도 길이 : fixedLength)\n- isLandscape 면 가로, 아니면 세로가 고정 쪽이다. 뷰 배율 방식도 그에 맞춰 둔다. (가로 고정 stretchWidthExpandHeight, 세로 고정 stretchHeightExpandWidth)\n- 무시할 세이프에어리어 쪽은 ViewManager.setIgnoredSafeAreaSides 로 넘긴다. fixedLength 가 0 이면 끈다. (기준 해상도는 그대로 둔다)",
+								"en": "Sets the play area reference. (Enlarges the reference resolution so the fixed-side length of the play area excluding the safe area insets is always fixedLength)\n- The engine fits the whole canvas length to the reference resolution, but the canvas also covers the safe area insets. The reference resolution is enlarged by that much.\n  (canvas length : length excluding the safe area insets = reference resolution length : fixedLength)\n- If isLandscape the width is the fixed side, otherwise the height. The view scale mode is set to match. (width fixed stretchWidthExpandHeight, height fixed stretchHeightExpandWidth)\n- Pass the safe area sides to ignore with ViewManager.setIgnoredSafeAreaSides. A fixedLength of 0 turns it off. (The reference resolution is left as is)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "getPlayAreaFixedLength",
+							"signature": "getPlayAreaFixedLength()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "게임 영역의 고정 쪽 길이. (0 이면 쓰지 않음)",
+									"en": "Fixed-side length of the play area. (0 if not used)"
+								}
+							},
+							"description": {
+								"ko": "게임 영역의 고정 쪽 길이. (0 이면 쓰지 않음)",
+								"en": "Fixed-side length of the play area. (0 if not used)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "method",
+							"name": "applyPlayAreaReference",
+							"signature": "applyPlayAreaReference()",
+							"params": [],
+							"description": {
+								"ko": "게임 영역 기준을 기준 해상도에 걸기. (캔버스와 인셋 크기에서만 셈해 몇 번을 불러도 같다, 같으면 건드리지 않는다)",
+								"en": "Applies the play area reference to the reference resolution. (Computed only from the canvas and inset sizes, so repeated calls give the same result, left untouched if unchanged)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
+						},
+						{
+							"kind": "static",
+							"name": "calculatePlayAreaReferenceLength",
+							"signature": "static calculatePlayAreaReferenceLength(fixedLength, isLandscape, canvasNativeSize, safeAreaInsets, insetScale)",
+							"params": [
+								{
+									"name": "fixedLength",
+									"type": "number",
+									"description": {
+										"ko": "세이프에어리어를 뺀 게임 영역의 고정 쪽 길이. (기준 해상도 단위)",
+										"en": "Fixed-side length of the play area excluding the safe area insets. (reference resolution units)"
+									}
+								},
+								{
+									"name": "isLandscape",
+									"type": "boolean",
+									"description": {
+										"ko": "참이면 가로, 거짓이면 세로가 고정 쪽.",
+										"en": "If true the width is the fixed side, if false the height."
+									}
+								},
+								{
+									"name": "canvasNativeSize",
+									"type": "Vector2",
+									"description": {
+										"ko": "캔버스 요소의 크기. (CSS 픽셀)",
+										"en": "Size of the canvas element. (CSS pixels)"
+									}
+								},
+								{
+									"name": "safeAreaInsets",
+									"type": "object",
+									"description": {
+										"ko": "{ top, right, bottom, left } (뷰 좌표)",
+										"en": "{ top, right, bottom, left } (view coordinates)"
+									}
+								},
+								{
+									"name": "insetScale",
+									"type": "number",
+									"description": {
+										"ko": "뷰 좌표 → 캔버스 단위 배율.",
+										"en": "Scale from view coordinates → canvas units."
+									}
+								}
+							],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "기준 해상도의 고정 쪽 길이. (못 셈하면 0)",
+									"en": "Fixed-side length of the reference resolution. (0 if it cannot be computed)"
+								}
+							},
+							"description": {
+								"ko": "게임 영역 기준의 기준 해상도 길이 셈. (못 셈하면 0)",
+								"en": "Computes the reference resolution length for the play area reference. (0 if it cannot be computed)"
+							},
+							"since": "0.4.0",
+							"source": "src/game/gamescene.js"
 						}
 					]
 				}
@@ -23514,19 +24890,50 @@
 						},
 						{
 							"kind": "method",
+							"name": "setVisible",
+							"signature": "setVisible(isVisible)",
+							"params": [
+								{
+									"name": "isVisible",
+									"type": "boolean",
+									"description": {
+										"ko": "거짓이면 숨긴다. (기본 참)",
+										"en": "Hides the node if false. (default true)"
+									}
+								}
+							],
+							"description": {
+								"ko": "보이기 설정. (켜짐, 투명도와 따로 두는 플래그, 러스트 판 WorldNode::set_visible 과 같다)\n- 거짓이면 이 노드와 자손을 그리지 않고 TouchRaycaster 의 누름도 받지 않는다. 갱신(tick)은 그대로 돈다.",
+								"en": "Sets visibility. (A flag kept separate from active and opacity, the same as the Rust edition's WorldNode::set_visible)\n- If false, this node and its descendants are not drawn and do not receive TouchRaycaster presses. Updates (tick) still run."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "부모를 숨기면 자식도 계층에서 안 보인다",
+										"en": "Hiding the parent makes the child invisible in the hierarchy"
+									},
+									"code": "import { WorldNode } from \"./build/vanilla.js\";\n\nconst parentNode = new WorldNode();\nconst childNode = new WorldNode();\nparentNode.addChild(childNode);\nparentNode.setVisible(false);\nconsole.log(parentNode.isVisible(), parentNode.isActive(), childNode.isVisible(), childNode.isVisibleInHierarchy());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "isVisible",
 							"signature": "isVisible()",
 							"params": [],
 							"returns": {
 								"type": "boolean",
 								"description": {
-									"ko": "켜져 있고 로컬 투명도가 0 보다 크면 참.",
-									"en": "True if active and the local opacity is above 0."
+									"ko": "보이기 플래그. (기본 참)",
+									"en": "Visibility flag. (default true)"
 								}
 							},
 							"description": {
-								"ko": "가시 상태 반환.",
-								"en": "Returns the visibility state."
+								"ko": "보이기 플래그 반환. (setVisible 로 정한 값, 켜짐과 투명도는 보지 않는다, 계층 판정은 isVisibleInHierarchy)",
+								"en": "Returns the visibility flag. (The value set with setVisible, active and opacity are not considered, use isVisibleInHierarchy for the hierarchy)"
 							},
 							"since": "0.0.9",
 							"source": "src/core/node/transformnode.js",
@@ -23550,8 +24957,8 @@
 								}
 							},
 							"description": {
-								"ko": "현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)",
-								"en": "Returns the visibility state of the entire hierarchy from here to the root. (returns false if even one up to the root is disabled)"
+								"ko": "현재부터 루트까지 계층 전체의 가시 상태 반환. (자신과 조상 모두 켜져 있고, 보이기 플래그가 참이고, 로컬 투명도가 0 보다 커야 참)",
+								"en": "Returns the visibility of the whole hierarchy from this node to the root. (True only if this node and all ancestors are active, have the visibility flag set, and have local opacity above 0)"
 							},
 							"since": "0.0.9",
 							"source": "src/core/node/transformnode.js",
@@ -23560,7 +24967,17 @@
 								"module": "core/node/nodetree",
 								"class": "NodeTree",
 								"name": "is_visible_in_hierarchy"
-							}
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "꺼짐, 투명도 0, 숨김 가운데 하나라도 조상에 있으면 거짓",
+										"en": "False if any ancestor is inactive, has opacity 0, or is hidden"
+									},
+									"code": "import { WorldNode } from \"./build/vanilla.js\";\n\nconst parentNode = new WorldNode();\nconst childNode = new WorldNode();\nparentNode.addChild(childNode);\nparentNode.setLocalOpacity(0);\nconsole.log(childNode.isActiveInHierarchy(), childNode.isVisibleInHierarchy());\nparentNode.setLocalOpacity(1);\nchildNode.setVisible(false);\nconsole.log(parentNode.isVisibleInHierarchy(), childNode.isVisibleInHierarchy());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -24458,6 +25875,82 @@
 								"class": "NodeTree",
 								"name": "convert_view_to_local"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "convertNodePositionToViewPosition",
+							"signature": "convertNodePositionToViewPosition(nodePosition)",
+							"params": [
+								{
+									"name": "nodePosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "이 노드 내용 좌표의 점.",
+										"en": "A point in this node's content coordinates."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2",
+								"description": {
+									"ko": "뷰 좌표의 점.",
+									"en": "A point in view coordinates."
+								}
+							},
+							"description": {
+								"ko": "노드 영역 안의 점 → 뷰 좌표. (내용 영역의 왼쪽 위가 원점, 부모들의 변환을 모두 거친다, 러스트 판 NodeTree::convert_node_position_to_view_position)",
+								"en": "A point inside the node area → view coordinates. (The top left of the content area is the origin, goes through all parent transforms, Rust edition NodeTree::convert_node_position_to_view_position)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/worldnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "단추 오른쪽 아래 귀퉁이의 뷰 자리",
+										"en": "View position of a button's bottom right corner"
+									},
+									"code": "import { Vector2, WorldNode } from \"./build/vanilla.js\";\n\nconst rootNode = new WorldNode();\nconst buttonNode = new WorldNode();\nrootNode.addChild(buttonNode);\nbuttonNode.setLocalPosition(Vector2.create(100, 100));\nbuttonNode.setContentSize(Vector2.create(40, 20));\nconst corner = buttonNode.convertNodePositionToViewPosition(Vector2.create(40, 20));\nconsole.log(corner.x, corner.y);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "convertViewPositionToNodePosition",
+							"signature": "convertViewPositionToNodePosition(viewPosition)",
+							"params": [
+								{
+									"name": "viewPosition",
+									"type": "Vector2",
+									"description": {
+										"ko": "뷰 좌표의 점.",
+										"en": "A point in view coordinates."
+									}
+								}
+							],
+							"returns": {
+								"type": "Vector2 | null",
+								"description": {
+									"ko": "이 노드 내용 좌표의 점. (배율이 0 이라 뒤집을 수 없으면 null)",
+									"en": "A point in this node's content coordinates. (null if the scale is 0 and it cannot be inverted)"
+								}
+							},
+							"description": {
+								"ko": "뷰 좌표 → 노드 영역 안의 점. (행렬을 뒤집을 수 없으면(배율 0) null, 러스트 판 NodeTree::convert_view_position_to_node_position)",
+								"en": "View coordinates → a point inside the node area. (null if the matrix cannot be inverted (scale 0), Rust edition NodeTree::convert_view_position_to_node_position)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/worldnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "뷰 자리를 노드 안 자리로 바꾸고 되돌리기",
+										"en": "Converting a view position to a position inside the node and back"
+									},
+									"code": "import { Vector2, WorldNode } from \"./build/vanilla.js\";\n\nconst rootNode = new WorldNode();\nconst panelNode = new WorldNode();\nrootNode.addChild(panelNode);\npanelNode.setLocalPosition(Vector2.create(200, 100));\npanelNode.setContentSize(Vector2.create(100, 50));\npanelNode.setLocalScale(Vector2.create(2, 2));\nconst nodePosition = panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100));\nconsole.log(nodePosition.x, nodePosition.y);\npanelNode.setLocalScale(Vector2.create(0, 1));\nconsole.log(panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100)));",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -28499,7 +29992,7 @@
 								},
 								{
 									"name": "color",
-									"type": "string",
+									"type": "Color | string",
 									"description": {
 										"ko": "\"#rrggbb\"",
 										"en": "\"#rrggbb\""
@@ -29070,7 +30563,7 @@
 								},
 								{
 									"name": "textColor",
-									"type": "string",
+									"type": "Color | string",
 									"description": {
 										"ko": "글 색. (\"#rrggbb\" 나 CSS 색)",
 										"en": "Text color. (\"#rrggbb\" or a CSS color)"
@@ -29426,7 +30919,7 @@
 							"params": [
 								{
 									"name": "shadowColor",
-									"type": "string",
+									"type": "Color | string",
 									"description": {
 										"ko": "\"#rrggbb\"",
 										"en": "\"#rrggbb\""
@@ -29823,6 +31316,46 @@
 						},
 						{
 							"kind": "method",
+							"name": "setImagePath",
+							"signature": "setImagePath(imagePath)",
+							"params": [
+								{
+									"name": "imagePath",
+									"type": "string",
+									"description": {
+										"ko": "그림 경로.",
+										"en": "Image path."
+									}
+								}
+							],
+							"description": {
+								"ko": "그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)",
+								"en": "Sets the image path. (Only records it and does not load the image, UIDocument writes and reads this path instead of the image)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/component/shadowimage.js"
+						},
+						{
+							"kind": "method",
+							"name": "getImagePath",
+							"signature": "getImagePath()",
+							"params": [],
+							"returns": {
+								"type": "string",
+								"description": {
+									"ko": "그림 경로. (정하지 않았으면 빈 글)",
+									"en": "Image path. (empty string if not set)"
+								}
+							},
+							"description": {
+								"ko": "그림 경로 반환. (정하지 않았으면 빈 글)",
+								"en": "Returns the image path. (empty string if not set)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/component/shadowimage.js"
+						},
+						{
+							"kind": "method",
 							"name": "getImageRect",
 							"signature": "getImageRect()",
 							"params": [],
@@ -29905,7 +31438,7 @@
 							"params": [
 								{
 									"name": "shadowColor",
-									"type": "string",
+									"type": "Color | string",
 									"description": {
 										"ko": "\"#rrggbb\"",
 										"en": "\"#rrggbb\""
@@ -30329,6 +31862,56 @@
 								"class": "Sprite",
 								"name": "get_image"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "setImagePath",
+							"signature": "setImagePath(imagePath)",
+							"params": [
+								{
+									"name": "imagePath",
+									"type": "string",
+									"description": {
+										"ko": "그림 경로.",
+										"en": "Image path."
+									}
+								}
+							],
+							"description": {
+								"ko": "그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)",
+								"en": "Sets the image path. (Only records it and does not load the image, UIDocument writes and reads this path instead of the image)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/component/sprite.js"
+						},
+						{
+							"kind": "method",
+							"name": "getImagePath",
+							"signature": "getImagePath()",
+							"params": [],
+							"returns": {
+								"type": "string",
+								"description": {
+									"ko": "그림 경로. (정하지 않았으면 빈 글)",
+									"en": "Image path. (empty string if not set)"
+								}
+							},
+							"description": {
+								"ko": "그림 경로 반환. (정하지 않았으면 빈 글)",
+								"en": "Returns the image path. (empty string if not set)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/component/sprite.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "그림 경로를 적고 다시 읽기",
+										"en": "Recording an image path and reading it back"
+									},
+									"code": "import { Sprite } from \"./build/vanilla.js\";\n\nconst sprite = new Sprite();\nconsole.log(sprite.getImagePath() === \"\");\nsprite.setImagePath(\"images/coin.png\");\nconsole.log(sprite.getImagePath());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -33540,33 +35123,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "setSceneBackgroundColor",
-							"signature": "setSceneBackgroundColor(color)",
-							"params": [
-								{
-									"name": "color",
-									"type": "Color",
-									"description": {
-										"ko": "캔버스 전체를 칠할 색. (기본 검정)",
-										"en": "Color to fill the whole canvas with. (default black)"
-									}
-								}
-							],
-							"description": {
-								"ko": "캔버스 배경색 설정. (preDraw 단계에서 캔버스 전체에 적용)",
-								"en": "Sets the canvas background color. (applied to the whole canvas in the preDraw phase)"
-							},
-							"since": "0.2.1",
-							"source": "src/ui/uiscene.js",
-							"counterpart": {
-								"engine": "vanilla-engine",
-								"module": "ui/uiscene",
-								"class": "UISceneBase",
-								"name": "set_scene_background_color"
-							}
-						},
-						{
-							"kind": "method",
 							"name": "create",
 							"signature": "create()",
 							"params": [],
@@ -33709,8 +35265,8 @@
 							"signature": "layout()",
 							"params": [],
 							"description": {
-								"ko": "레이아웃.\n- viewSize 를 솔버에 suggest 하고, env() 인셋을 자체 safeAreaInsets 에 동기화.\n- 변화가 있을 때만 setSafeAreaInsets 호출 (제약 재구축 비용 절감).",
-								"en": "Layout.\n- Suggests viewSize to the solver, and syncs env() insets to its own safeAreaInsets.\n- Calls setSafeAreaInsets only when there is a change (saves constraint rebuild cost)."
+								"ko": "레이아웃.\n- viewSize 를 솔버에 suggest 하고, 뷰 매니저의 세이프 에어리어 인셋을 자체 safeAreaInsets 에 동기화.\n- 변화가 있을 때만 setSafeAreaInsets 호출 (제약 재구축 비용 절감).",
+								"en": "Layout.\n- Suggests viewSize to the solver, and syncs the view manager's safe area insets to its own safeAreaInsets.\n- Calls setSafeAreaInsets only when there is a change (saves constraint rebuild cost)."
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiscene.js",
@@ -33734,11 +35290,21 @@
 								}
 							},
 							"description": {
-								"ko": "env(safe-area-inset-*) 기준 영역 계산. (뷰 좌표계)",
-								"en": "Calculates the area based on env(safe-area-inset-*). (view coordinate system)"
+								"ko": "세이프 에어리어 영역 계산. (뷰 좌표계)\n- 뷰 매니저의 getSafeAreaInsets 를 따른다. (setSafeAreaOverride > URL ?safeArea= > env() 실측, setIgnoredSafeAreaSides 로 뺀 쪽은 0)",
+								"en": "Calculates the safe area rect. (view coordinate system)\n- Follows the view manager's getSafeAreaInsets. (setSafeAreaOverride > URL ?safeArea= > measured env(), sides excluded with setIgnoredSafeAreaSides are 0)"
 							},
 							"since": "0.2.1",
-							"source": "src/ui/uiscene.js"
+							"source": "src/ui/uiscene.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "데스크톱에서 노치를 흉내 내 세이프 에어리어를 읽기",
+										"en": "Reading the safe area while simulating a notch on desktop"
+									},
+									"code": "import { Engine, EngineConfiguration, UIScene, Vector2 } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);\nconst engine = new Engine(engineConfiguration);\nengine.getViewManager().setSafeAreaOverride({ top: 40, right: 0, bottom: 20, left: 10 });\nclass MainScene extends UIScene {\n\tinitialize() {\n\t\tsuper.initialize();\n\t\tconst safeAreaRect = this.computeSafeAreaRect();\n\t\tconsole.log(safeAreaRect.position.x, safeAreaRect.position.y, safeAreaRect.size.x, safeAreaRect.size.y);\n\t}\n}\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -33884,6 +35450,35 @@
 								"class": "UISceneBase",
 								"name": "rebuild_safe_area_layout_guide_constraints"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "getDevTools",
+							"signature": "getDevTools()",
+							"params": [],
+							"returns": {
+								"type": "DEVTools | null",
+								"description": {
+									"ko": "개발자 도구. (만들지 않았으면 null)",
+									"en": "Developer tools. (null if not created)"
+								}
+							},
+							"description": {
+								"ko": "개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)",
+								"en": "Returns the developer tools. (null before initialize or when EngineConfiguration.useDevTools is off)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiscene.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "개발자 도구를 끈 엔진에서는 null",
+										"en": "null on an engine with the developer tools turned off"
+									},
+									"code": "import { Engine, EngineConfiguration, UIScene, Vector2 } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);\nengineConfiguration.useDevTools = false;\nconst engine = new Engine(engineConfiguration);\nclass MainScene extends UIScene {\n\tinitialize() {\n\t\tsuper.initialize();\n\t\tconsole.log(this.getDevTools() === null);\n\t}\n}\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -34532,7 +36127,54 @@
 					]
 				}
 			],
-			"functions": [],
+			"functions": [
+				{
+					"kind": "method",
+					"name": "isViewPositionInsideNode",
+					"signature": "isViewPositionInsideNode(node, viewPosition)",
+					"params": [
+						{
+							"name": "node",
+							"type": "WorldNode | null",
+							"description": {
+								"ko": "볼 노드. (없으면 거짓)",
+								"en": "Node to test. (false if none)"
+							}
+						},
+						{
+							"name": "viewPosition",
+							"type": "Vector2",
+							"description": {
+								"ko": "뷰 좌표의 점. (픽셀)",
+								"en": "A point in view coordinates. (pixels)"
+							}
+						}
+					],
+					"returns": {
+						"type": "boolean",
+						"description": {
+							"ko": "노드 contentSize 영역 안이면 참.",
+							"en": "True if inside the node's contentSize area."
+						}
+					},
+					"description": {
+						"ko": "뷰 좌표의 점이 노드 내용 영역 안인지. (부모들의 변환을 모두 거친 네 귀퉁이로 본다, 러스트 판 ui::uiview::is_view_position_inside_node)",
+						"en": "Whether a point in view coordinates is inside the node's content area. (Tested with the four corners after all parent transforms, Rust edition ui::uiview::is_view_position_inside_node)"
+					},
+					"since": "0.4.0",
+					"source": "src/ui/uiview.js",
+					"examples": [
+						{
+							"title": {
+								"ko": "가운데 피봇(기본)인 40 x 20 노드의 안과 밖",
+								"en": "Inside and outside a 40 x 20 node with the center pivot (default)"
+							},
+							"code": "import { isViewPositionInsideNode, Vector2, WorldNode } from \"./build/vanilla.js\";\n\nconst rootNode = new WorldNode();\nconst buttonNode = new WorldNode();\nrootNode.addChild(buttonNode);\nbuttonNode.setLocalPosition(Vector2.create(100, 100));\nbuttonNode.setContentSize(Vector2.create(40, 20));\nconsole.log(isViewPositionInsideNode(buttonNode, Vector2.create(100, 100)));\nconsole.log(isViewPositionInsideNode(buttonNode, Vector2.create(81, 91)));\nconsole.log(isViewPositionInsideNode(buttonNode, Vector2.create(79, 100)));",
+							"language": "javascript"
+						}
+					]
+				}
+			],
 			"enums": []
 		},
 		{
@@ -34701,6 +36343,46 @@
 								"class": "UIImageView",
 								"name": "get_image"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "setImagePath",
+							"signature": "setImagePath(imagePath)",
+							"params": [
+								{
+									"name": "imagePath",
+									"type": "string",
+									"description": {
+										"ko": "그림 경로.",
+										"en": "Image path."
+									}
+								}
+							],
+							"description": {
+								"ko": "그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)",
+								"en": "Sets the image path. (Only records it and does not load the image, UIDocument writes and reads this path instead of the image)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiimageview.js"
+						},
+						{
+							"kind": "method",
+							"name": "getImagePath",
+							"signature": "getImagePath()",
+							"params": [],
+							"returns": {
+								"type": "string",
+								"description": {
+									"ko": "그림 경로. (정하지 않았으면 빈 글)",
+									"en": "Image path. (empty string if not set)"
+								}
+							},
+							"description": {
+								"ko": "그림 경로 반환. (정하지 않았으면 빈 글)",
+								"en": "Returns the image path. (empty string if not set)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiimageview.js"
 						},
 						{
 							"kind": "method",
@@ -37024,7 +38706,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "마우스가 올라 있을 때 덮을 틴트 색. (사본을 담는다, 기본 new Color(1, 1, 1, 0.12))",
 										"en": "Tint color applied while the mouse is over it. (a copy is stored, default new Color(1, 1, 1, 0.12))"
@@ -37128,7 +38810,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "누르는 동안 덮을 틴트 색. (기본 new Color(0, 0, 0, 0.3))",
 										"en": "Tint color applied while pressed. (default new Color(0, 0, 0, 0.3))"
@@ -37493,7 +39175,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "켜져 있을 때 덮을 틴트 색. (눌림 틴트 색도 이 색이 된다, 기본 new Color(0, 0, 0, 0.3))",
 										"en": "Tint color applied while on. (the pressed tint color becomes this color too, default new Color(0, 0, 0, 0.3))"
@@ -38868,7 +40550,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "반대편 채움 색. (복제하지 않고 그대로 쥔다)",
 										"en": "Opposite fill color. (kept as is, not cloned)"
@@ -38920,7 +40602,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "트랙 색. (UIView 의 배경 색으로 넣는다)",
 										"en": "Track color. (set as the UIView background color)"
@@ -38972,7 +40654,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "채움 색. (복제하지 않고 그대로 쥔다)",
 										"en": "Fill color. (kept as is, not cloned)"
@@ -40738,7 +42420,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "트랙(바탕) 색. (트랙 Paint 에 그대로 건다, 기본 검정 알파 0.15)",
 										"en": "Track (background) color. (Set on the track Paint as is, default black with alpha 0.15)"
@@ -40765,7 +42447,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "썸(끄는 손잡이) 색. (썸 노드 Paint 에 그대로 건다, 기본 흰색 알파 0.6)",
 										"en": "Thumb (drag handle) color. (Set on the thumb node Paint as is, default white with alpha 0.6)"
@@ -41651,7 +43333,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "값 글자의 색. (기본 #222222)",
 										"en": "Color of the value text. (default #222222)"
@@ -41678,7 +43360,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "플레이스홀더 글자의 색. (기본 #999999)",
 										"en": "Color of the placeholder text. (default #999999)"
@@ -41705,7 +43387,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "커서와 조합 밑줄의 색. (기본 #5b8def)",
 										"en": "Color of the cursor and the composition underline. (default #5b8def)"
@@ -41732,7 +43414,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "포커스 테두리 색. (기본 #f97316)",
 										"en": "Focus border color. (default #f97316)"
@@ -41786,7 +43468,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "선택 영역을 칠할 색. (기본 알파 0.35 의 파랑)",
 										"en": "Color to fill the selection with. (default blue with alpha 0.35)"
@@ -45717,7 +47399,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "트랙 색. (기본 new Color(0.7, 0.7, 0.7, 1))",
 										"en": "Track color. (default new Color(0.7, 0.7, 0.7, 1))"
@@ -45769,7 +47451,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "값까지 채우는 색. (기본 new Color(0.23, 0.51, 0.96, 1))",
 										"en": "Color filled up to the value. (default new Color(0.23, 0.51, 0.96, 1))"
@@ -45821,7 +47503,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "손잡이 원의 색. (기본 흰색, 손잡이 노드를 정했으면 쓰지 않는다)",
 										"en": "Color of the thumb circle. (default white, unused if a thumb node is set)"
@@ -46333,7 +48015,7 @@
 										"ko": "미리 받은 그림으로 이미지 경로 잇기",
 										"en": "Wiring image paths to preloaded images"
 									},
-									"code": "import { UIDocument, Sprite } from \"./build/vanilla.js\";\n\nconst imagePath = \"examples/assets/spritesheet.png\";\nconst image = new Image();\nimage.src = imagePath;\nawait image.decode();\nconst imageTable = new Map([[imagePath, image]]);\nUIDocument.setImageResolver((path) => {\n\tconst foundImage = imageTable.get(path);\n\treturn foundImage !== undefined ? foundImage : null;\n});\nconst documentData = {\n\tversion: 1,\n\troot: { type: \"WorldNode\", name: \"Root\", contentSize: [128, 128], components: [{ type: \"Sprite\", imagePath: imagePath }], children: [] },\n};\nconst jsonText = JSON.stringify(documentData);\nconst rootNode = UIDocument.fromJsonText(jsonText);\nconst sprite = rootNode.getComponent(Sprite);\nconsole.log(sprite.imagePath);",
+									"code": "import { UIDocument, Sprite } from \"./build/vanilla.js\";\n\nconst imagePath = \"examples/assets/spritesheet.png\";\nconst image = new Image();\nimage.src = imagePath;\nawait image.decode();\nconst imageTable = new Map([[imagePath, image]]);\nUIDocument.setImageResolver((path) => {\n\tconst foundImage = imageTable.get(path);\n\treturn foundImage !== undefined ? foundImage : null;\n});\nconst documentData = {\n\tversion: 1,\n\troot: { type: \"WorldNode\", name: \"Root\", contentSize: [128, 128], components: [{ type: \"Sprite\", imagePath: imagePath }], children: [] },\n};\nconst jsonText = JSON.stringify(documentData);\nconst rootNode = UIDocument.fromJsonText(jsonText);\nconst sprite = rootNode.getComponent(Sprite);\nconsole.log(sprite.getImagePath());",
 									"language": "javascript"
 								}
 							]
@@ -50465,7 +52147,7 @@
 							"params": [
 								{
 									"name": "padColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "패드 색. (기본 검정)",
 										"en": "Pad color. (default black)"
@@ -50517,7 +52199,7 @@
 							"params": [
 								{
 									"name": "ballColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "구슬 색. (기본 흰색)",
 										"en": "Ball color. (default white)"
@@ -85295,7 +86977,7 @@
 							"params": [
 								{
 									"name": "colorA",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "시작 색. (복사해 둔다)",
 										"en": "Start color. (kept as a copy)"
@@ -85303,7 +86985,7 @@
 								},
 								{
 									"name": "colorB",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "둘 사이 무작위.",
 										"en": "Random between the two."
@@ -86434,7 +88116,7 @@
 							"params": [
 								{
 									"name": "startColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "갓 생긴 점의 색. (복사해 둔다)",
 										"en": "Color of a fresh point. (kept as a copy)"
@@ -86442,7 +88124,7 @@
 								},
 								{
 									"name": "endColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "수명이 다한 점의 색. (복사해 둔다)",
 										"en": "Color of a point at the end of its lifetime. (kept as a copy)"
@@ -86871,7 +88553,7 @@
 							"params": [
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "효과 색. (복사해 둔다, null 이면 무시한다)",
 										"en": "Effect color. (kept as a copy, ignored if null)"
@@ -88120,7 +89802,7 @@
 								},
 								{
 									"name": "color",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "효과 색. (복사해 둔다, null 이면 무시한다)",
 										"en": "Effect color. (kept as a copy, ignored if null)"
@@ -91257,7 +92939,7 @@
 							"params": [
 								{
 									"name": "lineColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "선 색. (복제해 쥔다)",
 										"en": "Line color. (cloned and kept)"
@@ -91284,7 +92966,7 @@
 							"params": [
 								{
 									"name": "gridColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "격자 색. (복제해 쥔다)",
 										"en": "Grid color. (cloned and kept)"
@@ -91523,7 +93205,7 @@
 							"params": [
 								{
 									"name": "barColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "막대 색. (복제해 쥔다)",
 										"en": "Bar color. (cloned and kept)"
@@ -91550,7 +93232,7 @@
 							"params": [
 								{
 									"name": "highlightColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "강조 막대 색. (복제해 쥔다)",
 										"en": "Highlighted bar color. (cloned and kept)"
@@ -91906,6 +93588,73 @@
 								"class": "UIDropdown",
 								"name": "is_open"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "getOptionList",
+							"signature": "getOptionList()",
+							"params": [],
+							"returns": {
+								"type": "string[]",
+								"description": {
+									"ko": "선택지 글 목록. (setOptionList 로 준 차례, 고쳐 쓰지 않는다)",
+									"en": "List of option texts. (In the order given to setOptionList, do not modify)"
+								}
+							},
+							"description": {
+								"ko": "선택지 목록 반환.",
+								"en": "Returns the option list."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidropdown.js"
+						},
+						{
+							"kind": "method",
+							"name": "getPopupNode",
+							"signature": "getPopupNode()",
+							"params": [],
+							"returns": {
+								"type": "WorldNode",
+								"description": {
+									"ko": "펼침 목록 노드.",
+									"en": "Popup list node."
+								}
+							},
+							"description": {
+								"ko": "펼침 목록 노드 반환. (펼친 동안은 트리 뿌리의 자식)",
+								"en": "Returns the popup list node. (A child of the tree root while open)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidropdown.js"
+						},
+						{
+							"kind": "method",
+							"name": "getOptionNodes",
+							"signature": "getOptionNodes()",
+							"params": [],
+							"returns": {
+								"type": "WorldNode[]",
+								"description": {
+									"ko": "행 노드. (새 배열)",
+									"en": "Row nodes. (a new array)"
+								}
+							},
+							"description": {
+								"ko": "선택지 행 노드 목록 반환. (선택지 차례, setOptionList 마다 다시 만든다)",
+								"en": "Returns the option row nodes. (In option order, rebuilt on every setOptionList)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidropdown.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "선택지 행 노드를 읽어 둘째 행을 누른 것처럼 고르기",
+										"en": "Reading the option row nodes and selecting the second row as if it were pressed"
+									},
+									"code": "import { UIDropdown } from \"./build/vanilla.js\";\n\nconst dropdown = new UIDropdown({ width: 160 });\ndropdown.setOptionList([\"Low\", \"Medium\", \"High\"]);\nconst optionNodes = dropdown.getOptionNodes();\nconsole.log(optionNodes.length, optionNodes[1].getName(), dropdown.getOptionList()[1]);\ndropdown.selectIndex(1);\nconsole.log(dropdown.getSelectedText());",
+									"language": "javascript"
+								}
+							]
 						}
 					]
 				}
@@ -92659,7 +94408,7 @@
 							"params": [
 								{
 									"name": "dotColor",
-									"type": "Color",
+									"type": "Color | string",
 									"description": {
 										"ko": "점 색. (복제해 모든 점의 Paint 에 넣는다)",
 										"en": "Dot color. (cloned and set on every dot's Paint)"
@@ -93603,6 +95352,111 @@
 								"class": "UIDialog",
 								"name": "set_instant_enabled"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "getPopupMotion",
+							"signature": "getPopupMotion()",
+							"params": [],
+							"returns": {
+								"type": "PopupMotion",
+								"description": {
+									"ko": "여닫는 연출.",
+									"en": "Open and close motion."
+								}
+							},
+							"description": {
+								"ko": "연출 반환.",
+								"en": "Returns the motion."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidialog.js"
+						},
+						{
+							"kind": "method",
+							"name": "getOverlayNode",
+							"signature": "getOverlayNode()",
+							"params": [],
+							"returns": {
+								"type": "WorldNode",
+								"description": {
+									"ko": "막 노드.",
+									"en": "Overlay node."
+								}
+							},
+							"description": {
+								"ko": "뒤를 덮는 막 노드 반환.",
+								"en": "Returns the overlay node that covers what is behind."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidialog.js"
+						},
+						{
+							"kind": "method",
+							"name": "getPanelNode",
+							"signature": "getPanelNode()",
+							"params": [],
+							"returns": {
+								"type": "WorldNode",
+								"description": {
+									"ko": "판 노드.",
+									"en": "Panel node."
+								}
+							},
+							"description": {
+								"ko": "판 노드 반환.",
+								"en": "Returns the panel node."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidialog.js"
+						},
+						{
+							"kind": "method",
+							"name": "getConfirmNode",
+							"signature": "getConfirmNode()",
+							"params": [],
+							"returns": {
+								"type": "WorldNode",
+								"description": {
+									"ko": "확인 단추 노드.",
+									"en": "Confirm button node."
+								}
+							},
+							"description": {
+								"ko": "확인 단추 노드 반환.",
+								"en": "Returns the confirm button node."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidialog.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "확인 단추 노드를 찾아 이름과 크기 읽기",
+										"en": "Finding the confirm button node and reading its name and size"
+									},
+									"code": "import { UIDialog } from \"./build/vanilla.js\";\n\nconst dialog = new UIDialog({ confirmText: \"OK\", cancelText: \"Cancel\" });\nconst confirmNode = dialog.getConfirmNode();\nconst cancelNode = dialog.getCancelNode();\nconsole.log(confirmNode.getName(), cancelNode.getName(), dialog.getPanelNode().getName());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getCancelNode",
+							"signature": "getCancelNode()",
+							"params": [],
+							"returns": {
+								"type": "WorldNode",
+								"description": {
+									"ko": "취소 단추 노드.",
+									"en": "Cancel button node."
+								}
+							},
+							"description": {
+								"ko": "취소 단추 노드 반환.",
+								"en": "Returns the cancel button node."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uidialog.js"
 						}
 					]
 				}
@@ -99510,7 +101364,7 @@
 						"ko": "툰 장면 위에 폭발 효과를 내고 한 프레임 그리기",
 						"en": "Show an explosion effect over a toon scene and draw one frame"
 					},
-					"code": "import { ToonRenderer, ToonVfx, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), \"#708090\", { hasOutline: false });\nconst floorMesh = renderer.createMesh(builder.readArrays());\nconst vfx = new ToonVfx(webGL2RenderingContext);\nvfx.setRamps([[\"#ffffff\", \"#ffe080\", \"#ff8020\", \"#a02010\", \"#301008\"]]);\nvfx.prepare();\nvfx.addFireball({ x: 0, y: 0.8, z: 0, radius: 0.9, life: 1.2, ramp: 0 });\nvfx.addShockwave({ x: 0, z: 0, endRadius: 3, life: 0.6, ramp: 0 });\nvfx.addDecal({ x: 0, z: 0, radius: 1.4, life: 8, heatSeconds: 1.5, mode: ToonVfxDecalMode.scorch, ramp: 0 });\nvfx.emitParticles({ count: 40, x: 0, y: 0.6, z: 0, shape: ToonVfxShape.sphere, radius: 0.3, speed: [2, 5], gravity: 6, size: [0.05, 0.12], life: [0.4, 0.9], look: ToonVfxLook.streak, stretch: 0.05, ramp: 0, isGrounded: true });\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(4, 3, 5), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nvfx.update(1 / 60);\nrenderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);\nrenderer.drawMesh(floorMesh, Matrix4.createIdentity());\nrenderer.endFrame();\nvfx.draw(viewMatrix, projectionMatrix);",
+					"code": "import { ToonRenderer, ToonVfx, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, ToonMesh, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new ToonMesh.MeshBuilder();\nbuilder.addPart(ToonMesh.createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), \"#708090\", { hasOutline: false });\nconst floorMesh = renderer.createMesh(builder.readArrays());\nconst vfx = new ToonVfx(webGL2RenderingContext);\nvfx.setRamps([[\"#ffffff\", \"#ffe080\", \"#ff8020\", \"#a02010\", \"#301008\"]]);\nvfx.prepare();\nvfx.addFireball({ position: [0, 0.8, 0], radius: 0.9, life: 1.2, ramp: 0 });\nvfx.addShockwave({ x: 0, z: 0, endRadius: 3, life: 0.6, ramp: 0 });\nvfx.addDecal({ x: 0, z: 0, radius: 1.4, life: 8, heatSeconds: 1.5, mode: ToonVfxDecalMode.scorch, ramp: 0 });\nvfx.emitParticles({ count: 40, position: [0, 0.6, 0], shape: ToonVfxShape.sphere, radius: 0.3, speed: [2, 5], gravity: 6, size: [0.05, 0.12], life: [0.4, 0.9], look: ToonVfxLook.streak, stretch: 0.05, ramp: 0, isGrounded: true });\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(4, 3, 5), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nvfx.update(1 / 60);\nrenderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);\nrenderer.drawMesh(floorMesh, Matrix4.createIdentity());\nrenderer.endFrame();\nvfx.draw(viewMatrix, projectionMatrix);",
 					"language": "javascript"
 				}
 			],
@@ -99527,7 +101381,7 @@
 								"ko": "매 프레임 상태에서 사건을 다시 내도 열쇠로 한 번만 내기",
 								"en": "Fire an event only once by key even if the state re-fires it every frame"
 							},
-							"code": "import { ToonVfx, ToonVfxLook, ToonVfxShape, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst vfx = new ToonVfx(webGL2RenderingContext, 2000);\nvfx.setRamps([[\"#ffffff\", \"#ffd070\", \"#ff7020\", \"#802010\", \"#200808\"]]);\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(0, 3, 6), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nfor (let frameIndex = 0; frameIndex < 3; ++frameIndex) {\n\tvfx.addFireball({ x: 0, y: 0.8, z: 0, radius: 0.7, life: 1, ramp: 0, key: \"explosion-1\" });\n\tvfx.emitParticles({ count: 24, x: 0, y: 0.8, z: 0, shape: ToonVfxShape.sphere, radius: 0.2, speed: [2, 4], look: ToonVfxLook.ember, ramp: 0, life: 0.8, key: \"explosion-1-sparks\" });\n\tvfx.queueBlobShadow({ x: 1, z: 0, radius: 0.4 });\n\tvfx.update(1 / 60);\n\tvfx.draw(viewMatrix, projectionMatrix);\n}\nconst counts = vfx.getActiveCounts();\nvfx.destroy();",
+							"code": "import { ToonVfx, ToonVfxLook, ToonVfxShape, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst vfx = new ToonVfx(webGL2RenderingContext, 2000);\nvfx.setRamps([[\"#ffffff\", \"#ffd070\", \"#ff7020\", \"#802010\", \"#200808\"]]);\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(0, 3, 6), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nfor (let frameIndex = 0; frameIndex < 3; ++frameIndex) {\n\tvfx.addFireball({ position: [0, 0.8, 0], radius: 0.7, life: 1, ramp: 0, key: \"explosion-1\" });\n\tvfx.emitParticles({ count: 24, position: [0, 0.8, 0], shape: ToonVfxShape.sphere, radius: 0.2, speed: [2, 4], look: ToonVfxLook.ember, ramp: 0, life: 0.8, key: \"explosion-1-sparks\" });\n\tvfx.queueBlobShadow({ x: 1, z: 0, radius: 0.4 });\n\tvfx.update(1 / 60);\n\tvfx.draw(viewMatrix, projectionMatrix);\n}\nconst counts = vfx.getActiveCounts();\nvfx.destroy();",
 							"language": "javascript"
 						}
 					],
@@ -99759,7 +101613,7 @@
 										"ko": "불과 얼음 램프 두 줄을 주고 줄 번호로 고르기",
 										"en": "Give two ramp rows, fire and ice, and choose by row number"
 									},
-									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setRamps([\n\t[\"#ffffff\", \"#ffe080\", \"#ff8020\", \"#801808\", \"#200804\"],\n\t[\"#ffffff\", [0.7, 0.95, 1], [0.3, 0.6, 1], [0.05, 0.1, 0.3]],\n]);\nvfx.emitParticles({ count: 20, x: 0, y: 1, z: 0, ramp: 0, look: ToonVfxLook.ember, speed: [1, 3], life: 0.8 });\nvfx.emitParticles({ count: 20, x: 2, y: 1, z: 0, ramp: 1, look: ToonVfxLook.star, speed: [0.5, 1], life: 0.6 });",
+									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setRamps([\n\t[\"#ffffff\", \"#ffe080\", \"#ff8020\", \"#801808\", \"#200804\"],\n\t[\"#ffffff\", [0.7, 0.95, 1], [0.3, 0.6, 1], [0.05, 0.1, 0.3]],\n]);\nvfx.emitParticles({ count: 20, position: [0, 1, 0], ramp: 0, look: ToonVfxLook.ember, speed: [1, 3], life: 0.8 });\nvfx.emitParticles({ count: 20, position: [2, 1, 0], ramp: 1, look: ToonVfxLook.star, speed: [0.5, 1], life: 0.6 });",
 									"language": "javascript"
 								}
 							]
@@ -100112,7 +101966,7 @@
 										"ko": "밝은 바탕에서도 보이게 테를 두른 빛 알갱이와 불덩이",
 										"en": "Light grains and fireballs with a rim so they show on a bright background"
 									},
-									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setRimColor([0.12, 0.06, 0.03]);\nvfx.emitParticles({ count: 12, x: 0, y: 1, z: 0, look: ToonVfxLook.soft, color: [1, 0.8, 0.3], rim: 1, size: 0.3, speed: 1.5, life: 0.6 });\nvfx.addFireball({ x: 0, y: 1, z: 0, radius: 0.8, life: 1, rim: 0.7 });",
+									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setRimColor([0.12, 0.06, 0.03]);\nvfx.emitParticles({ count: 12, position: [0, 1, 0], look: ToonVfxLook.soft, color: [1, 0.8, 0.3], rim: 1, size: 0.3, speed: 1.5, life: 0.6 });\nvfx.addFireball({ position: [0, 1, 0], radius: 0.8, life: 1, rim: 0.7 });",
 									"language": "javascript"
 								}
 							]
@@ -100174,7 +102028,7 @@
 										"ko": "울퉁불퉁한 바닥 높이를 알려 주기",
 										"en": "Tell it the height of a bumpy floor"
 									},
-									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setFloorHeightReader((x, z) => {\n\treturn Math.sin(x * 0.5) * 0.3 + Math.cos(z * 0.5) * 0.2;\n});\nvfx.addDecal({ x: 1, z: 2, radius: 1, life: 4 });\nvfx.emitParticles({ count: 16, x: 1, y: 1, z: 2, isGrounded: true, gravity: 9, speed: [1, 2], look: ToonVfxLook.grit, color: [0.4, 0.3, 0.2] });\nconst floorHeight = vfx.readFloorHeight(1, 2);\nvfx.setFloorHeightReader(null);",
+									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setFloorHeightReader((x, z) => {\n\treturn Math.sin(x * 0.5) * 0.3 + Math.cos(z * 0.5) * 0.2;\n});\nvfx.addDecal({ x: 1, z: 2, radius: 1, life: 4 });\nvfx.emitParticles({ count: 16, position: [1, 1, 2], isGrounded: true, gravity: 9, speed: [1, 2], look: ToonVfxLook.grit, color: [0.4, 0.3, 0.2] });\nconst floorHeight = vfx.readFloorHeight(1, 2);\nvfx.setFloorHeightReader(null);",
 									"language": "javascript"
 								}
 							]
@@ -100276,7 +102130,7 @@
 										"ko": "효과가 다 사라졌는지 보기",
 										"en": "Check whether all effects have disappeared"
 									},
-									"code": "import { ToonVfx } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.addFireball({ x: 0, y: 1, z: 0, radius: 1, life: 0.5 });\nvfx.emitParticles({ count: 10, x: 0, y: 1, z: 0, life: 0.3 });\nvfx.update(1);\nconst counts = vfx.getActiveCounts();\nconst isQuiet = counts.particleCount === 0 && counts.fireballCount === 0;",
+									"code": "import { ToonVfx } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.addFireball({ position: [0, 1, 0], radius: 1, life: 0.5 });\nvfx.emitParticles({ count: 10, position: [0, 1, 0], life: 0.3 });\nvfx.update(1);\nconst counts = vfx.getActiveCounts();\nconst isQuiet = counts.particleCount === 0 && counts.fireballCount === 0;",
 									"language": "javascript"
 								}
 							]
@@ -100387,8 +102241,8 @@
 								}
 							],
 							"description": {
-								"ko": "파티클 내기.\n  options: { count, x, y, z, shape(ToonVfxShape), radius, direction, spread(라디안), length, isUpward, isInward,\n             speed, rise, gravity, drag, size, sizeEnd(시작 크기에 곱함), sizeCurve, life, delay,\n             color, ramp, look(ToonVfxLook), stretch, spin, floor, isGrounded, brightness, alpha, fadeIn, rim(빛의 꼴의 테, 0 이면 더하는 빛만, 1 이면 테로 덮음, 음수면 엷게 덮는 빛무리),\n             age(이미 지난 초, 음수면 그만큼 늦게), key(사건 열쇠, 이미 낸 열쇠면 내지 않음) }\n  범위가 되는 값(speed, rise, size, sizeEnd, life, delay, spin)은 수 하나나 [최소, 최대] 다. 색은 0 ~ 1 의 [r, g, b], 램프는 줄 번호(없으면 -1)다.\n  floor 를 주면 그 높이에서, isGrounded 면 낸 자리의 바닥 높이에서 멈춘다. isInward 면 속도를 무시하고 나이가 다할 때 낸 자리로 빨려 든다.",
-								"en": "Emits particles.\n  options: { count, x, y, z, shape(ToonVfxShape), radius, direction, spread(radians), length, isUpward, isInward,\n             speed, rise, gravity, drag, size, sizeEnd(multiplied by the start size), sizeCurve, life, delay,\n             color, ramp, look(ToonVfxLook), stretch, spin, floor, isGrounded, brightness, alpha, fadeIn, rim(rim of the glow look, 0 additive light only, 1 covers with the rim, negative is a faintly covering halo),\n             age(seconds already elapsed, negative delays by that much), key(event key, not emitted if already emitted) }\n  Range values (speed, rise, size, sizeEnd, life, delay, spin) are a single number or [min, max]. Color is [r, g, b] in 0 ~ 1, ramp is the row number (-1 if none).\n  If floor is given it stops at that height, if isGrounded it stops at the floor height of the emission point. If isInward, velocity is ignored and it is sucked into the emission point as its age runs out."
+								"ko": "파티클 내기.\n  options: { count, position([x, y, z], 기본 [0, 0, 0]), shape(ToonVfxShape), radius, direction, spread(라디안), length, isUpward, isInward,\n             speed, rise, gravity, drag, size, sizeEnd(시작 크기에 곱함), sizeCurve, life, delay,\n             color, ramp, look(ToonVfxLook), stretch, spin, floor, isGrounded, brightness, alpha, fadeIn, rim(빛의 꼴의 테, 0 이면 더하는 빛만, 1 이면 테로 덮음, 음수면 엷게 덮는 빛무리),\n             age(이미 지난 초, 음수면 그만큼 늦게), key(사건 열쇠, 이미 낸 열쇠면 내지 않음) }\n  범위가 되는 값(speed, rise, size, sizeEnd, life, delay, spin)은 수 하나나 [최소, 최대] 다. 색은 0 ~ 1 의 [r, g, b], 램프는 줄 번호(없으면 -1)다.\n  floor 를 주면 그 높이에서, isGrounded 면 낸 자리의 바닥 높이에서 멈춘다. isInward 면 속도를 무시하고 나이가 다할 때 낸 자리로 빨려 든다.",
+								"en": "Emits particles.\n  options: { count, position([x, y, z], default [0, 0, 0]), shape(ToonVfxShape), radius, direction, spread(radians), length, isUpward, isInward,\n             speed, rise, gravity, drag, size, sizeEnd(multiplied by the start size), sizeCurve, life, delay,\n             color, ramp, look(ToonVfxLook), stretch, spin, floor, isGrounded, brightness, alpha, fadeIn, rim(rim of the glow look, 0 additive light only, 1 covers with the rim, negative is a faintly covering halo),\n             age(seconds already elapsed, negative delays by that much), key(event key, not emitted if already emitted) }\n  Range values (speed, rise, size, sizeEnd, life, delay, spin) are a single number or [min, max]. Color is [r, g, b] in 0 ~ 1, ramp is the row number (-1 if none).\n  If floor is given it stops at that height, if isGrounded it stops at the floor height of the emission point. If isInward, velocity is ignored and it is sucked into the emission point as its age runs out."
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonvfx.js",
@@ -100404,7 +102258,7 @@
 										"ko": "원뿔로 튀는 불꽃 줄기, 같은 열쇠로 다시 내면 무시",
 										"en": "Spark streaks bursting in a cone, ignored if fired again with the same key"
 									},
-									"code": "import { ToonVfx, ToonVfxLook, ToonVfxShape } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst sparkOptions = {\n\tcount: 30, x: 0, y: 1, z: 0,\n\tshape: ToonVfxShape.cone, direction: [0, 1, 0], spread: 0.4,\n\tspeed: [3, 6], gravity: 9, drag: 1.5, size: [0.04, 0.08], sizeEnd: 0.3,\n\tlife: [0.5, 1], look: ToonVfxLook.streak, stretch: 0.04, color: [1, 0.7, 0.3],\n\tisGrounded: true, age: 0.1, key: \"spark-12\",\n};\nvfx.emitParticles(sparkOptions);\nvfx.emitParticles(sparkOptions);",
+									"code": "import { ToonVfx, ToonVfxLook, ToonVfxShape } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst sparkOptions = {\n\tcount: 30, position: [0, 1, 0],\n\tshape: ToonVfxShape.cone, direction: [0, 1, 0], spread: 0.4,\n\tspeed: [3, 6], gravity: 9, drag: 1.5, size: [0.04, 0.08], sizeEnd: 0.3,\n\tlife: [0.5, 1], look: ToonVfxLook.streak, stretch: 0.04, color: [1, 0.7, 0.3],\n\tisGrounded: true, age: 0.1, key: \"spark-12\",\n};\nvfx.emitParticles(sparkOptions);\nvfx.emitParticles(sparkOptions);",
 									"language": "javascript"
 								}
 							]
@@ -100493,8 +102347,8 @@
 								}
 							],
 							"description": {
-								"ko": "불덩이 더하기. (잡음으로 끓는 구가 부풀며 식어 연기가 되고 위로 떠오름)\n  options: { x, y, z, radius, life, ramp, smokeColor, rise, growSeconds, boil, rim(덮는 꼴의 몫, 0 이면 더하는 빛만), age, key }",
-								"en": "Adds a fireball. (A sphere boiling with noise swells, cools into smoke and rises)\n  options: { x, y, z, radius, life, ramp, smokeColor, rise, growSeconds, boil, rim(fraction of the covering look, 0 additive light only), age, key }"
+								"ko": "불덩이 더하기. (잡음으로 끓는 구가 부풀며 식어 연기가 되고 위로 떠오름)\n  options: { position([x, y, z], 기본 [0, 0, 0]), radius, life, ramp, smokeColor, rise, growSeconds, boil, rim(덮는 꼴의 몫, 0 이면 더하는 빛만), age, key }",
+								"en": "Adds a fireball. (A sphere boiling with noise swells, cools into smoke and rises)\n  options: { position([x, y, z], default [0, 0, 0]), radius, life, ramp, smokeColor, rise, growSeconds, boil, rim(fraction of the covering look, 0 additive light only), age, key }"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonvfx.js",
@@ -100510,7 +102364,7 @@
 										"ko": "부풀어 식으며 떠오르는 불덩이",
 										"en": "A fireball that swells, cools and rises"
 									},
-									"code": "import { ToonVfx } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setRamps([[\"#ffffff\", \"#ffe080\", \"#ff8020\", \"#801808\", \"#200804\"]]);\nvfx.addFireball({ x: 0, y: 1, z: 0, radius: 1.2, life: 1.5, ramp: 0, rise: 1, growSeconds: 0.25, boil: 0.4, smokeColor: [0.2, 0.18, 0.16], key: \"barrel-3\" });",
+									"code": "import { ToonVfx } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setRamps([[\"#ffffff\", \"#ffe080\", \"#ff8020\", \"#801808\", \"#200804\"]]);\nvfx.addFireball({ position: [0, 1, 0], radius: 1.2, life: 1.5, ramp: 0, rise: 1, growSeconds: 0.25, boil: 0.4, smokeColor: [0.2, 0.18, 0.16], key: \"barrel-3\" });",
 									"language": "javascript"
 								}
 							]
@@ -100759,8 +102613,8 @@
 								}
 							],
 							"description": {
-								"ko": "이번 프레임에만 그리는 회전체 빔 넘기기.\n  options: { start, end([x, y, z], 결은 start 에서 end 쪽으로 흐름), radius, isCore(심이면 흰빛, 아니면 램프의 겉집), alpha, brightness, ramp, wobble, flowSpeed, grainRepeat(길이 한 칸마다의 결), time, seed }",
-								"en": "Passes a solid-of-revolution beam drawn only this frame.\n  options: { start, end([x, y, z], grain flows from start toward end), radius, isCore(white light if core, otherwise the ramp's outer sheath), alpha, brightness, ramp, wobble, flowSpeed, grainRepeat(grain per unit of length), time, seed }"
+								"ko": "이번 프레임에만 그리는 회전체 빔 넘기기.\n  options: { start, end([x, y, z], 결은 start 에서 end 쪽으로 흐름), radius, isCore(심이면 흰빛, 아니면 램프의 겉집), alpha(기본 1), brightness, ramp, wobble, flowSpeed, grainRepeat(길이 한 칸마다의 결), time, seed }",
+								"en": "Passes a solid-of-revolution beam drawn only this frame.\n  options: { start, end([x, y, z], grain flows from start toward end), radius, isCore(white light if core, otherwise the ramp's outer sheath), alpha(default 1), brightness, ramp, wobble, flowSpeed, grainRepeat(grain per unit of length), time, seed }"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonvfx.js",
@@ -100790,14 +102644,14 @@
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "리본 값. (꼴은 위 머리 주석의 options, 점이 둘 이상이고 width 와 alpha 가 0 보다 커야 넘어감)",
-										"en": "Ribbon values. (The form is the options in the header comment above, submitted only with two or more points and width and alpha above 0)"
+										"ko": "리본 값. (꼴은 위 머리 주석의 options, 점이 둘 이상이고 width 와 alpha(주지 않으면 1) 가 0 보다 커야 넘어감)",
+										"en": "Ribbon values. (The form is the options in the header comment above, submitted only with two or more points and width and alpha (1 if omitted) above 0)"
 									}
 								}
 							],
 							"description": {
-								"ko": "이번 프레임에만 그리는 리본 넘기기. (점열을 카메라 쪽으로 편 띠)\n  options: { points([[x, y, z], ...], 둘 이상), width, taper(0 이면 고른 너비, 1 이면 두 끝이 0), color, ramp, alpha, brightness, grainRepeat, flow,\n             glow(번짐 색 [r, g, b], 주면 흰 심과 그 색 둘레와 테 색 가장자리로 덮는다, 없으면 더하는 빛), rim(glow 가 없을 때 몸을 테 색으로 덮고 심은 색인 꼴의 몫, 0 이면 더하는 빛만) }",
-								"en": "Passes a ribbon drawn only this frame. (A strip of a point sequence spread toward the camera)\n  options: { points([[x, y, z], ...], two or more), width, taper(0 uniform width, 1 both ends 0), color, ramp, alpha, brightness, grainRepeat, flow,\n             glow(glow color [r, g, b], if given covers with a white core, that color around it and rim-colored edges, otherwise additive light), rim(when there is no glow, fraction of the look that covers the body with the rim color and keeps the core in color, 0 additive light only) }"
+								"ko": "이번 프레임에만 그리는 리본 넘기기. (점열을 카메라 쪽으로 편 띠)\n  options: { points([[x, y, z], ...], 둘 이상), width, taper(0 이면 고른 너비, 1 이면 두 끝이 0), color, ramp, alpha(기본 1), brightness, grainRepeat, flow,\n             glow(번짐 색 [r, g, b], 주면 흰 심과 그 색 둘레와 테 색 가장자리로 덮는다, 없으면 더하는 빛), rim(glow 가 없을 때 몸을 테 색으로 덮고 심은 색인 꼴의 몫, 0 이면 더하는 빛만) }",
+								"en": "Passes a ribbon drawn only this frame. (A strip of a point sequence spread toward the camera)\n  options: { points([[x, y, z], ...], two or more), width, taper(0 uniform width, 1 both ends 0), color, ramp, alpha(default 1), brightness, grainRepeat, flow,\n             glow(glow color [r, g, b], if given covers with a white core, that color around it and rim-colored edges, otherwise additive light), rim(when there is no glow, fraction of the look that covers the body with the rim color and keeps the core in color, 0 additive light only) }"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonvfx.js",
@@ -100870,8 +102724,8 @@
 								}
 							],
 							"description": {
-								"ko": "이번 프레임에만 그리는 빛 점 넘기기. (파티클과 같은 꼴, 나이 없이 그 자리에 그대로, setGlintCapacity 까지(기본 96))\n  options: { x, y, z, size, color, ramp, look, brightness, alpha, angle, rim(파티클의 rim 과 같음) }",
-								"en": "Passes a glint drawn only this frame. (Same look as particles, stays in place without age, up to setGlintCapacity (default 96))\n  options: { x, y, z, size, color, ramp, look, brightness, alpha, angle, rim(same as the particle rim) }"
+								"ko": "이번 프레임에만 그리는 빛 점 넘기기. (파티클과 같은 꼴, 나이 없이 그 자리에 그대로, setGlintCapacity 까지(기본 96))\n  options: { position([x, y, z], 기본 [0, 0, 0]), size(기본 0.2), color, ramp, look, brightness, alpha(기본 1), angle, rim(파티클의 rim 과 같음) }",
+								"en": "Passes a glint drawn only this frame. (Same look as particles, stays in place without age, up to setGlintCapacity (default 96))\n  options: { position([x, y, z], default [0, 0, 0]), size(default 0.2), color, ramp, look, brightness, alpha(default 1), angle, rim(same as the particle rim) }"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonvfx.js",
@@ -100887,7 +102741,7 @@
 										"ko": "보석 위에 반짝이는 빛살을 매 프레임",
 										"en": "Light rays twinkling over a gem every frame"
 									},
-									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setGlintCapacity(32);\nconst twinkle = 0.5 + 0.5 * Math.sin(vfx.getTime() * 6);\nvfx.queueGlint({ x: 0.5, y: 1.2, z: 0, size: 0.4 * twinkle, look: ToonVfxLook.star, color: [1, 0.95, 0.7], angle: 0.3, brightness: 1.5 });",
+									"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.setGlintCapacity(32);\nconst twinkle = 0.5 + 0.5 * Math.sin(vfx.getTime() * 6);\nvfx.queueGlint({ position: [0.5, 1.2, 0], size: 0.4 * twinkle, look: ToonVfxLook.star, color: [1, 0.95, 0.7], angle: 0.3, brightness: 1.5 });",
 									"language": "javascript"
 								}
 							]
@@ -101093,7 +102947,7 @@
 										"ko": "직교 투영 장면에 효과 그리기",
 										"en": "Draw effects in an orthographic projection scene"
 									},
-									"code": "import { ToonVfx, ToonVfxLook, Matrix4, Vector3 } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(5, 5, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createOrthographic(-4, 4, -4, 4, 0.1, 50);\nvfx.emitParticles({ count: 20, x: 0, y: 0.5, z: 0, look: ToonVfxLook.glow, color: [0.4, 0.8, 1], speed: 1, size: 0.4, life: 1 });\nvfx.queueBeam({ start: [-2, 0.5, 0], end: [2, 0.5, 0], radius: 0.1, isCore: true, alpha: 1 });\nvfx.update(0.1);\nvfx.draw(viewMatrix, projectionMatrix);",
+									"code": "import { ToonVfx, ToonVfxLook, Matrix4, Vector3 } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(5, 5, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createOrthographic(-4, 4, -4, 4, 0.1, 50);\nvfx.emitParticles({ count: 20, position: [0, 0.5, 0], look: ToonVfxLook.glow, color: [0.4, 0.8, 1], speed: 1, size: 0.4, life: 1 });\nvfx.queueBeam({ start: [-2, 0.5, 0], end: [2, 0.5, 0], radius: 0.1, isCore: true, alpha: 1 });\nvfx.update(0.1);\nvfx.draw(viewMatrix, projectionMatrix);",
 									"language": "javascript"
 								}
 							]
@@ -101610,7 +103464,7 @@
 								"ko": "덮는 연기와 바닥에 멈추는 흙 알갱이",
 								"en": "Covering smoke and soil grains that stop on the floor"
 							},
-							"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.emitParticles({ count: 8, x: 0, y: 0.5, z: 0, look: ToonVfxLook.smoke, color: [0.5, 0.48, 0.45], speed: 0.4, rise: 0.8, size: 0.6, sizeEnd: 2.5, life: [1.5, 2.5], spin: [-1, 1] });\nvfx.emitParticles({ count: 20, x: 0, y: 0.2, z: 0, look: ToonVfxLook.grit, color: [0.35, 0.28, 0.2], speed: [2, 4], gravity: 9, isUpward: true, isGrounded: true, size: 0.06, life: 1.2 });",
+							"code": "import { ToonVfx, ToonVfxLook } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.emitParticles({ count: 8, position: [0, 0.5, 0], look: ToonVfxLook.smoke, color: [0.5, 0.48, 0.45], speed: 0.4, rise: 0.8, size: 0.6, sizeEnd: 2.5, life: [1.5, 2.5], spin: [-1, 1] });\nvfx.emitParticles({ count: 20, position: [0, 0.2, 0], look: ToonVfxLook.grit, color: [0.35, 0.28, 0.2], speed: [2, 4], gravity: 9, isUpward: true, isGrounded: true, size: 0.06, life: 1.2 });",
 							"language": "javascript"
 						}
 					]
@@ -101682,7 +103536,7 @@
 								"ko": "바닥 고리로 퍼지는 먼지와 선을 따라 늘어선 빛",
 								"en": "Dust spreading in a floor ring and lights lined up along a line"
 							},
-							"code": "import { ToonVfx, ToonVfxLook, ToonVfxShape } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.emitParticles({ count: 32, x: 0, y: 0.1, z: 0, shape: ToonVfxShape.ring, radius: 0.5, speed: 3, drag: 4, look: ToonVfxLook.soft, size: 0.15, life: 0.5 });\nvfx.emitParticles({ count: 40, x: 0, y: 1, z: 0, shape: ToonVfxShape.line, direction: [1, 0, 0], length: 5, radius: 0.05, speed: 0.5, look: ToonVfxLook.glow, size: 0.3, life: 0.4 });",
+							"code": "import { ToonVfx, ToonVfxLook, ToonVfxShape } from \"./vanilla.js\";\nconst vfx = new ToonVfx(document.createElement(\"canvas\").getContext(\"webgl2\"));\nvfx.emitParticles({ count: 32, position: [0, 0.1, 0], shape: ToonVfxShape.ring, radius: 0.5, speed: 3, drag: 4, look: ToonVfxLook.soft, size: 0.15, life: 0.5 });\nvfx.emitParticles({ count: 40, position: [0, 1, 0], shape: ToonVfxShape.line, direction: [1, 0, 0], length: 5, radius: 0.05, speed: 0.5, look: ToonVfxLook.glow, size: 0.3, life: 0.4 });",
 							"language": "javascript"
 						}
 					]
