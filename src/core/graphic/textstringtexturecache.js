@@ -31,6 +31,7 @@ const JOINING_CLUSTER_PATTERN = /^[\p{L}\p{M}]/u; // 글자 덩어리가 낱말 
 const STANDALONE_SCRIPT_PATTERN = /^[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Bopomofo}]/u; // 글자 덩어리마다 따로 그려도 되는 글자. (한글, 한자, 가나)
 const COMBINING_MARK_PATTERN = /\p{M}/u;
 const EMOJI_CLUSTER_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+const BLANK_CHUNK_PATTERN = /^[\u0009\u0020\u00A0\u2000-\u200B\u202F\u205F\u3000]+$/u; // 그릴 잉크가 없는 공백 덩어리. (굽지 않는다, 오검 공백 U+1680 처럼 꼴이 보이는 공백은 넣지 않는다)
 // 글자 안티앨리어싱. 끄면 구운 글자의 알파를 문턱값으로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다.
 // 도트 글꼴을 설계 크기의 정수 배로 그리는 프로젝트가 끈다. 기본은 켜짐이라 동작이 바뀌지 않는다.
 let isTextAntialiasEnabled = true;
@@ -290,7 +291,11 @@ function hasCharacterInRanges(text, ranges) {
 //   그래서 (글자 덩어리, 1/8 자리 칸) 열쇠로 구운 글리프를 measureText 로 잰 자리에 놓으면 통째로 그린 것과 같다.
 //   서브픽셀 자리가 꺼진 기계(정수 반올림, 경계 1/2)도 1/8 칸이 경계를 담아 같다.
 // - 글자 덩어리(Intl.Segmenter 의 grapheme)마다 하나씩 굽는다. 합자나 이어진 꼴이 생길 수 있는 글자(라틴, 키릴 같은 글자의 낱말)는
-//   낱말째 한 덩어리로 굽는다. 한글, 한자, 가나, 숫자, 문장 부호, 이모지는 덩어리마다 따로다.
+//   낱말째 한 덩어리로 굽는다. 한글, 한자, 가나, 숫자, 문장 부호, 이모지는 덩어리마다 따로다. 공백 덩어리는 굽지 않는다.
+//   그래서 숫자만 바뀌는 새 문자열(자원, 체력, 뜨는 숫자)은 아는 숫자 덩어리만으로 그려 새로 굽지 않는다.
+// - 정수 자리(화소 맞추기)는 통째로 그린 것과 같다. 소수 자리에 놓인 글은 덩어리마다 선형 거르기가 따로 걸려
+//   잉크가 닿는 이웃(숫자 같은)의 겹친 가장자리에서 몇 화소가 조금 다르다. (스키아 글리프 캐시, TextMeshPro 처럼 글리프를 따로 굽는 정석의 몫)
+// - 칸의 맨 위와 맨 아래 한 줄은 문자열 사각형의 가장자리 줄을 되풀이한다. (세로 소수 자리에서 거르기가 아틀라스의 다른 줄을 뽑지 않게)
 // - 오른쪽에서 왼쪽 글(아랍어, 히브리어), 아주 큰 글꼴, Intl.Segmenter 가 없는 곳은 문자열째 한 덩어리로 굽는다. (예전과 같다)
 // - 아틀라스 장이 차면 새 장을 열고, 장 수가 상한이면 가장 오래 안 쓴 장을 비워 다시 쓴다.
 //==============================================================================
@@ -556,6 +561,9 @@ export class TextStringTextureCache extends Object {
 		const glyphList = [];
 		const missingGlyphList = [];
 		for (const chunk of chunks) {
+			if (BLANK_CHUNK_PATTERN.test(chunk.text)) {
+				continue;
+			}
 			const startPosition = chunk.positions[0];
 			const anchorX = Math.floor(startPosition);
 			const fractionX = startPosition - anchorX;
@@ -587,8 +595,8 @@ export class TextStringTextureCache extends Object {
 					fractionX: fractionX,
 					originX: originX,
 					width: originX + 1 + chunkRight + cellPadding,
-					height: bakeHeight,
-					baselineY: scaledBaselineY,
+					height: bakeHeight + 2,
+					baselineY: scaledBaselineY + 1,
 					atlasPage: null,
 					atlasX: 0,
 					atlasY: 0,
@@ -799,6 +807,11 @@ export class TextStringTextureCache extends Object {
 			else {
 				bakeCanvasRenderingContext.fillStyle = colorString;
 			}
+			// 문자열 사각형 줄만 그린다. (칸의 위아래 한 줄은 비워 두고 아래에서 채운다)
+			bakeCanvasRenderingContext.save();
+			bakeCanvasRenderingContext.beginPath();
+			bakeCanvasRenderingContext.rect(0, 1, span.width, span.height - 2);
+			bakeCanvasRenderingContext.clip();
 			for (const glyph of span.glyphs) {
 				const penX = glyph.atlasX - span.atlasX + glyph.originX + glyph.fractionX;
 				if (mode === "stroke") {
@@ -808,6 +821,13 @@ export class TextStringTextureCache extends Object {
 					bakeCanvasRenderingContext.fillText(glyph.text, penX, glyph.baselineY);
 				}
 			}
+			bakeCanvasRenderingContext.restore();
+
+			// 칸의 맨 위와 맨 아래 한 줄은 문자열 사각형의 가장자리 줄을 되풀이한다.
+			// (줄 높이를 넘는 잉크는 문자열 사각형에서 잘리고, 세로 소수 자리에서 선형 거르기가 사각형 밖 한 줄을 뽑을 때
+			//  아틀라스의 이웃 줄이 아니라 예전 문자열 텍스처의 CLAMP_TO_EDGE 와 같은 가장자리 줄을 뽑는다)
+			bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, 1, span.width, 1, 0, 0, span.width, 1);
+			bakeCanvasRenderingContext.drawImage(bakeCanvas, 0, span.height - 2, span.width, 1, 0, span.height - 1, span.width, 1);
 
 			// 안티앨리어싱을 끈 경우: 알파를 문턱값으로 갈라 가장자리의 반투명 픽셀을 없앤다.
 			if (isNearest) {
