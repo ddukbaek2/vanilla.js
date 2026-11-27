@@ -5782,6 +5782,42 @@
 		{
 			"vanilla-engine": {
 				"module": "core/component",
+				"class": "ComponentBase",
+				"name": "mark_drawn_rect_dirty"
+			},
+			"vanilla.js": {
+				"module": "core/component",
+				"class": "Component",
+				"name": "markDrawnRectDirty"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component",
+				"class": "ComponentBase",
+				"name": "mark_all_drawn_rects_dirty"
+			},
+			"vanilla.js": {
+				"module": "core/component",
+				"class": "Component",
+				"name": "markAllDrawnRectsDirty"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component",
+				"class": "ComponentBase",
+				"name": "get_drawn_rect_generation"
+			},
+			"vanilla.js": {
+				"module": "core/component",
+				"class": "Component",
+				"name": "getDrawnRectGeneration"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component",
 				"class": "Component"
 			},
 			"vanilla.js": {
@@ -5895,6 +5931,18 @@
 				"module": "core/component",
 				"class": "Component",
 				"name": "isDrawnInsideContent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component",
+				"class": "Component",
+				"name": "mark_drawn_rect_dirty"
+			},
+			"vanilla.js": {
+				"module": "core/component",
+				"class": "Component",
+				"name": "markDrawnRectDirty"
 			}
 		},
 		{
@@ -10207,6 +10255,66 @@
 			"vanilla-engine": {
 				"module": "core/graphic",
 				"class": "Graphic",
+				"name": "set_subtree_culling_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "setSubtreeCullingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "is_subtree_culling_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "isSubtreeCullingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "get_last_frame_culled_subtree_count"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "getLastFrameCulledSubtreeCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "add_culled_subtree_count"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "addCulledSubtreeCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "read_local_visible_bounds"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "readLocalVisibleBounds"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
 				"name": "add_culled_node_count"
 			},
 			"vanilla.js": {
@@ -13713,6 +13821,42 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "core/node/nodetree",
+				"class": "NodeTree",
+				"name": "draw_children"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "drawChildren"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/nodetree",
+				"class": "NodeTree",
+				"name": "read_subtree_draw_bounds"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "readSubtreeDrawBounds"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/nodetree",
+				"class": "NodeTree",
+				"name": "read_parent_draw_bounds"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "readParentDrawBounds"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "core/node/worldnode",
 				"class": "WorldNode"
 			},
@@ -14175,6 +14319,42 @@
 				"module": "core/node/transformnode",
 				"class": "TransformNode",
 				"name": "getLastDrawnMaximumScale"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "get_last_drawn_frame_number"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "getLastDrawnFrameNumber"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "mark_draw_bounds_dirty"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "markDrawBoundsDirty"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "mark_parent_draw_bounds_dirty"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "markParentDrawBoundsDirty"
 			}
 		},
 		{
@@ -19675,6 +19855,54 @@
 			"vanilla-engine": {
 				"module": "graphics3d/shadowmap",
 				"class": "ShadowMap",
+				"name": "set_update_mode"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "setUpdateMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "get_update_mode"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "getUpdateMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "get_update_interval"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "getUpdateInterval"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "request_update"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "requestUpdate"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
 				"name": "get_framebuffer"
 			},
 			"vanilla.js": {
@@ -19811,6 +20039,54 @@
 				"module": "graphics3d/shadowmap",
 				"class": "ShadowAtlas",
 				"name": "beginRender"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "set_update_mode"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "setUpdateMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "get_update_mode"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "getUpdateMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "get_update_interval"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "getUpdateInterval"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "request_update"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowAtlas",
+				"name": "requestUpdate"
 			}
 		},
 		{
@@ -19955,6 +20231,16 @@
 				"module": "graphics3d/shadowmap",
 				"class": "ShadowAtlas",
 				"name": "destroy"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowUpdateMode"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowUpdateMode"
 			}
 		},
 		{
@@ -39441,6 +39727,30 @@
 				"module": "ui/autolayout/layoutvariable",
 				"class": "LayoutVariable",
 				"name": "setValue"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/autolayout/layoutvariable",
+				"class": "LayoutVariable",
+				"name": "set_value_changed_event"
+			},
+			"vanilla.js": {
+				"module": "ui/autolayout/layoutvariable",
+				"class": "LayoutVariable",
+				"name": "setValueChangedEvent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/autolayout/layoutvariable",
+				"class": "LayoutVariable",
+				"name": "get_value_changed_event"
+			},
+			"vanilla.js": {
+				"module": "ui/autolayout/layoutvariable",
+				"class": "LayoutVariable",
+				"name": "getValueChangedEvent"
 			}
 		},
 		{
