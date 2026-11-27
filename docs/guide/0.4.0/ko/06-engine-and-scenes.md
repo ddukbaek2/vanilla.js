@@ -52,7 +52,7 @@ console.log(sameEngine === engine, versionString);
 
 `engine.run(scene)` 은 씬이 `Scene` 이 아니면 예외를 던지고, 씬 불러오기를 뒤에서 시작한 뒤 바로 프레임 루프(`requestAnimationFrame`)를 돌립니다. 기본 글꼴도 뒤에서 받습니다. `run` 은 한 번만 부르고, 다음 씬부터는 `loadScene` 으로 올립니다.
 
-엔진이 가진 것은 `getSceneManager()`, `getTimeManager()`, `getViewManager()`, `getInputManager()`, `getGraphic()`, `getCanvas()`, `getEngineConfiguration()` 으로 얻습니다. 씬 안에서는 `this.getEngine()` 으로 엔진을 얻습니다.
+엔진이 가진 것은 `getTimeManager()`, `getViewManager()`, `getInputManager()`, `getGraphic()`, `getCanvas()`, `getEngineConfiguration()` 으로 얻습니다. 씬 안에서는 `this.getEngine()` 으로 엔진을 얻습니다.
 
 ## 씬의 생명 주기
 
@@ -135,9 +135,9 @@ engine.run(new LifecycleScene());
 
 엔진 쪽에서 본 한 프레임은 이렇습니다. 최대 FPS 거르기, `Graphic` 상태 되돌리기, `TimeManager` 갱신, `InputManager` 갱신(게임패드, 입력 동작), 불러온 씬마다 위의 5 번(불러오는 중)이나 6 번, 정보창(켰을 때), 남은 묶음 그리기, 마우스 커서, 한 프레임짜리 입력 표시 지우기, 검증용 화면 저장(요청했을 때). 씬 하나에서 난 예외는 그 씬에서 잡아 `console.error` 로 찍고 루프는 계속 돕니다.
 
-## 씬 바꾸기 (SceneManager)
+## 씬 바꾸기
 
-`SceneManager` 는 불러온 씬 목록을 들고 위의 차례를 지킵니다. 엔진에도 같은 일을 하는 `engine.loadScene(scene)`, `engine.unloadScene(scene)`, `engine.unloadAllScenes()` 가 있고, 모두 Promise 를 돌려줍니다. `loadScene` 의 Promise 는 `initialize` 까지 끝나면 풀립니다.
+엔진이 불러온 씬 목록을 들고 위의 차례를 지킵니다. `engine.loadScene(scene)`, `engine.unloadScene(scene)`, `engine.unloadAllScenes()` 로 올리고 내리며, 모두 Promise 를 돌려줍니다. 불러온 씬 목록은 `engine.getAllLoadedScenes()` 로 얻습니다. (러스트 판 get_all_loaded_scenes 와 같다, 씬 매니저는 엔진 안쪽이라 내보내지 않는다) `loadScene` 의 Promise 는 `initialize` 까지 끝나면 풀립니다.
 
 씬은 여럿을 함께 올릴 수 있습니다. 올린 씬은 모두 매 프레임 갱신되고, 올린 차례로 그려집니다. (나중에 올린 씬이 위) 바꿀 때는 다음 씬을 먼저 올려 두고, 다 올라오면 지금 씬을 내리면 화면이 비지 않습니다.
 
@@ -400,4 +400,4 @@ engine.run(new PausingScene());
 
 ## 관련 클래스
 
-Engine, EngineConfiguration, PageEvent, Scene, SceneManager, TimeManager, ViewManager, ViewScaleMode, UIScene, Graphic
+Engine, EngineConfiguration, PageEvent, Scene, TimeManager, ViewManager, ViewScaleMode, UIScene, Graphic

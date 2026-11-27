@@ -721,7 +721,7 @@ export class Graphic extends Object {
 	/** @private @type { WebGLBuffer | null } */ #particleVertexBuffer;
 	/** @private @type { Float32Array | null } */ #particleVertexData;
 	/** @private @type { WebGLTexture | null } */ #softDiscTexture; // 부드러운 원 스프라이트. (지연 생성)
-	/** @private @type { boolean } */ #isSpriteBatchingEnabled; // 같은 텍스처의 연이은 드로우를 한 번에 그릴지.
+	/** @private @type { boolean } */ #isBatchingEnabled; // 같은 텍스처의 연이은 드로우를 한 번에 그릴지.
 	/** @private @type { ShaderProgram | null } */ #batchShaderProgram; // 묶어 그리기 전용. (지연 생성)
 	/** @private @type { WebGLVertexArrayObject | null } */ #batchVertexArray;
 	/** @private @type { WebGLBuffer | null } */ #batchVertexBuffer;
@@ -907,7 +907,7 @@ export class Graphic extends Object {
 		this.#softDiscTexture = null;
 
 		// 묶어 그리기 자원. (켤 때 만든다)
-		this.#isSpriteBatchingEnabled = false;
+		this.#isBatchingEnabled = false;
 		this.#batchShaderProgram = null;
 		this.#batchVertexArray = null;
 		this.#batchVertexBuffer = null;
@@ -935,7 +935,7 @@ export class Graphic extends Object {
 		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
 		// 글리프 아틀라스 장을 비워 덮어쓰기 전에 쌓아 둔 묶음을 먼저 그린다. (묶음에 그 장을 쓰는 글자가 있을 수 있다)
 		const beforeTextureOverwrite = () => {
-			this.flushSpriteBatch();
+			this.flushBatch();
 		};
 		this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder, beforeTextureOverwrite);
 
@@ -1049,7 +1049,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 
 		// 묶어 그리기와 화면 밖 거르기는 기본으로 켠다. (지금 엔진을 쓰는 게임들이 묶어 그리기를 켜고 돌았고, 거르기는 내용 영역 안에만 그린다고 알린 컴포넌트만 거른다)
-		this.setSpriteBatchingEnabled(true);
+		this.setBatchingEnabled(true);
 		this.setCullingEnabled(true);
 	}
 
@@ -1170,7 +1170,7 @@ export class Graphic extends Object {
 	 * @param { number } value 밉맵 단계에 더할 값. (음수면 또렷해진다)
 	 */
 	setImageMipmapBias(value) {
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.#imageMipmapBias = value;
 		const shaderPrograms = [this.#shaderProgram, this.#batchShaderProgram, this.#particleShaderProgram, this.#blendShaderProgram, this.#particleBlendShaderProgram, this.#shaderProgramOverride];
 		for (const shaderProgram of shaderPrograms) {
@@ -1499,7 +1499,7 @@ export class Graphic extends Object {
 
 		// 블렌드가 바뀌면 그 전에 쌓인 것을 먼저 그린다.
 		if (blendMode !== this.#blendMode) {
-			this.flushSpriteBatch();
+			this.flushBatch();
 		}
 		this.#blendMode = blendMode;
 		this.#shaderBlendModeIndex = shaderBlendModeIndex;
@@ -1707,12 +1707,12 @@ export class Graphic extends Object {
 		const isShaderBlendDraw = shaderBlendModeIndex > 0;
 
 		// 묶어 그리기가 켜져 있으면 쌓아 두었다가 텍스처나 상태가 바뀔 때 한 번에 그린다. (바꿔 끼운 셰이더는 제 유니폼을 쓰므로 바로 그린다)
-		if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
+		if (this.#isBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
 			this.appendSpriteBatch(vertexCount, texture, color);
 			return;
 		}
 		this.breakGeometryRecord();
-		this.flushSpriteBatch();
+		this.flushBatch();
 
 		// 묶지 않고 그리는 것에는 셰이더 자르기를 가위로 건다. (화소 가운데 기준이 같아 결과가 같다)
 		this.applyClipScissor();
@@ -2335,34 +2335,34 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 스프라이트 묶어 그리기 설정.
+	// 묶어 그리기 켜고 끄기. (엔진이 처음에 켠다, 끄면 그리기 하나에 드로우 콜 하나)
 	// - 켜면 연이은 드로우(이미지, 도형, 글자, 정점 색 쿼드)를 정점에 변환과 색을 실어 쌓아 두었다가 한 번의 드로우 콜로 그린다.
 	// - 텍스처는 한 묶음에 여러 장(기기 텍스처 유닛 수와 16 가운데 작은 것)까지 묶어 텍스처가 바뀌어도 이어진다. (PixiJS 와 같은 꼴)
 	// - 축에 맞고 화소 경계에 놓인 자르기(beginClipRect)는 정점의 자르기 사각형으로 셰이더가 잘라 묶음을 끊지 않는다. (돌아갔거나 둥근 자르기는 스텐실)
 	// - 텍스처 칸이 차거나, 블렌드, 스텐실 자르기, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.
-	// - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.
+	// - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushBatch() 를 부른다.
 	//==============================================================================
 	/**
-	 * @param { boolean } isSpriteBatchingEnabled 묶어 그리기를 켤지. (true 일 때만 켠다, 끄면 쌓인 것을 먼저 그린다)
+	 * @param { boolean } isBatchingEnabled 묶어 그리기를 켤지. (true 일 때만 켠다, 끄면 쌓인 것을 먼저 그린다)
 	 */
-	setSpriteBatchingEnabled(isSpriteBatchingEnabled) {
-		if (!isSpriteBatchingEnabled) {
-			this.flushSpriteBatch();
+	setBatchingEnabled(isBatchingEnabled) {
+		if (!isBatchingEnabled) {
+			this.flushBatch();
 		}
 		else {
 			this.ensureSpriteBatchResources();
 		}
-		this.#isSpriteBatchingEnabled = isSpriteBatchingEnabled === true;
+		this.#isBatchingEnabled = isBatchingEnabled === true;
 	}
 
 	//==============================================================================
-	// 스프라이트 묶어 그리기 여부 반환.
+	// 묶어 그리기를 켰는지 반환.
 	//==============================================================================
 	/**
 	 * @returns { boolean } 묶어 그리기가 켜졌으면 참.
 	 */
-	isSpriteBatchingEnabled() {
-		return this.#isSpriteBatchingEnabled;
+	isBatchingEnabled() {
+		return this.#isBatchingEnabled;
 	}
 
 	//==============================================================================
@@ -2558,7 +2558,7 @@ export class Graphic extends Object {
 		const isClipSlotMissing = this.#isShaderClipActive && this.#shaderClipSlotGeneration !== this.#batchGeneration && this.#batchClipRectCount >= BATCH_CLIP_SLOT_CAPACITY;
 		const isVertexCapacityMissing = this.#batchVertexCount + vertexCount > BATCH_VERTEX_CAPACITY;
 		if (isTextureSlotMissing || isClipSlotMissing || isVertexCapacityMissing) {
-			this.flushSpriteBatch();
+			this.flushBatch();
 			textureSlot = -1;
 		}
 		if (textureSlot < 0) {
@@ -2741,10 +2741,22 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 쌓인 묶음 그리기의 옛 이름. (폐기 예정, flushBatch 와 같다)
+	// - toonview3d.js 가 flushBatch 로 옮기면 뺀다. 공개 자료에는 싣지 않는다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @deprecated flushBatch 를 쓴다.
+	 */
+	flushSpriteBatch() {
+		this.flushBatch();
+	}
+
+	//==============================================================================
 	// 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
 	// - 묶음의 텍스처를 0 번부터의 유닛에 묶는다. 쓰지 않는 칸의 유닛에는 흰 텍스처를 묶어, 지난 그리기의 텍스처가 지금 그리는 칸(렌더 타겟)이어도 되먹임이 생기지 않게 한다.
 	//==============================================================================
-	flushSpriteBatch() {
+	flushBatch() {
 		const batchVertexCount = this.#batchVertexCount;
 		if (batchVertexCount <= 0) {
 			return;
@@ -2956,7 +2968,7 @@ export class Graphic extends Object {
 	 * @param { Component } component 그릴 컴포넌트.
 	 */
 	drawComponent(component) {
-		if (!this.#isGeometryCachingEnabled || this.#geometryActiveCache !== null || !this.#isSpriteBatchingEnabled || this.#shaderProgramOverride !== null || this.#isStencilRecording) {
+		if (!this.#isGeometryCachingEnabled || this.#geometryActiveCache !== null || !this.#isBatchingEnabled || this.#shaderProgramOverride !== null || this.#isStencilRecording) {
 			component.draw(this);
 			return;
 		}
@@ -3546,11 +3558,11 @@ export class Graphic extends Object {
 		// 고정 블렌딩이면 스프라이트 묶음에 이어 쌓는다. (이미지, 도형, 글자와 같은 드로우 콜에 들어간다)
 		const shaderBlendModeIndex = this.getDrawShaderBlendModeIndex();
 		const isShaderBlendDraw = shaderBlendModeIndex > 0;
-		if (this.#isSpriteBatchingEnabled && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
+		if (this.#isBatchingEnabled && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
 			this.appendColoredQuadsToSpriteBatch(vertexCount, texture);
 			return;
 		}
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.applyClipScissor();
 		this.ensureParticleBatchResources();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -3586,7 +3598,7 @@ export class Graphic extends Object {
 		}
 
 		// 기본 경로 상태 복원.
-		// 셰이더 프로그램은 되돌리지 않는다. (flushSpriteBatch 와 같다, 다음에 그리는 쪽이 제 프로그램을 쓰게 한다)
+		// 셰이더 프로그램은 되돌리지 않는다. (flushBatch 와 같다, 다음에 그리는 쪽이 제 프로그램을 쓰게 한다)
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 		this.releaseClipScissor();
@@ -4345,7 +4357,7 @@ export class Graphic extends Object {
 			return false;
 		}
 		// 텍스처를 묶기 전에 쌓아 둔 묶음을 먼저 그린다. (묶은 텍스처 기억이 바뀐다)
-		this.flushSpriteBatch();
+		this.flushBatch();
 		const imageTextureCache = this.getImageTextureCache();
 		const texture = imageTextureCache.getTexture(image, this.isImageSmoothingEnabled(), this.isImageMipmapEnabled());
 		return texture !== null;
@@ -5265,7 +5277,7 @@ export class Graphic extends Object {
 		}
 
 		// 클리핑 전에 쌓인 것을 먼저 그린다. (스텐실 상태가 바뀌기 전)
-		this.flushSpriteBatch();
+		this.flushBatch();
 		const previousStencilClipDepth = this.#stencilClipDepth;
 		this.#stencilClipDepth += 1;
 		if (previousStencilClipDepth === 0) {
@@ -5283,7 +5295,7 @@ export class Graphic extends Object {
 		else {
 			this.drawRect(rect);
 		}
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.#isStencilRecording = false;
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -5383,7 +5395,7 @@ export class Graphic extends Object {
 		if (shaderClipCount === 0) {
 			return 0;
 		}
-		this.flushSpriteBatch();
+		this.flushBatch();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const isShaderClipActive = this.#isShaderClipActive;
 		this.#isShaderClipActive = false;
@@ -5402,7 +5414,7 @@ export class Graphic extends Object {
 				this.drawRect(clipEntry.rect);
 			}
 		}
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.#isStencilRecording = false;
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -5451,7 +5463,7 @@ export class Graphic extends Object {
 	 */
 	beginOpacityLayer() {
 		this.breakGeometryRecord();
-		this.flushSpriteBatch();
+		this.flushBatch();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
 		const globalAlpha = this.#globalAlpha;
@@ -5476,7 +5488,7 @@ export class Graphic extends Object {
 		if (opacityLayer === undefined) {
 			return;
 		}
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.#globalAlpha = opacityLayer.globalAlpha;
 		const target = opacityLayer.target;
 		if (target === null) {
@@ -5499,7 +5511,7 @@ export class Graphic extends Object {
 		this.setBlendMode("source-over");
 		const vertexCount = this.writeQuad(0, 0, 0, viewportWidth, viewportHeight, 0, 1, 1, 0) / FLOATS_PER_VERTEX;
 		this.drawVertices(vertexCount, target.texture, this.getWhiteColor());
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.setBlendMode(blendMode);
 		this.#transformMatrix = transformMatrix;
 		this.#imageTintColor = imageTintColor;
@@ -5577,7 +5589,7 @@ export class Graphic extends Object {
 		// 기록 시점의 변환 행렬로 같은 영역을 DECR 해 스텐실 원복.
 		// (begin 과 end 사이에 변환이 바뀌었을 수 있으므로 스냅샷 사용)
 		// 칸은 다음 클립이 고쳐 쓰므로 지금 행렬 객체로 삼지 않고 값만 옮겨 적는다. (아래 popState 가 begin 때의 행렬로 되돌린다)
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.#transformMatrix.copyFrom(clipEntry.transformMatrix);
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
@@ -5589,7 +5601,7 @@ export class Graphic extends Object {
 		else {
 			this.drawRect(clipEntry.rect);
 		}
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.#isStencilRecording = false;
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
@@ -5783,7 +5795,7 @@ export class Graphic extends Object {
 	 */
 	setShaderProgramOverride(shaderProgram) {
 		this.breakGeometryRecord();
-		this.flushSpriteBatch();
+		this.flushBatch();
 		this.#shaderProgramOverride = shaderProgram;
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const activeShaderProgram = this.getShaderProgram();
@@ -5869,7 +5881,7 @@ export class Graphic extends Object {
 	//   자르기 안에 3D 를 그릴 노드는 beginClipRect 앞에서 이것을 부르고, runExternalPass 에는 clearDepth: false 를 준다.
 	//==============================================================================
 	clearDepthBuffer() {
-		this.flushSpriteBatch();
+		this.flushBatch();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		webGL2RenderingContext.depthMask(true);
 		webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
@@ -5912,7 +5924,7 @@ export class Graphic extends Object {
 	runExternalPass(callback, options = {}) {
 		this.breakGeometryRecord();
 		const isDepthCleared = options.clearDepth !== false;
-		this.flushSpriteBatch();
+		this.flushBatch();
 		if (isDepthCleared) {
 			this.clearDepthBuffer();
 		}

@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Matrix4, Vector3, Camera3D, ToonRenderer, ToonDrawQueue, ToonDrawStage, ToonBlendMode, ToonBufferUsage, ToonMesh, createReflectionMatrix } from "../../import.js";
+import { Matrix4, Vector3, Camera3D, ToonRenderer, ToonDrawQueue, ToonDrawStage, ToonBlendMode, ToonBufferUsage, MeshBuilder, createBoxGeometry, createTorusGeometry, createSphereGeometry, createCapsuleGeometry, createOctahedronGeometry, createReflectionMatrix } from "../../import.js";
 
 
 //==============================================================================
@@ -66,7 +66,7 @@ const ROCK_COUNT = 27;
  * @returns { object }
  */
 function buildArrays(geometry, matrix, colorText, options) {
-	const builder = new ToonMesh.MeshBuilder();
+	const builder = new MeshBuilder();
 	builder.addPart(geometry, matrix, colorText, options);
 	return builder.readArrays();
 }
@@ -164,15 +164,14 @@ export class ToonMaterialScene {
 		const identityMatrix = Matrix4.createIdentity();
 		const unlitOptions = { isUnlit: true, hasOutline: false };
 		this.#meshes = {
-			floor: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(9, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), "#3a4660", { hasOutline: false })),
-			screen: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(1.6, 1.0, 0.12), identityMatrix, "#1a2230", {})),
-			cube: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(1.1, 1.1, 1.1), identityMatrix, "#ffffff", {})),
-			torus: renderer.createMesh(buildArrays(ToonMesh.createTorusGeometry(0.5, 0.2, 16, 40), identityMatrix, "#e0a050", {})),
-			sphere: renderer.createMesh(buildArrays(ToonMesh.createSphereGeometry(0.55, 32, 20), identityMatrix, "#d8d8e0", {})),
-			hologramBall: renderer.createMesh(buildArrays(ToonMesh.createSphereGeometry(0.42, 24, 16), identityMatrix, "#ffffff", unlitOptions)),
-			hologramBody: renderer.createMesh(buildArrays(ToonMesh.createCapsuleGeometry(0.28, 0.7, 8, 16), identityMatrix, "#ffffff", unlitOptions)),
-			rock: renderer.createMesh(buildArrays(ToonMesh.createOctahedronGeometry(0.22), identityMatrix, "#a89880", {})),
-		};
+			floor: renderer.createMesh(buildArrays(createBoxGeometry(9, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), "#3a4660", { hasOutline: false })),
+			screen: renderer.createMesh(buildArrays(createBoxGeometry(1.6, 1.0, 0.12), identityMatrix, "#1a2230", {})),
+			cube: renderer.createMesh(buildArrays(createBoxGeometry(1.1, 1.1, 1.1), identityMatrix, "#ffffff", {})),
+			torus: renderer.createMesh(buildArrays(createTorusGeometry(0.5, 0.2, 16, 40), identityMatrix, "#e0a050", {})),
+			sphere: renderer.createMesh(buildArrays(createSphereGeometry(0.55, 32, 20), identityMatrix, "#d8d8e0", {})),
+			hologramBall: renderer.createMesh(buildArrays(createSphereGeometry(0.42, 24, 16), identityMatrix, "#ffffff", unlitOptions)),
+			hologramBody: renderer.createMesh(buildArrays(createCapsuleGeometry(0.28, 0.7, 8, 16), identityMatrix, "#ffffff", unlitOptions)),
+			rock: renderer.createMesh(buildArrays(createOctahedronGeometry(0.22), identityMatrix, "#a89880", {})) };
 		this.#segmentMaterial = renderer.createMaterial({ name: "segment", uniformChunk: SEGMENT_CHUNK, surfaceChunk: SEGMENT_SURFACE_CHUNK });
 		const rockLayout = renderer.createInstanceLayout([{ name: "instanceShape", size: 4 }, { name: "instanceOffset", size: 3 }, { name: "instanceColor", size: 3 }]);
 		this.#rockMaterial = renderer.createMaterial({ name: "rock", vertexChunk: ROCK_VERTEX_CHUNK });

@@ -132,7 +132,7 @@ export class HeatHazeEffect extends Component {
 		}
 
 		// 앞서 그린 것이 화면에 다 나가야 떠 올 수 있다. (묶어 그리기로 쌓인 것을 먼저 그린다)
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 
 		// 화면상의 절대 좌표 영역(바운딩 박스)을 가져와 캡처 범위로 사용합니다. (지금 변환으로 옮긴 드로잉 버퍼 픽셀, 왼쪽 위 원점)
 		const transformMatrix = graphic.getTransformMatrix();

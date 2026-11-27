@@ -265,7 +265,7 @@ class ModelViewerScene extends Scene {
 	// 3D 출력. (2D 묶음 내보내기 → 3D 패스 → 2D 상태 복구)
 	//==============================================================================
 	preDraw(graphic) {
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 		const canvasPixelSize = this.getEngine().getViewManager().getCanvasPixelSize();
 		if (this.#isReady) {
 			this.renderScene(graphic.getWebGL2RenderingContext(), System.Math.floor(canvasPixelSize.x), System.Math.floor(canvasPixelSize.y), this.#elapsedTime);

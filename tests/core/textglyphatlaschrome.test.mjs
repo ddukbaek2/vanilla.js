@@ -93,7 +93,7 @@ try {
 				super.draw(graphic);
 				frame += 1;
 				// 프레임마다 검게 비운다. (preserveDrawingBuffer 라 지난 프레임 글이 겹쳐 쌓이지 않게)
-				graphic.flushSpriteBatch();
+				graphic.flushBatch();
 				const clearContext = graphic.getWebGL2RenderingContext();
 				clearContext.clearColor(0, 0, 0, 1);
 				clearContext.clear(clearContext.COLOR_BUFFER_BIT);

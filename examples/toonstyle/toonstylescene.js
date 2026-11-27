@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Matrix4, Vector3, Camera3D, ToonRenderer, ToonDrawQueue, ToonMesh, ToonScreenOutline, ToonMatcapBlend, ShadowMap, ShadowAtlas } from "../../import.js";
+import { Matrix4, Vector3, Camera3D, ToonRenderer, ToonDrawQueue, MeshBuilder, createBoxGeometry, createSphereGeometry, createOctahedronGeometry, createFacetedChunkGeometry, createTorusGeometry, ToonScreenOutline, ToonMatcapBlend, ShadowMap, ShadowAtlas } from "../../import.js";
 
 
 //==============================================================================
@@ -50,7 +50,7 @@ function buildArrays(geometry, colorText, hasShell) {
 	if (geometry.uvs !== undefined && geometry.uvs1 === undefined) {
 		geometry.uvs1 = geometry.uvs;
 	}
-	const builder = new ToonMesh.MeshBuilder();
+	const builder = new MeshBuilder();
 	builder.addPart(geometry, Matrix4.createIdentity(), colorText, { hasOutline: hasShell, outlineWidth: 0.025 });
 	return builder.readArrays();
 }
@@ -195,13 +195,13 @@ export class ToonStyleScene {
 			return renderer.createMesh(buildArrays(geometry, colorText, isShell));
 		};
 		this.#itemList = [
-			{ mesh: meshOf(ToonMesh.createBoxGeometry(14, 0.2, 10), "#9aa4b4"), matrix: Matrix4.createTranslation(0, -0.1, 0), options: { lineId: 1, hasScreenOutline: !isToggled, hasOutline: false, specularScale: 0, rimScale: 0 } },
-			{ mesh: meshOf(ToonMesh.createBoxGeometry(2.4, 0.1, 3.0), "#86a07e"), matrix: createPlaced([-3.4, 0.55, -1.6], 0.5, 0.25, [1, 1, 1]), options: { lineId: 2, specularScale: 0 } },
-			{ mesh: meshOf(ToonMesh.createBoxGeometry(1.2, 1.2, 1.2), "#e8a860"), matrix: createPlaced([-2.0, 0.6, 0.7], 0, 0.55, [1, 1, 1]), options: { lineId: 3 } },
-			{ mesh: meshOf(ToonMesh.createSphereGeometry(0.8, 48, 32), "#4a5a8a"), matrix: Matrix4.createTranslation(-0.2, 0.8, 0.2), options: { lineId: 4, angelRingTexture: this.#angelRingTexture, angelRingColor: [0.9, 0.85, 0.7], angelRingOffsetV: 0.3, outlineOffsetZ: 0.02 } },
-			{ mesh: meshOf(ToonMesh.createOctahedronGeometry(0.6), "#80c8ff"), matrix: createPlaced([1.5, 0.96, 0.6], 0, 0.4, [1, 1.6, 1]), options: { lineId: 5, matcapTexture: this.#matcapTexture, matcapStrength: 0.7, matcapBlend: ToonMatcapBlend.add, outlineColor: [0.1, 0.22, 0.4, 1] } },
-			{ mesh: meshOf(ToonMesh.createFacetedChunkGeometry(0.55, CHUNK_SCALES, [1, 0.8, 1]), "#b0a0d0"), matrix: Matrix4.createTranslation(3.0, 0.45, 0.2), options: { lineId: 6, hasCreaseLine: !isToggled } },
-			{ mesh: meshOf(ToonMesh.createTorusGeometry(0.45, 0.17, 16, 40), "#d06070"), matrix: createPlaced([0.9, 0.3, 2.1], 1.2, 0.3, [1, 1, 1]), options: { lineId: 7, outlineColor: [0.35, 0.08, 0.12, 1], outlineWidthScale: 1.4 } },
+			{ mesh: meshOf(createBoxGeometry(14, 0.2, 10), "#9aa4b4"), matrix: Matrix4.createTranslation(0, -0.1, 0), options: { lineId: 1, hasScreenOutline: !isToggled, hasOutline: false, specularScale: 0, rimScale: 0 } },
+			{ mesh: meshOf(createBoxGeometry(2.4, 0.1, 3.0), "#86a07e"), matrix: createPlaced([-3.4, 0.55, -1.6], 0.5, 0.25, [1, 1, 1]), options: { lineId: 2, specularScale: 0 } },
+			{ mesh: meshOf(createBoxGeometry(1.2, 1.2, 1.2), "#e8a860"), matrix: createPlaced([-2.0, 0.6, 0.7], 0, 0.55, [1, 1, 1]), options: { lineId: 3 } },
+			{ mesh: meshOf(createSphereGeometry(0.8, 48, 32), "#4a5a8a"), matrix: Matrix4.createTranslation(-0.2, 0.8, 0.2), options: { lineId: 4, angelRingTexture: this.#angelRingTexture, angelRingColor: [0.9, 0.85, 0.7], angelRingOffsetV: 0.3, outlineOffsetZ: 0.02 } },
+			{ mesh: meshOf(createOctahedronGeometry(0.6), "#80c8ff"), matrix: createPlaced([1.5, 0.96, 0.6], 0, 0.4, [1, 1.6, 1]), options: { lineId: 5, matcapTexture: this.#matcapTexture, matcapStrength: 0.7, matcapBlend: ToonMatcapBlend.add, outlineColor: [0.1, 0.22, 0.4, 1] } },
+			{ mesh: meshOf(createFacetedChunkGeometry(0.55, CHUNK_SCALES, [1, 0.8, 1]), "#b0a0d0"), matrix: Matrix4.createTranslation(3.0, 0.45, 0.2), options: { lineId: 6, hasCreaseLine: !isToggled } },
+			{ mesh: meshOf(createTorusGeometry(0.45, 0.17, 16, 40), "#d06070"), matrix: createPlaced([0.9, 0.3, 2.1], 1.2, 0.3, [1, 1, 1]), options: { lineId: 7, outlineColor: [0.35, 0.08, 0.12, 1], outlineWidthScale: 1.4 } },
 		];
 	}
 

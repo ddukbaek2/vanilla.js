@@ -6,7 +6,7 @@ const System = globalThis;
 
 /**
  * @example <caption>표면 조각으로 줄무늬를 넣고 텍스처와 유니폼을 그리기마다 넘기기</caption>
- * import { ToonRenderer, ToonMaterial, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonMaterial, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * const material = new ToonMaterial({
@@ -18,8 +18,8 @@ const System = globalThis;
  * 	}`,
  * });
  * const stripeTexture = renderer.createTexture({ width: 2, height: 1, data: new Uint8Array([255, 255, 255, 255, 0, 0, 0, 255]) }, { isMipmapped: false });
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#80c0e0", { hasOutline: true });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#80c0e0", { hasOutline: true });
  * const mesh = renderer.createMesh(builder.readArrays());
  * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
  * renderer.drawMesh(mesh, Matrix4.createIdentity(), {
@@ -50,10 +50,10 @@ export const TOON_INSTANCE_TINT_NAME = "instanceTint";
 /**
  * 섞는 방식. (alpha 는 곧은 알파 SRC_ALPHA, premultiplied 는 미리 곱한 알파 ONE, additive 는 더하기 ONE, ONE)
  * @example <caption>빛나는 고리를 더하기로 섞기</caption>
- * import { ToonRenderer, ToonBlendMode, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonBlendMode, MeshBuilder, createTorusGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createTorusGeometry(0.5, 0.05, 8, 32), Matrix4.createIdentity(), "#40c0ff", { glow: 1, isUnlit: true, hasOutline: false });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createTorusGeometry(0.5, 0.05, 8, 32), Matrix4.createIdentity(), "#40c0ff", { glow: 1, isUnlit: true, hasOutline: false });
  * const ringMesh = renderer.createMesh(builder.readArrays());
  * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
  * renderer.drawMesh(ringMesh, Matrix4.createIdentity(), { blendMode: ToonBlendMode.additive, alpha: 0.8 });
@@ -68,11 +68,11 @@ export const ToonBlendMode = System.Object.freeze({
 /**
  * 매트캡을 섞는 방식. (multiply 는 색에 곱함, add 는 색에 더함, 유니티 툰 셰이더의 MatCap 섞기와 같다)
  * @example <caption>매트캡을 더해 금속 빛 내기</caption>
- * import { ToonRenderer, ToonMatcapBlend, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonMatcapBlend, MeshBuilder, createSphereGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
  * const matcapTexture = renderer.createTexture({ width: 2, height: 2, data: new Uint8Array([40, 40, 48, 255, 255, 255, 255, 255, 40, 40, 48, 255, 120, 120, 140, 255]) }, { isMipmapped: false, isRepeated: false });
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createIdentity(), "#c0a060", { hasOutline: true });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.5, 24, 16), Matrix4.createIdentity(), "#c0a060", { hasOutline: true });
  * const mesh = renderer.createMesh(builder.readArrays());
  * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 0, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 20));
  * renderer.drawMesh(mesh, Matrix4.createIdentity(), { matcapTexture: matcapTexture, matcapStrength: 0.6, matcapBlend: ToonMatcapBlend.add });

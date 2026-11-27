@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Matrix4, Vector3, ToonGlb, ToonRenderer } from "../../import.js";
+import { Matrix4, Vector3, readGlbArrays, ToonRenderer } from "../../import.js";
 
 
 //==============================================================================
@@ -84,7 +84,7 @@ export class ModelPreview {
 		if (!webGL2RenderingContext) {
 			throw new Error("WebGL2 를 쓸 수 없다.");
 		}
-		const arrays = ToonGlb.readGlbArrays(arrayBuffer);
+		const arrays = readGlbArrays(arrayBuffer);
 		const vertexData = arrays.vertexData;
 		const minimum = [System.Infinity, System.Infinity, System.Infinity];
 		const maximum = [-System.Infinity, -System.Infinity, -System.Infinity];
@@ -103,8 +103,7 @@ export class ModelPreview {
 			vertexCount: vertexData.length / VERTEX_FLOAT_COUNT,
 			triangleCount: arrays.indexData.length / 3,
 			hasSkeleton: arrays.skeleton !== null && arrays.skeleton !== undefined,
-			size: [maximum[0] - minimum[0], maximum[1] - minimum[1], maximum[2] - minimum[2]],
-		};
+			size: [maximum[0] - minimum[0], maximum[1] - minimum[1], maximum[2] - minimum[2]] };
 	}
 
 	//==============================================================================

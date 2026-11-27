@@ -28,7 +28,7 @@ src/animation/             # Timeline, Animator, Action
 src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, SkinnedModelRenderer, HumanSkinRenderer, Camera3D,
                            #     ShadowMap, RenderTarget, BloomEffect, MultiLevelBloomEffect,
                            #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass is in core)
-src/graphics3d/toon/       # Toon 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
+src/graphics3d/toon/       # Toon 3D: MeshBuilder, glbmeshreader, ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
 src/deprecated/            # AnchoredWorldNode (deprecated), Camera (to be deprecated, Camera2D covers it), dead code aabb, transform2d, gl2d, webgl2
 ```
@@ -203,7 +203,7 @@ Scene (sample code)
 └── BloomEffect, MultiLevelBloomEffect ── bright area extraction → blur (multi-level halves down and scales up with a tent shape) → composite chain
 
 Toon 3D (graphics3d/toon)
-├── ToonMesh(MeshBuilder), ToonGlb ── building vertex arrays and reading GLB (including UV and material ranges, GL-independent)
+├── MeshBuilder, glbmeshreader ── building vertex arrays and reading GLB (including UV and material ranges, GL-independent)
 ├── ToonRenderer ── body, outline shell and shadow depth programs + programs built per material and instance layout
 │   ├── ToonLightSet (default light set: sun, fill light, rim, specular, 8 point lights, band ramp, light shape)
 │   └── ToonMaterial (reference, shader fragments: uniform, surface, light, vertex)
@@ -236,7 +236,7 @@ Every frame, Engine.updateEngine(timestamp):
    - scene.tick(timeDelta)      # root.tick recursion (tick only components whose isTickNeeded is true) → touch dispatch (both press and release within one frame) → tweens
    - graphic.invalidateRenderStateCache() → scene.preDraw / draw / postDraw → (gizmos)   # default draw implementation = graphic.drawNode(root) recursion
    (try/catch per scene, an exception in one scene does not kill the loop)
-5. Stats output (optional) → flushSpriteBatch (remaining batch) → PointerCursor.apply() → clear one-shot input flags → screen capture for verification (requestFrameCapture, ?capture=) → next rAF
+5. Stats output (optional) → flushBatch (remaining batch) → PointerCursor.apply() → clear one-shot input flags → screen capture for verification (requestFrameCapture, ?capture=) → next rAF
 ```
 
 Node render recursion: `drawNode` = pushTransform (local TRS/pivot correction) → (skip if off screen) component draw → child recursion → popTransform. The `Mask` component sets and releases a stencil clip before and after drawing children.
@@ -251,7 +251,7 @@ Node render recursion: `drawNode` = pushTransform (local TRS/pivot correction) �
 
 - It is **WebGL2-based** (not Canvas2D, no fallback). It reproduces the API surface of the Canvas2D era (top-left origin, save/restore state stack, fillRect/drawImage/fillText) on top of WebGL2.
 - All draws converge to a single point, `drawVertices()` (the batching insertion point). Solid-color shapes are also unified with the texture path via a 1x1 white texture.
-- Batched drawing (`setSpriteBatchingEnabled`) and off-screen culling (`setCullingEnabled`) are on by default. Culling skips drawing a node's components when all enabled components report that they draw only inside the content area (`isDrawnInsideContent`) or report the rectangle they draw (`calculateDrawnRect`, single-line and multi-line Text), and that bounding box does not overlap the screen.
+- Batched drawing (`setBatchingEnabled`) and off-screen culling (`setCullingEnabled`) are on by default. Culling skips drawing a node's components when all enabled components report that they draw only inside the content area (`isDrawnInsideContent`) or report the rectangle they draw (`calculateDrawnRect`, single-line and multi-line Text), and that bounding box does not overlap the screen.
 - It remembers the shader program last put in use and the texture of texture unit 0, and does not bind them again if they are the same. After touching WebGL without going through Graphic, call `invalidateRenderStateCache`. (restoreRenderState, applySettings, and losing or restoring the context make it forget on its own)
 - Clipping is stencil-buffer based (handles rotated/scaled masks accurately). Text is baked into an offscreen 2D canvas and output as a texture.
 - Blending draws all 26 Canvas2D composite strings. 13 of them (Porter-Duff operators, lighter, multiply, screen) use fixed blending, and the remaining 13 (overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity) copy the area under each draw from the current framebuffer with `blitFramebuffer` and mix in a shader following the W3C Compositing and Blending Level 1 formulas (no batching in mix modes; a swapped-in shader is first drawn to an overlay slot, then mixed and transferred). multiply uses fixed blending on the default framebuffer and mixes in a shader only when drawing to a render target (while a framebuffer is bound) (because fixed blending differs from the W3C formula when the backdrop is translucent). Unlike Canvas2D, source-in, source-out, destination-in, destination-atop and copy change only the inside of the drawn shape.
@@ -288,7 +288,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 
 - A single barrel file at the repository root. Its 13 comment-section blocks (built-in/base/core/basic components/UI/resources/other/collections/animation/shaders and fullscreen pass/3D graphics/to be deprecated/experimental) are the logical layer divisions, and after the experimental block come exports with a one-line comment per branch.
 - Enums are exported on the same line together with their class (`export { ViewScaleMode, ViewManager }`).
-- Function-collection modules are exported as namespaces (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
+- Function-collection modules are exported as namespaces (`export * as Format`, `LanguagePack`, `UIFont`). The toon mesh builder and GLB reading functions are exported by name, as in the Rust version.
 - **Intentionally unexposed** = treated as internal implementation: `AudioManager` (used via Engine), `Layer`, `DevTools`, `FbxLoader` (via SkinnedModel), the 2 texture caches and sharedbakecache, autolayout internal types (`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), all of src/web (`Pane`, `WebSocketClient`). Projects that need an unexposed class import it directly by file path.
 
 ---

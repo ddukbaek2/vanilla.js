@@ -74,7 +74,7 @@ try {
 					super.draw(graphic);
 					graphic.setFillColor("#ff8000");
 					graphic.drawRect(Rect.create(0, 0, 640, 360));
-					graphic.flushSpriteBatch();
+					graphic.flushBatch();
 					const gl = graphic.getWebGL2RenderingContext();
 					const pixel = new Uint8Array(4);
 					gl.readPixels(Math.floor(gl.drawingBufferWidth / 2), Math.floor(gl.drawingBufferHeight / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);

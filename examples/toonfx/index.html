@@ -27,7 +27,7 @@ const System = globalThis;
 //   테를 두른 빛살 파티클(rim 1)과 빛 점(rim 1, 하나 걸러), 번짐 색 리본(glow)은 가장자리를 테 색으로 덮는다.
 // - 원본 ToonVfx 는 자리를 x, y, z 로 받고(러스트는 position), 리본과 번개와 빛 점은 alpha 를 꼭 준다(러스트는 기본 1).
 //==============================================================================
-import { Engine, EngineConfiguration, Scene, Vector2, Vector3, Rect, Matrix4, ToonMesh, ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "../../import.js";
+import { Engine, EngineConfiguration, Scene, Vector2, Vector3, Rect, Matrix4, MeshBuilder, createBoxGeometry, createPartMatrix, createRoundedBoxGeometry, createSphereGeometry, createTorusGeometry, createCylinderGeometry, createOctahedronGeometry, ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "../../import.js";
 
 const PI = System.Math.PI;
 const BACKGROUND_COLOR = "#21242b";
@@ -36,7 +36,7 @@ const BACKGROUND_COLOR = "#21242b";
 // 도형 하나로 모형 짓기. (껍데기 바깥선 없이)
 //==============================================================================
 function buildMesh(renderer, geometry, matrix, color) {
-	const builder = new ToonMesh.MeshBuilder();
+	const builder = new MeshBuilder();
 	builder.addPart(geometry, matrix, color, { hasOutline: false });
 	return renderer.createMesh(builder.readArrays());
 }
@@ -107,13 +107,13 @@ class ToonFxScene extends Scene {
 		const renderer = new ToonRenderer(webGL2RenderingContext);
 		renderer.setBandCount(3);
 		renderer.setLight([-0.5, -1.0, -0.35], [0.85, 0.8, 0.75], [0.55, 0.6, 0.7], [0.25, 0.22, 0.2]);
-		this.#groundMesh = buildMesh(renderer, ToonMesh.createBoxGeometry(8.0, 0.2, 5.0), ToonMesh.createPartMatrix(null, [0, -0.1, 0], null, null), "#c9c2b4");
+		this.#groundMesh = buildMesh(renderer, createBoxGeometry(8.0, 0.2, 5.0), createPartMatrix(null, [0, -0.1, 0], null, null), "#c9c2b4");
 		const shapeList = [
-			[ToonMesh.createBoxGeometry(1.0, 1.0, 1.0), ToonMesh.createPartMatrix(null, [0, 0.5, 0], null, null), "#ff8844", [-2.4, 0, -0.8], 0.5],
-			[ToonMesh.createRoundedBoxGeometry(1.0, 1.0, 1.0, 3, 0.2), ToonMesh.createPartMatrix(null, [0, 0.5, 0], null, null), "#45b585", [-1.35, 0, -0.8], 0.3],
-			[ToonMesh.createSphereGeometry(0.55, 24, 16, PI), ToonMesh.createPartMatrix(null, [0, 0.55, 0], null, null), "#ffd257", [0.2, 0, -0.9], 0.0],
-			[ToonMesh.createTorusGeometry(0.45, 0.16, 12, 32, PI * 2.0), ToonMesh.createPartMatrix(null, [0, 0.6, 0], [PI * 0.5, 0, 0], null), "#78c8ff", [1.6, 0, -0.6], 0.7],
-			[ToonMesh.createCylinderGeometry(0.0, 0.5, 1.0, 20), ToonMesh.createPartMatrix(null, [0, 0.5, 0], null, null), "#8d7dff", [2.7, 0, -0.9], 0.0],
+			[createBoxGeometry(1.0, 1.0, 1.0), createPartMatrix(null, [0, 0.5, 0], null, null), "#ff8844", [-2.4, 0, -0.8], 0.5],
+			[createRoundedBoxGeometry(1.0, 1.0, 1.0, 3, 0.2), createPartMatrix(null, [0, 0.5, 0], null, null), "#45b585", [-1.35, 0, -0.8], 0.3],
+			[createSphereGeometry(0.55, 24, 16, PI), createPartMatrix(null, [0, 0.55, 0], null, null), "#ffd257", [0.2, 0, -0.9], 0.0],
+			[createTorusGeometry(0.45, 0.16, 12, 32, PI * 2.0), createPartMatrix(null, [0, 0.6, 0], [PI * 0.5, 0, 0], null), "#78c8ff", [1.6, 0, -0.6], 0.7],
+			[createCylinderGeometry(0.0, 0.5, 1.0, 20), createPartMatrix(null, [0, 0.5, 0], null, null), "#8d7dff", [2.7, 0, -0.9], 0.0],
 		];
 		for (const [geometry, matrix, color, position, spin] of shapeList) {
 			const mesh = buildMesh(renderer, geometry, matrix, color);
@@ -121,7 +121,7 @@ class ToonFxScene extends Scene {
 				this.#placedList.push({ mesh, position, spin });
 			}
 		}
-		this.#rockMesh = buildMesh(renderer, ToonMesh.createOctahedronGeometry(0.22), ToonMesh.createPartMatrix(null, [0, 0.15, 0], null, [1.0, 0.7, 1.0]), "#a89a88");
+		this.#rockMesh = buildMesh(renderer, createOctahedronGeometry(0.22), createPartMatrix(null, [0, 0.15, 0], null, [1.0, 0.7, 1.0]), "#a89a88");
 		for (let rockIndex = 0; rockIndex < 14; rockIndex++) {
 			const modelMatrix = Matrix4.createTranslation(-3.0 + rockIndex * 0.46, 0.0, 1.3 + (rockIndex % 2) * 0.25);
 			modelMatrix.rotateY(rockIndex * 0.9);
@@ -182,7 +182,7 @@ class ToonFxScene extends Scene {
 		graphic.setFillColor(BACKGROUND_COLOR);
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 		viewManager.applyViewRect(graphic);
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 		if (this.#renderer === null) {
 			this.createResources(webGL2RenderingContext);

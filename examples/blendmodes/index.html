@@ -321,7 +321,7 @@ class BlendModeScene extends Scene {
 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 		const drawingBufferWidth = graphic.getDrawingBufferWidth();
 		const drawingBufferHeight = graphic.getDrawingBufferHeight();
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 		if (this.#renderTarget === null) {
 			this.#renderTarget = new RenderTarget(webGL2RenderingContext, drawingBufferWidth, drawingBufferHeight, false);
 		}
@@ -336,7 +336,7 @@ class BlendModeScene extends Scene {
 			this.drawShapePage(graphic, cellX, cellY);
 		}
 		graphic.setBlendMode("source-over");
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 		webGL2RenderingContext.viewport(0, 0, drawingBufferWidth, drawingBufferHeight);
 		// 바탕을 칠하고 렌더 타겟을 그대로 옮긴다. (렌더 타겟은 아래가 0 이라 위아래를 뒤집어 짚는다, 프리멀티플라이드라 source-over)

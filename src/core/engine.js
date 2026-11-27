@@ -1138,7 +1138,7 @@ export class Engine extends Object {
 		}
 
 		// 묶어 그리기로 쌓여 남은 것을 그린다.
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 
 		// 마우스 커서. (켜져 있을 때만 캔버스의 커서를 정한다)
 		const pointerCursor = PointerCursor.getInstance();
@@ -1199,6 +1199,7 @@ export class Engine extends Object {
 	// 씬 매니저 반환.
 	//==============================================================================
 	/**
+	 * @private
 	 * @returns { SceneManager } 씬 매니저.
 	 */
 	getSceneManager() {
@@ -1585,8 +1586,7 @@ export class Engine extends Object {
 	 * const isPauseSceneLoaded = pauseScene.isLoaded();
 	 * console.log(isPauseSceneLoaded);
 	 * await engine.unloadScene(pauseScene);
-	 * const sceneManager = engine.getSceneManager();
-	 * const loadedScenes = sceneManager.getAllLoadedScenes();
+	 * const loadedScenes = engine.getAllLoadedScenes();
 	 * console.log(loadedScenes.length);
 	 */
 	loadScene(scene) {
@@ -1615,6 +1615,23 @@ export class Engine extends Object {
 	unloadAllScenes() {
 		const sceneManager = this.getSceneManager();
 		return sceneManager.unloadAllScenes();
+	}
+
+	//==============================================================================
+	// 불러온 씬 목록 반환. (불러온 차례, 러스트 판 get_all_loaded_scenes 와 같다)
+	//==============================================================================
+	/**
+	 * @returns { Scene[] } 불러온 씬 목록. (엔진이 들고 있는 배열이라 고치지 않는다)
+	 * @example <caption>run 한 씬이 목록에 든다</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * console.log(engine.getAllLoadedScenes().length);
+	 */
+	getAllLoadedScenes() {
+		const sceneManager = this.getSceneManager();
+		return sceneManager.getAllLoadedScenes();
 	}
 
 	//==============================================================================
