@@ -3,6 +3,7 @@
 // - 설정 창 같은 장면(UIScrollView 안 줄 50 개, 줄마다 둥근 바탕, 글, 단추 바탕과 글)을 기하 캐시를 켜고 끄고 그려 찍은 화면의 화소가 모두 같은지 본다.
 //   멈춘 때, 스크롤하는 때(부모 이동만 바뀜), 위치, 색(세터와 받은 Color 를 바로 고친 것), 글, 글 색, 보임, 투명도, 배율을 바꾼 때를 찍는다.
 // - 캐시를 켜면 멈춘 프레임과 스크롤 프레임에 다시 셈하는 컴포넌트가 없고, 바꾼 프레임에는 바꾼 것만 다시 셈하는지 센다.
+// - 캐시를 켜면 멈춘 프레임은 GPU 에 남긴 묶음으로 그리는지(정점을 올리지 않음) 센다. 찍는 프레임 30, 86, 90 은 남긴 묶음으로 그린 화면이다.
 // - 프레임마다 장면 트리 그리기(super.draw)의 CPU 시간을 재어 찍는다. (재는 값은 견주지 않는다)
 // - 씬이 그려진 프레임 번호로 일을 정하고 찍는다. (로딩 화면이 아닌지도 본다)
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
@@ -116,6 +117,8 @@ class SettingsScene extends Scene {
 			const previousFrame = window.frameList[window.frameList.length - 1];
 			previousFrame.hitCount = graphic.getLastFrameGeometryCacheHitCount();
 			previousFrame.rebuildCount = graphic.getLastFrameGeometryRebuildCount();
+			previousFrame.retainedCount = graphic.getLastFrameRetainedBatchCount();
+			previousFrame.drawCallCount = graphic.getLastFrameDrawCallCount();
 		}
 		this.applyFrameEvent(frameNumber);
 		if (CAPTURE_FRAME_LIST.includes(frameNumber)) {
@@ -124,7 +127,7 @@ class SettingsScene extends Scene {
 		const startTime = performance.now();
 		super.draw(graphic);
 		const drawTime = performance.now() - startTime;
-		window.frameList.push({ frameNumber, drawTime, hitCount: -1, rebuildCount: -1 });
+		window.frameList.push({ frameNumber, drawTime, hitCount: -1, rebuildCount: -1, retainedCount: -1, drawCallCount: -1 });
 		if (frameNumber === CAPTURE_FRAME_LIST[CAPTURE_FRAME_LIST.length - 1] + 2) {
 			window.isFinished = true;
 		}
@@ -252,15 +255,22 @@ try {
 	const changedRebuildCount = frameTable.get(81).rebuildCount;
 	check(changedRebuildCount >= 6 && changedRebuildCount <= 30, `바꾼 프레임은 바꾼 것만 다시 셈 (${changedRebuildCount})`);
 	checkEqual(frameTable.get(83).rebuildCount, 0, "바꾼 뒤 멈춘 프레임 다시 셈 수");
+	// 멈춘 프레임은 모든 묶음을 남긴 버퍼로 그리고, 바꾼 프레임은 남기지 않은 묶음이 있다.
+	for (const frameNumber of [30, 86, 90]) {
+		const frame = frameTable.get(frameNumber);
+		check(frame.retainedCount >= 1 && frame.retainedCount === frame.drawCallCount, `멈춘 프레임은 남긴 묶음으로 그림 (${frameNumber}, ${frame.retainedCount} / ${frame.drawCallCount})`);
+	}
+	check(frameTable.get(81).retainedCount < frameTable.get(81).drawCallCount, `바꾼 프레임은 묶음을 다시 올림 (${frameTable.get(81).retainedCount} / ${frameTable.get(81).drawCallCount})`);
 	for (const frame of uncachedResult.frameList) {
 		check(frame.hitCount <= 0, `캐시 끈 길은 캐시로 그리지 않음 (${frame.frameNumber})`);
+		check(frame.retainedCount <= 0, `캐시 끈 길은 남긴 묶음을 쓰지 않음 (${frame.frameNumber})`);
 	}
 	const uncachedStaticTime = readMedianDrawTime(uncachedResult.frameList, 10, 40);
 	const cachedStaticTime = readMedianDrawTime(cachedResult.frameList, 10, 40);
 	const uncachedScrollTime = readMedianDrawTime(uncachedResult.frameList, 45, 80);
 	const cachedScrollTime = readMedianDrawTime(cachedResult.frameList, 45, 80);
 	console.log(`장면 그리기 가운데 값(ms): 멈춤 끔 ${uncachedStaticTime.toFixed(3)} 켬 ${cachedStaticTime.toFixed(3)}, 스크롤 끔 ${uncachedScrollTime.toFixed(3)} 켬 ${cachedScrollTime.toFixed(3)}`);
-	console.log(`캐시로 그린 수: 멈춤 ${frameTable.get(30).hitCount}, 스크롤 ${frameTable.get(70).hitCount}, 바꾼 프레임 다시 셈 ${changedRebuildCount}`);
+	console.log(`캐시로 그린 수: 멈춤 ${frameTable.get(30).hitCount}, 스크롤 ${frameTable.get(70).hitCount}, 바꾼 프레임 다시 셈 ${changedRebuildCount}, 남긴 묶음 멈춤 ${frameTable.get(30).retainedCount} / ${frameTable.get(30).drawCallCount}, 스크롤 ${frameTable.get(70).retainedCount} / ${frameTable.get(70).drawCallCount}`);
 }
 finally {
 	await browser.close();

@@ -415,6 +415,7 @@ const GEOMETRY_COMMAND_SPRITE = 0; // 기하 캐시 명령: 스크래치 정점�
 const GEOMETRY_COMMAND_TEXT = 1; // 기하 캐시 명령: 글 배치 엔트리를 그린 것. (엔트리, 자리, 색, 정렬)
 const GEOMETRY_COPY_LOOP_VERTEX_COUNT = 12; // 기하 캐시가 이 수 이하의 정점은 하나씩, 넘으면 TypedArray.set 으로 옮긴다. (사각형 둘까지)
 const BATCH_VERTEX_CAPACITY = 6 * 8192; // 사각형 8192 개. (러스트 판과 같은 값)
+const BATCH_RETAINED_FLUSH_CAPACITY = 32; // 묶음을 GPU 버퍼에 남겨 두는 프레임당 그리기 차례 수. (넘는 차례는 남기지 않고 늘 올린다)
 
 // 스크래치 버텍스 버퍼 용량. (버텍스 수)
 const VERTEX_CAPACITY = 4096;
@@ -556,6 +557,8 @@ function acquireGeometryCommand(geometryCache, commandType) {
 			texture: null,
 			vertexCount: 0,
 			localVertexData: null,
+			linearPositionData: null,
+			isLinearPositionValid: false,
 			color: null,
 			tintColor: null,
 			entry: null,
@@ -796,6 +799,14 @@ export class Graphic extends Object {
 	/** @private @type { WeakMap<Component, object> } */ #geometryCacheMap; // 컴포넌트마다의 기하 캐시.
 	/** @private @type { object | null } */ #geometryActiveCache; // 지금 적거나 다시 옮기는 기하 캐시.
 	/** @private @type { object | null } */ #geometryCaptureTarget; // 묶음에 넣은 정점을 받아 적을 명령. (null 이면 새 명령을 만든다)
+	/** @private @type { number } */ #geometryVersionCounter; // 캐시 조각의 디바이스 정점을 고쳐 쓸 때마다 올리는 수.
+	/** @private @type { Array<object> } */ #batchRetainedFlushList; // 프레임 안 그리기 차례마다 GPU 버퍼에 남겨 둔 묶음. (기하 캐시 조각만으로 채운 묶음)
+	/** @private @type { object | null } */ #batchRetainedFlush; // 지금 묶음이 채우는 남김 칸. (null 이면 정점을 묶음 배열에 바로 쓴다)
+	/** @private @type { number } */ #batchFlushIndex; // 이번 프레임에 그린 묶음 수. (남김 칸 번호)
+	/** @private @type { number } */ #batchSegmentCount; // 지금 묶음에 미뤄 둔 캐시 조각 수.
+	/** @private @type { boolean } */ #isBatchSegmentMatching; // 미뤄 둔 조각이 남김 칸의 지난 조각과 차례까지 모두 같은지.
+	/** @private @type { number } */ #retainedBatchCount; // 이번 프레임에 정점을 올리지 않고 남긴 버퍼로 그린 묶음 수.
+	/** @private @type { number } */ #lastFrameRetainedBatchCount; // 지난 프레임의 그 수.
 	/** @private @type { number } */ #geometryCacheGeneration; // 정점 셈을 바꾸는 설정이 바뀔 때마다 늘린다. (다르면 캐시를 다시 적는다)
 	/** @private @type { number } */ #geometryCacheHitCount; // 이번 프레임에 캐시로 그린 컴포넌트 수.
 	/** @private @type { number } */ #geometryRebuildCount; // 이번 프레임에 draw 를 불러 다시 셈한 컴포넌트 수. (캐시하는 컴포넌트만)
@@ -842,6 +853,11 @@ export class Graphic extends Object {
 		const contextChangeCallback = () => {
 			this.invalidateRenderStateCache();
 			this.#geometryCacheGeneration += 1;
+			for (const retainedFlush of this.#batchRetainedFlushList) {
+				retainedFlush.vertexArray = null;
+				retainedFlush.vertexBuffer = null;
+				retainedFlush.isValid = false;
+			}
 		};
 		canvas.addEventListener("webglcontextlost", contextChangeCallback);
 		canvas.addEventListener("webglcontextrestored", contextChangeCallback);
@@ -985,6 +1001,14 @@ export class Graphic extends Object {
 		this.#geometryRebuildCount = 0;
 		this.#lastFrameGeometryCacheHitCount = 0;
 		this.#lastFrameGeometryRebuildCount = 0;
+		this.#geometryVersionCounter = 0;
+		this.#batchRetainedFlushList = [];
+		this.#batchRetainedFlush = null;
+		this.#batchFlushIndex = 0;
+		this.#batchSegmentCount = 0;
+		this.#isBatchSegmentMatching = false;
+		this.#retainedBatchCount = 0;
+		this.#lastFrameRetainedBatchCount = 0;
 
 		// 블렌드 함수 매핑 테이블. (프리멀티플라이드 알파 기준)
 		// - 고정 블렌딩으로 재현 가능한 모드만 등록. 그 외(SHADER_BLEND_MODE_INDEX_TABLE)는 셰이더로 섞는다.
@@ -2162,11 +2186,14 @@ export class Graphic extends Object {
 		this.#lastFrameCulledNodeCount = this.#culledNodeCount;
 		this.#lastFrameGeometryCacheHitCount = this.#geometryCacheHitCount;
 		this.#lastFrameGeometryRebuildCount = this.#geometryRebuildCount;
+		this.#lastFrameRetainedBatchCount = this.#retainedBatchCount;
 		this.#drawCallCount = 0;
 		this.#drawVertexCount = 0;
 		this.#culledNodeCount = 0;
 		this.#geometryCacheHitCount = 0;
 		this.#geometryRebuildCount = 0;
+		this.#retainedBatchCount = 0;
+		this.#batchFlushIndex = 0;
 	}
 
 	//==============================================================================
@@ -2363,22 +2390,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
-		const positionLocation = this.#batchShaderProgram.getAttributeLocation("vertexPosition");
-		const textureCoordinateLocation = this.#batchShaderProgram.getAttributeLocation("vertexTextureCoordinate");
-		const colorLocation = this.#batchShaderProgram.getAttributeLocation("vertexColor");
-		const tintColorLocation = this.#batchShaderProgram.getAttributeLocation("vertexTintColor");
-		const slotLocation = this.#batchShaderProgram.getAttributeLocation("vertexSlot");
-		const strideBytes = BATCH_FLOATS_PER_VERTEX * 4;
-		webGL2RenderingContext.enableVertexAttribArray(positionLocation);
-		webGL2RenderingContext.vertexAttribPointer(positionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
-		webGL2RenderingContext.enableVertexAttribArray(textureCoordinateLocation);
-		webGL2RenderingContext.vertexAttribPointer(textureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
-		webGL2RenderingContext.enableVertexAttribArray(colorLocation);
-		webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
-		webGL2RenderingContext.enableVertexAttribArray(tintColorLocation);
-		webGL2RenderingContext.vertexAttribPointer(tintColorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 32);
-		webGL2RenderingContext.enableVertexAttribArray(slotLocation);
-		webGL2RenderingContext.vertexAttribPointer(slotLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 48);
+		this.setupBatchVertexAttributes();
 		webGL2RenderingContext.bindVertexArray(null);
 		this.useShaderProgram(this.#batchShaderProgram);
 		const textureUnitList = new Int32Array(textureSlotCount);
@@ -2392,6 +2404,118 @@ export class Graphic extends Object {
 		this.useShaderProgram(activeShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
+	// 묶음 셰이더의 정점 속성을 지금 묶인 버텍스 어레이와 버퍼에 걸기. (묶음 버퍼와 남김 칸 버퍼가 같은 꼴을 쓴다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	setupBatchVertexAttributes() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const batchShaderProgram = this.#batchShaderProgram;
+		const positionLocation = batchShaderProgram.getAttributeLocation("vertexPosition");
+		const textureCoordinateLocation = batchShaderProgram.getAttributeLocation("vertexTextureCoordinate");
+		const colorLocation = batchShaderProgram.getAttributeLocation("vertexColor");
+		const tintColorLocation = batchShaderProgram.getAttributeLocation("vertexTintColor");
+		const slotLocation = batchShaderProgram.getAttributeLocation("vertexSlot");
+		const strideBytes = BATCH_FLOATS_PER_VERTEX * 4;
+		webGL2RenderingContext.enableVertexAttribArray(positionLocation);
+		webGL2RenderingContext.vertexAttribPointer(positionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
+		webGL2RenderingContext.enableVertexAttribArray(textureCoordinateLocation);
+		webGL2RenderingContext.vertexAttribPointer(textureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
+		webGL2RenderingContext.enableVertexAttribArray(colorLocation);
+		webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
+		webGL2RenderingContext.enableVertexAttribArray(tintColorLocation);
+		webGL2RenderingContext.vertexAttribPointer(tintColorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 32);
+		webGL2RenderingContext.enableVertexAttribArray(slotLocation);
+		webGL2RenderingContext.vertexAttribPointer(slotLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 48);
+	}
+
+	//==============================================================================
+	// 빈 묶음에 캐시 조각을 미뤄 쌓기 시작. (이번 프레임 그리기 차례의 남김 칸을 고른다)
+	// - 묶음이 캐시 조각만으로 차면 정점을 묶음 배열에 옮기지 않고 조각 목록만 적는다. 그릴 때 지난 프레임 같은 차례의 조각과 모두 같으면 남긴 GPU 버퍼를 그대로 그린다.
+	//   (유니티 UGUI Canvas 가 바뀐 것이 없으면 지난 묶음 메시를 다시 짓지 않고 그대로 그리는 꼴)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	beginBatchSegments() {
+		const flushIndex = this.#batchFlushIndex;
+		if (flushIndex >= BATCH_RETAINED_FLUSH_CAPACITY) {
+			this.#batchRetainedFlush = null;
+			return;
+		}
+		const retainedFlushList = this.#batchRetainedFlushList;
+		while (retainedFlushList.length <= flushIndex) {
+			retainedFlushList.push({ vertexArray: null, vertexBuffer: null, segmentList: [], versionList: [], segmentCount: 0, vertexCount: 0, isValid: false });
+		}
+		const retainedFlush = retainedFlushList[flushIndex];
+		this.#batchRetainedFlush = retainedFlush;
+		this.#batchSegmentCount = 0;
+		this.#isBatchSegmentMatching = retainedFlush.isValid;
+	}
+
+	//==============================================================================
+	// 지금 묶음에 캐시 조각 하나 적기. (지난 프레임 같은 차례 같은 자리의 조각과 판까지 견준다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } subAppend 묶음에 넣은 조각.
+	 */
+	addBatchSegment(subAppend) {
+		const retainedFlush = this.#batchRetainedFlush;
+		const segmentIndex = this.#batchSegmentCount;
+		if (retainedFlush.segmentList[segmentIndex] !== subAppend || retainedFlush.versionList[segmentIndex] !== subAppend.version) {
+			retainedFlush.segmentList[segmentIndex] = subAppend;
+			retainedFlush.versionList[segmentIndex] = subAppend.version;
+			this.#isBatchSegmentMatching = false;
+		}
+		subAppend.segmentBatchGeneration = this.#batchGeneration;
+		this.#batchSegmentCount = segmentIndex + 1;
+	}
+
+	//==============================================================================
+	// 미뤄 둔 캐시 조각의 디바이스 정점을 묶음 배열 앞에서부터 옮겨 쓰기. (캐시를 적으며 이미 쓴 조각도 같은 값으로 다시 쓴다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } retainedFlush 조각을 적은 남김 칸.
+	 */
+	writeBatchSegments(retainedFlush) {
+		const segmentList = retainedFlush.segmentList;
+		const batchVertexData = this.#batchVertexData;
+		let targetOffset = 0;
+		for (let segmentIndex = 0; segmentIndex < this.#batchSegmentCount; ++segmentIndex) {
+			const subAppend = segmentList[segmentIndex];
+			const worldVertexData = subAppend.worldVertexData;
+			const floatCount = subAppend.vertexCount * BATCH_FLOATS_PER_VERTEX;
+			// 정점이 많으면 한 번에 옮기고(memcpy), 적으면 부르는 값이 더 커 하나씩 옮긴다.
+			if (subAppend.vertexCount > GEOMETRY_COPY_LOOP_VERTEX_COUNT) {
+				batchVertexData.set(worldVertexData, targetOffset);
+			}
+			else {
+				for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
+					batchVertexData[targetOffset + floatIndex] = worldVertexData[floatIndex];
+				}
+			}
+			targetOffset += floatCount;
+		}
+	}
+
+	//==============================================================================
+	// 미뤄 쌓던 묶음에 정점을 바로 쓰는 그리기가 끼면, 미뤄 둔 조각을 옮겨 쓰고 이 묶음은 남기지 않는다.
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	endBatchSegments() {
+		const retainedFlush = this.#batchRetainedFlush;
+		this.writeBatchSegments(retainedFlush);
+		retainedFlush.isValid = false;
+		this.#batchRetainedFlush = null;
+		this.#batchSegmentCount = 0;
 	}
 
 	//==============================================================================
@@ -2474,6 +2598,16 @@ export class Graphic extends Object {
 	appendSpriteBatch(vertexCount, texture, color) {
 		const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
 		const clipSlot = this.#shaderClipSlot;
+		// 기하 캐시를 적는 쓰기는 떠 둔 조각과 같으므로 묶음을 남길 수 있다. 그 밖의 바로 쓰기가 끼면 남기지 않는다.
+		const isCapturing = this.#geometryActiveCache !== null;
+		if (isCapturing) {
+			if (this.#batchVertexCount === 0) {
+				this.beginBatchSegments();
+			}
+		}
+		else if (this.#batchRetainedFlush !== null) {
+			this.endBatchSegments();
+		}
 
 		// 기본 셰이더와 같은 색 셈을 정점 색 하나로 미리 곱해 둔다.
 		const globalAlpha = this.getGlobalAlpha();
@@ -2525,8 +2659,11 @@ export class Graphic extends Object {
 			targetOffset += BATCH_FLOATS_PER_VERTEX;
 		}
 		// 기하 캐시를 적는 중이면 넣은 정점을 캐시에도 적는다.
-		if (this.#geometryActiveCache !== null) {
-			this.captureGeometryAppend(vertexCount, texture, color, textureSlot, clipSlot);
+		if (isCapturing) {
+			const subAppend = this.captureGeometryAppend(vertexCount, texture, color, textureSlot, clipSlot);
+			if (this.#batchRetainedFlush !== null) {
+				this.addBatchSegment(subAppend);
+			}
 		}
 		this.#batchVertexCount += vertexCount;
 	}
@@ -2543,6 +2680,9 @@ export class Graphic extends Object {
 	appendColoredQuadsToSpriteBatch(vertexCount, texture) {
 		const textureSlot = this.prepareSpriteBatch(vertexCount, texture);
 		const clipSlot = this.#shaderClipSlot;
+		if (this.#batchRetainedFlush !== null) {
+			this.endBatchSegments();
+		}
 		const globalAlpha = this.getGlobalAlpha();
 		const transformMatrix = this.#transformMatrix;
 		const matrixA = transformMatrix.a;
@@ -2591,10 +2731,45 @@ export class Graphic extends Object {
 		this.releaseClipScissor();
 
 		this.useShaderProgram(this.#batchShaderProgram);
-		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
-		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
+		const retainedFlush = this.#batchRetainedFlush;
+		if (retainedFlush === null) {
+			// 정점을 바로 쓴 묶음은 남기지 않는다. (이 차례의 남김 칸은 다음 프레임에 다시 올리게 한다)
+			if (this.#batchFlushIndex < this.#batchRetainedFlushList.length) {
+				this.#batchRetainedFlushList[this.#batchFlushIndex].isValid = false;
+			}
+			webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
+			// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
+			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
+		}
+		else {
+			// 캐시 조각만으로 찬 묶음은 이 차례의 남김 칸 버퍼로 그린다. 조각과 그 정점 판이 지난번과 모두 같으면 올리지 않는다.
+			const isRetainedSame = this.#isBatchSegmentMatching && retainedFlush.isValid && retainedFlush.segmentCount === this.#batchSegmentCount && retainedFlush.vertexCount === batchVertexCount && retainedFlush.vertexArray !== null;
+			if (retainedFlush.vertexArray === null) {
+				retainedFlush.vertexArray = webGL2RenderingContext.createVertexArray();
+				retainedFlush.vertexBuffer = webGL2RenderingContext.createBuffer();
+				webGL2RenderingContext.bindVertexArray(retainedFlush.vertexArray);
+				webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
+				this.setupBatchVertexAttributes();
+			}
+			else {
+				webGL2RenderingContext.bindVertexArray(retainedFlush.vertexArray);
+			}
+			if (isRetainedSame) {
+				this.#retainedBatchCount += 1;
+			}
+			else {
+				this.writeBatchSegments(retainedFlush);
+				webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, retainedFlush.vertexBuffer);
+				webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.STATIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
+				retainedFlush.segmentCount = this.#batchSegmentCount;
+				retainedFlush.vertexCount = batchVertexCount;
+				retainedFlush.isValid = true;
+			}
+			this.#batchRetainedFlush = null;
+			this.#batchSegmentCount = 0;
+		}
+		this.#batchFlushIndex += 1;
 		const batchShaderProgram = this.#batchShaderProgram;
 		webGL2RenderingContext.uniformMatrix3fv(batchShaderProgram.getUniformLocation("projectionMatrix"), false, this.#projectionMatrixArray);
 		webGL2RenderingContext.uniform1f(batchShaderProgram.getUniformLocation("framebufferHeight"), this.#appliedViewportHeight);
@@ -2711,6 +2886,39 @@ export class Graphic extends Object {
 	 */
 	getLastFrameGeometryRebuildCount() {
 		return this.#lastFrameGeometryRebuildCount;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 정점을 다시 올리지 않고 GPU 에 남겨 둔 버퍼로 그린 묶음 수 반환.
+	// - 기하 캐시 조각만으로 찬 묶음이 지난 프레임 같은 차례의 묶음과 조각까지 같으면 정점을 옮기지도 올리지도 않고 드로 콜만 낸다.
+	//==============================================================================
+	/**
+	 * @returns { number } 남긴 버퍼로 그린 묶음 수.
+	 * @example <caption>멈춘 UI 가 남긴 묶음으로 그려지는지 보기</caption>
+	 * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const boxNode = new WorldNode();
+	 * 		boxNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		boxNode.setContentSize(Vector2.create(200, 100));
+	 * 		boxNode.addComponent(Paint).setColor("#3399ff");
+	 * 		this.getRoot().addChild(boxNode);
+	 * 	}
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		console.log(graphic.getLastFrameRetainedBatchCount(), graphic.getLastFrameDrawCallCount());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	getLastFrameRetainedBatchCount() {
+		return this.#lastFrameRetainedBatchCount;
 	}
 
 	//==============================================================================
@@ -2927,6 +3135,7 @@ export class Graphic extends Object {
 	 * @param { Color } color
 	 * @param { number } textureSlot
 	 * @param { number } clipSlot
+	 * @returns { object } 적은 조각.
 	 */
 	captureGeometryAppend(vertexCount, texture, color, textureSlot, clipSlot) {
 		let geometryCommand = this.#geometryCaptureTarget;
@@ -2940,6 +3149,7 @@ export class Graphic extends Object {
 				geometryCommand.localVertexData = new Float32Array(localFloatCount);
 			}
 			geometryCommand.localVertexData.set(this.getVertexData().subarray(0, localFloatCount));
+			geometryCommand.isLinearPositionValid = false;
 			geometryCommand.color = color.clone();
 			geometryCommand.tintColor = this.#imageTintColor ? this.#imageTintColor.clone() : null;
 			this.checkGeometryTranslatable(geometryCache);
@@ -2949,8 +3159,12 @@ export class Graphic extends Object {
 		const subAppendIndex = geometryCommand.subAppendCount;
 		let subAppend = geometryCommand.subAppendList[subAppendIndex];
 		if (subAppend === undefined) {
-			subAppend = { texture: null, vertexCount: 0, worldVertexData: null, textureSlot: 0, clipSlot: 0 };
+			subAppend = { texture: null, vertexCount: 0, worldVertexData: null, textureSlot: 0, clipSlot: 0, version: 0, segmentBatchGeneration: -1 };
 			geometryCommand.subAppendList.push(subAppend);
+		}
+		// 지금 묶음이 이 조각을 미뤄 두었으면(한 묶음에 같은 컴포넌트를 두 번 그림) 덮어쓰기 전에 옮겨 쓴다.
+		if (this.#batchRetainedFlush !== null && subAppend.segmentBatchGeneration === this.#batchGeneration) {
+			this.endBatchSegments();
 		}
 		const worldFloatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
 		if (subAppend.worldVertexData === null || subAppend.worldVertexData.length !== worldFloatCount) {
@@ -2971,7 +3185,10 @@ export class Graphic extends Object {
 		subAppend.vertexCount = vertexCount;
 		subAppend.textureSlot = textureSlot;
 		subAppend.clipSlot = clipSlot;
+		this.#geometryVersionCounter += 1;
+		subAppend.version = this.#geometryVersionCounter;
 		geometryCommand.subAppendCount = subAppendIndex + 1;
+		return subAppend;
 	}
 
 	//==============================================================================
@@ -3017,23 +3234,38 @@ export class Graphic extends Object {
 				const clipSlot = this.#shaderClipSlot;
 				const worldVertexData = subAppend.worldVertexData;
 				if (subAppend.textureSlot !== textureSlot || subAppend.clipSlot !== clipSlot) {
+					if (this.#batchRetainedFlush !== null && subAppend.segmentBatchGeneration === this.#batchGeneration) {
+						this.endBatchSegments();
+					}
 					for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
 						worldVertexData[vertexIndex * BATCH_FLOATS_PER_VERTEX + 12] = textureSlot;
 						worldVertexData[vertexIndex * BATCH_FLOATS_PER_VERTEX + 13] = clipSlot;
 					}
 					subAppend.textureSlot = textureSlot;
 					subAppend.clipSlot = clipSlot;
+					this.#geometryVersionCounter += 1;
+					subAppend.version = this.#geometryVersionCounter;
 				}
-				// 정점이 많으면 한 번에 옮기고(memcpy), 적으면 부르는 값이 더 커 하나씩 옮긴다.
-				const batchVertexData = this.#batchVertexData;
-				const startOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
-				if (vertexCount > GEOMETRY_COPY_LOOP_VERTEX_COUNT) {
-					batchVertexData.set(worldVertexData, startOffset);
+				if (this.#batchVertexCount === 0) {
+					this.beginBatchSegments();
+				}
+				const retainedFlush = this.#batchRetainedFlush;
+				if (retainedFlush !== null) {
+					// 미뤄 쌓는 묶음이면 정점을 옮기지 않고 조각만 적는다.
+					this.addBatchSegment(subAppend);
 				}
 				else {
-					const floatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
-					for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
-						batchVertexData[startOffset + floatIndex] = worldVertexData[floatIndex];
+					// 정점이 많으면 한 번에 옮기고(memcpy), 적으면 부르는 값이 더 커 하나씩 옮긴다.
+					const batchVertexData = this.#batchVertexData;
+					const startOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
+					if (vertexCount > GEOMETRY_COPY_LOOP_VERTEX_COUNT) {
+						batchVertexData.set(worldVertexData, startOffset);
+					}
+					else {
+						const floatCount = vertexCount * BATCH_FLOATS_PER_VERTEX;
+						for (let floatIndex = 0; floatIndex < floatCount; ++floatIndex) {
+							batchVertexData[startOffset + floatIndex] = worldVertexData[floatIndex];
+						}
 					}
 				}
 				this.#batchVertexCount += vertexCount;
@@ -3067,8 +3299,13 @@ export class Graphic extends Object {
 				}
 				this.#imageTintColor = geometryCommand.tintColor;
 				if (geometryCommand.type === GEOMETRY_COMMAND_SPRITE) {
-					this.getVertexData().set(geometryCommand.localVertexData);
-					this.appendSpriteBatch(geometryCommand.vertexCount, geometryCommand.texture, geometryCommand.color);
+					if (isCapturing) {
+						this.getVertexData().set(geometryCommand.localVertexData);
+						this.appendSpriteBatch(geometryCommand.vertexCount, geometryCommand.texture, geometryCommand.color);
+					}
+					else {
+						this.appendTranslatedGeometryCommand(geometryCommand, geometryCache);
+					}
 				}
 				else {
 					this.#textAlign = geometryCommand.textAlign;
@@ -3087,6 +3324,88 @@ export class Graphic extends Object {
 		geometryCache.globalAlpha = this.#globalAlpha;
 		geometryCache.isWorldVertexStale = !isCapturing;
 		return true;
+	}
+
+	//==============================================================================
+	// 그림 명령을 지금 이동과 투명도로 묶음에 넣기. (이동만 바뀌는 동안 부른다)
+	// - 행렬 곱의 앞부분(a * x + c * y, b * x + d * y)을 Float64 로 떠 두고 이동만 더한다.
+	//   appendSpriteBatch 와 셈 차례가 같아((a * x + c * y) + e 를 배정밀도로 셈한 뒤 Float32 로 적음) 결과가 비트까지 같다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } geometryCommand
+	 * @param { object } geometryCache 명령을 담은 캐시. (행렬 a, b, c, d 를 읽는다)
+	 */
+	appendTranslatedGeometryCommand(geometryCommand, geometryCache) {
+		const vertexCount = geometryCommand.vertexCount;
+		const localVertexData = geometryCommand.localVertexData;
+		if (!geometryCommand.isLinearPositionValid) {
+			const linearFloatCount = vertexCount * 2;
+			if (geometryCommand.linearPositionData === null || geometryCommand.linearPositionData.length !== linearFloatCount) {
+				geometryCommand.linearPositionData = new Float64Array(linearFloatCount);
+			}
+			const linearPositionData = geometryCommand.linearPositionData;
+			const matrixA = geometryCache.matrixA;
+			const matrixB = geometryCache.matrixB;
+			const matrixC = geometryCache.matrixC;
+			const matrixD = geometryCache.matrixD;
+			for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+				const positionX = localVertexData[vertexIndex * FLOATS_PER_VERTEX];
+				const positionY = localVertexData[vertexIndex * FLOATS_PER_VERTEX + 1];
+				linearPositionData[vertexIndex * 2] = matrixA * positionX + matrixC * positionY;
+				linearPositionData[vertexIndex * 2 + 1] = matrixB * positionX + matrixD * positionY;
+			}
+			geometryCommand.isLinearPositionValid = true;
+		}
+		const textureSlot = this.prepareSpriteBatch(vertexCount, geometryCommand.texture);
+		const clipSlot = this.#shaderClipSlot;
+		if (this.#batchRetainedFlush !== null) {
+			this.endBatchSegments();
+		}
+
+		// appendSpriteBatch 와 같은 색 셈.
+		const color = geometryCommand.color;
+		const colorAlpha = color.alpha * this.#globalAlpha;
+		const colorRed = color.red * colorAlpha;
+		const colorGreen = color.green * colorAlpha;
+		const colorBlue = color.blue * colorAlpha;
+		const imageTintColor = geometryCommand.tintColor;
+		let tintRed = 0;
+		let tintGreen = 0;
+		let tintBlue = 0;
+		let tintAlpha = 0;
+		if (imageTintColor) {
+			tintRed = imageTintColor.red;
+			tintGreen = imageTintColor.green;
+			tintBlue = imageTintColor.blue;
+			tintAlpha = imageTintColor.alpha;
+		}
+		const transformMatrix = this.#transformMatrix;
+		const matrixE = transformMatrix.e;
+		const matrixF = transformMatrix.f;
+		const linearPositionData = geometryCommand.linearPositionData;
+		const batchVertexData = this.#batchVertexData;
+		let sourceOffset = 0;
+		let targetOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
+		for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+			batchVertexData[targetOffset] = linearPositionData[vertexIndex * 2] + matrixE;
+			batchVertexData[targetOffset + 1] = linearPositionData[vertexIndex * 2 + 1] + matrixF;
+			batchVertexData[targetOffset + 2] = localVertexData[sourceOffset + 2];
+			batchVertexData[targetOffset + 3] = localVertexData[sourceOffset + 3];
+			batchVertexData[targetOffset + 4] = colorRed;
+			batchVertexData[targetOffset + 5] = colorGreen;
+			batchVertexData[targetOffset + 6] = colorBlue;
+			batchVertexData[targetOffset + 7] = colorAlpha;
+			batchVertexData[targetOffset + 8] = tintRed;
+			batchVertexData[targetOffset + 9] = tintGreen;
+			batchVertexData[targetOffset + 10] = tintBlue;
+			batchVertexData[targetOffset + 11] = tintAlpha;
+			batchVertexData[targetOffset + 12] = textureSlot;
+			batchVertexData[targetOffset + 13] = clipSlot;
+			sourceOffset += FLOATS_PER_VERTEX;
+			targetOffset += BATCH_FLOATS_PER_VERTEX;
+		}
+		this.#batchVertexCount += vertexCount;
 	}
 
 	//==============================================================================
