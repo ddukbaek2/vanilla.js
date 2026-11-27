@@ -18044,6 +18044,11 @@
 						}
 					],
 					"extends": "Object",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/graphic",
+						"class": "GeometryKey"
+					},
 					"members": [
 						{
 							"kind": "constructor",
@@ -18055,7 +18060,13 @@
 								"en": "Constructor."
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "GeometryKey",
+								"name": "new"
+							}
 						},
 						{
 							"kind": "method",
@@ -18067,7 +18078,13 @@
 								"en": "Starts writing. (Graphic calls it before writeGeometryKey)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "GeometryKey",
+								"name": "begin"
+							}
 						},
 						{
 							"kind": "method",
@@ -18088,7 +18105,13 @@
 								"en": "Writes one value. (number, string, boolean, object reference, null)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "GeometryKey",
+								"name": "add"
+							}
 						},
 						{
 							"kind": "method",
@@ -18107,7 +18130,13 @@
 								"en": "Ends writing. (true if same as last time)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "GeometryKey",
+								"name": "end"
+							}
 						}
 					]
 				},
@@ -19717,6 +19746,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "set_geometry_caching_enabled"
+							},
 							"examples": [
 								{
 									"title": {
@@ -19745,7 +19780,13 @@
 								"en": "Returns whether the geometry cache is on."
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "is_geometry_caching_enabled"
+							}
 						},
 						{
 							"kind": "method",
@@ -19764,7 +19805,13 @@
 								"en": "Returns the number of components drawn from the geometry cache in the last frame. (draw was not called)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "get_last_frame_geometry_cache_hit_count"
+							}
 						},
 						{
 							"kind": "method",
@@ -19783,7 +19830,13 @@
 								"en": "Returns the number of components whose geometry cache was rewritten in the last frame. (among caching components, those whose draw was called)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "get_last_frame_geometry_rebuild_count"
+							}
 						},
 						{
 							"kind": "method",
@@ -19803,6 +19856,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "get_last_frame_retained_batch_count"
+							},
 							"examples": [
 								{
 									"title": {
@@ -19833,7 +19892,13 @@
 								"en": "Draws a component. (nodes call it for each component, it goes through the geometry cache)\n- If the component does not report its inputs through writeGeometryKey, the cache is off, or the state is not batched, draw is called as is.\n- If the inputs and the drawing state (scale, rotation, blend, tint, text direction) are the same as last time:\n  if the translation and opacity are also the same, the cached device vertices are copied into the batch as is; otherwise the current matrix and opacity are applied again to the cached local vertices.\n  (scrolling only changes the parent's translation, so child components only do a matrix multiply without draw; text recomputes pixel snapping identically)\n- Otherwise draw is called to rewrite the cache. If the draw does work outside the batch such as clipping, layers or changing the blend mode, that component is not cached."
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic.js"
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "draw_component"
+							}
 						},
 						{
 							"kind": "method",
@@ -26076,6 +26141,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/nodetree",
+								"class": "NodeTree",
+								"name": "read_scale"
+							},
 							"examples": [
 								{
 									"title": {
@@ -26114,6 +26185,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "read_local_position"
+							},
 							"examples": [
 								{
 									"title": {
@@ -26152,6 +26229,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "read_local_scale"
+							},
 							"examples": [
 								{
 									"title": {
@@ -27518,6 +27601,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/worldnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "read_pivot"
+							},
 							"examples": [
 								{
 									"title": {
@@ -27694,6 +27783,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/worldnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "read_content_size"
+							},
 							"examples": [
 								{
 									"title": {
@@ -27885,7 +27980,13 @@
 								"en": "Writes the global position into a given vector. (Same arithmetic in the same order as getPosition, no new vector)\n- Subclasses that override getPosition or the parent's content size or pivot readers are read through those functions."
 							},
 							"since": "0.4.0",
-							"source": "src/core/node/worldnode.js"
+							"source": "src/core/node/worldnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/nodetree",
+								"class": "NodeTree",
+								"name": "read_position"
+							}
 						},
 						{
 							"kind": "method",
@@ -30716,6 +30817,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/component.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component",
+								"class": "Component",
+								"name": "write_geometry_key"
+							},
 							"examples": [
 								{
 									"title": {
@@ -103964,8 +104071,8 @@
 		{
 			"name": "graphics3d/toon/toonscreenoutline",
 			"summary": {
-				"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)",
-				"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)"
+				"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 가는 선은 둘레 칸을 바로 보고, 굵은 선은 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)",
+				"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, looks at the surrounding cells directly for thin lines and widens thick lines with jump flooding, then computes coverage from distance and blends)"
 			},
 			"examples": [
 				{
@@ -103982,8 +104089,8 @@
 				{
 					"name": "ToonScreenOutline",
 					"summary": {
-						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 잰 오차(노멀 8 비트 각 오차 x 두 자리 사이 거리, 꺾임의 화소 한 칸 x 사인, 깊이 24 비트 한 칸) x 배율을 더해 먼 것도 같은 뜻이 되고, 나란한 낮은 턱은 화소 한 칸보다 낮아도 잡힌다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.\n- 인스턴스: drawMeshInstanced 는 인스턴스 배열을 걸러 그때 올린다. drawMeshInstanceBuffer 는 ToonRenderer.createInstanceBuffer 의 버퍼를 몸과 같이 쓰고 다시 올리지 않는다.\n  버퍼의 인스턴스마다 번호는 꼴의 instanceLineId 칸에서 읽는다. (없으면 공통 번호)\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)",
-						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the occluding pixel is farther than the depth threshold plus the error margin from the occluded pixel's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. The measured error (8-bit normal angular error x the distance between the two positions, one pixel x the sine at a crease, one 24-bit depth step) x the factor is added to the threshold, so distant things mean the same, and a low parallel step is caught even when it is lower than one pixel.\n- Widening: the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines even when the widening target is reduced)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Per-ID color: setLineColor gives a line color per ID. (The Unreal Custom Stencil form; a line where two IDs touch takes the color of the nearer ID, and IDs not in the table, or an empty table, keep the setColor color)\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Cost: setResolutionScale reduces the widening (jump flooding) target. (The light path for phones) The line target and seeds stay at drawing area resolution, so line positions do not change when reduced.\n- Instances: drawMeshInstanced culls the instance array and uploads it then. drawMeshInstanceBuffer shares the ToonRenderer.createInstanceBuffer buffer with the body and does not upload it again.\n  The ID of each instance in the buffer is read from the layout's instanceLineId slot. (The common ID if there is none)\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushBatch before it)"
+						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 가는 선은 둘레 칸을 바로 보고, 굵은 선은 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 잰 오차(노멀 8 비트 각 오차 x 두 자리 사이 거리, 꺾임의 화소 한 칸 x 사인, 깊이 24 비트 한 칸) x 배율을 더해 먼 것도 같은 뜻이 되고, 나란한 낮은 턱은 화소 한 칸보다 낮아도 잡힌다.\n- 가는 선(굵기 약 3.24 픽셀까지): 씨앗 고르기와 같은 차례로 화소마다 첫 경계 쪽(R8UI 한 바이트)을 고르고, 섞기가 둘레 3 x 3 화소의 씨앗을 점프 플러딩 마지막 걸음과 같은 차례로 보아 가장 가까운 것까지의 거리를 잰다.\n  화면 전체 패스가 씨앗 쪽 판 하나와 섞기 하나다. (모바일 타일 GPU 에서 패스 수와 판 대역폭이 굵은 선 길의 몇 분의 1)\n- 넓히기(굵은 선): 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 섞기 앞의 모든 판(선의 판, 가면, 씨앗, 넓히기 판)을 줄인다. (기본 1 은 그리는 영역 그대로, 줄이면 가는 선은 선의 판 해상도에서 덮는 몫 판 하나를 셈해 쌍선형으로 한 번 읽어 섞는다)\n- 인스턴스: drawMeshInstanced 는 인스턴스 배열을 걸러 그때 올린다. drawMeshInstanceBuffer 는 ToonRenderer.createInstanceBuffer 의 버퍼를 몸과 같이 쓰고 다시 올리지 않는다.\n  버퍼의 인스턴스마다 번호는 꼴의 instanceLineId 칸에서 읽는다. (없으면 공통 번호)\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)",
+						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, looks at the surrounding cells directly for thin lines and widens thick lines with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the occluding pixel is farther than the depth threshold plus the error margin from the occluded pixel's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. The measured error (8-bit normal angular error x the distance between the two positions, one pixel x the sine at a crease, one 24-bit depth step) x the factor is added to the threshold, so distant things mean the same, and a low parallel step is caught even when it is lower than one pixel.\n- Thin lines (up to a width of about 3.24 pixels): in the same order as the seed pick, picks each pixel's first boundary side (one R8UI byte), and the blend looks at the seeds of the 3 x 3 surrounding pixels in the same order as the last jump flooding step to measure the distance to the nearest one.\n  The full-screen passes are one side target and one blend. (A fraction of the passes and target bandwidth of the thick-line path on mobile tile GPUs)\n- Widening (thick lines): the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Per-ID color: setLineColor gives a line color per ID. (The Unreal Custom Stencil form; a line where two IDs touch takes the color of the nearer ID, and IDs not in the table, or an empty table, keep the setColor color)\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Value: setResolutionScale shrinks every target before the blend (the line target, the mask, the seeds, the widening targets). (At the default 1 it is the drawing area as is; below 1 a thin line computes one coverage target at the line-target resolution and blends it with one bilinear read)\n- Instances: drawMeshInstanced culls the instance array and uploads it then. drawMeshInstanceBuffer shares the ToonRenderer.createInstanceBuffer buffer with the body and does not upload it again.\n  The ID of each instance in the buffer is read from the layout's instanceLineId slot. (The common ID if there is none)\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushBatch before it)"
 					},
 					"examples": [
 						{
@@ -104024,8 +104131,8 @@
 								}
 							],
 							"description": {
-								"ko": "생성. (다섯 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)",
-								"en": "Constructor. (Builds five programs and an empty vertex array, the line target on the first beginLineIds)"
+								"ko": "생성. (아홉 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)",
+								"en": "Constructor. (Builds the nine programs and an empty vertex array; the line target is built at the first beginLineIds)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
@@ -104053,8 +104160,8 @@
 							"returns": {
 								"type": "Array<object>",
 								"description": {
-									"ko": "{ vertexShader, fragmentShader, attributeLocationTable } 다섯. (번호, 씨앗, 모으기, 넓히기, 섞기)",
-									"en": "Five { vertexShader, fragmentShader, attributeLocationTable }. (ID, seed, gather, widening, blending)"
+									"ko": "{ vertexShader, fragmentShader, attributeLocationTable } 아홉. (번호, 씨앗, 모으기, 넓히기, 섞기, 가는 선의 씨앗 쪽 판, 가는 선 섞기, 줄인 판의 가는 선 덮는 몫, 덮는 몫 판 섞기)",
+									"en": "Nine { vertexShader, fragmentShader, attributeLocationTable }. (ID, seed, gather, widening, blending, thin-line seed side target, thin-line blending, thin-line coverage on a reduced target, coverage target blending)"
 								}
 							},
 							"description": {
@@ -104482,14 +104589,14 @@
 									"name": "resolutionScale",
 									"type": "number",
 									"description": {
-										"ko": "0.25 ~ 1.",
-										"en": "0.25 ~ 1."
+										"ko": "0.25 ~ 1. (1 이면 그리는 영역 해상도 그대로)",
+										"en": "0.25 ~ 1. (1 keeps the drawing area resolution)"
 									}
 								}
 							],
 							"description": {
-								"ko": "넓히기 판의 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춘다)\n- 선의 판과 씨앗은 늘 그리는 영역 해상도로 잡는다. 점프 플러딩만 줄인 판에서 하고, 씨앗 자리는 그리는 영역 화소 좌표 그대로 넣어 거리로 섞는다.\n  그래서 줄여도 선 자리는 그리는 영역의 화소 경계이고 계단과 점선이 없다. 줄이면 넓히기의 값(걸음 수 x 화소 수)이 몫의 제곱으로 준다.",
-								"en": "Set the resolution fraction of the widening target. (Fraction of the drawing area 0.25 ~ 1, lowered on the light path for phones)\n- The line target and seeds are always at drawing area resolution. Only the jump flooding runs on the reduced target, and seed positions are stored as drawing area pixel coordinates and blended by distance.\n  So even when reduced, line positions are pixel boundaries of the drawing area with no stairs or dotted lines. Reducing it cuts the widening cost (steps x pixels) by the square of the fraction."
+								"ko": "선의 판 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 기본 1, 폰과 태블릿의 가벼운 길은 낮춘다)\n- 이름대로 섞기 앞의 모든 판(선의 판 = 노멀과 번호와 깊이, 가면, 씨앗, 넓히기 판)을 그리는 영역 x 몫 크기로 잡는다. 선의 판은 몫만큼 작은 해상도로 한 번 더 그려지므로 값이 몫의 제곱으로 준다.\n  기본 1 은 그리는 영역과 같은 크기라 화면이 바이트까지 그대로다.\n- 몫이 1 보다 작을 때 가는 선(굵기 x 몫이 약 3.24 선의 판 픽셀 이하)은 선의 판 해상도에서 덮는 몫(진하기와 번호 색을 곱한 RGBA8)을 한 번 셈하고, 마지막 섞기가 그것을 쌍선형으로 한 번 읽는다. (읽기 9 에서 1)\n  굵은 선은 선의 판 해상도에서 점프 플러딩을 하고 섞을 때 거리를 그리는 영역 픽셀로 곱해 잰다. 어느 길이든 선 굵기는 그리는 영역 픽셀(setWidth)이고 선 자리는 몫이 작을수록 가장자리가 부드러워진다.\n- getLineTarget() 의 lineTexture, depthTexture 해상도는 그리는 영역 x 몫이다. (광부의 lineTexture 약속 RGBA8, b 와 a 아래 6 비트 번호, a 위 2 비트 깃발, 굵기 0 이면 선의 판만은 그대로, 해상도만 그리는 영역과 다를 수 있다)\n- CSS 화소당 1.5 화소로 맞추려면 몫 = 1.5 / (그리는 버퍼 화소 / CSS 화소) 로 준다. 엔진 해상도 설정이 그리는 버퍼를 묶어 devicePixelRatio 와 다를 수 있어 캔버스의 width / clientWidth 로 센다.",
+								"en": "Set the resolution fraction of the line target. (Fraction of the drawing area 0.25 ~ 1, default 1, lowered on the light path for phones and tablets)\n- As the name says, every target before the blend (the line target = normals, IDs and depth, the mask, the seeds, the widening targets) is built at drawing area x fraction. The line target is drawn once more at that smaller resolution, so the cost falls by the square of the fraction.\n  The default 1 is the same size as the drawing area, so the screen is byte for byte the same.\n- Below 1, a thin line (width x fraction up to about 3.24 line-target pixels) computes its coverage (strength times the ID color, RGBA8) once at the line-target resolution, and the final blend reads it once with bilinear filtering. (Nine reads become one)\n  A thick line floods at the line-target resolution and measures the distance in drawing area pixels when blending. At any scale the line width (setWidth) is in drawing area pixels, and the smaller the fraction the softer the edges.\n- The lineTexture and depthTexture of getLineTarget() are drawing area x fraction in size. (The lineTexture contract of the miner stays: RGBA8, the ID in b and the low 6 bits of a, flags in the top 2 bits of a, and width 0 draws only the line target; only the resolution may differ from the drawing area)\n- To match 1.5 pixels per CSS pixel, pass 1.5 / (buffer pixels per CSS pixel). Since the engine resolution setting may bundle the buffer and differ from devicePixelRatio, count it as the canvas width / clientWidth."
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
@@ -104498,7 +104605,17 @@
 								"module": "graphics3d/toon/toonscreenoutline",
 								"class": "ToonScreenOutline",
 								"name": "set_resolution_scale"
-							}
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "CSS 화소당 선의 판 1.5 화소로 맞추기",
+										"en": "Match 1.5 line-target pixels per CSS pixel"
+									},
+									"code": "import { ToonScreenOutline } from \"./vanilla.js\";\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = 750;\ncanvas.height = 990;\ncanvas.style.width = \"375px\";\nconst outline = new ToonScreenOutline(canvas.getContext(\"webgl2\"));\nconst bufferPixelPerCssPixel = canvas.width / 375;\noutline.setResolutionScale(1.5 / bufferPixelPerCssPixel);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -104595,8 +104712,8 @@
 							"returns": {
 								"type": "object | null",
 								"description": {
-									"ko": "{ lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), seedTexture (온 해상도 씨앗 RGBA16UI), jumpFloodTextures (넓히기 판 RGBA16UI 둘), jumpFloodIndex (넓히기를 마친 쪽), width, height, jumpFloodWidth, jumpFloodHeight }",
-									"en": "{ lineTexture (normal and ID RGBA8), depthTexture (depth 24), seedTexture (full resolution seeds RGBA16UI), jumpFloodTextures (two widening targets RGBA16UI), jumpFloodIndex (the side where widening finished), width, height, jumpFloodWidth, jumpFloodHeight }"
+									"ko": "{ lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), edgeMaskTexture (가는 선의 씨앗 쪽 판 R8UI, 아래 3 비트 바깥 선, 위 3 비트 꺾임 선의 첫 경계 쪽 0 없음, 1 오른쪽, 2 왼쪽, 3 위, 4 아래), seedTexture (온 해상도 씨앗 RGBA16UI, 굵은 선을 긋기 전에는 null), jumpFloodTextures (넓히기 판 RGBA16UI 둘, 굵은 선을 긋기 전에는 빔), jumpFloodIndex (넓히기를 마친 쪽, 점프 플러딩을 안 했으면 -1), coverageTexture (선의 판을 줄였을 때 가는 선의 덮는 몫 RGBA8 곱한 색, 줄여 가는 선을 그을 때 짓기 전에는 null), outlinePath (이번 프레임의 길 \"none\", \"thin\", \"thinScaled\", \"jumpFlood\"), width, height (선의 판 해상도, 그리는 영역 x setResolutionScale 의 몫), jumpFloodWidth, jumpFloodHeight (선의 판과 같다) }",
+									"en": "{ lineTexture (normal and ID RGBA8), depthTexture (depth 24), edgeMaskTexture (thin-line seed side target R8UI, low 3 bits contour and next 3 bits crease first edge side, 0 none, 1 right, 2 left, 3 up, 4 down), seedTexture (seeds at the line-target resolution RGBA16UI, null until a thick line is drawn), jumpFloodTextures (two widening targets RGBA16UI, empty until a thick line is drawn), jumpFloodIndex (the side that finished widening, -1 when jump flooding did not run), coverageTexture (coverage of a thin line when the line target is reduced, RGBA8 premultiplied color, null until a reduced thin line is drawn), outlinePath (this frame's path \"none\", \"thin\", \"thinScaled\", \"jumpFlood\"), width, height (line-target resolution, drawing area x the fraction of setResolutionScale), jumpFloodWidth, jumpFloodHeight (same as the line target) }"
 								}
 							},
 							"description": {
@@ -104922,8 +105039,8 @@
 							"signature": "endLineIds()",
 							"params": [],
 							"description": {
-								"ko": "번호 그리기 끝. (씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)",
-								"en": "End ID drawing. (Picks seeds and widens them with jump flooding, then restores the framebuffer, viewport and state)"
+								"ko": "번호 그리기 끝. (가는 선은 씨앗 쪽 판 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)\n- 가는 선(굵기가 THIN_LINE_MAXIMUM_WIDTH 이하, 약 3.24 픽셀까지): 화면 전체 패스가 씨앗 쪽 판 하나다. 섞기가 둘레 3 x 3 화소의 씨앗을 본다. (씨앗, 모으기, 넓히기 없음)\n- 굵은 선: 씨앗, 모으기, 넓히기 걸음마다 한 패스. (씨앗 판과 넓히기 판은 처음 굵은 선을 그을 때 짓는다)\n- 판을 통째로 덮어쓰는 패스는 앞에 invalidateFramebuffer 를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰)",
+								"en": "End ID drawing. (Thin lines pick one seed side target, thick lines pick seeds and widen them with jump flooding, then restores the framebuffer, viewport and state)\n- Thin lines (width at most THIN_LINE_MAXIMUM_WIDTH, about 3.24 pixels): one full-screen pass for the seed side target. The composite looks at the seeds of the surrounding 3 x 3 pixels. (No seed, gather or widening)\n- Thick lines: one pass each for seed, gather and every widening step. (The seed and widening targets are built the first time a thick line is drawn)\n- Passes that overwrite a whole target call invalidateFramebuffer first so the old contents are not loaded. (Removes target loads on tile GPUs)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
@@ -104940,8 +105057,8 @@
 							"signature": "drawOutline()",
 							"params": [],
 							"description": {
-								"ko": "바깥선 긋기. (넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)",
-								"en": "Draw the outline. (Blends into the drawing area of beginLineIds with the widened seed target, neither reads nor writes depth, stencil untouched)"
+								"ko": "바깥선 긋기. (가는 선은 씨앗 쪽 판, 굵은 선은 넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)",
+								"en": "Draw the outline. (Blends into the drawing area of beginLineIds with the seed side target for thin lines and the widened seed target for thick lines, neither reads nor writes depth, stencil untouched)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
@@ -105136,8 +105253,8 @@
 							"signature": "destroy()",
 							"params": [],
 							"description": {
-								"ko": "다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 다섯)",
-								"en": "Delete after use. (Line target, vertex array, five programs)"
+								"ko": "다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 일곱)",
+								"en": "Delete after use. (Line target, vertex array, seven programs)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",

@@ -5923,6 +5923,18 @@
 			"vanilla-engine": {
 				"module": "core/component",
 				"class": "Component",
+				"name": "write_geometry_key"
+			},
+			"vanilla.js": {
+				"module": "core/component",
+				"class": "Component",
+				"name": "writeGeometryKey"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component",
+				"class": "Component",
 				"name": "draw_gizmos"
 			},
 			"vanilla.js": {
@@ -9786,6 +9798,64 @@
 		{
 			"vanilla-engine": {
 				"module": "core/graphic",
+				"class": "GeometryKey"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "GeometryKey"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "begin"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "begin"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "add"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "add"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "end"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "GeometryKey",
+				"name": "end"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
 				"class": "Graphic"
 			},
 			"vanilla.js": {
@@ -10211,6 +10281,78 @@
 				"module": "core/graphic",
 				"class": "Graphic",
 				"name": "drawVertices"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "set_geometry_caching_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "setGeometryCachingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "is_geometry_caching_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "isGeometryCachingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "get_last_frame_geometry_cache_hit_count"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "getLastFrameGeometryCacheHitCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "get_last_frame_geometry_rebuild_count"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "getLastFrameGeometryRebuildCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "get_last_frame_retained_batch_count"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "getLastFrameRetainedBatchCount"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "draw_component"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "drawComponent"
 			}
 		},
 		{
@@ -13737,6 +13879,30 @@
 			"vanilla-engine": {
 				"module": "core/node/nodetree",
 				"class": "NodeTree",
+				"name": "read_position"
+			},
+			"vanilla.js": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "readPosition"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/nodetree",
+				"class": "NodeTree",
+				"name": "read_scale"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "readScale"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/nodetree",
+				"class": "NodeTree",
 				"name": "set_scale"
 			},
 			"vanilla.js": {
@@ -14305,6 +14471,54 @@
 				"module": "core/node/worldnode",
 				"class": "WorldNode",
 				"name": "copyContentSizeTo"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "read_content_size"
+			},
+			"vanilla.js": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "readContentSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "read_pivot"
+			},
+			"vanilla.js": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "readPivot"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "read_local_position"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "readLocalPosition"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "read_local_scale"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "readLocalScale"
 			}
 		},
 		{
@@ -19700,6 +19914,18 @@
 				"module": "graphics3d/rendertarget",
 				"class": "RenderTarget",
 				"name": "resolve"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/rendertarget",
+				"class": "RenderTarget",
+				"name": "resolve"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/rendertarget",
+				"class": "RenderTarget",
+				"name": "resolve_with_attachment_kept"
 			},
 			"vanilla.js": {
 				"module": "graphics3d/rendertarget",

@@ -39568,6 +39568,7 @@ var BloomEffect = class extends Object2 {
     const pingRenderTarget = this.getPingRenderTarget();
     const pongRenderTarget = this.getPongRenderTarget();
     pingRenderTarget.bind();
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
     const brightPass = this.getBrightPass();
     brightPass.useProgram();
     const brightSceneTextureLocation = brightPass.getUniformLocation("sceneTexture");
@@ -39584,12 +39585,14 @@ var BloomEffect = class extends Object2 {
     const iterationCount = this.getIterationCount();
     for (let blurIndex = 0; blurIndex < iterationCount; ++blurIndex) {
       pongRenderTarget.bind();
+      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
       const pingWidth = pingRenderTarget.getWidth();
       webGL2RenderingContext.uniform2f(blurDirectionLocation, 1 / pingWidth, 0);
       const pingColorTexture = pingRenderTarget.getColorTexture();
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, pingColorTexture);
       blurPass.draw();
       pingRenderTarget.bind();
+      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
       const pongHeight = pongRenderTarget.getHeight();
       webGL2RenderingContext.uniform2f(blurDirectionLocation, 0, 1 / pongHeight);
       const pongColorTexture = pongRenderTarget.getColorTexture();
@@ -43701,6 +43704,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     const extractPass = this.#extractPass;
     const firstRenderTarget = levelRenderTargetList[0];
     firstRenderTarget.bind();
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
     extractPass.useProgram();
     webGL2RenderingContext.uniform1i(extractPass.getUniformLocation("sourceTexture"), 0);
     webGL2RenderingContext.uniform2f(extractPass.getUniformLocation("sourceTexel"), 1 / this.#sceneWidth, 1 / this.#sceneHeight);
@@ -43716,6 +43720,7 @@ var MultiLevelBloomEffect = class extends Object2 {
       const sourceRenderTarget = levelRenderTargetList[levelIndex - 1];
       const targetRenderTarget = levelRenderTargetList[levelIndex];
       targetRenderTarget.bind();
+      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
       webGL2RenderingContext.uniform2f(downsampleTexelLocation, 1 / sourceRenderTarget.getWidth(), 1 / sourceRenderTarget.getHeight());
       const sourceTexture = sourceRenderTarget.getColorTexture(0);
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
@@ -43771,6 +43776,7 @@ var DEPTH_TEXTURE_UNIT = 6;
 var LINE_COLOR_TEXTURE_UNIT = 4;
 var COMPOSITE_LINE_TEXTURE_UNIT = 6;
 var COMPOSITE_DEPTH_TEXTURE_UNIT = 7;
+var THIN_LINE_MAXIMUM_WIDTH = 2 * System109.Math.sqrt(4.5) - 1;
 var LINE_COLOR_TABLE_WIDTH = 128;
 var LINE_VERTEX_SHADER = `#version 300 es
 in vec3 vertexPosition;
@@ -43830,8 +43836,7 @@ void main() {
 	gl_Position = vec4(TRIANGLE_POINTS[gl_VertexID], 0.0, 1.0);
 }
 `;
-var SEED_FRAGMENT_SHADER = `#version 300 es
-precision highp float;
+var LINE_EDGE_SHADER_PART = `precision highp float;
 precision highp int;
 uniform highp sampler2D lineTexture;
 uniform highp sampler2D depthTexture;
@@ -43842,8 +43847,6 @@ uniform float isPerspective;
 uniform float depthThreshold;
 uniform float depthMargin;
 uniform float creaseCosine;
-out uvec4 fragmentSeed;
-const uint NO_SEED = 65535u;
 const float NORMAL_ERROR = 0.0165;
 const float DEPTH_STEP = 1.0 / 16777215.0;
 const ivec2 SIDES[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
@@ -43923,6 +43926,10 @@ int readEdge(LinePixel first, LinePixel second) {
 	}
 	return 0;
 }
+`;
+var SEED_FRAGMENT_SHADER = `#version 300 es
+${LINE_EDGE_SHADER_PART}out uvec4 fragmentSeed;
+const uint NO_SEED = 65535u;
 void main() {
 	ivec2 size = textureSize(lineTexture, 0);
 	vec2 sizeValue = vec2(size);
@@ -43945,6 +43952,31 @@ void main() {
 		}
 	}
 	fragmentSeed = uvec4(contourSeed, creaseSeed);
+}
+`;
+var EDGE_MASK_FRAGMENT_SHADER = `#version 300 es
+${LINE_EDGE_SHADER_PART}out uint fragmentMask;
+void main() {
+	ivec2 size = textureSize(lineTexture, 0);
+	vec2 sizeValue = vec2(size);
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	LinePixel center = readPixel(pixel, sizeValue);
+	uint contourSide = 0u;
+	uint creaseSide = 0u;
+	for (int index = 0; index < 4; ++index) {
+		ivec2 neighborPixel = pixel + SIDES[index];
+		if (neighborPixel.x < 0 || neighborPixel.y < 0 || neighborPixel.x >= size.x || neighborPixel.y >= size.y) {
+			continue;
+		}
+		int edge = readEdge(center, readPixel(neighborPixel, sizeValue));
+		if (edge == 2 && contourSide == 0u) {
+			contourSide = uint(index + 1);
+		}
+		if (edge == 1 && creaseSide == 0u) {
+			creaseSide = uint(index + 1);
+		}
+	}
+	fragmentMask = contourSide | (creaseSide << 3u);
 }
 `;
 var SEED_GATHER_FRAGMENT_SHADER = `#version 300 es
@@ -44048,20 +44080,18 @@ void main() {
 	fragmentSeed = best;
 }
 `;
-var COMPOSITE_FRAGMENT_SHADER = `#version 300 es
-precision highp float;
+var COMPOSITE_SHADER_PART = `precision highp float;
 precision highp int;
-uniform highp usampler2D seedTexture;
 uniform highp sampler2D lineTexture;
 uniform highp sampler2D depthTexture;
 uniform highp sampler2D lineColorTexture;
 uniform float lineColorEnabled;
 uniform vec4 viewportRect;
-uniform vec2 pointScale;
 uniform vec2 lineWidths;
 uniform float creaseOpacity;
 uniform vec4 outlineColor;
 uniform float hdrOutput;
+uniform vec2 lineScale; // \uC120\uC758 \uD310 \uD654\uC18C \uC218 / \uADF8\uB9AC\uB294 \uC601\uC5ED \uD654\uC18C \uC218. (1 \uC774\uBA74 \uAC19\uC740 \uD574\uC0C1\uB3C4)
 out vec4 fragmentColor;
 const uint NO_SEED = 65535u;
 float readLineId(ivec2 pixel) {
@@ -44095,10 +44125,44 @@ float readSeedDistance(vec2 point, uvec2 seed, vec2 toOutput) {
 	}
 	return length(offset * toOutput);
 }
+void writeLineColor(float contourDistance, float creaseDistance, uvec2 contourSeed, uvec2 creaseSeed) {
+	float contour = lineWidths.x > 0.0 ? clamp(lineWidths.x * 0.5 - contourDistance + 0.5, 0.0, 1.0) : 0.0;
+	float crease = lineWidths.y > 0.0 ? clamp(lineWidths.y * 0.5 - creaseDistance + 0.5, 0.0, 1.0) * creaseOpacity : 0.0;
+	vec4 lineColor = outlineColor;
+	float strength = max(contour, crease) * outlineColor.a;
+	if (lineColorEnabled > 0.5 && max(contour, crease) > 0.0) {
+		vec4 contourColor = contour > 0.0 ? readSeedColor(contourSeed) : outlineColor;
+		vec4 creaseColor = crease > 0.0 ? readSeedColor(creaseSeed) : outlineColor;
+		float contourStrength = contour * contourColor.a;
+		float creaseStrength = crease * creaseColor.a;
+		lineColor = contourStrength >= creaseStrength ? contourColor : creaseColor;
+		strength = max(contourStrength, creaseStrength);
+	}
+	if (strength < 0.004) {
+#ifdef VANILLA_COVERAGE_PASS
+		fragmentColor = vec4(0.0);
+		return;
+#else
+		discard;
+#endif
+	}
+#ifdef VANILLA_COLOR_SPACE_LINEAR
+	vec3 linearColor = max(lineColor.rgb, vec3(0.0));
+	linearColor = mix(linearColor / 12.92, pow((linearColor + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), linearColor));
+	vec3 color = hdrOutput > 0.5 ? linearColor : lineColor.rgb;
+#else
+	vec3 color = hdrOutput > 0.5 ? pow(lineColor.rgb, vec3(2.2)) : lineColor.rgb;
+#endif
+	fragmentColor = vec4(color * strength, strength);
+}
+`;
+var COMPOSITE_FRAGMENT_SHADER = `#version 300 es
+${COMPOSITE_SHADER_PART}uniform highp usampler2D seedTexture;
+uniform vec2 pointScale;
 void main() {
 	ivec2 size = textureSize(seedTexture, 0);
-	vec2 toOutput = vec2(1.0);
-	vec2 point = gl_FragCoord.xy - viewportRect.xy - 0.5;
+	vec2 toOutput = 1.0 / lineScale;
+	vec2 point = (gl_FragCoord.xy - viewportRect.xy) * lineScale - 0.5;
 	ivec2 basePixel = ivec2(floor((point + 0.5) / pointScale - 0.5));
 	float contourDistance = 1.0e9;
 	float creaseDistance = 1.0e9;
@@ -44120,31 +44184,73 @@ void main() {
 			}
 		}
 	}
-	float contour = lineWidths.x > 0.0 ? clamp(lineWidths.x * 0.5 - contourDistance + 0.5, 0.0, 1.0) : 0.0;
-	float crease = lineWidths.y > 0.0 ? clamp(lineWidths.y * 0.5 - creaseDistance + 0.5, 0.0, 1.0) * creaseOpacity : 0.0;
-	vec4 lineColor = outlineColor;
-	float strength = max(contour, crease) * outlineColor.a;
-	if (lineColorEnabled > 0.5 && max(contour, crease) > 0.0) {
-		vec4 contourColor = contour > 0.0 ? readSeedColor(contourSeed) : outlineColor;
-		vec4 creaseColor = crease > 0.0 ? readSeedColor(creaseSeed) : outlineColor;
-		float contourStrength = contour * contourColor.a;
-		float creaseStrength = crease * creaseColor.a;
-		lineColor = contourStrength >= creaseStrength ? contourColor : creaseColor;
-		strength = max(contourStrength, creaseStrength);
-	}
-	if (strength < 0.004) {
-		discard;
-	}
-#ifdef VANILLA_COLOR_SPACE_LINEAR
-	vec3 linearColor = max(lineColor.rgb, vec3(0.0));
-	linearColor = mix(linearColor / 12.92, pow((linearColor + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), linearColor));
-	vec3 color = hdrOutput > 0.5 ? linearColor : lineColor.rgb;
-#else
-	vec3 color = hdrOutput > 0.5 ? pow(lineColor.rgb, vec3(2.2)) : lineColor.rgb;
-#endif
-	fragmentColor = vec4(color * strength, strength);
+	writeLineColor(contourDistance, creaseDistance, contourSeed, creaseSeed);
 }
 `;
+var THIN_COMPOSITE_FRAGMENT_SHADER = `#version 300 es
+${COMPOSITE_SHADER_PART}uniform highp usampler2D edgeMaskTexture;
+const vec2 SIDE_OFFSETS[5] = vec2[5](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
+float readSideDistance(vec2 base, vec2 side) {
+	vec2 offset = max(abs(base + side * 0.5) - abs(side.yx) * 0.5, vec2(0.0));
+#ifdef VANILLA_COVERAGE_PASS
+	offset *= 1.0 / lineScale;
+#endif
+	return dot(offset, offset);
+}
+void main() {
+	ivec2 size = textureSize(lineTexture, 0);
+#ifdef VANILLA_COVERAGE_PASS
+	vec2 point = gl_FragCoord.xy - 0.5;
+#else
+	vec2 point = gl_FragCoord.xy - viewportRect.xy - 0.5;
+#endif
+	ivec2 pixel = ivec2(floor(point + 0.5));
+	float contourDistance = 1.0e18;
+	float creaseDistance = 1.0e18;
+	uvec2 contourSeed = uvec2(NO_SEED);
+	uvec2 creaseSeed = uvec2(NO_SEED);
+	for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+		for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+			ivec2 wantedPixel = pixel + ivec2(offsetX, offsetY);
+			ivec2 samplePixel = clamp(wantedPixel, ivec2(0), size - 1);
+			uint sides = texelFetch(edgeMaskTexture, samplePixel, 0).r;
+			sides = samplePixel == wantedPixel ? sides : 0u;
+			uint contourSide = sides & 7u;
+			uint creaseSide = (sides >> 3u) & 7u;
+			vec2 base = vec2(samplePixel) - point;
+			vec2 contourOffset = SIDE_OFFSETS[contourSide];
+			vec2 creaseOffset = SIDE_OFFSETS[creaseSide];
+			float sampleContourDistance = readSideDistance(base, contourOffset);
+			float sampleCreaseDistance = readSideDistance(base, creaseOffset);
+			bool isTaken = contourSide != 0u && sampleContourDistance < contourDistance;
+			contourDistance = isTaken ? sampleContourDistance : contourDistance;
+			contourSeed = isTaken ? uvec2(samplePixel * 2 + ivec2(contourOffset)) : contourSeed;
+			isTaken = creaseSide != 0u && sampleCreaseDistance < creaseDistance;
+			creaseDistance = isTaken ? sampleCreaseDistance : creaseDistance;
+			creaseSeed = isTaken ? uvec2(samplePixel * 2 + ivec2(creaseOffset)) : creaseSeed;
+		}
+	}
+	writeLineColor(sqrt(contourDistance), sqrt(creaseDistance), contourSeed, creaseSeed);
+}
+`;
+var COVERAGE_BLIT_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+uniform highp sampler2D coverageTexture;
+uniform vec4 viewportRect;
+out vec4 fragmentColor;
+void main() {
+	vec4 color = texture(coverageTexture, (gl_FragCoord.xy - viewportRect.xy) / viewportRect.zw);
+	if (color.a < 0.004) {
+		discard;
+	}
+	fragmentColor = color;
+}
+`;
+function addCoveragePassDefine(source) {
+  const lineEnd = source.indexOf("\n");
+  return source.slice(0, lineEnd + 1) + "#define VANILLA_COVERAGE_PASS\n" + source.slice(lineEnd + 1);
+}
+__name(addCoveragePassDefine, "addCoveragePassDefine");
 function readJumpFloodSteps(reach) {
   const distance = System109.Math.max(1, System109.Math.ceil(reach));
   let step = 1;
@@ -44173,6 +44279,10 @@ var ToonScreenOutline = class {
   #seedGatherProgram;
   #jumpFloodProgram;
   #compositeProgram;
+  #edgeMaskProgram;
+  #thinCompositeProgram;
+  #thinCoverageProgram;
+  #coverageBlitProgram;
   #colorSpace;
   #emptyVertexArray;
   #lineTarget;
@@ -44208,6 +44318,10 @@ var ToonScreenOutline = class {
     this.#seedGatherProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_GATHER_FRAGMENT_SHADER, {});
     this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
     this.#compositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, this.#colorSpace), {});
+    this.#edgeMaskProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, EDGE_MASK_FRAGMENT_SHADER, {});
+    this.#thinCompositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, this.#colorSpace), {});
+    this.#thinCoverageProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, addCoveragePassDefine(addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, this.#colorSpace)), {});
+    this.#coverageBlitProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, COVERAGE_BLIT_FRAGMENT_SHADER, {});
     this.#emptyVertexArray = webGL2RenderingContext.createVertexArray();
     this.#lineTarget = null;
     this.#color = [0.08, 0.07, 0.1, 1];
@@ -44236,7 +44350,7 @@ var ToonScreenOutline = class {
     this.#isLineColorTableDirty = false;
   }
   static readProgramSources(colorSpace = readEngineColorSpace()) {
-    return [{ vertexShader: LINE_VERTEX_SHADER, fragmentShader: LINE_FRAGMENT_SHADER, attributeLocationTable: TOON_ATTRIBUTE_LOCATIONS }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_FRAGMENT_SHADER, attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_GATHER_FRAGMENT_SHADER, attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: JUMP_FLOOD_FRAGMENT_SHADER, attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} }];
+    return [{ vertexShader: LINE_VERTEX_SHADER, fragmentShader: LINE_FRAGMENT_SHADER, attributeLocationTable: TOON_ATTRIBUTE_LOCATIONS }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_FRAGMENT_SHADER, attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_GATHER_FRAGMENT_SHADER, attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: JUMP_FLOOD_FRAGMENT_SHADER, attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: EDGE_MASK_FRAGMENT_SHADER, attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, colorSpace), attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: addCoveragePassDefine(addColorSpaceDefine(THIN_COMPOSITE_FRAGMENT_SHADER, colorSpace)), attributeLocationTable: {} }, { vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: COVERAGE_BLIT_FRAGMENT_SHADER, attributeLocationTable: {} }];
   }
   setColor(color) {
     this.#color = [color[0], color[1], color[2], color.length > 3 ? color[3] : 1];
@@ -44338,7 +44452,9 @@ var ToonScreenOutline = class {
     this.#drawnDistanceCount = 0;
     const width = System109.Math.max(1, viewport[2]);
     const height = System109.Math.max(1, viewport[3]);
-    const lineTarget = this.readLineTarget(width, height, System109.Math.max(1, System109.Math.ceil(width * this.#resolutionScale)), System109.Math.max(1, System109.Math.ceil(height * this.#resolutionScale)));
+    const lineWidth = System109.Math.max(1, System109.Math.ceil(width * this.#resolutionScale));
+    const lineHeight = System109.Math.max(1, System109.Math.ceil(height * this.#resolutionScale));
+    const lineTarget = this.readLineTarget(lineWidth, lineHeight, lineWidth, lineHeight);
     if (lineTarget === null) {
       return false;
     }
@@ -44528,11 +44644,19 @@ var ToonScreenOutline = class {
     }
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     const lineTarget = this.#lineTarget;
-    const frame = this.#frame;
     const lineWidths = this.readLineWidths();
     this.#lineWidths = lineWidths;
+    lineTarget.jumpFloodIndex = -1;
+    lineTarget.outlinePath = "none";
     if (lineWidths[0] <= 0 && lineWidths[1] <= 0) {
-      lineTarget.jumpFloodIndex = -1;
+      this.restoreState();
+      return;
+    }
+    const lineScaleX = lineTarget.width / System109.Math.max(1, this.#frame.viewport[2]);
+    const lineScaleY = lineTarget.height / System109.Math.max(1, this.#frame.viewport[3]);
+    const isScaled = lineTarget.width !== System109.Math.max(1, this.#frame.viewport[2]) || lineTarget.height !== System109.Math.max(1, this.#frame.viewport[3]);
+    const isThinLine = System109.Math.max(lineWidths[0], lineWidths[1]) * System109.Math.min(lineScaleX, lineScaleY) <= THIN_LINE_MAXIMUM_WIDTH;
+    if (!isThinLine && !this.readJumpFloodTarget(lineTarget)) {
       this.restoreState();
       return;
     }
@@ -44542,24 +44666,24 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.depthMask(false);
     webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
-    const seedProgram = this.#seedProgram;
-    const projectionElements = frame.projectionElements;
-    const viewElements = frame.viewElements;
+    const discardedAttachments = [webGL2RenderingContext.COLOR_ATTACHMENT0];
+    if (isThinLine) {
+      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.edgeMaskFramebuffer);
+      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+      this.useEdgeProgram(this.#edgeMaskProgram, lineTarget, lineWidths);
+      webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+      lineTarget.outlinePath = "thin";
+      if (isScaled && this.readCoverageTarget(lineTarget)) {
+        this.drawThinCoverage(lineTarget, lineWidths, lineScaleX, lineScaleY);
+        lineTarget.outlinePath = "thinScaled";
+      }
+      this.unbindEndTextures();
+      this.restoreState();
+      return;
+    }
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffer);
-    seedProgram.useProgram();
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
-    webGL2RenderingContext.uniform1i(seedProgram.getUniformLocation("lineTexture"), LINE_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(seedProgram.getUniformLocation("depthTexture"), DEPTH_TEXTURE_UNIT);
-    webGL2RenderingContext.uniformMatrix3fv(seedProgram.getUniformLocation("viewRotation"), false, [viewElements[0], viewElements[1], viewElements[2], viewElements[4], viewElements[5], viewElements[6], viewElements[8], viewElements[9], viewElements[10]]);
-    webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionScale"), projectionElements[0], projectionElements[5], projectionElements[8], projectionElements[9]);
-    webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionDepth"), projectionElements[10], projectionElements[14], projectionElements[12], projectionElements[13]);
-    webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
-    webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthThreshold"), this.#depthThreshold);
-    webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthMargin"), this.#depthMargin);
-    webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("creaseCosine"), lineWidths[1] > 0 ? this.#creaseCosine : -2);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
+    this.useEdgeProgram(this.#seedProgram, lineTarget, lineWidths);
     webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
@@ -44568,6 +44692,7 @@ var ToonScreenOutline = class {
     const seedGatherProgram = this.#seedGatherProgram;
     webGL2RenderingContext.viewport(0, 0, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight);
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[0]);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
     seedGatherProgram.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTexture);
@@ -44578,10 +44703,11 @@ var ToonScreenOutline = class {
     jumpFloodProgram.useProgram();
     webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform2f(jumpFloodProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
-    const reach = (System109.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System109.Math.min(pointScaleX, pointScaleY) + 1.5;
+    const reach = (System109.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) * System109.Math.min(lineScaleX, lineScaleY) / System109.Math.min(pointScaleX, pointScaleY) + 1.5;
     let seedIndex = 0;
     for (const stepSize of readJumpFloodSteps(reach)) {
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[1 - seedIndex]);
+      webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[seedIndex]);
       webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("stepSize"), stepSize);
@@ -44589,18 +44715,106 @@ var ToonScreenOutline = class {
       seedIndex = 1 - seedIndex;
     }
     lineTarget.jumpFloodIndex = seedIndex;
+    lineTarget.outlinePath = "jumpFlood";
+    this.unbindEndTextures();
+    this.restoreState();
+  }
+  readCoverageTarget(lineTarget) {
+    if (lineTarget.coverageTexture !== null) {
+      return true;
+    }
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+    const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+    const texture = this.createTargetTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, lineTarget.width, lineTarget.height);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
+    const framebuffer = this.createTargetFramebuffer(texture, null);
+    const isComplete = this.isFramebufferComplete();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
+    if (!isComplete) {
+      webGL2RenderingContext.deleteFramebuffer(framebuffer);
+      webGL2RenderingContext.deleteTexture(texture);
+      return false;
+    }
+    lineTarget.coverageFramebuffer = framebuffer;
+    lineTarget.coverageTexture = texture;
+    return true;
+  }
+  drawThinCoverage(lineTarget, lineWidths, lineScaleX, lineScaleY) {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const program = this.#thinCoverageProgram;
+    const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.coverageFramebuffer);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    program.useProgram();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.edgeMaskTexture);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_COLOR_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isLineColorEnabled ? this.#lineColorTexture : null);
+    webGL2RenderingContext.uniform1i(program.getUniformLocation("edgeMaskTexture"), LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(program.getUniformLocation("lineTexture"), COMPOSITE_LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(program.getUniformLocation("depthTexture"), COMPOSITE_DEPTH_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(program.getUniformLocation("lineColorTexture"), LINE_COLOR_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1f(program.getUniformLocation("lineColorEnabled"), isLineColorEnabled ? 1 : 0);
+    webGL2RenderingContext.uniform2f(program.getUniformLocation("lineScale"), lineScaleX, lineScaleY);
+    webGL2RenderingContext.uniform2f(program.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
+    webGL2RenderingContext.uniform1f(program.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
+    const color = this.#color;
+    webGL2RenderingContext.uniform4f(program.getUniformLocation("outlineColor"), color[0], color[1], color[2], color[3]);
+    webGL2RenderingContext.uniform1f(program.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
+    webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_COLOR_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+  }
+  useEdgeProgram(program, lineTarget, lineWidths) {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const frame = this.#frame;
+    const projectionElements = frame.projectionElements;
+    const viewElements = frame.viewElements;
+    program.useProgram();
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
+    webGL2RenderingContext.uniform1i(program.getUniformLocation("lineTexture"), LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(program.getUniformLocation("depthTexture"), DEPTH_TEXTURE_UNIT);
+    webGL2RenderingContext.uniformMatrix3fv(program.getUniformLocation("viewRotation"), false, [viewElements[0], viewElements[1], viewElements[2], viewElements[4], viewElements[5], viewElements[6], viewElements[8], viewElements[9], viewElements[10]]);
+    webGL2RenderingContext.uniform4f(program.getUniformLocation("projectionScale"), projectionElements[0], projectionElements[5], projectionElements[8], projectionElements[9]);
+    webGL2RenderingContext.uniform4f(program.getUniformLocation("projectionDepth"), projectionElements[10], projectionElements[14], projectionElements[12], projectionElements[13]);
+    webGL2RenderingContext.uniform1f(program.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
+    webGL2RenderingContext.uniform1f(program.getUniformLocation("depthThreshold"), this.#depthThreshold);
+    webGL2RenderingContext.uniform1f(program.getUniformLocation("depthMargin"), this.#depthMargin);
+    webGL2RenderingContext.uniform1f(program.getUniformLocation("creaseCosine"), lineWidths[1] > 0 ? this.#creaseCosine : -2);
+  }
+  unbindEndTextures() {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    for (const textureUnit of [DEPTH_TEXTURE_UNIT, LINE_TEXTURE_UNIT]) {
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + textureUnit);
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+    }
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
     webGL2RenderingContext.bindVertexArray(null);
-    this.restoreState();
   }
   drawOutline() {
     const lineTarget = this.#lineTarget;
     const frame = this.#frame;
-    if (lineTarget === null || frame === null || lineTarget.jumpFloodIndex < 0) {
+    if (lineTarget === null || frame === null || lineTarget.outlinePath === "none") {
       return;
     }
+    if (lineTarget.outlinePath === "thinScaled") {
+      this.drawCoverageBlit(lineTarget);
+      return;
+    }
+    const isThinLine = lineTarget.outlinePath === "thin";
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     this.saveState();
     const viewport = frame.viewport;
@@ -44610,11 +44824,11 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
     webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
     webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
-    const compositeProgram = this.#compositeProgram;
+    const compositeProgram = isThinLine ? this.#thinCompositeProgram : this.#compositeProgram;
     compositeProgram.useProgram();
     const isLineColorEnabled = this.#lineColorCount > 0 && this.uploadLineColorTable();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isThinLine ? lineTarget.edgeMaskTexture : lineTarget.jumpFloodTextures[lineTarget.jumpFloodIndex]);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + COMPOSITE_DEPTH_TEXTURE_UNIT);
@@ -44624,13 +44838,18 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
     const color = this.#color;
     const lineWidths = this.#lineWidths;
-    webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
+    if (isThinLine) {
+      webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("edgeMaskTexture"), LINE_TEXTURE_UNIT);
+    } else {
+      webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
+      webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
+      webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineScale"), lineTarget.width / System109.Math.max(1, viewport[2]), lineTarget.height / System109.Math.max(1, viewport[3]));
+    }
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineTexture"), COMPOSITE_LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("depthTexture"), COMPOSITE_DEPTH_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineColorTexture"), LINE_COLOR_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("lineColorEnabled"), isLineColorEnabled ? 1 : 0);
     webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System109.Math.max(1, viewport[2]), System109.Math.max(1, viewport[3]));
-    webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
     webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
     webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
     webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("outlineColor"), color[0], color[1], color[2], color[3]);
@@ -44642,6 +44861,29 @@ var ToonScreenOutline = class {
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + textureUnit);
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
     }
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    this.restoreState();
+  }
+  drawCoverageBlit(lineTarget) {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const viewport = this.#frame.viewport;
+    this.saveState();
+    webGL2RenderingContext.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+    webGL2RenderingContext.depthMask(false);
+    webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+    webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+    webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+    const program = this.#coverageBlitProgram;
+    program.useProgram();
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.coverageTexture);
+    webGL2RenderingContext.uniform1i(program.getUniformLocation("coverageTexture"), LINE_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform4f(program.getUniformLocation("viewportRect"), viewport[0], viewport[1], System109.Math.max(1, viewport[2]), System109.Math.max(1, viewport[3]));
+    webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
+    webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+    webGL2RenderingContext.bindVertexArray(null);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
     this.restoreState();
   }
@@ -44751,49 +44993,85 @@ var ToonScreenOutline = class {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
     const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
-    const createTexture = __name((internalFormat, format, type, textureWidth, textureHeight) => {
-      const texture = webGL2RenderingContext.createTexture();
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, textureWidth, textureHeight, 0, format, type, null);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-      return texture;
-    }, "createTexture");
-    const createFramebuffer = __name((colorTexture, depthTexture2) => {
-      const framebuffer2 = webGL2RenderingContext.createFramebuffer();
-      webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer2);
-      webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, colorTexture, 0);
-      if (depthTexture2 !== null) {
-        webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.TEXTURE_2D, depthTexture2, 0);
-      }
-      return framebuffer2;
-    }, "createFramebuffer");
-    const lineTexture = createTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
-    const depthTexture = createTexture(webGL2RenderingContext.DEPTH_COMPONENT24, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, width, height);
-    const seedTexture = createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, width, height);
-    const jumpFloodTextures = [createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, jumpFloodWidth, jumpFloodHeight), createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, jumpFloodWidth, jumpFloodHeight)];
+    const lineTexture = this.createTargetTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
+    const depthTexture = this.createTargetTexture(webGL2RenderingContext.DEPTH_COMPONENT24, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, width, height);
+    const edgeMaskTexture = this.createTargetTexture(webGL2RenderingContext.R8UI, webGL2RenderingContext.RED_INTEGER, webGL2RenderingContext.UNSIGNED_BYTE, width, height);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
-    const isFramebufferComplete = __name(() => {
-      return webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER) === webGL2RenderingContext.FRAMEBUFFER_COMPLETE;
-    }, "isFramebufferComplete");
-    const framebuffer = createFramebuffer(lineTexture, depthTexture);
-    let isComplete = isFramebufferComplete();
-    const seedFramebuffer = createFramebuffer(seedTexture, null);
-    isComplete = isComplete && isFramebufferComplete();
-    const jumpFloodFramebuffers = [];
-    for (const jumpFloodTexture of jumpFloodTextures) {
-      jumpFloodFramebuffers.push(createFramebuffer(jumpFloodTexture, null));
-      isComplete = isComplete && isFramebufferComplete();
-    }
+    const framebuffer = this.createTargetFramebuffer(lineTexture, depthTexture);
+    let isComplete = this.isFramebufferComplete();
+    const edgeMaskFramebuffer = this.createTargetFramebuffer(edgeMaskTexture, null);
+    isComplete = isComplete && this.isFramebufferComplete();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
-    this.#lineTarget = { framebuffer, lineTexture, depthTexture, seedFramebuffer, seedTexture, jumpFloodFramebuffers, jumpFloodTextures, jumpFloodIndex: 0, width, height, jumpFloodWidth, jumpFloodHeight };
+    this.#lineTarget = { framebuffer, lineTexture, depthTexture, edgeMaskFramebuffer, edgeMaskTexture, seedFramebuffer: null, seedTexture: null, jumpFloodFramebuffers: [], jumpFloodTextures: [], jumpFloodIndex: -1, coverageFramebuffer: null, coverageTexture: null, outlinePath: "none", width, height, jumpFloodWidth, jumpFloodHeight };
     if (!isComplete) {
       this.deleteLineTarget();
       return null;
     }
     return this.#lineTarget;
+  }
+  readJumpFloodTarget(lineTarget) {
+    if (lineTarget.seedTexture !== null) {
+      return true;
+    }
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+    const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+    lineTarget.seedTexture = this.createTargetTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, lineTarget.width, lineTarget.height);
+    lineTarget.jumpFloodTextures = [this.createTargetTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight), this.createTargetTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT, lineTarget.jumpFloodWidth, lineTarget.jumpFloodHeight)];
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
+    lineTarget.seedFramebuffer = this.createTargetFramebuffer(lineTarget.seedTexture, null);
+    let isComplete = this.isFramebufferComplete();
+    for (const jumpFloodTexture of lineTarget.jumpFloodTextures) {
+      lineTarget.jumpFloodFramebuffers.push(this.createTargetFramebuffer(jumpFloodTexture, null));
+      isComplete = isComplete && this.isFramebufferComplete();
+    }
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
+    if (!isComplete) {
+      this.deleteJumpFloodTarget(lineTarget);
+      return false;
+    }
+    return true;
+  }
+  createTargetTexture(internalFormat, format, type, textureWidth, textureHeight) {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const texture = webGL2RenderingContext.createTexture();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, textureWidth, textureHeight, 0, format, type, null);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+    return texture;
+  }
+  createTargetFramebuffer(colorTexture, depthTexture) {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const framebuffer = webGL2RenderingContext.createFramebuffer();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+    webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, colorTexture, 0);
+    if (depthTexture !== null) {
+      webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.TEXTURE_2D, depthTexture, 0);
+    }
+    return framebuffer;
+  }
+  isFramebufferComplete() {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    return webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER) === webGL2RenderingContext.FRAMEBUFFER_COMPLETE;
+  }
+  deleteJumpFloodTarget(lineTarget) {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    webGL2RenderingContext.deleteFramebuffer(lineTarget.seedFramebuffer);
+    for (const jumpFloodFramebuffer of lineTarget.jumpFloodFramebuffers) {
+      webGL2RenderingContext.deleteFramebuffer(jumpFloodFramebuffer);
+    }
+    webGL2RenderingContext.deleteTexture(lineTarget.seedTexture);
+    for (const jumpFloodTexture of lineTarget.jumpFloodTextures) {
+      webGL2RenderingContext.deleteTexture(jumpFloodTexture);
+    }
+    lineTarget.seedFramebuffer = null;
+    lineTarget.seedTexture = null;
+    lineTarget.jumpFloodFramebuffers = [];
+    lineTarget.jumpFloodTextures = [];
+    lineTarget.jumpFloodIndex = -1;
   }
   deleteLineTarget() {
     const lineTarget = this.#lineTarget;
@@ -44801,16 +45079,15 @@ var ToonScreenOutline = class {
       return;
     }
     const webGL2RenderingContext = this.#webGL2RenderingContext;
+    this.deleteJumpFloodTarget(lineTarget);
     webGL2RenderingContext.deleteFramebuffer(lineTarget.framebuffer);
-    webGL2RenderingContext.deleteFramebuffer(lineTarget.seedFramebuffer);
-    for (const jumpFloodFramebuffer of lineTarget.jumpFloodFramebuffers) {
-      webGL2RenderingContext.deleteFramebuffer(jumpFloodFramebuffer);
-    }
+    webGL2RenderingContext.deleteFramebuffer(lineTarget.edgeMaskFramebuffer);
     webGL2RenderingContext.deleteTexture(lineTarget.lineTexture);
     webGL2RenderingContext.deleteTexture(lineTarget.depthTexture);
-    webGL2RenderingContext.deleteTexture(lineTarget.seedTexture);
-    for (const jumpFloodTexture of lineTarget.jumpFloodTextures) {
-      webGL2RenderingContext.deleteTexture(jumpFloodTexture);
+    webGL2RenderingContext.deleteTexture(lineTarget.edgeMaskTexture);
+    if (lineTarget.coverageTexture !== null) {
+      webGL2RenderingContext.deleteFramebuffer(lineTarget.coverageFramebuffer);
+      webGL2RenderingContext.deleteTexture(lineTarget.coverageTexture);
     }
     this.#lineTarget = null;
   }
@@ -44859,6 +45136,10 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.deleteProgram(this.#seedGatherProgram.getProgram());
     webGL2RenderingContext.deleteProgram(this.#jumpFloodProgram.getProgram());
     webGL2RenderingContext.deleteProgram(this.#compositeProgram.getProgram());
+    webGL2RenderingContext.deleteProgram(this.#edgeMaskProgram.getProgram());
+    webGL2RenderingContext.deleteProgram(this.#thinCompositeProgram.getProgram());
+    webGL2RenderingContext.deleteProgram(this.#thinCoverageProgram.getProgram());
+    webGL2RenderingContext.deleteProgram(this.#coverageBlitProgram.getProgram());
   }
 };
 var System110 = globalThis;
@@ -45044,6 +45325,7 @@ float readTapWeight(vec3 position, vec3 normal, ivec2 cell, out float occlusion)
 }
 `;
 var AMBIENT_OCCLUSION_BLUR_FRAGMENT_SHADER = AMBIENT_OCCLUSION_COMMON_CHUNK + AMBIENT_OCCLUSION_WEIGHT_CHUNK + `
+uniform ivec2 blurDirection;
 const float GAUSSIAN_WEIGHTS[4] = float[4](1.0, 0.8, 0.45, 0.2);
 void main() {
 	ivec2 cell = ivec2(gl_FragCoord.xy);
@@ -45059,7 +45341,7 @@ void main() {
 	float weightSum = 0.0;
 	for (int offset = -3; offset <= 3; ++offset) {
 		float occlusion;
-		float weight = GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, cell + ivec2(offset, 0), occlusion);
+		float weight = GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, cell + blurDirection * offset, occlusion);
 		occlusionSum += occlusion * weight;
 		weightSum += weight;
 	}
@@ -45068,7 +45350,6 @@ void main() {
 `;
 var AMBIENT_OCCLUSION_UPSAMPLE_FRAGMENT_SHADER = AMBIENT_OCCLUSION_COMMON_CHUNK + AMBIENT_OCCLUSION_WEIGHT_CHUNK + `
 uniform float intensity;
-const float GAUSSIAN_WEIGHTS[4] = float[4](1.0, 0.8, 0.45, 0.2);
 vec3 packDepth(float depth) {
 	float value = floor(depth * 16777215.0 + 0.5);
 	float high = floor(value / 65536.0);
@@ -45085,19 +45366,17 @@ void main() {
 	vec3 position = readViewPosition(pixel, depth);
 	vec3 normal = readViewNormal(pixel);
 	vec2 point = (gl_FragCoord.xy - 0.5) / sourceScale;
-	ivec2 nearestCell = ivec2(floor(point + 0.5));
-	int sideX = point.x >= float(nearestCell.x) ? 1 : -1;
+	ivec2 baseCell = ivec2(floor(point));
+	vec2 fraction = point - vec2(baseCell);
 	float occlusionSum = 0.0;
 	float weightSum = 0.0;
-	for (int column = 0; column < 2; ++column) {
-		int cellX = nearestCell.x + column * sideX;
-		float columnWeight = column == 0 ? 1.0 : 0.5;
-		for (int offset = -3; offset <= 3; ++offset) {
-			float occlusion;
-			float weight = columnWeight * GAUSSIAN_WEIGHTS[abs(offset)] * readTapWeight(position, normal, ivec2(cellX, nearestCell.y + offset), occlusion);
-			occlusionSum += occlusion * weight;
-			weightSum += weight;
-		}
+	for (int index = 0; index < 4; ++index) {
+		ivec2 corner = ivec2(index & 1, index >> 1);
+		float bilinear = (corner.x == 1 ? fraction.x : 1.0 - fraction.x) * (corner.y == 1 ? fraction.y : 1.0 - fraction.y);
+		float occlusion;
+		float weight = (bilinear + 0.0001) * readTapWeight(position, normal, baseCell + corner, occlusion);
+		occlusionSum += occlusion * weight;
+		weightSum += weight;
 	}
 	float visibility = weightSum > 0.0001 ? occlusionSum / weightSum : 1.0;
 	fragmentColor = vec4(1.0 - intensity * (1.0 - visibility), packDepth(depth));
@@ -45452,6 +45731,7 @@ var ToonPostProcess = class _ToonPostProcess {
       webGL2RenderingContext.uniform1f(pass.getUniformLocation("planeTolerance"), ambientOcclusion.radius * 0.1);
     }, "bindCommon");
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
     webGL2RenderingContext.viewport(0, 0, target.cellWidth, target.cellHeight);
     const occlusionPass = passes.occlusionPass;
     bindCommon(occlusionPass, target.blurTexture);
@@ -45461,12 +45741,20 @@ var ToonPostProcess = class _ToonPostProcess {
     webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("pixelsPerUnit"), 0.5 * System110.Math.abs(projectionElements[0]) * width);
     occlusionPass.draw();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.blurFramebuffer);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
     bindCommon(passes.blurPass, target.occlusionTexture);
+    webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 1, 0);
+    passes.blurPass.draw();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.occlusionFramebuffer);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
+    bindCommon(passes.blurPass, target.blurTexture);
+    webGL2RenderingContext.uniform2i(passes.blurPass.getUniformLocation("blurDirection"), 0, 1);
     passes.blurPass.draw();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.resultFramebuffer);
+    webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, [webGL2RenderingContext.COLOR_ATTACHMENT0]);
     webGL2RenderingContext.viewport(0, 0, width, height);
     const upsamplePass = passes.upsamplePass;
-    bindCommon(upsamplePass, target.blurTexture);
+    bindCommon(upsamplePass, target.occlusionTexture);
     webGL2RenderingContext.uniform1f(upsamplePass.getUniformLocation("intensity"), ambientOcclusion.intensity);
     upsamplePass.draw();
     for (const unit of [2, 1, 0]) {
