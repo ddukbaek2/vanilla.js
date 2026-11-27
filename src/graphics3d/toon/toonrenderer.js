@@ -105,6 +105,30 @@ export const ToonProgramKind = System.Object.freeze({
 	depth: "depth", // 그림자 깊이.
 });
 
+// 프레임 블록. (프로그램마다 올리던 프레임 값을 std140 블록 하나로, 패스마다 한 번 올리고 바인딩 2 에 묶는다, 차례와 자리는 writeFrameBlockValues)
+// - 몸, 바깥선, 깊이 프로그램의 정점과 조각 셰이더가 모두 같은 선언을 쓴다. (float 배열은 std140 에서 칸마다 vec4 자리)
+const FRAME_BLOCK_CHUNK = `layout(std140) uniform ToonFrame {
+	mat4 viewProjectionMatrix;
+	mat4 lightViewProjectionMatrix;
+	vec4 cameraPosition;
+	vec3 cameraForward;
+	float hdrOutput;
+	mat3 viewRotation;
+	vec3 outlineDistanceScale;
+	float shadowEnabled;
+	vec2 cameraRoll;
+	vec2 outlineFadeDistance;
+	float shadowStrength;
+	float shadowTexelSize;
+	vec4 localShadowAtlas;
+	vec4 localShadowPositions[4];
+	vec4 localShadowForwards[4];
+	vec4 localShadowUps[4];
+	float localShadowTiles[4];
+	float pointLightShadowSlots[8];
+};
+`;
+
 // 세 정점 셰이더의 머리. (몸에만 있는 어트리뷰트도 모두 적는다, 바깥선 버텍스 어레이에 없는 것은 기본값으로 읽힘)
 const VERTEX_HEAD_CHUNK = `#version 300 es
 in vec3 vertexPosition;
@@ -128,7 +152,6 @@ in vec4 instanceTint;
 uniform mat4 jointMatrices[96];
 uniform float skinned;
 uniform float instanced;
-uniform mat4 viewProjectionMatrix;
 uniform mat4 modelMatrix;
 mat4 readSkinMatrix() {
 	if (skinned < 0.5) {
@@ -197,8 +220,7 @@ const DEFAULT_LIGHT_CHUNK = `void applyLight(ToonSurface surface, inout ToonLigh
 `;
 
 // 몸을 그리는 정점 셰이더의 몸통.
-const SOLID_VERTEX_BODY = `uniform mat4 lightViewProjectionMatrix;
-out vec3 worldPosition;
+const SOLID_VERTEX_BODY = `out vec3 worldPosition;
 out vec3 localPosition;
 out vec3 worldNormal;
 out vec3 surfaceColor;
@@ -234,7 +256,7 @@ void main() {
 const SOLID_FRAGMENT_HEAD = `#version 300 es
 precision highp float;
 precision highp sampler2DShadow;
-in vec3 worldPosition;
+${FRAME_BLOCK_CHUNK}in vec3 worldPosition;
 in vec3 localPosition;
 in vec3 worldNormal;
 in vec3 surfaceColor;
@@ -270,20 +292,10 @@ uniform vec3 pointLightColors[8];
 uniform vec3 pointLightShapes[8];
 uniform vec4 pointLightSpots[8];
 uniform vec2 pointLightCones[8];
-uniform float pointLightShadowSlots[8];
-uniform vec4 localShadowAtlas;
-uniform vec4 localShadowPositions[4];
-uniform vec4 localShadowForwards[4];
-uniform vec4 localShadowUps[4];
-uniform float localShadowTiles[4];
 uniform sampler2DShadow localShadowTexture;
 uniform vec4 lightColorUsage;
 uniform vec3 lightColorUsageExtra;
 uniform vec4 shadeRimLight;
-uniform vec4 cameraPosition;
-uniform vec3 cameraForward;
-uniform mat3 viewRotation;
-uniform vec2 cameraRoll;
 layout(std140) uniform ToonDrawMaterial {
 	vec4 tintColor;
 	vec4 emissiveColor;
@@ -305,15 +317,11 @@ layout(std140) uniform ToonDrawMaterial {
 	float receivesShadow;
 	float shadeOffset;
 };
-uniform float hdrOutput;
 uniform sampler2D baseColorTexture;
 uniform sampler2D emissiveTexture;
 uniform sampler2D decalTexture;
 uniform sampler2D matcapTexture;
 uniform sampler2D angelRingTexture;
-uniform float shadowEnabled;
-uniform float shadowStrength;
-uniform float shadowTexelSize;
 uniform sampler2DShadow shadowTexture;
 out vec4 fragmentColor;
 const float RECIPROCAL_PI = 0.3183098862;
@@ -658,10 +666,6 @@ const OUTLINE_VERTEX_BODY = `layout(std140) uniform ToonDrawOutline {
 	float alpha;
 	float premultipliedOutput;
 };
-uniform vec3 outlineDistanceScale;
-uniform vec2 outlineFadeDistance;
-uniform vec4 cameraPosition;
-uniform vec3 cameraForward;
 out float outlineTint;
 void main() {
 	ToonVertex vertex = readVertex();
@@ -684,7 +688,7 @@ void main() {
 `;
 const OUTLINE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
-in float outlineTint;
+${FRAME_BLOCK_CHUNK}in float outlineTint;
 layout(std140) uniform ToonDrawOutline {
 	vec4 outlineColor;
 	vec3 outlineLightColor;
@@ -693,7 +697,6 @@ layout(std140) uniform ToonDrawOutline {
 	float alpha;
 	float premultipliedOutput;
 };
-uniform float hdrOutput;
 out vec4 fragmentColor;
 void main() {
 	vec3 color = (hdrOutput > 0.5 ? pow(outlineColor.rgb, vec3(2.2)) : outlineColor.rgb) * outlineLightColor;
@@ -746,7 +749,7 @@ export function composeToonProgramSources(material, instanceLayout) {
 	const surfaceChunk = material !== null && material.getSurfaceChunk() !== "" ? material.getSurfaceChunk() : DEFAULT_SURFACE_CHUNK;
 	const lightChunk = material !== null && material.getLightChunk() !== "" ? material.getLightChunk() : DEFAULT_LIGHT_CHUNK;
 	const instanceChunk = instanceLayout !== null ? instanceLayout.readDeclarationSource() : "";
-	const vertexHead = VERTEX_HEAD_CHUNK + VERTEX_COMMON_CHUNK + instanceChunk + VERTEX_STRUCT_CHUNK + vertexChunk;
+	const vertexHead = VERTEX_HEAD_CHUNK + FRAME_BLOCK_CHUNK + VERTEX_COMMON_CHUNK + instanceChunk + VERTEX_STRUCT_CHUNK + vertexChunk;
 	const attributeLocationTable = System.Object.assign({}, TOON_ATTRIBUTE_LOCATIONS);
 	if (instanceLayout !== null) {
 		for (const attribute of instanceLayout.getAttributes()) {
@@ -1253,6 +1256,9 @@ const MATERIAL_BLOCK_FLOAT_COUNT = 44;
 const OUTLINE_BLOCK_NAME = "ToonDrawOutline";
 const OUTLINE_BLOCK_BINDING = 1;
 const OUTLINE_BLOCK_FLOAT_COUNT = 12;
+const FRAME_BLOCK_NAME = "ToonFrame"; // 프레임 블록. (FRAME_BLOCK_CHUNK)
+const FRAME_BLOCK_BINDING = 2;
+const FRAME_BLOCK_FLOAT_COUNT = 164;
 const MATERIAL_BLOCK_LIMIT = 1024; // 블록 갈래마다 기억할 블록 수. (넘으면 그 갈래를 모두 지우고 다시 짓는다)
 const DRAW_PART_OUTLINE = 1; // drawWithCount 가 그릴 것: 바깥선 껍데기.
 const DRAW_PART_BODY = 2; // 몸.
@@ -1696,11 +1702,10 @@ export class ToonRenderer {
 	/** @private @type { Array<number> } */ #outlineDistanceScale; // 껍데기 바깥선의 거리 배. ([기준 거리 (0 이면 끔), 가장 작은 배, 가장 큰 배])
 	/** @private @type { Array<number> } */ #outlineFadeDistance; // 껍데기 바깥선이 사라지는 거리. ([가까운 거리 (지은 굵기), 먼 거리 (0), 먼 거리가 가까운 거리 이하면 끔])
 	/** @private @type { object | null } */ #localShadowInput; // 받을 점광과 스포트라이트 그림자. ({ depthTexture, lights, gridSize, tileSize, texelSize, strength })
-	/** @private @type { Float32Array } */ #pointShadowSlotValues; // 점광마다의 그림자 칸 번호 + 1. (0 이면 없음)
-	/** @private @type { Float32Array } */ #localShadowPositionValues;
-	/** @private @type { Float32Array } */ #localShadowForwardValues;
-	/** @private @type { Float32Array } */ #localShadowUpValues;
-	/** @private @type { Float32Array } */ #localShadowTileValues;
+	/** @private @type { WebGLBuffer } */ #frameBlockBuffer; // 프레임 블록(ToonFrame)의 GPU 버퍼.
+	/** @private @type { Float32Array } */ #frameBlockValues; // 프레임 블록의 값. (FRAME_BLOCK_FLOAT_COUNT)
+	/** @private @type { number } */ #frameBlockSerial; // 프레임 블록을 올린 frameSerial. (같으면 다시 올리지 않는다)
+	/** @private @type { boolean } */ #isFrameBlockBound; // 프레임 블록을 바인딩 자리에 묶었다고 아는지. (forgetAllUniformValues 가 잊는다)
 	/** @private @type { WebGLStateCache } */ #stateCache; // 컨텍스트의 GL 상태 기억. (같은 프로그램, 텍스처, 버텍스 어레이, 감김을 다시 걸지 않을 때 묻는다)
 	/** @private @type { WeakMap<ShaderProgram, Map<string, object>> } */ #uniformSlotTable; // 프로그램마다 유니폼 이름별 위치와 마지막으로 올린 값.
 	/** @private @type { number } */ #uniformSerial; // 올린 유니폼 값이 아직 맞는 판 번호. (바뀌면 모든 프로그램의 기억한 값을 잊는다)
@@ -1768,11 +1773,12 @@ export class ToonRenderer {
 		this.#outlineDistanceScale = [0, 0.5, 4];
 		this.#outlineFadeDistance = [0, 0];
 		this.#localShadowInput = null;
-		this.#pointShadowSlotValues = new System.Float32Array(TOON_MAXIMUM_POINT_LIGHTS);
-		this.#localShadowPositionValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-		this.#localShadowForwardValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-		this.#localShadowUpValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-		this.#localShadowTileValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS);
+		this.#frameBlockValues = new System.Float32Array(FRAME_BLOCK_FLOAT_COUNT);
+		this.#frameBlockBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, this.#frameBlockBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, this.#frameBlockValues, webGL2RenderingContext.DYNAMIC_DRAW);
+		this.#frameBlockSerial = 0;
+		this.#isFrameBlockBound = false;
 	}
 
 	//==============================================================================
@@ -1844,6 +1850,9 @@ export class ToonRenderer {
 		};
 		bindBlock(solidProgram, MATERIAL_BLOCK_NAME, MATERIAL_BLOCK_BINDING);
 		bindBlock(programList[1], OUTLINE_BLOCK_NAME, OUTLINE_BLOCK_BINDING);
+		for (const shaderProgram of programList) {
+			bindBlock(shaderProgram, FRAME_BLOCK_NAME, FRAME_BLOCK_BINDING);
+		}
 		webGL2RenderingContext.useProgram(previousProgram);
 		const createEntry = (shaderProgram, kind) => {
 			return { program: shaderProgram, kind: kind, frameSerial: 0, lightSet: null, lightVersion: -1 };
@@ -2516,6 +2525,7 @@ export class ToonRenderer {
 		this.clearBlockCache(this.#outlineBlocks);
 		webGL2RenderingContext.deleteTexture(this.#emptyShadowTexture);
 		webGL2RenderingContext.deleteTexture(this.#whiteTexture);
+		webGL2RenderingContext.deleteBuffer(this.#frameBlockBuffer);
 	}
 
 	//==============================================================================
@@ -3198,78 +3208,88 @@ export class ToonRenderer {
 		}
 		entry.frameSerial = this.#frameSerial;
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const shaderProgram = entry.program;
-		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewProjectionMatrix"), false, this.#viewProjectionElements);
-		if (entry.kind === ToonProgramKind.outline) {
-			const cameraPosition = this.#cameraPosition;
-			const outlineDistanceScale = this.#outlineDistanceScale;
-			webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("cameraPosition"), cameraPosition[0], cameraPosition[1], cameraPosition[2], cameraPosition[3]);
-			webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("outlineDistanceScale"), outlineDistanceScale[0], outlineDistanceScale[1], outlineDistanceScale[2]);
-			webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("outlineFadeDistance"), this.#outlineFadeDistance[0], this.#outlineFadeDistance[1]);
-			webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("cameraForward"), this.#cameraForward[0], this.#cameraForward[1], this.#cameraForward[2]);
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
-			return;
+		if (this.#frameBlockSerial !== this.#frameSerial) {
+			this.#frameBlockSerial = this.#frameSerial;
+			this.writeFrameBlockValues(this.#frameBlockValues);
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, this.#frameBlockBuffer);
+			webGL2RenderingContext.bufferSubData(webGL2RenderingContext.UNIFORM_BUFFER, 0, this.#frameBlockValues);
 		}
-		if (entry.kind !== ToonProgramKind.solid) {
-			return;
+		if (!this.#isFrameBlockBound) {
+			webGL2RenderingContext.bindBufferBase(webGL2RenderingContext.UNIFORM_BUFFER, FRAME_BLOCK_BINDING, this.#frameBlockBuffer);
+			this.#isFrameBlockBound = true;
 		}
-		const cameraPosition = this.#cameraPosition;
-		const cameraForward = this.#cameraForward;
-		webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("cameraPosition"), cameraPosition[0], cameraPosition[1], cameraPosition[2], cameraPosition[3]);
-		webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("cameraForward"), cameraForward[0], cameraForward[1], cameraForward[2]);
-		webGL2RenderingContext.uniformMatrix3fv(shaderProgram.getUniformLocation("viewRotation"), false, this.#viewRotationElements);
-		webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("cameraRoll"), System.Math.cos(this.#cameraRoll), System.Math.sin(this.#cameraRoll));
-		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
-		const shadowInput = this.#shadowInput;
-		if (shadowInput !== null) {
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowEnabled"), 1);
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowStrength"), shadowInput.strength);
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowTexelSize"), 1 / System.Math.max(1, shadowInput.resolution));
-			webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("lightViewProjectionMatrix"), false, shadowInput.lightViewProjectionMatrix.getElements());
-		}
-		else {
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowEnabled"), 0);
-		}
-		this.uploadLocalShadowUniforms(shaderProgram);
 	}
 
 	//==============================================================================
-	// 점광과 스포트라이트 그림자 올리기. (아틀라스의 빛마다 자리, 바탕, 거리, 첫 칸과 점광마다의 칸 번호)
+	// 프레임 블록의 값 쓰기. (FRAME_BLOCK_CHUNK 의 std140 자리, 그림자나 점광 그림자가 없으면 그 행렬과 아틀라스 칸은 앞의 값 그대로)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram - 몸 프로그램.
+	 * @param { Float32Array } values - 쓸 곳. (FRAME_BLOCK_FLOAT_COUNT)
 	 * @private
 	 */
-	uploadLocalShadowUniforms(shaderProgram) {
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+	writeFrameBlockValues(values) {
+		values.set(this.#viewProjectionElements, 0);
+		const shadowInput = this.#shadowInput;
+		if (shadowInput !== null) {
+			values.set(shadowInput.lightViewProjectionMatrix.getElements(), 16);
+		}
+		const cameraPosition = this.#cameraPosition;
+		const cameraForward = this.#cameraForward;
+		values[32] = cameraPosition[0];
+		values[33] = cameraPosition[1];
+		values[34] = cameraPosition[2];
+		values[35] = cameraPosition[3];
+		values[36] = cameraForward[0];
+		values[37] = cameraForward[1];
+		values[38] = cameraForward[2];
+		values[39] = this.#isHdrOutput ? 1 : 0;
+		const viewRotation = this.#viewRotationElements;
+		for (let column = 0; column < 3; ++column) {
+			values[40 + column * 4] = viewRotation[column * 3];
+			values[41 + column * 4] = viewRotation[column * 3 + 1];
+			values[42 + column * 4] = viewRotation[column * 3 + 2];
+		}
+		const outlineDistanceScale = this.#outlineDistanceScale;
+		values[52] = outlineDistanceScale[0];
+		values[53] = outlineDistanceScale[1];
+		values[54] = outlineDistanceScale[2];
+		values[55] = shadowInput !== null ? 1 : 0;
+		values[56] = System.Math.cos(this.#cameraRoll);
+		values[57] = System.Math.sin(this.#cameraRoll);
+		values[58] = this.#outlineFadeDistance[0];
+		values[59] = this.#outlineFadeDistance[1];
+		if (shadowInput !== null) {
+			values[60] = shadowInput.strength;
+			values[61] = 1 / System.Math.max(1, shadowInput.resolution);
+		}
+		// 점광 그림자. (칸 넷의 자리, 앞, 위, 첫 칸과 점광마다의 칸 번호, 없으면 0)
 		const localShadowInput = this.#localShadowInput;
-		const slotValues = this.#pointShadowSlotValues;
-		const positionValues = this.#localShadowPositionValues;
-		const forwardValues = this.#localShadowForwardValues;
-		const upValues = this.#localShadowUpValues;
-		const tileValues = this.#localShadowTileValues;
-		slotValues.fill(0);
-		positionValues.fill(0);
-		forwardValues.fill(0);
-		upValues.fill(0);
-		tileValues.fill(0);
+		values.fill(0, 68, 164);
 		if (localShadowInput !== null) {
+			values[64] = localShadowInput.gridSize;
+			values[65] = localShadowInput.tileSize;
+			values[66] = localShadowInput.texelSize;
+			values[67] = localShadowInput.strength;
 			localShadowInput.lights.forEach((light, slot) => {
 				if (light.lightIndex < TOON_MAXIMUM_POINT_LIGHTS) {
-					slotValues[light.lightIndex] = slot + 1;
+					values[132 + light.lightIndex * 4] = slot + 1;
 				}
-				positionValues.set([light.position[0], light.position[1], light.position[2], light.near], slot * 4);
-				forwardValues.set([light.forward[0], light.forward[1], light.forward[2], light.far], slot * 4);
-				upValues.set([light.up[0], light.up[1], light.up[2], light.tangent], slot * 4);
-				tileValues[slot] = light.firstTile;
+				const offset = slot * 4;
+				values[68 + offset] = light.position[0];
+				values[69 + offset] = light.position[1];
+				values[70 + offset] = light.position[2];
+				values[71 + offset] = light.near;
+				values[84 + offset] = light.forward[0];
+				values[85 + offset] = light.forward[1];
+				values[86 + offset] = light.forward[2];
+				values[87 + offset] = light.far;
+				values[100 + offset] = light.up[0];
+				values[101 + offset] = light.up[1];
+				values[102 + offset] = light.up[2];
+				values[103 + offset] = light.tangent;
+				values[116 + offset] = light.firstTile;
 			});
-			webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("localShadowAtlas"), localShadowInput.gridSize, localShadowInput.tileSize, localShadowInput.texelSize, localShadowInput.strength);
 		}
-		webGL2RenderingContext.uniform1fv(shaderProgram.getUniformLocation("pointLightShadowSlots"), slotValues);
-		webGL2RenderingContext.uniform4fv(shaderProgram.getUniformLocation("localShadowPositions"), positionValues);
-		webGL2RenderingContext.uniform4fv(shaderProgram.getUniformLocation("localShadowForwards"), forwardValues);
-		webGL2RenderingContext.uniform4fv(shaderProgram.getUniformLocation("localShadowUps"), upValues);
-		webGL2RenderingContext.uniform1fv(shaderProgram.getUniformLocation("localShadowTiles"), tileValues);
 	}
 
 	//==============================================================================
@@ -3511,6 +3531,7 @@ export class ToonRenderer {
 		this.#uniformSerial += 1;
 		this.#materialBlocks.boundBlock = null;
 		this.#outlineBlocks.boundBlock = null;
+		this.#isFrameBlockBound = false;
 	}
 
 	//==============================================================================
