@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../../base/object.js";
+import { WebGLStateCache } from "./webglstatecache.js";
 
 
 //==============================================================================
@@ -151,11 +152,15 @@ export class ShaderProgram extends Object {
 	}
 
 	//==============================================================================
-	// 프로그램 사용 시작.
+	// 프로그램 사용 시작. (컨텍스트의 상태 캐시가 이미 이 프로그램을 쓴다고 기억하면 다시 걸지 않는다)
 	//==============================================================================
 	use() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const program = this.getProgram();
+		const stateCache = WebGLStateCache.find(webGL2RenderingContext);
+		if (stateCache !== null && stateCache.isProgramInUse(program)) {
+			return;
+		}
 		webGL2RenderingContext.useProgram(program);
 	}
 

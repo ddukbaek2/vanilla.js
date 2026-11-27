@@ -554,6 +554,93 @@ export class WebGLStateCache extends Object {
 	}
 
 	//==============================================================================
+	// 쓰는 프로그램이 이것인지. (기억한 값과 견주어 같은 값을 다시 거는 호출을 건너뛸 때 쓴다)
+	// - 기억한 값이 주어진 것과 같을 때만 참이다. 모르는 값(처음, reset 뒤, 검사하지 못한 인자를 받은 뒤)이면 거짓이라 부르는 쪽이 GL 에 다시 건다.
+	// - GL 에 묻지 않는다. (컨텍스트를 잃거나 되살리면 기억을 잊으므로 거짓이 된다, 잃은 동안 건너뛴 호출은 GL 도 무시한다)
+	//==============================================================================
+	/**
+	 * @param { WebGLProgram | null } program 견줄 프로그램.
+	 * @returns { boolean } 지금 쓰는 프로그램이 이것이라고 기억하면 참.
+	 */
+	isProgramInUse(program) {
+		return this.#program !== undefined && this.#program === program;
+	}
+
+	//==============================================================================
+	// 묶은 버텍스 어레이가 이것인지. (모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { WebGLVertexArrayObject | null } vertexArray 견줄 버텍스 어레이. (null 이면 기본)
+	 * @returns { boolean } 묶은 버텍스 어레이가 이것이라고 기억하면 참.
+	 */
+	isVertexArrayBound(vertexArray) {
+		return this.#vertexArray !== undefined && this.#vertexArray === vertexArray;
+	}
+
+	//==============================================================================
+	// 활성 텍스처 유닛이 이것인지. (모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { number } textureUnit 견줄 유닛. (TEXTURE0 + 번호)
+	 * @returns { boolean } 활성 텍스처 유닛이 이것이라고 기억하면 참.
+	 */
+	isActiveTexture(textureUnit) {
+		return this.#activeTexture !== undefined && this.#activeTexture === textureUnit;
+	}
+
+	//==============================================================================
+	// 유닛의 대상에 묶인 텍스처가 이것인지. (모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { number } textureUnit 유닛. (TEXTURE0 + 번호)
+	 * @param { number } target 텍스처 대상. (TEXTURE_2D, TEXTURE_CUBE_MAP, TEXTURE_3D, TEXTURE_2D_ARRAY)
+	 * @param { WebGLTexture | null } texture 견줄 텍스처.
+	 * @returns { boolean } 그 유닛의 그 대상에 이 텍스처가 묶였다고 기억하면 참.
+	 */
+	isTextureBound(textureUnit, target, texture) {
+		const textureTargetIndex = TEXTURE_TARGET_LIST.indexOf(target);
+		if (textureTargetIndex < 0) {
+			return false;
+		}
+		const key = (textureUnit - TEXTURE0) * 4 + textureTargetIndex;
+		return this.#textureBindingTable.has(key) && this.#textureBindingTable.get(key) === texture;
+	}
+
+	//==============================================================================
+	// 앞면 감김 방향이 이것인지. (모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { number } mode 견줄 감김 방향. (CW, CCW)
+	 * @returns { boolean } 앞면 감김 방향이 이것이라고 기억하면 참.
+	 */
+	isFrontFace(mode) {
+		return this.#frontFace !== undefined && this.#frontFace === mode;
+	}
+
+	//==============================================================================
+	// 가리는 면이 이것인지. (모르면 거짓)
+	//==============================================================================
+	/**
+	 * @param { number } mode 견줄 가리는 면. (FRONT, BACK, FRONT_AND_BACK)
+	 * @returns { boolean } 가리는 면이 이것이라고 기억하면 참.
+	 */
+	isCullFace(mode) {
+		return this.#cullFaceMode !== undefined && this.#cullFaceMode === mode;
+	}
+
+	//==============================================================================
+	// 컨텍스트에 걸린 상태 캐시 찾기. (걸지 않는다, 없으면 null)
+	//==============================================================================
+	/**
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext 컨텍스트.
+	 * @returns { WebGLStateCache | null } 그 컨텍스트의 상태 캐시. (attach 를 부른 적이 없으면 null)
+	 */
+	static find(webGL2RenderingContext) {
+		const stateCache = stateCacheTable.get(webGL2RenderingContext);
+		return stateCache !== undefined ? stateCache : null;
+	}
+
+	//==============================================================================
 	// 컨텍스트의 상태 함수 가로채기. (원래 함수를 부른 뒤 바뀐 값을 기억한다)
 	// - 원래 함수가 던지면(인자 꼴이 틀림) 기억을 바꾸지 않는다.
 	// - 검사하지 못한 인자는 그 값을 모른다로 두어, 다음에 읽을 때 GL 에 묻는다. (GL 이 오류로 무시했을 수 있다)
