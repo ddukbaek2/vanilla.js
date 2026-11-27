@@ -4224,6 +4224,9 @@
   var DRAW_BOUNDS_KNOWN = 1;
   var DRAW_BOUNDS_UNKNOWN = 2;
   var childDrawBounds = new Rect();
+  var subtreeNodeRect = new Rect();
+  var subtreeComponentRect = new Rect();
+  var subtreeContentSize = Vector2.zero();
   var TransformNode = class _TransformNode extends ComponentNode {
     static {
       __name(this, "TransformNode");
@@ -4504,9 +4507,12 @@
      * @param { Vector2 } position 부모 기준 자리. (값을 옮겨 적고 받은 벡터는 들고 있지 않는다)
      */
     setLocalPosition(position) {
+      const isChanged = this.#localPosition.x !== position.x || this.#localPosition.y !== position.y;
       this.#localPosition.x = position.x;
       this.#localPosition.y = position.y;
-      this.markParentDrawBoundsDirty();
+      if (isChanged) {
+        this.markParentDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 로컬 위치 설정. (x, y 를 바로 받는다, Vector2 를 만들지 않는다)
@@ -4522,9 +4528,12 @@
         this.setLocalPosition(Vector2.create(x, y));
         return;
       }
+      const isChanged = this.#localPosition.x !== x || this.#localPosition.y !== y;
       this.#localPosition.x = x;
       this.#localPosition.y = y;
-      this.markParentDrawBoundsDirty();
+      if (isChanged) {
+        this.markParentDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 로컬 위치 반환.
@@ -4542,9 +4551,12 @@
      * @param { Vector2 } scale 로컬 크기 배율. (값을 옮겨 적는다)
      */
     setLocalScale(scale) {
+      const isChanged = this.#localScale.x !== scale.x || this.#localScale.y !== scale.y;
       this.#localScale.x = scale.x;
       this.#localScale.y = scale.y;
-      this.markParentDrawBoundsDirty();
+      if (isChanged) {
+        this.markParentDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 로컬 크기 설정. (x, y 를 바로 받는다, Vector2 를 만들지 않는다)
@@ -4560,9 +4572,12 @@
         this.setLocalScale(Vector2.create(x, y));
         return;
       }
+      const isChanged = this.#localScale.x !== x || this.#localScale.y !== y;
       this.#localScale.x = x;
       this.#localScale.y = y;
-      this.markParentDrawBoundsDirty();
+      if (isChanged) {
+        this.markParentDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 로컬 크기 반환.
@@ -4580,8 +4595,11 @@
      * @param { number } rotation 로컬 회전. (도)
      */
     setLocalRotation(rotation) {
+      const isChanged = this.#localRotation !== rotation;
       this.#localRotation = rotation;
-      this.markParentDrawBoundsDirty();
+      if (isChanged) {
+        this.markParentDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 로컬 회전 반환.
@@ -4608,8 +4626,11 @@
      * console.log(parentNode.isVisible(), parentNode.isActive(), childNode.isVisible(), childNode.isVisibleInHierarchy());
      */
     setVisible(isVisible) {
+      const isChanged = this.#isVisible !== isVisible;
       this.#isVisible = isVisible;
-      this.markParentDrawBoundsDirty();
+      if (isChanged) {
+        this.markParentDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 보이기 플래그 반환. (setVisible 로 정한 값, 켜짐과 투명도는 보지 않는다, 계층 판정은 isVisibleInHierarchy)
@@ -4897,9 +4918,98 @@
       return true;
     }
     //==============================================================================
-    // 하위 트리 그리기 경계 셈하기. (readSubtreeDrawBounds 가 바뀐 때만 부른다, 알면 true)
-    // - TransformNode 는 내용 영역이 없어 컴포넌트가 어디에 그리는지 모르므로 false. (WorldNode 가 덮어쓴다)
+    // 노드 스스로(컴포넌트와 자식 밖에) 그리는 사각형을 rect 에 적기. (내용 영역의 왼쪽 위가 원점, 알면 true)
+    // - draw 를 덮어쓰지 않은 노드는 스스로 그리는 것이 없으므로 크기 0 을 적고 true.
+    // - draw 를 덮어쓴 노드는 어디에 그리는지 모르므로 false. (그 노드의 조상은 하위 트리 그리기를 건너뛰지 않는다)
+    //   덮어쓴 노드가 이 함수도 덮어써 그리는 사각형을 알리면 건너뛸 수 있다. 사각형이 바뀌면 markDrawBoundsDirty 를 부른다.
+    //==============================================================================
+    /**
+     * @virtual
+     * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+     * @returns { boolean } 알면 참.
+     * @example <caption>그리기를 덮어쓰지 않은 노드는 스스로 그리는 것이 없다</caption>
+     * import { TransformNode, Rect } from "./build/vanilla.js";
+     *
+     * const node = new TransformNode();
+     * const drawnRect = Rect.zero();
+     * console.log(node.calculateDrawnRect(drawnRect), drawnRect.size.x);
+     */
+    calculateDrawnRect(rect) {
+      if (this.draw !== _TransformNode.prototype.draw) {
+        return false;
+      }
+      rect.position.set(0, 0);
+      rect.size.set(0, 0);
+      return true;
+    }
+    //==============================================================================
+    // 하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (알면 true, calculateSubtreeDrawBounds 가 자식마다 부른다)
+    // - TransformNode 는 내용 영역과 피봇이 없어 어디에 놓이는지 정하지 않으므로 false. (WorldNode, UINode 가 저마다 놓는 꼴로 덮어쓴다)
+    //==============================================================================
+    /**
+     * @virtual
+     * @param { Rect } rect 옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)
+     * @returns { boolean } 놓이는 곳을 알면 참.
+     * @example <caption>놓는 꼴을 모르는 노드</caption>
+     * import { TransformNode, Rect } from "./build/vanilla.js";
+     *
+     * const node = new TransformNode();
+     * console.log(node.transformDrawBoundsToParent(Rect.create(0, 0, 10, 10)));
+     */
+    transformDrawBoundsToParent(rect) {
+      return false;
+    }
+    //==============================================================================
+    // 사각형을 이 노드의 회전과 배율로 돌리고 키워 부모 좌표에 옮긴 경계 상자로 바꾸기. (transformDrawBoundsToParent 가 쓴다)
+    // - 차례: 기준점만큼 당김 → 배율 → 회전 → 옮김. (pushTransform 의 옮김, 회전, 배율과 같은 결과)
+    //==============================================================================
+    /**
+     * @param { Rect } rect 바꿀 사각형. (이 노드의 내용 좌표, 바뀐 경계 상자를 적는다)
+     * @param { number } pivotOffsetX 기준점의 가로 자리. (내용 좌표, 이만큼 당긴 뒤 키운다)
+     * @param { number } pivotOffsetY 기준점의 세로 자리.
+     * @param { number } translateX 부모 좌표로 옮기는 가로 거리.
+     * @param { number } translateY 부모 좌표로 옮기는 세로 거리.
+     * @example <caption>두 배로 키우고 옮긴 사각형</caption>
+     * import { TransformNode, Rect, Vector2 } from "./build/vanilla.js";
+     *
+     * const node = new TransformNode();
+     * node.setLocalScale(Vector2.create(2, 2));
+     * const rect = Rect.create(0, 0, 10, 10);
+     * node.transformLocalRectToParent(rect, 5, 5, 100, 0);
+     * console.log(rect.position.x, rect.size.x);
+     */
+    transformLocalRectToParent(rect, pivotOffsetX, pivotOffsetY, translateX, translateY) {
+      const localScale = this.#localScale;
+      const radian = degreeToRadian(this.#localRotation);
+      const cosRadian = radian === 0 ? 1 : System10.Math.cos(radian);
+      const sinRadian = radian === 0 ? 0 : System10.Math.sin(radian);
+      const leftX = (rect.position.x - pivotOffsetX) * localScale.x;
+      const topY = (rect.position.y - pivotOffsetY) * localScale.y;
+      const rightX = (rect.position.x + rect.size.x - pivotOffsetX) * localScale.x;
+      const bottomY = (rect.position.y + rect.size.y - pivotOffsetY) * localScale.y;
+      const leftTopX = cosRadian * leftX - sinRadian * topY;
+      const leftTopY = sinRadian * leftX + cosRadian * topY;
+      const rightTopX = cosRadian * rightX - sinRadian * topY;
+      const rightTopY = sinRadian * rightX + cosRadian * topY;
+      const leftBottomX = cosRadian * leftX - sinRadian * bottomY;
+      const leftBottomY = sinRadian * leftX + cosRadian * bottomY;
+      const rightBottomX = cosRadian * rightX - sinRadian * bottomY;
+      const rightBottomY = sinRadian * rightX + cosRadian * bottomY;
+      const minimumX = System10.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX) + translateX;
+      const minimumY = System10.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY) + translateY;
+      const maximumX = System10.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX) + translateX;
+      const maximumY = System10.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY) + translateY;
+      rect.position.set(minimumX, minimumY);
+      rect.size.set(maximumX - minimumX, maximumY - minimumY);
+    }
+    //==============================================================================
+    // 하위 트리 그리기 경계 셈하기. (자기 그림과 켜지고 보이는 자식들 경계의 합, readSubtreeDrawBounds 가 바뀐 때만 부른다, 알면 true)
+    // - 자기 그림: calculateDrawnRect 와 켜진 컴포넌트. 내용 영역 안에서만 그리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 보고,
+    //   밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 로 본다. 그리지 않는 컴포넌트(draw 를 덮어쓰지 않은 것)는 빼고,
+    //   모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드와 내용 크기를 읽을 수 없는 노드(내용 영역 안 컴포넌트가 있을 때)도 모른다.
+    // - 자식: 자식의 하위 트리 경계를 자식이 옮긴(transformDrawBoundsToParent) 이 노드의 내용 좌표 경계 상자. 놓이는 곳을 모르는 자식이 있으면 모른다.
     // - 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)
+    // - 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)
     //==============================================================================
     /**
      * @virtual
@@ -4907,13 +5017,134 @@
      * @returns { boolean } 경계를 알면 참.
      */
     calculateSubtreeDrawBounds(rect) {
-      const children = this.getChildren();
-      for (const child of children) {
-        if (child instanceof _TransformNode && child.isActive() && child.isVisible()) {
-          child.readSubtreeDrawBounds(childDrawBounds);
+      let isKnown = true;
+      let isFound = false;
+      let minimumX = 0;
+      let minimumY = 0;
+      let maximumX = 0;
+      let maximumY = 0;
+      const nodeRect = subtreeNodeRect;
+      if (this.isGizmoVisible() || !this.calculateDrawnRect(nodeRect)) {
+        isKnown = false;
+      } else if (nodeRect.size.x > 0 && nodeRect.size.y > 0) {
+        minimumX = nodeRect.position.x;
+        minimumY = nodeRect.position.y;
+        maximumX = minimumX + nodeRect.size.x;
+        maximumY = minimumY + nodeRect.size.y;
+        isFound = true;
+      }
+      if (isKnown) {
+        let isInsideContentReported = false;
+        const componentRect = subtreeComponentRect;
+        const components = this.getAllComponents();
+        for (const component of components) {
+          if (!component.isEnable() || component.draw === Component.prototype.draw) {
+            continue;
+          }
+          if (component.isDrawnInsideContent()) {
+            isInsideContentReported = true;
+            continue;
+          }
+          if (!component.calculateDrawnRect(componentRect)) {
+            isKnown = false;
+            break;
+          }
+          if (!(componentRect.size.x > 0 && componentRect.size.y > 0)) {
+            continue;
+          }
+          const componentRightX = componentRect.position.x + componentRect.size.x;
+          const componentBottomY = componentRect.position.y + componentRect.size.y;
+          if (!isFound) {
+            minimumX = componentRect.position.x;
+            minimumY = componentRect.position.y;
+            maximumX = componentRightX;
+            maximumY = componentBottomY;
+            isFound = true;
+          } else {
+            minimumX = System10.Math.min(minimumX, componentRect.position.x);
+            minimumY = System10.Math.min(minimumY, componentRect.position.y);
+            maximumX = System10.Math.max(maximumX, componentRightX);
+            maximumY = System10.Math.max(maximumY, componentBottomY);
+          }
+        }
+        if (isKnown && isInsideContentReported) {
+          const contentSize = subtreeContentSize;
+          if (typeof this.copyContentSizeTo === "function") {
+            this.copyContentSizeTo(contentSize);
+          } else if (typeof this.getContentSize === "function") {
+            const nodeContentSize = this.getContentSize();
+            contentSize.set(nodeContentSize.x, nodeContentSize.y);
+          } else {
+            isKnown = false;
+          }
+          if (isKnown) {
+            const contentMinimumX = System10.Math.min(0, contentSize.x) - 1;
+            const contentMinimumY = System10.Math.min(0, contentSize.y) - 1;
+            const contentMaximumX = System10.Math.max(0, contentSize.x) + 1;
+            const contentMaximumY = System10.Math.max(0, contentSize.y) + 1;
+            if (!isFound) {
+              minimumX = contentMinimumX;
+              minimumY = contentMinimumY;
+              maximumX = contentMaximumX;
+              maximumY = contentMaximumY;
+              isFound = true;
+            } else {
+              minimumX = System10.Math.min(minimumX, contentMinimumX);
+              minimumY = System10.Math.min(minimumY, contentMinimumY);
+              maximumX = System10.Math.max(maximumX, contentMaximumX);
+              maximumY = System10.Math.max(maximumY, contentMaximumY);
+            }
+          }
         }
       }
-      return false;
+      const childRect = childDrawBounds;
+      const children = this.getChildren();
+      for (const child of children) {
+        if (!(child instanceof _TransformNode)) {
+          isKnown = false;
+          continue;
+        }
+        if (!child.isActive() || !child.isVisible()) {
+          continue;
+        }
+        if (!child.readSubtreeDrawBounds(childRect)) {
+          isKnown = false;
+          continue;
+        }
+        const isChildEmpty = !(childRect.size.x > 0 && childRect.size.y > 0);
+        if (!child.transformDrawBoundsToParent(childRect)) {
+          isKnown = false;
+          continue;
+        }
+        if (!isKnown || isChildEmpty) {
+          continue;
+        }
+        const childRightX = childRect.position.x + childRect.size.x;
+        const childBottomY = childRect.position.y + childRect.size.y;
+        if (!isFound) {
+          minimumX = childRect.position.x;
+          minimumY = childRect.position.y;
+          maximumX = childRightX;
+          maximumY = childBottomY;
+          isFound = true;
+        } else {
+          minimumX = System10.Math.min(minimumX, childRect.position.x);
+          minimumY = System10.Math.min(minimumY, childRect.position.y);
+          maximumX = System10.Math.max(maximumX, childRightX);
+          maximumY = System10.Math.max(maximumY, childBottomY);
+        }
+      }
+      if (!isKnown) {
+        return false;
+      }
+      if (!isFound) {
+        rect.position.set(0, 0);
+        rect.size.set(0, 0);
+        return true;
+      }
+      rect.position.set(minimumX, minimumY);
+      rect.size.set(maximumX - minimumX, maximumY - minimumY);
+      return true;
     }
   };
 
@@ -16517,10 +16748,6 @@ void main() {
   var cullContentSize = Vector2.zero();
   var cullRect = new Rect();
   var cullDrawnRect = new Rect();
-  var subtreeNodeRect = new Rect();
-  var subtreeComponentRect = new Rect();
-  var subtreeChildRect = new Rect();
-  var subtreeContentSize = Vector2.zero();
   var convertContentSize = Vector2.zero();
   var WorldNode = class _WorldNode extends TransformNode {
     static {
@@ -16722,7 +16949,7 @@ void main() {
     //   덮어쓴 노드가 이 함수도 덮어써 그리는 사각형을 알리면 건너뛸 수 있다. 사각형이 바뀌면 markDrawBoundsDirty 를 부른다.
     //==============================================================================
     /**
-     * @virtual
+     * @override
      * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
      * @returns { boolean } 알면 참.
      * @example <caption>스스로 그리는 노드가 그리는 곳 알리기</caption>
@@ -16757,154 +16984,32 @@ void main() {
       return true;
     }
     //==============================================================================
-    // 하위 트리 그리기 경계 셈하기. (오버라이드: 자기 그림과 켜지고 보이는 자식들 경계의 합, readSubtreeDrawBounds 가 바뀐 때만 부른다)
-    // - 자기 그림: calculateDrawnRect 와 켜진 컴포넌트. 내용 영역 안에서만 그리는 컴포넌트는 내용 영역을 한 단위씩 넓혀 보고,
-    //   밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 로 본다. 모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드도 모른다.
-    // - 자식: 자식의 하위 트리 경계를 자식의 변환(위치, 회전, 배율, 피봇)으로 이 노드의 내용 좌표에 옮긴 경계 상자.
-    //   pushTransform 이나 위치, 배율, 회전, 피봇, 내용 크기 읽기를 덮어쓴 자식은 어디에 놓이는지 모르므로 모른다. (그 자식 아래는 저마다 건너뛸 수 있다)
-    // - 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)
+    // 하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (오버라이드: 위치, 회전, 배율, 피봇으로, pushTransform 과 같은 차례)
+    // - pushTransform 이나 위치, 배율, 회전, 피봇, 내용 크기 읽기를 덮어쓴 노드는 어디에 놓이는지 모르므로 false. (부모는 건너뛰지 않고 이 노드 아래는 저마다 건너뛸 수 있다)
     //==============================================================================
     /**
      * @override
-     * @param { Rect } rect 셈한 경계를 적을 곳. (이 노드의 내용 좌표)
-     * @returns { boolean } 경계를 알면 참.
+     * @param { Rect } rect 옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)
+     * @returns { boolean } 놓이는 곳을 알면 참.
+     * @example <caption>자식의 그리기 경계를 부모 좌표로 옮기기</caption>
+     * import { WorldNode, Rect, Vector2, Pivot } from "./build/vanilla.js";
+     *
+     * const node = new WorldNode();
+     * node.setPivot(Pivot.topLeft);
+     * node.setLocalPosition(Vector2.create(100, 20));
+     * node.setLocalScale(Vector2.create(2, 2));
+     * const drawBounds = Rect.create(0, 0, 10, 10);
+     * node.transformDrawBoundsToParent(drawBounds);
+     * console.log(drawBounds.position.x, drawBounds.size.x);
      */
-    calculateSubtreeDrawBounds(rect) {
-      let isKnown = true;
-      let isFound = false;
-      let minimumX = 0;
-      let minimumY = 0;
-      let maximumX = 0;
-      let maximumY = 0;
-      const nodeRect = subtreeNodeRect;
-      if (this.isGizmoVisible() || !this.calculateDrawnRect(nodeRect)) {
-        isKnown = false;
-      } else if (nodeRect.size.x > 0 && nodeRect.size.y > 0) {
-        minimumX = nodeRect.position.x;
-        minimumY = nodeRect.position.y;
-        maximumX = minimumX + nodeRect.size.x;
-        maximumY = minimumY + nodeRect.size.y;
-        isFound = true;
-      }
-      if (isKnown) {
-        let isInsideContentReported = false;
-        const componentRect = subtreeComponentRect;
-        const components = this.getAllComponents();
-        for (const component of components) {
-          if (!component.isEnable() || component.draw === Component.prototype.draw) {
-            continue;
-          }
-          if (component.isDrawnInsideContent()) {
-            isInsideContentReported = true;
-            continue;
-          }
-          if (!component.calculateDrawnRect(componentRect)) {
-            isKnown = false;
-            break;
-          }
-          if (!(componentRect.size.x > 0 && componentRect.size.y > 0)) {
-            continue;
-          }
-          const componentRightX = componentRect.position.x + componentRect.size.x;
-          const componentBottomY = componentRect.position.y + componentRect.size.y;
-          if (!isFound) {
-            minimumX = componentRect.position.x;
-            minimumY = componentRect.position.y;
-            maximumX = componentRightX;
-            maximumY = componentBottomY;
-            isFound = true;
-          } else {
-            minimumX = System20.Math.min(minimumX, componentRect.position.x);
-            minimumY = System20.Math.min(minimumY, componentRect.position.y);
-            maximumX = System20.Math.max(maximumX, componentRightX);
-            maximumY = System20.Math.max(maximumY, componentBottomY);
-          }
-        }
-        if (isKnown && isInsideContentReported) {
-          const contentSize = subtreeContentSize;
-          this.copyContentSizeTo(contentSize);
-          const contentMinimumX = System20.Math.min(0, contentSize.x) - 1;
-          const contentMinimumY = System20.Math.min(0, contentSize.y) - 1;
-          const contentMaximumX = System20.Math.max(0, contentSize.x) + 1;
-          const contentMaximumY = System20.Math.max(0, contentSize.y) + 1;
-          if (!isFound) {
-            minimumX = contentMinimumX;
-            minimumY = contentMinimumY;
-            maximumX = contentMaximumX;
-            maximumY = contentMaximumY;
-            isFound = true;
-          } else {
-            minimumX = System20.Math.min(minimumX, contentMinimumX);
-            minimumY = System20.Math.min(minimumY, contentMinimumY);
-            maximumX = System20.Math.max(maximumX, contentMaximumX);
-            maximumY = System20.Math.max(maximumY, contentMaximumY);
-          }
-        }
-      }
-      const childRect = subtreeChildRect;
-      const children = this.getChildren();
-      for (const child of children) {
-        if (!(child instanceof TransformNode)) {
-          isKnown = false;
-          continue;
-        }
-        if (!child.isActive() || !child.isVisible()) {
-          continue;
-        }
-        const isChildKnown = child.readSubtreeDrawBounds(childRect);
-        if (!isChildKnown || !(child instanceof _WorldNode) || !child.#isPlacementKnown()) {
-          isKnown = false;
-          continue;
-        }
-        if (!isKnown || !(childRect.size.x > 0 && childRect.size.y > 0)) {
-          continue;
-        }
-        const localPosition = child.getLocalPosition();
-        const localScale = child.getLocalScale();
-        const radian = degreeToRadian(child.getLocalRotation());
-        const cosRadian = radian === 0 ? 1 : System20.Math.cos(radian);
-        const sinRadian = radian === 0 ? 0 : System20.Math.sin(radian);
-        const pivotOffsetX = child.#contentSize.x * child.#pivot.x;
-        const pivotOffsetY = child.#contentSize.y * child.#pivot.y;
-        const leftX = (childRect.position.x - pivotOffsetX) * localScale.x;
-        const topY = (childRect.position.y - pivotOffsetY) * localScale.y;
-        const rightX = (childRect.position.x + childRect.size.x - pivotOffsetX) * localScale.x;
-        const bottomY = (childRect.position.y + childRect.size.y - pivotOffsetY) * localScale.y;
-        const leftTopX = cosRadian * leftX - sinRadian * topY;
-        const leftTopY = sinRadian * leftX + cosRadian * topY;
-        const rightTopX = cosRadian * rightX - sinRadian * topY;
-        const rightTopY = sinRadian * rightX + cosRadian * topY;
-        const leftBottomX = cosRadian * leftX - sinRadian * bottomY;
-        const leftBottomY = sinRadian * leftX + cosRadian * bottomY;
-        const rightBottomX = cosRadian * rightX - sinRadian * bottomY;
-        const rightBottomY = sinRadian * rightX + cosRadian * bottomY;
-        const childMinimumX = System20.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX) + localPosition.x;
-        const childMinimumY = System20.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY) + localPosition.y;
-        const childMaximumX = System20.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX) + localPosition.x;
-        const childMaximumY = System20.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY) + localPosition.y;
-        if (!isFound) {
-          minimumX = childMinimumX;
-          minimumY = childMinimumY;
-          maximumX = childMaximumX;
-          maximumY = childMaximumY;
-          isFound = true;
-        } else {
-          minimumX = System20.Math.min(minimumX, childMinimumX);
-          minimumY = System20.Math.min(minimumY, childMinimumY);
-          maximumX = System20.Math.max(maximumX, childMaximumX);
-          maximumY = System20.Math.max(maximumY, childMaximumY);
-        }
-      }
-      if (!isKnown) {
+    transformDrawBoundsToParent(rect) {
+      if (!this.#isPlacementKnown()) {
         return false;
       }
-      if (!isFound) {
-        rect.position.set(0, 0);
-        rect.size.set(0, 0);
-        return true;
-      }
-      rect.position.set(minimumX, minimumY);
-      rect.size.set(maximumX - minimumX, maximumY - minimumY);
+      const pivotOffsetX = this.#contentSize.x * this.#pivot.x;
+      const pivotOffsetY = this.#contentSize.y * this.#pivot.y;
+      const localPosition = this.getLocalPosition();
+      this.transformLocalRectToParent(rect, pivotOffsetX, pivotOffsetY, localPosition.x, localPosition.y);
       return true;
     }
     //==============================================================================
@@ -16956,9 +17061,14 @@ void main() {
      * @param { Vector2 } pivot 기준점. (내용 크기에 대한 비, 0 ~ 1 로 자르고, (0, 0) 이 왼쪽 위)
      */
     setPivot(pivot) {
-      this.#pivot.x = clamp(pivot.x, 0, 1);
-      this.#pivot.y = clamp(pivot.y, 0, 1);
-      this.markParentDrawBoundsDirty();
+      const pivotX = clamp(pivot.x, 0, 1);
+      const pivotY = clamp(pivot.y, 0, 1);
+      const isChanged = this.#pivot.x !== pivotX || this.#pivot.y !== pivotY;
+      this.#pivot.x = pivotX;
+      this.#pivot.y = pivotY;
+      if (isChanged) {
+        this.markParentDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 기준점 반환.
@@ -16976,9 +17086,12 @@ void main() {
      * @param { Vector2 } contentSize 내용 크기. (값을 옮겨 적는다)
      */
     setContentSize(contentSize) {
+      const isChanged = this.#contentSize.x !== contentSize.x || this.#contentSize.y !== contentSize.y;
       this.#contentSize.x = contentSize.x;
       this.#contentSize.y = contentSize.y;
-      this.markDrawBoundsDirty();
+      if (isChanged) {
+        this.markDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 실제 내용 크기 설정. (너비, 높이를 바로 받는다, Vector2 를 만들지 않는다)
@@ -16994,9 +17107,12 @@ void main() {
         this.setContentSize(Vector2.create(width, height));
         return;
       }
+      const isChanged = this.#contentSize.x !== width || this.#contentSize.y !== height;
       this.#contentSize.x = width;
       this.#contentSize.y = height;
-      this.markDrawBoundsDirty();
+      if (isChanged) {
+        this.markDrawBoundsDirty();
+      }
     }
     //==============================================================================
     // 부모 영역 안의 사각형에 놓기. (x, y 는 이 노드의 왼쪽 위, 부모 내용 영역의 왼쪽 위가 원점)

@@ -26468,6 +26468,145 @@
 						},
 						{
 							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "알면 참.",
+									"en": "True if known."
+								}
+							},
+							"description": {
+								"ko": "노드 스스로(컴포넌트와 자식 밖에) 그리는 사각형을 rect 에 적기. (내용 영역의 왼쪽 위가 원점, 알면 true)\n- draw 를 덮어쓰지 않은 노드는 스스로 그리는 것이 없으므로 크기 0 을 적고 true.\n- draw 를 덮어쓴 노드는 어디에 그리는지 모르므로 false. (그 노드의 조상은 하위 트리 그리기를 건너뛰지 않는다)\n  덮어쓴 노드가 이 함수도 덮어써 그리는 사각형을 알리면 건너뛸 수 있다. 사각형이 바뀌면 markDrawBoundsDirty 를 부른다.",
+								"en": "Writes into rect the rectangle the node draws by itself (outside its components and children). (origin at the top-left of the content area, true if known)\n- A node that does not override draw draws nothing by itself, so it writes size 0 and returns true.\n- A node that overrides draw does not know where it draws and returns false. (its ancestors do not skip the subtree drawing)\n  If the overriding node also overrides this function to report the drawn rectangle it can be skipped. Call markDrawBoundsDirty when the rectangle changes."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "그리기를 덮어쓰지 않은 노드는 스스로 그리는 것이 없다",
+										"en": "A node that does not override draw draws nothing by itself"
+									},
+									"code": "import { TransformNode, Rect } from \"./build/vanilla.js\";\n\nconst node = new TransformNode();\nconst drawnRect = Rect.zero();\nconsole.log(node.calculateDrawnRect(drawnRect), drawnRect.size.x);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "transformDrawBoundsToParent",
+							"signature": "transformDrawBoundsToParent(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)",
+										"en": "The bounds to move. (In this node's content coordinates; the bounding box in the parent's content coordinates is written back)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "놓이는 곳을 알면 참.",
+									"en": "True if where the node is placed is known."
+								}
+							},
+							"description": {
+								"ko": "하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (알면 true, calculateSubtreeDrawBounds 가 자식마다 부른다)\n- TransformNode 는 내용 영역과 피봇이 없어 어디에 놓이는지 정하지 않으므로 false. (WorldNode, UINode 가 저마다 놓는 꼴로 덮어쓴다)",
+								"en": "Moves subtree draw bounds into the parent's content coordinates. (True if known; calculateSubtreeDrawBounds calls it for each child)\n- TransformNode has no content area or pivot and does not define its placement, so it returns false. (WorldNode and UINode override it with their own placement)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "놓는 꼴을 모르는 노드",
+										"en": "A node whose placement is unknown"
+									},
+									"code": "import { TransformNode, Rect } from \"./build/vanilla.js\";\n\nconst node = new TransformNode();\nconsole.log(node.transformDrawBoundsToParent(Rect.create(0, 0, 10, 10)));",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "transformLocalRectToParent",
+							"signature": "transformLocalRectToParent(rect, pivotOffsetX, pivotOffsetY, translateX, translateY)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "바꿀 사각형. (이 노드의 내용 좌표, 바뀐 경계 상자를 적는다)",
+										"en": "The rectangle to transform. (In this node's content coordinates; the transformed bounding box is written back)"
+									}
+								},
+								{
+									"name": "pivotOffsetX",
+									"type": "number",
+									"description": {
+										"ko": "기준점의 가로 자리. (내용 좌표, 이만큼 당긴 뒤 키운다)",
+										"en": "Horizontal pivot position. (Content coordinates; subtracted before scaling)"
+									}
+								},
+								{
+									"name": "pivotOffsetY",
+									"type": "number",
+									"description": {
+										"ko": "기준점의 세로 자리.",
+										"en": "Vertical pivot position."
+									}
+								},
+								{
+									"name": "translateX",
+									"type": "number",
+									"description": {
+										"ko": "부모 좌표로 옮기는 가로 거리.",
+										"en": "Horizontal distance to move into parent coordinates."
+									}
+								},
+								{
+									"name": "translateY",
+									"type": "number",
+									"description": {
+										"ko": "부모 좌표로 옮기는 세로 거리.",
+										"en": "Vertical distance to move into parent coordinates."
+									}
+								}
+							],
+							"description": {
+								"ko": "사각형을 이 노드의 회전과 배율로 돌리고 키워 부모 좌표에 옮긴 경계 상자로 바꾸기. (transformDrawBoundsToParent 가 쓴다)\n- 차례: 기준점만큼 당김 → 배율 → 회전 → 옮김. (pushTransform 의 옮김, 회전, 배율과 같은 결과)",
+								"en": "Turns a rectangle into the bounding box after this node's rotation and scale and the move into parent coordinates. (Used by transformDrawBoundsToParent)\n- Order: subtract the pivot → scale → rotate → translate. (Same result as pushTransform's translate, rotate, scale)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "두 배로 키우고 옮긴 사각형",
+										"en": "A rectangle scaled by two and moved"
+									},
+									"code": "import { TransformNode, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new TransformNode();\nnode.setLocalScale(Vector2.create(2, 2));\nconst rect = Rect.create(0, 0, 10, 10);\nnode.transformLocalRectToParent(rect, 5, 5, 100, 0);\nconsole.log(rect.position.x, rect.size.x);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "calculateSubtreeDrawBounds",
 							"signature": "calculateSubtreeDrawBounds(rect)",
 							"params": [
@@ -26488,8 +26627,8 @@
 								}
 							},
 							"description": {
-								"ko": "하위 트리 그리기 경계 셈하기. (readSubtreeDrawBounds 가 바뀐 때만 부른다, 알면 true)\n- TransformNode 는 내용 영역이 없어 컴포넌트가 어디에 그리는지 모르므로 false. (WorldNode 가 덮어쓴다)\n- 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)",
-								"en": "Calculates the subtree draw bounds. (readSubtreeDrawBounds calls it only when something changed, true if known)\n- TransformNode has no content area so it cannot know where its components draw, and returns false. (WorldNode overrides it)\n- Even when unknown it reads the bounds of every active, visible child. (children must store theirs so that changes in descendants spread up to this node)"
+								"ko": "하위 트리 그리기 경계 셈하기. (자기 그림과 켜지고 보이는 자식들 경계의 합, readSubtreeDrawBounds 가 바뀐 때만 부른다, 알면 true)\n- 자기 그림: calculateDrawnRect 와 켜진 컴포넌트. 내용 영역 안에서만 그리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 보고,\n  밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 로 본다. 그리지 않는 컴포넌트(draw 를 덮어쓰지 않은 것)는 빼고,\n  모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드와 내용 크기를 읽을 수 없는 노드(내용 영역 안 컴포넌트가 있을 때)도 모른다.\n- 자식: 자식의 하위 트리 경계를 자식이 옮긴(transformDrawBoundsToParent) 이 노드의 내용 좌표 경계 상자. 놓이는 곳을 모르는 자식이 있으면 모른다.\n- 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)\n- 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)",
+								"en": "Calculates subtree draw bounds. (The union of the node's own drawing and its enabled, visible children's bounds; readSubtreeDrawBounds calls it only after a change; true if known)\n- Own drawing: calculateDrawnRect and enabled components. Components drawing only inside the content area (Component.isDrawnInsideContent) count as the content area grown by one unit,\n  components drawing outside use Component.calculateDrawnRect. Components that draw nothing (no draw override) are skipped;\n  a single unknown component makes the bounds unknown. A node drawing gizmos, or one whose content size cannot be read (when it has inside-content components), is also unknown.\n- Children: each child's subtree bounds moved by the child (transformDrawBoundsToParent) into this node's content coordinates. A child with unknown placement makes the bounds unknown.\n- Even when unknown, all enabled and visible children's bounds are read. (Children must cache theirs so descendant changes propagate up to this node)\n- Bounds are not shrunk by masks clipping children. (Kept generous)"
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/transformnode.js"
@@ -26642,31 +26781,41 @@
 						},
 						{
 							"kind": "method",
-							"name": "calculateSubtreeDrawBounds",
-							"signature": "calculateSubtreeDrawBounds(rect)",
+							"name": "transformDrawBoundsToParent",
+							"signature": "transformDrawBoundsToParent(rect)",
 							"params": [
 								{
 									"name": "rect",
 									"type": "Rect",
 									"description": {
-										"ko": "셈한 경계를 적을 곳. (이 노드의 내용 좌표)",
-										"en": "Where to write the calculated bounds. (in this node's content coordinates)"
+										"ko": "옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)",
+										"en": "The bounds to move. (In this node's content coordinates; the bounding box in the parent's content coordinates is written back)"
 									}
 								}
 							],
 							"returns": {
 								"type": "boolean",
 								"description": {
-									"ko": "경계를 알면 참.",
-									"en": "True if the bounds are known."
+									"ko": "놓이는 곳을 알면 참.",
+									"en": "True if where the node is placed is known."
 								}
 							},
 							"description": {
-								"ko": "하위 트리 그리기 경계 셈하기. (오버라이드: 자기 그림과 켜지고 보이는 자식들 경계의 합, readSubtreeDrawBounds 가 바뀐 때만 부른다)\n- 자기 그림: calculateDrawnRect 와 켜진 컴포넌트. 내용 영역 안에서만 그리는 컴포넌트는 내용 영역을 한 단위씩 넓혀 보고,\n  밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 로 본다. 모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드도 모른다.\n- 자식: 자식의 하위 트리 경계를 자식의 변환(위치, 회전, 배율, 피봇)으로 이 노드의 내용 좌표에 옮긴 경계 상자.\n  pushTransform 이나 위치, 배율, 회전, 피봇, 내용 크기 읽기를 덮어쓴 자식은 어디에 놓이는지 모르므로 모른다. (그 자식 아래는 저마다 건너뛸 수 있다)\n- 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)",
-								"en": "Calculates the subtree draw bounds. (override: the union of its own drawing and the bounds of its active, visible children, called by readSubtreeDrawBounds only when something changed)\n- Own drawing: calculateDrawnRect and the enabled components. A component that draws only inside the content area counts as the content area widened by one unit,\n  and a component that draws outside it counts as Component.calculateDrawnRect. If even one component is unknown the bounds are unknown. A node that draws gizmos is unknown too.\n- Children: the bounding box of the child's subtree bounds moved into this node's content coordinates by the child's transform (position, rotation, scale, pivot).\n  A child that overrides pushTransform or reading its position, scale, rotation, pivot or content size has an unknown placement, so the bounds are unknown. (each subtree below that child can still be skipped)\n- The bounds are not shrunk even when a mask clips the children. (kept generous)"
+								"ko": "하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (오버라이드: 위치, 회전, 배율, 피봇으로, pushTransform 과 같은 차례)\n- pushTransform 이나 위치, 배율, 회전, 피봇, 내용 크기 읽기를 덮어쓴 노드는 어디에 놓이는지 모르므로 false. (부모는 건너뛰지 않고 이 노드 아래는 저마다 건너뛸 수 있다)",
+								"en": "Moves subtree draw bounds into the parent's content coordinates. (Override: by position, rotation, scale and pivot, in the same order as pushTransform)\n- A node that overrides pushTransform or the position, scale, rotation, pivot or content size getters has unknown placement and returns false. (The parent is not skipped; nodes below this one can still be skipped on their own)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/node/worldnode.js"
+							"source": "src/core/node/worldnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "자식의 그리기 경계를 부모 좌표로 옮기기",
+										"en": "Moving a child's draw bounds into parent coordinates"
+									},
+									"code": "import { WorldNode, Rect, Vector2, Pivot } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nnode.setPivot(Pivot.topLeft);\nnode.setLocalPosition(Vector2.create(100, 20));\nnode.setLocalScale(Vector2.create(2, 2));\nconst drawBounds = Rect.create(0, 0, 10, 10);\nnode.transformDrawBoundsToParent(drawBounds);\nconsole.log(drawBounds.position.x, drawBounds.size.x);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -27482,6 +27631,44 @@
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uinode.js"
+						},
+						{
+							"kind": "method",
+							"name": "transformDrawBoundsToParent",
+							"signature": "transformDrawBoundsToParent(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)",
+										"en": "The bounds to move. (In this node's content coordinates; the bounding box in the parent's content coordinates is written back)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "놓이는 곳을 알면 참.",
+									"en": "True if where the node is placed is known."
+								}
+							},
+							"description": {
+								"ko": "하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (오버라이드: pushTransform 과 같이 솔버가 푼 왼쪽 위로 옮기고 회전, 배율, 기준점 없음)\n- 부모가 UINode 면 부모의 왼쪽 위에서 잰 자리, 아니면 솔버의 좌표 그대로.\n- pushTransform 이나 자리, 크기, 회전, 배율 읽기를 덮어쓴 노드는 어디에 놓이는지 모르므로 false.\n- 솔버가 푼 자리와 크기가 바뀌면(LayoutSolver.updateVariables) 이 노드의 경계를 다시 셈한다.",
+								"en": "Moves subtree draw bounds into the parent's content coordinates. (Override: like pushTransform, moves to the solver's top-left with rotation and scale, no pivot)\n- Measured from the parent's top-left if the parent is a UINode, otherwise the solver's coordinates as is.\n- A node that overrides pushTransform or the position, size, rotation or scale getters has unknown placement and returns false.\n- When the solver's position or size changes (LayoutSolver.updateVariables), this node's bounds are recalculated."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uinode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "솔버가 놓은 줄의 경계를 부모 좌표로 옮기기",
+										"en": "Moving a solver-placed row's bounds into parent coordinates"
+									},
+									"code": "import { UINode, LayoutSolver, Rect } from \"./build/vanilla.js\";\n\nconst solver = new LayoutSolver();\nconst rowNode = new UINode();\nrowNode.setSolver(solver);\nrowNode.addConstraint(rowNode.leftAnchor.equalTo(20));\nrowNode.addConstraint(rowNode.topAnchor.equalTo(40));\nrowNode.addConstraint(rowNode.widthAnchor.equalTo(100));\nrowNode.addConstraint(rowNode.heightAnchor.equalTo(30));\nsolver.updateVariables();\nconst drawBounds = Rect.create(0, 0, 100, 30);\nrowNode.transformDrawBoundsToParent(drawBounds);\nconsole.log(drawBounds.position.x, drawBounds.position.y);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -31789,6 +31976,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "적었으면 참. (잴 수 없으면 거짓)",
+									"en": "True if written. (False if it cannot be measured)"
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형을 rect 에 적기. (오버라이드: 정렬로 놓은 글에 그림자의 번짐과 내림을 더한 사각형, 화면 밖 거르기와 하위 트리 그리기 경계가 쓴다)\n- 가로는 처음 글꼴 크기로 잰 글 너비(넘쳐 줄여도 이보다 좁다)를 정렬대로 놓고, 글꼴 크기의 반과 번짐의 두 배만큼 양옆에 더한다.\n  \"start\" 와 \"end\" 는 그릴 때의 방향으로 왼쪽이나 오른쪽이 되므로 둘 다 품는다.\n- 세로는 내용 높이의 가운데에서 위아래로 글꼴 크기의 1.5 배와 번짐의 두 배씩, 아래는 그림자 내림만큼 더 잡는다. (밑줄, 취소선도 이 안)\n  (캔버스 shadowBlur 는 표준 편차 blur / 2 의 가우스라 꼬리가 1.5 배까지 간다, 굽는 칸의 여유와 같이 두 배)\n- 글이 없으면 크기 0. 잴 수 없으면 false. (거르지 않는다)",
+								"en": "Writes the drawn rectangle to rect. (Override: the aligned text grown by the shadow's blur and offset; used by off-screen culling and subtree draw bounds)\n- Horizontally, the text width measured at the initial font size (fitting only makes it narrower) is placed by alignment and grown by half the font size plus twice the blur on both sides.\n  \"start\" and \"end\" become left or right depending on the direction at draw time, so both are covered.\n- Vertically, from the middle of the content height up and down by 1.5 times the font size plus twice the blur, and further down by the shadow offset. (Underline and strikethrough fit inside)\n  (Canvas shadowBlur is a Gaussian with standard deviation blur / 2 whose tail reaches 1.5 times; twice, matching the bake padding)\n- Size 0 when there is no text. False if it cannot be measured. (Not culled)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/component/shadowtext.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "그림자 글이 그리는 곳 보기",
+										"en": "Seeing where shadow text draws"
+									},
+									"code": "import { WorldNode, ShadowText, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nnode.setContentSize(Vector2.create(120, 30));\nconst shadowText = node.addComponent(ShadowText);\nshadowText.setText(\"SCORE\");\nshadowText.setShadow(\"#000000\", 0.8, 3, 4);\nconst drawnRect = Rect.zero();\nconst isKnown = shadowText.calculateDrawnRect(drawnRect);\nconsole.log(isKnown, drawnRect.size.y > 30);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "detach",
 							"signature": "detach(node)",
 							"params": [
@@ -32557,6 +32782,44 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/component/shadowimage.js"
+						},
+						{
+							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "노드에 붙어 있으면 참.",
+									"en": "True if attached to a node."
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형을 rect 에 적기. (오버라이드: 그림은 내용 영역 안에 비를 지켜 들어가고, 그림자가 번짐과 내림만큼 넘친다)\n- 내용 영역을 사방으로 번짐의 두 배와 굽는 칸의 여유만큼, 아래(내림이 음수면 위)로 그림자 내림만큼 더 넓힌다.\n  (캔버스 shadowBlur 는 표준 편차 blur / 2 의 가우스라 꼬리가 1.5 배까지 간다, 넉넉히 두 배)\n- 그림이 있는지와 상관없이 같은 사각형을 알린다. (그림을 바꿔도 다시 셈하지 않는다)",
+								"en": "Writes the drawn rectangle to rect. (Override: the image fits inside the content area keeping its ratio, and the shadow spills by its blur and offset)\n- The content area grows on all sides by twice the blur plus the bake padding, and downward (upward if negative) by the shadow offset.\n  (Canvas shadowBlur is a Gaussian with standard deviation blur / 2 whose tail reaches 1.5 times; twice to be generous)\n- Reports the same rectangle whether or not there is an image. (Changing the image does not recalculate)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/component/shadowimage.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "그림자 그림이 그리는 곳 보기",
+										"en": "Seeing where a shadow image draws"
+									},
+									"code": "import { WorldNode, ShadowImage, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nnode.setContentSize(Vector2.create(64, 64));\nconst shadowImage = node.addComponent(ShadowImage);\nshadowImage.setShadow(\"#000000\", 0.6, 6, 8);\nconst drawnRect = Rect.zero();\nshadowImage.calculateDrawnRect(drawnRect);\nconsole.log(drawnRect.position.x, drawnRect.size.y);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -36024,24 +36287,34 @@
 									"name": "rect",
 									"type": "Rect",
 									"description": {
-										"ko": "그리는 사각형을 적을 곳. (적지 않는다)",
-										"en": "Rect to write the drawn area into. (not written)"
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
 									}
 								}
 							],
 							"returns": {
 								"type": "boolean",
 								"description": {
-									"ko": "늘 거짓. (거르지 않는다)",
-									"en": "Always false. (not culled)"
+									"ko": "적었으면 참. (잴 수 없으면 거짓)",
+									"en": "True if written. (False if it cannot be measured)"
 								}
 							},
 							"description": {
-								"ko": "그리는 사각형. (조각마다 크기와 글꼴이 달라 Text 의 한 줄 셈이 맞지 않으므로 모른다고 한다, 거르지 않는다)",
-								"en": "Drawn rectangle. (each piece differs in size and font, so Text's single-line calculation does not fit; reports unknown, not culled)"
+								"ko": "그리는 사각형을 rect 에 적기. (오버라이드: 조각이 없으면 Text 와 같고, 있으면 조각을 이은 한 줄의 사각형)\n- 조각마다 제 글꼴로 잰 너비를 더한 합산 폭을 정렬대로 놓고(그리기와 같은 자리), 가장 큰 글꼴 크기의 반과 가장 굵은 외곽선만큼 양옆에 더한다.\n  \"start\" 와 \"end\" 는 그릴 때의 방향으로 왼쪽이나 오른쪽이 되므로 둘 다 품는다.\n- 세로는 베이스라인 자리에서 위아래로 가장 큰 글꼴 크기의 1.5 배와 가장 굵은 외곽선만큼. (밑줄, 취소선도 이 안)\n- 잴 수 없으면 false. (거르지 않는다)",
+								"en": "Writes the drawn rectangle to rect. (Override: same as Text without segments; with segments, the rectangle of the joined single line)\n- The summed width of each segment measured in its own font is placed by alignment (same as drawing) and grown by half the largest font size plus the thickest stroke on both sides.\n  \"start\" and \"end\" become left or right depending on the direction at draw time, so both are covered.\n- Vertically, from the baseline position up and down by 1.5 times the largest font size plus the thickest stroke. (Underline and strikethrough fit inside)\n- False if it cannot be measured. (Not culled)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/richtext.js"
+							"source": "src/core/component/richtext.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "조각을 이은 글이 그리는 곳 보기",
+										"en": "Seeing where segmented text draws"
+									},
+									"code": "import { WorldNode, RichText, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nnode.setContentSize(Vector2.create(200, 40));\nconst richText = node.addComponent(RichText);\nrichText.appendSegment(\"HP \", { bold: true });\nrichText.appendSegment(\"42\", { fontSize: 32 });\nconst drawnRect = Rect.zero();\nconst isKnown = richText.calculateDrawnRect(drawnRect);\nconsole.log(isKnown, drawnRect.size.y >= 32);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -46947,6 +47220,56 @@
 						},
 						{
 							"kind": "method",
+							"name": "setValueChangedEvent",
+							"signature": "setValueChangedEvent(valueChangedEvent)",
+							"params": [
+								{
+									"name": "valueChangedEvent",
+									"type": "((variable: LayoutVariable) => void) | null",
+									"description": {
+										"ko": "바뀐 변수를 받는 함수.",
+										"en": "A function receiving the changed variable."
+									}
+								}
+							],
+							"description": {
+								"ko": "값이 바뀔 때 부를 함수 설정. (솔버가 푼 값이 달라질 때만 부른다, 변수를 가진 쪽이 바뀐 것을 알아챈다. null 이면 부르지 않는다)\n- UINode 는 자기 자리와 크기 변수에 걸어 하위 트리 그리기 경계를 다시 셈하게 한다.",
+								"en": "Sets the function called when the value changes. (Called only when the solved value differs, so the variable's owner notices the change; null calls nothing)\n- UINode hooks it on its position and size variables to recalculate subtree draw bounds."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/autolayout/layoutvariable.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "값이 바뀔 때 알기",
+										"en": "Knowing when the value changes"
+									},
+									"code": "import { LayoutVariable } from \"./build/vanilla.js\";\n\nconst width = new LayoutVariable(\"width\");\nwidth.setValueChangedEvent((variable) => console.log(variable.getName(), variable.getValue()));\nwidth.setValue(120);\nwidth.setValue(120);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getValueChangedEvent",
+							"signature": "getValueChangedEvent()",
+							"params": [],
+							"returns": {
+								"type": "((variable: LayoutVariable) => void) | null",
+								"description": {
+									"ko": "건 함수. (없으면 null)",
+									"en": "The hooked function. (null if none)"
+								}
+							},
+							"description": {
+								"ko": "값이 바뀔 때 부를 함수 반환.",
+								"en": "Returns the function called when the value changes."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/autolayout/layoutvariable.js"
+						},
+						{
+							"kind": "method",
 							"name": "getValue",
 							"signature": "getValue()",
 							"params": [],
@@ -48648,6 +48971,44 @@
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uislider.js"
+						},
+						{
+							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "노드에 붙어 있으면 참.",
+									"en": "True if attached to a node."
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형을 rect 에 적기. (오버라이드: 트랙과 채움은 내용 영역 안, 손잡이 원은 값이 움직이는 줄 전체에 반지름만큼 넘친다)\n- 값에 따라 움직이는 손잡이가 어디에 있든 품도록 값과 상관없는 사각형을 알린다. (값을 바꿔도 경계를 다시 셈하지 않는다)\n- 손잡이 노드를 정했으면 원을 그리지 않으므로 내용 영역만. 가장자리 매끄럽게 하기만큼 한 단위씩 넓혀 본다.",
+								"en": "Writes the drawn rectangle to rect. (Override: the track and fill stay inside the content area, the thumb circle spills by its radius along the whole range it moves over)\n- Reports a value-independent rectangle that covers the thumb wherever the value moves it. (Changing the value does not recalculate bounds)\n- With a thumb node set, no circle is drawn, so only the content area. Grown by one unit for anti-aliasing."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uislider.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "손잡이 원이 넘치는 만큼 보기",
+										"en": "Seeing how far the thumb circle spills"
+									},
+									"code": "import { WorldNode, UISlider, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst sliderNode = new WorldNode();\nsliderNode.setContentSize(Vector2.create(200, 8));\nconst slider = sliderNode.addComponent(UISlider);\nslider.setThumbRadius(12);\nconst drawnRect = Rect.zero();\nslider.calculateDrawnRect(drawnRect);\nconsole.log(drawnRect.position.x, drawnRect.position.y, drawnRect.size.x, drawnRect.size.y);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -64534,8 +64895,8 @@
 				{
 					"name": "ToonRenderer",
 					"summary": {
-						"ko": "툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)\n- 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).\n  셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)\n  해는 램프 색을 통째로, 채움 빛과 점광과 스포트라이트는 램프의 밝기 단계를 받는다. 하이라이트와 림은 단단한 툰 꼴에서 부드러운 꼴까지. 셈은 ToonLightSet 머리말에 있다.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel 은 기본 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음(createLightSet)을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 노멀: 모형 행렬과 본 행렬의 왼쪽 위 3x3 의 역행렬의 전치로 옮긴다. (늘이고 줄인 모형도 빛이 맞다, 정점 조각이 고친 행렬도 같다)\n- 재질: 꼭짓점의 색(sRGB), 빛남(바탕색에 곱해 더함), 빛을 받지 않음. 꼭짓점 UV(arrays.uvData, 2 씩)가 있으면 텍스처를 읽는다.\n- 그리기 꼴(options, 기본값이면 지금까지와 같은 화면):\n  tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강)\n  glowScale 꼭짓점 빛남의 배(기본 1), colorScale 마지막 선형 색의 배(기본 1, 거울에 비친 모습을 어둡게), emissiveColor [r, g, b] sRGB 와 emissiveIntensity(선형 배, 기본 1, 색 기본 검정).\n  baseColorTexture(바탕색에 곱함, 알파는 불투명도에), emissiveTexture(빛남 색에 곱함), uvTransform [u 옮김, v 옮김, u 배, v 배] (KHR_texture_transform 의 offset, scale).\n  decalTexture 는 바탕색 위에 알파로 덮는다(색 = 텍스처 x decalColor). decalEmission 만큼 그 색으로 빛난다. decalUvTransform 은 묶음 그림의 한 칸을 고를 때.\n  alphaCutoff 는 불투명도가 그보다 작은 화소를 버린다. (0 이면 끔, glTF MASK)\n  blendMode: ToonBlendMode.alpha(기본, 곧은 알파), premultiplied(미리 곱한 알파), additive(더하기). alpha 가 아니면 비치는 것으로 그린다.\n  softEdge 는 pow(|dot(N, V)|, softEdge) 를 불투명도에 곱해 가장자리를 엷게 한다. (0 이면 끔, 프레넬 꼴)\n  isMirrored 는 감기를 뒤집어 그린다. 주지 않으면 모형 행렬의 행렬식이 음수일 때 스스로 뒤집는다. 보기 행렬이 거울에 비쳤으면 그것도 더해 뒤집는다.\n  indexStart, indexCount 는 몸의 꼭짓점 번호 가운데 그 자리만 그린다. (GLB 재질 범위, 숨긴 부분) outlineIndexStart, outlineIndexCount 는 바깥선 껍데기.\n  material(ToonMaterial), textures({ 유니폼 이름: 텍스처 }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) 는 확장 자리다. (toonmaterial.js 머리말)\n  lightSet(ToonLightSet) 은 그 그리기의 빛 묶음이다.\n  receivesShadow (기본 true) 가 false 면 해의 그림자를 보지 않는다. shadeOffset 은 빛을 받는 몫에 더해 그늘 경계를 옮긴다. (길티기어 Xrd 의 꼭짓점 색 문턱, 유니티 툰 셰이더의 Shading Grade Map 꼴)\n  specularScale, rimScale (기본 1) 은 그 그리기의 하이라이트와 림 배다. (0 이면 없음, 재질마다의 세기)\n  matcapTexture 는 보기 공간 노멀로 읽는 매트캡이다. matcapStrength (기본 1), matcapBlend (ToonMatcapBlend.multiply 기본, add)\n  outlineColor [r, g, b, a] sRGB 는 그 그리기의 껍데기 바깥선 색 (주지 않으면 setOutlineColor), outlineWidthScale (기본 1) 은 지은 굵기의 배다.\n  outlineOffsetZ (기본 0) 는 껍데기를 카메라에서 먼 쪽으로 미는 월드 길이다. (몸 앞으로 비치지 않게, 유니티 툰 셰이더의 Offset Z)\n  angelRingTexture 는 천사 고리 텍스처다. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 angelRingOffsetV (기본 0.3) 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring)\n  angelRingColor [r, g, b] (선형 배, 기본 흰색), angelRingOffsetU (0 ~ 0.5, 기본 0), isAngelRingAlpha (기본 false 면 더하고 true 면 텍스처 알파로 덮는다)\n  천사 고리 UV 는 카메라 기울임만큼 되돌려 돌린다. (readCameraRoll, 유니티 툰 셰이더의 Camera Rolling Stabilizer, 카메라를 기울여도 고리는 머리에 붙어 있다)\n  lineId, hasScreenOutline, hasCreaseLine 은 ToonDrawQueue 가 화면 공간 바깥선에 넘기는 값이다. (렌더러는 읽지 않는다)\n- 바깥선 껍데기(inverted hull): MeshBuilder 가 지은 껍데기의 바탕 자리와 미는 쪽(지은 굵기, 같은 자리의 노멀을 평균한 쪽)을 올리고, 셰이더가 outlineWidthScale 만큼 밀어 뒷면만 그린다.\n  setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 를 주면 카메라까지의 거리 / 기준 거리 를 굵기에 곱해 화면 굵기를 맞춘다. (원근만)\n  setOutlineFadeDistance(가까운 거리, 먼 거리) 를 주면 모형의 자리에서 카메라까지가 먼 거리에 다가갈수록 굵기가 0 이 된다. (smoothstep, 유니티 툰 셰이더의 Nearest, Farthest Distance)\n  껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)\n- 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)\n- GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)\n  오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (거르지 않음, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)\n- 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)\n- 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF)\n  점광과 스포트라이트 그림자는 ShadowAtlas 에 beginShadowAtlasPass, 칸마다 setShadowAtlasTile 과 drawMesh 로 드리우고, setLocalShadows 로 받는다. (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)\n  그 빛의 받는 몫에 그림자를 곱해 그늘 램프에 넣는다. (해와 같은 꼴) castsShadow 가 true 인 점광만 칸을 받는다. (SHADOW_ATLAS_MAXIMUM_LIGHTS 까지)\n  그림자를 받지 않을 때도 두 그림자 유닛에 1x1 비교 깊이 텍스처를 묶는다. (sampler2DShadow 유닛에 깊이 텍스처가 없으면 맥 드라이버가 알리고, 색 텍스처가 묶여 있으면 WebGL 이 그리기를 거부한다)\n- HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.\n- 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.\n  beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.\n  (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)\n  beginFrameWithMatrices(보기, 투영) 는 두 행렬로 시작한다. (직교 원 행렬 카메라) 카메라의 자리와 보기 돌림(하이라이트, 림, 소프트 엣지, 매트캡)은 보기와 투영에서 읽는다.\n- 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR)과 빛 묶음은 바뀔 때만 올린다. 그리기마다 바뀌는 값(모형 행렬, 틴트, 텍스처)만 매번 올린다.\n- readProgramSources(material, instanceLayout) 로 ShaderWarmer 에 넘길 소스를 준다.\n- 노드 사각형 안에 그리기: setScreenRect(x, y, 너비, 높이) 를 주면 beginFrame 이 보기와 투영의 클립 공간을 그 사각형으로 옮기고 가위로 밖을 자른다.\n  사각형은 beginFrame 때의 뷰포트(보통 드로잉 버퍼 전체) 안의 픽셀이고 왼쪽 위가 원점이다. (2D 노드의 draw 에서 graphic.getTransformMatrix 로 셈한 자리)\n  화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.\n- drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)\n- 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)\n- 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.\n- 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))\n- 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.",
-						"en": "Toon renderer. (Draws MeshBuilder and readGlbArrays arrays with single-color material and outlines)\n- Light: holds one ToonLightSet as the default. Sun (direction and color, shadow), ambient light of sky color and ground color, fill light, point lights and spotlights (up to TOON_MAXIMUM_POINT_LIGHTS), rim light, highlight, light model (÷π).\n  Cel shading is a shade ramp. (Base, 1st shade, 2nd shade with Step and Feather of the Unity Toon Shader, shadows enter as the shade color, boundaries without stairs by fwidth, a ramp texture also works)\n  The sun receives the whole ramp color, while the fill light, point lights and spotlights receive the ramp's brightness level. Highlight and rim range from the hard toon form to the soft form. The math is in the ToonLightSet header.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel change the default set. Another set (createLightSet) can be given per draw with options.lightSet. (When the shade color differs per material)\n- Normals: transformed by the transpose of the inverse of the upper left 3x3 of the model matrix and the joint matrix. (Light stays correct on stretched and squashed models, the same goes for matrices changed by the vertex chunk)\n- Material: vertex color (sRGB), glow (multiplied by the base color and added), unlit. If there are vertex UVs (arrays.uvData, 2 each), textures are read.\n- Draw options (options, the defaults give the same picture as before):\n  tintColor [r, g, b, a] sRGB and alpha. If tintAmount (0 ~ 1) is given, the tint is mixed in sRGB instead of multiplied. (Hit flash, broken red)\n  glowScale multiplier of vertex glow (default 1), colorScale multiplier of the final linear color (default 1, darkens a mirrored image), emissiveColor [r, g, b] sRGB and emissiveIntensity (linear multiplier, default 1, color default black).\n  baseColorTexture (multiplied by the base color, alpha into opacity), emissiveTexture (multiplied by the glow color), uvTransform [u offset, v offset, u scale, v scale] (offset and scale of KHR_texture_transform).\n  decalTexture covers the base color with alpha (color = texture x decalColor). It glows in that color by decalEmission. decalUvTransform picks one cell of an atlas.\n  alphaCutoff discards pixels whose opacity is below it. (0 turns it off, glTF MASK)\n  blendMode: ToonBlendMode.alpha (default, straight alpha), premultiplied (premultiplied alpha), additive (add). Anything other than alpha is drawn as transparent.\n  softEdge multiplies pow(|dot(N, V)|, softEdge) into the opacity to thin the edges. (0 turns it off, Fresnel form)\n  isMirrored draws with the winding flipped. If not given, it flips by itself when the determinant of the model matrix is negative. If the view matrix is mirrored, that flip is added too.\n  indexStart, indexCount draw only that span of the body vertex indices. (GLB material ranges, hidden parts) outlineIndexStart, outlineIndexCount are for the outline shell.\n  material (ToonMaterial), textures ({ uniform name: texture }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) are extension points. (toonmaterial.js header)\n  lightSet (ToonLightSet) is the light set of that draw.\n  If receivesShadow (default true) is false, the sun's shadow is not looked up. shadeOffset is added to the received light amount to move the shade boundary. (Vertex color threshold of Guilty Gear Xrd, Shading Grade Map form of the Unity Toon Shader)\n  specularScale, rimScale (default 1) are the highlight and rim multipliers of that draw. (0 means none, strength per material)\n  matcapTexture is a matcap read with the view-space normal. matcapStrength (default 1), matcapBlend (ToonMatcapBlend.multiply default, add)\n  outlineColor [r, g, b, a] sRGB is the shell outline color of that draw (setOutlineColor if not given), outlineWidthScale (default 1) is the multiplier of the built thickness.\n  outlineOffsetZ (default 0) is the world length the shell is pushed away from the camera. (So it does not show in front of the body, Offset Z of the Unity Toon Shader)\n  angelRingTexture is the angel ring texture. u is the x of the view-space normal, v is the y of the second UV mixed with the y of the view normal by angelRingOffsetV (default 0.3). (Angel Ring of the Unity Toon Shader)\n  angelRingColor [r, g, b] (linear multiplier, default white), angelRingOffsetU (0 ~ 0.5, default 0), isAngelRingAlpha (default false adds, true covers with the texture alpha)\n  The angel ring UV is rotated back by the camera roll. (readCameraRoll, Camera Rolling Stabilizer of the Unity Toon Shader, the ring stays on the head even when the camera is tilted)\n  lineId, hasScreenOutline, hasCreaseLine are values ToonDrawQueue passes to the screen-space outline. (The renderer does not read them)\n- Outline shell (inverted hull): uploads the base position and push direction (built thickness, the averaged normal of the same position) of the shell MeshBuilder built, and the shader pushes it by outlineWidthScale and draws only back faces.\n  If setOutlineDistanceScale(reference distance, minimum scale, maximum scale) is given, distance to the camera / reference distance is multiplied into the thickness to keep the screen thickness. (Perspective only)\n  If setOutlineFadeDistance(near distance, far distance) is given, the thickness goes to 0 as the distance from the model position to the camera approaches the far distance. (smoothstep, Nearest and Farthest Distance of the Unity Toon Shader)\n  The shell color is multiplied by the sun color when the outline light color usage of the light set is on (default). (Divided by its intensity when the intensity is 1 or more, same as the Unity Toon Shader outline)\n- Skeleton: the joint matrices computed by writeSkinPose are passed to drawMesh. (Up to TOON_MAXIMUM_JOINTS)\n- GPU instancing: drawMeshInstanced draws many copies of the same model at once with a matrix and tint per instance. (Both body and outline, culled and uploaded on every draw)\n  Long-lived instances build a persistent buffer with createInstanceLayout and createInstanceBuffer and are drawn with drawMeshInstanceBuffer. (Not culled, the material vertex chunk reads user attributes)\n- Off-screen culling: the model's bounding sphere is tested against the frustum of view and projection and is not drawn if outside. (Instances are culled one by one and only the remaining ones are uploaded)\n- Shadows: cast into a ShadowMap with beginShadowPass and drawMesh, received with setShadow. (3x3 PCF)\n  Point light and spotlight shadows are cast into a ShadowAtlas with beginShadowAtlasPass and, per tile, setShadowAtlasTile and drawMesh, and received with setLocalShadows. (A point light uses six cube tiles, a spotlight one perspective tile)\n  The shadow is multiplied into that light's received amount and goes into the shade ramp. (Same form as the sun) Only point lights with castsShadow true get tiles. (Up to SHADOW_ATLAS_MAXIMUM_LIGHTS)\n  Even when shadows are not received, a 1x1 comparison depth texture is bound to both shadow units. (Without a depth texture on a sampler2DShadow unit the Mac driver reports it, and if a color texture is bound WebGL refuses to draw)\n- HDR: setHdrOutput(true) outputs linear color without gamma. Draw into a float render target (ToonPostProcess) and finish with bloom and tone mapping.\n- Use: createMesh(arrays) → every frame beginFrame(view and projection) → drawMesh / drawMeshInstanced → endFrame() → deleteMesh when done.\n  beginFrame notes the previous draw state (blend, depth, face culling, program, vertex array) and turns on depth test and face culling, and endFrame restores the noted state.\n  (When inserted between engine 2D drawing, call Graphic.flushBatch before it)\n  beginFrameWithMatrices(view, projection) starts with two matrices. (Orthographic or raw matrix camera) The camera position and view rotation (highlight, rim, soft edge, matcap) are read from the view and projection.\n- Per program, frame values (view and projection, camera, shadow, HDR) and the light set are uploaded only when changed. Only values that change per draw (model matrix, tint, textures) are uploaded every time.\n- readProgramSources(material, instanceLayout) gives the sources to pass to ShaderWarmer.\n- Drawing inside a node rectangle: if setScreenRect(x, y, width, height) is given, beginFrame moves the clip space of view and projection into that rectangle and cuts the outside with the scissor.\n  The rectangle is in pixels inside the viewport at beginFrame (usually the whole drawing buffer) with the top left as the origin. (The position computed with graphic.getTransformMatrix in a 2D node's draw)\n  Off-screen culling uses the frustum before the move. endFrame releases the scissor. Match the camera aspect ratio to the rectangle's ratio. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) calls beginFrame with the camera's view and projection. It uses the same camera as the 2D display (Camera3D.projectToView).\n- drawMeshOutline draws only the outline shell. (When ToonDrawQueue draws all outlines together after all opaque bodies, drawn counts are not counted)\n- Textures: createTexture(image or { width, height, data }, { isMipmapped, isRepeated, isFiltered }) builds an RGBA texture. UV (0, 0) is the top left of the image. (Same as glTF)\n- Texture units: point light shadow atlas 0, ramp 1, matcap 2, sun shadow 3, base color 4, glow 5, decal 6, angel ring 7, material 8 ~ 15. beginFrame notes the binding of unit 0 and endFrame restores it.\n- Second UV: if the arrays have uv1Data, vertexUv is four values (UV, second UV). Shader chunks read it as ToonSurface.uv1. ((0, 1) if none)\n- Light color usage (setLightColorUsage), shade-side rim (setShadeRimLight) and light intensity limit (setLightIntensityLimited) live in the light set (ToonLightSet)."
+						"ko": "툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)\n- 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).\n  셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)\n  해는 램프 색을 통째로, 채움 빛과 점광과 스포트라이트는 램프의 밝기 단계를 받는다. 하이라이트와 림은 단단한 툰 꼴에서 부드러운 꼴까지. 셈은 ToonLightSet 머리말에 있다.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel 은 기본 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음(createLightSet)을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 노멀: 모형 행렬과 본 행렬의 왼쪽 위 3x3 의 역행렬의 전치로 옮긴다. (늘이고 줄인 모형도 빛이 맞다, 정점 조각이 고친 행렬도 같다)\n- 재질: 꼭짓점의 색(sRGB), 빛남(바탕색에 곱해 더함), 빛을 받지 않음. 꼭짓점 UV(arrays.uvData, 2 씩)가 있으면 텍스처를 읽는다.\n- 그리기 꼴(options, 기본값이면 지금까지와 같은 화면):\n  tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강)\n  glowScale 꼭짓점 빛남의 배(기본 1), colorScale 마지막 선형 색의 배(기본 1, 거울에 비친 모습을 어둡게), emissiveColor [r, g, b] sRGB 와 emissiveIntensity(선형 배, 기본 1, 색 기본 검정).\n  baseColorTexture(바탕색에 곱함, 알파는 불투명도에), emissiveTexture(빛남 색에 곱함), uvTransform [u 옮김, v 옮김, u 배, v 배] (KHR_texture_transform 의 offset, scale).\n  decalTexture 는 바탕색 위에 알파로 덮는다(색 = 텍스처 x decalColor). decalEmission 만큼 그 색으로 빛난다. decalUvTransform 은 묶음 그림의 한 칸을 고를 때.\n  alphaCutoff 는 불투명도가 그보다 작은 화소를 버린다. (0 이면 끔, glTF MASK)\n  blendMode: ToonBlendMode.alpha(기본, 곧은 알파), premultiplied(미리 곱한 알파), additive(더하기). alpha 가 아니면 비치는 것으로 그린다.\n  softEdge 는 pow(|dot(N, V)|, softEdge) 를 불투명도에 곱해 가장자리를 엷게 한다. (0 이면 끔, 프레넬 꼴)\n  isMirrored 는 감기를 뒤집어 그린다. 주지 않으면 모형 행렬의 행렬식이 음수일 때 스스로 뒤집는다. 보기 행렬이 거울에 비쳤으면 그것도 더해 뒤집는다.\n  indexStart, indexCount 는 몸의 꼭짓점 번호 가운데 그 자리만 그린다. (GLB 재질 범위, 숨긴 부분) outlineIndexStart, outlineIndexCount 는 바깥선 껍데기.\n  material(ToonMaterial), textures({ 유니폼 이름: 텍스처 }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) 는 확장 자리다. (toonmaterial.js 머리말)\n  lightSet(ToonLightSet) 은 그 그리기의 빛 묶음이다.\n  receivesShadow (기본 true) 가 false 면 해의 그림자를 보지 않는다. shadeOffset 은 빛을 받는 몫에 더해 그늘 경계를 옮긴다. (길티기어 Xrd 의 꼭짓점 색 문턱, 유니티 툰 셰이더의 Shading Grade Map 꼴)\n  specularScale, rimScale (기본 1) 은 그 그리기의 하이라이트와 림 배다. (0 이면 없음, 재질마다의 세기)\n  matcapTexture 는 보기 공간 노멀로 읽는 매트캡이다. matcapStrength (기본 1), matcapBlend (ToonMatcapBlend.multiply 기본, add)\n  outlineColor [r, g, b, a] sRGB 는 그 그리기의 껍데기 바깥선 색 (주지 않으면 setOutlineColor), outlineWidthScale (기본 1) 은 지은 굵기의 배다.\n  outlineOffsetZ (기본 0) 는 껍데기를 카메라에서 먼 쪽으로 미는 월드 길이다. (몸 앞으로 비치지 않게, 유니티 툰 셰이더의 Offset Z)\n  angelRingTexture 는 천사 고리 텍스처다. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 angelRingOffsetV (기본 0.3) 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring)\n  angelRingColor [r, g, b] (선형 배, 기본 흰색), angelRingOffsetU (0 ~ 0.5, 기본 0), isAngelRingAlpha (기본 false 면 더하고 true 면 텍스처 알파로 덮는다)\n  천사 고리 UV 는 카메라 기울임만큼 되돌려 돌린다. (readCameraRoll, 유니티 툰 셰이더의 Camera Rolling Stabilizer, 카메라를 기울여도 고리는 머리에 붙어 있다)\n  lineId, hasScreenOutline, hasCreaseLine 은 ToonDrawQueue 가 화면 공간 바깥선에 넘기는 값이다. (렌더러는 읽지 않는다)\n- 바깥선 껍데기(inverted hull): MeshBuilder 가 지은 껍데기의 바탕 자리와 미는 쪽(지은 굵기, 같은 자리의 노멀을 평균한 쪽)을 올리고, 셰이더가 outlineWidthScale 만큼 밀어 뒷면만 그린다.\n  setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 를 주면 카메라까지의 거리 / 기준 거리 를 굵기에 곱해 화면 굵기를 맞춘다. (원근만)\n  setOutlineFadeDistance(가까운 거리, 먼 거리) 를 주면 모형의 자리에서 카메라까지가 먼 거리에 다가갈수록 굵기가 0 이 된다. (smoothstep, 유니티 툰 셰이더의 Nearest, Farthest Distance)\n  껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)\n- 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)\n- GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)\n  오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (거르지 않음, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)\n- 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)\n- 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF, 치우침은 ShadowMap.setBias 의 텍셀 단위 값에 텍셀 크기와 기울기를 곱한다)\n  점광과 스포트라이트 그림자는 ShadowAtlas 에 beginShadowAtlasPass, 칸마다 setShadowAtlasTile 과 drawMesh 로 드리우고, setLocalShadows 로 받는다. (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)\n  그 빛의 받는 몫에 그림자를 곱해 그늘 램프에 넣는다. (해와 같은 꼴) castsShadow 가 true 인 점광만 칸을 받는다. (SHADOW_ATLAS_MAXIMUM_LIGHTS 까지)\n  그림자를 받지 않을 때도 두 그림자 유닛에 1x1 비교 깊이 텍스처를 묶는다. (sampler2DShadow 유닛에 깊이 텍스처가 없으면 맥 드라이버가 알리고, 색 텍스처가 묶여 있으면 WebGL 이 그리기를 거부한다)\n- HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.\n- 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.\n  beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.\n  (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)\n  beginFrameWithMatrices(보기, 투영) 는 두 행렬로 시작한다. (직교 원 행렬 카메라) 카메라의 자리와 보기 돌림(하이라이트, 림, 소프트 엣지, 매트캡)은 보기와 투영에서 읽는다.\n- 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR)과 빛 묶음은 바뀔 때만 올린다. 그리기마다 바뀌는 값(모형 행렬, 틴트, 텍스처)만 매번 올린다.\n- readProgramSources(material, instanceLayout) 로 ShaderWarmer 에 넘길 소스를 준다.\n- 노드 사각형 안에 그리기: setScreenRect(x, y, 너비, 높이) 를 주면 beginFrame 이 보기와 투영의 클립 공간을 그 사각형으로 옮기고 가위로 밖을 자른다.\n  사각형은 beginFrame 때의 뷰포트(보통 드로잉 버퍼 전체) 안의 픽셀이고 왼쪽 위가 원점이다. (2D 노드의 draw 에서 graphic.getTransformMatrix 로 셈한 자리)\n  화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.\n- drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)\n- 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)\n- 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.\n- 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))\n- 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.",
+						"en": "Toon renderer. (Draws MeshBuilder and readGlbArrays arrays with single-color material and outlines)\n- Light: holds one ToonLightSet as the default. Sun (direction and color, shadow), ambient light of sky color and ground color, fill light, point lights and spotlights (up to TOON_MAXIMUM_POINT_LIGHTS), rim light, highlight, light model (÷π).\n  Cel shading is a shade ramp. (Base, 1st shade, 2nd shade with Step and Feather of the Unity Toon Shader, shadows enter as the shade color, boundaries without stairs by fwidth, a ramp texture also works)\n  The sun receives the whole ramp color, while the fill light, point lights and spotlights receive the ramp's brightness level. Highlight and rim range from the hard toon form to the soft form. The math is in the ToonLightSet header.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel change the default set. Another set (createLightSet) can be given per draw with options.lightSet. (When the shade color differs per material)\n- Normals: transformed by the transpose of the inverse of the upper left 3x3 of the model matrix and the joint matrix. (Light stays correct on stretched and squashed models, the same goes for matrices changed by the vertex chunk)\n- Material: vertex color (sRGB), glow (multiplied by the base color and added), unlit. If there are vertex UVs (arrays.uvData, 2 each), textures are read.\n- Draw options (options, the defaults give the same picture as before):\n  tintColor [r, g, b, a] sRGB and alpha. If tintAmount (0 ~ 1) is given, the tint is mixed in sRGB instead of multiplied. (Hit flash, broken red)\n  glowScale multiplier of vertex glow (default 1), colorScale multiplier of the final linear color (default 1, darkens a mirrored image), emissiveColor [r, g, b] sRGB and emissiveIntensity (linear multiplier, default 1, color default black).\n  baseColorTexture (multiplied by the base color, alpha into opacity), emissiveTexture (multiplied by the glow color), uvTransform [u offset, v offset, u scale, v scale] (offset and scale of KHR_texture_transform).\n  decalTexture covers the base color with alpha (color = texture x decalColor). It glows in that color by decalEmission. decalUvTransform picks one cell of an atlas.\n  alphaCutoff discards pixels whose opacity is below it. (0 turns it off, glTF MASK)\n  blendMode: ToonBlendMode.alpha (default, straight alpha), premultiplied (premultiplied alpha), additive (add). Anything other than alpha is drawn as transparent.\n  softEdge multiplies pow(|dot(N, V)|, softEdge) into the opacity to thin the edges. (0 turns it off, Fresnel form)\n  isMirrored draws with the winding flipped. If not given, it flips by itself when the determinant of the model matrix is negative. If the view matrix is mirrored, that flip is added too.\n  indexStart, indexCount draw only that span of the body vertex indices. (GLB material ranges, hidden parts) outlineIndexStart, outlineIndexCount are for the outline shell.\n  material (ToonMaterial), textures ({ uniform name: texture }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) are extension points. (toonmaterial.js header)\n  lightSet (ToonLightSet) is the light set of that draw.\n  If receivesShadow (default true) is false, the sun's shadow is not looked up. shadeOffset is added to the received light amount to move the shade boundary. (Vertex color threshold of Guilty Gear Xrd, Shading Grade Map form of the Unity Toon Shader)\n  specularScale, rimScale (default 1) are the highlight and rim multipliers of that draw. (0 means none, strength per material)\n  matcapTexture is a matcap read with the view-space normal. matcapStrength (default 1), matcapBlend (ToonMatcapBlend.multiply default, add)\n  outlineColor [r, g, b, a] sRGB is the shell outline color of that draw (setOutlineColor if not given), outlineWidthScale (default 1) is the multiplier of the built thickness.\n  outlineOffsetZ (default 0) is the world length the shell is pushed away from the camera. (So it does not show in front of the body, Offset Z of the Unity Toon Shader)\n  angelRingTexture is the angel ring texture. u is the x of the view-space normal, v is the y of the second UV mixed with the y of the view normal by angelRingOffsetV (default 0.3). (Angel Ring of the Unity Toon Shader)\n  angelRingColor [r, g, b] (linear multiplier, default white), angelRingOffsetU (0 ~ 0.5, default 0), isAngelRingAlpha (default false adds, true covers with the texture alpha)\n  The angel ring UV is rotated back by the camera roll. (readCameraRoll, Camera Rolling Stabilizer of the Unity Toon Shader, the ring stays on the head even when the camera is tilted)\n  lineId, hasScreenOutline, hasCreaseLine are values ToonDrawQueue passes to the screen-space outline. (The renderer does not read them)\n- Outline shell (inverted hull): uploads the base position and push direction (built thickness, the averaged normal of the same position) of the shell MeshBuilder built, and the shader pushes it by outlineWidthScale and draws only back faces.\n  If setOutlineDistanceScale(reference distance, minimum scale, maximum scale) is given, distance to the camera / reference distance is multiplied into the thickness to keep the screen thickness. (Perspective only)\n  If setOutlineFadeDistance(near distance, far distance) is given, the thickness goes to 0 as the distance from the model position to the camera approaches the far distance. (smoothstep, Nearest and Farthest Distance of the Unity Toon Shader)\n  The shell color is multiplied by the sun color when the outline light color usage of the light set is on (default). (Divided by its intensity when the intensity is 1 or more, same as the Unity Toon Shader outline)\n- Skeleton: the joint matrices computed by writeSkinPose are passed to drawMesh. (Up to TOON_MAXIMUM_JOINTS)\n- GPU instancing: drawMeshInstanced draws many copies of the same model at once with a matrix and tint per instance. (Both body and outline, culled and uploaded on every draw)\n  Long-lived instances build a persistent buffer with createInstanceLayout and createInstanceBuffer and are drawn with drawMeshInstanceBuffer. (Not culled, the material vertex chunk reads user attributes)\n- Off-screen culling: the model's bounding sphere is tested against the frustum of view and projection and is not drawn if outside. (Instances are culled one by one and only the remaining ones are uploaded)\n- Shadows: cast into a ShadowMap with beginShadowPass and drawMesh, received with setShadow. (3x3 PCF, the bias is the texel-unit value of ShadowMap.setBias multiplied by the texel size and slope)\n  Point light and spotlight shadows are cast into a ShadowAtlas with beginShadowAtlasPass and, per tile, setShadowAtlasTile and drawMesh, and received with setLocalShadows. (A point light uses six cube tiles, a spotlight one perspective tile)\n  The shadow is multiplied into that light's received amount and goes into the shade ramp. (Same form as the sun) Only point lights with castsShadow true get tiles. (Up to SHADOW_ATLAS_MAXIMUM_LIGHTS)\n  Even when shadows are not received, a 1x1 comparison depth texture is bound to both shadow units. (Without a depth texture on a sampler2DShadow unit the Mac driver reports it, and if a color texture is bound WebGL refuses to draw)\n- HDR: setHdrOutput(true) outputs linear color without gamma. Draw into a float render target (ToonPostProcess) and finish with bloom and tone mapping.\n- Use: createMesh(arrays) → every frame beginFrame(view and projection) → drawMesh / drawMeshInstanced → endFrame() → deleteMesh when done.\n  beginFrame notes the previous draw state (blend, depth, face culling, program, vertex array) and turns on depth test and face culling, and endFrame restores the noted state.\n  (When inserted between engine 2D drawing, call Graphic.flushBatch before it)\n  beginFrameWithMatrices(view, projection) starts with two matrices. (Orthographic or raw matrix camera) The camera position and view rotation (highlight, rim, soft edge, matcap) are read from the view and projection.\n- Per program, frame values (view and projection, camera, shadow, HDR) and the light set are uploaded only when changed. Only values that change per draw (model matrix, tint, textures) are uploaded every time.\n- readProgramSources(material, instanceLayout) gives the sources to pass to ShaderWarmer.\n- Drawing inside a node rectangle: if setScreenRect(x, y, width, height) is given, beginFrame moves the clip space of view and projection into that rectangle and cuts the outside with the scissor.\n  The rectangle is in pixels inside the viewport at beginFrame (usually the whole drawing buffer) with the top left as the origin. (The position computed with graphic.getTransformMatrix in a 2D node's draw)\n  Off-screen culling uses the frustum before the move. endFrame releases the scissor. Match the camera aspect ratio to the rectangle's ratio. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) calls beginFrame with the camera's view and projection. It uses the same camera as the 2D display (Camera3D.projectToView).\n- drawMeshOutline draws only the outline shell. (When ToonDrawQueue draws all outlines together after all opaque bodies, drawn counts are not counted)\n- Textures: createTexture(image or { width, height, data }, { isMipmapped, isRepeated, isFiltered }) builds an RGBA texture. UV (0, 0) is the top left of the image. (Same as glTF)\n- Texture units: point light shadow atlas 0, ramp 1, matcap 2, sun shadow 3, base color 4, glow 5, decal 6, angel ring 7, material 8 ~ 15. beginFrame notes the binding of unit 0 and endFrame restores it.\n- Second UV: if the arrays have uv1Data, vertexUv is four values (UV, second UV). Shader chunks read it as ToonSurface.uv1. ((0, 1) if none)\n- Light color usage (setLightColorUsage), shade-side rim (setShadeRimLight) and light intensity limit (setLightIntensityLimited) live in the light set (ToonLightSet)."
 					},
 					"examples": [
 						{
@@ -72377,6 +72738,83 @@
 								"class": "ShadowMap",
 								"name": "get_light_view_projection_matrix"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "setBias",
+							"signature": "setBias(depthBias, normalBias)",
+							"params": [
+								{
+									"name": "depthBias",
+									"type": "number",
+									"description": {
+										"ko": "깊이 치우침. (텍셀 단위, 0 이상)",
+										"en": "Depth bias. (in shadow texels, 0 or more)"
+									}
+								},
+								{
+									"name": "normalBias",
+									"type": "number",
+									"description": {
+										"ko": "노멀 치우침. (텍셀 단위, 0 이상)",
+										"en": "Normal bias. (in shadow texels, 0 or more)"
+									}
+								}
+							],
+							"description": {
+								"ko": "그림자 치우침 정하기. (그림자 텍셀 단위, 기본 깊이 1, 노멀 1, 받는 쪽이 읽을 때 쓴다)\n- 텍셀 하나의 월드 크기(빛 행렬의 가로 폭 / 해상도)를 곱해 월드 거리로 바꾸므로 extent 와 해상도가 바뀌어도 같은 몫으로 걸린다. (유니티 URP 의 Depth Bias, Normal Bias 와 같은 단위)\n- 깊이 치우침은 빛 쪽으로 견줄 깊이를 당긴다. 노멀 치우침은 받는 점을 면의 노멀 쪽으로 밀어 읽는다. 둘 다 3x3 PCF 의 반지름 1.5 텍셀을 곱한다.\n- ToonRenderer 는 여기에 기울기 비례 치우침(빛과 면이 스칠수록 커짐, 텍셀 2.5 x 기울기, 기울기는 10 까지)을 더한다.\n- 줄이면 그림자가 붙고 제 그림자 여드름이 생기기 쉽다. 늘리면 여드름은 없어지고 그림자가 떠 보인다(피터 패닝).",
+								"en": "Sets the shadow bias. (in shadow texels, default depth 1, normal 1, applied by the receiver when it reads the shadow)\n- It is multiplied by the world size of one texel (light matrix width / resolution), so the same amount applies when the extent or resolution changes. (the same units as Depth Bias and Normal Bias in Unity URP)\n- Depth bias pulls the compared depth toward the light. Normal bias pushes the receiving point along the surface normal before reading. Both are multiplied by the 1.5 texel radius of the 3x3 PCF.\n- ToonRenderer adds a slope-scaled bias on top (grows as the light grazes the surface, 2.5 texels x slope, slope clamped at 10).\n- Lower values keep shadows attached but invite self-shadow acne. Higher values remove acne but make shadows look detached (peter panning)."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/shadowmap.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "텍셀 단위로 그림자 치우침 정하기",
+										"en": "Setting the shadow bias in texels"
+									},
+									"code": "import { ShadowMap, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst shadowMap = new ShadowMap(webGL2RenderingContext, 1024);\nshadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.3, -1, -0.2), 20, 1, 100);\nshadowMap.setBias(0.5, 1.5);\nconsole.log(shadowMap.getDepthBias(), shadowMap.getNormalBias());\nshadowMap.destroy();",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "getDepthBias",
+							"signature": "getDepthBias()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "깊이 치우침. (그림자 텍셀 단위, 기본 1)",
+									"en": "Depth bias. (in shadow texels, default 1)"
+								}
+							},
+							"description": {
+								"ko": "깊이 치우침 반환.",
+								"en": "Returns the depth bias."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/shadowmap.js"
+						},
+						{
+							"kind": "method",
+							"name": "getNormalBias",
+							"signature": "getNormalBias()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "노멀 치우침. (그림자 텍셀 단위, 기본 1)",
+									"en": "Normal bias. (in shadow texels, default 1)"
+								}
+							},
+							"description": {
+								"ko": "노멀 치우침 반환.",
+								"en": "Returns the normal bias."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/shadowmap.js"
 						},
 						{
 							"kind": "method",
@@ -93262,6 +93700,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "노드에 붙어 있으면 참.",
+									"en": "True if attached to a node."
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형을 rect 에 적기. (오버라이드: 격자는 내용 영역 안, 선은 값이 정한 범위 밖으로 나간 만큼 위아래로 넘친다)\n- 가로는 표본이 내용 폭 안에 퍼지므로 내용 폭. 세로는 내용 높이와 가장 큰 값, 가장 작은 값이 놓이는 높이를 합친다.\n- 선 두께만큼(이음새를 메우는 반두께 연장까지) 사방으로 넓혀 본다.",
+								"en": "Writes the drawn rectangle to rect. (Override: the grid stays inside the content area, the line spills up or down as far as values leave the set range)\n- Horizontally the content width, since samples spread within it. Vertically the union of the content height and the heights of the largest and smallest values.\n- Grown on all sides by the line width (including the half-width extension that fills joints)."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uichart.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "범위를 넘는 값이 그리는 곳 보기",
+										"en": "Seeing where out-of-range values draw"
+									},
+									"code": "import { WorldNode, UILineChart, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nnode.setContentSize(Vector2.create(160, 60));\nconst chart = node.addComponent(UILineChart);\nchart.setValueRange(0, 1);\nchart.setValueList([0.5, 2, 0.2]);\nconst drawnRect = Rect.zero();\nchart.calculateDrawnRect(drawnRect);\nconsole.log(drawnRect.position.y < 0);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "calculatePoints",
 							"signature": "calculatePoints(width, height)",
 							"params": [
@@ -93605,6 +94081,44 @@
 							},
 							"since": "0.3.0",
 							"source": "src/ui/uichart.js"
+						},
+						{
+							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "노드에 붙어 있으면 참.",
+									"en": "True if attached to a node."
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형을 rect 에 적기. (오버라이드: 막대는 내용 영역 안, 막대 사이가 너무 넓어 막대 폭이 음수가 되면 그만큼 옆으로 넘친다)\n- 세로는 막대가 가장 낮아도 한 단위 높이로 그리므로 내용 높이가 한 단위보다 작으면 위로 넘친다. 한 단위씩 넓혀 본다.",
+								"en": "Writes the drawn rectangle to rect. (Override: bars stay inside the content area; if the gaps are so wide that the bar width turns negative, it spills sideways by that much)\n- Vertically, the lowest bar is still drawn one unit tall, so it spills upward when the content height is under one unit. Grown by one unit."
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uichart.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "막대 그래프가 그리는 곳 보기",
+										"en": "Seeing where a bar chart draws"
+									},
+									"code": "import { WorldNode, UIBarChart, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nnode.setContentSize(Vector2.create(120, 40));\nconst chart = node.addComponent(UIBarChart);\nchart.setValueList([3, 5, 2]);\nconst drawnRect = Rect.zero();\nchart.calculateDrawnRect(drawnRect);\nconsole.log(drawnRect.size.x, drawnRect.size.y);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -107584,6 +108098,44 @@
 								"class": "HeatHazeEffect",
 								"name": "get_timer"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "노드에 붙어 있으면 참.",
+									"en": "True if attached to a node."
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형을 rect 에 적기. (오버라이드: 내용 영역을 줄마다 좌우로 흔들림 폭만큼 옮겨 그리므로 양옆으로 폭만큼 넘친다)",
+								"en": "Writes the drawn rectangle to rect. (Override: each row of the content area is shifted left and right by the wobble amplitude, so it spills by that much on both sides)"
+							},
+							"since": "0.4.0",
+							"source": "src/effect/heathazeeffect.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "아지랑이가 그리는 곳 보기",
+										"en": "Seeing where the heat haze draws"
+									},
+									"code": "import { WorldNode, HeatHazeEffect, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nnode.setContentSize(Vector2.create(100, 40));\nconst heatHazeEffect = node.addComponent(HeatHazeEffect);\nheatHazeEffect.setAmplitude(4);\nconst drawnRect = Rect.zero();\nheatHazeEffect.calculateDrawnRect(drawnRect);\nconsole.log(drawnRect.position.x, drawnRect.size.x);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
