@@ -667,7 +667,7 @@ export class ToonDrawQueue {
 		const itemCount = this.#itemCount;
 		let item = itemList[itemCount];
 		if (item === undefined) {
-			item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, drawItem: null, entry: null, heldEntry: null, heldRenderer: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
+			item = { mesh: null, modelMatrix: null, instances: null, instanceBuffer: null, instanceCount: 0, options: null, drawItem: null, entry: null, heldEntry: null, heldRenderer: null, state: null, isTransparent: false, materialBlock: null, mirrorSign: 0, isStaticCaster: false, depthPosition: { x: 0, y: 0, z: 0 }, depth: 0 };
 			itemList.push(item);
 		}
 		item.mesh = mesh;
@@ -1065,7 +1065,8 @@ export class ToonDrawQueue {
 	// 그림자 드리우개 그리기. (그림자 판의 갱신 방식대로 다시 그리거나 건너뛴다, 불투명하고 castsShadow 가 false 가 아닌 것만)
 	// - everyFrame: 판을 비우고 전부 그린다.
 	// - interval: N 프레임마다(처음과 requestUpdate 뒤에는 바로) 판을 비우고 전부 그린다. 사이의 프레임은 그리지 않는다.
-	// - onChange: 드리우개를 담은 차례로 앞의 프레임과 견준다. SHADOW_STATIC_FRAME_COUNT 프레임 그대로인 것은 구운 판에 굽고,
+	// - onChange: 드리우개를 담은 차례로 앞의 프레임과 견준다. (모형, 재질, 행렬, 뼈대처럼 깊이에 닿는 것만, 틴트와 색 같은 재질 값으로 바뀌는 정렬 차례로 견주지 않는다)
+	//   SHADOW_STATIC_FRAME_COUNT 프레임 그대로인 것은 구운 판에 굽고,
 	//   나머지(움직이는 것, 정점 조각이 있는 재질)는 매 프레임 구운 판을 판에 옮긴 뒤 그 위에 덧그린다.
 	//   구운 것이 바뀌거나 빠지거나 새로 구울 것이 생기거나 requestUpdate 를 부르면 다시 굽는다. 움직이는 것이 없고 판이 구운 판과 같으면 아무것도 그리지 않는다.
 	//   빛 행렬이나 칸이 바뀐 프레임은 전부를 판에 바로 그리고, 빛이 멈춘 다음 프레임에 굽는다.
@@ -1128,16 +1129,19 @@ export class ToonDrawQueue {
 		if (recordList.length > casterList.length) {
 			recordList.length = casterList.length;
 		}
-		const staticList = this.#staticCasterList;
-		const dynamicList = this.#dynamicCasterList;
-		let staticCount = 0;
-		let dynamicCount = 0;
-		for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
-			const item = casterList[casterIndex];
+		// 기록은 담은 차례로 견준다. (정렬 차례는 재질 블록 같은 깊이에 닿지 않는 값으로도 바뀌어, 그 차례로 견주면 바뀌지 않은 드리우개도 다르게 보인다)
+		const itemList = this.#itemList;
+		let casterIndex = 0;
+		for (let index = 0; index < this.#itemCount; ++index) {
+			const item = itemList[index];
+			if (item.isTransparent || !item.state[DRAW_STATE_CASTS_SHADOW]) {
+				continue;
+			}
 			if (casterIndex >= recordList.length) {
 				recordList.push({ mesh: null, material: undefined, instanceBuffer: null, generation: -1, values: new System.Float32Array(0), stableFrameCount: 0, isStatic: false, drawItem: null, changeSerial: -1 });
 			}
 			const record = recordList[casterIndex];
+			casterIndex += 1;
 			const material = item.state[DRAW_STATE_MATERIAL];
 			const isVertexAnimated = material !== undefined && material !== null && material.getVertexChunk() !== "";
 			if (this.isCasterChanged(record, item) || isVertexAnimated) {
@@ -1152,7 +1156,16 @@ export class ToonDrawQueue {
 					isCacheStale = true;
 				}
 			}
-			if (record.isStatic) {
+			item.isStaticCaster = record.isStatic;
+		}
+		// 굽는 것과 덧그리는 것은 정렬 차례로 나눈다. (자동 인스턴싱으로 이어진 같은 것을 묶는다)
+		const staticList = this.#staticCasterList;
+		const dynamicList = this.#dynamicCasterList;
+		let staticCount = 0;
+		let dynamicCount = 0;
+		for (let index = 0; index < casterList.length; ++index) {
+			const item = casterList[index];
+			if (item.isStaticCaster) {
 				staticList[staticCount] = item;
 				staticCount += 1;
 			}

@@ -1901,6 +1901,7 @@ function isSameOptionsSnapshot(entry, options) {
 //   linear: 색 텍스처를 sRGB 형식으로 올려 GPU 가 선형으로 풀고, 넘기는 색은 sRGB 표준 곡선(IEC 61966-2-1)으로 선형으로 바꿔 곱하고 섞는다. 화면에 낼 때 같은 곡선으로 sRGB 로 바꾼다.
 //     셰이더 소스마다 #define VANILLA_COLOR_SPACE_LINEAR 1 이 들어간다. (ToonPostProcess, ToonScreenOutline 도 같은 값으로 짓는다)
 // - 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.
+//   유닛마다 묶인 텍스처가 같으면 묶지 않고, 고른 유닛도 그리기마다 0 으로 되돌리지 않는다. (고른 유닛은 endFrame 이 돌린다, 단계 콜백과 onBeforeDraw 에는 유닛 0 을 고른 채 넘긴다)
 // - 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))
 // - 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.
 //==============================================================================
@@ -2923,7 +2924,7 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
-	// 유닛 0 에 묶인 텍스처 읽기. (지금 고른 유닛은 그대로 둔다)
+	// 유닛 0 에 묶인 텍스처 읽기. (지금 고른 유닛은 그대로 둔다, 이미 유닛 0 이면 고르지 않는다)
 	//==============================================================================
 	/**
 	 * @returns { WebGLTexture | null } 유닛 0 의 텍스처. (없으면 null)
@@ -2932,6 +2933,9 @@ export class ToonRenderer {
 	readFirstUnitTexture() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const activeTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.ACTIVE_TEXTURE);
+		if (activeTexture === webGL2RenderingContext.TEXTURE0) {
+			return webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
+		}
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		const texture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
 		webGL2RenderingContext.activeTexture(activeTexture);
@@ -2966,9 +2970,9 @@ export class ToonRenderer {
 		this.applyCapability(webGL2RenderingContext.BLEND, savedState.isBlendEnabled);
 		this.applyCapability(webGL2RenderingContext.DEPTH_TEST, savedState.isDepthTestEnabled);
 		this.applyCapability(webGL2RenderingContext.CULL_FACE, savedState.isCullFaceEnabled);
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, savedState.firstUnitTexture);
-		webGL2RenderingContext.activeTexture(savedState.activeTexture);
+		// 유닛 0 의 묶음과 고른 유닛. (상태 캐시가 이미 그렇다고 기억하면 건너뛴다)
+		this.bindTexture2D(0, savedState.firstUnitTexture);
+		this.applyActiveTexture(savedState.activeTexture);
 		this.#savedState = null;
 	}
 
@@ -4222,6 +4226,10 @@ export class ToonRenderer {
 	 * @private
 	 */
 	pauseTrustedOptions(isPaused) {
+		if (isPaused) {
+			// 단계 콜백에는 지금까지처럼 유닛 0 을 고른 채 넘긴다. (그리기는 유닛을 0 으로 되돌리지 않는다)
+			this.applyActiveTexture(this.getWebGL2RenderingContext().TEXTURE0);
+		}
 		this.#isTrusting = !isPaused;
 		this.#hintOptions = null;
 		this.#hintEntry = null;
@@ -4686,8 +4694,10 @@ export class ToonRenderer {
 				unit += 1;
 			}
 		}
-		this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
+		// 고른 유닛은 그리기마다 0 으로 되돌리지 않는다. (다음 그리기가 같은 유닛만 바꾸면 activeTexture 없이 bindTexture 하나로, 프레임 끝에 restoreState 가 돌린다)
 		if (onBeforeDraw !== null) {
+			// 확장 콜백에는 지금까지처럼 유닛 0 을 고른 채 넘긴다.
+			this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
 			onBeforeDraw(solidProgram, webGL2RenderingContext, ToonProgramKind.solid);
 			this.forgetUniformValues(solidProgram);
 		}
