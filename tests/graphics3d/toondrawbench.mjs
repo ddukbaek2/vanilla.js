@@ -1,7 +1,7 @@
 //==============================================================================
 // 툰 그리기 줄의 그리기마다 CPU 비용 재기. (NODE_PATH=$(npm root -g) node tests/graphics3d/toondrawbench.mjs <견줄 저장소 경로> [반복 수] [장면들])
 // - 두 엔진 사본을 견준다. a: 견줄 저장소(고치기 전 사본), b: 이 저장소. 장면은 이 저장소의 것을 두 엔진에 같이 쓴다.
-//   lobby: 애버런트 로비 꼴(toonlobbyscene.mjs), lobbymove: 같은 로비를 카메라가 돌며(프레임 블록 값이 패스마다 바뀜), miner: 광부 mid 꼴(toonminerscene.mjs, 인스턴스 버퍼, 청크 6),
+//   lobby: 애버런트 로비 꼴(toonlobbyscene.mjs), lobbymove: 같은 로비를 카메라가 돌며(프레임 블록 값이 패스마다 바뀜), roommove: 판의 방(fresh)을 카메라가 돌며, miner: 광부 mid 꼴(toonminerscene.mjs, 인스턴스 버퍼, 청크 6),
 //   room: 애버런트 판의 방 꼴(toonroomscene.mjs, 부품마다 꼴을 프레임마다 새로 지음), roomitem: 같은 방을 남겨 두는 항목(ToonDrawItem)으로. (엔진에 없으면 room 과 같다)
 // - 찍는 것:
 //   1. 센 값(부하와 상관없음): 프레임당 GL 호출 수(전부, 유니폼, 프로그램 바꿈, 텍스처 묶기, 버텍스 어레이 묶기, 버퍼 올림, 유니폼 버퍼 묶기, 드로 콜).
@@ -132,9 +132,9 @@ async function runScene(version, sceneName, mode) {
 			const { createLobbyScene } = await import("/b/tests/graphics3d/toonlobbyscene.mjs");
 			scene = createLobbyScene(vanilla, gl, width, height, mode === "read" ? readCounter : null, sceneName === "lobbymove");
 		}
-		else if (sceneName === "room" || sceneName === "roomitem") {
+		else if (sceneName === "room" || sceneName === "roomitem" || sceneName === "roommove") {
 			const { createRoomScene } = await import("/b/tests/graphics3d/toonroomscene.mjs");
-			scene = createRoomScene(vanilla, gl, width, height, sceneName === "room" ? "fresh" : "item");
+			scene = createRoomScene(vanilla, gl, width, height, sceneName === "roomitem" ? "item" : "fresh", sceneName === "roommove");
 		}
 		else {
 			const { createMinerScene } = await import("/b/tests/graphics3d/toonminerscene.mjs");

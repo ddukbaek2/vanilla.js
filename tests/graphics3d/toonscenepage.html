@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
 	툰 재기 장면을 requestAnimationFrame 으로 돌리는 페이지. (tools/perftrace.mjs 로 프레임 전체 시간을 잰다, 시험이 아니다)
-	- 주소 값: scene (lobby, lobbymove, room, roomitem, miner, 기본 lobbymove), engine (import.js 가 든 폴더, 기본 이 저장소 뿌리)
+	- 주소 값: scene (lobby, lobbymove, room, roomitem, roommove, miner, 기본 lobbymove), engine (import.js 가 든 폴더, 기본 이 저장소 뿌리)
 	- 예: NODE_PATH=$(npm root -g) node tools/perftrace.mjs "tests/graphics3d/toonscenepage.html?scene=lobbymove" --seconds 10 --keep-trace trace.json
 -->
 <html>
@@ -25,9 +25,9 @@ if (sceneName === "lobby" || sceneName === "lobbymove") {
 	const { createLobbyScene } = await import("./toonlobbyscene.mjs");
 	scene = createLobbyScene(vanilla, gl, canvas.width, canvas.height, null, sceneName === "lobbymove");
 }
-else if (sceneName === "room" || sceneName === "roomitem") {
+else if (sceneName === "room" || sceneName === "roomitem" || sceneName === "roommove") {
 	const { createRoomScene } = await import("./toonroomscene.mjs");
-	scene = createRoomScene(vanilla, gl, canvas.width, canvas.height, sceneName === "room" ? "fresh" : "item");
+	scene = createRoomScene(vanilla, gl, canvas.width, canvas.height, sceneName === "roomitem" ? "item" : "fresh", sceneName === "roommove");
 }
 else {
 	const { createMinerScene } = await import("./toonminerscene.mjs");
