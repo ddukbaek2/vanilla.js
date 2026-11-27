@@ -1040,6 +1040,11 @@ export class Engine extends Object {
 			++this.#frameLimitFrameCount;
 		}
 
+		// 렌더 배율 상한을 바꿨으면 프레임 머리에서 캔버스 크기를 맞춘다. (그리는 중에 바꾸면 그 프레임이 까맣다)
+		if (this.getViewManager().isViewRectPending()) {
+			this.resize();
+		}
+
 		// 렌더러 처리.
 		const graphic = this.getGraphic();
 		graphic.applySettings(this);

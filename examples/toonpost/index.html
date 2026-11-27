@@ -182,8 +182,7 @@ class PanelDrawer {
 		vfx.update(this.#frameCount === 0 ? 0 : FRAME_SECONDS);
 		PanelDrawer.emitEffects(vfx, elapsedSeconds);
 		vfx.draw(camera.getViewMatrix(), camera.getProjectionMatrix());
-		const bottom = webGL2RenderingContext.drawingBufferHeight - System.Math.round(screenRect.y) - height;
-		postProcess.end(null, [System.Math.round(screenRect.x), bottom, width, height]);
+		postProcess.end(screenRect.outputFramebuffer, screenRect.outputViewport);
 		this.#frameCount += 1;
 		if (this.#frameCount === 30) {
 			System.console.log(`toonpost: 판 ${this.#panelMode} 표본 수 ${postProcess.getSampleCount()} 실수 판 ${postProcess.getUseFloatColor()} 블룸 단 ${postProcess.getBloomLevelCount()}`);
