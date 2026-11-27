@@ -69,9 +69,10 @@ const LINE_COLOR_TEXTURE_UNIT = 4;
 const COMPOSITE_LINE_TEXTURE_UNIT = 6;
 const COMPOSITE_DEPTH_TEXTURE_UNIT = 7;
 
-// 가는 선 길의 가장 큰 찾기 반지름. (섞기가 보는 가면 칸이 (2 x 2 + 1) 제곱 = 25 개, 굵기 4 픽셀까지, 섞기 셰이더의 상수 5 x 5 와 맞춘다)
-// - 굵기 w 의 선은 둘레 ceil(w / 2 + 1) - 1 칸을 보면 빠짐이 없다. 이보다 굵으면 점프 플러딩 길로 간다. (넓히기 걸음이 셋 이상이 되는 굵기부터)
-const THIN_LINE_MAXIMUM_SEARCH_RADIUS = 2;
+// 가는 선 길의 가장 큰 굵기. (그리는 영역 픽셀, 2 x sqrt(4.5) - 1 = 약 3.24)
+// - 덮는 몫이 0 보다 크려면 거리가 굵기 / 2 + 0.5 보다 작아야 한다. 이 굵기까지는 덮는 토막이 모두 화소 하나 거리(0.5, 0.71)나 두 칸 사이(1.5, 1.58)에 있고,
+//   그 토막은 둘레 3 x 3 화소의 첫 경계(씨앗)에 든다. 섞기가 그 아홉을 점프 플러딩 마지막 걸음과 같은 차례로 본다. 이보다 굵으면 점프 플러딩 길로 간다. (광부 키우기 1.7 ~ 2.7, 기본 2)
+const THIN_LINE_MAXIMUM_WIDTH = 2 * System.Math.sqrt(4.5) - 1;
 
 // 번호 색 표 텍스처의 너비. (선 번호 0 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID 를 128 x 128 칸에 하나씩, 번호 % 128 이 x, 번호 / 128 이 y)
 const LINE_COLOR_TABLE_WIDTH = 128;
@@ -146,7 +147,7 @@ void main() {
 //   오차 여유는 이어진 면에서도 생기는 거리의 오차를 잰 것이다: 노멀 8 비트 팔면체의 각 오차 x 두 자리 사이 거리(면이 비스듬할수록 길다), 꺾인 줄을 사이에 둔 두 화소의 화소 한 칸 x 두 노멀이 벌어진 사인, 깊이 24 비트 한 칸.
 //   거기에 여유 배율(setDepthMargin)을 곱한다. 두 면이 나란한 턱은 꺾임 몫이 0 이라 화소 한 칸보다 낮아도 잡힌다.
 // - 꺾임 선: 같은 번호이고 떨어지지 않았는데 두 노멀이 꺾임 각보다 더 벌어짐. (비스듬한 면과 둥근 면은 접평면 안이라 바깥 선으로 잡히지 않는다)
-// - 경계를 보는 함수(readPixel, readEdge)는 가는 선의 가면 셰이더와 같이 쓴다. (LINE_EDGE_SHADER_PART)
+// - 경계를 보는 함수(readPixel, readEdge)는 가는 선의 씨앗 쪽 판 셰이더와 같이 쓴다. (LINE_EDGE_SHADER_PART)
 const LINE_EDGE_SHADER_PART = `precision highp float;
 precision highp int;
 uniform highp sampler2D lineTexture;
@@ -265,9 +266,9 @@ void main() {
 	fragmentSeed = uvec4(contourSeed, creaseSeed);
 }
 `;
-// 가는 선의 가면을 고르는 셰이더. (화소마다 오른쪽과 위 이웃 사이의 경계 둘만 본다, 경계마다 한 번)
-// - 비트 0 은 오른쪽 경계의 바깥 선, 1 은 위 경계의 바깥 선, 2 는 오른쪽 경계의 꺾임 선, 3 은 위 경계의 꺾임 선. (R8UI 한 바이트)
-// - 모든 경계는 어느 화소의 오른쪽이거나 위이므로 빠지는 경계가 없다. 씨앗과 같은 readEdge 로 가린다.
+// 가는 선의 씨앗 쪽 판을 고르는 셰이더. (씨앗 셰이더와 같은 차례로 화소마다 바깥 선과 꺾임 선의 첫 경계 쪽을 고르고, 씨앗 자리 대신 쪽 번호만 담는다)
+// - 아래 3 비트는 바깥 선, 그 위 3 비트는 꺾임 선의 쪽이다. 0 은 없음, 1 ~ 4 는 SIDES 차례(오른쪽, 왼쪽, 위, 아래)에서 처음 선이 선 쪽. (R8UI 한 바이트)
+// - 씨앗은 화소 * 2 + 쪽이므로 씨앗 판과 같은 것을 한 바이트에 담는다. (씨앗 판은 RGBA16UI 8 바이트)
 const EDGE_MASK_FRAGMENT_SHADER = `#version 300 es
 ${LINE_EDGE_SHADER_PART}out uint fragmentMask;
 void main() {
@@ -275,16 +276,22 @@ void main() {
 	vec2 sizeValue = vec2(size);
 	ivec2 pixel = ivec2(gl_FragCoord.xy);
 	LinePixel center = readPixel(pixel, sizeValue);
-	uint mask = 0u;
-	if (pixel.x + 1 < size.x) {
-		int edge = readEdge(center, readPixel(pixel + ivec2(1, 0), sizeValue));
-		mask |= edge == 2 ? 1u : (edge == 1 ? 4u : 0u);
+	uint contourSide = 0u;
+	uint creaseSide = 0u;
+	for (int index = 0; index < 4; ++index) {
+		ivec2 neighborPixel = pixel + SIDES[index];
+		if (neighborPixel.x < 0 || neighborPixel.y < 0 || neighborPixel.x >= size.x || neighborPixel.y >= size.y) {
+			continue;
+		}
+		int edge = readEdge(center, readPixel(neighborPixel, sizeValue));
+		if (edge == 2 && contourSide == 0u) {
+			contourSide = uint(index + 1);
+		}
+		if (edge == 1 && creaseSide == 0u) {
+			creaseSide = uint(index + 1);
+		}
 	}
-	if (pixel.y + 1 < size.y) {
-		int edge = readEdge(center, readPixel(pixel + ivec2(0, 1), sizeValue));
-		mask |= edge == 2 ? 2u : (edge == 1 ? 8u : 0u);
-	}
-	fragmentMask = mask;
+	fragmentMask = contourSide | (creaseSide << 3u);
 }
 `;
 // 온 해상도 씨앗을 넓히기 판으로 모으는 셰이더. (넓히기 판 한 칸이 덮는 씨앗 판 칸들 가운데 칸 가운데에 가장 가까운 씨앗을 고른다, 줄이지 않으면 그대로 옮김)
@@ -498,14 +505,18 @@ void main() {
 	writeLineColor(contourDistance, creaseDistance, contourSeed, creaseSeed);
 }
 `;
-// 가는 선을 한 패스로 섞는 셰이더. (점프 플러딩 없이 가면 판에서 searchRadius 화소 안의 경계 토막을 모두 보고 가장 가까운 것까지의 거리로 덮는 몫을 셈한다)
-// - 화소 q 의 오른쪽 경계는 (2q.x + 1, 2q.y), 위 경계는 (2q.x, 2q.y + 1) 의 씨앗과 같다. 색 찾기와 덮는 몫은 점프 플러딩 길과 같은 함수다.
-// - 덮는 몫이 0 보다 크려면 거리가 굵기 / 2 + 0.5 보다 작아야 하므로, 그 거리 안의 토막을 가진 화소는 모두 ceil(굵기 / 2 + 1) - 1 화소 안에 있다. (빠짐 없이 가장 가까운 토막)
-// - 고리는 상수 5 x 5 로 펼치고, 반지름 밖과 판 밖의 칸은 가면을 0 으로 고르며, 토막 고르기도 갈래 없이 고른다. (SIMD 무리가 갈리지 않게, 실기기에서 갈래 있는 고리보다 빨랐다)
-// - 거리는 제곱으로 견주고 끝에 한 번 sqrt 한다.
+// 가는 선을 한 패스로 섞는 셰이더. (점프 플러딩 없이 둘레 3 x 3 화소의 씨앗을 점프 플러딩 마지막 걸음과 같은 차례로 보고 가장 가까운 것까지의 거리로 덮는 몫을 셈한다)
+// - 화소 q 의 씨앗은 q * 2 + 쪽이다. 아래 줄부터, 줄 안은 왼쪽부터 보고 거리가 더 작을 때만 바꾼다. (점프 플러딩 걸음 1 과 같은 차례, 같은 거리면 먼저 본 것)
+//   그래서 선 색이 다른 두 번호가 맞닿아 같은 거리 토막이 여럿인 자리도 점프 플러딩 길과 거의 같은 쪽을 고른다. (앞 걸음에서 씨앗을 넘겨받은 빈 화소만 다를 수 있다)
+// - 씨앗에서 화소까지의 자리는 고리 칸마다 정해진 반 정수라 거리가 정확하다. 거리는 제곱으로 견주고 끝에 한 번 sqrt 한다. 고르기는 갈래 없이 고른다.
+// - 색 찾기와 덮는 몫은 점프 플러딩 길과 같은 함수다.
 const THIN_COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 ${COMPOSITE_SHADER_PART}uniform highp usampler2D edgeMaskTexture;
-uniform int searchRadius;
+const vec2 SIDE_OFFSETS[5] = vec2[5](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
+float readSideDistance(vec2 base, vec2 side) {
+	vec2 offset = max(abs(base + side * 0.5) - abs(side.yx) * 0.5, vec2(0.0));
+	return dot(offset, offset);
+}
 void main() {
 	ivec2 size = textureSize(lineTexture, 0);
 	vec2 point = gl_FragCoord.xy - viewportRect.xy - 0.5;
@@ -514,32 +525,25 @@ void main() {
 	float creaseDistance = 1.0e18;
 	uvec2 contourSeed = uvec2(NO_SEED);
 	uvec2 creaseSeed = uvec2(NO_SEED);
-	for (int offsetY = -2; offsetY <= 2; ++offsetY) {
-		for (int offsetX = -2; offsetX <= 2; ++offsetX) {
+	for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+		for (int offsetX = -1; offsetX <= 1; ++offsetX) {
 			ivec2 wantedPixel = pixel + ivec2(offsetX, offsetY);
 			ivec2 samplePixel = clamp(wantedPixel, ivec2(0), size - 1);
-			uint mask = texelFetch(edgeMaskTexture, samplePixel, 0).r;
-			bool isInside = samplePixel == wantedPixel && max(abs(offsetX), abs(offsetY)) <= searchRadius;
-			mask = isInside ? mask : 0u;
+			uint sides = texelFetch(edgeMaskTexture, samplePixel, 0).r;
+			sides = samplePixel == wantedPixel ? sides : 0u;
+			uint contourSide = sides & 7u;
+			uint creaseSide = (sides >> 3u) & 7u;
 			vec2 base = vec2(samplePixel) - point;
-			vec2 offsetSideX = vec2(abs(base.x + 0.5), max(abs(base.y) - 0.5, 0.0));
-			vec2 offsetSideY = vec2(max(abs(base.x) - 0.5, 0.0), abs(base.y + 0.5));
-			float distanceX = dot(offsetSideX, offsetSideX);
-			float distanceY = dot(offsetSideY, offsetSideY);
-			uvec2 sideX = uvec2(samplePixel * 2 + ivec2(1, 0));
-			uvec2 sideY = uvec2(samplePixel * 2 + ivec2(0, 1));
-			bool isTaken = (mask & 1u) != 0u && distanceX < contourDistance;
-			contourDistance = isTaken ? distanceX : contourDistance;
-			contourSeed = isTaken ? sideX : contourSeed;
-			isTaken = (mask & 2u) != 0u && distanceY < contourDistance;
-			contourDistance = isTaken ? distanceY : contourDistance;
-			contourSeed = isTaken ? sideY : contourSeed;
-			isTaken = (mask & 4u) != 0u && distanceX < creaseDistance;
-			creaseDistance = isTaken ? distanceX : creaseDistance;
-			creaseSeed = isTaken ? sideX : creaseSeed;
-			isTaken = (mask & 8u) != 0u && distanceY < creaseDistance;
-			creaseDistance = isTaken ? distanceY : creaseDistance;
-			creaseSeed = isTaken ? sideY : creaseSeed;
+			vec2 contourOffset = SIDE_OFFSETS[contourSide];
+			vec2 creaseOffset = SIDE_OFFSETS[creaseSide];
+			float sampleContourDistance = readSideDistance(base, contourOffset);
+			float sampleCreaseDistance = readSideDistance(base, creaseOffset);
+			bool isTaken = contourSide != 0u && sampleContourDistance < contourDistance;
+			contourDistance = isTaken ? sampleContourDistance : contourDistance;
+			contourSeed = isTaken ? uvec2(samplePixel * 2 + ivec2(contourOffset)) : contourSeed;
+			isTaken = creaseSide != 0u && sampleCreaseDistance < creaseDistance;
+			creaseDistance = isTaken ? sampleCreaseDistance : creaseDistance;
+			creaseSeed = isTaken ? uvec2(samplePixel * 2 + ivec2(creaseOffset)) : creaseSeed;
 		}
 	}
 	writeLineColor(sqrt(contourDistance), sqrt(creaseDistance), contourSeed, creaseSeed);
@@ -592,8 +596,8 @@ function readColorByte(value) {
 //   바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 가린 화소가 가려진 화소의 접평면에서 깊이 문턱과 오차 여유보다 떨어진 곳(가려진 실루엣)이다.
 //   꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.
 //   깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 잰 오차(노멀 8 비트 각 오차 x 두 자리 사이 거리, 꺾임의 화소 한 칸 x 사인, 깊이 24 비트 한 칸) x 배율을 더해 먼 것도 같은 뜻이 되고, 나란한 낮은 턱은 화소 한 칸보다 낮아도 잡힌다.
-// - 가는 선(굵기 4 픽셀까지): 경계마다 한 번 가린 가면(화소마다 4 비트, R8UI 한 바이트)을 고르고, 섞기가 둘레 ceil(굵기 / 2 + 1) - 1 화소(5 x 5 까지)의 경계 토막을 모두 보아 가장 가까운 것까지의 거리를 잰다.
-//   화면 전체 패스가 가면 하나와 섞기 하나다. (모바일 타일 GPU 에서 패스 수와 판 대역폭이 굵은 선 길의 몇 분의 1)
+// - 가는 선(굵기 약 3.24 픽셀까지): 씨앗 고르기와 같은 차례로 화소마다 첫 경계 쪽(R8UI 한 바이트)을 고르고, 섞기가 둘레 3 x 3 화소의 씨앗을 점프 플러딩 마지막 걸음과 같은 차례로 보아 가장 가까운 것까지의 거리를 잰다.
+//   화면 전체 패스가 씨앗 쪽 판 하나와 섞기 하나다. (모바일 타일 GPU 에서 패스 수와 판 대역폭이 굵은 선 길의 몇 분의 1)
 // - 넓히기(굵은 선): 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.
 // - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)
 // - 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.
@@ -626,11 +630,11 @@ export class ToonScreenOutline {
 	/** @private @type { ShaderProgram } */ #seedGatherProgram;
 	/** @private @type { ShaderProgram } */ #jumpFloodProgram;
 	/** @private @type { ShaderProgram } */ #compositeProgram;
-	/** @private @type { ShaderProgram } */ #edgeMaskProgram; // 가는 선의 가면 고르기.
+	/** @private @type { ShaderProgram } */ #edgeMaskProgram; // 가는 선의 씨앗 쪽 판 고르기.
 	/** @private @type { ShaderProgram } */ #thinCompositeProgram; // 가는 선을 한 패스로 섞기.
 	/** @private @type { string } */ #colorSpace; // 색 공간. (ColorSpace, 생성 때 정함, HDR 출력에서 선 색을 선형으로 바꾸는 곡선)
 	/** @private @type { WebGLVertexArrayObject } */ #emptyVertexArray; // 화면 세모용 빈 버텍스 어레이.
-	/** @private @type { object | null } */ #lineTarget; // 선의 판. ({ framebuffer, lineTexture, depthTexture, edgeMaskFramebuffer, edgeMaskTexture, seedFramebuffer, seedTexture, jumpFloodFramebuffers, jumpFloodTextures, jumpFloodIndex, outlinePath, searchRadius, width, height, jumpFloodWidth, jumpFloodHeight })
+	/** @private @type { object | null } */ #lineTarget; // 선의 판. ({ framebuffer, lineTexture, depthTexture, edgeMaskFramebuffer, edgeMaskTexture, seedFramebuffer, seedTexture, jumpFloodFramebuffers, jumpFloodTextures, jumpFloodIndex, outlinePath, width, height, jumpFloodWidth, jumpFloodHeight })
 	/** @private @type { Array<number> } */ #color; // 선 색. (sRGB, 알파)
 	/** @private @type { number } */ #width; // 바깥 선 굵기.
 	/** @private @type { string } */ #widthUnit;
@@ -708,7 +712,7 @@ export class ToonScreenOutline {
 	/**
 	 * @static
 	 * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, 지을 ToonScreenOutline 과 같은 값을 준다)
-	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 일곱. (번호, 씨앗, 모으기, 넓히기, 섞기, 가는 선의 가면, 가는 선 섞기)
+	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 일곱. (번호, 씨앗, 모으기, 넓히기, 섞기, 가는 선의 씨앗 쪽 판, 가는 선 섞기)
 	 * @example <caption>셰이더를 미리 링크할 목록에 넣기</caption>
 	 * import { ToonScreenOutline } from "./vanilla.js";
 	 * const sources = ToonScreenOutline.readProgramSources();
@@ -1000,7 +1004,7 @@ export class ToonScreenOutline {
 	// 선의 판 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null } { lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), edgeMaskTexture (가는 선의 가면 R8UI), seedTexture (온 해상도 씨앗 RGBA16UI, 굵은 선을 긋기 전에는 null), jumpFloodTextures (넓히기 판 RGBA16UI 둘, 굵은 선을 긋기 전에는 빔), jumpFloodIndex (넓히기를 마친 쪽, 점프 플러딩을 안 했으면 -1), outlinePath (이번 프레임의 길 "none", "thin", "jumpFlood"), width, height, jumpFloodWidth, jumpFloodHeight }
+	 * @returns { object | null } { lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), edgeMaskTexture (가는 선의 씨앗 쪽 판 R8UI, 아래 3 비트 바깥 선, 위 3 비트 꺾임 선의 첫 경계 쪽 0 없음, 1 오른쪽, 2 왼쪽, 3 위, 4 아래), seedTexture (온 해상도 씨앗 RGBA16UI, 굵은 선을 긋기 전에는 null), jumpFloodTextures (넓히기 판 RGBA16UI 둘, 굵은 선을 긋기 전에는 빔), jumpFloodIndex (넓히기를 마친 쪽, 점프 플러딩을 안 했으면 -1), outlinePath (이번 프레임의 길 "none", "thin", "jumpFlood"), width, height, jumpFloodWidth, jumpFloodHeight }
 	 */
 	getLineTarget() {
 		return this.#lineTarget;
@@ -1351,8 +1355,8 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 번호 그리기 끝. (가는 선은 가면 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
-	// - 가는 선(찾기 반지름이 THIN_LINE_MAXIMUM_SEARCH_RADIUS 이하, 굵기 4 픽셀까지): 화면 전체 패스가 가면 하나다. 섞기가 둘레 화소의 경계 토막을 모두 본다. (씨앗, 모으기, 넓히기 없음)
+	// 번호 그리기 끝. (가는 선은 씨앗 쪽 판 하나를 고르고, 굵은 선은 씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
+	// - 가는 선(굵기가 THIN_LINE_MAXIMUM_WIDTH 이하, 약 3.24 픽셀까지): 화면 전체 패스가 씨앗 쪽 판 하나다. 섞기가 둘레 3 x 3 화소의 씨앗을 본다. (씨앗, 모으기, 넓히기 없음)
 	// - 굵은 선: 씨앗, 모으기, 넓히기 걸음마다 한 패스. (씨앗 판과 넓히기 판은 처음 굵은 선을 그을 때 짓는다)
 	// - 판을 통째로 덮어쓰는 패스는 앞에 invalidateFramebuffer 를 불러 옛 내용을 읽어 들이지 않게 한다. (타일 GPU 의 판 불러오기를 없앰)
 	//==============================================================================
@@ -1371,8 +1375,7 @@ export class ToonScreenOutline {
 			this.restoreState();
 			return;
 		}
-		const searchRadius = System.Math.ceil(System.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 1) - 1;
-		const isThinLine = searchRadius <= THIN_LINE_MAXIMUM_SEARCH_RADIUS;
+		const isThinLine = System.Math.max(lineWidths[0], lineWidths[1]) <= THIN_LINE_MAXIMUM_WIDTH;
 		if (!isThinLine && !this.readJumpFloodTarget(lineTarget)) {
 			this.restoreState();
 			return;
@@ -1385,14 +1388,13 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		const discardedAttachments = [webGL2RenderingContext.COLOR_ATTACHMENT0];
 
-		// 가는 선: 가면 고르기 한 패스.
+		// 가는 선: 씨앗 쪽 판 고르기 한 패스.
 		if (isThinLine) {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.edgeMaskFramebuffer);
 			webGL2RenderingContext.invalidateFramebuffer(webGL2RenderingContext.FRAMEBUFFER, discardedAttachments);
 			this.useEdgeProgram(this.#edgeMaskProgram, lineTarget, lineWidths);
 			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 			lineTarget.outlinePath = "thin";
-			lineTarget.searchRadius = searchRadius;
 			this.unbindEndTextures();
 			this.restoreState();
 			return;
@@ -1443,7 +1445,7 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 경계를 보는 프로그램(씨앗, 가는 선의 가면)을 쓰고 선의 판, 깊이, 카메라, 문턱을 묶기.
+	// 경계를 보는 프로그램(씨앗, 가는 선의 씨앗 쪽 판)을 쓰고 선의 판, 깊이, 카메라, 문턱을 묶기.
 	//==============================================================================
 	/**
 	 * @param { ShaderProgram } program - #seedProgram 이나 #edgeMaskProgram.
@@ -1489,7 +1491,7 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 바깥선 긋기. (가는 선은 가면 판, 굵은 선은 넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)
+	// 바깥선 긋기. (가는 선은 씨앗 쪽 판, 굵은 선은 넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)
 	//==============================================================================
 	drawOutline() {
 		const lineTarget = this.#lineTarget;
@@ -1523,7 +1525,6 @@ export class ToonScreenOutline {
 		const lineWidths = this.#lineWidths;
 		if (isThinLine) {
 			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("edgeMaskTexture"), LINE_TEXTURE_UNIT);
-			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("searchRadius"), lineTarget.searchRadius);
 		}
 		else {
 			webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
@@ -1708,7 +1709,7 @@ export class ToonScreenOutline {
 		const edgeMaskFramebuffer = this.createTargetFramebuffer(edgeMaskTexture, null);
 		isComplete = isComplete && this.isFramebufferComplete();
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
-		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, edgeMaskFramebuffer: edgeMaskFramebuffer, edgeMaskTexture: edgeMaskTexture, seedFramebuffer: null, seedTexture: null, jumpFloodFramebuffers: [], jumpFloodTextures: [], jumpFloodIndex: -1, outlinePath: "none", searchRadius: 0, width: width, height: height, jumpFloodWidth: jumpFloodWidth, jumpFloodHeight: jumpFloodHeight };
+		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, edgeMaskFramebuffer: edgeMaskFramebuffer, edgeMaskTexture: edgeMaskTexture, seedFramebuffer: null, seedTexture: null, jumpFloodFramebuffers: [], jumpFloodTextures: [], jumpFloodIndex: -1, outlinePath: "none", width: width, height: height, jumpFloodWidth: jumpFloodWidth, jumpFloodHeight: jumpFloodHeight };
 		if (!isComplete) {
 			this.deleteLineTarget();
 			return null;
