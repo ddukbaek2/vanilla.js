@@ -654,9 +654,13 @@ ToonLighting readLighting(ToonSurface surface) {
 		}
 		vec3 toLight = pointLightPositions[index].xyz - surface.worldPosition;
 		float lightDistance = length(toLight);
-		vec3 lightDirection = toLight / max(lightDistance, 0.0001);
 		float lightRange = pointLightPositions[index].w;
 		vec3 shape = pointLightShapes[index];
+		// 반지름 밖(window 가 정확히 0)이면 이 빛의 기여가 0 이라 나머지 셈을 건너뛴다. (그림자 읽기 포함, 경계 화소의 fwidth 가 건너뛴 이웃 때문에 달라지지 않게 반지름의 1.1 배부터)
+		if (lightRange > 0.0 && shape.y > 0.0 && lightDistance >= lightRange * 1.1) {
+			continue;
+		}
+		vec3 lightDirection = toLight / max(lightDistance, 0.0001);
 		float window = 1.0;
 		if (lightRange > 0.0) {
 			window = clamp(1.0 - pow(lightDistance / lightRange, shape.y), 0.0, 1.0);
