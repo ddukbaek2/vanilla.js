@@ -3,7 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
-import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, writeInstanceBufferSphere, isSphereInFrustum, readHypot } from "./toonrenderer.js";
+import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, writeInstanceBufferSphere, isSphereInFrustum, readHypot, createMeshInstanceVertexArray } from "./toonrenderer.js";
 import { TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_LINE_ID_LOCATION } from "./toonmaterial.js";
 import { readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../../core/graphic/colorspace.js";
 
@@ -57,6 +57,7 @@ export const TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
 
 // 씨앗 판에서 씨앗이 없다는 값. (부호 없는 16 비트의 끝)
 const NO_SEED = 65535;
+const BATCH_SLOT_MESH_LIMIT = 8; // 묶음 자리마다 버텍스 어레이를 지어 둘 모형 수. (넘으면 그 자리의 것을 모두 지우고 다시, 몸 묶음 자리와 같은 값)
 
 // 인스턴스 그리기의 modelMatrix 자리. (단위 행렬)
 const IDENTITY_ELEMENTS = new System.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -685,6 +686,7 @@ export class ToonScreenOutline {
 	/** @private @type { object | null } */ #frame; // 이번 프레임의 카메라. ({ viewProjectionElements, viewElements, projectionElements, frustumPlanes, isPerspective, viewport })
 	/** @private @type { object | null } */ #savedState; // beginLineIds 앞의 그리기 상태.
 	/** @private @type { Float32Array } */ #instanceData;
+	/** @private @type { Array<object> } */ #batchSlots; // 자동 인스턴싱 묶음 자리. ({ buffer, values, count, vertexArrays }, 그리기 줄이 프레임마다 같은 차례로 주고 값이 같으면 다시 올리지 않는다)
 	/** @private @type { Float32Array } */ #lineUniformValues; // 선의 판에 올린 instanced, instanceLineIds, skinned, lineFlags. (같으면 건너뜀, beginLineIds 가 잊는다)
 	/** @private @type { number } */ #drawnDistanceSum; // 이번 프레임에 그린 모형의 거리 합과 수. (초점 거리를 주지 않았을 때)
 	/** @private @type { number } */ #drawnDistanceCount;
@@ -732,6 +734,7 @@ export class ToonScreenOutline {
 		this.#frame = null;
 		this.#savedState = null;
 		this.#instanceData = new System.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+		this.#batchSlots = [];
 		this.#lineUniformValues = new System.Float32Array([System.NaN, System.NaN, System.NaN, System.NaN]);
 		this.#drawnDistanceSum = 0;
 		this.#drawnDistanceCount = 0;
@@ -1145,9 +1148,10 @@ export class ToonScreenOutline {
 	 * @param { number } start - 목록에서 그릴 첫 자리.
 	 * @param { number } count - 그릴 수.
 	 * @param { object } options - 모두에 같은 그리기 꼴.
+	 * @param { number } slotIndex - 묶음 자리 번호. (그리기 줄이 프레임마다 같은 차례로 준다)
 	 * @private
 	 */
-	drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options) {
+	drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options, slotIndex) {
 		if (this.#savedState === null || count <= 0) {
 			return;
 		}
@@ -1168,9 +1172,46 @@ export class ToonScreenOutline {
 			instanceData[offset + 18] = 0;
 			instanceData[offset + 19] = 1;
 		}
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, count * TOON_INSTANCE_FLOAT_COUNT); // 앞의 칸만. (subarray 를 짓지 않는다)
-		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
+		// 묶음 자리의 값이 앞 프레임과 같으면 다시 올리지 않는다. (멈춘 장면은 올림 없음, 몸 묶음 자리와 같은 꼴)
+		const floatCount = count * TOON_INSTANCE_FLOAT_COUNT;
+		let slot = this.#batchSlots[slotIndex];
+		if (slot === undefined) {
+			slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System.Float32Array(0), count: 0, vertexArrays: new System.Map() };
+			this.#batchSlots[slotIndex] = slot;
+		}
+		let isSame = slot.count === count;
+		if (isSame) {
+			const values = slot.values;
+			for (let index = 0; index < floatCount; ++index) {
+				const value = values[index];
+				const other = instanceData[index];
+				if (value !== other || (value === 0 && 1 / value !== 1 / other)) {
+					isSame = false;
+					break;
+				}
+			}
+		}
+		if (!isSame) {
+			if (slot.values.length < floatCount) {
+				slot.values = new System.Float32Array(floatCount);
+			}
+			slot.values.set(instanceData.subarray(0, floatCount));
+			slot.count = count;
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
+			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount); // 앞의 칸만. (subarray 를 짓지 않는다)
+		}
+		let vertexArray = slot.vertexArrays.get(mesh);
+		if (vertexArray === undefined) {
+			if (slot.vertexArrays.size >= BATCH_SLOT_MESH_LIMIT) {
+				for (const oldVertexArray of slot.vertexArrays.values()) {
+					webGL2RenderingContext.deleteVertexArray(oldVertexArray);
+				}
+				slot.vertexArrays.clear();
+			}
+			vertexArray = createMeshInstanceVertexArray(webGL2RenderingContext, mesh, slot.buffer);
+			slot.vertexArrays.set(mesh, vertexArray);
+		}
+		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, false, options, vertexArray);
 	}
 
 	//==============================================================================
@@ -2103,6 +2144,13 @@ export class ToonScreenOutline {
 			this.#lineColorTexture = null;
 		}
 		webGL2RenderingContext.deleteVertexArray(this.#emptyVertexArray);
+		for (const slot of this.#batchSlots) {
+			for (const vertexArray of slot.vertexArrays.values()) {
+				webGL2RenderingContext.deleteVertexArray(vertexArray);
+			}
+			webGL2RenderingContext.deleteBuffer(slot.buffer);
+		}
+		this.#batchSlots.length = 0;
 		webGL2RenderingContext.deleteProgram(this.#lineProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#seedProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#seedGatherProgram.getProgram());

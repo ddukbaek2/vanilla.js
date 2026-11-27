@@ -194,7 +194,7 @@ for (let frame = 0; frame < result.frames.length; ++frame) {
 	check(entry.litCount > 1000, frame + " 프레임 무언가 그렸다 (" + entry.litCount + ")");
 	check(entry.differentCount === 0, frame + " 프레임 화면이 묶지 않고 그린 것과 바이트까지 같음 (다른 바이트 " + entry.differentCount + ")");
 }
-// 묶음 자리는 값이 같으면 다시 올리지 않는다. (몸, 그림자 묶음 넷씩 여덟, 바깥선 껍데기는 몸의 자리를 같이 씀, 선의 판 둘은 프레임마다 올림)
-check(result.frames[1].mainUploadCount === result.frames[0].mainUploadCount - 8 && result.frames[2].mainUploadCount === result.frames[1].mainUploadCount, "같은 행렬이면 묶음 자리를 다시 올리지 않음 (" + result.frames.map((entry) => entry.mainUploadCount).join(", ") + ")");
+// 묶음 자리는 값이 같으면 다시 올리지 않는다. (몸, 그림자 묶음 넷씩 여덟, 바깥선 껍데기는 몸의 자리를 같이 씀, 선의 판 둘도 자기 묶음 자리라 올리지 않음)
+check(result.frames[1].mainUploadCount === result.frames[0].mainUploadCount - 10 && result.frames[2].mainUploadCount === result.frames[1].mainUploadCount, "같은 행렬이면 묶음 자리를 다시 올리지 않음 (" + result.frames.map((entry) => entry.mainUploadCount).join(", ") + ")");
 check(result.error === 0, "GL 오류 없음 (" + result.error + ")");
 console.log("툰 자동 인스턴싱 크롬 시험 통과 (" + checkCount + " 개 확인)");
