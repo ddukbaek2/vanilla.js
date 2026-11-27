@@ -26,7 +26,7 @@ const System = globalThis;
 // - 원본 그리기 함수의 화면 사각형은 { x, y, width, height, outputFramebuffer, outputViewport } 다. (러스트는 Rect 의 position, size)
 // - ?renderScale=0.5 처럼 주면 두 판의 3D 만 그 배율로 그려 늘여 얹는다. (ToonView3D.setRenderScale, 이름표와 띠 같은 2D 는 기기 화소 그대로)
 //==============================================================================
-import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Paint, Text, TextAlign, ToonMesh, ToonRenderer, ToonPostProcess, ToonDrawQueue, ToonView3D } from "../../import.js";
+import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Paint, Text, TextAlign, MeshBuilder, createPartMatrix, createFacetedChunkGeometry, createBoxGeometry, createSphereGeometry, ToonRenderer, ToonPostProcess, ToonDrawQueue, ToonView3D } from "../../import.js";
 const RENDER_SCALE = Number(new URLSearchParams(location.search).get("renderScale") ?? "1") || 1; // 3D 렌더 스케일. (?renderScale=0.5)
 
 const PI = System.Math.PI;
@@ -36,8 +36,8 @@ const BACKGROUND_COLOR = "#000000";
 // 부품 하나의 배열.
 //==============================================================================
 function buildArrays(geometry, position, colorText, options) {
-	const builder = new ToonMesh.MeshBuilder();
-	builder.addPart(geometry, ToonMesh.createPartMatrix(null, position, null, null), colorText, options);
+	const builder = new MeshBuilder();
+	builder.addPart(geometry, createPartMatrix(null, position, null, null), colorText, options);
 	return builder.readArrays();
 }
 
@@ -68,16 +68,15 @@ class PanelDrawer {
 	//==============================================================================
 	static createMeshes(renderer) {
 		const outlineOptions = { outlineWidth: 0.03 };
-		const chunk = buildArrays(ToonMesh.createFacetedChunkGeometry(0.4, [1.0, 0.85, 1.1, 0.95, 1.05, 0.9], [1.0, 0.8, 1.0]), [0, 0.3, 0], "#9a8a7a", {});
-		const pile = ToonMesh.MeshBuilder.combine([{ arrays: chunk, offset: [0, 0, 0] }, { arrays: chunk, offset: [0.7, 0, 0.2] }, { arrays: chunk, offset: [0.3, 0.45, 0.1] }]);
+		const chunk = buildArrays(createFacetedChunkGeometry(0.4, [1.0, 0.85, 1.1, 0.95, 1.05, 0.9], [1.0, 0.8, 1.0]), [0, 0.3, 0], "#9a8a7a", {});
+		const pile = MeshBuilder.combine([{ arrays: chunk, offset: [0, 0, 0] }, { arrays: chunk, offset: [0.7, 0, 0.2] }, { arrays: chunk, offset: [0.3, 0.45, 0.1] }]);
 		return {
-			ground: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(8, 0.2, 6), [0, -0.1, 0], "#6b8f5a", { hasOutline: false })),
-			box: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(1, 1, 1), [0, 0.5, 0], "#ff8844", outlineOptions)),
-			sphere: renderer.createMesh(buildArrays(ToonMesh.createSphereGeometry(0.5, 24, 16, PI), [0, 0.5, 0], "#ffd257", outlineOptions)),
-			glass: renderer.createMesh(buildArrays(ToonMesh.createSphereGeometry(0.45, 24, 16, PI), [0, 0.45, 0], "#66ccff", { outlineWidth: 0.02 })),
+			ground: renderer.createMesh(buildArrays(createBoxGeometry(8, 0.2, 6), [0, -0.1, 0], "#6b8f5a", { hasOutline: false })),
+			box: renderer.createMesh(buildArrays(createBoxGeometry(1, 1, 1), [0, 0.5, 0], "#ff8844", outlineOptions)),
+			sphere: renderer.createMesh(buildArrays(createSphereGeometry(0.5, 24, 16, PI), [0, 0.5, 0], "#ffd257", outlineOptions)),
+			glass: renderer.createMesh(buildArrays(createSphereGeometry(0.45, 24, 16, PI), [0, 0.45, 0], "#66ccff", { outlineWidth: 0.02 })),
 			pile: renderer.createMesh(pile),
-			pebble: renderer.createMesh(buildArrays(ToonMesh.createFacetedChunkGeometry(0.12, [1.0, 0.8, 1.2], [1.0, 0.7, 1.0]), [0, 0.08, 0], "#c9b8a0", { outlineWidth: 0.012 })),
-		};
+			pebble: renderer.createMesh(buildArrays(createFacetedChunkGeometry(0.12, [1.0, 0.8, 1.2], [1.0, 0.7, 1.0]), [0, 0.08, 0], "#c9b8a0", { outlineWidth: 0.012 })) };
 	}
 
 	//==============================================================================

@@ -26,7 +26,7 @@ const System = globalThis;
 //   빛 점 120 개(상한 160), 불꽃 줄기 밝기 배 5. 불덩이는 3 초마다 사건 열쇠와 나이로 한 번만 낸다.
 // - 원본 ToonVfx 는 자리를 x, y, z 로 받는다. (러스트는 position) 원본 그리기 함수의 화면 사각형은 { x, y, width, height } 다.
 //==============================================================================
-import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Paint, Text, TextAlign, ToonMesh, ToonPostProcess, ToonDrawQueue, ToonView3D, ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "../../import.js";
+import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Paint, Text, TextAlign, MeshBuilder, createPartMatrix, createBoxGeometry, createSphereGeometry, ToonPostProcess, ToonDrawQueue, ToonView3D, ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "../../import.js";
 
 const PI = System.Math.PI;
 const BACKGROUND_COLOR = "#000000";
@@ -43,8 +43,8 @@ const PANEL_MODE_LOW_DYNAMIC_RANGE = 2;
 // 부품 하나의 배열.
 //==============================================================================
 function buildArrays(geometry, position, colorText, options) {
-	const builder = new ToonMesh.MeshBuilder();
-	builder.addPart(geometry, ToonMesh.createPartMatrix(null, position, null, null), colorText, options);
+	const builder = new MeshBuilder();
+	builder.addPart(geometry, createPartMatrix(null, position, null, null), colorText, options);
 	return builder.readArrays();
 }
 
@@ -68,11 +68,10 @@ class PanelDrawer {
 	static createMeshes(renderer) {
 		const outlineOptions = { outlineWidth: 0.03 };
 		return {
-			ground: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(8, 0.2, 6), [0, -0.1, 0], "#8a857b", { hasOutline: false })),
-			box: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(1, 1, 1), [0, 0.5, 0], "#ff8844", outlineOptions)),
-			pole: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(0.05, 2.0, 0.05), [0, 1.0, 0], "#30343c", { hasOutline: false })),
-			sphere: renderer.createMesh(buildArrays(ToonMesh.createSphereGeometry(0.4, 24, 16, PI), [0, 0.4, 0], "#ffd257", { glow: 2.5, outlineWidth: 0.02 })),
-		};
+			ground: renderer.createMesh(buildArrays(createBoxGeometry(8, 0.2, 6), [0, -0.1, 0], "#8a857b", { hasOutline: false })),
+			box: renderer.createMesh(buildArrays(createBoxGeometry(1, 1, 1), [0, 0.5, 0], "#ff8844", outlineOptions)),
+			pole: renderer.createMesh(buildArrays(createBoxGeometry(0.05, 2.0, 0.05), [0, 1.0, 0], "#30343c", { hasOutline: false })),
+			sphere: renderer.createMesh(buildArrays(createSphereGeometry(0.4, 24, 16, PI), [0, 0.4, 0], "#ffd257", { glow: 2.5, outlineWidth: 0.02 })) };
 	}
 
 	//==============================================================================

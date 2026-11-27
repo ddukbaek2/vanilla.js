@@ -78,13 +78,13 @@ function normalizeDirection(direction) {
 //==============================================================================
 /**
  * @example <caption>재질마다 다른 그늘 색을 빛 묶음으로 주기</caption>
- * import { ToonRenderer, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, MeshBuilder, createSphereGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * const skinLightSet = renderer.createLightSet();
  * skinLightSet.setShade({ step: 0.55, feather: 0.04, color: [0.86, 0.6, 0.6] });
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f0d0c0", { hasOutline: false });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#f0d0c0", { hasOutline: false });
  * const mesh = renderer.createMesh(builder.readArrays());
  * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 0, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 10));
  * renderer.drawMesh(mesh, Matrix4.createIdentity(), { lightSet: skinLightSet });

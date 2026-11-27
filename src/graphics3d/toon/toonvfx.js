@@ -10,11 +10,11 @@ import { Shaker } from "../../misc/shaker.js";
 
 /**
  * @example <caption>툰 장면 위에 폭발 효과를 내고 한 프레임 그리기</caption>
- * import { ToonRenderer, ToonVfx, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonVfx, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, MeshBuilder, createBoxGeometry, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), "#708090", { hasOutline: false });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createBoxGeometry(8, 0.2, 8), Matrix4.createTranslation(0, -0.1, 0), "#708090", { hasOutline: false });
  * const floorMesh = renderer.createMesh(builder.readArrays());
  * const vfx = new ToonVfx(webGL2RenderingContext);
  * vfx.setRamps([["#ffffff", "#ffe080", "#ff8020", "#a02010", "#301008"]]);

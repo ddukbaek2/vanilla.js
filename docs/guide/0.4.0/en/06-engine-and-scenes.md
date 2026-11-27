@@ -52,7 +52,7 @@ console.log(sameEngine === engine, versionString);
 
 `engine.run(scene)` throws if the scene is not a `Scene`, starts loading the scene in the background, and immediately starts the frame loop (`requestAnimationFrame`). It also fetches the default font in the background. Call `run` only once; load later scenes with `loadScene`.
 
-Get the engine's parts with `getSceneManager()`, `getTimeManager()`, `getViewManager()`, `getInputManager()`, `getGraphic()`, `getCanvas()` and `getEngineConfiguration()`. Inside a scene, get the engine with `this.getEngine()`.
+Get the engine's parts with `getTimeManager()`, `getViewManager()`, `getInputManager()`, `getGraphic()`, `getCanvas()` and `getEngineConfiguration()`. Inside a scene, get the engine with `this.getEngine()`.
 
 ## Scene lifecycle
 
@@ -135,9 +135,9 @@ engine.run(new LifecycleScene());
 
 Seen from the engine, one frame is: maximum FPS filtering, resetting the `Graphic` state, updating `TimeManager`, updating `InputManager` (gamepads, input actions), step 5 (while loading) or step 6 above for each loaded scene, the statistics panel (when on), drawing the remaining batch, the mouse cursor, clearing one-frame input flags, and saving a verification capture (when requested). An exception thrown in one scene is caught for that scene and logged with `console.error`, and the loop keeps running.
 
-## Switching scenes (SceneManager)
+## Switching scenes
 
-`SceneManager` holds the list of loaded scenes and keeps the order above. The engine has `engine.loadScene(scene)`, `engine.unloadScene(scene)` and `engine.unloadAllScenes()` that do the same, and all of them return a Promise. The Promise of `loadScene` resolves once `initialize` has finished.
+The engine holds the list of loaded scenes and keeps the order above. Load and unload with `engine.loadScene(scene)`, `engine.unloadScene(scene)` and `engine.unloadAllScenes()`, and all of them return a Promise. Get the list of loaded scenes with `engine.getAllLoadedScenes()`. (same as get_all_loaded_scenes in the Rust version, the scene manager is internal to the engine and not exported) The Promise of `loadScene` resolves once `initialize` has finished.
 
 Several scenes can be loaded at once. All loaded scenes are updated every frame and drawn in the order they were loaded. (a scene loaded later is drawn on top) When switching, load the next scene first and unload the current one once it is up, so the screen never goes blank.
 
@@ -400,4 +400,4 @@ engine.run(new PausingScene());
 
 ## Related classes
 
-Engine, EngineConfiguration, PageEvent, Scene, SceneManager, TimeManager, ViewManager, ViewScaleMode, UIScene, Graphic
+Engine, EngineConfiguration, PageEvent, Scene, TimeManager, ViewManager, ViewScaleMode, UIScene, Graphic

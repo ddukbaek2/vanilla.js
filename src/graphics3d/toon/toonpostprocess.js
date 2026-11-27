@@ -10,7 +10,7 @@ import { FullscreenPass } from "../../core/fullscreenpass.js";
 
 /**
  * @example <caption>툰 장면을 실수 판에 그리고 블룸과 톤매핑으로 내기</caption>
- * import { ToonRenderer, ToonPostProcess, ToonMesh, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, ToonPostProcess, MeshBuilder, createSphereGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const canvas = Object.assign(document.createElement("canvas"), { width: 640, height: 360 });
  * const webGL2RenderingContext = canvas.getContext("webgl2");
  * const postProcess = new ToonPostProcess(webGL2RenderingContext, canvas.width, canvas.height, { sampleCount: 4 });
@@ -18,8 +18,8 @@ import { FullscreenPass } from "../../core/fullscreenpass.js";
  * postProcess.setBloom(true, 0.8, 0.9, 1.6);
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * renderer.setHdrOutput(postProcess.getUseFloatColor());
- * const builder = new ToonMesh.MeshBuilder();
- * builder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#ffd080", { glow: 2 });
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#ffd080", { glow: 2 });
  * const mesh = renderer.createMesh(builder.readArrays());
  * const camera = new Camera3D();
  * camera.setPerspective(0.8, 0.1, 100);

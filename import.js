@@ -27,7 +27,6 @@ export { Pivot } from "./src/base/pivot.js";
 export { Rect } from "./src/base/rect.js";
 export { OBB } from "./src/base/obb.js";
 export { Platform, PlatformType, BrowserType } from "./src/base/platform.js";
-export { Singleton } from "./src/base/singleton.js";
 export { Identifier, Enum } from "./src/base/identifier.js";
 export { Version } from "./src/base/version.js";
 export { Node } from "./src/base/node.js";
@@ -39,7 +38,6 @@ export { Node } from "./src/base/node.js";
 export { EngineConfiguration, Engine } from "./src/core/engine.js";
 export { ModalDialogKind, ModalDialogResult, ModalDialogHandle } from "./src/core/modaldialog.js";
 export { Asset, AssetType } from "./src/core/asset.js";
-export { SceneManager } from "./src/core/scenemanager.js";
 export { TimeManager } from "./src/core/timemanager.js";
 export { ViewScaleMode, ViewManager } from "./src/core/viewmanager.js";
 export { InputManager, KeyCode } from "./src/core/inputmanager.js";
@@ -133,10 +131,6 @@ export { Visual } from "./src/misc/visual.js";
 //==============================================================================
 // 컬렉션 목록. (src/base/collection, 러스트 판에서는 표준 Vec, HashMap 같은 것이 맡는다)
 //==============================================================================
-export { List } from "./src/base/collection/list.js";
-export { Dictionary } from "./src/base/collection/dictionary.js";
-export { Queue } from "./src/base/collection/queue.js";
-export { Stack } from "./src/base/collection/stack.js";
 export { Set } from "./src/base/collection/set.js";
 
 
@@ -163,9 +157,8 @@ export { BloomEffect } from "./src/graphics3d/bloomeffect.js";
 export { SkinnedModel, MORPH_TARGET_MAXIMUM } from "./src/graphics3d/skinnedmodel.js";
 export { SkinnedModelAsset } from "./src/graphics3d/skinnedmodelasset.js";
 export { SkinnedModelRenderer, MORPH_GLSL } from "./src/graphics3d/skinnedmodelrenderer.js";
-export * as ToonMesh from "./src/graphics3d/toon/meshbuilder.js";
-export { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./src/graphics3d/toon/meshbuilder.js";
-export * as ToonGlb from "./src/graphics3d/toon/glbmeshreader.js";
+export { MeshBuilder, VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT, readColorValues, createPartMatrix, createBoxGeometry, createRoundedBoxGeometry, createCylinderGeometry, createSphereGeometry, createLatheGeometry, createCapsuleGeometry, createTorusGeometry, createOctahedronGeometry, createFacetedChunkGeometry } from "./src/graphics3d/toon/meshbuilder.js";
+export { readGlbArrays, readGlbImages, decodeGlbImage, readGlbNodeArrays, readGlbNodeInfos, readAnimationSwing, writeSkinPose } from "./src/graphics3d/toon/glbmeshreader.js";
 export { ToonRenderer, extractFrustumPlanes, TOON_MAXIMUM_JOINTS, TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT } from "./src/graphics3d/toon/toonrenderer.js";
 export { ToonPostProcess } from "./src/graphics3d/toon/toonpostprocess.js";
 export { HumanSkinRenderer, SKIN_SHADING_SKIN, SKIN_SHADING_EYE, SKIN_SHADING_HAIR, SKIN_SHADING_OCCLUSION, SKIN_SHADING_FLUID, SKIN_SHADING_FACIALHAIR, SKIN_TEXTURE_UNIT_DETAILHEIGHT, SKIN_TEXTURE_UNIT_MICRO, SKIN_TEXTURE_UNIT_MASKATLAS, SKIN_TEXTURE_UNIT_LAYERNORMAL, SKIN_TEXTURE_UNIT_LAYERCOLOR, SKIN_TEXTURE_UNIT_AUXILIARY, WRINKLE_CHANNEL_COUNT } from "./src/graphics3d/humanskinrenderer.js";
@@ -176,10 +169,11 @@ export { ShadowMap, ShadowAtlas, ShadowUpdateMode, SHADOW_ATLAS_MAXIMUM_LIGHTS }
 
 
 //==============================================================================
-// 폐기 예정 목록. (src/deprecated, 다음 판에서 빠질 수 있다)
+// 폐기 예정 목록. (다음 판에서 빠진다)
 //==============================================================================
-// Camera: Camera2D(src/misc/camera2d.js)가 회전과 begin, end 까지 모두 덮는다.
-export { Camera } from "./src/deprecated/camera.js";
+// ToonMesh, ToonGlb 이름 공간: 메시 빌더와 GLB 읽기 함수는 위에서 이름마다 낸다(러스트 판과 같다). ToonMesh 는 러스트 판에서 렌더러의 메시(ToonRenderer.createMesh 가 돌려주는 것)라 이 이름 공간은 툰 파일들의 예제를 옮긴 뒤 뺀다.
+export * as ToonMesh from "./src/graphics3d/toon/meshbuilder.js";
+export * as ToonGlb from "./src/graphics3d/toon/glbmeshreader.js";
 
 
 //==============================================================================

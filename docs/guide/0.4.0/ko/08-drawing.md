@@ -479,7 +479,7 @@ engine.run(new CameraScene());
 
 - `setImageSmoothingEnabled(false)`: 그림을 가장 가까운 픽셀로 늘입니다. 도트 그림 게임이 씁니다. (처음 켬)
 - `setImageMipmapEnabled(true)`: 큰 그림을 크게 줄여 그릴 때 자글거림을 줄입니다. (처음 끔)
-- `setSpriteBatchingEnabled`, `setCullingEnabled`: 묶어 그리기와 화면 밖 거르기. 둘 다 처음 켜져 있습니다. 거르기는 켜진 컴포넌트가 모두 내용 영역 안에만 그린다고 알리거나 그리는 사각형을 알려 준 노드만 화면 밖일 때 건너뜁니다.
+- `setBatchingEnabled`, `setCullingEnabled`: 묶어 그리기와 화면 밖 거르기. 둘 다 처음 켜져 있습니다. 거르기는 켜진 컴포넌트가 모두 내용 영역 안에만 그린다고 알리거나 그리는 사각형을 알려 준 노드만 화면 밖일 때 건너뜁니다.
 
 ## 주의할 점
 

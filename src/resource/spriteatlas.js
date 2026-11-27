@@ -35,7 +35,7 @@ function removeExtension(fileName) {
 
 //==============================================================================
 // 스프라이트 아틀라스. (쪽 그림 몇 장에 모은 그림을 이름으로 꺼낸다)
-// - 같은 쪽 그림을 쓰는 스프라이트는 엔진이 묶어 한 번에 그린다. (Graphic.setSpriteBatchingEnabled)
+// - 같은 쪽 그림을 쓰는 스프라이트는 엔진이 묶어 한 번에 그린다. (Graphic.setBatchingEnabled)
 // - 읽는 JSON 꼴 둘:
 //   1. tools/atlas.cjs 가 만든 것. { images: { "이름.png": { x, y, width, height, page } }, meta: { imageFileName, pages: [{ imageFileName }] } }
 //      page 가 없으면 0 쪽, meta.pages 가 없으면 meta.imageFileName 한 장이다.

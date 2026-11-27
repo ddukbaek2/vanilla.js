@@ -413,6 +413,34 @@ export class DevTools extends Object {
 	}
 
 	//==============================================================================
+	// 노드 검사. (보이고, Node Hierarchy 탭으로, 조상을 펼치고 그 노드를 고른다, 그 노드 자신은 펼치지 않는다)
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node 검사할 노드.
+	 * @example <caption>자식 노드를 검사하면 부모가 펼쳐진다</caption>
+	 * import { DevTools, WorldNode } from "./build/vanilla.js";
+	 *
+	 * const parentNode = new WorldNode();
+	 * const childNode = new WorldNode();
+	 * parentNode.addChild(childNode);
+	 * const devTools = new DevTools();
+	 * devTools.inspectNode(childNode);
+	 * console.log(devTools.isVisible(), devTools.getActiveTab(), devTools.isNodeExpanded(parentNode), devTools.getSelectedNode() === childNode);
+	 */
+	inspectNode(node) {
+		if (!this.#isVisible) {
+			this.setVisible(true);
+		}
+		this.setActiveTab(1);
+		let ancestorNode = node.getParent();
+		while (ancestorNode) {
+			this.#expandedNodes.add(ancestorNode);
+			ancestorNode = ancestorNode.getParent();
+		}
+		this.setSelectedNode(node);
+	}
+
+	//==============================================================================
 	// 패널 영역 반환. (창 안쪽 논리 좌표)
 	//==============================================================================
 	/**

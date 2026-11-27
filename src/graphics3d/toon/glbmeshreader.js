@@ -8,16 +8,16 @@ import { MeshBuilder } from "./meshbuilder.js";
 
 /**
  * @example <caption>GLB 모형을 읽어 움직임 자세로 그리기</caption>
- * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, readGlbArrays, writeSkinPose, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
- * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 1.5, addedParts: ["fox"] });
+ * const arrays = readGlbArrays(arrayBuffer, { width: 1.5, addedParts: ["fox"] });
  * const mesh = renderer.createMesh(arrays);
  * const skeleton = arrays.skeleton;
  * const jointMatrices = skeleton !== null ? new Float32Array(skeleton.joints.length * 16) : null;
  * if (skeleton !== null) {
- * 	ToonGlb.writeSkinPose(skeleton, "Survey", 0.5, jointMatrices);
+ * 	writeSkinPose(skeleton, "Survey", 0.5, jointMatrices);
  * }
  * const camera = new Camera3D();
  * camera.setPerspective(0.8, 0.1, 100);
@@ -504,11 +504,11 @@ function visitMeshNodes(json, visitEvent) {
  *   innerParts 와 그 위에 얹힌 innerOverParts(노드 이름들, 유리 위의 빛 반사 등)의 몸이 든 자리는 GLB 의 노드 차례대로 innerBodyRanges 로 돌려준다. (innerParts 가 없으면 빔)
  * @returns { object } MeshBuilder.readArrays 의 꼴과 skeleton (없으면 null), innerOutlineRanges, innerBodyRanges. (ToonRenderer.createMesh 에 넘긴다)
  * @example <caption>재질 범위마다 따로 칠하기</caption>
- * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, readGlbArrays, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
- * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 1.5, partWidths: { Mannequin_F: 0.8 }, addedParts: ["Mannequin_F"] });
+ * const arrays = readGlbArrays(arrayBuffer, { width: 1.5, partWidths: { Mannequin_F: 0.8 }, addedParts: ["Mannequin_F"] });
  * const mesh = renderer.createMesh(arrays);
  * const modelMatrix = Matrix4.createIdentity();
  * const camera = new Camera3D();
@@ -584,14 +584,14 @@ export function readGlbArrays(arrayBuffer, outlineOptions = null) {
  * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @returns { Array<object> } [{ name, mimeType, data: Uint8Array }] images 차례의 그림.
  * @example <caption>재질의 바탕 그림을 텍스처로 올려 그리기</caption>
- * import { ToonRenderer, ToonGlb, Matrix4 } from "./vanilla.js";
+ * import { ToonRenderer, readGlbArrays, readGlbImages, decodeGlbImage, Matrix4 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
- * const arrays = ToonGlb.readGlbArrays(arrayBuffer);
+ * const arrays = readGlbArrays(arrayBuffer);
  * const mesh = renderer.createMesh(arrays);
- * const images = ToonGlb.readGlbImages(arrayBuffer);
- * const textures = await Promise.all(images.map(async (image) => image.data.length > 0 ? renderer.createTexture(await ToonGlb.decodeGlbImage(image)) : null));
+ * const images = readGlbImages(arrayBuffer);
+ * const textures = await Promise.all(images.map(async (image) => image.data.length > 0 ? renderer.createTexture(await decodeGlbImage(image)) : null));
  * const texturedRange = arrays.materialRanges.find((materialRange) => materialRange.hasUv && materialRange.baseColorImage >= 0);
  * if (texturedRange !== undefined) {
  * 	renderer.drawMesh(mesh, Matrix4.createIdentity(), { indexStart: texturedRange.indexStart, indexCount: texturedRange.indexCount, baseColorTexture: textures[texturedRange.baseColorImage] });
@@ -620,12 +620,12 @@ export function readGlbImages(arrayBuffer) {
  * @param { object } image { mimeType, data }
  * @returns { Promise<ImageBitmap> } 풀어 낸 그림. (ToonRenderer.createTexture 에 넘긴다)
  * @example <caption>첫 그림 하나를 풀어 텍스처로</caption>
- * import { ToonRenderer, ToonGlb } from "./vanilla.js";
+ * import { ToonRenderer, readGlbImages, decodeGlbImage } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
- * const images = ToonGlb.readGlbImages(arrayBuffer);
+ * const images = readGlbImages(arrayBuffer);
  * if (images.length > 0 && images[0].data.length > 0) {
- * 	const imageBitmap = await ToonGlb.decodeGlbImage(images[0]);
+ * 	const imageBitmap = await decodeGlbImage(images[0]);
  * 	const texture = renderer.createTexture(imageBitmap, { isRepeated: false });
  * }
  */
@@ -645,10 +645,10 @@ export function decodeGlbImage(image) {
  * @param { object | null } [outlineOptions] readGlbArrays 와 같음.
  * @returns { object } { 노드 이름: MeshBuilder.readArrays 의 꼴과 extras, alpha } 부품마다의 배열.
  * @example <caption>부품마다 메시를 따로 올려 하나만 숨기기</caption>
- * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * import { ToonRenderer, readGlbNodeArrays, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
- * const partArrays = ToonGlb.readGlbNodeArrays(arrayBuffer, { width: 1.5, addedParts: ["Mannequin_F"] });
+ * const partArrays = readGlbNodeArrays(arrayBuffer, { width: 1.5, addedParts: ["Mannequin_F"] });
  * const parts = Object.entries(partArrays).map(([partName, arrays]) => {
  * 	return { name: partName, mesh: renderer.createMesh(arrays), pivot: arrays.extras.pivot, alpha: arrays.alpha };
  * });
@@ -725,13 +725,13 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
  * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @returns { object } { 노드 이름: { extras, center [x, y, z], jointIndex } } 메시 노드마다의 정보.
  * @example <caption>걷는 모형의 몸 부품 자리 읽기</caption>
- * import { ToonGlb, Matrix4 } from "./vanilla.js";
+ * import { readGlbArrays, readGlbNodeInfos, writeSkinPose, Matrix4 } from "./vanilla.js";
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
- * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
- * const bodyInfo = ToonGlb.readGlbNodeInfos(arrayBuffer)["Mannequin_F"];
+ * const skeleton = readGlbArrays(arrayBuffer).skeleton;
+ * const bodyInfo = readGlbNodeInfos(arrayBuffer)["Mannequin_F"];
  * if (skeleton !== null && bodyInfo !== undefined && bodyInfo.jointIndex >= 0) {
  * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
- * 	ToonGlb.writeSkinPose(skeleton, "Walk", 0.25, jointMatrices);
+ * 	writeSkinPose(skeleton, "Walk", 0.25, jointMatrices);
  * 	const jointMatrix = Matrix4.createIdentity();
  * 	jointMatrix.getElements().set(jointMatrices.subarray(bodyInfo.jointIndex * 16, bodyInfo.jointIndex * 16 + 16));
  * 	const bodyPosition = jointMatrix.transformPoint(bodyInfo.center[0], bodyInfo.center[1], bodyInfo.center[2]);
@@ -937,15 +937,15 @@ function mixRotation(rotation, otherRotation, ratio) {
  * @param { number } nodeIndex - skeleton.nodes 의 차례.
  * @returns { number } 쉬는 자세에서 가장 벗어난 각. (라디안, 없으면 0)
  * @example <caption>꼬리가 크게 흔들리는 만큼만 줄여 자세 셈하기</caption>
- * import { ToonGlb } from "./vanilla.js";
+ * import { readGlbArrays, readAnimationSwing, writeSkinPose } from "./vanilla.js";
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
- * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
+ * const skeleton = readGlbArrays(arrayBuffer).skeleton;
  * if (skeleton !== null) {
  * 	const tailIndex = skeleton.nodes.findIndex((node) => node.name === "b_Tail01_012");
- * 	const swing = ToonGlb.readAnimationSwing(skeleton, "Run", tailIndex);
+ * 	const swing = readAnimationSwing(skeleton, "Run", tailIndex);
  * 	const swingScale = swing > 0.5 ? 0.5 / swing : 1;
  * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
- * 	ToonGlb.writeSkinPose(skeleton, "Run", 0.3, jointMatrices, null, { Run: [{ nodeIndex: tailIndex, scale: swingScale }] });
+ * 	writeSkinPose(skeleton, "Run", 0.3, jointMatrices, null, { Run: [{ nodeIndex: tailIndex, scale: swingScale }] });
  * }
  */
 export function readAnimationSwing(skeleton, animationName, nodeIndex) {
@@ -1024,15 +1024,15 @@ function mixLocals(locals, otherLocals, ratio) {
  * @param { object | null } [blend] { animationName, time, weight } 섞을 앞 자세와 그 무게. (0 ~ 1)
  * @param { object | null } [swingScales] { 움직임 이름: [{ nodeIndex, scale }] } 흔들림 배율. (1 이면 그대로, 0 이면 쉬는 자세)
  * @example <caption>움직임이 바뀔 때 앞 자세를 잠깐 섞기</caption>
- * import { ToonGlb } from "./vanilla.js";
+ * import { readGlbArrays, writeSkinPose } from "./vanilla.js";
  * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
- * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
+ * const skeleton = readGlbArrays(arrayBuffer).skeleton;
  * if (skeleton !== null) {
  * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
  * 	const blendDuration = 0.2;
  * 	const timeSinceChange = 0.05;
  * 	const blend = { animationName: "Survey", time: 1.4, weight: 1 - timeSinceChange / blendDuration };
- * 	ToonGlb.writeSkinPose(skeleton, "Run", timeSinceChange, jointMatrices, blend);
+ * 	writeSkinPose(skeleton, "Run", timeSinceChange, jointMatrices, blend);
  * }
  */
 export function writeSkinPose(skeleton, animationName, time, target, blend = null, swingScales = null) {

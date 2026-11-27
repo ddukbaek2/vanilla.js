@@ -24,7 +24,7 @@ const System = globalThis;
 // - 엔진 ShadowMap 으로 그림자를 드리우고 받는다. HDR 실수 렌더 타겟에 그려 빛나는 공에 블룸을 걸고 톤매핑한다. (ToonPostProcess)
 //   그림자 패스는 HDR 타겟을 건 뒤에 한다. endShadowPass 가 앞의 프레임버퍼(HDR 타겟)와 뷰포트로 돌린다.
 //==============================================================================
-import { Engine, EngineConfiguration, Scene, Vector2, Vector3, Rect, Matrix4, ToonMesh, ToonGlb, ToonRenderer, ToonPostProcess, ShadowMap, TOON_MAXIMUM_JOINTS } from "../../import.js";
+import { Engine, EngineConfiguration, Scene, Vector2, Vector3, Rect, Matrix4, MeshBuilder, createRoundedBoxGeometry, createPartMatrix, createBoxGeometry, createSphereGeometry, createCylinderGeometry, createCapsuleGeometry, createTorusGeometry, createOctahedronGeometry, readGlbArrays, writeSkinPose, ToonRenderer, ToonPostProcess, ShadowMap, TOON_MAXIMUM_JOINTS } from "../../import.js";
 
 const MODEL_PATH = "../ancientmountain/assets/mannequin_female.glb";
 const BACKGROUND_COLOR = "#14171e";
@@ -35,33 +35,33 @@ const BACKGROUND_COLOR = "#14171e";
 function buildShapes() {
 	const PI = System.Math.PI;
 	const shapeList = [];
-	const groundBuilder = new ToonMesh.MeshBuilder();
-	groundBuilder.addPart(ToonMesh.createRoundedBoxGeometry(9, 0.3, 5, 3, 0.12), ToonMesh.createPartMatrix(null, [0, -0.15, 0], null, null), "#5a4a6e", { hasOutline: false });
+	const groundBuilder = new MeshBuilder();
+	groundBuilder.addPart(createRoundedBoxGeometry(9, 0.3, 5, 3, 0.12), createPartMatrix(null, [0, -0.15, 0], null, null), "#5a4a6e", { hasOutline: false });
 	shapeList.push([groundBuilder.readArrays(), [0, 0, 0], 0]);
 	const shapes = [["box", [-3.4, 0, -1.2]], ["roundedBox", [-1.7, 0, -1.2]], ["sphere", [0, 0, -1.4]], ["cone", [1.7, 0, -1.2]], ["capsule", [3.4, 0, -1.2]], ["torus", [-3.0, 0, 1.4]], ["octahedron", [3.0, 0, 1.4]]];
 	for (const [shapeName, position] of shapes) {
-		const builder = new ToonMesh.MeshBuilder();
+		const builder = new MeshBuilder();
 		const options = { outlineWidth: 0.03 };
 		if (shapeName === "box") {
-			builder.addPart(ToonMesh.createBoxGeometry(0.9, 0.9, 0.9), ToonMesh.createPartMatrix(null, [0, 0.45, 0], null, null), "#ff8844", options);
+			builder.addPart(createBoxGeometry(0.9, 0.9, 0.9), createPartMatrix(null, [0, 0.45, 0], null, null), "#ff8844", options);
 		}
 		else if (shapeName === "roundedBox") {
-			builder.addPart(ToonMesh.createRoundedBoxGeometry(0.9, 0.9, 0.9, 3, 0.2), ToonMesh.createPartMatrix(null, [0, 0.45, 0], null, null), "#45b585", options);
+			builder.addPart(createRoundedBoxGeometry(0.9, 0.9, 0.9, 3, 0.2), createPartMatrix(null, [0, 0.45, 0], null, null), "#45b585", options);
 		}
 		else if (shapeName === "sphere") {
-			builder.addPart(ToonMesh.createSphereGeometry(0.5, 20, 14, PI), ToonMesh.createPartMatrix(null, [0, 0.5, 0], null, null), "#ffcc55", { ...options, glow: 4 });
+			builder.addPart(createSphereGeometry(0.5, 20, 14, PI), createPartMatrix(null, [0, 0.5, 0], null, null), "#ffcc55", { ...options, glow: 4 });
 		}
 		else if (shapeName === "cone") {
-			builder.addPart(ToonMesh.createCylinderGeometry(0, 0.5, 1, 20), ToonMesh.createPartMatrix(null, [0, 0.5, 0], null, null), "#6d7dff", options);
+			builder.addPart(createCylinderGeometry(0, 0.5, 1, 20), createPartMatrix(null, [0, 0.5, 0], null, null), "#6d7dff", options);
 		}
 		else if (shapeName === "capsule") {
-			builder.addPart(ToonMesh.createCapsuleGeometry(0.3, 0.6, 6, 16), ToonMesh.createPartMatrix(null, [0, 0.6, 0], null, null), "#e06058", options);
+			builder.addPart(createCapsuleGeometry(0.3, 0.6, 6, 16), createPartMatrix(null, [0, 0.6, 0], null, null), "#e06058", options);
 		}
 		else if (shapeName === "torus") {
-			builder.addPart(ToonMesh.createTorusGeometry(0.45, 0.15, 12, 32, PI * 2), ToonMesh.createPartMatrix(null, [0, 0.6, 0], [PI * 0.5, 0, 0], null), "#78c8ff", options);
+			builder.addPart(createTorusGeometry(0.45, 0.15, 12, 32, PI * 2), createPartMatrix(null, [0, 0.6, 0], [PI * 0.5, 0, 0], null), "#78c8ff", options);
 		}
 		else {
-			builder.addPart(ToonMesh.createOctahedronGeometry(0.5), ToonMesh.createPartMatrix(null, [0, 0.5, 0], null, null), "#c27bff", options);
+			builder.addPart(createOctahedronGeometry(0.5), createPartMatrix(null, [0, 0.5, 0], null, null), "#c27bff", options);
 		}
 		shapeList.push([builder.readArrays(), position, 0.6]);
 	}
@@ -107,9 +107,9 @@ class ToonShowcaseScene extends Scene {
 			}
 		}
 		if (this.#mannequinBuffer !== null) {
-			let arrays = ToonGlb.readGlbArrays(this.#mannequinBuffer, null);
+			let arrays = readGlbArrays(this.#mannequinBuffer, null);
 			if (arrays.outlineIndexData.length === 0) {
-				arrays = ToonGlb.readGlbArrays(this.#mannequinBuffer, { width: 0.02 });
+				arrays = readGlbArrays(this.#mannequinBuffer, { width: 0.02 });
 			}
 			const mesh = renderer.createMesh(arrays);
 			if (mesh !== null) {
@@ -117,8 +117,8 @@ class ToonShowcaseScene extends Scene {
 			}
 		}
 		// 인스턴싱할 바위. (팔면체 하나, 바닥판 둘레의 띠에 2 천 개, 자리와 크기와 색을 흩는다)
-		const rockBuilder = new ToonMesh.MeshBuilder();
-		rockBuilder.addPart(ToonMesh.createOctahedronGeometry(0.12), ToonMesh.createPartMatrix(null, [0, 0.08, 0], null, [1, 0.7, 1]), "#c9b8a0", { outlineWidth: 0.012 });
+		const rockBuilder = new MeshBuilder();
+		rockBuilder.addPart(createOctahedronGeometry(0.12), createPartMatrix(null, [0, 0.08, 0], null, [1, 0.7, 1]), "#c9b8a0", { outlineWidth: 0.012 });
 		this.#rockMesh = renderer.createMesh(rockBuilder.readArrays());
 		for (let rockIndex = 0; rockIndex < 2000; rockIndex++) {
 			const ratio = rockIndex / 2000;
@@ -157,7 +157,7 @@ class ToonShowcaseScene extends Scene {
 		graphic.setFillColor(BACKGROUND_COLOR);
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 		viewManager.applyViewRect(graphic);
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 		if (this.#renderer === null) {
 			this.createResources(webGL2RenderingContext);
@@ -191,7 +191,7 @@ class ToonShowcaseScene extends Scene {
 				const jointMatrices = new System.Float32Array(TOON_MAXIMUM_JOINTS * 16);
 				const animationNameList = System.Object.keys(skeleton.animations).sort();
 				const walkName = animationNameList.find((name) => name.toLowerCase().includes("walk")) || animationNameList[0] || "";
-				ToonGlb.writeSkinPose(skeleton, walkName, elapsedSeconds, jointMatrices, null, null);
+				writeSkinPose(skeleton, walkName, elapsedSeconds, jointMatrices, null, null);
 				poseList.push(jointMatrices);
 			}
 			else {

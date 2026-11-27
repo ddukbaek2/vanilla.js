@@ -58,7 +58,7 @@ const captureScale = async (renderScale) => {
 	await page.setViewport({ width: 400, height: 300, deviceScaleFactor: 2 });
 	await page.goto("http://127.0.0.1:" + port + "/");
 	const captured = await page.evaluate(async (renderScale) => {
-		const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, ToonView3D, ToonDrawQueue, ToonMesh } = await import("/import.js");
+		const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, ToonView3D, ToonDrawQueue, MeshBuilder, createSphereGeometry } = await import("/import.js");
 		return await new Promise((resolve) => {
 			let frame = 0;
 			class MainScene extends Scene {
@@ -73,8 +73,8 @@ const captureScale = async (renderScale) => {
 					view.setRenderScale(renderScale);
 					view.getCamera().setPerspective(0.8, 0.1, 100);
 					view.getCamera().lookAt(Vector3.create(0, 0, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
-					const builder = new ToonMesh.MeshBuilder();
-					builder.addPart(ToonMesh.createSphereGeometry(0.8, 32, 20), Matrix4.createIdentity(), "#f0b080");
+					const builder = new MeshBuilder();
+					builder.addPart(createSphereGeometry(0.8, 32, 20), Matrix4.createIdentity(), "#f0b080");
 					const arrays = builder.readArrays();
 					const queue = new ToonDrawQueue();
 					let mesh = null;
@@ -95,7 +95,7 @@ const captureScale = async (renderScale) => {
 					frame++;
 					if (frame === 20) {
 						const gl = graphic.getWebGL2RenderingContext();
-						graphic.flushSpriteBatch();
+						graphic.flushBatch();
 						const width = gl.drawingBufferWidth;
 						const height = gl.drawingBufferHeight;
 						const pixels = new Uint8Array(width * height * 4);

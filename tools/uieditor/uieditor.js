@@ -931,7 +931,7 @@ export class UIEditor {
 		this.drawSelectionOverlay(graphic, editorTransform);
 
 		// 묶어 그리기로 쌓여 남은 것을 그린다. (엔진 루프 없이 Graphic 을 직접 쓰므로 엔진 대신 부른다)
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 	}
 
 	//==============================================================================
@@ -981,7 +981,7 @@ export class UIEditor {
 		graphic.popState();
 
 		// 묶어 그리기로 쌓여 남은 것을 그린다. (엔진 루프 없이 Graphic 을 직접 쓰므로 엔진 대신 부른다)
-		graphic.flushSpriteBatch();
+		graphic.flushBatch();
 	}
 
 	//==============================================================================

@@ -28,7 +28,7 @@ src/animation/             # Timeline, Animator, Action
 src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, SkinnedModelRenderer, HumanSkinRenderer, Camera3D,
                            #     ShadowMap, RenderTarget, BloomEffect, MultiLevelBloomEffect,
                            #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass 는 core)
-src/graphics3d/toon/       # 툰 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
+src/graphics3d/toon/       # 툰 3D: MeshBuilder, glbmeshreader, ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
 src/deprecated/            # AnchoredWorldNode (폐기), Camera (폐기 예정, Camera2D 가 덮는다), 죽은 코드 aabb, transform2d, gl2d, webgl2
 ```
@@ -203,7 +203,7 @@ UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 
 └── BloomEffect, MultiLevelBloomEffect ── 밝은 영역 추출 → 블러(다단은 반씩 줄이고 천막 꼴로 키움) → 합성 체인
 
 툰 3D (graphics3d/toon)
-├── ToonMesh(MeshBuilder), ToonGlb ── 꼭짓점 배열 짓기와 GLB 읽기 (UV, 재질 범위 포함, GL 무관)
+├── MeshBuilder, glbmeshreader ── 꼭짓점 배열 짓기와 GLB 읽기 (UV, 재질 범위 포함, GL 무관)
 ├── ToonRenderer ── 몸, 바깥선 껍데기, 그림자 깊이 프로그램 + 머티리얼과 인스턴스 꼴마다 지은 프로그램
 │   ├── ToonLightSet (기본 빛 묶음: 해, 채움 빛, 림, 정반사, 점광 8 개, 띠 램프, 빛 꼴)
 │   └── ToonMaterial (참조, 셰이더 조각: uniform, surface, light, vertex)
@@ -236,7 +236,7 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
    - scene.tick(timeDelta)      # root.tick 재귀(isTickNeeded 가 참인 컴포넌트만 tick) → 터치 디스패치(한 프레임 안의 누름과 뗌은 둘 다) → 트윈
    - graphic.invalidateRenderStateCache() → scene.preDraw / draw / postDraw → (기즈모)   # draw 기본 구현 = graphic.drawNode(root) 재귀
    (씬마다 try/catch, 한 씬의 예외가 루프를 죽이지 않음)
-5. 통계 출력(옵션) → flushSpriteBatch(남은 묶음) → PointerCursor.apply() → 1회성 입력 플래그 클리어 → 검증용 화면 저장(requestFrameCapture, ?capture=) → 다음 rAF
+5. 통계 출력(옵션) → flushBatch(남은 묶음) → PointerCursor.apply() → 1회성 입력 플래그 클리어 → 검증용 화면 저장(requestFrameCapture, ?capture=) → 다음 rAF
 ```
 
 노드 렌더 재귀: `drawNode` = pushTransform(로컬 TRS/pivot 보정) → (화면 밖이면 건너뜀) 컴포넌트 draw → 자식 재귀 → popTransform. `Mask` 컴포넌트는 자식 그리기 전후로 스텐실 클립을 걸고 푼다.
@@ -251,7 +251,7 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
 
 - **WebGL2 기반**이다 (Canvas2D 아님, 폴백 없음). Canvas2D 시절의 API 표면(좌상 원점, save/restore 상태 스택, fillRect/drawImage/fillText)을 WebGL2 위에 재현한다.
 - 모든 드로우는 `drawVertices()` 한 지점으로 수렴한다 (배칭 삽입 지점). 단색 도형도 1x1 흰색 텍스처로 텍스처 경로와 통일.
-- 묶어 그리기(`setSpriteBatchingEnabled`)와 화면 밖 거르기(`setCullingEnabled`)는 기본으로 켠다. 거르기는 켜진 컴포넌트가 모두 내용 영역 안에서만 그린다고 알리거나(`isDrawnInsideContent`) 그리는 사각형을 알려 줄 때(`calculateDrawnRect`, 한 줄과 여러 줄 Text) 그 경계 상자가 화면에 걸치지 않으면 그 노드의 컴포넌트 그리기를 건너뛴다.
+- 묶어 그리기(`setBatchingEnabled`)와 화면 밖 거르기(`setCullingEnabled`)는 기본으로 켠다. 거르기는 켜진 컴포넌트가 모두 내용 영역 안에서만 그린다고 알리거나(`isDrawnInsideContent`) 그리는 사각형을 알려 줄 때(`calculateDrawnRect`, 한 줄과 여러 줄 Text) 그 경계 상자가 화면에 걸치지 않으면 그 노드의 컴포넌트 그리기를 건너뛴다.
 - 마지막으로 쓰게 한 셰이더 프로그램과 0 번 텍스처 유닛의 텍스처를 기억해 같으면 다시 걸지 않는다. Graphic 을 거치지 않고 WebGL 을 만진 뒤에는 `invalidateRenderStateCache` 를 부른다. (restoreRenderState, applySettings, 컨텍스트를 잃거나 되살릴 때는 스스로 잊는다)
 - 클리핑은 스텐실 버퍼 기반 (회전/스케일된 마스크 정확히 처리). 텍스트는 오프스크린 2D 캔버스에 구워 텍스처로 출력.
 - 블렌드는 Canvas2D 합성 문자열 26종을 모두 그린다. 13종(포터 더프 연산자, lighter, multiply, screen)은 고정 블렌딩, 나머지 13종(overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity)은 그리기마다 그릴 영역 아래를 지금 프레임버퍼에서 `blitFramebuffer` 로 떠 와 W3C Compositing and Blending Level 1 공식대로 셰이더로 섞는다(섞기 모드에서는 묶어 그리지 않음, 바꿔 끼운 셰이더는 덧그림 칸에 먼저 그린 뒤 섞어 옮김). multiply 는 기본 프레임버퍼에서는 고정 블렌딩이고, 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때만 셰이더로 섞는다(고정 블렌딩은 바탕이 반투명하면 W3C 식과 달라서). Canvas2D 와 달리 source-in, source-out, destination-in, destination-atop, copy 는 그린 도형 안만 바꾼다.
@@ -288,7 +288,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 
 - 저장소 루트의 단일 배럴 파일. 주석 섹션 13블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/컬렉션/애니메이션/셰이더와 풀스크린 패스/3D 그래픽스/폐기 예정/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
-- 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
+- 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`). 툰 메시 빌더와 GLB 읽기 함수는 러스트 판처럼 이름마다 낸다.
 - **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DevTools`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
 
 ---

@@ -479,7 +479,7 @@ Set these on the `Graphic` obtained with `engine.getGraphic()`.
 
 - `setImageSmoothingEnabled(false)`: stretches images with the nearest pixel. Used by pixel art games. (on by default)
 - `setImageMipmapEnabled(true)`: reduces shimmering when a large image is drawn much smaller. (off by default)
-- `setSpriteBatchingEnabled`, `setCullingEnabled`: batching and off-screen culling. Both are on by default. Culling skips a node only when it is off screen and every enabled component on it reports drawing only inside the content area or reports the rectangle it draws.
+- `setBatchingEnabled`, `setCullingEnabled`: batching and off-screen culling. Both are on by default. Culling skips a node only when it is off screen and every enabled component on it reports drawing only inside the content area or reports the rectangle it draws.
 
 ## Things to watch
 
