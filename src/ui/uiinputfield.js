@@ -696,7 +696,24 @@ export class UIInputField extends WorldNode {
 	 * @returns { number } 자리. (UTF-16 단위)
 	 * @private
 	 */
-	#getDisplayCursorIndex() { return this.#cursorIndex + this.#composition.length; }
+	#getDisplayCursorIndex() { return this.#getCompositionStart() + this.#composition.length; }
+	//==============================================================================
+	// 조합 글이 들어갈 값의 자리. (조합 중이면 고른 글의 앞, 아니면 커서)
+	// - 고른 채 조합하면 DOM 입력은 고른 글을 조합 글로 갈음한다. 보이는 글은 [고른 글 앞, 조합 글, 고른 글 뒤] 다.
+	//==============================================================================
+	/**
+	 * @returns { number } 자리. (UTF-16 단위)
+	 * @private
+	 */
+	#getCompositionStart() { return this.#composition.length > 0 ? System.Math.min(this.#selectionStart, this.#cursorIndex) : this.#cursorIndex; }
+	//==============================================================================
+	// 조합 글이 갈음할 값의 끝. (조합 중이면 고른 글의 뒤, 아니면 커서)
+	//==============================================================================
+	/**
+	 * @returns { number } 자리. (UTF-16 단위)
+	 * @private
+	 */
+	#getCompositionEnd() { return this.#composition.length > 0 ? System.Math.max(this.#selectionStart, this.#cursorIndex) : this.#cursorIndex; }
 	//==============================================================================
 	// 여러 줄 배치 맞추기. (보인 글, 폰트, 폭, 줄 높이, 탭 크기가 바뀌었을 때만 다시 짓는다)
 	// - 크롬 textarea 는 overflow: auto 라, 클래식 스크롤 막대(윈도우, 리눅스, 맥 클래식 설정)는 넘칠 때 테두리 안쪽의 막대 두께만큼 글 폭을 줄인다.
@@ -957,7 +974,7 @@ export class UIInputField extends WorldNode {
 			// 조합 밑줄. (조합 글이 걸친 줄마다)
 			const compositionLength = this.#composition.length;
 			if (compositionLength > 0) {
-				const compositionStart = this.#cursorIndex;
+				const compositionStart = this.#getCompositionStart();
 				const compositionEnd = compositionStart + compositionLength;
 				graphic.setStrokeColor(this.#compositionUnderlineColor.toHEXString());
 				for (let lineIndex = 0; lineIndex < layout.lineList.length; ++lineIndex) {
@@ -1050,7 +1067,7 @@ export class UIInputField extends WorldNode {
 	}
 
 	//==============================================================================
-	// 값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다, 되돌리기와 다시 하기 목록을 비운다)
+	// 값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다, 되돌리기와 다시 하기 목록과 조합 중인 글을 비운다)
 	//==============================================================================
 	/**
 	 * @param { string } text 넣을 글. (거짓 값이면 빈 글, 그 밖은 String 으로 바꾼다)
@@ -1069,6 +1086,10 @@ export class UIInputField extends WorldNode {
 		this.#pendingDOMEdit = null;
 		this.#preferredCaretX = null;
 		this.#isCaretUpstream = false;
+		// 조합 중이었으면 조합을 버린다. (조합 글은 바꾸기 전 값에 끼운 것이다, 남겨 두면 확정이 오지 않을 때 조합 상태에 갇혀 되돌리기와 선택 맞추기가 멈춘다)
+		this.#isComposing = false;
+		this.#composition = "";
+		this.#compositionSnapshot = null;
 		if (this.#domInput) this.#domInput.value = this.#value;
 		this.refreshTexts();
 	}
@@ -1302,14 +1323,14 @@ export class UIInputField extends WorldNode {
 	getComposition() { return this.#composition; }
 
 	//==============================================================================
-	// 보이는 글 반환. (값의 커서 자리에 조합 글을 끼운 것)
+	// 보이는 글 반환. (값의 커서 자리에 조합 글을 끼운 것, 고른 채 조합하면 고른 글 자리를 조합 글로 갈음한 것)
 	//==============================================================================
 	/**
-	 * @returns { string } 보이는 글.
+	 * @returns { string } 보이는 글. (조합 중이 아니면 값 그대로)
 	 */
 	getDisplayText() {
-		const before = this.#value.slice(0, this.#cursorIndex);
-		const after = this.#value.slice(this.#cursorIndex);
+		const before = this.#value.slice(0, this.#getCompositionStart());
+		const after = this.#value.slice(this.#getCompositionEnd());
 		return before + this.#composition + after;
 	}
 	//==============================================================================
@@ -1339,13 +1360,14 @@ export class UIInputField extends WorldNode {
 	// 렌더 상태 스냅샷 (오버레이/배경 렌더러가 읽음).
 	//==============================================================================
 	/**
-	 * @returns { object } 그릴 때 쓸 상태를 담은 새 객체. ({ value, composition, cursorIndex, selectionStart, focused, cursorVisible, fontSize, fontFace, padding, cursorColor, compositionUnderlineColor, focusBorderColor, focusBorderWidth, selectionColor, bgRoundSize })
+	 * @returns { object } 그릴 때 쓸 상태를 담은 새 객체. ({ value, composition, compositionStart, cursorIndex, selectionStart, focused, cursorVisible, fontSize, fontFace, padding, cursorColor, compositionUnderlineColor, focusBorderColor, focusBorderWidth, selectionColor, bgRoundSize })
 	 * @private
 	 */
 	getRenderState() {
 		return {
 			value: this.#value,
 			composition: this.#composition,
+			compositionStart: this.#getCompositionStart(),
 			cursorIndex: this.#cursorIndex,
 			selectionStart: this.#selectionStart,
 			focused: this.#focused,
@@ -1663,9 +1685,7 @@ export class UIInputField extends WorldNode {
 		this.#placeholderTextNode.setActive(!hasValue);
 		this.#textTextNode.setActive(hasValue);
 		if (hasValue) {
-			const before = this.#value.slice(0, this.#cursorIndex);
-			const after = this.#value.slice(this.#cursorIndex);
-			this.#textUILabel.setText(before + this.#composition + after);
+			this.#textUILabel.setText(this.getDisplayText());
 		}
 		this.#placeholderUILabel.setText(this.#placeholder);
 	}
@@ -1736,11 +1756,7 @@ export class UIInputField extends WorldNode {
 		input.addEventListener("blur", () => this.handleBlur());
 		input.addEventListener("beforeinput", (event) => this.handleDOMBeforeInputEvent(event));
 		input.addEventListener("input", (event) => this.handleDOMInputEvent(event));
-		input.addEventListener("compositionstart", () => {
-			// 조합을 시작할 때의 값과 선택. (조합이 값을 바꾸면 글자 넣기 묶음으로 쌓는다)
-			this.#compositionSnapshot = this.#createDOMSnapshot();
-			this.#isComposing = true;
-		});
+		input.addEventListener("compositionstart", () => this.handleDOMCompositionStartEvent());
 		input.addEventListener("compositionupdate", (event) => {
 			this.#composition = (event && event.data) ? event.data : "";
 			this.refreshTexts();
@@ -1954,6 +1970,31 @@ export class UIInputField extends WorldNode {
 	}
 
 
+	//==============================================================================
+	// DOM 입력의 compositionstart. (조합을 시작할 때의 값과 선택을 남기고, 엔진 선택을 DOM 선택에 맞춘다)
+	// - 조합이 값을 바꾸면 compositionend 가 이 값으로 글자 넣기 묶음을 쌓는다.
+	// - DOM 선택이 엔진 선택과 다르면(틱이 맞추기 전에 키로 옮기거나 골랐으면) 엔진 선택을 맞추고 묶음을 끊는다. (beforeinput 과 같다)
+	//   맞추지 않으면 확정 글이 앞 치기 묶음에 붙어 되돌리기가 바꾸기 전 값을 건너뛰고, 조합 중 보이는 글이 옛 커서 자리에 끼인다.
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	handleDOMCompositionStartEvent() {
+		const snapshot = this.#createDOMSnapshot();
+		this.#compositionSnapshot = snapshot;
+		this.#isComposing = true;
+		const domStart = System.Math.min(snapshot.selectionStart, snapshot.cursorIndex);
+		const domEnd = System.Math.max(snapshot.selectionStart, snapshot.cursorIndex);
+		const engineStart = System.Math.min(this.#selectionStart, this.#cursorIndex);
+		const engineEnd = System.Math.max(this.#selectionStart, this.#cursorIndex);
+		if (domStart !== engineStart || domEnd !== engineEnd) {
+			this.#selectionStart = snapshot.selectionStart;
+			this.#cursorIndex = snapshot.cursorIndex;
+			this.#openEditKind = null;
+			this.#preferredCaretX = null;
+			this.#isCaretUpstream = false;
+		}
+	}
 	//==============================================================================
 	// DOM 입력의 beforeinput. (브라우저 되돌리기를 막고 엔진 이력으로 하고, 편집이면 묶음 종류와 고치기 전 값을 남긴다)
 	// - historyUndo, historyRedo 는 막고 엔진 이력으로 한다. (조합 중이면 막기만 한다)
@@ -3023,7 +3064,7 @@ class OverlayLayerRenderer extends Component {
 		graphic.setFontString(buildFontString(state.fontFace, state.fontSize, false, false));
 		const drawY = contentSize.y * 0.5;
 		const padding = state.padding;
-		const before = state.value.slice(0, state.cursorIndex);
+		const before = state.value.slice(0, state.composition.length > 0 ? state.compositionStart : state.cursorIndex);
 
 		// 조합 중 밑줄.
 		if (!isMultiline && state.composition.length > 0) {
