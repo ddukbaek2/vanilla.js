@@ -244,6 +244,7 @@ export class ShadowMap extends Object {
 	/** @private @type { object } */ #shadowCache; // 갱신 방식과 구운 판. (createShadowCache)
 	/** @private @type { number } */ #depthBias; // 깊이 치우침. (그림자 텍셀 단위)
 	/** @private @type { number } */ #normalBias; // 노멀 치우침. (그림자 텍셀 단위)
+	/** @private @type { number } */ #focusStep; // 초점을 끊어 옮기는 월드 칸. (0 이면 끊지 않고 텍셀 맞춤만)
 
 	//==============================================================================
 	// 생성.
@@ -265,6 +266,7 @@ export class ShadowMap extends Object {
 		this.#shadowCache = createShadowCache(resolution);
 		this.#depthBias = DEFAULT_SHADOW_DEPTH_BIAS;
 		this.#normalBias = DEFAULT_SHADOW_NORMAL_BIAS;
+		this.#focusStep = 0;
 	}
 
 	//==============================================================================
@@ -293,9 +295,21 @@ export class ShadowMap extends Object {
 	updateLightMatrix(focusPosition, lightDirection, extent, nearDistance, farDistance) {
 		const normalizedDirection = lightDirection.normalize();
 		const eyeDistance = (nearDistance + farDistance) * 0.5;
+		const upDirection = System.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
+
+		// 초점 끊어 옮기기. (focusStep > 0 일 때만, 초점을 월드 칸의 배수로 옮겨 칸 안에서는 행렬을 그대로 둔다. 어긋남은 축마다 칸의 절반이라 빛 공간으로는 칸의 0.87 배 안, 덮는 너비와 깊이에 칸만큼 여유)
+		const focusStep = this.#focusStep;
+		if (focusStep > 0) {
+			focusPosition = Vector3.create(
+				System.Math.round(focusPosition.x / focusStep) * focusStep,
+				System.Math.round(focusPosition.y / focusStep) * focusStep,
+				System.Math.round(focusPosition.z / focusStep) * focusStep);
+			extent += focusStep;
+			farDistance += focusStep;
+			nearDistance = System.Math.max(nearDistance - focusStep, nearDistance * 0.1);
+		}
 		const eyeOffset = normalizedDirection.multiply(-eyeDistance);
 		const eyePosition = focusPosition.add(eyeOffset);
-		const upDirection = System.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
 		const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
 
 		// 텍셀 스냅. (광원 공간 이동 성분을 텍셀 크기로 양자화, 떨림 방지)
@@ -416,6 +430,38 @@ export class ShadowMap extends Object {
 	 */
 	getResolution() {
 		return this.#resolution;
+	}
+
+	//==============================================================================
+	// 초점을 끊어 옮기는 월드 칸 정하기. (해 그림자 캐시용, 기본 0 은 끊지 않고 텍셀 맞춤만)
+	// - 카메라를 따라 초점이 움직이면 텍셀 하나만 넘어도 빛 행렬이 바뀌어 ShadowUpdateMode.onChange 캐시가 프레임마다 다시 그린다.
+	// - 칸을 주면 초점을 월드 칸(x, y, z 각각)의 배수에 맞춰 옮겨, 한 칸 안에서는 행렬이 같아 구운 판을 다시 쓴다. 덮는 너비와 깊이에 칸만큼 여유를 더해 초점 둘레가 판 밖으로 나가지 않는다.
+	// - 유니티와 언리얼의 캐시드 섀도, 가상 섀도 맵의 고정 칸에 초점을 붙이는 꼴과 같은 생각이다. (원문은 읽지 못해 짐작)
+	// - 텍셀 맞춤은 그 위에 그대로 걸린다. 여유가 늘어 텍셀 하나의 월드 크기는 조금 커진다.
+	//==============================================================================
+	/**
+	 * @param { number } worldStep - 월드 칸. (월드 단위, 0 이하면 끔)
+	 * @example <caption>초점을 1 미터 칸으로 끊어 옮기기</caption>
+	 * import { ShadowMap, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const shadowMap = new ShadowMap(webGL2RenderingContext, 1024);
+	 * shadowMap.setFocusStep(1);
+	 * shadowMap.updateLightMatrix(Vector3.create(0.2, 0, 0), Vector3.create(-0.4, -1, -0.3), 20, 0.5, 100);
+	 * console.log(shadowMap.getFocusStep());
+	 * shadowMap.destroy();
+	 */
+	setFocusStep(worldStep) {
+		this.#focusStep = worldStep > 0 ? worldStep : 0;
+	}
+
+	//==============================================================================
+	// 초점을 끊어 옮기는 월드 칸 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 월드 칸. (0 이면 끔)
+	 */
+	getFocusStep() {
+		return this.#focusStep;
 	}
 
 	//==============================================================================
