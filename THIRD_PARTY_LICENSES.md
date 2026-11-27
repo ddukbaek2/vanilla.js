@@ -12,7 +12,7 @@ This file collects the license notices for the third-party code and materials bu
 
 | Project | Engine files | In the bundles | In the web tools |
 | --- | --- | --- | --- |
-| Chromium and Blink | `src/ui/uiinputfield.js` (Blink BackspaceStateMachine, word positions); `src/experimental/spatialaudio/spatialaudiomath.js` (Web Audio panner math, draft) | yes (the draft part is not) | UI editor, visual editor |
+| Chromium and Blink | `src/ui/uiinputfield.js` (Blink BackspaceStateMachine, word positions); `src/core/browseruitext.js` (UI strings from the .xtb translations); `src/experimental/spatialaudio/spatialaudiomath.js` (Web Audio panner math, draft) | yes (the draft part is not) | UI editor, visual editor |
 | tween.js and Robert Penner's easing equations | `src/core/tween.js` | yes | all four |
 | Kiwi | `src/ui/autolayout/` | yes | UI editor, visual editor |
 | gl-matrix | `src/base/matrix4.js` | yes | UI editor, visual editor |
@@ -24,6 +24,7 @@ This file collects the license notices for the third-party code and materials bu
 ### Chromium and Blink
 
 - `src/ui/uiinputfield.js`: third_party/blink/renderer/core/editing/state_machines/backspace_state_machine.cc and position_units_word.cc.
+- `src/core/browseruitext.js`: the UI strings (the question window title and buttons, 82 locales) are translations from Chromium's generated_resources, ui_strings and components_strings .xtb files, copied through the Rust edition's `src/core/browseruitext.json`.
 - `src/experimental/spatialaudio/spatialaudiomath.js` (draft): third_party/blink/renderer/modules/webaudio/panner_handler.cc, third_party/blink/renderer/platform/audio/distance_effect.cc, cone_effect.cc, equal_power_panner.cc, ui/gfx/geometry/vector3d_f.cc. Their notices are the Chromium license and the WebKit-era notices of the Rust edition's THIRD_PARTY_LICENSES.md (https://github.com/ddukbaek2/vanilla-engine/blob/release/THIRD_PARTY_LICENSES.md).
 
 Files under "Copyright The Chromium Authors" are covered by the Chromium license:
