@@ -54,12 +54,13 @@ export const PageEvent = System.Object.freeze({
 //==============================================================================
 /**
  * @example <caption>설정을 채워 엔진 만들기</caption>
- * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Scene, Vector2, ViewScaleMode } from "./build/vanilla.js";
  *
  * const engineConfiguration = new EngineConfiguration();
  * engineConfiguration.canvasId = "gameCanvas";
  * engineConfiguration.title = "My Game";
  * engineConfiguration.referenceResolutionSize = Vector2.create(1920, 1080);
+ * engineConfiguration.viewScaleMode = ViewScaleMode.stretchShortExpandLong;
  * engineConfiguration.autoResizeOnWindowResize = true;
  * engineConfiguration.maximumFramePerSecond = 60;
  * engineConfiguration.useStatistics = true;
@@ -72,7 +73,8 @@ export class EngineConfiguration extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @type { Vector2 } */ referenceResolutionSize; // 기준 해상도.
-	// /** @type { ViewScaleMode } */ viewScaleMode; // 뷰 모드.
+	// 뷰 스케일 모드. (기본 ViewScaleMode.stretchShort, 엔진이 만들 때 뷰 매니저에 넣는다. UIScene 과 GameScene 은 initialize 에서 저마다의 모드로 바꾼다)
+	/** @type { string } */ viewScaleMode;
 
 	// 캔버스 식별자. 문서에 그 id 의 요소가 없으면 캔버스를 새로 만들어 그 id 를 주고 body 끝에 붙인다.
 	/** @type { string } */ canvasId; // 캔버스 식별자.
@@ -115,7 +117,7 @@ export class EngineConfiguration extends Object {
 		super();
 		// this.scene = null;
 		this.referenceResolutionSize = Vector2.zero();
-		// this.viewScaleMode = ViewScaleMode.none;
+		this.viewScaleMode = ViewScaleMode.stretchShort;
 		this.canvasId = "";
 		this.useStatistics = false;
 		this.autoResizeOnWindowResize = false;
@@ -212,6 +214,7 @@ export class Engine extends Object {
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this);
 		this.#viewManager.setCanvas(canvas);
+		this.#viewManager.setViewScaleMode(engineConfiguration.viewScaleMode ?? ViewScaleMode.stretchShort);
 		this.#inputManager = new InputManager(this);
 		this.#audioManager = new AudioManager(this);
 

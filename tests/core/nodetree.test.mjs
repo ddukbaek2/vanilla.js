@@ -7,7 +7,7 @@
 //==============================================================================
 import { WorldNode } from "../../src/core/node/worldnode.js";
 import { Vector2 } from "../../src/base/vector2.js";
-import { check, checkEqual, checkJson, checkNear, finish, knownDifference } from "../testcheck.mjs";
+import { check, checkEqual, checkJson, checkNear, finish } from "../testcheck.mjs";
 
 function isNothing(value) {
 	return value === null || value === undefined;
@@ -102,10 +102,13 @@ function getNameList(nodeList) {
 	checkEqual(childNode.isVisibleInHierarchy(), false, "부모 불투명도 0 은 안 보임");
 	parentNode.setLocalOpacity(0.5);
 	checkEqual(childNode.isVisibleInHierarchy(), true, "부모 불투명도 0.5 는 보임");
-	if (typeof childNode.setVisible !== "function") {
-		// 러스트 판에는 활성, 불투명도와 따로 보이기 플래그(set_visible)가 있고 원본 TransformNode 에는 없다.
-		knownDifference("src/core/node/nodetree.rs::active_and_visible_in_hierarchy", "보이기 플래그 set_visible 이 원본에 없음", "setVisible 없음", "set_visible(false) 면 is_visible_in_hierarchy 거짓");
-	}
+	// 활성, 불투명도와 따로 두는 보이기 플래그. (러스트 판 set_visible)
+	childNode.setVisible(false);
+	checkEqual(childNode.isVisibleInHierarchy(), false, "setVisible(false) 는 안 보임");
+	checkEqual(parentNode.isVisibleInHierarchy(), true, "숨긴 자식의 부모는 보임");
+	// 트리에서 뗀 노드. (러스트 판은 지운 노드가 둘 다 거짓, 원본은 지우는 대신 떼어 뿌리가 되므로 자기 플래그만 본다)
+	parentNode.removeChild(childNode);
+	checkEqual(childNode.isVisibleInHierarchy(), false, "뗀 노드도 숨긴 플래그는 그대로");
 }
 
 // 전역 위치, 크기, 회전, 투명도. (설정한 값이 다시 읽힌다)

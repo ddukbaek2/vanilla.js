@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Color } from "../base/color.js";
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Graphic } from "../core/graphic.js";
@@ -43,7 +44,7 @@ export class Indicator extends Object {
 	//==============================================================================
 	/** @private @type { Vector2 } */ #position; // 화면 상의 출력 위치.
 	/** @private @type { number } */ #radius; // 톱니바퀴의 기본 반지름.
-	/** @private @type { string } */ #color; // 톱니바퀴 색상.
+	/** @private @type { Color | string } */ #color; // 톱니바퀴 색상.
 	/** @private @type { number } */ #rotation; // 현재 회전 각도 (라디안).
 	/** @private @type { number } */ #speed; // 회전 속도 (라디안/초).
 	/** @private @type { boolean } */ #isVisible; // 화면 출력 여부.
@@ -187,6 +188,7 @@ export class Indicator extends Object {
 	 * @param { string | Color } color (예: "#ff0000", "rgba(255,255,255,0.8)")
 	 */
 	setColor(color) {
+		color = Color.from(color);
 		this.#color = color;
 	}
 

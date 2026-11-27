@@ -37,6 +37,43 @@ import { LoadingProgress } from "../misc/loadingprogress.js";
 // - loadAssets(): super 호출 후 자체 자산을 비동기 로드.
 // - layout(): super 호출 후 자체 콘텐츠 레이아웃 갱신.
 //==============================================================================
+/**
+ * @example <caption>세이프 에어리어 노드에 글을 붙이고 놀이 입력 받기</caption>
+ * import { Engine, EngineConfiguration, GameScene, WorldNode, Text, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class MainScene extends GameScene {
+ * 	constructor() {
+ * 		super();
+ * 		this.setLoadingMinDurationMs(0);
+ * 		this.setSceneBackgroundColor("#151821");
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const titleNode = new WorldNode();
+ * 		titleNode.setPivot(Pivot.topLeft);
+ * 		titleNode.setRect(40, 40, 600, 48);
+ * 		const text = titleNode.addComponent(Text);
+ * 		text.setText("Tap the play area");
+ * 		text.setFontSize(32);
+ * 		this.getSafeAreaNode().addChild(titleNode);
+ *
+ * 		// Only presses the UI did not take arrive here, in play area coordinates.
+ * 		this.setPlayInputHandler({
+ * 			press: (position) => {
+ * 				console.log("play press", position.x, position.y);
+ * 				this.fadeScreen(() => {
+ * 					text.setText("Faded at " + Math.round(position.x) + ", " + Math.round(position.y));
+ * 				});
+ * 			},
+ * 		});
+ * 	}
+ * }
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class GameScene extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -53,7 +90,6 @@ export class GameScene extends Scene {
 	/** @private @type { number } */ #loadMinDurationMs;
 	/** @private @type { boolean } */ #loadTouchedToSkip;
 	/** @private @type { boolean } */ #isLoadStartTimePending;
-	/** @private @type { Color } */ #sceneBackgroundColor;
 	/** @private @type { string } */ #viewScaleMode;
 	/** @private @type { ((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null } */ #loadingDrawer;
 	/** @private @type { Color | string } */ #loadingBackgroundColor;
@@ -88,7 +124,6 @@ export class GameScene extends Scene {
 		this.#loadMinDurationMs = 3000;
 		this.#loadTouchedToSkip = false;
 		this.#isLoadStartTimePending = false;
-		this.#sceneBackgroundColor = Color.black();
 		this.#viewScaleMode = ViewScaleMode.none;
 		this.#loadingDrawer = null;
 		this.#loadingBackgroundColor = Color.black();
@@ -120,7 +155,7 @@ export class GameScene extends Scene {
 	//   아니면 initialize() 에서 일괄 적용된다.
 	//==============================================================================
 	/**
-	 * @param { string } viewScaleMode
+	 * @param { string } viewScaleMode 뷰 배율 모드. (ViewScaleMode 의 값, 기본 ViewScaleMode.none)
 	 */
 	setViewScaleMode(viewScaleMode) {
 		this.#viewScaleMode = viewScaleMode;
@@ -134,7 +169,7 @@ export class GameScene extends Scene {
 	// 현재 ViewScaleMode 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 지금 뷰 배율 모드. (ViewScaleMode 의 값)
 	 */
 	getViewScaleMode() {
 		return this.#viewScaleMode;
@@ -144,7 +179,7 @@ export class GameScene extends Scene {
 	// 로딩 화면 중앙 이미지 URL 설정. (빈 문자열이면 이미지 없이 게이지만 노출)
 	//==============================================================================
 	/**
-	 * @param { string } url
+	 * @param { string } url 로딩 화면 가운데에 그릴 그림 주소. (빈 글이면 그림 없이 게이지만 그린다)
 	 */
 	setLoadingImageUrl(url) {
 		this.#loadingImageUrl = url || "";
@@ -154,7 +189,7 @@ export class GameScene extends Scene {
 	// 로딩 화면 최소 노출 시간 (ms) 설정.
 	//==============================================================================
 	/**
-	 * @param { number } milliseconds
+	 * @param { number } milliseconds 로딩 화면을 보여 줄 가장 짧은 시간. (밀리초, 기본 3000, 화면을 누르면 바로 넘긴다)
 	 */
 	setLoadingMinDurationMs(milliseconds) {
 		this.#loadMinDurationMs = milliseconds;
@@ -167,7 +202,7 @@ export class GameScene extends Scene {
 	// - 그림과 글꼴을 받기 전에도 그려지므로 도형과 시스템 글꼴로 그린다.
 	//==============================================================================
 	/**
-	 * @param { ((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null } drawer
+	 * @param { ((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null } drawer 로딩 화면 그리기 함수. (graphic, viewSize, progress, elapsedSeconds 를 받는다, null 이면 기본 그림)
 	 */
 	setLoadingDrawer(drawer) {
 		this.#loadingDrawer = drawer === undefined ? null : drawer;
@@ -177,7 +212,7 @@ export class GameScene extends Scene {
 	// 로딩 화면 그리기 함수 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { Function | null }
+	 * @returns { Function | null } 로딩 화면 그리기 함수. (정하지 않았으면 null)
 	 */
 	getLoadingDrawer() {
 		return this.#loadingDrawer;
@@ -188,12 +223,16 @@ export class GameScene extends Scene {
 	// - outsideColor 는 뷰 바깥(캔버스 나머지)의 색이다. 주지 않으면 바탕색과 같다.
 	//==============================================================================
 	/**
-	 * @param { Color | string } backgroundColor
-	 * @param { Color | string } barBackColor
-	 * @param { Color | string } barFillColor
-	 * @param { Color | string } outsideColor
+	 * @param { Color | string } backgroundColor 뷰 바탕색. (Color 나 색 글, 기본 검정)
+	 * @param { Color | string } barBackColor 게이지 바탕색. (기본 #333333)
+	 * @param { Color | string } barFillColor 게이지 채움 색. (기본 #ffffff)
+	 * @param { Color | string } outsideColor 뷰 바깥(캔버스 나머지)의 색. (주지 않으면 바탕색)
 	 */
 	setLoadingColors(backgroundColor, barBackColor, barFillColor, outsideColor = backgroundColor) {
+		backgroundColor = Color.from(backgroundColor);
+		barBackColor = Color.from(barBackColor);
+		barFillColor = Color.from(barFillColor);
+		outsideColor = Color.from(outsideColor);
 		this.#loadingBackgroundColor = backgroundColor;
 		this.#loadingBarBackColor = barBackColor;
 		this.#loadingBarFillColor = barFillColor;
@@ -204,9 +243,10 @@ export class GameScene extends Scene {
 	// 로딩 화면 뷰 바깥(캔버스 나머지)의 색 설정. (setLoadingColors 의 넷째 값만 바꾼다)
 	//==============================================================================
 	/**
-	 * @param { Color | string } outsideColor
+	 * @param { Color | string } outsideColor 뷰 바깥(캔버스 나머지)의 색. (Color 나 색 글)
 	 */
 	setLoadingOutsideColor(outsideColor) {
+		outsideColor = Color.from(outsideColor);
 		this.#loadingOutsideColor = outsideColor;
 	}
 
@@ -214,7 +254,7 @@ export class GameScene extends Scene {
 	// 로딩 화면 그리기 함수가 있는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 로딩 화면 그리기 함수를 정했으면 참.
 	 */
 	hasLoadingDrawer() {
 		return this.#loadingDrawer !== null;
@@ -224,7 +264,7 @@ export class GameScene extends Scene {
 	// 로딩 화면을 눌러 건너뛰었는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 로딩 화면을 눌러 최소 노출 시간을 건너뛰었으면 참.
 	 */
 	isLoadTouchedToSkip() {
 		return this.#loadTouchedToSkip;
@@ -234,7 +274,7 @@ export class GameScene extends Scene {
 	// 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
 	//==============================================================================
 	/**
-	 * @returns { DEVTools | null }
+	 * @returns { DEVTools | null } 개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
 	 */
 	getDevTools() {
 		return this.#devtools ?? null;
@@ -244,7 +284,7 @@ export class GameScene extends Scene {
 	// 세이프 에어리어 인셋 직접 설정. (CSS 픽셀 { top, right, bottom, left }, null 이면 뷰 매니저의 getSafeAreaInsets 를 읽는다)
 	//==============================================================================
 	/**
-	 * @param { { top: number, right: number, bottom: number, left: number } | null } insets
+	 * @param { { top: number, right: number, bottom: number, left: number } | null } insets 위, 오른쪽, 아래, 왼쪽 인셋. (CSS 픽셀, null 이면 뷰 매니저의 getSafeAreaInsets 를 읽는다)
 	 */
 	setSafeAreaInsets(insets) {
 		if (insets === null || insets === undefined) {
@@ -258,10 +298,10 @@ export class GameScene extends Scene {
 	// 세이프 에어리어 계산. (정적, CSS 픽셀 인셋을 뷰 배율로 나눠 뷰 영역에서 뺀다)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewSize
-	 * @param { number } targetResolutionScale
+	 * @param { Vector2 } viewSize 뷰 크기. (뷰 단위)
+	 * @param { number } targetResolutionScale 뷰 배율. (인셋을 이 값으로 나눠 뷰 단위로 바꾼다, 0 이하면 1)
 	 * @param { { top: number, right: number, bottom: number, left: number } } insets CSS 픽셀.
-	 * @returns { Rect }
+	 * @returns { Rect } 세이프 에어리어 영역. (뷰 좌표, 너비와 높이는 0 이상)
 	 */
 	static calculateSafeAreaRect(viewSize, targetResolutionScale, insets) {
 		const scale = targetResolutionScale > 0 ? targetResolutionScale : 1;
@@ -278,7 +318,7 @@ export class GameScene extends Scene {
 	// 로딩 진행률 알리기. (0 ~ 1, 줄어들지 않는다. 알린 뒤로 게이지가 경과 시간 대신 이 값을 따라간다)
 	//==============================================================================
 	/**
-	 * @param { number } progress
+	 * @param { number } progress 알릴 진행률. (0 ~ 1, 앞서 알린 것보다 작아지지 않는다)
 	 */
 	setLoadingProgress(progress) {
 		this.#isLoadingProgressReported = true;
@@ -289,7 +329,7 @@ export class GameScene extends Scene {
 	// 로딩 진행률 반환. (알린 정도와 부드럽게 따라가는 보이는 정도)
 	//==============================================================================
 	/**
-	 * @returns { LoadingProgress }
+	 * @returns { LoadingProgress } 로딩 진행률. (알린 정도와 부드럽게 따라가는 보이는 정도)
 	 */
 	getLoadingProgress() {
 		return this.#loadingProgress;
@@ -299,7 +339,7 @@ export class GameScene extends Scene {
 	// 애셋 함께 받기 맡기기. (로딩 화면이 프레임마다 맡긴 것들의 끝난 수 / 전체 수를 진행률로 알린다)
 	//==============================================================================
 	/**
-	 * @param { AssetLoader } assetLoader
+	 * @param { AssetLoader } assetLoader 로딩 화면이 진행률을 따라갈 애셋 함께 받기.
 	 */
 	trackAssetLoader(assetLoader) {
 		if (this.#trackedAssetLoaderList.indexOf(assetLoader) < 0) {
@@ -327,20 +367,10 @@ export class GameScene extends Scene {
 	}
 
 	//==============================================================================
-	// 캔버스 배경색 설정. (preDraw 단계에서 캔버스 전체에 적용)
-	//==============================================================================
-	/**
-	 * @param { Color } color
-	 */
-	setSceneBackgroundColor(color) {
-		this.#sceneBackgroundColor = color;
-	}
-
-	//==============================================================================
 	// 세이프 에어리어 노드 반환. (서브클래스가 자식 콘텐츠를 여기에 붙인다)
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 세이프 에어리어 노드. (서브클래스의 콘텐츠를 여기에 붙인다)
 	 */
 	getSafeAreaNode() {
 		return this.#safeAreaNode;
@@ -350,7 +380,7 @@ export class GameScene extends Scene {
 	// 마지막으로 계산된 세이프 에어리어 영역 반환.
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 마지막으로 계산한 세이프 에어리어 영역. (뷰 좌표)
 	 */
 	getSafeAreaRect() {
 		return this.#lastSafeAreaRect;
@@ -365,7 +395,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Engine } engine
+	 * @param { Engine } engine 씬을 불러오는 엔진.
 	 */
 	async load(engine) {
 		await super.load(engine);
@@ -407,7 +437,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawOnLoad(graphic) {
 		super.drawOnLoad(graphic);
@@ -487,7 +517,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Engine } engine
+	 * @param { Engine } engine 씬을 불러온 엔진.
 	 */
 	initialize(engine) {
 		super.initialize(engine);
@@ -528,7 +558,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } canvasNativeSize
+	 * @param { Vector2 } canvasNativeSize 바뀐 캔버스 요소의 크기. (CSS 픽셀)
 	 */
 	resize(canvasNativeSize) {
 		this.applyPlayAreaReference();
@@ -551,7 +581,7 @@ export class GameScene extends Scene {
 	// 세이프 에어리어 계산. (뷰 좌표계 기준)
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 세이프 에어리어 영역. (뷰 좌표, 너비와 높이는 0 이상)
 	 */
 	computeSafeAreaRect() {
 		const engine = this.getEngine();
@@ -590,7 +620,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -617,7 +647,7 @@ export class GameScene extends Scene {
 	// 디브툴이 입력을 가져가는 중인지 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 개발자 도구 패널이 보이고 포인터가 그 위에 있으면 참.
 	 */
 	isDevToolsCapturingInput() {
 		if (this.#devtools === null) {
@@ -642,7 +672,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 		this.#isPlayPressActive = false;
@@ -664,7 +694,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 옮긴 자리. (뷰 좌표)
 	 */
 	touchMove(viewInputPosition) {
 		if (this.isDevToolsCapturingInput()) {
@@ -681,7 +711,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (뷰 좌표)
 	 */
 	touchRelease(viewInputPosition) {
 		if (this.isDevToolsCapturingInput()) {
@@ -696,7 +726,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 취소된 때의 자리. (뷰 좌표)
 	 */
 	touchCancel(viewInputPosition) {
 		if (this.isDevToolsCapturingInput()) {
@@ -712,9 +742,9 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
-	 * @param { Vector2 } wheelDelta
-	 * @returns { boolean }
+	 * @param { Vector2 } viewInputPosition 휠을 굴린 자리. (뷰 좌표)
+	 * @param { Vector2 } wheelDelta 이번 프레임에 쌓인 휠 양. (WheelEvent 의 deltaX, deltaY)
+	 * @returns { boolean } 그 자리의 스크롤 칸이 휠을 받았으면 참.
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
 		if (this.isDevToolsCapturingInput() || this.isScreenFading()) {
@@ -741,20 +771,11 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	preDraw(graphic) {
 		super.preDraw(graphic);
-
-		const engine = this.getEngine();
-		const viewManager = engine.getViewManager();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-
-		viewManager.applyCanvasNativeRect(graphic);
-		graphic.setFillColor(this.#sceneBackgroundColor);
-		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
-
-		viewManager.applyViewRect(graphic);
+		this.drawSceneBackground(graphic);
 	}
 
 	//==============================================================================
@@ -762,7 +783,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	postDraw(graphic) {
 		super.postDraw(graphic);
@@ -795,7 +816,7 @@ export class GameScene extends Scene {
 	// 페이드 중인지. (어두워지거나, onDark 를 기다리거나, 밝아지는 중)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 어두워지거나, onDark 를 기다리거나, 밝아지는 중이면 참.
 	 */
 	isScreenFading() {
 		return this.#screenFadeDirection !== 0 || this.#isScreenFadeWaiting || this.#screenFadeAlpha > 0;
@@ -805,9 +826,10 @@ export class GameScene extends Scene {
 	// 어두워지는 막의 색 설정. (기본 검정)
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color | string } color 어두워지는 막의 색. (Color 나 색 글, 기본 검정)
 	 */
 	setScreenFadeColor(color) {
+		color = Color.from(color);
 		this.#screenFadeColor = color;
 	}
 
@@ -815,7 +837,7 @@ export class GameScene extends Scene {
 	// 어두워지는 시간과 밝아지는 시간 설정. (초, 기본 0.35, 0 이면 바로)
 	//==============================================================================
 	/**
-	 * @param { number } seconds
+	 * @param { number } seconds 어두워지는 시간이자 밝아지는 시간. (초, 기본 0.35, 0 이면 바로)
 	 */
 	setScreenFadeSeconds(seconds) {
 		this.#screenFadeSeconds = System.Math.max(0, seconds);
@@ -825,7 +847,7 @@ export class GameScene extends Scene {
 	// 어두워지는 막의 진하기. (0 ~ 1)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 어두워지는 막의 진하기. (0 ~ 1)
 	 */
 	getScreenFadeAlpha() {
 		return this.#screenFadeAlpha;
@@ -889,7 +911,7 @@ export class GameScene extends Scene {
 	// 어두워지는 막 그리기. (세이프에어리어까지 캔버스 전체를 덮는다)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawScreenFade(graphic) {
 		const screenFadeAlpha = this.getScreenFadeAlpha();
@@ -912,8 +934,8 @@ export class GameScene extends Scene {
 	// 그 자리에 UI(누를 수 있는 노드: 단추, 창의 어둠과 판, 스크롤 칸)가 있는지. (뷰 좌표)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewPosition
-	 * @returns { boolean }
+	 * @param { Vector2 } viewPosition 볼 자리. (뷰 좌표)
+	 * @returns { boolean } 그 자리에 누를 수 있는 UI 노드가 있으면 참.
 	 */
 	isUserInterfaceAt(viewPosition) {
 		if (!this.#touchRaycaster) {
@@ -940,7 +962,7 @@ export class GameScene extends Scene {
 	// 놀이 입력 모으기 켜기. (처리기 대신 모아 두었다가 takePlayInputs 로 꺼낸다, 끄면 모은 것을 버린다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isPlayInputEnabled
+	 * @param { boolean } isPlayInputEnabled 참이면 놀이 입력을 모은다. (거짓이면 모은 것을 버린다)
 	 */
 	setPlayInputEnabled(isPlayInputEnabled) {
 		this.#isPlayInputEnabled = isPlayInputEnabled;
@@ -954,7 +976,7 @@ export class GameScene extends Scene {
 	// 모은 놀이 입력 꺼내기. (온 차례대로 { kind, position, wheelDelta }, 꺼내면 비운다)
 	//==============================================================================
 	/**
-	 * @returns { Array<{ kind: string, position: Vector2, wheelDelta: Vector2 | null }> }
+	 * @returns { Array<{ kind: string, position: Vector2, wheelDelta: Vector2 | null }> } 모은 놀이 입력. (온 차례대로, kind 는 press, move, release, wheel, 꺼내면 비운다)
 	 */
 	takePlayInputs() {
 		const playInputs = this.#playInputs;
@@ -966,8 +988,8 @@ export class GameScene extends Scene {
 	// 뷰 좌표 → 게임 영역 좌표. (세이프에어리어 왼쪽 위가 0, 0)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewPosition
-	 * @returns { Vector2 }
+	 * @param { Vector2 } viewPosition 바꿀 자리. (뷰 좌표)
+	 * @returns { Vector2 } 게임 영역 좌표. (세이프에어리어 왼쪽 위가 0, 0)
 	 */
 	convertViewToPlayArea(viewPosition) {
 		const safeAreaRect = this.getSafeAreaRect();
@@ -981,9 +1003,9 @@ export class GameScene extends Scene {
 	// 놀이 입력 넘기기. (kind 는 press, move, release, wheel, 처리기에 그 함수가 없으면 넘기지 않는다)
 	//==============================================================================
 	/**
-	 * @param { string } kind
-	 * @param { Vector2 } viewPosition
-	 * @param { Vector2 | null } wheelDelta
+	 * @param { string } kind 입력 종류. (press, move, release, wheel)
+	 * @param { Vector2 } viewPosition 입력 자리. (뷰 좌표)
+	 * @param { Vector2 | null } wheelDelta 휠 양. (wheel 이 아니면 null)
 	 */
 	dispatchPlayInput(kind, viewPosition, wheelDelta) {
 		const playAreaPosition = this.convertViewToPlayArea(viewPosition);
@@ -1001,7 +1023,7 @@ export class GameScene extends Scene {
 	// 놀이로 간 누름 끝내기. (뗌과 취소)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewPosition
+	 * @param { Vector2 } viewPosition 뗀 자리. (뷰 좌표)
 	 */
 	releasePlayPress(viewPosition) {
 		if (!this.#isPlayPressActive) {
@@ -1019,8 +1041,8 @@ export class GameScene extends Scene {
 	// - 무시할 세이프에어리어 쪽은 ViewManager.setIgnoredSafeAreaSides 로 넘긴다. fixedLength 가 0 이면 끈다. (기준 해상도는 그대로 둔다)
 	//==============================================================================
 	/**
-	 * @param { number } fixedLength
-	 * @param { boolean } isLandscape
+	 * @param { number } fixedLength 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이. (기준 해상도 단위, 0 이면 끈다)
+	 * @param { boolean } isLandscape 참이면 가로, 거짓이면 세로가 고정 쪽.
 	 */
 	setPlayAreaReference(fixedLength, isLandscape) {
 		this.#playAreaFixedLength = System.Math.max(0, fixedLength);
@@ -1037,7 +1059,7 @@ export class GameScene extends Scene {
 	// 게임 영역의 고정 쪽 길이. (0 이면 쓰지 않음)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 게임 영역의 고정 쪽 길이. (0 이면 쓰지 않음)
 	 */
 	getPlayAreaFixedLength() {
 		return this.#playAreaFixedLength;
@@ -1080,12 +1102,12 @@ export class GameScene extends Scene {
 	// 게임 영역 기준의 기준 해상도 길이 셈. (못 셈하면 0)
 	//==============================================================================
 	/**
-	 * @param { number } fixedLength
-	 * @param { boolean } isLandscape
-	 * @param { Vector2 } canvasNativeSize
+	 * @param { number } fixedLength 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이. (기준 해상도 단위)
+	 * @param { boolean } isLandscape 참이면 가로, 거짓이면 세로가 고정 쪽.
+	 * @param { Vector2 } canvasNativeSize 캔버스 요소의 크기. (CSS 픽셀)
 	 * @param { object } safeAreaInsets { top, right, bottom, left } (뷰 좌표)
 	 * @param { number } insetScale 뷰 좌표 → 캔버스 단위 배율.
-	 * @returns { number }
+	 * @returns { number } 기준 해상도의 고정 쪽 길이. (못 셈하면 0)
 	 */
 	static calculatePlayAreaReferenceLength(fixedLength, isLandscape, canvasNativeSize, safeAreaInsets, insetScale) {
 		const canvasLength = isLandscape ? canvasNativeSize.x : canvasNativeSize.y;

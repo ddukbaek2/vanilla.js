@@ -1356,6 +1356,7 @@ export class Text extends Component {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color 글 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
 	 */
 	setTextColor(color) {
+		color = Color.from(color);
 		// 같은 색 문자열이고 가진 색이 그 색 그대로면 새로 만들지 않는다. (매 프레임 같은 색을 넣는 게임, 가진 색을 밖에서 고쳤으면 다시 만든다)
 		if (typeof color === "string" && color === this.#textColorString) {
 			const cachedColor = Color.fromCache(color);
@@ -1398,6 +1399,7 @@ export class Text extends Component {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color 외곽선 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
 	 */
 	setStrokeColor(color) {
+		color = Color.from(color);
 		if (color === null || color === undefined) {
 			this.#strokeColor = Color.transparent();
 		}

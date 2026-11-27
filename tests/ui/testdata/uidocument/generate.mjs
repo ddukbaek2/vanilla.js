@@ -31,34 +31,10 @@ for (const exportName of Object.keys(Engine)) {
 	}
 }
 
-// 원본 misc/devtools.js 의 getComponentProperties 와 같은 고리. (부르기만 하고 이름을 모은다)
+// 원본 misc/devtools.js 의 getComponentProperties 를 그대로 부른다. (부르기만 하고 이름을 모은다, 인스턴스 상태를 쓰지 않는 함수)
+const { DEVTools } = await import(path.join(repositoryPath, "src/misc/devtools.js"));
 function collectGetterNames(component) {
-	const getterNames = [];
-	const seenNames = new Set();
-	let prototypeObject = Object.getPrototypeOf(component);
-	while (prototypeObject && prototypeObject.constructor && prototypeObject.constructor !== Component && prototypeObject !== Object.prototype) {
-		for (const methodName of Object.getOwnPropertyNames(prototypeObject)) {
-			if (seenNames.has(methodName)) {
-				continue;
-			}
-			seenNames.add(methodName);
-			if (typeof component[methodName] !== "function" || component[methodName].length !== 0) {
-				continue;
-			}
-			if (!(methodName.startsWith("get") || methodName.startsWith("is")) || methodName === "constructor" || methodName === "getNode") {
-				continue;
-			}
-			try {
-				component[methodName]();
-			}
-			catch (exception) {
-				continue;
-			}
-			getterNames.push(methodName);
-		}
-		prototypeObject = Object.getPrototypeOf(prototypeObject);
-	}
-	return getterNames;
+	return DEVTools.prototype.getComponentProperties.call(null, component).map((property) => property.name);
 }
 
 const componentDocuments = {};

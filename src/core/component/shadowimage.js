@@ -5,7 +5,7 @@ const System = globalThis;
 import { Rect } from "../../base/rect.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
-import { buildRGBAString } from "./shadowtext.js";
+import { buildRGBAString, readColorText } from "./shadowtext.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
 
@@ -58,6 +58,7 @@ export class ShadowImage extends Component {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { HTMLImageElement | HTMLCanvasElement | null } */ #image; // 그림.
+	/** @private @type { string } */ #imagePath; // 그림 경로. (UIDocument 가 그림 대신 적고 읽는다, 그리기에는 쓰지 않는다)
 	/** @private @type { Rect | null } */ #imageRect; // 그림 안의 조각. (null 이면 그림 전체)
 	/** @private @type { string | null } */ #imageColor; // 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
 	/** @private @type { string } */ #shadowColor; // "#rrggbb"
@@ -78,6 +79,7 @@ export class ShadowImage extends Component {
 	constructor() {
 		super();
 		this.setComponentType("ShadowImage");
+		this.#imagePath = "";
 		this.#image = null;
 		this.#imageRect = null;
 		this.#imageColor = null;
@@ -279,6 +281,26 @@ export class ShadowImage extends Component {
 	}
 
 	//==============================================================================
+	// 그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)
+	//==============================================================================
+	/**
+	 * @param { string } imagePath 그림 경로.
+	 */
+	setImagePath(imagePath) {
+		this.#imagePath = imagePath ?? "";
+	}
+
+	//==============================================================================
+	// 그림 경로 반환. (정하지 않았으면 빈 글)
+	//==============================================================================
+	/**
+	 * @returns { string } 그림 경로. (정하지 않았으면 빈 글)
+	 */
+	getImagePath() {
+		return this.#imagePath;
+	}
+
+	//==============================================================================
 	// 그림 안의 조각 반환. (null 이면 그림 전체)
 	//==============================================================================
 	/**
@@ -312,12 +334,13 @@ export class ShadowImage extends Component {
 	// 그림자 설정. (색, 불투명도, 그림 아래로 내려가는 만큼, 번지는 만큼)
 	//==============================================================================
 	/**
-	 * @param { string } shadowColor - "#rrggbb"
+	 * @param { Color | string } shadowColor - "#rrggbb"
 	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
 	 * @param { number } shadowOffset 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
+		shadowColor = readColorText(shadowColor);
 		this.#shadowColor = shadowColor;
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;

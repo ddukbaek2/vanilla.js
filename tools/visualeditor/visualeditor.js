@@ -1209,7 +1209,7 @@ export class VisualEditor {
 		node.setName(asset.name.replace(/\.[^.]+$/, ""));
 		node.setContentSize(Vector2.create(image.naturalWidth, image.naturalHeight));
 		const sprite = node.addComponent(Sprite);
-		sprite.imagePath = asset.path;
+		sprite.setImagePath(asset.path);
 		sprite.setImage(image);
 		const selectedNode = this.#scene.getSelectedNode();
 		this.change("그림 놓기", () => {

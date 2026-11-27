@@ -2,6 +2,8 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../base/object.js";
+import { Color } from "../base/color.js";
+import { Rect } from "../base/rect.js";
 import { Pivot } from "../base/pivot.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
@@ -67,6 +69,7 @@ export class Scene extends Object {
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 	/** @private @type { boolean } */ #isLoaded; // 비동기 로딩 완료 여부.
 	/** @private @type { TouchRaycaster | null } */ #touchRaycaster; // 노드에 터치를 넘기는 레이캐스터. (null 이면 넘기지 않는다)
+	/** @private @type { Color } */ #sceneBackgroundColor; // drawSceneBackground 가 캔버스 전체를 칠하는 색. (기본 검정)
 	/** @private @type { boolean } */ #isTouchDispatchEnabled; // 노드에 터치를 넘기는지. (러스트 판 SceneBase 와 같은 스위치)
 
 	//==============================================================================
@@ -74,7 +77,7 @@ export class Scene extends Object {
 	//==============================================================================
 	constructor() {
 		super();
-		// this.#root = new WorldNode();
+		this.#sceneBackgroundColor = Color.black();
 	}
 	
 	//==============================================================================
@@ -694,5 +697,62 @@ export class Scene extends Object {
 	 */
 	isGizmoVisible() {
 		return this.#isGizmoVisible;
+	}
+
+	//==============================================================================
+	// 배경색 설정. (drawSceneBackground 가 칠한다, Color 나 "#202020" 같은 색 글)
+	//==============================================================================
+	/**
+	 * @param { Color | string } color 배경색. (색 글은 Color.from 으로 읽는다, 기본 검정)
+	 */
+	setSceneBackgroundColor(color) {
+		this.#sceneBackgroundColor = Color.from(color).clone();
+	}
+
+	//==============================================================================
+	// 배경색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 배경색. (기본 검정)
+	 */
+	getSceneBackgroundColor() {
+		return this.#sceneBackgroundColor;
+	}
+
+	//==============================================================================
+	// 배경 그리기. (캔버스 전체를 배경색으로 칠하고 뷰 좌표계를 건다, 세이프 에어리어 바깥까지)
+	// - GameScene 과 UIScene 은 preDraw 에서 부른다. Scene 을 바로 잇는 씬은 preDraw 에서 불러 쓴다.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그릴 그래픽.
+	 * @example <caption>Scene 을 바로 이은 씬의 배경을 칠하기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	create() {
+	 * 		super.create();
+	 * 		this.setSceneBackgroundColor("#203040");
+	 * 	}
+	 *
+	 * 	preDraw(graphic) {
+	 * 		super.preDraw(graphic);
+	 * 		this.drawSceneBackground(graphic);
+	 * 	}
+	 * }
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	drawSceneBackground(graphic) {
+		const engine = this.getEngine();
+		const viewManager = engine.getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(this.#sceneBackgroundColor);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+
+		viewManager.applyViewRect(graphic);
 	}
 }

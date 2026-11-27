@@ -119,8 +119,8 @@ export class WorldNode extends TransformNode {
      * @param { Graphic } graphic 그릴 그래픽.
      */
     draw(graphic) {
-        const isVisible = this.isVisible();
-        if (!isVisible) {
+        const isDrawn = this.isActive() && this.isVisible() && this.getLocalOpacity() > 0;
+        if (!isDrawn) {
             return;
         }
 
@@ -698,6 +698,115 @@ export class WorldNode extends TransformNode {
             ratioY = (offsetX * axisYX + offsetY * axisYY) / axisYLengthSquared;
         }
         return Vector2.create(ratioX * contentSize.x, ratioY * contentSize.y);
+    }
+
+    //==============================================================================
+    // 이 노드에서 뿌리까지 쌓은 월드 변환. (원소 여섯 { a, b, c, d, e, f }, 뷰 x = a * x + c * y + e, 뷰 y = b * x + d * y + f)
+    // - 노드마다 이동, 회전, 크기, 피봇 보정(내용 크기 x 피봇) 차례로 곱한다. (pushTransform, 러스트 판 calculate_local_matrix 와 같은 차례)
+    //==============================================================================
+    /**
+     * @private
+     * @returns { { a: number, b: number, c: number, d: number, e: number, f: number } }
+     */
+    calculateWorldAffine() {
+        let a = 1;
+        let b = 0;
+        let c = 0;
+        let d = 1;
+        let e = 0;
+        let f = 0;
+        let current = this;
+        while (current !== null && current !== undefined) {
+            const localPosition = current.getLocalPosition();
+            const localScale = current.getLocalScale();
+            const radian = Math.degreeToRadian(current.getLocalRotation());
+            const cosRadian = Math.cos(radian);
+            const sinRadian = Math.sin(radian);
+            let pivotOffsetX = 0;
+            let pivotOffsetY = 0;
+            if (typeof current.getContentSize === "function" && typeof current.getPivot === "function") {
+                const contentSize = current.getContentSize();
+                const pivot = current.getPivot();
+                pivotOffsetX = -contentSize.x * pivot.x;
+                pivotOffsetY = -contentSize.y * pivot.y;
+            }
+            // 이 노드의 로컬 행렬. (T(위치) R(회전) S(크기) T(피봇 보정))
+            const localA = cosRadian * localScale.x;
+            const localB = sinRadian * localScale.x;
+            const localC = -sinRadian * localScale.y;
+            const localD = cosRadian * localScale.y;
+            const localE = localA * pivotOffsetX + localC * pivotOffsetY + localPosition.x;
+            const localF = localB * pivotOffsetX + localD * pivotOffsetY + localPosition.y;
+            // 쌓인 행렬 앞에 부모 쪽 행렬을 곱한다. (local x accumulated)
+            const nextA = localA * a + localC * b;
+            const nextB = localB * a + localD * b;
+            const nextC = localA * c + localC * d;
+            const nextD = localB * c + localD * d;
+            const nextE = localA * e + localC * f + localE;
+            const nextF = localB * e + localD * f + localF;
+            a = nextA;
+            b = nextB;
+            c = nextC;
+            d = nextD;
+            e = nextE;
+            f = nextF;
+            const parent = current.getParent();
+            current = (parent !== null && parent !== undefined && typeof parent.getLocalPosition === "function") ? parent : null;
+        }
+        return { a, b, c, d, e, f };
+    }
+
+    //==============================================================================
+    // 노드 영역 안의 점 → 뷰 좌표. (내용 영역의 왼쪽 위가 원점, 부모들의 변환을 모두 거친다, 러스트 판 NodeTree::convert_node_position_to_view_position)
+    //==============================================================================
+    /**
+     * @param { Vector2 } nodePosition 이 노드 내용 좌표의 점.
+     * @returns { Vector2 } 뷰 좌표의 점.
+     * @example <caption>단추 오른쪽 아래 귀퉁이의 뷰 자리</caption>
+     * import { Vector2, WorldNode } from "./build/vanilla.js";
+     *
+     * const rootNode = new WorldNode();
+     * const buttonNode = new WorldNode();
+     * rootNode.addChild(buttonNode);
+     * buttonNode.setLocalPosition(Vector2.create(100, 100));
+     * buttonNode.setContentSize(Vector2.create(40, 20));
+     * const corner = buttonNode.convertNodePositionToViewPosition(Vector2.create(40, 20));
+     * console.log(corner.x, corner.y);
+     */
+    convertNodePositionToViewPosition(nodePosition) {
+        const affine = this.calculateWorldAffine();
+        return Vector2.create(affine.a * nodePosition.x + affine.c * nodePosition.y + affine.e, affine.b * nodePosition.x + affine.d * nodePosition.y + affine.f);
+    }
+
+    //==============================================================================
+    // 뷰 좌표 → 노드 영역 안의 점. (행렬을 뒤집을 수 없으면(배율 0) null, 러스트 판 NodeTree::convert_view_position_to_node_position)
+    //==============================================================================
+    /**
+     * @param { Vector2 } viewPosition 뷰 좌표의 점.
+     * @returns { Vector2 | null } 이 노드 내용 좌표의 점. (배율이 0 이라 뒤집을 수 없으면 null)
+     * @example <caption>뷰 자리를 노드 안 자리로 바꾸고 되돌리기</caption>
+     * import { Vector2, WorldNode } from "./build/vanilla.js";
+     *
+     * const rootNode = new WorldNode();
+     * const panelNode = new WorldNode();
+     * rootNode.addChild(panelNode);
+     * panelNode.setLocalPosition(Vector2.create(200, 100));
+     * panelNode.setContentSize(Vector2.create(100, 50));
+     * panelNode.setLocalScale(Vector2.create(2, 2));
+     * const nodePosition = panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100));
+     * console.log(nodePosition.x, nodePosition.y);
+     * panelNode.setLocalScale(Vector2.create(0, 1));
+     * console.log(panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100)));
+     */
+    convertViewPositionToNodePosition(viewPosition) {
+        const affine = this.calculateWorldAffine();
+        const determinant = affine.a * affine.d - affine.b * affine.c;
+        if (determinant === 0 || !System.Number.isFinite(determinant)) {
+            return null;
+        }
+        const offsetX = viewPosition.x - affine.e;
+        const offsetY = viewPosition.y - affine.f;
+        return Vector2.create((affine.d * offsetX - affine.c * offsetY) / determinant, (affine.a * offsetY - affine.b * offsetX) / determinant);
     }
 
     //==============================================================================

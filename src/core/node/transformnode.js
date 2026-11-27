@@ -39,6 +39,7 @@ export class TransformNode extends ComponentNode {
 	/** @private @type { Vector2 } */ #localScale; // 로컬 크기.
 	/** @private @type { number } */ #localRotation; // 로컬 회전값. (degree)
 	/** @private @type { number } */ #localOpacity; // 투명도.
+	/** @private @type { boolean } */ #isVisible; // 보이기 플래그. (켜짐, 투명도와 따로, 거짓이면 이 노드와 자손을 그리지 않고 누름도 받지 않는다)
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 	/** @private @type { boolean } */ #isOpacityLayer; // 투명도를 노드와 자손에 묶어 한 번에 얹을지. (CSS opacity)
 	/** @private @type { number } */ #lastDrawnMaximumScale; // 지난번 그릴 때 변환의 가장 큰 배율. (0 이면 아직 모른다, Graphic 이 글 굽기 배율에 쓴다)
@@ -58,6 +59,7 @@ export class TransformNode extends ComponentNode {
 		this.#isGizmoVisible = false;
 		this.#isOpacityLayer = false;
 		this.#localOpacity = 1.0;
+		this.#isVisible = true;
 		this.#lastDrawnMaximumScale = 0;
 	}
 
@@ -115,8 +117,8 @@ export class TransformNode extends ComponentNode {
 	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
-		const isVisible = this.isVisible();
-		if (isVisible) {
+		const isDrawn = this.isActive() && this.isVisible() && this.getLocalOpacity() > 0;
+		if (isDrawn) {
 			// 컴포넌트 목록 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
@@ -417,47 +419,63 @@ export class TransformNode extends ComponentNode {
 	}
 
 	//==============================================================================
-	// 가시 상태 반환.
+	// 보이기 설정. (켜짐, 투명도와 따로 두는 플래그, 러스트 판 WorldNode::set_visible 과 같다)
+	// - 거짓이면 이 노드와 자손을 그리지 않고 TouchRaycaster 의 누름도 받지 않는다. 갱신(tick)은 그대로 돈다.
 	//==============================================================================
 	/**
-	 * @returns { boolean } 켜져 있고 로컬 투명도가 0 보다 크면 참.
+	 * @param { boolean } isVisible 거짓이면 숨긴다. (기본 참)
+	 * @example <caption>부모를 숨기면 자식도 계층에서 안 보인다</caption>
+	 * import { WorldNode } from "./build/vanilla.js";
+	 *
+	 * const parentNode = new WorldNode();
+	 * const childNode = new WorldNode();
+	 * parentNode.addChild(childNode);
+	 * parentNode.setVisible(false);
+	 * console.log(parentNode.isVisible(), parentNode.isActive(), childNode.isVisible(), childNode.isVisibleInHierarchy());
 	 */
-	isVisible() {
-		const isActive = this.isActive();
-		if (isActive) {
-			const opacity = this.getLocalOpacity();
-			if (opacity > 0) {
-				return true;
-			}
-		}
-
-		return false;
+	setVisible(isVisible) {
+		this.#isVisible = isVisible;
 	}
 
 	//==============================================================================
-	// 현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
+	// 보이기 플래그 반환. (setVisible 로 정한 값, 켜짐과 투명도는 보지 않는다, 계층 판정은 isVisibleInHierarchy)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 보이기 플래그. (기본 참)
+	 */
+	isVisible() {
+		return this.#isVisible;
+	}
+
+	//==============================================================================
+	// 현재부터 루트까지 계층 전체의 가시 상태 반환. (자신과 조상 모두 켜져 있고, 보이기 플래그가 참이고, 로컬 투명도가 0 보다 커야 참)
 	//==============================================================================
 	/**
 	 * @returns { boolean } 자신과 모든 부모가 보이면 참.
+	 * @example <caption>꺼짐, 투명도 0, 숨김 가운데 하나라도 조상에 있으면 거짓</caption>
+	 * import { WorldNode } from "./build/vanilla.js";
+	 *
+	 * const parentNode = new WorldNode();
+	 * const childNode = new WorldNode();
+	 * parentNode.addChild(childNode);
+	 * parentNode.setLocalOpacity(0);
+	 * console.log(childNode.isActiveInHierarchy(), childNode.isVisibleInHierarchy());
+	 * parentNode.setLocalOpacity(1);
+	 * childNode.setVisible(false);
+	 * console.log(parentNode.isVisibleInHierarchy(), childNode.isVisibleInHierarchy());
 	 */
 	isVisibleInHierarchy() {
-		const isVisible = this.isVisible();
-		if (isVisible) {
-			let current = this;
-			while (current !== null && current !== undefined) {
-				const isCurrentVisible = current.isVisible();
-				if (isCurrentVisible) {
-					current = current.getParent();
-				}
-				else {
-					return false;
-				}
+		let current = this;
+		while (current !== null && current !== undefined) {
+			const isCurrentActive = typeof current.isActive === "function" ? current.isActive() : true;
+			const isCurrentVisible = typeof current.isVisible === "function" ? current.isVisible() : true;
+			const currentOpacity = typeof current.getLocalOpacity === "function" ? current.getLocalOpacity() : 1;
+			if (!isCurrentActive || !isCurrentVisible || !(currentOpacity > 0)) {
+				return false;
 			}
-			return true;
+			current = current.getParent();
 		}
-		else {
-			return false;
-		}
+		return true;
 	}
 
 	//==============================================================================

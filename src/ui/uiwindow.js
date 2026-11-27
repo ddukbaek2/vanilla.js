@@ -237,6 +237,7 @@ export class UIWindow extends WorldNode {
 	 * @param { Color | string } dimColor 어둠 색. (기본 검정 알파 0.55, 움직임이 알파를 0 ~ 1 배로 곱한다)
 	 */
 	setDimColor(dimColor) {
+		dimColor = Color.from(dimColor);
 		this.#dimPaint.setColor(dimColor);
 	}
 
@@ -247,6 +248,7 @@ export class UIWindow extends WorldNode {
 	 * @param { Color | string } panelColor 판 색.
 	 */
 	setPanelColor(panelColor) {
+		panelColor = Color.from(panelColor);
 		this.#panelPaint.setColor(panelColor);
 	}
 

@@ -204,9 +204,10 @@ export class UIScrollBar extends WorldNode {
 	// 트랙 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 트랙(바탕) 색. (트랙 Paint 에 그대로 건다, 기본 검정 알파 0.15)
+	 * @param { Color | string } color 트랙(바탕) 색. (트랙 Paint 에 그대로 건다, 기본 검정 알파 0.15)
 	 */
 	setTrackColor(color) {
+		color = Color.from(color);
 		this.#trackPaint.setColor(color);
 	}
 
@@ -214,9 +215,10 @@ export class UIScrollBar extends WorldNode {
 	// 썸 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 썸(끄는 손잡이) 색. (썸 노드 Paint 에 그대로 건다, 기본 흰색 알파 0.6)
+	 * @param { Color | string } color 썸(끄는 손잡이) 색. (썸 노드 Paint 에 그대로 건다, 기본 흰색 알파 0.6)
 	 */
 	setThumbColor(color) {
+		color = Color.from(color);
 		this.#thumbPaint.setColor(color);
 	}
 

@@ -354,9 +354,10 @@ export class VirtualPad extends Object {
 	// 패드 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } padColor 패드 색. (기본 검정)
+	 * @param { Color | string } padColor 패드 색. (기본 검정)
 	 */
 	setPadColor(padColor) {
+		padColor = Color.from(padColor);
 		this.#padColor = padColor;
 	}
 
@@ -374,9 +375,10 @@ export class VirtualPad extends Object {
 	// 구슬 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } ballColor 구슬 색. (기본 흰색)
+	 * @param { Color | string } ballColor 구슬 색. (기본 흰색)
 	 */
 	setBallColor(ballColor) {
+		ballColor = Color.from(ballColor);
 		this.#ballColor = ballColor;
 	}
 

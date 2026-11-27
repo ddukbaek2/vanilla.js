@@ -62,6 +62,7 @@ export class UIImageView extends UIView {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { Sprite | null } */ #sprite;
+	/** @private @type { string } */ #imagePath; // 그림 경로. (UIDocument 가 그림 대신 적고 읽는다, 그리기에는 쓰지 않는다)
 
 	//==============================================================================
 	// 생성.
@@ -69,6 +70,7 @@ export class UIImageView extends UIView {
 	constructor() {
 		super();
 		this.setComponentType("UIImageView");
+		this.#imagePath = "";
 		this.#sprite = null;
 	}
 
@@ -138,6 +140,26 @@ export class UIImageView extends UIView {
 	}
 
 	//==============================================================================
+	// 그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)
+	//==============================================================================
+	/**
+	 * @param { string } imagePath 그림 경로.
+	 */
+	setImagePath(imagePath) {
+		this.#imagePath = imagePath ?? "";
+	}
+
+	//==============================================================================
+	// 그림 경로 반환. (정하지 않았으면 빈 글)
+	//==============================================================================
+	/**
+	 * @returns { string } 그림 경로. (정하지 않았으면 빈 글)
+	 */
+	getImagePath() {
+		return this.#imagePath;
+	}
+
+	//==============================================================================
 	// 이미지 부분 영역(소스 사각형) 설정.
 	//==============================================================================
 	/**
@@ -156,6 +178,7 @@ export class UIImageView extends UIView {
 	 * @param { Color | string } color 틴트 색. (알파가 0 보다 크면 그림의 실루엣 안을 이 색으로 덮는다, 그림이 없으면 내용 영역을 이 색으로 칠한다, 기본 투명)
 	 */
 	setColor(color) {
+		color = Color.from(color);
 		if (this.#sprite) {
 			this.#sprite.setColor(color);
 		}

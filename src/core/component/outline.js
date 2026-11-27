@@ -151,12 +151,7 @@ export class Outline extends Component {
 			this.#color = Color.transparent();
 		}
 		else if (typeof other === "string") {
-			if (other.startsWith("#")) {
-				this.#color = Color.createFromHEX(other);
-			}
-			else if (other.startsWith("rgb")) {
-				this.#color = Color.createFromRGBA(other);
-			}
+			this.#color = Color.from(other);
 		}
 		else if (other instanceof Color) {
 			this.#color = other;

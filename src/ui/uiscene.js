@@ -94,7 +94,6 @@ export class UIScene extends Scene {
 	/** @private @type { number } */ #loadStartTime;
 	/** @private @type { number } */ #loadMinDurationMs;
 	/** @private @type { boolean } */ #loadTouchedToSkip;
-	/** @private @type { Color } */ #sceneBackgroundColor;
 	/** @private @type { string } */ #viewScaleMode;
 	/** @private @type { LayoutSolver } */ #solver;
 	/** @private @type { UINode } */ #screenNode;
@@ -112,7 +111,6 @@ export class UIScene extends Scene {
 		this.#loadStartTime = 0;
 		this.#loadMinDurationMs = 3000;
 		this.#loadTouchedToSkip = false;
-		this.#sceneBackgroundColor = Color.black();
 		this.#viewScaleMode = ViewScaleMode.none;
 	}
 
@@ -191,16 +189,6 @@ export class UIScene extends Scene {
 	 */
 	setLoadingMinDurationMs(milliseconds) {
 		this.#loadMinDurationMs = milliseconds;
-	}
-
-	//==============================================================================
-	// 캔버스 배경색 설정. (preDraw 단계에서 캔버스 전체에 적용)
-	//==============================================================================
-	/**
-	 * @param { Color } color 캔버스 전체를 칠할 색. (기본 검정)
-	 */
-	setSceneBackgroundColor(color) {
-		this.#sceneBackgroundColor = color;
 	}
 
 	//==============================================================================
@@ -394,7 +382,7 @@ export class UIScene extends Scene {
 
 	//==============================================================================
 	// 레이아웃.
-	// - viewSize 를 솔버에 suggest 하고, env() 인셋을 자체 safeAreaInsets 에 동기화.
+	// - viewSize 를 솔버에 suggest 하고, 뷰 매니저의 세이프 에어리어 인셋을 자체 safeAreaInsets 에 동기화.
 	// - 변화가 있을 때만 setSafeAreaInsets 호출 (제약 재구축 비용 절감).
 	//==============================================================================
 	layout() {
@@ -424,44 +412,36 @@ export class UIScene extends Scene {
 	}
 
 	//==============================================================================
-	// env(safe-area-inset-*) 기준 영역 계산. (뷰 좌표계)
+	// 세이프 에어리어 영역 계산. (뷰 좌표계)
+	// - 뷰 매니저의 getSafeAreaInsets 를 따른다. (setSafeAreaOverride > URL ?safeArea= > env() 실측, setIgnoredSafeAreaSides 로 뺀 쪽은 0)
 	//==============================================================================
 	/**
 	 * @returns { Rect } 세이프 에어리어 영역. (뷰 좌표, 너비와 높이는 0 이상)
+	 * @example <caption>데스크톱에서 노치를 흉내 내 세이프 에어리어를 읽기</caption>
+	 * import { Engine, EngineConfiguration, UIScene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.getViewManager().setSafeAreaOverride({ top: 40, right: 0, bottom: 20, left: 10 });
+	 * class MainScene extends UIScene {
+	 * 	initialize() {
+	 * 		super.initialize();
+	 * 		const safeAreaRect = this.computeSafeAreaRect();
+	 * 		console.log(safeAreaRect.position.x, safeAreaRect.position.y, safeAreaRect.size.x, safeAreaRect.size.y);
+	 * 	}
+	 * }
+	 * engine.run(new MainScene());
 	 */
 	computeSafeAreaRect() {
 		const engine = this.getEngine();
 		const viewManager = engine.getViewManager();
 		const viewSize = viewManager.getViewSize();
-		const targetScale = viewManager.getTargetResolutionScale();
-
-		// CSS 픽셀 기준 세이프 에어리어 인셋.
-		const div = System.document.createElement("div");
-		div.style.position = "absolute";
-		div.style.visibility = "hidden";
-		div.style.paddingTop = "env(safe-area-inset-top)";
-		div.style.paddingRight = "env(safe-area-inset-right)";
-		div.style.paddingBottom = "env(safe-area-inset-bottom)";
-		div.style.paddingLeft = "env(safe-area-inset-left)";
-		System.document.body.appendChild(div);
-		const computedStyle = System.window.getComputedStyle(div);
-		const insetTopCss = System.Number.parseInt(computedStyle.paddingTop) || 0;
-		const insetRightCss = System.Number.parseInt(computedStyle.paddingRight) || 0;
-		const insetBottomCss = System.Number.parseInt(computedStyle.paddingBottom) || 0;
-		const insetLeftCss = System.Number.parseInt(computedStyle.paddingLeft) || 0;
-		System.document.body.removeChild(div);
-
-		// CSS 픽셀 → 뷰 좌표.
-		const scale = targetScale > 0 ? targetScale : 1;
-		const insetTop = insetTopCss / scale;
-		const insetRight = insetRightCss / scale;
-		const insetBottom = insetBottomCss / scale;
-		const insetLeft = insetLeftCss / scale;
-
-		const x = insetLeft;
-		const y = insetTop;
-		const width = System.Math.max(viewSize.x - insetLeft - insetRight, 0);
-		const height = System.Math.max(viewSize.y - insetTop - insetBottom, 0);
+		const safeAreaInsets = viewManager.getSafeAreaInsets();
+		const x = safeAreaInsets.left;
+		const y = safeAreaInsets.top;
+		const width = System.Math.max(viewSize.x - safeAreaInsets.left - safeAreaInsets.right, 0);
+		const height = System.Math.max(viewSize.y - safeAreaInsets.top - safeAreaInsets.bottom, 0);
 		return Rect.create(x, y, width, height);
 	}
 
@@ -610,6 +590,30 @@ export class UIScene extends Scene {
 	}
 
 	//==============================================================================
+	// 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
+	//==============================================================================
+	/**
+	 * @returns { DEVTools | null } 개발자 도구. (만들지 않았으면 null)
+	 * @example <caption>개발자 도구를 끈 엔진에서는 null</caption>
+	 * import { Engine, EngineConfiguration, UIScene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+	 * engineConfiguration.useDevTools = false;
+	 * const engine = new Engine(engineConfiguration);
+	 * class MainScene extends UIScene {
+	 * 	initialize() {
+	 * 		super.initialize();
+	 * 		console.log(this.getDevTools() === null);
+	 * 	}
+	 * }
+	 * engine.run(new MainScene());
+	 */
+	getDevTools() {
+		return this.#devtools ?? null;
+	}
+
+	//==============================================================================
 	// 디브툴이 입력을 가져가는 중인지 여부.
 	//==============================================================================
 	/**
@@ -713,16 +717,7 @@ export class UIScene extends Scene {
 	 */
 	preDraw(graphic) {
 		super.preDraw(graphic);
-
-		const engine = this.getEngine();
-		const viewManager = engine.getViewManager();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-
-		viewManager.applyCanvasNativeRect(graphic);
-		graphic.setFillColor(this.#sceneBackgroundColor);
-		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
-
-		viewManager.applyViewRect(graphic);
+		this.drawSceneBackground(graphic);
 	}
 
 	//==============================================================================

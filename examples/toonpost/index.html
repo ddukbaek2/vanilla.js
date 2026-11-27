@@ -118,9 +118,9 @@ class PanelDrawer {
 		const cycleIndex = System.Math.floor(elapsedSeconds / BLAST_CYCLE_SECONDS);
 		const age = elapsedSeconds - cycleIndex * BLAST_CYCLE_SECONDS;
 		const blast = [1.4, 0.6, -0.4];
-		vfx.addFireball({ x: blast[0], y: blast[1], z: blast[2], radius: 0.55, life: 2.4, ramp: 0, growSeconds: 0.4, rise: 0.5, rim: 1.0, age, key: 100 + cycleIndex });
+		vfx.addFireball({ position: [blast[0], blast[1], blast[2]], radius: 0.55, life: 2.4, ramp: 0, growSeconds: 0.4, rise: 0.5, rim: 1.0, age, key: 100 + cycleIndex });
 		vfx.addShockwave({ x: blast[0], z: blast[2], startRadius: 0.2, endRadius: 1.8, width: 0.45, life: 0.8, delay: 0.5, ramp: 0, rim: 1.0, age, key: 200 + cycleIndex });
-		vfx.emitParticles({ count: 48, x: blast[0], y: blast[1], z: blast[2], shape: ToonVfxShape.sphere, radius: 0.2, isUpward: true, speed: [2.5, 5.5], rise: [0.5, 2.0], gravity: 7.0, drag: 1.0, size: [0.05, 0.08], life: [0.8, 1.6], look: ToonVfxLook.streak, stretch: 0.05, ramp: 0, floor: 0.02, age, key: 300 + cycleIndex });
+		vfx.emitParticles({ count: 48, position: [blast[0], blast[1], blast[2]], shape: ToonVfxShape.sphere, radius: 0.2, isUpward: true, speed: [2.5, 5.5], rise: [0.5, 2.0], gravity: 7.0, drag: 1.0, size: [0.05, 0.08], life: [0.8, 1.6], look: ToonVfxLook.streak, stretch: 0.05, ramp: 0, floor: 0.02, age, key: 300 + cycleIndex });
 		// 발밑 그늘.
 		vfx.queueBlobShadow({ x: -1.7, z: 0.2, radius: 0.85 });
 		vfx.queueBlobShadow({ x: -0.2, z: -0.9, radius: 0.6, alpha: 0.6 });
@@ -134,7 +134,7 @@ class PanelDrawer {
 		// 빛 점 120 개. (기본 상한 96 을 넘는다)
 		for (let glintIndex = 0; glintIndex < 120; glintIndex++) {
 			const angle = glintIndex / 120 * PI * 2.0;
-			vfx.queueGlint({ x: System.Math.cos(angle) * 3.4, y: 0.08, z: System.Math.sin(angle) * 2.5, size: 0.14, color: [1.0, 0.85, 0.4], brightness: 3.0 });
+			vfx.queueGlint({ position: [System.Math.cos(angle) * 3.4, 0.08, System.Math.sin(angle) * 2.5], size: 0.14, color: [1.0, 0.85, 0.4], brightness: 3.0 });
 		}
 	}
 

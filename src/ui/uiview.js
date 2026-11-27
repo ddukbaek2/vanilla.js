@@ -230,6 +230,7 @@ export class UIView extends Component {
 	 * console.log(paintedColor.alpha, clearedColor.alpha);
 	 */
 	setBackgroundColor(backgroundColor) {
+		backgroundColor = Color.from(backgroundColor);
 		if (backgroundColor === null || backgroundColor === undefined) {
 			this.#backgroundColor = new Color(1, 1, 1, 0);
 			return;
@@ -246,4 +247,31 @@ export class UIView extends Component {
 	getBackgroundColor() {
 		return this.#backgroundColor;
 	}
+}
+
+
+//==============================================================================
+// 뷰 좌표의 점이 노드 내용 영역 안인지. (부모들의 변환을 모두 거친 네 귀퉁이로 본다, 러스트 판 ui::uiview::is_view_position_inside_node)
+//==============================================================================
+/**
+ * @param { WorldNode | null } node 볼 노드. (없으면 거짓)
+ * @param { Vector2 } viewPosition 뷰 좌표의 점. (픽셀)
+ * @returns { boolean } 노드 contentSize 영역 안이면 참.
+ * @example <caption>가운데 피봇(기본)인 40 x 20 노드의 안과 밖</caption>
+ * import { isViewPositionInsideNode, Vector2, WorldNode } from "./build/vanilla.js";
+ *
+ * const rootNode = new WorldNode();
+ * const buttonNode = new WorldNode();
+ * rootNode.addChild(buttonNode);
+ * buttonNode.setLocalPosition(Vector2.create(100, 100));
+ * buttonNode.setContentSize(Vector2.create(40, 20));
+ * console.log(isViewPositionInsideNode(buttonNode, Vector2.create(100, 100)));
+ * console.log(isViewPositionInsideNode(buttonNode, Vector2.create(81, 91)));
+ * console.log(isViewPositionInsideNode(buttonNode, Vector2.create(79, 100)));
+ */
+export function isViewPositionInsideNode(node, viewPosition) {
+	if (node === null || node === undefined || typeof node.contains !== "function") {
+		return false;
+	}
+	return node.contains(viewPosition);
 }

@@ -366,4 +366,43 @@ export class UIDropdown extends WorldNode {
 	isOpen() {
 		return this.#isOpen;
 	}
+
+	//==============================================================================
+	// 선택지 목록 반환.
+	//==============================================================================
+	/**
+	 * @returns { string[] } 선택지 글 목록. (setOptionList 로 준 차례, 고쳐 쓰지 않는다)
+	 */
+	getOptionList() {
+		return this.#optionList;
+	}
+
+	//==============================================================================
+	// 펼침 목록 노드 반환. (펼친 동안은 트리 뿌리의 자식)
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 펼침 목록 노드.
+	 */
+	getPopupNode() {
+		return this.#popupNode;
+	}
+
+	//==============================================================================
+	// 선택지 행 노드 목록 반환. (선택지 차례, setOptionList 마다 다시 만든다)
+	//==============================================================================
+	/**
+	 * @returns { WorldNode[] } 행 노드. (새 배열)
+	 * @example <caption>선택지 행 노드를 읽어 둘째 행을 누른 것처럼 고르기</caption>
+	 * import { UIDropdown } from "./build/vanilla.js";
+	 *
+	 * const dropdown = new UIDropdown({ width: 160 });
+	 * dropdown.setOptionList(["Low", "Medium", "High"]);
+	 * const optionNodes = dropdown.getOptionNodes();
+	 * console.log(optionNodes.length, optionNodes[1].getName(), dropdown.getOptionList()[1]);
+	 * dropdown.selectIndex(1);
+	 * console.log(dropdown.getSelectedText());
+	 */
+	getOptionNodes() {
+		return this.#popupNode.getChildren().slice();
+	}
 }

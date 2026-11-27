@@ -5,6 +5,7 @@ const System = globalThis;
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
+import { readColorText } from "./shadowtext.js";
 
 
 //==============================================================================
@@ -221,11 +222,12 @@ export class SoftShade extends Component {
 	//==============================================================================
 	/**
 	 * @param { string } shape - SoftShadeShape
-	 * @param { string } color - "#rrggbb"
+	 * @param { Color | string } color - "#rrggbb"
 	 * @param { number } opacity 가장 짙은 곳의 불투명도. (0 ~ 1, 0 이하면 그리지 않는다)
 	 * @param { number } fadeWidth 띠의 양옆이 엷어지는 너비. (내용 크기 단위, 내용 너비의 반까지, 0 이면 엷어지지 않는다)
 	 */
 	setShade(shape, color, opacity, fadeWidth = 0) {
+		color = readColorText(color);
 		this.#shape = shape;
 		this.#color = color;
 		this.#opacity = opacity;

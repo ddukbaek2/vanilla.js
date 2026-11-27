@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Color } from "../../base/color.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { detectTextDirection } from "../graphic.js";
@@ -39,6 +40,24 @@ export function buildRGBAString(colorText, opacity) {
 	const green = (value >> 8) & 255;
 	const blue = value & 255;
 	return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+}
+
+
+//==============================================================================
+// 색 인자를 굽기에 쓰는 색 글로. (글은 그대로, Color 는 알파를 뺀 "#rrggbb", 러스트 판 impl Into<Color> 자리의 짝)
+// - 이 컴포넌트들은 색을 글로 담아 굽는 열쇠와 캔버스 색에 쓴다. 불투명도는 따로 받으므로 Color 의 알파는 쓰지 않는다.
+//==============================================================================
+/**
+ * @param { Color | string } color - Color 나 "#rrggbb" 같은 색 글
+ * @returns { string }
+ */
+export function readColorText(color) {
+	if (typeof color === "string") {
+		return color;
+	}
+	const rgbColor = Color.from(color).clone();
+	rgbColor.alpha = 1;
+	return rgbColor.toHEXString();
 }
 
 
@@ -372,9 +391,10 @@ export class ShadowText extends Component {
 	/**
 	 * @param { number } fontSize 처음 글자 크기. (내용 크기 단위, 넘치면 줄여 굽는다)
 	 * @param { boolean } isBold 굵게 할지.
-	 * @param { string } textColor 글 색. ("#rrggbb" 나 CSS 색)
+	 * @param { Color | string } textColor 글 색. ("#rrggbb" 나 CSS 색)
 	 */
 	setTextStyle(fontSize, isBold, textColor) {
+		textColor = readColorText(textColor);
 		this.#fontSize = fontSize;
 		this.#isBold = isBold;
 		this.#textColor = textColor;
@@ -520,12 +540,13 @@ export class ShadowText extends Component {
 	// 그림자 설정. (색, 불투명도, 글 아래로 내려가는 만큼, 번지는 만큼)
 	//==============================================================================
 	/**
-	 * @param { string } shadowColor - "#rrggbb"
+	 * @param { Color | string } shadowColor - "#rrggbb"
 	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
 	 * @param { number } shadowOffset 그림자가 글 아래로 내려가는 만큼. (내용 크기 단위)
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
+		shadowColor = readColorText(shadowColor);
 		this.#shadowColor = shadowColor;
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;

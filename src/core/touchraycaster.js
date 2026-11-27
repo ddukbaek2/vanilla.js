@@ -19,6 +19,14 @@ function isTouchableNode(node) {
 
 
 //==============================================================================
+// 노드의 보이기 플래그. (setVisible 로 숨긴 노드와 자손은 누름을 받지 않는다, 플래그가 없는 노드는 보임)
+//==============================================================================
+function isNodeVisible(node) {
+	return typeof node.isVisible === "function" ? node.isVisible() : true;
+}
+
+
+//==============================================================================
 // 터치 레이캐스터.
 // - 씬의 터치(Scene.tickTouch 가 씬의 레이캐스터에 넘긴다, Scene.setTouchRaycaster)를 받아
 //   루트 노드 트리를 draw() 순서로 순회하고,
@@ -183,7 +191,7 @@ export class TouchRaycaster extends Object {
 		let scrollViewDrawOrder = -1;
 
 		const traverse = (node) => {
-			if (!node || !node.isActive()) {
+			if (!node || !node.isActive() || !isNodeVisible(node)) {
 				return;
 			}
 			const currentDrawOrder = drawOrderCounter;
@@ -295,7 +303,7 @@ export class TouchRaycaster extends Object {
 				return;
 			}
 			const isActive = node.isActive();
-			if (!isActive) {
+			if (!isActive || !isNodeVisible(node)) {
 				return;
 			}
 

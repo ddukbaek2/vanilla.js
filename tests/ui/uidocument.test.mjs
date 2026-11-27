@@ -68,7 +68,7 @@ const panelNode = editorRootNode.findChildByName("Panel");
 checkEqual(panelNode.getComponent(Paint).getRoundSize(), 24, "Panel 둥근 크기");
 checkEqual(panelNode.findChildByName("Title").getComponent(Text).getText(), "vanilla.js", "Title 글");
 const emblemNode = panelNode.findChildByName("emblem");
-checkEqual(emblemNode.getComponent(Sprite).imagePath, "emblem.png", "emblem 그림 경로 (원본은 UIDocument 가 imagePath 칸에 둔다)");
+checkEqual(emblemNode.getComponent(Sprite).getImagePath(), "emblem.png", "emblem 그림 경로 (UIDocument 가 imagePath 칸을 setImagePath 로 넣는다, 러스트 판 get_image_path)");
 checkEqual(emblemNode.getLocalRotation(), 15, "emblem 회전");
 checkEqual(emblemNode.getAnchor().x + "," + emblemNode.getAnchor().y, "0,1", "emblem 앵커");
 

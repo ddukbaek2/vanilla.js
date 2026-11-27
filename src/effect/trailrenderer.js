@@ -199,10 +199,12 @@ export class TrailRenderer extends Component {
 	// 색 설정. (갓 생긴 점의 색에서 끝 색으로 바뀐다)
 	//==============================================================================
 	/**
-	 * @param { Color } startColor 갓 생긴 점의 색. (복사해 둔다)
-	 * @param { Color } endColor 수명이 다한 점의 색. (복사해 둔다)
+	 * @param { Color | string } startColor 갓 생긴 점의 색. (복사해 둔다)
+	 * @param { Color | string } endColor 수명이 다한 점의 색. (복사해 둔다)
 	 */
 	setColors(startColor, endColor) {
+		startColor = Color.from(startColor);
+		endColor = Color.from(endColor);
 		this.#startColor = startColor.clone();
 		this.#endColor = endColor.clone();
 	}

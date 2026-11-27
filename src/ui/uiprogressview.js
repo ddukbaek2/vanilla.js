@@ -264,9 +264,10 @@ export class UIProgressView extends UIView {
 	// 반대편 채움 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 반대편 채움 색. (복제하지 않고 그대로 쥔다)
+	 * @param { Color | string } color 반대편 채움 색. (복제하지 않고 그대로 쥔다)
 	 */
 	setSecondaryFillColor(color) {
+		color = Color.from(color);
 		this.#secondaryFillColor = color;
 	}
 
@@ -284,9 +285,10 @@ export class UIProgressView extends UIView {
 	// 트랙 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 트랙 색. (UIView 의 배경 색으로 넣는다)
+	 * @param { Color | string } color 트랙 색. (UIView 의 배경 색으로 넣는다)
 	 */
 	setTrackColor(color) {
+		color = Color.from(color);
 		this.setBackgroundColor(color);
 	}
 
@@ -302,9 +304,10 @@ export class UIProgressView extends UIView {
 	// 채움 색.
 	//==============================================================================
 	/**
-	 * @param { Color } color 채움 색. (복제하지 않고 그대로 쥔다)
+	 * @param { Color | string } color 채움 색. (복제하지 않고 그대로 쥔다)
 	 */
 	setFillColor(color) {
+		color = Color.from(color);
 		this.#fillColor = color;
 	}
 

@@ -575,6 +575,7 @@ export class UILabel extends UIView {
 	 * @param { Color | string } color 글 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 처음은 흰색)
 	 */
 	setTextColor(color) {
+		color = Color.from(color);
 		if (this.#text) {
 			this.#text.setTextColor(color);
 		}
@@ -603,6 +604,7 @@ export class UILabel extends UIView {
 	 * @param { Color | string } color 외곽선 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명)
 	 */
 	setStrokeColor(color) {
+		color = Color.from(color);
 		if (this.#text) {
 			this.#text.setStrokeColor(color);
 		}
