@@ -55808,6 +55808,60 @@ void main() {
     return value === other && (value !== 0 || 1 / value === 1 / other);
   }
   __name(isSameNumber, "isSameNumber");
+  function attachSkinAttributes(webGL2RenderingContext, skinBuffer) {
+    const stride = SKIN_FLOAT_COUNT * 4;
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, skinBuffer);
+    webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexJoints);
+    webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexJoints, 4, webGL2RenderingContext.FLOAT, false, stride, 0);
+    webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexWeights);
+    webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexWeights, 4, webGL2RenderingContext.FLOAT, false, stride, 16);
+  }
+  __name(attachSkinAttributes, "attachSkinAttributes");
+  function attachBodyAttributes(webGL2RenderingContext, mesh) {
+    const stride = VERTEX_FLOAT_COUNT * 4;
+    const attributeLayouts = [
+      [TOON_ATTRIBUTE_LOCATIONS.vertexPosition, 3, 0],
+      [TOON_ATTRIBUTE_LOCATIONS.vertexNormal, 3, 12],
+      [TOON_ATTRIBUTE_LOCATIONS.vertexColor, 3, 24],
+      [TOON_ATTRIBUTE_LOCATIONS.vertexMaterial, 2, 36],
+      [TOON_ATTRIBUTE_LOCATIONS.vertexDetail, 4, 44]
+    ];
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.vertexBuffer);
+    for (const attributeLayout of attributeLayouts) {
+      webGL2RenderingContext.enableVertexAttribArray(attributeLayout[0]);
+      webGL2RenderingContext.vertexAttribPointer(attributeLayout[0], attributeLayout[1], webGL2RenderingContext.FLOAT, false, stride, attributeLayout[2]);
+    }
+    if (mesh.skinBuffer !== null) {
+      attachSkinAttributes(webGL2RenderingContext, mesh.skinBuffer);
+    }
+    if (mesh.uvBuffer !== null) {
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.uvBuffer);
+      webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexUv);
+      webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexUv, mesh.hasSecondUv ? 4 : 2, webGL2RenderingContext.FLOAT, false, mesh.hasSecondUv ? 16 : 8, 0);
+    }
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, mesh.bodyIndexBuffer);
+  }
+  __name(attachBodyAttributes, "attachBodyAttributes");
+  function attachInstanceAttributes(webGL2RenderingContext, instanceBuffer) {
+    const stride = TOON_INSTANCE_FLOAT_COUNT * 4;
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer);
+    for (let columnIndex = 0; columnIndex < 5; ++columnIndex) {
+      const location = TOON_ATTRIBUTE_LOCATIONS.instanceMatrix0 + columnIndex;
+      webGL2RenderingContext.enableVertexAttribArray(location);
+      webGL2RenderingContext.vertexAttribPointer(location, 4, webGL2RenderingContext.FLOAT, false, stride, columnIndex * 16);
+      webGL2RenderingContext.vertexAttribDivisor(location, 1);
+    }
+  }
+  __name(attachInstanceAttributes, "attachInstanceAttributes");
+  function createMeshInstanceVertexArray(webGL2RenderingContext, mesh, instanceBuffer) {
+    const vertexArray = webGL2RenderingContext.createVertexArray();
+    webGL2RenderingContext.bindVertexArray(vertexArray);
+    attachBodyAttributes(webGL2RenderingContext, mesh);
+    attachInstanceAttributes(webGL2RenderingContext, instanceBuffer);
+    webGL2RenderingContext.bindVertexArray(null);
+    return vertexArray;
+  }
+  __name(createMeshInstanceVertexArray, "createMeshInstanceVertexArray");
   var MATERIAL_BLOCK_NAME = "ToonDrawMaterial";
   var MATERIAL_BLOCK_BINDING = 0;
   var MATERIAL_BLOCK_FLOAT_COUNT = 44;
@@ -56901,29 +56955,7 @@ void main() {
      * @private
      */
     attachBodyAttributes(mesh) {
-      const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const stride = VERTEX_FLOAT_COUNT * 4;
-      const attributeLayouts = [
-        [TOON_ATTRIBUTE_LOCATIONS.vertexPosition, 3, 0],
-        [TOON_ATTRIBUTE_LOCATIONS.vertexNormal, 3, 12],
-        [TOON_ATTRIBUTE_LOCATIONS.vertexColor, 3, 24],
-        [TOON_ATTRIBUTE_LOCATIONS.vertexMaterial, 2, 36],
-        [TOON_ATTRIBUTE_LOCATIONS.vertexDetail, 4, 44]
-      ];
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.vertexBuffer);
-      for (const attributeLayout of attributeLayouts) {
-        webGL2RenderingContext.enableVertexAttribArray(attributeLayout[0]);
-        webGL2RenderingContext.vertexAttribPointer(attributeLayout[0], attributeLayout[1], webGL2RenderingContext.FLOAT, false, stride, attributeLayout[2]);
-      }
-      if (mesh.skinBuffer !== null) {
-        this.attachSkinAttributes(mesh.skinBuffer);
-      }
-      if (mesh.uvBuffer !== null) {
-        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.uvBuffer);
-        webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexUv);
-        webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexUv, mesh.hasSecondUv ? 4 : 2, webGL2RenderingContext.FLOAT, false, mesh.hasSecondUv ? 16 : 8, 0);
-      }
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, mesh.bodyIndexBuffer);
+      attachBodyAttributes(this.getWebGL2RenderingContext(), mesh);
     }
     //==============================================================================
     // 바깥선 껍데기의 자리, 뼈대 어트리뷰트와 번호 버퍼를 지금 묶인 버텍스 어레이에 붙이기.
@@ -56952,13 +56984,7 @@ void main() {
      * @private
      */
     attachSkinAttributes(skinBuffer) {
-      const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const stride = SKIN_FLOAT_COUNT * 4;
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, skinBuffer);
-      webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexJoints);
-      webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexJoints, 4, webGL2RenderingContext.FLOAT, false, stride, 0);
-      webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexWeights);
-      webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexWeights, 4, webGL2RenderingContext.FLOAT, false, stride, 16);
+      attachSkinAttributes(this.getWebGL2RenderingContext(), skinBuffer);
     }
     //==============================================================================
     // 인스턴스 버퍼를 지금 묶인 버텍스 어레이의 인스턴스 어트리뷰트로. (행렬 네 줄, 틴트, 인스턴스마다 하나씩)
@@ -56968,15 +56994,7 @@ void main() {
      * @private
      */
     attachInstanceAttributes(instanceBuffer) {
-      const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const stride = TOON_INSTANCE_FLOAT_COUNT * 4;
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer);
-      for (let columnIndex = 0; columnIndex < 5; ++columnIndex) {
-        const location = TOON_ATTRIBUTE_LOCATIONS.instanceMatrix0 + columnIndex;
-        webGL2RenderingContext.enableVertexAttribArray(location);
-        webGL2RenderingContext.vertexAttribPointer(location, 4, webGL2RenderingContext.FLOAT, false, stride, columnIndex * 16);
-        webGL2RenderingContext.vertexAttribDivisor(location, 1);
-      }
+      attachInstanceAttributes(this.getWebGL2RenderingContext(), instanceBuffer);
     }
     //==============================================================================
     // 인스턴스 꼴의 버퍼를 지금 묶인 버텍스 어레이의 인스턴스 어트리뷰트로.
@@ -74124,6 +74142,7 @@ void main() {
     // 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)
   });
   var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
+  var BATCH_SLOT_MESH_LIMIT2 = 8;
   var IDENTITY_ELEMENTS2 = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   var INSTANCE_BUFFER_SPHERE2 = [0, 0, 0, 0];
   var LINE_TEXTURE_UNIT = 5;
@@ -74700,6 +74719,9 @@ void main() {
     // beginLineIds 앞의 그리기 상태.
     /** @private @type { Float32Array } */
     #instanceData;
+    /** @private @type { Array<object> } */
+    #batchSlots;
+    // 자동 인스턴싱 묶음 자리. ({ buffer, values, count, vertexArrays }, 그리기 줄이 프레임마다 같은 차례로 주고 값이 같으면 다시 올리지 않는다)
     /** @private @type { Float32Array } */
     #lineUniformValues;
     // 선의 판에 올린 instanced, instanceLineIds, skinned, lineFlags. (같으면 건너뜀, beginLineIds 가 잊는다)
@@ -74765,6 +74787,7 @@ void main() {
       this.#frame = null;
       this.#savedState = null;
       this.#instanceData = new System109.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+      this.#batchSlots = [];
       this.#lineUniformValues = new System109.Float32Array([System109.NaN, System109.NaN, System109.NaN, System109.NaN]);
       this.#drawnDistanceSum = 0;
       this.#drawnDistanceCount = 0;
@@ -75156,9 +75179,10 @@ void main() {
      * @param { number } start - 목록에서 그릴 첫 자리.
      * @param { number } count - 그릴 수.
      * @param { object } options - 모두에 같은 그리기 꼴.
+     * @param { number } slotIndex - 묶음 자리 번호. (그리기 줄이 프레임마다 같은 차례로 준다)
      * @private
      */
-    drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options) {
+    drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options, slotIndex) {
       if (this.#savedState === null || count <= 0) {
         return;
       }
@@ -75179,9 +75203,45 @@ void main() {
         instanceData[offset + 18] = 0;
         instanceData[offset + 19] = 1;
       }
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, count * TOON_INSTANCE_FLOAT_COUNT);
-      this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
+      const floatCount = count * TOON_INSTANCE_FLOAT_COUNT;
+      let slot = this.#batchSlots[slotIndex];
+      if (slot === void 0) {
+        slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System109.Float32Array(0), count: 0, vertexArrays: new System109.Map() };
+        this.#batchSlots[slotIndex] = slot;
+      }
+      let isSame = slot.count === count;
+      if (isSame) {
+        const values = slot.values;
+        for (let index = 0; index < floatCount; ++index) {
+          const value = values[index];
+          const other = instanceData[index];
+          if (value !== other || value === 0 && 1 / value !== 1 / other) {
+            isSame = false;
+            break;
+          }
+        }
+      }
+      if (!isSame) {
+        if (slot.values.length < floatCount) {
+          slot.values = new System109.Float32Array(floatCount);
+        }
+        slot.values.set(instanceData.subarray(0, floatCount));
+        slot.count = count;
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
+        webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount);
+      }
+      let vertexArray = slot.vertexArrays.get(mesh);
+      if (vertexArray === void 0) {
+        if (slot.vertexArrays.size >= BATCH_SLOT_MESH_LIMIT2) {
+          for (const oldVertexArray of slot.vertexArrays.values()) {
+            webGL2RenderingContext.deleteVertexArray(oldVertexArray);
+          }
+          slot.vertexArrays.clear();
+        }
+        vertexArray = createMeshInstanceVertexArray(webGL2RenderingContext, mesh, slot.buffer);
+        slot.vertexArrays.set(mesh, vertexArray);
+      }
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineIdList[start], 1, false, options, vertexArray);
     }
     //==============================================================================
     // 모형 하나의 번호 그리기. (ToonRenderer.drawMesh 와 같은 행렬과 자세, 화면 밖이면 건너뛴다)
@@ -76072,6 +76132,13 @@ void main() {
         this.#lineColorTexture = null;
       }
       webGL2RenderingContext.deleteVertexArray(this.#emptyVertexArray);
+      for (const slot of this.#batchSlots) {
+        for (const vertexArray of slot.vertexArrays.values()) {
+          webGL2RenderingContext.deleteVertexArray(vertexArray);
+        }
+        webGL2RenderingContext.deleteBuffer(slot.buffer);
+      }
+      this.#batchSlots.length = 0;
       webGL2RenderingContext.deleteProgram(this.#lineProgram.getProgram());
       webGL2RenderingContext.deleteProgram(this.#seedProgram.getProgram());
       webGL2RenderingContext.deleteProgram(this.#seedGatherProgram.getProgram());
@@ -88649,6 +88716,9 @@ void main() {
     #lineGroupCount;
     // 지금 쓰는 묶음 칸 수.
     /** @private @type { number } */
+    #lineBatchSlotCount;
+    // 이 프레임 선의 판에서 지금까지 쓴 묶음 자리 수. (프레임마다 같은 차례로 자리를 준다)
+    /** @private @type { number } */
     #lineGroupSerial;
     // 묶음을 비울 때마다 오르는 번호. (모형마다 기억한 첫 묶음이 지금 것인지)
     /** @private @type { WeakMap<object, object> } */
@@ -88692,6 +88762,7 @@ void main() {
       this.#lineGroupPool = [];
       this.#lineGroupCount = 0;
       this.#lineGroupSerial = 0;
+      this.#lineBatchSlotCount = 0;
       this.#lineGroupOfMesh = new System140.WeakMap();
       this.#transparentPool = [];
       this.#transparentList = [];
@@ -89402,6 +89473,7 @@ void main() {
         this.#lineMatrixCount = 0;
         this.#lineGroupCount = 0;
         this.#lineGroupSerial += 1;
+        this.#lineBatchSlotCount = 0;
         const itemList = this.#itemList;
         for (let itemIndex = 1; itemIndex <= this.#itemCount; ++itemIndex) {
           const item = itemList[itemIndex - 1];
@@ -89499,7 +89571,8 @@ void main() {
           const sourceIndex = group.itemIndexList[index];
           this.pushLineMatrix(lineMatrices[sourceIndex], lineIds[sourceIndex]);
         }
-        screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options);
+        screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options, this.#lineBatchSlotCount);
+        this.#lineBatchSlotCount += 1;
         group.item = null;
       }
       this.#lineGroupCount = 0;

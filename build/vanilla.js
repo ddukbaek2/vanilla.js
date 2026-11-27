@@ -32685,6 +32685,54 @@ function isSameNumber(value, other) {
   return value === other && (value !== 0 || 1 / value === 1 / other);
 }
 __name(isSameNumber, "isSameNumber");
+function attachSkinAttributes(webGL2RenderingContext, skinBuffer) {
+  const stride = SKIN_FLOAT_COUNT * 4;
+  webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, skinBuffer);
+  webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexJoints);
+  webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexJoints, 4, webGL2RenderingContext.FLOAT, false, stride, 0);
+  webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexWeights);
+  webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexWeights, 4, webGL2RenderingContext.FLOAT, false, stride, 16);
+}
+__name(attachSkinAttributes, "attachSkinAttributes");
+function attachBodyAttributes(webGL2RenderingContext, mesh) {
+  const stride = VERTEX_FLOAT_COUNT * 4;
+  const attributeLayouts = [[TOON_ATTRIBUTE_LOCATIONS.vertexPosition, 3, 0], [TOON_ATTRIBUTE_LOCATIONS.vertexNormal, 3, 12], [TOON_ATTRIBUTE_LOCATIONS.vertexColor, 3, 24], [TOON_ATTRIBUTE_LOCATIONS.vertexMaterial, 2, 36], [TOON_ATTRIBUTE_LOCATIONS.vertexDetail, 4, 44]];
+  webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.vertexBuffer);
+  for (const attributeLayout of attributeLayouts) {
+    webGL2RenderingContext.enableVertexAttribArray(attributeLayout[0]);
+    webGL2RenderingContext.vertexAttribPointer(attributeLayout[0], attributeLayout[1], webGL2RenderingContext.FLOAT, false, stride, attributeLayout[2]);
+  }
+  if (mesh.skinBuffer !== null) {
+    attachSkinAttributes(webGL2RenderingContext, mesh.skinBuffer);
+  }
+  if (mesh.uvBuffer !== null) {
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.uvBuffer);
+    webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexUv);
+    webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexUv, mesh.hasSecondUv ? 4 : 2, webGL2RenderingContext.FLOAT, false, mesh.hasSecondUv ? 16 : 8, 0);
+  }
+  webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, mesh.bodyIndexBuffer);
+}
+__name(attachBodyAttributes, "attachBodyAttributes");
+function attachInstanceAttributes(webGL2RenderingContext, instanceBuffer) {
+  const stride = TOON_INSTANCE_FLOAT_COUNT * 4;
+  webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer);
+  for (let columnIndex = 0; columnIndex < 5; ++columnIndex) {
+    const location = TOON_ATTRIBUTE_LOCATIONS.instanceMatrix0 + columnIndex;
+    webGL2RenderingContext.enableVertexAttribArray(location);
+    webGL2RenderingContext.vertexAttribPointer(location, 4, webGL2RenderingContext.FLOAT, false, stride, columnIndex * 16);
+    webGL2RenderingContext.vertexAttribDivisor(location, 1);
+  }
+}
+__name(attachInstanceAttributes, "attachInstanceAttributes");
+function createMeshInstanceVertexArray(webGL2RenderingContext, mesh, instanceBuffer) {
+  const vertexArray = webGL2RenderingContext.createVertexArray();
+  webGL2RenderingContext.bindVertexArray(vertexArray);
+  attachBodyAttributes(webGL2RenderingContext, mesh);
+  attachInstanceAttributes(webGL2RenderingContext, instanceBuffer);
+  webGL2RenderingContext.bindVertexArray(null);
+  return vertexArray;
+}
+__name(createMeshInstanceVertexArray, "createMeshInstanceVertexArray");
 var MATERIAL_BLOCK_NAME = "ToonDrawMaterial";
 var MATERIAL_BLOCK_BINDING = 0;
 var MATERIAL_BLOCK_FLOAT_COUNT = 44;
@@ -33374,23 +33422,7 @@ var ToonRenderer = class {
     return buffer;
   }
   attachBodyAttributes(mesh) {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const stride = VERTEX_FLOAT_COUNT * 4;
-    const attributeLayouts = [[TOON_ATTRIBUTE_LOCATIONS.vertexPosition, 3, 0], [TOON_ATTRIBUTE_LOCATIONS.vertexNormal, 3, 12], [TOON_ATTRIBUTE_LOCATIONS.vertexColor, 3, 24], [TOON_ATTRIBUTE_LOCATIONS.vertexMaterial, 2, 36], [TOON_ATTRIBUTE_LOCATIONS.vertexDetail, 4, 44]];
-    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.vertexBuffer);
-    for (const attributeLayout of attributeLayouts) {
-      webGL2RenderingContext.enableVertexAttribArray(attributeLayout[0]);
-      webGL2RenderingContext.vertexAttribPointer(attributeLayout[0], attributeLayout[1], webGL2RenderingContext.FLOAT, false, stride, attributeLayout[2]);
-    }
-    if (mesh.skinBuffer !== null) {
-      this.attachSkinAttributes(mesh.skinBuffer);
-    }
-    if (mesh.uvBuffer !== null) {
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.uvBuffer);
-      webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexUv);
-      webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexUv, mesh.hasSecondUv ? 4 : 2, webGL2RenderingContext.FLOAT, false, mesh.hasSecondUv ? 16 : 8, 0);
-    }
-    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, mesh.bodyIndexBuffer);
+    attachBodyAttributes(this.getWebGL2RenderingContext(), mesh);
   }
   attachOutlineAttributes(mesh) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -33405,24 +33437,10 @@ var ToonRenderer = class {
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, mesh.outlineIndexBuffer);
   }
   attachSkinAttributes(skinBuffer) {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const stride = SKIN_FLOAT_COUNT * 4;
-    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, skinBuffer);
-    webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexJoints);
-    webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexJoints, 4, webGL2RenderingContext.FLOAT, false, stride, 0);
-    webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexWeights);
-    webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexWeights, 4, webGL2RenderingContext.FLOAT, false, stride, 16);
+    attachSkinAttributes(this.getWebGL2RenderingContext(), skinBuffer);
   }
   attachInstanceAttributes(instanceBuffer) {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const stride = TOON_INSTANCE_FLOAT_COUNT * 4;
-    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer);
-    for (let columnIndex = 0; columnIndex < 5; ++columnIndex) {
-      const location = TOON_ATTRIBUTE_LOCATIONS.instanceMatrix0 + columnIndex;
-      webGL2RenderingContext.enableVertexAttribArray(location);
-      webGL2RenderingContext.vertexAttribPointer(location, 4, webGL2RenderingContext.FLOAT, false, stride, columnIndex * 16);
-      webGL2RenderingContext.vertexAttribDivisor(location, 1);
-    }
+    attachInstanceAttributes(this.getWebGL2RenderingContext(), instanceBuffer);
   }
   attachLayoutAttributes(instanceLayout, buffer) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -43769,6 +43787,7 @@ var MultiLevelBloomEffect = class extends Object2 {
 var System109 = globalThis;
 var ToonOutlineWidthUnit = System109.Object.freeze({ world: "world", pixel: "pixel" });
 var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
+var BATCH_SLOT_MESH_LIMIT2 = 8;
 var IDENTITY_ELEMENTS2 = new System109.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 var INSTANCE_BUFFER_SPHERE2 = [0, 0, 0, 0];
 var LINE_TEXTURE_UNIT = 5;
@@ -44300,6 +44319,7 @@ var ToonScreenOutline = class {
   #frame;
   #savedState;
   #instanceData;
+  #batchSlots;
   #lineUniformValues;
   #drawnDistanceSum;
   #drawnDistanceCount;
@@ -44338,6 +44358,7 @@ var ToonScreenOutline = class {
     this.#frame = null;
     this.#savedState = null;
     this.#instanceData = new System109.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+    this.#batchSlots = [];
     this.#lineUniformValues = new System109.Float32Array([System109.NaN, System109.NaN, System109.NaN, System109.NaN]);
     this.#drawnDistanceSum = 0;
     this.#drawnDistanceCount = 0;
@@ -44484,7 +44505,7 @@ var ToonScreenOutline = class {
     this.addDrawnDistance(mesh, modelElements);
     return true;
   }
-  drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options) {
+  drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options, slotIndex) {
     if (this.#savedState === null || count <= 0) {
       return;
     }
@@ -44505,9 +44526,45 @@ var ToonScreenOutline = class {
       instanceData[offset + 18] = 0;
       instanceData[offset + 19] = 1;
     }
-    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
-    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, count * TOON_INSTANCE_FLOAT_COUNT);
-    this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineIdList[start], 1, false, options, mesh.bodyVertexArray);
+    const floatCount = count * TOON_INSTANCE_FLOAT_COUNT;
+    let slot = this.#batchSlots[slotIndex];
+    if (slot === void 0) {
+      slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System109.Float32Array(0), count: 0, vertexArrays: new System109.Map() };
+      this.#batchSlots[slotIndex] = slot;
+    }
+    let isSame = slot.count === count;
+    if (isSame) {
+      const values = slot.values;
+      for (let index = 0; index < floatCount; ++index) {
+        const value = values[index];
+        const other = instanceData[index];
+        if (value !== other || value === 0 && 1 / value !== 1 / other) {
+          isSame = false;
+          break;
+        }
+      }
+    }
+    if (!isSame) {
+      if (slot.values.length < floatCount) {
+        slot.values = new System109.Float32Array(floatCount);
+      }
+      slot.values.set(instanceData.subarray(0, floatCount));
+      slot.count = count;
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
+      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData, webGL2RenderingContext.DYNAMIC_DRAW, 0, floatCount);
+    }
+    let vertexArray = slot.vertexArrays.get(mesh);
+    if (vertexArray === void 0) {
+      if (slot.vertexArrays.size >= BATCH_SLOT_MESH_LIMIT2) {
+        for (const oldVertexArray of slot.vertexArrays.values()) {
+          webGL2RenderingContext.deleteVertexArray(oldVertexArray);
+        }
+        slot.vertexArrays.clear();
+      }
+      vertexArray = createMeshInstanceVertexArray(webGL2RenderingContext, mesh, slot.buffer);
+      slot.vertexArrays.set(mesh, vertexArray);
+    }
+    this.drawWithCount(mesh, IDENTITY_ELEMENTS2, count, lineIdList[start], 1, false, options, vertexArray);
   }
   drawMesh(mesh, modelMatrix, lineId, options = {}) {
     if (mesh === null || mesh === void 0 || this.#savedState === null) {
@@ -45131,6 +45188,13 @@ var ToonScreenOutline = class {
       this.#lineColorTexture = null;
     }
     webGL2RenderingContext.deleteVertexArray(this.#emptyVertexArray);
+    for (const slot of this.#batchSlots) {
+      for (const vertexArray of slot.vertexArrays.values()) {
+        webGL2RenderingContext.deleteVertexArray(vertexArray);
+      }
+      webGL2RenderingContext.deleteBuffer(slot.buffer);
+    }
+    this.#batchSlots.length = 0;
     webGL2RenderingContext.deleteProgram(this.#lineProgram.getProgram());
     webGL2RenderingContext.deleteProgram(this.#seedProgram.getProgram());
     webGL2RenderingContext.deleteProgram(this.#seedGatherProgram.getProgram());
@@ -52970,6 +53034,7 @@ var ToonDrawQueue = class {
   #localLightKey;
   #lineGroupPool;
   #lineGroupCount;
+  #lineBatchSlotCount;
   #lineGroupSerial;
   #lineGroupOfMesh;
   #transparentPool;
@@ -53003,6 +53068,7 @@ var ToonDrawQueue = class {
     this.#lineGroupPool = [];
     this.#lineGroupCount = 0;
     this.#lineGroupSerial = 0;
+    this.#lineBatchSlotCount = 0;
     this.#lineGroupOfMesh = new System140.WeakMap();
     this.#transparentPool = [];
     this.#transparentList = [];
@@ -53412,6 +53478,7 @@ var ToonDrawQueue = class {
       this.#lineMatrixCount = 0;
       this.#lineGroupCount = 0;
       this.#lineGroupSerial += 1;
+      this.#lineBatchSlotCount = 0;
       const itemList = this.#itemList;
       for (let itemIndex = 1; itemIndex <= this.#itemCount; ++itemIndex) {
         const item = itemList[itemIndex - 1];
@@ -53502,7 +53569,8 @@ var ToonDrawQueue = class {
         const sourceIndex = group.itemIndexList[index];
         this.pushLineMatrix(lineMatrices[sourceIndex], lineIds[sourceIndex]);
       }
-      screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options);
+      screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options, this.#lineBatchSlotCount);
+      this.#lineBatchSlotCount += 1;
       group.item = null;
     }
     this.#lineGroupCount = 0;
