@@ -10,6 +10,7 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
+import { gotoPage } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -55,7 +56,7 @@ const browser = await puppeteer.launch({ executablePath, headless: true });
 let result = null;
 try {
 	const page = await browser.newPage();
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	result = await page.evaluate(async () => {
 		const engineModule = await import("/import.js");
 		const Experimental = await import("/src/experimental/experimental.js");
