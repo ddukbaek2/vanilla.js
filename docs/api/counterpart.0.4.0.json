@@ -89,6 +89,18 @@
 			"vanilla-engine": {
 				"module": "animation/action",
 				"class": "Action",
+				"name": "repeat_while"
+			},
+			"vanilla.js": {
+				"module": "animation/action",
+				"class": "Action",
+				"name": "repeatWhile"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "animation/action",
+				"class": "Action",
 				"name": "start_with"
 			},
 			"vanilla.js": {
@@ -8927,6 +8939,18 @@
 			"vanilla-engine": {
 				"module": "core/fullscreenpass",
 				"class": "FullscreenPass",
+				"name": "use_program"
+			},
+			"vanilla.js": {
+				"module": "core/fullscreenpass",
+				"class": "FullscreenPass",
+				"name": "useProgram"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/fullscreenpass",
+				"class": "FullscreenPass",
 				"name": "draw"
 			},
 			"vanilla.js": {
@@ -10587,6 +10611,30 @@
 				"module": "core/graphic",
 				"class": "Graphic",
 				"name": "isTextPixelSnapEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "set_text_antialias_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "setTextAntialiasEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "is_text_antialias_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "isTextAntialiasEnabled"
 			}
 		},
 		{
@@ -17518,6 +17566,52 @@
 		{
 			"vanilla-engine": {
 				"module": "game/gamescene",
+				"class": "ScreenFadeHold"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "ScreenFadeHold"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "ScreenFadeHold",
+				"name": "new"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "ScreenFadeHold",
+				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "ScreenFadeHold",
+				"name": "release"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "ScreenFadeHold",
+				"name": "release"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "ScreenFadeHold",
+				"name": "is_released"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "ScreenFadeHold",
+				"name": "isReleased"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
 				"class": "GameSceneBase",
 				"name": "new"
 			},
@@ -17909,6 +18003,18 @@
 				"module": "game/gamescene",
 				"class": "GameScene",
 				"name": "fadeScreen"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "game/gamescene",
+				"class": "GameSceneBase",
+				"name": "fade_screen_with_hold"
+			},
+			"vanilla.js": {
+				"module": "game/gamescene",
+				"class": "GameScene",
+				"name": "fadeScreenWithHold"
 			}
 		},
 		{
@@ -27757,6 +27863,18 @@
 			"vanilla-engine": {
 				"module": "misc/pointergesture",
 				"class": "PointerGesture",
+				"name": "move_pointer"
+			},
+			"vanilla.js": {
+				"module": "misc/pointergesture",
+				"class": "PointerGesture",
+				"name": "movePointer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "misc/pointergesture",
+				"class": "PointerGesture",
 				"name": "tick"
 			},
 			"vanilla.js": {
@@ -30368,8 +30486,8 @@
 				"name": "unload"
 			},
 			"vanilla.js": {
-				"module": "core/asset",
-				"class": "Asset",
+				"module": "resource/imageasset",
+				"class": "ImageAsset",
 				"name": "unload"
 			}
 		},

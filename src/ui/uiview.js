@@ -11,6 +11,8 @@ import { Engine } from "../core/engine.js";
 import { Graphic } from "../core/graphic.js";
 import { WorldNode } from "../core/node/worldnode.js";
 
+const geometryKeyContentSize = Vector2.zero(); // writeGeometryKey 가 노드의 내용 크기를 복제본 없이 받는 곳.
+
 
 //==============================================================================
 // 뷰 컴포넌트.
@@ -146,6 +148,41 @@ export class UIView extends Component {
 	 */
 	isDrawnInsideContent() {
 		return this.draw === UIView.prototype.draw;
+	}
+
+	//==============================================================================
+	// 그리기 입력을 기하 캐시 열쇠에 적기. (배경색, 내용 크기)
+	// - draw 를 덮어쓴 하위 클래스는 무엇을 읽는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { GeometryKey } geometryKey 입력을 적을 열쇠.
+	 * @returns { boolean } 입력을 적었으면 참.
+	 */
+	writeGeometryKey(geometryKey) {
+		if (this.draw !== UIView.prototype.draw) {
+			return false;
+		}
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		const backgroundColor = this.getBackgroundColor();
+		geometryKey.add(backgroundColor.red);
+		geometryKey.add(backgroundColor.green);
+		geometryKey.add(backgroundColor.blue);
+		geometryKey.add(backgroundColor.alpha);
+		const contentSize = geometryKeyContentSize;
+		if (typeof node.copyContentSizeTo === "function") {
+			node.copyContentSizeTo(contentSize);
+		}
+		else {
+			const nodeContentSize = node.getContentSize();
+			contentSize.set(nodeContentSize.x, nodeContentSize.y);
+		}
+		geometryKey.add(contentSize.x);
+		geometryKey.add(contentSize.y);
+		return true;
 	}
 
 	//==============================================================================

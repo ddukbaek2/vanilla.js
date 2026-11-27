@@ -125,7 +125,7 @@ export class TransformNode extends ComponentNode {
 				if (!component.isEnable()) {
 					continue;
 				}
-				component.draw(graphic);
+				graphic.drawComponent(component);
 			}
 
 			// 자식 목록 출력.

@@ -168,6 +168,50 @@ export class Component extends Object {
 	}
 
 	//==============================================================================
+	// 그리기 입력을 기하 캐시 열쇠에 적기. (적었으면 true, 기본 false)
+	// - true 를 돌려주면 Graphic 이 이 컴포넌트가 그린 정점을 캐시해 두고, 열쇠에 적은 값과 그리는 상태가 그대로면 draw 를 부르지 않고 캐시를 묶음에 옮긴다.
+	//   이동(스크롤 등)이나 투명도만 바뀌면 캐시한 지역 정점에 새 행렬만 곱한다. (유니티 UGUI 의 SetVerticesDirty, Slate 의 Invalidate 와 같은 일을 입력 견주기로 한다)
+	// - draw 가 읽는 값(색의 칸, 크기, 글, 그림, 노드의 내용 크기 등)을 모두 geometryKey.add 로 적는다. 빠진 값이 바뀌면 화면에 나오지 않는다.
+	// - 시각이나 난수처럼 프레임마다 달라지는 것을 그리면 false 로 둔다. (프레임마다 draw 를 부른다)
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { GeometryKey } geometryKey 입력을 적을 열쇠. (add 로 적는다)
+	 * @returns { boolean } 입력을 모두 적었으면 참. (모르면 거짓)
+	 * @example <caption>색과 크기만 읽는 컴포넌트의 입력 알리기</caption>
+	 * import { WorldNode, Component, GeometryKey, Color, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class Box extends Component {
+	 * 	color = new Color(0.2, 0.6, 1, 1);
+	 * 	draw(graphic) {
+	 * 		const contentSize = this.getNode().getContentSize();
+	 * 		graphic.setFillColor(this.color);
+	 * 		graphic.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
+	 * 	}
+	 * 	writeGeometryKey(geometryKey) {
+	 * 		const contentSize = this.getNode().getContentSize();
+	 * 		geometryKey.add(this.color.red);
+	 * 		geometryKey.add(this.color.green);
+	 * 		geometryKey.add(this.color.blue);
+	 * 		geometryKey.add(this.color.alpha);
+	 * 		geometryKey.add(contentSize.x);
+	 * 		geometryKey.add(contentSize.y);
+	 * 		return true;
+	 * 	}
+	 * }
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(100, 50));
+	 * const box = node.addComponent(Box);
+	 * const geometryKey = new GeometryKey();
+	 * geometryKey.begin();
+	 * console.log(box.writeGeometryKey(geometryKey), geometryKey.end());
+	 */
+	writeGeometryKey(geometryKey) {
+		return false;
+	}
+
+	//==============================================================================
 	// 의존 컴포넌트 목록 반환. (자식 클래스가 오버라이드)
 	// - addComponent 가 본 컴포넌트를 부착하기 직전에 호출하여, 반환된 클래스 목록을
 	//   같은 노드에 자동으로 추가한다 (이미 있으면 건너뜀).
