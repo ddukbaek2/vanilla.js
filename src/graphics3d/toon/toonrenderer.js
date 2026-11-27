@@ -7,7 +7,6 @@ import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
 import { WebGLStateCache } from "../../core/graphic/webglstatecache.js";
 import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
 import { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./toonlightset.js";
-import { SHADOW_ATLAS_MAXIMUM_LIGHTS } from "../shadowmap.js";
 import { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME } from "./toonmaterial.js";
 
 
@@ -113,6 +112,31 @@ export const ToonProgramKind = System.Object.freeze({
 	depth: "depth", // 그림자 깊이.
 });
 
+// 프레임 블록. (프로그램마다 올리던 프레임 값을 std140 블록 하나로, 패스마다 한 번 올리고 바인딩 2 에 묶는다, 차례와 자리는 writeFrameBlockValues)
+// - 몸, 바깥선, 깊이 프로그램의 정점과 조각 셰이더가 모두 같은 선언을 쓴다. (float 배열은 std140 에서 칸마다 vec4 자리)
+const FRAME_BLOCK_CHUNK = `layout(std140) uniform ToonFrame {
+	mat4 viewProjectionMatrix;
+	mat4 lightViewProjectionMatrix;
+	vec4 cameraPosition;
+	vec3 cameraForward;
+	float hdrOutput;
+	mat3 viewRotation;
+	vec3 outlineDistanceScale;
+	float shadowEnabled;
+	vec2 cameraRoll;
+	vec2 outlineFadeDistance;
+	float shadowStrength;
+	float shadowTexelSize;
+	vec4 localShadowAtlas;
+	vec4 localShadowPositions[4];
+	vec4 localShadowForwards[4];
+	vec4 localShadowUps[4];
+	float localShadowTiles[4];
+	float pointLightShadowSlots[8];
+	vec4 shadowBias;
+};
+`;
+
 // 세 정점 셰이더의 머리. (몸에만 있는 어트리뷰트도 모두 적는다, 바깥선 버텍스 어레이에 없는 것은 기본값으로 읽힘)
 const VERTEX_HEAD_CHUNK = `#version 300 es
 in vec3 vertexPosition;
@@ -136,7 +160,6 @@ in vec4 instanceTint;
 uniform mat4 jointMatrices[96];
 uniform float skinned;
 uniform float instanced;
-uniform mat4 viewProjectionMatrix;
 uniform mat4 modelMatrix;
 mat4 readSkinMatrix() {
 	if (skinned < 0.5) {
@@ -205,9 +228,7 @@ const DEFAULT_LIGHT_CHUNK = `void applyLight(ToonSurface surface, inout ToonLigh
 `;
 
 // 몸을 그리는 정점 셰이더의 몸통.
-const SOLID_VERTEX_BODY = `uniform mat4 lightViewProjectionMatrix;
-uniform vec4 shadowBias;
-out vec3 worldPosition;
+const SOLID_VERTEX_BODY = `out vec3 worldPosition;
 out vec3 localPosition;
 out vec3 worldNormal;
 out vec3 surfaceColor;
@@ -248,7 +269,7 @@ void main() {
 const SOLID_FRAGMENT_HEAD = `#version 300 es
 precision highp float;
 precision highp sampler2DShadow;
-in vec3 worldPosition;
+${FRAME_BLOCK_CHUNK}in vec3 worldPosition;
 in vec3 localPosition;
 in vec3 worldNormal;
 in vec3 surfaceColor;
@@ -284,48 +305,36 @@ uniform vec3 pointLightColors[8];
 uniform vec3 pointLightShapes[8];
 uniform vec4 pointLightSpots[8];
 uniform vec2 pointLightCones[8];
-uniform float pointLightShadowSlots[8];
-uniform vec4 localShadowAtlas;
-uniform vec4 localShadowPositions[4];
-uniform vec4 localShadowForwards[4];
-uniform vec4 localShadowUps[4];
-uniform float localShadowTiles[4];
 uniform sampler2DShadow localShadowTexture;
 uniform vec4 lightColorUsage;
 uniform vec3 lightColorUsageExtra;
 uniform vec4 shadeRimLight;
-uniform vec4 cameraPosition;
-uniform vec3 cameraForward;
-uniform mat3 viewRotation;
-uniform vec2 cameraRoll;
-uniform vec4 tintColor;
-uniform float tintAmount;
-uniform float alpha;
-uniform float glowScale;
-uniform float colorScale;
-uniform vec4 emissiveColor;
-uniform float softEdge;
-uniform float alphaCutoff;
-uniform float premultipliedOutput;
-uniform float hdrOutput;
-uniform vec3 textureEnabled;
+layout(std140) uniform ToonDrawMaterial {
+	vec4 tintColor;
+	vec4 emissiveColor;
+	vec4 uvTransform;
+	vec4 decalUvTransform;
+	vec4 decalColor;
+	vec4 angelRingSettings;
+	vec3 textureEnabled;
+	float tintAmount;
+	vec3 matcapSettings;
+	float alpha;
+	vec3 angelRingColor;
+	float glowScale;
+	vec2 highlightScale;
+	float colorScale;
+	float softEdge;
+	float alphaCutoff;
+	float premultipliedOutput;
+	float receivesShadow;
+	float shadeOffset;
+};
 uniform sampler2D baseColorTexture;
 uniform sampler2D emissiveTexture;
 uniform sampler2D decalTexture;
-uniform vec4 uvTransform;
-uniform vec4 decalUvTransform;
-uniform vec4 decalColor;
-uniform float receivesShadow;
-uniform float shadeOffset;
-uniform vec2 highlightScale;
-uniform vec3 matcapSettings;
 uniform sampler2D matcapTexture;
-uniform vec4 angelRingSettings;
-uniform vec3 angelRingColor;
 uniform sampler2D angelRingTexture;
-uniform float shadowEnabled;
-uniform float shadowStrength;
-uniform float shadowTexelSize;
 uniform sampler2DShadow shadowTexture;
 out vec4 fragmentColor;
 const float RECIPROCAL_PI = 0.3183098862;
@@ -662,12 +671,14 @@ void main() {
 `;
 
 // 바깥선 껍데기를 그리는 셰이더. (껍데기는 뒷면만 그려 몸 둘레에 테로 보인다)
-const OUTLINE_VERTEX_BODY = `uniform float outlineWidthScale;
-uniform vec3 outlineDistanceScale;
-uniform vec2 outlineFadeDistance;
-uniform float outlineOffsetZ;
-uniform vec4 cameraPosition;
-uniform vec3 cameraForward;
+const OUTLINE_VERTEX_BODY = `layout(std140) uniform ToonDrawOutline {
+	vec4 outlineColor;
+	vec3 outlineLightColor;
+	float outlineWidthScale;
+	float outlineOffsetZ;
+	float alpha;
+	float premultipliedOutput;
+};
 out float outlineTint;
 void main() {
 	ToonVertex vertex = readVertex();
@@ -690,12 +701,15 @@ void main() {
 `;
 const OUTLINE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
-in float outlineTint;
-uniform vec4 outlineColor;
-uniform vec3 outlineLightColor;
-uniform float alpha;
-uniform float hdrOutput;
-uniform float premultipliedOutput;
+${FRAME_BLOCK_CHUNK}in float outlineTint;
+layout(std140) uniform ToonDrawOutline {
+	vec4 outlineColor;
+	vec3 outlineLightColor;
+	float outlineWidthScale;
+	float outlineOffsetZ;
+	float alpha;
+	float premultipliedOutput;
+};
 out vec4 fragmentColor;
 void main() {
 	vec3 color = (hdrOutput > 0.5 ? pow(outlineColor.rgb, vec3(2.2)) : outlineColor.rgb) * outlineLightColor;
@@ -748,7 +762,7 @@ export function composeToonProgramSources(material, instanceLayout) {
 	const surfaceChunk = material !== null && material.getSurfaceChunk() !== "" ? material.getSurfaceChunk() : DEFAULT_SURFACE_CHUNK;
 	const lightChunk = material !== null && material.getLightChunk() !== "" ? material.getLightChunk() : DEFAULT_LIGHT_CHUNK;
 	const instanceChunk = instanceLayout !== null ? instanceLayout.readDeclarationSource() : "";
-	const vertexHead = VERTEX_HEAD_CHUNK + VERTEX_COMMON_CHUNK + instanceChunk + VERTEX_STRUCT_CHUNK + vertexChunk;
+	const vertexHead = VERTEX_HEAD_CHUNK + FRAME_BLOCK_CHUNK + VERTEX_COMMON_CHUNK + instanceChunk + VERTEX_STRUCT_CHUNK + vertexChunk;
 	const attributeLocationTable = System.Object.assign({}, TOON_ATTRIBUTE_LOCATIONS);
 	if (instanceLayout !== null) {
 		for (const attribute of instanceLayout.getAttributes()) {
@@ -1263,6 +1277,345 @@ function isSameNumber(value, other) {
 
 
 //==============================================================================
+// 전역 상수 목록. (재질 블록)
+// - 몸 프로그램의 재질 값(틴트, 빛남, 텍스처 쓰기, 무늬 옮김, 반사 세기 같은 것)은 std140 유니폼 블록 ToonDrawMaterial 하나에 담는다. (유니티 SRP Batcher 의 UnityPerMaterial 꼴)
+//   값이 같은 블록은 하나만 지어 두고(GPU 버퍼) 그리기마다 bindBufferBase 하나로 고른다. 바뀐 값은 새 블록을 지어 올린다. (그리기마다 유니폼 스물을 올리지 않는다)
+// - float 자리는 셰이더의 블록 선언 차례와 같다. (vec4 여섯, vec3 셋 + float 셋, vec2 + float 둘, float 넷 = 44)
+//==============================================================================
+// - 바깥선 껍데기 프로그램의 값(선 색, 굵기 배, 깊이 밀기, 빛 색, 알파)도 같은 꼴의 블록 ToonDrawOutline 에 담는다. (vec4, vec3 + float, float 셋 = 12)
+const MATERIAL_BLOCK_NAME = "ToonDrawMaterial";
+const MATERIAL_BLOCK_BINDING = 0; // 재질 블록의 바인딩 자리.
+const MATERIAL_BLOCK_FLOAT_COUNT = 44;
+const OUTLINE_BLOCK_NAME = "ToonDrawOutline";
+const OUTLINE_BLOCK_BINDING = 1;
+const OUTLINE_BLOCK_FLOAT_COUNT = 12;
+const FRAME_BLOCK_NAME = "ToonFrame"; // 프레임 블록. (FRAME_BLOCK_CHUNK)
+const FRAME_BLOCK_BINDING = 2;
+const FRAME_BLOCK_FLOAT_COUNT = 168;
+const MATERIAL_BLOCK_LIMIT = 1024;
+const BATCH_SLOT_MESH_LIMIT = 8; // 묶음 자리마다 버텍스 어레이를 지어 둘 모형 수. (넘으면 그 자리의 것을 모두 지우고 다시) // 블록 갈래마다 기억할 블록 수. (넘으면 그 갈래를 모두 지우고 다시 짓는다)
+const DRAW_PART_OUTLINE = 1; // drawWithCount 가 그릴 것: 바깥선 껍데기.
+const DRAW_PART_BODY = 2; // 몸.
+const DRAW_PART_ALL = 3;
+const WHITE_COLOR = System.Object.freeze([1, 1, 1, 1]);
+const BLACK_COLOR = System.Object.freeze([0, 0, 0]);
+const IDENTITY_UV_TRANSFORM = System.Object.freeze([0, 0, 1, 1]);
+export const EMPTY_OPTIONS = System.Object.freeze({}); // 꼴을 주지 않은 그리기의 꼴. (그리기마다 새 빈 객체를 짓지 않아 렌더러가 기억한 푼 칸을 같이 쓴다)
+
+
+//==============================================================================
+// 재질 블록 값 쓰기. (그리기 꼴을 ToonDrawMaterial 의 float 44 로 푼다, 기본값은 drawMesh 머리말과 같다)
+//==============================================================================
+/**
+ * @param { Float32Array } values - 쓸 칸. (MATERIAL_BLOCK_FLOAT_COUNT)
+ * @param { object } options - 그리기 꼴.
+ */
+function writeMaterialBlockValues(values, options) {
+	const tintColor = options.tintColor !== undefined ? options.tintColor : WHITE_COLOR;
+	const emissiveColor = options.emissiveColor !== undefined ? options.emissiveColor : BLACK_COLOR;
+	const uvTransform = options.uvTransform !== undefined ? options.uvTransform : IDENTITY_UV_TRANSFORM;
+	const decalUvTransform = options.decalUvTransform !== undefined ? options.decalUvTransform : IDENTITY_UV_TRANSFORM;
+	const decalColor = options.decalColor !== undefined ? options.decalColor : WHITE_COLOR;
+	const angelRingColor = options.angelRingColor !== undefined ? options.angelRingColor : WHITE_COLOR;
+	values[0] = tintColor[0];
+	values[1] = tintColor[1];
+	values[2] = tintColor[2];
+	values[3] = tintColor[3];
+	values[4] = emissiveColor[0];
+	values[5] = emissiveColor[1];
+	values[6] = emissiveColor[2];
+	values[7] = options.emissiveIntensity !== undefined ? options.emissiveIntensity : 1;
+	values[8] = uvTransform[0];
+	values[9] = uvTransform[1];
+	values[10] = uvTransform[2];
+	values[11] = uvTransform[3];
+	values[12] = decalUvTransform[0];
+	values[13] = decalUvTransform[1];
+	values[14] = decalUvTransform[2];
+	values[15] = decalUvTransform[3];
+	values[16] = decalColor[0];
+	values[17] = decalColor[1];
+	values[18] = decalColor[2];
+	values[19] = options.decalEmission !== undefined ? options.decalEmission : 0;
+	values[20] = isTextureGiven(options.angelRingTexture) ? 1 : 0;
+	values[21] = options.angelRingOffsetU !== undefined ? options.angelRingOffsetU : 0;
+	values[22] = options.angelRingOffsetV !== undefined ? options.angelRingOffsetV : 0.3;
+	values[23] = options.isAngelRingAlpha === true ? 1 : 0;
+	values[24] = isTextureGiven(options.baseColorTexture) ? 1 : 0;
+	values[25] = isTextureGiven(options.emissiveTexture) ? 1 : 0;
+	values[26] = isTextureGiven(options.decalTexture) ? 1 : 0;
+	values[27] = options.tintAmount !== undefined && options.tintAmount !== null ? System.Math.max(0, System.Math.min(1, options.tintAmount)) : -1;
+	values[28] = isTextureGiven(options.matcapTexture) ? 1 : 0;
+	values[29] = options.matcapStrength !== undefined ? options.matcapStrength : 1;
+	values[30] = options.matcapBlend === ToonMatcapBlend.add ? 1 : 0;
+	values[31] = options.alpha !== undefined ? options.alpha : 1;
+	values[32] = angelRingColor[0];
+	values[33] = angelRingColor[1];
+	values[34] = angelRingColor[2];
+	values[35] = options.glowScale !== undefined ? options.glowScale : 1;
+	values[36] = options.specularScale !== undefined ? System.Math.max(0, options.specularScale) : 1;
+	values[37] = options.rimScale !== undefined ? System.Math.max(0, options.rimScale) : 1;
+	values[38] = options.colorScale !== undefined ? options.colorScale : 1;
+	values[39] = options.softEdge !== undefined ? options.softEdge : 0;
+	values[40] = options.alphaCutoff !== undefined ? options.alphaCutoff : 0;
+	values[41] = options.blendMode !== undefined && options.blendMode !== ToonBlendMode.alpha ? 1 : 0;
+	values[42] = options.receivesShadow !== false ? 1 : 0;
+	values[43] = options.shadeOffset !== undefined ? options.shadeOffset : 0;
+}
+
+//==============================================================================
+// 텍스처를 주었는지. (undefined 와 null 은 안 줌)
+//==============================================================================
+/**
+ * @param { WebGLTexture | null | undefined } texture - 텍스처.
+ * @returns { boolean } 주었으면 참.
+ */
+function isTextureGiven(texture) {
+	return texture !== undefined && texture !== null;
+}
+
+//==============================================================================
+// 재질 블록 값의 해시. (FNV-1a, float 의 비트로)
+//==============================================================================
+/**
+ * @param { Uint32Array } bits - 재질 블록 값의 비트.
+ * @returns { number } 해시.
+ */
+function readMaterialBlockHash(bits) {
+	let hash = 2166136261;
+	for (let index = 0; index < bits.length; ++index) {
+		hash = System.Math.imul(hash ^ bits[index], 16777619);
+	}
+	return hash >>> 0;
+}
+
+//==============================================================================
+// 같은 비트인지. (재질 블록 값 둘, NaN 과 -0 도 비트로 가른다)
+//==============================================================================
+/**
+ * @param { Uint32Array } bits - 앞의 값.
+ * @param { Uint32Array } other - 지금 값.
+ * @returns { boolean } 모두 같으면 참.
+ */
+function isSameBits(bits, other) {
+	for (let index = 0; index < bits.length; ++index) {
+		if (bits[index] !== other[index]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+//==============================================================================
+// 블록 갈래 짓기. (값이 같은 유니폼 블록을 하나씩 기억하는 칸)
+//==============================================================================
+/**
+ * @param { number } binding - 블록의 바인딩 자리.
+ * @param { number } floatCount - 블록의 float 수.
+ * @returns { object } { binding, values Float32Array, bits Uint32Array, table Map<해시, Array<{ buffer, bits }>>, count, boundBlock }
+ */
+function createBlockCache(binding, floatCount) {
+	const values = new System.Float32Array(floatCount);
+	return { binding: binding, values: values, bits: new System.Uint32Array(values.buffer), table: new System.Map(), count: 0, boundBlock: null };
+}
+
+//==============================================================================
+// 전역 상수 목록. (그리기 꼴을 푼 칸, readDrawEntry)
+// - 그리기마다 꼴 객체의 칸을 이름으로 찾아 읽지 않게 한 번 풀어 번호로 읽는 배열에 둔다. (그리기 줄도 같이 읽는다)
+//==============================================================================
+export const DRAW_STATE_MATERIAL = 0; // ToonMaterial 이나 null.
+export const DRAW_STATE_JOINT_MATRICES = 1; // Float32Array 나 null.
+export const DRAW_STATE_INDEX_START = 2; // 꼴의 indexStart. (없으면 0)
+export const DRAW_STATE_INDEX_COUNT = 3; // 꼴의 indexCount. (없거나 0 이하면 -1)
+const DRAW_STATE_OUTLINE_INDEX_START = 4;
+const DRAW_STATE_OUTLINE_INDEX_COUNT = 5;
+export const DRAW_STATE_IS_MIRRORED = 6; // -1 행렬로 가림, 1 뒤집음, 0 안 뒤집음.
+const DRAW_STATE_ON_BEFORE_DRAW = 7; // 함수나 null.
+export const DRAW_STATE_IS_TRANSPARENT = 8; // alpha 나 틴트 알파가 1 보다 작거나 섞는 방식이 곧은 알파가 아님.
+const DRAW_STATE_ALPHA = 9;
+const DRAW_STATE_BLEND_MODE = 10;
+export const DRAW_STATE_HAS_OUTLINE = 11; // hasOutline 이 false 가 아님.
+const DRAW_STATE_IS_BODY_DRAWN = 12; // isBodyDrawn 이 false 가 아님.
+const DRAW_STATE_LIGHT_SET = 13; // ToonLightSet 이나 null.
+export const DRAW_STATE_BASE_COLOR_TEXTURE = 14; // 텍스처 다섯. (없으면 null)
+const DRAW_STATE_EMISSIVE_TEXTURE = 15;
+const DRAW_STATE_DECAL_TEXTURE = 16;
+const DRAW_STATE_MATCAP_TEXTURE = 17;
+const DRAW_STATE_ANGEL_RING_TEXTURE = 18;
+const DRAW_STATE_TEXTURES = 19; // { 유니폼 이름: 텍스처 } 이나 null. (안은 그리기마다 읽는다)
+const DRAW_STATE_OUTLINE_COLOR = 20; // 꼴의 outlineColor 나 null.
+const DRAW_STATE_OUTLINE_WIDTH_SCALE = 21;
+const DRAW_STATE_OUTLINE_OFFSET_Z = 22;
+const DRAW_STATE_PREMULTIPLIED_OUTPUT = 23;
+export const DRAW_STATE_IS_CULLED = 24; // isCulled 가 false 가 아님.
+export const DRAW_STATE_CASTS_SHADOW = 25; // castsShadow 가 false 가 아님.
+export const DRAW_STATE_LINE_ID = 26; // 수면 그 번호, 아니면 null.
+export const DRAW_STATE_GROUP = 27; // group 이나 null.
+export const DRAW_STATE_IS_DEPTH_PREPASSED = 28;
+const DRAW_STATE_COUNT = 29;
+
+//==============================================================================
+// 자동 인스턴싱으로 묶을 수 있는 푼 칸인지. (그리기 줄이 같은 모형, 같은 재질 블록의 이어진 것을 drawMeshBatch 한 번으로 그린다)
+// - 선 번호, 묶음, 깊이 먼저, 그림자 드리우기, 거르기 말고 모든 칸이 같아야 한다. (거르기는 그리기 줄이 하나씩 먼저 한다)
+// - 뼈대 행렬, 그리기 앞 함수가 있거나 비치는 것은 묶지 않는다. (그리기마다 다를 수 있다)
+//==============================================================================
+/**
+ * @param { Array<any> } state - readDrawEntry 의 푼 칸.
+ * @param { Array<any> } other - 견줄 푼 칸.
+ * @returns { boolean } 묶을 수 있으면 true.
+ */
+export function isSameBatchState(state, other) {
+	if (state === other) {
+		return state[DRAW_STATE_JOINT_MATRICES] === null && state[DRAW_STATE_ON_BEFORE_DRAW] === null && !state[DRAW_STATE_IS_TRANSPARENT];
+	}
+	if (state[DRAW_STATE_JOINT_MATRICES] !== null || state[DRAW_STATE_ON_BEFORE_DRAW] !== null || state[DRAW_STATE_IS_TRANSPARENT]) {
+		return false;
+	}
+	for (let index = 0; index < DRAW_STATE_COUNT; ++index) {
+		if (index === DRAW_STATE_LINE_ID || index === DRAW_STATE_GROUP || index === DRAW_STATE_IS_DEPTH_PREPASSED || index === DRAW_STATE_CASTS_SHADOW || index === DRAW_STATE_IS_CULLED) {
+			continue;
+		}
+		if (state[index] !== other[index]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+//==============================================================================
+// 그리기 꼴 풀기. (칸마다 한 번 읽어 DRAW_STATE_ 자리에 둔다, 기본값은 drawMesh 머리말과 같다)
+//==============================================================================
+/**
+ * @param { Array<any> } state - 쓸 칸. (DRAW_STATE_COUNT)
+ * @param { object } options - 그리기 꼴.
+ */
+function writeDrawState(state, options) {
+	const readTexture = (texture) => {
+		return texture !== undefined ? texture : null;
+	};
+	const tintColor = options.tintColor !== undefined ? options.tintColor : WHITE_COLOR;
+	const alpha = options.alpha !== undefined ? options.alpha : 1;
+	const blendMode = options.blendMode !== undefined ? options.blendMode : ToonBlendMode.alpha;
+	const indexCount = options.indexCount;
+	const outlineIndexCount = options.outlineIndexCount;
+	const isMirrored = options.isMirrored;
+	const onBeforeDraw = options.onBeforeDraw;
+	const textures = options.textures;
+	const outlineColor = options.outlineColor;
+	const outlineWidthScale = options.outlineWidthScale;
+	const lineId = options.lineId;
+	const group = options.group;
+	state[DRAW_STATE_MATERIAL] = options.material !== undefined ? options.material : null;
+	state[DRAW_STATE_JOINT_MATRICES] = options.jointMatrices !== undefined ? options.jointMatrices : null;
+	state[DRAW_STATE_INDEX_START] = options.indexStart !== undefined ? options.indexStart : 0;
+	state[DRAW_STATE_INDEX_COUNT] = indexCount !== undefined && indexCount > 0 ? indexCount : -1;
+	state[DRAW_STATE_OUTLINE_INDEX_START] = options.outlineIndexStart !== undefined ? options.outlineIndexStart : 0;
+	state[DRAW_STATE_OUTLINE_INDEX_COUNT] = outlineIndexCount !== undefined && outlineIndexCount > 0 ? outlineIndexCount : -1;
+	state[DRAW_STATE_IS_MIRRORED] = isMirrored !== undefined ? (isMirrored === true ? 1 : 0) : -1;
+	state[DRAW_STATE_ON_BEFORE_DRAW] = typeof onBeforeDraw === "function" ? onBeforeDraw : null;
+	state[DRAW_STATE_IS_TRANSPARENT] = alpha < 1 || tintColor[3] < 1 || blendMode !== ToonBlendMode.alpha;
+	state[DRAW_STATE_ALPHA] = alpha;
+	state[DRAW_STATE_BLEND_MODE] = blendMode;
+	state[DRAW_STATE_HAS_OUTLINE] = options.hasOutline !== false;
+	state[DRAW_STATE_IS_BODY_DRAWN] = options.isBodyDrawn !== false;
+	state[DRAW_STATE_LIGHT_SET] = options.lightSet !== undefined && options.lightSet !== null ? options.lightSet : null;
+	state[DRAW_STATE_BASE_COLOR_TEXTURE] = readTexture(options.baseColorTexture);
+	state[DRAW_STATE_EMISSIVE_TEXTURE] = readTexture(options.emissiveTexture);
+	state[DRAW_STATE_DECAL_TEXTURE] = readTexture(options.decalTexture);
+	state[DRAW_STATE_MATCAP_TEXTURE] = readTexture(options.matcapTexture);
+	state[DRAW_STATE_ANGEL_RING_TEXTURE] = readTexture(options.angelRingTexture);
+	state[DRAW_STATE_TEXTURES] = textures !== undefined && textures !== null ? textures : null;
+	state[DRAW_STATE_OUTLINE_COLOR] = outlineColor !== undefined && outlineColor !== null ? outlineColor : null;
+	state[DRAW_STATE_OUTLINE_WIDTH_SCALE] = outlineWidthScale !== undefined ? System.Math.max(0, outlineWidthScale) : 1;
+	state[DRAW_STATE_OUTLINE_OFFSET_Z] = options.outlineOffsetZ !== undefined ? options.outlineOffsetZ : 0;
+	state[DRAW_STATE_PREMULTIPLIED_OUTPUT] = blendMode !== ToonBlendMode.alpha ? 1 : 0;
+	state[DRAW_STATE_IS_CULLED] = options.isCulled !== false;
+	state[DRAW_STATE_CASTS_SHADOW] = options.castsShadow !== false;
+	state[DRAW_STATE_LINE_ID] = typeof lineId === "number" ? lineId : null;
+	state[DRAW_STATE_GROUP] = group !== undefined && group !== null ? group : null;
+	state[DRAW_STATE_IS_DEPTH_PREPASSED] = options.isDepthPrepassed === true;
+}
+
+//==============================================================================
+// 수 배열인지. (틴트 같은 칸, 값의 내용까지 견줄 것)
+//==============================================================================
+/**
+ * @param { any } value - 꼴의 칸 값.
+ * @returns { boolean } 배열이나 Float32Array, Float64Array 면 참.
+ */
+function isNumberArray(value) {
+	return value instanceof System.Array || value instanceof System.Float32Array || value instanceof System.Float64Array;
+}
+
+//==============================================================================
+// 꼴 객체의 얕은 사본 쓰기. (칸 이름, 값, 넷 이하의 수 배열(색, 무늬 옮김)의 내용을 for-in 차례로, 이름으로 칸을 찾아 읽지 않는다)
+// - 본 행렬 같은 긴 배열은 참조만 견준다. (그 내용은 그리기마다 올리며 견준다)
+//==============================================================================
+/**
+ * @param { object } entry - 블록 기억 칸. ({ keys, values, numbers })
+ * @param { object } options - 그리기 꼴.
+ */
+function writeOptionsSnapshot(entry, options) {
+	const keys = entry.keys;
+	const values = entry.values;
+	const numbers = entry.numbers;
+	keys.length = 0;
+	values.length = 0;
+	numbers.length = 0;
+	for (const key in options) {
+		const value = options[key];
+		keys.push(key);
+		values.push(value);
+		if (isNumberArray(value) && value.length <= 4) {
+			numbers.push(value.length);
+			for (let index = 0; index < value.length; ++index) {
+				numbers.push(value[index]);
+			}
+		}
+	}
+}
+
+//==============================================================================
+// 꼴 객체가 얕은 사본과 같은지. (칸 이름과 차례, 값의 참조, 수 배열의 내용이 모두 같으면 참, 그 자리에서 고친 틴트 배열도 가린다)
+//==============================================================================
+/**
+ * @param { object } entry - 블록 기억 칸.
+ * @param { object } options - 그리기 꼴.
+ * @returns { boolean } 같으면 참.
+ */
+function isSameOptionsSnapshot(entry, options) {
+	const keys = entry.keys;
+	const values = entry.values;
+	const numbers = entry.numbers;
+	let index = 0;
+	let numberIndex = 0;
+	for (const key in options) {
+		if (index >= keys.length || keys[index] !== key) {
+			return false;
+		}
+		const value = options[key];
+		if (value !== values[index]) {
+			return false;
+		}
+		if (isNumberArray(value) && value.length <= 4) {
+			if (numbers[numberIndex] !== value.length) {
+				return false;
+			}
+			numberIndex += 1;
+			for (let elementIndex = 0; elementIndex < value.length; ++elementIndex) {
+				if (!isSameNumber(numbers[numberIndex], value[elementIndex])) {
+					return false;
+				}
+				numberIndex += 1;
+			}
+		}
+		index += 1;
+	}
+	return index === keys.length;
+}
+
+
+//==============================================================================
 // 툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)
 // - 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).
 //   셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)
@@ -1383,14 +1736,22 @@ export class ToonRenderer {
 	/** @private @type { Array<number> } */ #outlineDistanceScale; // 껍데기 바깥선의 거리 배. ([기준 거리 (0 이면 끔), 가장 작은 배, 가장 큰 배])
 	/** @private @type { Array<number> } */ #outlineFadeDistance; // 껍데기 바깥선이 사라지는 거리. ([가까운 거리 (지은 굵기), 먼 거리 (0), 먼 거리가 가까운 거리 이하면 끔])
 	/** @private @type { object | null } */ #localShadowInput; // 받을 점광과 스포트라이트 그림자. ({ depthTexture, lights, gridSize, tileSize, texelSize, strength })
-	/** @private @type { Float32Array } */ #pointShadowSlotValues; // 점광마다의 그림자 칸 번호 + 1. (0 이면 없음)
-	/** @private @type { Float32Array } */ #localShadowPositionValues;
-	/** @private @type { Float32Array } */ #localShadowForwardValues;
-	/** @private @type { Float32Array } */ #localShadowUpValues;
-	/** @private @type { Float32Array } */ #localShadowTileValues;
+	/** @private @type { Array<object> } */ #batchSlots; // 자동 인스턴싱 묶음 자리. ({ buffer, values, count, vertexArrays }, 그리기 줄이 프레임마다 같은 차례로 고르고 값이 같으면 다시 올리지 않는다)
+	/** @private @type { Array<object> } */ #shadowBatchSlots; // 그림자 패스의 묶음 자리.
+	/** @private @type { object } */ #frameBlocks; // 프레임 블록(ToonFrame) 갈래. (재질 블록과 같은 꼴, 값이 같은 블록은 하나, 지은 버퍼는 고치지 않는다)
+	/** @private @type { object | null } */ #frameBlock; // 지금 frameSerial 의 프레임 블록.
+	/** @private @type { number } */ #frameBlockSerial; // #frameBlock 을 고른 frameSerial. (같으면 다시 고르지 않는다)
 	/** @private @type { WebGLStateCache } */ #stateCache; // 컨텍스트의 GL 상태 기억. (같은 프로그램, 텍스처, 버텍스 어레이, 감김을 다시 걸지 않을 때 묻는다)
 	/** @private @type { WeakMap<ShaderProgram, Map<string, object>> } */ #uniformSlotTable; // 프로그램마다 유니폼 이름별 위치와 마지막으로 올린 값.
 	/** @private @type { number } */ #uniformSerial; // 올린 유니폼 값이 아직 맞는 판 번호. (바뀌면 모든 프로그램의 기억한 값을 잊는다)
+	/** @private @type { ShaderProgram | null } */ #slotTableProgram; // 마지막으로 찾은 유니폼 칸 표의 프로그램. (같은 프로그램이 이어지면 표를 다시 찾지 않는다)
+	/** @private @type { Map<string, object> | null } */ #slotTable;
+	/** @private @type { number } */ #trustSerial; // 그리기 줄이 꼴을 고치지 않는다고 맡긴 판 번호. (beginTrustedOptions 마다 오른다)
+	/** @private @type { boolean } */ #isTrusting; // 지금 맡긴 판인지. (맡긴 판에서 한 번 견준 꼴은 다시 견주지 않는다)
+	/** @private @type { WeakMap<object, object> } */ #drawEntryOfOptions; // 그리기 꼴 객체 → { keys, values, numbers (얕은 사본), state (푼 칸), materialBlock, outlineBlock, outlineStates }
+	/** @private @type { object } */ #materialBlocks; // 몸의 재질 블록 갈래. (createBlockCache)
+	/** @private @type { object } */ #outlineBlocks; // 바깥선 껍데기의 블록 갈래.
+	/** @private @type { object | null } */ #lastProgramKey; // 마지막으로 찾은 프로그램 셋의 머티리얼과 인스턴스 꼴. ({ material, instanceLayout, programSet })
 
 	//==============================================================================
 	// 생성.
@@ -1404,6 +1765,14 @@ export class ToonRenderer {
 		this.#stateCache = WebGLStateCache.attach(webGL2RenderingContext);
 		this.#uniformSlotTable = new System.WeakMap();
 		this.#uniformSerial = 1;
+		this.#slotTableProgram = null;
+		this.#slotTable = null;
+		this.#drawEntryOfOptions = new System.WeakMap();
+		this.#trustSerial = 1;
+		this.#isTrusting = false;
+		this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
+		this.#outlineBlocks = createBlockCache(OUTLINE_BLOCK_BINDING, OUTLINE_BLOCK_FLOAT_COUNT);
+		this.#lastProgramKey = null;
 		this.#programSets = new Map();
 		this.#emptyShadowTexture = this.createEmptyShadowTexture();
 		this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
@@ -1439,11 +1808,11 @@ export class ToonRenderer {
 		this.#outlineDistanceScale = [0, 0.5, 4];
 		this.#outlineFadeDistance = [0, 0];
 		this.#localShadowInput = null;
-		this.#pointShadowSlotValues = new System.Float32Array(TOON_MAXIMUM_POINT_LIGHTS);
-		this.#localShadowPositionValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-		this.#localShadowForwardValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-		this.#localShadowUpValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS * 4);
-		this.#localShadowTileValues = new System.Float32Array(SHADOW_ATLAS_MAXIMUM_LIGHTS);
+		this.#batchSlots = [];
+		this.#shadowBatchSlots = [];
+		this.#frameBlocks = createBlockCache(FRAME_BLOCK_BINDING, FRAME_BLOCK_FLOAT_COUNT);
+		this.#frameBlock = null;
+		this.#frameBlockSerial = 0;
 	}
 
 	//==============================================================================
@@ -1507,9 +1876,20 @@ export class ToonRenderer {
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("matcapTexture"), MATCAP_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("localShadowTexture"), LOCAL_SHADOW_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("angelRingTexture"), ANGEL_RING_TEXTURE_UNIT);
+		const bindBlock = (shaderProgram, blockName, binding) => {
+			const blockIndex = webGL2RenderingContext.getUniformBlockIndex(shaderProgram.getProgram(), blockName);
+			if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
+				webGL2RenderingContext.uniformBlockBinding(shaderProgram.getProgram(), blockIndex, binding);
+			}
+		};
+		bindBlock(solidProgram, MATERIAL_BLOCK_NAME, MATERIAL_BLOCK_BINDING);
+		bindBlock(programList[1], OUTLINE_BLOCK_NAME, OUTLINE_BLOCK_BINDING);
+		for (const shaderProgram of programList) {
+			bindBlock(shaderProgram, FRAME_BLOCK_NAME, FRAME_BLOCK_BINDING);
+		}
 		webGL2RenderingContext.useProgram(previousProgram);
 		const createEntry = (shaderProgram, kind) => {
-			return { program: shaderProgram, kind: kind, frameSerial: 0, lightSet: null, lightVersion: -1 };
+			return { program: shaderProgram, kind: kind, lightSet: null, lightVersion: -1 };
 		};
 		return { solid: createEntry(solidProgram, ToonProgramKind.solid), outline: createEntry(programList[1], ToonProgramKind.outline), depth: createEntry(programList[2], ToonProgramKind.depth) };
 	}
@@ -1527,9 +1907,16 @@ export class ToonRenderer {
 		if (material === null && instanceLayout === null) {
 			return this.#defaultProgramSet;
 		}
+		// 정렬한 그리기 줄은 같은 머티리얼이 이어진다. 마지막에 찾은 것이면 열쇠 글을 짓지 않는다.
+		const lastProgramKey = this.#lastProgramKey;
+		if (lastProgramKey !== null && lastProgramKey.material === material && lastProgramKey.instanceLayout === instanceLayout) {
+			return lastProgramKey.programSet;
+		}
 		const key = `${material !== null ? material.getId() : 0}/${instanceLayout !== null ? instanceLayout.getId() : 0}`;
 		if (this.#programSets.has(key)) {
-			return this.#programSets.get(key);
+			const programSet = this.#programSets.get(key);
+			this.#lastProgramKey = { material: material, instanceLayout: instanceLayout, programSet: programSet };
+			return programSet;
 		}
 		let programSet = null;
 		try {
@@ -1585,6 +1972,7 @@ export class ToonRenderer {
 	 * @param { ToonMaterial } material - 프로그램을 지울 머티리얼.
 	 */
 	deleteMaterial(material) {
+		this.#lastProgramKey = null;
 		const prefix = `${material.getId()}/`;
 		for (const [key, programSet] of System.Array.from(this.#programSets.entries())) {
 			if (!key.startsWith(prefix)) {
@@ -2166,8 +2554,19 @@ export class ToonRenderer {
 			this.deleteProgramSet(programSet);
 		}
 		this.#programSets.clear();
+		this.#lastProgramKey = null;
+		this.clearBlockCache(this.#materialBlocks);
+		this.clearBlockCache(this.#outlineBlocks);
 		webGL2RenderingContext.deleteTexture(this.#emptyShadowTexture);
 		webGL2RenderingContext.deleteTexture(this.#whiteTexture);
+		this.clearBlockCache(this.#frameBlocks);
+		this.#frameBlock = null;
+		for (const slot of this.#batchSlots.concat(this.#shadowBatchSlots)) {
+			this.deleteBatchVertexArrays(slot, null);
+			webGL2RenderingContext.deleteBuffer(slot.buffer);
+		}
+		this.#batchSlots.length = 0;
+		this.#shadowBatchSlots.length = 0;
 	}
 
 	//==============================================================================
@@ -2181,6 +2580,9 @@ export class ToonRenderer {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		for (const slot of this.#batchSlots.concat(this.#shadowBatchSlots)) {
+			this.deleteBatchVertexArrays(slot, mesh);
+		}
 		webGL2RenderingContext.deleteVertexArray(mesh.bodyVertexArray);
 		if (mesh.outlineVertexArray !== null) {
 			webGL2RenderingContext.deleteVertexArray(mesh.outlineVertexArray);
@@ -2608,7 +3010,7 @@ export class ToonRenderer {
 	 * renderer.drawMesh(mesh, Matrix4.createTranslation(1, 0, 0), { alpha: 0.5, softEdge: 1.5, hasOutline: false });
 	 * renderer.endFrame();
 	 */
-	drawMesh(mesh, modelMatrix, options = {}) {
+	drawMesh(mesh, modelMatrix, options = EMPTY_OPTIONS) {
 		if (mesh === null) {
 			return;
 		}
@@ -2658,7 +3060,7 @@ export class ToonRenderer {
 	 * renderer.drawMeshInstanced(rockMesh, instances);
 	 * renderer.endFrame();
 	 */
-	drawMeshInstanced(mesh, instances, options = {}) {
+	drawMeshInstanced(mesh, instances, options = EMPTY_OPTIONS) {
 		if (mesh === null) {
 			return;
 		}
@@ -2726,7 +3128,7 @@ export class ToonRenderer {
 	 * renderer.endFrame();
 	 * renderer.deleteInstanceBuffer(instanceBuffer);
 	 */
-	drawMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, options = {}) {
+	drawMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, options = EMPTY_OPTIONS) {
 		if (mesh === null || instanceCount <= 0) {
 			return;
 		}
@@ -2751,101 +3153,267 @@ export class ToonRenderer {
 	 * @param { Matrix4 } modelMatrix - 모형 행렬.
 	 * @param { object } [options] - drawMesh 와 같다.
 	 */
-	drawMeshOutline(mesh, modelMatrix, options = {}) {
+	drawMeshOutline(mesh, modelMatrix, options = EMPTY_OPTIONS) {
 		if (mesh === null || mesh.outlineVertexArray === null || options.hasOutline === false || this.#isShadowPass) {
 			return;
 		}
-		const outlineOptions = System.Object.assign({}, options, { isBodyDrawn: false });
-		this.drawWithCount(mesh, modelMatrix.getElements(), 0, outlineOptions, null);
+		this.drawWithCount(mesh, modelMatrix.getElements(), 0, options, null, DRAW_PART_OUTLINE);
 	}
 
 	//==============================================================================
-	// 프로그램의 프레임 값 올리기. (보기와 투영, 카메라, HDR, 그림자, 바깥선 색, 이번 프레임에 이미 올렸으면 건너뛴다)
+	// 모형 하나의 몸만 그리기. (바깥선 껍데기 없이, 거르지 않고 그린 수만 센다, 그리기 줄이 거른 뒤 부른다)
 	//==============================================================================
 	/**
-	 * @param { object } entry - 프로그램 칸.
+	 * @param { object } mesh - createMesh 의 결과.
+	 * @param { Matrix4 } modelMatrix - 모형 행렬.
+	 * @param { object } [options] - drawMesh 와 같다.
+	 * @private
+	 */
+	drawMeshBody(mesh, modelMatrix, options = EMPTY_OPTIONS) {
+		if (mesh === null) {
+			return;
+		}
+		this.#frameStatistics.drawnObjectCount += 1;
+		this.drawWithCount(mesh, modelMatrix.getElements(), 0, options, null, DRAW_PART_BODY);
+	}
+
+	//==============================================================================
+	// 꼴의 재질 블록 읽기. (값이 같은 꼴은 같은 블록, 그리기 줄이 정렬과 자동 인스턴싱의 열쇠로 쓴다)
+	//==============================================================================
+	/**
+	 * @param { object } options - 그리기 꼴.
+	 * @returns { object } 재질 블록. (값이 같으면 같은 객체)
+	 * @private
+	 */
+	readMaterialBlock(options) {
+		const drawEntry = this.readDrawEntry(options);
+		if (drawEntry.materialBlock === null) {
+			writeMaterialBlockValues(this.#materialBlocks.values, options);
+			drawEntry.materialBlock = this.readUniformBlock(this.#materialBlocks);
+		}
+		return drawEntry.materialBlock;
+	}
+
+	//==============================================================================
+	// 같은 모형과 꼴의 여럿을 인스턴스 그리기 한 번으로. (그리기 줄의 자동 인스턴싱, 유니티 GPU 인스턴싱과 언리얼 auto-instancing 꼴, 거른 뒤 부른다)
+	// - 행렬을 묶음 자리의 인스턴스 버퍼에 담고 drawElementsInstanced 하나로 그린다. 틴트는 1, 빛남은 0 이라 그리기마다 그린 것과 화면이 같다.
+	//   (instanced 1 은 보통 그리기와 같은 프로그램의 같은 셈이고 모형 행렬만 어트리뷰트에서 읽는다, 행렬은 아핀)
+	// - 묶음 자리(slot)는 그리기 줄이 프레임마다 같은 차례로 준다. 자리의 값이 앞과 같으면 다시 올리지 않는다. (몸과 바깥선 껍데기가 같은 자리, 움직이지 않는 것은 올림 없음)
+	// - 감기는 첫 행렬로 가린다. (그리기 줄이 감기가 같은 것만 묶는다)
+	//==============================================================================
+	/**
+	 * @param { object } mesh - createMesh 의 결과.
+	 * @param { Array<Matrix4> } modelMatrixList - 모형 행렬 목록.
+	 * @param { number } start - 목록에서 그릴 첫 자리.
+	 * @param { number } count - 그릴 수.
+	 * @param { object } options - 모두에 같은 그리기 꼴. (isSameBatchState 로 견준 것)
+	 * @param { number } parts - 그릴 것. (1 바깥선 껍데기, 2 몸, 3 둘 다, 그림자 패스면 깊이)
+	 * @param { number } slotIndex - 묶음 자리 번호. (그림자 패스는 따로 센다)
+	 * @private
+	 */
+	drawMeshBatch(mesh, modelMatrixList, start, count, options, parts, slotIndex) {
+		if (mesh === null || count <= 0) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const floatCount = count * TOON_INSTANCE_FLOAT_COUNT;
+		if (this.#instanceData.length < floatCount) {
+			this.#instanceData = new System.Float32Array(floatCount);
+		}
+		const instanceData = this.#instanceData;
+		for (let index = 0; index < count; ++index) {
+			const offset = index * TOON_INSTANCE_FLOAT_COUNT;
+			instanceData.set(modelMatrixList[start + index].getElements(), offset);
+			instanceData[offset + 3] = 0;
+			instanceData[offset + 7] = 0;
+			instanceData[offset + 11] = 0;
+			instanceData[offset + 15] = 1;
+			instanceData[offset + 16] = 1;
+			instanceData[offset + 17] = 1;
+			instanceData[offset + 18] = 1;
+			instanceData[offset + 19] = 1;
+		}
+		if ((parts & DRAW_PART_BODY) !== 0) {
+			this.#frameStatistics.drawnObjectCount += count;
+		}
+		const slots = this.#isShadowPass ? this.#shadowBatchSlots : this.#batchSlots;
+		let slot = slots[slotIndex];
+		if (slot === undefined) {
+			slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System.Float32Array(0), count: 0, vertexArrays: new Map() };
+			slots[slotIndex] = slot;
+		}
+		let isSame = slot.count === count;
+		if (isSame) {
+			const values = slot.values;
+			for (let index = 0; index < floatCount; ++index) {
+				if (!isSameNumber(values[index], instanceData[index])) {
+					isSame = false;
+					break;
+				}
+			}
+		}
+		if (!isSame) {
+			if (slot.values.length < floatCount) {
+				slot.values = new System.Float32Array(floatCount);
+			}
+			slot.values.set(instanceData.subarray(0, floatCount));
+			slot.count = count;
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, slot.buffer);
+			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, floatCount), webGL2RenderingContext.DYNAMIC_DRAW);
+		}
+		let vertexArrays = slot.vertexArrays.get(mesh);
+		if (vertexArrays === undefined) {
+			if (slot.vertexArrays.size >= BATCH_SLOT_MESH_LIMIT) {
+				this.deleteBatchVertexArrays(slot, null);
+			}
+			vertexArrays = this.createBatchVertexArrays(mesh, slot.buffer);
+			slot.vertexArrays.set(mesh, vertexArrays);
+		}
+		this.drawWithCount(mesh, instanceData.subarray(0, 16), count, options, null, parts, vertexArrays);
+	}
+
+	//==============================================================================
+	// 모형과 묶음 자리의 버퍼를 함께 묶은 버텍스 어레이 짓기. (모형의 버텍스 어레이와 같은 꼴, 인스턴스 어트리뷰트만 자리의 버퍼에서)
+	//==============================================================================
+	/**
+	 * @param { object } mesh - createMesh 의 결과.
+	 * @param { WebGLBuffer } buffer - 묶음 자리의 인스턴스 버퍼. (TOON_INSTANCE_FLOAT_COUNT 걸음)
+	 * @returns { object } 몸과 바깥선의 버텍스 어레이. ({ body, outline }, 껍데기가 없으면 outline 은 null)
+	 * @private
+	 */
+	createBatchVertexArrays(mesh, buffer) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const body = webGL2RenderingContext.createVertexArray();
+		webGL2RenderingContext.bindVertexArray(body);
+		this.attachBodyAttributes(mesh);
+		this.attachInstanceAttributes(buffer);
+		let outline = null;
+		if (mesh.outlineVertexArray !== null) {
+			outline = webGL2RenderingContext.createVertexArray();
+			webGL2RenderingContext.bindVertexArray(outline);
+			this.attachOutlineAttributes(mesh);
+			this.attachInstanceAttributes(buffer);
+		}
+		webGL2RenderingContext.bindVertexArray(null);
+		return { body: body, outline: outline };
+	}
+
+	//==============================================================================
+	// 묶음 자리의 버텍스 어레이 지우기. (mesh 가 null 이면 그 자리의 것 모두)
+	//==============================================================================
+	/**
+	 * @param { object } slot - 묶음 자리.
+	 * @param { object | null } mesh - 지울 모형. (null 이면 모두)
+	 * @private
+	 */
+	deleteBatchVertexArrays(slot, mesh) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		for (const [slotMesh, vertexArrays] of slot.vertexArrays) {
+			if (mesh !== null && slotMesh !== mesh) {
+				continue;
+			}
+			webGL2RenderingContext.deleteVertexArray(vertexArrays.body);
+			if (vertexArrays.outline !== null) {
+				webGL2RenderingContext.deleteVertexArray(vertexArrays.outline);
+			}
+			slot.vertexArrays.delete(slotMesh);
+		}
+	}
+
+	//==============================================================================
+	// 프로그램의 프레임 값 올리기. (보기와 투영, 카메라, HDR, 그림자, 바깥선 거리, 점광 그림자를 프레임 블록 ToonFrame 하나로, 패스마다 한 번 고르고 묶였으면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { object } entry - 프로그램 칸. (세 프로그램이 같은 블록을 읽는다)
 	 * @private
 	 */
 	uploadFrameUniforms(entry) {
-		if (entry.frameSerial === this.#frameSerial) {
-			return;
+		// 패스(frameSerial)마다 값을 한 번 써서 같은 값의 블록을 찾거나 짓는다. (그리는 중인 버퍼를 고치지 않는다, 카메라와 빛이 그대로면 올림이 없다)
+		const frameBlocks = this.#frameBlocks;
+		if (this.#frameBlockSerial !== this.#frameSerial || this.#frameBlock === null) {
+			this.#frameBlockSerial = this.#frameSerial;
+			this.writeFrameBlockValues(frameBlocks.values);
+			this.#frameBlock = this.readUniformBlock(frameBlocks);
 		}
-		entry.frameSerial = this.#frameSerial;
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const shaderProgram = entry.program;
-		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewProjectionMatrix"), false, this.#viewProjectionElements);
-		if (entry.kind === ToonProgramKind.outline) {
-			const cameraPosition = this.#cameraPosition;
-			const outlineDistanceScale = this.#outlineDistanceScale;
-			webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("cameraPosition"), cameraPosition[0], cameraPosition[1], cameraPosition[2], cameraPosition[3]);
-			webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("outlineDistanceScale"), outlineDistanceScale[0], outlineDistanceScale[1], outlineDistanceScale[2]);
-			webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("outlineFadeDistance"), this.#outlineFadeDistance[0], this.#outlineFadeDistance[1]);
-			webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("cameraForward"), this.#cameraForward[0], this.#cameraForward[1], this.#cameraForward[2]);
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
-			return;
-		}
-		if (entry.kind !== ToonProgramKind.solid) {
-			return;
-		}
-		const cameraPosition = this.#cameraPosition;
-		const cameraForward = this.#cameraForward;
-		webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("cameraPosition"), cameraPosition[0], cameraPosition[1], cameraPosition[2], cameraPosition[3]);
-		webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("cameraForward"), cameraForward[0], cameraForward[1], cameraForward[2]);
-		webGL2RenderingContext.uniformMatrix3fv(shaderProgram.getUniformLocation("viewRotation"), false, this.#viewRotationElements);
-		webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("cameraRoll"), System.Math.cos(this.#cameraRoll), System.Math.sin(this.#cameraRoll));
-		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
-		const shadowInput = this.#shadowInput;
-		if (shadowInput !== null) {
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowEnabled"), 1);
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowStrength"), shadowInput.strength);
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowTexelSize"), 1 / System.Math.max(1, shadowInput.resolution));
-			webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("lightViewProjectionMatrix"), false, shadowInput.lightViewProjectionMatrix.getElements());
-			const shadowBias = shadowInput.bias;
-			webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("shadowBias"), shadowBias[0], shadowBias[1], shadowBias[2], shadowBias[3]);
-		}
-		else {
-			webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("shadowEnabled"), 0);
-		}
-		this.uploadLocalShadowUniforms(shaderProgram);
+		this.bindBlock(frameBlocks, this.#frameBlock);
 	}
 
 	//==============================================================================
-	// 점광과 스포트라이트 그림자 올리기. (아틀라스의 빛마다 자리, 바탕, 거리, 첫 칸과 점광마다의 칸 번호)
+	// 프레임 블록의 값 쓰기. (FRAME_BLOCK_CHUNK 의 std140 자리, 그림자나 점광 그림자가 없으면 그 행렬, 치우침과 아틀라스 칸은 앞의 값 그대로)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram - 몸 프로그램.
+	 * @param { Float32Array } values - 쓸 곳. (FRAME_BLOCK_FLOAT_COUNT)
 	 * @private
 	 */
-	uploadLocalShadowUniforms(shaderProgram) {
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+	writeFrameBlockValues(values) {
+		values.set(this.#viewProjectionElements, 0);
+		const shadowInput = this.#shadowInput;
+		if (shadowInput !== null) {
+			values.set(shadowInput.lightViewProjectionMatrix.getElements(), 16);
+		}
+		const cameraPosition = this.#cameraPosition;
+		const cameraForward = this.#cameraForward;
+		values[32] = cameraPosition[0];
+		values[33] = cameraPosition[1];
+		values[34] = cameraPosition[2];
+		values[35] = cameraPosition[3];
+		values[36] = cameraForward[0];
+		values[37] = cameraForward[1];
+		values[38] = cameraForward[2];
+		values[39] = this.#isHdrOutput ? 1 : 0;
+		const viewRotation = this.#viewRotationElements;
+		for (let column = 0; column < 3; ++column) {
+			values[40 + column * 4] = viewRotation[column * 3];
+			values[41 + column * 4] = viewRotation[column * 3 + 1];
+			values[42 + column * 4] = viewRotation[column * 3 + 2];
+		}
+		const outlineDistanceScale = this.#outlineDistanceScale;
+		values[52] = outlineDistanceScale[0];
+		values[53] = outlineDistanceScale[1];
+		values[54] = outlineDistanceScale[2];
+		values[55] = shadowInput !== null ? 1 : 0;
+		values[56] = System.Math.cos(this.#cameraRoll);
+		values[57] = System.Math.sin(this.#cameraRoll);
+		values[58] = this.#outlineFadeDistance[0];
+		values[59] = this.#outlineFadeDistance[1];
+		if (shadowInput !== null) {
+			values[60] = shadowInput.strength;
+			values[61] = 1 / System.Math.max(1, shadowInput.resolution);
+			// 해 그림자 치우침. (x 깊이, y 노멀 월드 거리, z 기울기 깊이, w 기울기 상한, readShadowBias)
+			const shadowBias = shadowInput.bias;
+			values[164] = shadowBias[0];
+			values[165] = shadowBias[1];
+			values[166] = shadowBias[2];
+			values[167] = shadowBias[3];
+		}
+		// 점광 그림자. (칸 넷의 자리, 앞, 위, 첫 칸과 점광마다의 칸 번호, 없으면 0)
 		const localShadowInput = this.#localShadowInput;
-		const slotValues = this.#pointShadowSlotValues;
-		const positionValues = this.#localShadowPositionValues;
-		const forwardValues = this.#localShadowForwardValues;
-		const upValues = this.#localShadowUpValues;
-		const tileValues = this.#localShadowTileValues;
-		slotValues.fill(0);
-		positionValues.fill(0);
-		forwardValues.fill(0);
-		upValues.fill(0);
-		tileValues.fill(0);
+		values.fill(0, 68, 164);
 		if (localShadowInput !== null) {
+			values[64] = localShadowInput.gridSize;
+			values[65] = localShadowInput.tileSize;
+			values[66] = localShadowInput.texelSize;
+			values[67] = localShadowInput.strength;
 			localShadowInput.lights.forEach((light, slot) => {
 				if (light.lightIndex < TOON_MAXIMUM_POINT_LIGHTS) {
-					slotValues[light.lightIndex] = slot + 1;
+					values[132 + light.lightIndex * 4] = slot + 1;
 				}
-				positionValues.set([light.position[0], light.position[1], light.position[2], light.near], slot * 4);
-				forwardValues.set([light.forward[0], light.forward[1], light.forward[2], light.far], slot * 4);
-				upValues.set([light.up[0], light.up[1], light.up[2], light.tangent], slot * 4);
-				tileValues[slot] = light.firstTile;
+				const offset = slot * 4;
+				values[68 + offset] = light.position[0];
+				values[69 + offset] = light.position[1];
+				values[70 + offset] = light.position[2];
+				values[71 + offset] = light.near;
+				values[84 + offset] = light.forward[0];
+				values[85 + offset] = light.forward[1];
+				values[86 + offset] = light.forward[2];
+				values[87 + offset] = light.far;
+				values[100 + offset] = light.up[0];
+				values[101 + offset] = light.up[1];
+				values[102 + offset] = light.up[2];
+				values[103 + offset] = light.tangent;
+				values[116 + offset] = light.firstTile;
 			});
-			webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("localShadowAtlas"), localShadowInput.gridSize, localShadowInput.tileSize, localShadowInput.texelSize, localShadowInput.strength);
 		}
-		webGL2RenderingContext.uniform1fv(shaderProgram.getUniformLocation("pointLightShadowSlots"), slotValues);
-		webGL2RenderingContext.uniform4fv(shaderProgram.getUniformLocation("localShadowPositions"), positionValues);
-		webGL2RenderingContext.uniform4fv(shaderProgram.getUniformLocation("localShadowForwards"), forwardValues);
-		webGL2RenderingContext.uniform4fv(shaderProgram.getUniformLocation("localShadowUps"), upValues);
-		webGL2RenderingContext.uniform1fv(shaderProgram.getUniformLocation("localShadowTiles"), tileValues);
 	}
 
 	//==============================================================================
@@ -3062,11 +3630,13 @@ export class ToonRenderer {
 	 * @private
 	 */
 	readUniformSlot(shaderProgram, uniformName) {
-		let slotTable = this.#uniformSlotTable.get(shaderProgram);
+		let slotTable = shaderProgram === this.#slotTableProgram ? this.#slotTable : this.#uniformSlotTable.get(shaderProgram);
 		if (slotTable === undefined) {
 			slotTable = new System.Map();
 			this.#uniformSlotTable.set(shaderProgram, slotTable);
 		}
+		this.#slotTableProgram = shaderProgram;
+		this.#slotTable = slotTable;
 		let slot = slotTable.get(uniformName);
 		if (slot === undefined) {
 			slot = { location: shaderProgram.getUniformLocation(uniformName), serial: 0, values: null, count: 0 };
@@ -3083,6 +3653,148 @@ export class ToonRenderer {
 	 */
 	forgetAllUniformValues() {
 		this.#uniformSerial += 1;
+		this.#materialBlocks.boundBlock = null;
+		this.#outlineBlocks.boundBlock = null;
+		this.#frameBlocks.boundBlock = null;
+	}
+
+	//==============================================================================
+	// 그리기 꼴 객체의 푼 칸 읽기. (앞의 그리기와 꼴 객체의 얕은 사본이 같으면 앞서 푼 것을 쓰고, 다르면 다시 푼다)
+	// - 게임이 프레임마다 같은 꼴 객체를 넘기면 칸을 이름으로 찾아 풀지 않는다. (for-in 으로 있는 칸만 견준다, 난독화로 이름 읽기가 비싼 빌드에서도 싸다)
+	// - 꼴 객체의 값을 그 자리에서 고치거나(틴트 같은 넷 이하 수 배열의 수까지) 칸을 더하고 빼면 다르다고 보고 다시 푼다. 재질 블록도 다시 고른다.
+	//   꼴 객체는 평범한 객체다. (클래스의 get 칸은 견주지 못한다) 그리기 줄(ToonDrawQueue)도 이것으로 꼴을 읽는다.
+	//==============================================================================
+	/**
+	 * @param { object } options - 그리기 꼴.
+	 * @returns { object } { state (DRAW_STATE_ 자리의 배열), materialBlock, outlineBlock, ... }
+	 * @private
+	 */
+	readDrawEntry(options) {
+		let entry = this.#drawEntryOfOptions.get(options);
+		if (entry === undefined) {
+			entry = { keys: [], values: [], numbers: [], state: new System.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0 };
+			this.#drawEntryOfOptions.set(options, entry);
+		}
+		else if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
+			return entry;
+		}
+		else if (isSameOptionsSnapshot(entry, options)) {
+			entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
+			return entry;
+		}
+		writeOptionsSnapshot(entry, options);
+		writeDrawState(entry.state, options);
+		entry.materialBlock = null;
+		entry.outlineBlock = null;
+		entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
+		return entry;
+	}
+
+	//==============================================================================
+	// 꼴을 고치지 않는 판 맡기 시작과 끝. (그리기 줄이 draw, drawShadows 동안 부른다, 맡긴 판에서는 꼴 객체마다 한 번만 견준다)
+	// - 그리기 줄은 draw 를 부를 때까지 담은 꼴을 고치지 않는다(ToonDrawQueue 머리말). 단계 콜백을 부르는 동안은 멈춘다(pauseTrustedOptions).
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	beginTrustedOptions() {
+		this.#trustSerial += 1;
+		this.#isTrusting = true;
+	}
+
+	//==============================================================================
+	// 맡긴 판 끝. (그리기 줄이 draw, drawShadows 끝에 try/finally 로 부른다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	endTrustedOptions() {
+		this.#isTrusting = false;
+	}
+
+	//==============================================================================
+	// 맡긴 판 멈추기와 다시. (단계 콜백이 렌더러로 바로 그리는 동안 멈춘다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isPaused - 멈출지. (false 면 같은 판으로 다시)
+	 * @private
+	 */
+	pauseTrustedOptions(isPaused) {
+		this.#isTrusting = !isPaused;
+	}
+
+	//==============================================================================
+	// 블록 묶기. (그 바인딩 자리에 이미 묶였으면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { object } blockCache - createBlockCache 의 결과.
+	 * @param { object } block - readUniformBlock 의 결과.
+	 * @private
+	 */
+	bindBlock(blockCache, block) {
+		if (block !== blockCache.boundBlock) {
+			const webGL2RenderingContext = this.getWebGL2RenderingContext();
+			webGL2RenderingContext.bindBufferBase(webGL2RenderingContext.UNIFORM_BUFFER, blockCache.binding, block.buffer);
+			blockCache.boundBlock = block;
+		}
+	}
+
+	//==============================================================================
+	// 값이 같은 블록 찾기. (없으면 지어 올린다, MATERIAL_BLOCK_LIMIT 을 넘으면 갈래를 모두 지우고 다시 짓는다)
+	//==============================================================================
+	/**
+	 * @param { object } blockCache - createBlockCache 의 결과.
+	 * @returns { object } { buffer, bits }
+	 * @private
+	 */
+	readUniformBlock(blockCache) {
+		const bits = blockCache.bits;
+		const hash = readMaterialBlockHash(bits);
+		let blockList = blockCache.table.get(hash);
+		if (blockList !== undefined) {
+			for (const block of blockList) {
+				if (isSameBits(block.bits, bits)) {
+					return block;
+				}
+			}
+		}
+		if (blockCache.count >= MATERIAL_BLOCK_LIMIT) {
+			this.clearBlockCache(blockCache);
+			blockList = undefined;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const buffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, bits, webGL2RenderingContext.STATIC_DRAW);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
+		const block = { buffer: buffer, bits: bits.slice() };
+		if (blockList === undefined) {
+			blockList = [];
+			blockCache.table.set(hash, blockList);
+		}
+		blockList.push(block);
+		blockCache.count += 1;
+		return block;
+	}
+
+	//==============================================================================
+	// 블록 갈래 모두 지우기.
+	//==============================================================================
+	/**
+	 * @param { object } blockCache - createBlockCache 의 결과.
+	 * @private
+	 */
+	clearBlockCache(blockCache) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		for (const blockList of blockCache.table.values()) {
+			for (const block of blockList) {
+				webGL2RenderingContext.deleteBuffer(block.buffer);
+			}
+		}
+		blockCache.table.clear();
+		blockCache.count = 0;
+		blockCache.boundBlock = null;
+		this.#drawEntryOfOptions = new System.WeakMap(); // 꼴마다 기억한 블록이 지운 것을 가리키지 않게.
 	}
 
 	//==============================================================================
@@ -3218,6 +3930,29 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 삼각형 범위 그리기. (instanceCount 가 0 이면 보통, 아니면 인스턴스로, 수가 0 이하면 그리지 않는다)
+	//==============================================================================
+	/**
+	 * @param { number } start - 첫 번호 자리.
+	 * @param { number } count - 번호 수.
+	 * @param { number } instanceCount - 인스턴스 수. (0 이면 보통 그리기)
+	 * @private
+	 */
+	drawElementRange(start, count, instanceCount) {
+		if (count <= 0) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		if (instanceCount > 0) {
+			webGL2RenderingContext.drawElementsInstanced(webGL2RenderingContext.TRIANGLES, count, webGL2RenderingContext.UNSIGNED_INT, start * 4, instanceCount);
+		}
+		else {
+			webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, count, webGL2RenderingContext.UNSIGNED_INT, start * 4);
+		}
+		this.#frameStatistics.drawCallCount += 1;
+	}
+
+	//==============================================================================
 	// 그리기 본체. (instanceCount 가 0 이면 보통, 아니면 인스턴스로, instanceBuffer 가 있으면 그 꼴로)
 	//==============================================================================
 	/**
@@ -3226,16 +3961,20 @@ export class ToonRenderer {
 	 * @param { number } instanceCount - 인스턴스 수. (0 이면 보통 그리기)
 	 * @param { object } options - drawMesh 의 그리기 꼴.
 	 * @param { object | null } instanceBuffer - createInstanceBuffer 의 결과. (없으면 null)
+	 * @param { number } [parts] - 그릴 것. (DRAW_PART_OUTLINE 바깥선 껍데기, DRAW_PART_BODY 몸, 기본 둘 다, 꼴의 hasOutline, isBodyDrawn 이 false 면 그것도 뺀다)
+	 * @param { object | null } [vertexArrays] - 모형 대신 쓸 버텍스 어레이. ({ body, outline }, 자동 인스턴싱의 묶음 자리, 기본 null)
 	 */
-	drawWithCount(mesh, modelElements, instanceCount, options, instanceBuffer) {
+	drawWithCount(mesh, modelElements, instanceCount, options, instanceBuffer, parts = DRAW_PART_ALL, vertexArrays = null) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const material = options.material !== undefined ? options.material : null;
+		const drawEntry = this.readDrawEntry(options);
+		const state = drawEntry.state;
+		const material = state[DRAW_STATE_MATERIAL];
 		const instanceLayout = instanceBuffer !== null ? instanceBuffer.layout : null;
 		const programSet = this.readProgramSet(material, instanceLayout);
 		if (programSet === null) {
 			return;
 		}
-		const jointMatrices = options.jointMatrices !== undefined ? options.jointMatrices : null;
+		const jointMatrices = state[DRAW_STATE_JOINT_MATRICES];
 		const isSkinned = mesh.isSkinned && jointMatrices !== null;
 		const isInstanced = instanceCount > 0;
 		let instancedMode = isInstanced ? 1 : 0;
@@ -3250,26 +3989,18 @@ export class ToonRenderer {
 				webGL2RenderingContext.vertexAttrib4f(TOON_ATTRIBUTE_LOCATIONS.instanceTint, 1, 1, 1, 1);
 			}
 		}
-		const indexStart = System.Math.max(0, System.Math.min(mesh.bodyIndexCount, options.indexStart !== undefined ? options.indexStart : 0));
-		const indexCount = options.indexCount !== undefined && options.indexCount > 0 ? System.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
-		const outlineIndexStart = System.Math.max(0, System.Math.min(mesh.outlineIndexCount, options.outlineIndexStart !== undefined ? options.outlineIndexStart : 0));
-		const outlineIndexCount = options.outlineIndexCount !== undefined && options.outlineIndexCount > 0 ? System.Math.min(options.outlineIndexCount, mesh.outlineIndexCount - outlineIndexStart) : mesh.outlineIndexCount - outlineIndexStart;
-		const isMirroredDraw = options.isMirrored !== undefined ? options.isMirrored === true : readMatrixDeterminant(modelElements) < 0;
+		if (vertexArrays !== null) {
+			bodyVertexArray = vertexArrays.body;
+			outlineVertexArray = vertexArrays.outline;
+		}
+		const indexStart = System.Math.max(0, System.Math.min(mesh.bodyIndexCount, state[DRAW_STATE_INDEX_START]));
+		const indexCount = state[DRAW_STATE_INDEX_COUNT] > 0 ? System.Math.min(state[DRAW_STATE_INDEX_COUNT], mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
+		const outlineIndexStart = System.Math.max(0, System.Math.min(mesh.outlineIndexCount, state[DRAW_STATE_OUTLINE_INDEX_START]));
+		const outlineIndexCount = state[DRAW_STATE_OUTLINE_INDEX_COUNT] > 0 ? System.Math.min(state[DRAW_STATE_OUTLINE_INDEX_COUNT], mesh.outlineIndexCount - outlineIndexStart) : mesh.outlineIndexCount - outlineIndexStart;
+		const isMirroredDraw = state[DRAW_STATE_IS_MIRRORED] >= 0 ? state[DRAW_STATE_IS_MIRRORED] === 1 : readMatrixDeterminant(modelElements) < 0;
 		const isMirrored = isMirroredDraw !== this.#isFrameMirrored;
 		this.applyFrontFace(isMirrored ? webGL2RenderingContext.CW : webGL2RenderingContext.CCW);
-		const onBeforeDraw = typeof options.onBeforeDraw === "function" ? options.onBeforeDraw : null;
-		const drawElements = (start, count) => {
-			if (count <= 0) {
-				return;
-			}
-			if (isInstanced) {
-				webGL2RenderingContext.drawElementsInstanced(webGL2RenderingContext.TRIANGLES, count, webGL2RenderingContext.UNSIGNED_INT, start * 4, instanceCount);
-			}
-			else {
-				webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, count, webGL2RenderingContext.UNSIGNED_INT, start * 4);
-			}
-			this.#frameStatistics.drawCallCount += 1;
-		};
+		const onBeforeDraw = state[DRAW_STATE_ON_BEFORE_DRAW];
 
 		// 그림자 패스. (몸의 깊이만)
 		if (this.#isShadowPass) {
@@ -3282,17 +4013,16 @@ export class ToonRenderer {
 				this.forgetUniformValues(depthEntry.program);
 			}
 			this.applyVertexArray(bodyVertexArray);
-			drawElements(indexStart, indexCount);
+			this.drawElementRange(indexStart, indexCount, instanceCount);
 			this.applyFrontFace(webGL2RenderingContext.CCW);
 			return;
 		}
 
-		const tintColor = options.tintColor !== undefined ? options.tintColor : [1, 1, 1, 1];
-		const alpha = options.alpha !== undefined ? options.alpha : 1;
-		const blendMode = options.blendMode !== undefined ? options.blendMode : ToonBlendMode.alpha;
-		const hasOutline = options.hasOutline !== false && outlineVertexArray !== null;
-		const isTransparent = alpha < 1 || tintColor[3] < 1 || blendMode !== ToonBlendMode.alpha;
-		const premultipliedOutput = blendMode !== ToonBlendMode.alpha ? 1 : 0;
+		const alpha = state[DRAW_STATE_ALPHA];
+		const blendMode = state[DRAW_STATE_BLEND_MODE];
+		const hasOutline = (parts & DRAW_PART_OUTLINE) !== 0 && state[DRAW_STATE_HAS_OUTLINE] && outlineVertexArray !== null;
+		const isTransparent = state[DRAW_STATE_IS_TRANSPARENT];
+		const premultipliedOutput = state[DRAW_STATE_PREMULTIPLIED_OUTPUT];
 		if (isTransparent) {
 			// 알파 칸은 덮은 정도(미리 곱한 알파의 over)로 쌓는다. (유니티 Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha 와 같다)
 			// 캔버스(알파 없음)에는 색이 같고, 투명하게 비운 판(ToonView3D 렌더 스케일, 투명도 층)에 그려 얹을 때 아래가 맞게 비친다.
@@ -3316,24 +4046,41 @@ export class ToonRenderer {
 			outlineProgram.useProgram();
 			this.uploadFrameUniforms(outlineEntry);
 			this.uploadDrawUniforms(outlineProgram, modelElements, isSkinned, instancedMode, jointMatrices);
-			const outlineColor = options.outlineColor !== undefined && options.outlineColor !== null ? options.outlineColor : this.#outlineColor;
-			this.writeUniformFloats(outlineProgram, "outlineColor", 4, outlineColor[0], outlineColor[1], outlineColor[2], outlineColor.length > 3 ? outlineColor[3] : 1);
-			this.writeUniformFloats(outlineProgram, "outlineWidthScale", 1, options.outlineWidthScale !== undefined ? System.Math.max(0, options.outlineWidthScale) : 1);
-			this.writeUniformFloats(outlineProgram, "outlineOffsetZ", 1, options.outlineOffsetZ !== undefined ? options.outlineOffsetZ : 0);
-			const outlineLightSet = options.lightSet !== undefined && options.lightSet !== null ? options.lightSet : this.#lightSet;
-			const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? readOutlineLightColor(outlineLightSet.getSunColor()) : [1, 1, 1];
-			this.writeUniformFloats(outlineProgram, "outlineLightColor", 3, outlineLightColor[0], outlineLightColor[1], outlineLightColor[2]);
-			this.writeUniformFloats(outlineProgram, "alpha", 1, alpha);
-			this.writeUniformFloats(outlineProgram, "premultipliedOutput", 1, premultipliedOutput);
+			// 선 값은 블록 하나로. (몸의 재질 블록과 같은 꼴)
+			const outlineBlocks = this.#outlineBlocks;
+			const outlineLightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
+			const outlineLightVersion = outlineLightSet.getVersion();
+			if (drawEntry.outlineBlock === null || drawEntry.outlineColor !== this.#outlineColor || drawEntry.outlineLightSet !== outlineLightSet || drawEntry.outlineLightVersion !== outlineLightVersion) {
+				const outlineColor = state[DRAW_STATE_OUTLINE_COLOR] !== null ? state[DRAW_STATE_OUTLINE_COLOR] : this.#outlineColor;
+				const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? readOutlineLightColor(outlineLightSet.getSunColor()) : WHITE_COLOR;
+				const outlineValues = outlineBlocks.values;
+				outlineValues[0] = outlineColor[0];
+				outlineValues[1] = outlineColor[1];
+				outlineValues[2] = outlineColor[2];
+				outlineValues[3] = outlineColor.length > 3 ? outlineColor[3] : 1;
+				outlineValues[4] = outlineLightColor[0];
+				outlineValues[5] = outlineLightColor[1];
+				outlineValues[6] = outlineLightColor[2];
+				outlineValues[7] = state[DRAW_STATE_OUTLINE_WIDTH_SCALE];
+				outlineValues[8] = state[DRAW_STATE_OUTLINE_OFFSET_Z];
+				outlineValues[9] = alpha;
+				outlineValues[10] = premultipliedOutput;
+				outlineValues[11] = 0;
+				drawEntry.outlineBlock = this.readUniformBlock(outlineBlocks);
+				drawEntry.outlineColor = this.#outlineColor;
+				drawEntry.outlineLightSet = outlineLightSet;
+				drawEntry.outlineLightVersion = outlineLightVersion;
+			}
+			this.bindBlock(outlineBlocks, drawEntry.outlineBlock);
 			if (onBeforeDraw !== null) {
 				onBeforeDraw(outlineProgram, webGL2RenderingContext, ToonProgramKind.outline);
 				this.forgetUniformValues(outlineProgram);
 			}
 			this.applyCullFace(webGL2RenderingContext.FRONT);
 			this.applyVertexArray(outlineVertexArray);
-			drawElements(outlineIndexStart, outlineIndexCount);
+			this.drawElementRange(outlineIndexStart, outlineIndexCount, instanceCount);
 		}
-		if (options.isBodyDrawn === false) {
+		if ((parts & DRAW_PART_BODY) === 0 || !state[DRAW_STATE_IS_BODY_DRAWN]) {
 			if (isTransparent) {
 				webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 			}
@@ -3347,38 +4094,21 @@ export class ToonRenderer {
 		const solidProgram = solidEntry.program;
 		solidProgram.useProgram();
 		this.uploadFrameUniforms(solidEntry);
-		const lightSet = options.lightSet !== undefined && options.lightSet !== null ? options.lightSet : this.#lightSet;
+		const lightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
 		this.uploadLightUniforms(solidEntry, lightSet);
 		this.uploadDrawUniforms(solidProgram, modelElements, isSkinned, instancedMode, jointMatrices);
-		const emissiveColor = options.emissiveColor !== undefined ? options.emissiveColor : [0, 0, 0];
-		const decalColor = options.decalColor !== undefined ? options.decalColor : [1, 1, 1];
-		const uvTransform = options.uvTransform !== undefined ? options.uvTransform : [0, 0, 1, 1];
-		const decalUvTransform = options.decalUvTransform !== undefined ? options.decalUvTransform : [0, 0, 1, 1];
-		const baseColorTexture = options.baseColorTexture !== undefined ? options.baseColorTexture : null;
-		const emissiveTexture = options.emissiveTexture !== undefined ? options.emissiveTexture : null;
-		const decalTexture = options.decalTexture !== undefined ? options.decalTexture : null;
-		this.writeUniformFloats(solidProgram, "tintColor", 4, tintColor[0], tintColor[1], tintColor[2], tintColor[3]);
-		this.writeUniformFloats(solidProgram, "tintAmount", 1, options.tintAmount !== undefined && options.tintAmount !== null ? System.Math.max(0, System.Math.min(1, options.tintAmount)) : -1);
-		this.writeUniformFloats(solidProgram, "alpha", 1, alpha);
-		this.writeUniformFloats(solidProgram, "glowScale", 1, options.glowScale !== undefined ? options.glowScale : 1);
-		this.writeUniformFloats(solidProgram, "colorScale", 1, options.colorScale !== undefined ? options.colorScale : 1);
-		this.writeUniformFloats(solidProgram, "emissiveColor", 4, emissiveColor[0], emissiveColor[1], emissiveColor[2], options.emissiveIntensity !== undefined ? options.emissiveIntensity : 1);
-		this.writeUniformFloats(solidProgram, "softEdge", 1, options.softEdge !== undefined ? options.softEdge : 0);
-		this.writeUniformFloats(solidProgram, "alphaCutoff", 1, options.alphaCutoff !== undefined ? options.alphaCutoff : 0);
-		this.writeUniformFloats(solidProgram, "premultipliedOutput", 1, premultipliedOutput);
-		this.writeUniformFloats(solidProgram, "textureEnabled", 3, baseColorTexture !== null ? 1 : 0, emissiveTexture !== null ? 1 : 0, decalTexture !== null ? 1 : 0);
-		this.writeUniformFloats(solidProgram, "uvTransform", 4, uvTransform[0], uvTransform[1], uvTransform[2], uvTransform[3]);
-		this.writeUniformFloats(solidProgram, "decalUvTransform", 4, decalUvTransform[0], decalUvTransform[1], decalUvTransform[2], decalUvTransform[3]);
-		this.writeUniformFloats(solidProgram, "decalColor", 4, decalColor[0], decalColor[1], decalColor[2], options.decalEmission !== undefined ? options.decalEmission : 0);
-		const matcapTexture = options.matcapTexture !== undefined ? options.matcapTexture : null;
-		this.writeUniformFloats(solidProgram, "receivesShadow", 1, options.receivesShadow !== false ? 1 : 0);
-		this.writeUniformFloats(solidProgram, "shadeOffset", 1, options.shadeOffset !== undefined ? options.shadeOffset : 0);
-		this.writeUniformFloats(solidProgram, "highlightScale", 2, options.specularScale !== undefined ? System.Math.max(0, options.specularScale) : 1, options.rimScale !== undefined ? System.Math.max(0, options.rimScale) : 1);
-		this.writeUniformFloats(solidProgram, "matcapSettings", 3, matcapTexture !== null ? 1 : 0, options.matcapStrength !== undefined ? options.matcapStrength : 1, options.matcapBlend === ToonMatcapBlend.add ? 1 : 0);
-		const angelRingTexture = options.angelRingTexture !== undefined ? options.angelRingTexture : null;
-		const angelRingColor = options.angelRingColor !== undefined ? options.angelRingColor : [1, 1, 1];
-		this.writeUniformFloats(solidProgram, "angelRingSettings", 4, angelRingTexture !== null ? 1 : 0, options.angelRingOffsetU !== undefined ? options.angelRingOffsetU : 0, options.angelRingOffsetV !== undefined ? options.angelRingOffsetV : 0.3, options.isAngelRingAlpha === true ? 1 : 0);
-		this.writeUniformFloats(solidProgram, "angelRingColor", 3, angelRingColor[0], angelRingColor[1], angelRingColor[2]);
+		// 재질 값은 블록 하나로. (값이 같은 블록은 하나, 그리기마다 bindBufferBase 하나)
+		const materialBlocks = this.#materialBlocks;
+		if (drawEntry.materialBlock === null) {
+			writeMaterialBlockValues(materialBlocks.values, options);
+			drawEntry.materialBlock = this.readUniformBlock(materialBlocks);
+		}
+		this.bindBlock(materialBlocks, drawEntry.materialBlock);
+		const baseColorTexture = state[DRAW_STATE_BASE_COLOR_TEXTURE];
+		const emissiveTexture = state[DRAW_STATE_EMISSIVE_TEXTURE];
+		const decalTexture = state[DRAW_STATE_DECAL_TEXTURE];
+		const matcapTexture = state[DRAW_STATE_MATCAP_TEXTURE];
+		const angelRingTexture = state[DRAW_STATE_ANGEL_RING_TEXTURE];
 		const shadowInput = this.#shadowInput;
 		this.bindTexture2D(SHADOW_TEXTURE_UNIT, shadowInput !== null ? shadowInput.depthTexture : this.#emptyShadowTexture);
 		this.bindTextureUnit(BASE_COLOR_TEXTURE_UNIT, baseColorTexture);
@@ -3388,9 +4118,9 @@ export class ToonRenderer {
 		this.bindTextureUnit(MATCAP_TEXTURE_UNIT, matcapTexture);
 		this.bindTextureUnit(ANGEL_RING_TEXTURE_UNIT, angelRingTexture);
 		this.bindTexture2D(LOCAL_SHADOW_TEXTURE_UNIT, this.#localShadowInput !== null ? this.#localShadowInput.depthTexture : this.#emptyShadowTexture);
-		if (options.textures !== undefined && options.textures !== null) {
+		if (state[DRAW_STATE_TEXTURES] !== null) {
 			let unit = FIRST_MATERIAL_TEXTURE_UNIT;
-			for (const [uniformName, texture] of System.Object.entries(options.textures)) {
+			for (const [uniformName, texture] of System.Object.entries(state[DRAW_STATE_TEXTURES])) {
 				if (unit >= FIRST_MATERIAL_TEXTURE_UNIT + TOON_MAXIMUM_MATERIAL_TEXTURES) {
 					break;
 				}
@@ -3406,7 +4136,7 @@ export class ToonRenderer {
 		}
 		this.applyCullFace(webGL2RenderingContext.BACK);
 		this.applyVertexArray(bodyVertexArray);
-		drawElements(indexStart, indexCount);
+		this.drawElementRange(indexStart, indexCount, instanceCount);
 		if (isTransparent) {
 			webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		}
