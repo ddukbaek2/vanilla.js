@@ -21,7 +21,7 @@
 		{
 			"label": "Engine: Build (Debug)",
 			"type": "shell",
-			"command": "esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap",
+			"command": "node tools/bundle.cjs",
 			"group": {
 				"kind": "build",
 				"isDefault": true

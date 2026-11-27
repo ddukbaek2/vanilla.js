@@ -24,12 +24,13 @@
 
 ![The quick start code running: one white rectangle on a black background](../images/quickstart.webp)
 
-To build the bundle yourself, use esbuild.
+To build the bundle yourself, use esbuild. From the repository root, the command below builds `build/vanilla.js` and `build/vanilla.min.js`.
 
 ```bash
-esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+node tools/bundle.cjs
 ```
+
+- `vanilla.js` is the readable build: it keeps lines and indentation and drops comments. The original sources and comments are in the source map (`vanilla.js.map`). `vanilla.min.js` is the minified build.
 
 ## Samples
 
