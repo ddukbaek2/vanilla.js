@@ -9739,18 +9739,6 @@
 			"vanilla-engine": {
 				"module": "core/graphic",
 				"class": "Graphic",
-				"name": "invalidate_render_state_cache"
-			},
-			"vanilla.js": {
-				"module": "core/graphic",
-				"class": "Graphic",
-				"name": "invalidateRenderStateCache"
-			}
-		},
-		{
-			"vanilla-engine": {
-				"module": "core/graphic",
-				"class": "Graphic",
 				"name": "clear_depth_buffer"
 			},
 			"vanilla.js": {
@@ -10321,6 +10309,30 @@
 				"module": "core/graphic",
 				"class": "Graphic",
 				"name": "getSoftDiscTexture"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "prepare_image"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "prepareImage"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "prepare_loaded_images"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "prepareLoadedImages"
 			}
 		},
 		{
@@ -13322,8 +13334,8 @@
 				"name": "set_parent"
 			},
 			"vanilla.js": {
-				"module": "base/node",
-				"class": "Node",
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
 				"name": "setParent"
 			}
 		},
@@ -13848,8 +13860,8 @@
 				"name": "set_active"
 			},
 			"vanilla.js": {
-				"module": "base/node",
-				"class": "Node",
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
 				"name": "setActive"
 			}
 		},
@@ -19711,6 +19723,42 @@
 			"vanilla-engine": {
 				"module": "graphics3d/shadowmap",
 				"class": "ShadowMap",
+				"name": "set_bias"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "setBias"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "get_depth_bias"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "getDepthBias"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "get_normal_bias"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "getNormalBias"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
 				"name": "destroy"
 			},
 			"vanilla.js": {
@@ -23165,6 +23213,54 @@
 				"module": "graphics3d/toon/toonscreenoutline",
 				"class": "ToonScreenOutline",
 				"name": "setColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "set_line_color"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "setLineColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "remove_line_color"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "removeLineColor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "clear_line_colors"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "clearLineColors"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "get_line_color_count"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "getLineColorCount"
 			}
 		},
 		{

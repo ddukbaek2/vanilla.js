@@ -8815,13 +8815,7 @@
 								"en": "Sets the parent."
 							},
 							"since": "0.0.8",
-							"source": "src/base/node.js",
-							"counterpart": {
-								"engine": "vanilla-engine",
-								"module": "core/node/nodetree",
-								"class": "NodeTree",
-								"name": "set_parent"
-							}
+							"source": "src/base/node.js"
 						},
 						{
 							"kind": "method",
@@ -9207,13 +9201,7 @@
 								"en": "Sets the active state."
 							},
 							"since": "0.0.8",
-							"source": "src/base/node.js",
-							"counterpart": {
-								"engine": "vanilla-engine",
-								"module": "core/node/worldnode",
-								"class": "WorldNode",
-								"name": "set_active"
-							}
+							"source": "src/base/node.js"
 						},
 						{
 							"kind": "method",
@@ -19325,6 +19313,65 @@
 						},
 						{
 							"kind": "method",
+							"name": "readLocalVisibleBounds",
+							"signature": "readLocalVisibleBounds(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "경계 상자를 적을 곳. (지금 변환의 지역 좌표)",
+										"en": "Where to write the bounding box. (In the current transform's local coordinates)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "알면 참. (모르면 rect 를 건드리지 않는다)",
+									"en": "True if known. (Otherwise rect is left untouched)"
+								}
+							},
+							"description": {
+								"ko": "보이는 사각형(화면과 걸린 자르기)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 읽기. (하위 트리 거르기가 켜졌을 때만, 알면 true)\n- 돌림이나 기울임이 있으면 넉넉하다(네 꼭짓점의 경계 상자, 한 디바이스 픽셀씩 넓힘). 이 사각형 밖에 그리는 것은 보이지 않는다.\n- 노드가 많은 자식 가운데 보이는 범위를 찾을 때 쓴다(TransformNode.drawChildren). 변환과 자르기가 같으면 다시 셈하지 않는다.\n- 화면 밖 거르기나 하위 트리 거르기가 꺼졌거나, 기즈모를 모두 그리거나, 뷰포트를 아직 정하지 않았거나, 변환을 거꾸로 걸 수 없으면(배율 0) false.",
+								"en": "Reads the visible rectangle (the screen and active clips) moved back into the current transform's local coordinates as a bounding box. (Only while subtree culling is on; true if known)\n- With rotation or skew it is conservative (the bounding box of the four corners, grown by one device pixel). Anything drawn outside this rectangle is not visible.\n- Used by a node to find the visible range among many children (TransformNode.drawChildren). Not recalculated while the transform and clip stay the same.\n- False if off-screen culling or subtree culling is off, all gizmos are drawn, the viewport is not set yet, or the transform cannot be inverted (scale 0)."
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "지금 변환에서 보이는 사각형 읽기",
+										"en": "Reading the visible rectangle under the current transform"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Rect } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tconst visibleRect = Rect.zero();\n\t\tgraphic.pushState();\n\t\tgraphic.translate(100, 0);\n\t\tconsole.log(graphic.readLocalVisibleBounds(visibleRect), visibleRect.position.x < -100);\n\t\tgraphic.popState();\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "addCulledSubtreeCount",
+							"signature": "addCulledSubtreeCount(culledSubtreeCount)",
+							"params": [
+								{
+									"name": "culledSubtreeCount",
+									"type": "number",
+									"description": {
+										"ko": "더할 하위 트리 수.",
+										"en": "The number of subtrees to add."
+									}
+								}
+							],
+							"description": {
+								"ko": "이번 프레임에 화면 밖이라 그리기를 통째로 건너뛴 하위 트리 수 더하기. (TransformNode.drawChildren 이 보이는 범위 밖 자식을 한꺼번에 건너뛰고 부른다)",
+								"en": "Adds to the number of subtrees whose drawing was skipped entirely this frame because they were off screen. (TransformNode.drawChildren calls it after skipping the children outside the visible range at once)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js"
+						},
+						{
+							"kind": "method",
 							"name": "isLocalRectVisible",
 							"signature": "isLocalRectVisible(rect)",
 							"params": [
@@ -20454,6 +20501,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "prepare_image"
+							},
 							"examples": [
 								{
 									"title": {
@@ -20492,6 +20545,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "prepare_loaded_images"
+							},
 							"examples": [
 								{
 									"title": {
@@ -25562,6 +25621,37 @@
 						},
 						{
 							"kind": "method",
+							"name": "drawChildren",
+							"signature": "drawChildren(graphic)",
+							"params": [
+								{
+									"name": "graphic",
+									"type": "Graphic",
+									"description": {
+										"ko": "그릴 그래픽.",
+										"en": "Graphic to draw with."
+									}
+								}
+							],
+							"description": {
+								"ko": "자식 목록 출력. (자식 차례대로 Graphic.drawNode, draw 가 부른다)\n- 하위 트리 거르기가 켜졌으면 부모 좌표의 보이는 사각형(Graphic.readLocalVisibleBounds)으로 보이는 자식 범위를 이분 찾기로 좁혀 그 앞뒤 자식은 부르지 않는다.\n  범위는 하위 트리 경계를 셀 때 적어 둔 자식 경계(앞에서부터 모은 가장 큰 아래와 오른쪽, 뒤에서부터 모은 가장 작은 위와 왼쪽)로 찾으므로 자식이 어떤 차례로 놓여도 맞고,\n  줄처럼 차례대로 놓이면 보이는 줄만 남는다. 경계를 모르는 자식이 있으면 그 자식을 넘어 좁히지 않는다. 그리기 차례는 그대로다.\n- 그리는 동안 이 노드의 경계가 바뀌면(자식이 형제를 옮김 같은) 남은 자식을 모두 부른다.",
+								"en": "Draws the children. (Graphic.drawNode for each child in order; called by draw)\n- While subtree culling is on, the visible range of children is narrowed by binary search against the visible rectangle in parent coordinates (Graphic.readLocalVisibleBounds), and the children before and after it are not called.\n  The range is found from the children's bounds written when the subtree bounds were calculated (the largest bottom and right gathered from the front, the smallest top and left gathered from the back), so it is correct in any child order,\n  and when children are laid out in order like rows only the visible rows remain. A child with unknown bounds stops the narrowing past it. Drawing order is unchanged.\n- If this node's bounds change while drawing (such as a child moving a sibling), all remaining children are called."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "draw 를 덮어쓴 노드가 자식을 그리기",
+										"en": "A node that overrides draw drawing its children"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Colors, Rect, Vector2, Pivot } from \"./build/vanilla.js\";\n\nclass FrameNode extends WorldNode {\n\tdraw(graphic) {\n\t\tgraphic.setFillColor(Colors.white);\n\t\tgraphic.drawRect(Rect.create(0, 0, 20, 20));\n\t\tthis.drawChildren(graphic);\n\t}\n\tcalculateDrawnRect(rect) {\n\t\trect.position.set(0, 0);\n\t\trect.size.set(20, 20);\n\t\treturn true;\n\t}\n}\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tconst frameNode = new FrameNode();\n\t\tframeNode.setPivot(Pivot.topLeft);\n\t\tthis.getRoot().addChild(frameNode);\n\t\tconst childNode = new WorldNode();\n\t\tchildNode.setPivot(Pivot.topLeft);\n\t\tchildNode.setRect(30, 0, 20, 20);\n\t\tchildNode.addComponent(Paint);\n\t\tframeNode.addChild(childNode);\n\t}\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tconsole.log(graphic.getLastFrameCulledSubtreeCount());\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "drawGizmos",
 							"signature": "drawGizmos(graphic)",
 							"params": [
@@ -26371,7 +26461,13 @@
 								"en": "Sets the parent. (override: the subtree draw bounds of the old and the new parent change)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/node/transformnode.js"
+							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/nodetree",
+								"class": "NodeTree",
+								"name": "set_parent"
+							}
 						},
 						{
 							"kind": "method",
@@ -26392,7 +26488,13 @@
 								"en": "Sets the active state. (override: an inactive child is not part of the parent's subtree draw bounds)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/node/transformnode.js"
+							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "set_active"
+							}
 						},
 						{
 							"kind": "method",
@@ -26462,6 +26564,44 @@
 										"en": "Read the subtree bounds of a row node"
 									},
 									"code": "import { WorldNode, Paint, Rect, Vector2, Pivot } from \"./build/vanilla.js\";\n\nconst rowNode = new WorldNode();\nrowNode.setPivot(Pivot.topLeft);\nrowNode.setContentSize(Vector2.create(300, 40));\nrowNode.addComponent(Paint);\nconst iconNode = new WorldNode();\niconNode.setPivot(Pivot.topLeft);\niconNode.setRect(-20, 4, 32, 32);\niconNode.addComponent(Paint);\nrowNode.addChild(iconNode);\nconst drawBounds = Rect.zero();\nconst isKnown = rowNode.readSubtreeDrawBounds(drawBounds);\nconsole.log(isKnown, drawBounds.position.x, drawBounds.size.x);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "readParentDrawBounds",
+							"signature": "readParentDrawBounds(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "경계를 적을 곳. (부모의 내용 좌표, 크기가 0 이면 아무것도 그리지 않는다)",
+										"en": "Where to write the bounds. (In the parent's content coordinates; a size of 0 means nothing is drawn)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "맞는 경계가 있으면 참. (없으면 rect 를 건드리지 않는다)",
+									"en": "True if valid bounds exist. (Otherwise rect is left untouched)"
+								}
+							},
+							"description": {
+								"ko": "부모가 셈해 둔 이 노드의 하위 트리 그리기 경계 읽기. (부모의 내용 좌표, 이 노드의 변환을 건 경계 상자, 맞으면 true)\n- 부모가 하위 트리 경계를 셈할 때(calculateSubtreeDrawBounds) 자식마다 옮겨 적어 둔 것이다. 이 노드의 변환이나 경계가 바뀌면 부모가 다시 셈하므로 그때까지 그대로 쓴다.\n- 그리기 순회가 부모의 변환 아래에서 이 사각형을 먼저 보아, 부모 좌표의 보이는 사각형 밖이면 이 노드에 변환을 걸지 않고 건너뛴다. (스크롤은 부모의 변환만 바뀌므로 자식마다 다시 셈하지 않는다)\n- 부모가 아직 셈하지 않았거나 셈한 뒤 바뀌었으면(다시 셈할 차례), 이 노드가 어디에 그리는지 모르거나 놓이는 곳을 모르면 false.",
+								"en": "Reads this node's subtree draw bounds as calculated by the parent. (In the parent's content coordinates, the bounding box with this node's transform applied; true if valid)\n- The parent writes these for each child when it calculates its subtree bounds (calculateSubtreeDrawBounds). When this node's transform or bounds change the parent recalculates, so they are reused until then.\n- The draw traversal checks this rectangle first under the parent's transform and skips this node without applying its transform when it lies outside the visible rectangle in parent coordinates. (Scrolling changes only the parent's transform, so children are not recalculated one by one)\n- False if the parent has not calculated yet or something changed since (a recalculation is due), or if where this node draws or where it is placed is unknown."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "부모가 셈해 둔 줄의 경계를 부모 좌표로 읽기",
+										"en": "Reading a row's bounds calculated by its parent, in parent coordinates"
+									},
+									"code": "import { WorldNode, Paint, Rect, Vector2, Pivot } from \"./build/vanilla.js\";\n\nconst listNode = new WorldNode();\nlistNode.setPivot(Pivot.topLeft);\nconst rowNode = new WorldNode();\nrowNode.setPivot(Pivot.topLeft);\nrowNode.setRect(0, 120, 300, 40);\nrowNode.addComponent(Paint);\nlistNode.addChild(rowNode);\nconst drawBounds = Rect.zero();\nconsole.log(rowNode.readParentDrawBounds(drawBounds));\nlistNode.readSubtreeDrawBounds(drawBounds);\nconsole.log(rowNode.readParentDrawBounds(drawBounds), drawBounds.position.y, drawBounds.size.y);",
 									"language": "javascript"
 								}
 							]
@@ -26627,8 +26767,8 @@
 								}
 							},
 							"description": {
-								"ko": "하위 트리 그리기 경계 셈하기. (자기 그림과 켜지고 보이는 자식들 경계의 합, readSubtreeDrawBounds 가 바뀐 때만 부른다, 알면 true)\n- 자기 그림: calculateDrawnRect 와 켜진 컴포넌트. 내용 영역 안에서만 그리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 보고,\n  밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 로 본다. 그리지 않는 컴포넌트(draw 를 덮어쓰지 않은 것)는 빼고,\n  모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드와 내용 크기를 읽을 수 없는 노드(내용 영역 안 컴포넌트가 있을 때)도 모른다.\n- 자식: 자식의 하위 트리 경계를 자식이 옮긴(transformDrawBoundsToParent) 이 노드의 내용 좌표 경계 상자. 놓이는 곳을 모르는 자식이 있으면 모른다.\n- 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)\n- 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)",
-								"en": "Calculates subtree draw bounds. (The union of the node's own drawing and its enabled, visible children's bounds; readSubtreeDrawBounds calls it only after a change; true if known)\n- Own drawing: calculateDrawnRect and enabled components. Components drawing only inside the content area (Component.isDrawnInsideContent) count as the content area grown by one unit,\n  components drawing outside use Component.calculateDrawnRect. Components that draw nothing (no draw override) are skipped;\n  a single unknown component makes the bounds unknown. A node drawing gizmos, or one whose content size cannot be read (when it has inside-content components), is also unknown.\n- Children: each child's subtree bounds moved by the child (transformDrawBoundsToParent) into this node's content coordinates. A child with unknown placement makes the bounds unknown.\n- Even when unknown, all enabled and visible children's bounds are read. (Children must cache theirs so descendant changes propagate up to this node)\n- Bounds are not shrunk by masks clipping children. (Kept generous)"
+								"ko": "하위 트리 그리기 경계 셈하기. (자기 그림과 켜지고 보이는 자식들 경계의 합, readSubtreeDrawBounds 가 바뀐 때만 부른다, 알면 true)\n- 자기 그림: calculateDrawnRect 와 켜진 컴포넌트. 내용 영역 안에서만 그리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 보고,\n  밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 로 본다. 그리지 않는 컴포넌트(draw 를 덮어쓰지 않은 것)는 빼고,\n  모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드와 내용 크기를 읽을 수 없는 노드(내용 영역 안 컴포넌트가 있을 때)도 모른다.\n- 자식: 자식의 하위 트리 경계를 자식이 옮긴(transformDrawBoundsToParent) 이 노드의 내용 좌표 경계 상자. 놓이는 곳을 모르는 자식이 있으면 모른다.\n- 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)\n- 부모 좌표로 옮긴 자식의 경계는 자식에 적어 둔다. (readParentDrawBounds, 그리기 순회가 자식에 변환을 걸기 전에 본다, 이 노드가 다시 셈할 때까지 맞다)\n- 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)",
+								"en": "Calculates subtree draw bounds. (The union of the node's own drawing and its enabled, visible children's bounds; readSubtreeDrawBounds calls it only after a change; true if known)\n- Own drawing: calculateDrawnRect and enabled components. Components drawing only inside the content area (Component.isDrawnInsideContent) count as the content area grown by one unit,\n  components drawing outside use Component.calculateDrawnRect. Components that draw nothing (no draw override) are skipped;\n  a single unknown component makes the bounds unknown. A node drawing gizmos, or one whose content size cannot be read (when it has inside-content components), is also unknown.\n- Children: each child's subtree bounds moved by the child (transformDrawBoundsToParent) into this node's content coordinates. A child with unknown placement makes the bounds unknown.\n- Even when unknown, all enabled and visible children's bounds are read. (Children must cache theirs so descendant changes propagate up to this node)\n- Each child's bounds moved into parent coordinates are written onto the child. (readParentDrawBounds, which the draw traversal checks before applying the child's transform, valid until this node recalculates)\n- Bounds are not shrunk by masks clipping children. (Kept generous)"
 							},
 							"since": "0.4.0",
 							"source": "src/core/node/transformnode.js"
@@ -64895,8 +65035,8 @@
 				{
 					"name": "ToonRenderer",
 					"summary": {
-						"ko": "툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)\n- 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).\n  셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)\n  해는 램프 색을 통째로, 채움 빛과 점광과 스포트라이트는 램프의 밝기 단계를 받는다. 하이라이트와 림은 단단한 툰 꼴에서 부드러운 꼴까지. 셈은 ToonLightSet 머리말에 있다.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel 은 기본 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음(createLightSet)을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 노멀: 모형 행렬과 본 행렬의 왼쪽 위 3x3 의 역행렬의 전치로 옮긴다. (늘이고 줄인 모형도 빛이 맞다, 정점 조각이 고친 행렬도 같다)\n- 재질: 꼭짓점의 색(sRGB), 빛남(바탕색에 곱해 더함), 빛을 받지 않음. 꼭짓점 UV(arrays.uvData, 2 씩)가 있으면 텍스처를 읽는다.\n- 그리기 꼴(options, 기본값이면 지금까지와 같은 화면):\n  tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강)\n  glowScale 꼭짓점 빛남의 배(기본 1), colorScale 마지막 선형 색의 배(기본 1, 거울에 비친 모습을 어둡게), emissiveColor [r, g, b] sRGB 와 emissiveIntensity(선형 배, 기본 1, 색 기본 검정).\n  baseColorTexture(바탕색에 곱함, 알파는 불투명도에), emissiveTexture(빛남 색에 곱함), uvTransform [u 옮김, v 옮김, u 배, v 배] (KHR_texture_transform 의 offset, scale).\n  decalTexture 는 바탕색 위에 알파로 덮는다(색 = 텍스처 x decalColor). decalEmission 만큼 그 색으로 빛난다. decalUvTransform 은 묶음 그림의 한 칸을 고를 때.\n  alphaCutoff 는 불투명도가 그보다 작은 화소를 버린다. (0 이면 끔, glTF MASK)\n  blendMode: ToonBlendMode.alpha(기본, 곧은 알파), premultiplied(미리 곱한 알파), additive(더하기). alpha 가 아니면 비치는 것으로 그린다.\n  softEdge 는 pow(|dot(N, V)|, softEdge) 를 불투명도에 곱해 가장자리를 엷게 한다. (0 이면 끔, 프레넬 꼴)\n  isMirrored 는 감기를 뒤집어 그린다. 주지 않으면 모형 행렬의 행렬식이 음수일 때 스스로 뒤집는다. 보기 행렬이 거울에 비쳤으면 그것도 더해 뒤집는다.\n  indexStart, indexCount 는 몸의 꼭짓점 번호 가운데 그 자리만 그린다. (GLB 재질 범위, 숨긴 부분) outlineIndexStart, outlineIndexCount 는 바깥선 껍데기.\n  material(ToonMaterial), textures({ 유니폼 이름: 텍스처 }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) 는 확장 자리다. (toonmaterial.js 머리말)\n  lightSet(ToonLightSet) 은 그 그리기의 빛 묶음이다.\n  receivesShadow (기본 true) 가 false 면 해의 그림자를 보지 않는다. shadeOffset 은 빛을 받는 몫에 더해 그늘 경계를 옮긴다. (길티기어 Xrd 의 꼭짓점 색 문턱, 유니티 툰 셰이더의 Shading Grade Map 꼴)\n  specularScale, rimScale (기본 1) 은 그 그리기의 하이라이트와 림 배다. (0 이면 없음, 재질마다의 세기)\n  matcapTexture 는 보기 공간 노멀로 읽는 매트캡이다. matcapStrength (기본 1), matcapBlend (ToonMatcapBlend.multiply 기본, add)\n  outlineColor [r, g, b, a] sRGB 는 그 그리기의 껍데기 바깥선 색 (주지 않으면 setOutlineColor), outlineWidthScale (기본 1) 은 지은 굵기의 배다.\n  outlineOffsetZ (기본 0) 는 껍데기를 카메라에서 먼 쪽으로 미는 월드 길이다. (몸 앞으로 비치지 않게, 유니티 툰 셰이더의 Offset Z)\n  angelRingTexture 는 천사 고리 텍스처다. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 angelRingOffsetV (기본 0.3) 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring)\n  angelRingColor [r, g, b] (선형 배, 기본 흰색), angelRingOffsetU (0 ~ 0.5, 기본 0), isAngelRingAlpha (기본 false 면 더하고 true 면 텍스처 알파로 덮는다)\n  천사 고리 UV 는 카메라 기울임만큼 되돌려 돌린다. (readCameraRoll, 유니티 툰 셰이더의 Camera Rolling Stabilizer, 카메라를 기울여도 고리는 머리에 붙어 있다)\n  lineId, hasScreenOutline, hasCreaseLine 은 ToonDrawQueue 가 화면 공간 바깥선에 넘기는 값이다. (렌더러는 읽지 않는다)\n- 바깥선 껍데기(inverted hull): MeshBuilder 가 지은 껍데기의 바탕 자리와 미는 쪽(지은 굵기, 같은 자리의 노멀을 평균한 쪽)을 올리고, 셰이더가 outlineWidthScale 만큼 밀어 뒷면만 그린다.\n  setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 를 주면 카메라까지의 거리 / 기준 거리 를 굵기에 곱해 화면 굵기를 맞춘다. (원근만)\n  setOutlineFadeDistance(가까운 거리, 먼 거리) 를 주면 모형의 자리에서 카메라까지가 먼 거리에 다가갈수록 굵기가 0 이 된다. (smoothstep, 유니티 툰 셰이더의 Nearest, Farthest Distance)\n  껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)\n- 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)\n- GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)\n  오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (거르지 않음, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)\n- 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)\n- 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF, 치우침은 ShadowMap.setBias 의 텍셀 단위 값에 텍셀 크기와 기울기를 곱한다)\n  점광과 스포트라이트 그림자는 ShadowAtlas 에 beginShadowAtlasPass, 칸마다 setShadowAtlasTile 과 drawMesh 로 드리우고, setLocalShadows 로 받는다. (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)\n  그 빛의 받는 몫에 그림자를 곱해 그늘 램프에 넣는다. (해와 같은 꼴) castsShadow 가 true 인 점광만 칸을 받는다. (SHADOW_ATLAS_MAXIMUM_LIGHTS 까지)\n  그림자를 받지 않을 때도 두 그림자 유닛에 1x1 비교 깊이 텍스처를 묶는다. (sampler2DShadow 유닛에 깊이 텍스처가 없으면 맥 드라이버가 알리고, 색 텍스처가 묶여 있으면 WebGL 이 그리기를 거부한다)\n- HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.\n- 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.\n  beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.\n  (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)\n  beginFrameWithMatrices(보기, 투영) 는 두 행렬로 시작한다. (직교 원 행렬 카메라) 카메라의 자리와 보기 돌림(하이라이트, 림, 소프트 엣지, 매트캡)은 보기와 투영에서 읽는다.\n- 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR)과 빛 묶음은 바뀔 때만 올린다. 그리기마다 바뀌는 값(모형 행렬, 틴트, 텍스처)만 매번 올린다.\n- readProgramSources(material, instanceLayout) 로 ShaderWarmer 에 넘길 소스를 준다.\n- 노드 사각형 안에 그리기: setScreenRect(x, y, 너비, 높이) 를 주면 beginFrame 이 보기와 투영의 클립 공간을 그 사각형으로 옮기고 가위로 밖을 자른다.\n  사각형은 beginFrame 때의 뷰포트(보통 드로잉 버퍼 전체) 안의 픽셀이고 왼쪽 위가 원점이다. (2D 노드의 draw 에서 graphic.getTransformMatrix 로 셈한 자리)\n  화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.\n- drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)\n- 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)\n- 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.\n- 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))\n- 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.",
-						"en": "Toon renderer. (Draws MeshBuilder and readGlbArrays arrays with single-color material and outlines)\n- Light: holds one ToonLightSet as the default. Sun (direction and color, shadow), ambient light of sky color and ground color, fill light, point lights and spotlights (up to TOON_MAXIMUM_POINT_LIGHTS), rim light, highlight, light model (÷π).\n  Cel shading is a shade ramp. (Base, 1st shade, 2nd shade with Step and Feather of the Unity Toon Shader, shadows enter as the shade color, boundaries without stairs by fwidth, a ramp texture also works)\n  The sun receives the whole ramp color, while the fill light, point lights and spotlights receive the ramp's brightness level. Highlight and rim range from the hard toon form to the soft form. The math is in the ToonLightSet header.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel change the default set. Another set (createLightSet) can be given per draw with options.lightSet. (When the shade color differs per material)\n- Normals: transformed by the transpose of the inverse of the upper left 3x3 of the model matrix and the joint matrix. (Light stays correct on stretched and squashed models, the same goes for matrices changed by the vertex chunk)\n- Material: vertex color (sRGB), glow (multiplied by the base color and added), unlit. If there are vertex UVs (arrays.uvData, 2 each), textures are read.\n- Draw options (options, the defaults give the same picture as before):\n  tintColor [r, g, b, a] sRGB and alpha. If tintAmount (0 ~ 1) is given, the tint is mixed in sRGB instead of multiplied. (Hit flash, broken red)\n  glowScale multiplier of vertex glow (default 1), colorScale multiplier of the final linear color (default 1, darkens a mirrored image), emissiveColor [r, g, b] sRGB and emissiveIntensity (linear multiplier, default 1, color default black).\n  baseColorTexture (multiplied by the base color, alpha into opacity), emissiveTexture (multiplied by the glow color), uvTransform [u offset, v offset, u scale, v scale] (offset and scale of KHR_texture_transform).\n  decalTexture covers the base color with alpha (color = texture x decalColor). It glows in that color by decalEmission. decalUvTransform picks one cell of an atlas.\n  alphaCutoff discards pixels whose opacity is below it. (0 turns it off, glTF MASK)\n  blendMode: ToonBlendMode.alpha (default, straight alpha), premultiplied (premultiplied alpha), additive (add). Anything other than alpha is drawn as transparent.\n  softEdge multiplies pow(|dot(N, V)|, softEdge) into the opacity to thin the edges. (0 turns it off, Fresnel form)\n  isMirrored draws with the winding flipped. If not given, it flips by itself when the determinant of the model matrix is negative. If the view matrix is mirrored, that flip is added too.\n  indexStart, indexCount draw only that span of the body vertex indices. (GLB material ranges, hidden parts) outlineIndexStart, outlineIndexCount are for the outline shell.\n  material (ToonMaterial), textures ({ uniform name: texture }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) are extension points. (toonmaterial.js header)\n  lightSet (ToonLightSet) is the light set of that draw.\n  If receivesShadow (default true) is false, the sun's shadow is not looked up. shadeOffset is added to the received light amount to move the shade boundary. (Vertex color threshold of Guilty Gear Xrd, Shading Grade Map form of the Unity Toon Shader)\n  specularScale, rimScale (default 1) are the highlight and rim multipliers of that draw. (0 means none, strength per material)\n  matcapTexture is a matcap read with the view-space normal. matcapStrength (default 1), matcapBlend (ToonMatcapBlend.multiply default, add)\n  outlineColor [r, g, b, a] sRGB is the shell outline color of that draw (setOutlineColor if not given), outlineWidthScale (default 1) is the multiplier of the built thickness.\n  outlineOffsetZ (default 0) is the world length the shell is pushed away from the camera. (So it does not show in front of the body, Offset Z of the Unity Toon Shader)\n  angelRingTexture is the angel ring texture. u is the x of the view-space normal, v is the y of the second UV mixed with the y of the view normal by angelRingOffsetV (default 0.3). (Angel Ring of the Unity Toon Shader)\n  angelRingColor [r, g, b] (linear multiplier, default white), angelRingOffsetU (0 ~ 0.5, default 0), isAngelRingAlpha (default false adds, true covers with the texture alpha)\n  The angel ring UV is rotated back by the camera roll. (readCameraRoll, Camera Rolling Stabilizer of the Unity Toon Shader, the ring stays on the head even when the camera is tilted)\n  lineId, hasScreenOutline, hasCreaseLine are values ToonDrawQueue passes to the screen-space outline. (The renderer does not read them)\n- Outline shell (inverted hull): uploads the base position and push direction (built thickness, the averaged normal of the same position) of the shell MeshBuilder built, and the shader pushes it by outlineWidthScale and draws only back faces.\n  If setOutlineDistanceScale(reference distance, minimum scale, maximum scale) is given, distance to the camera / reference distance is multiplied into the thickness to keep the screen thickness. (Perspective only)\n  If setOutlineFadeDistance(near distance, far distance) is given, the thickness goes to 0 as the distance from the model position to the camera approaches the far distance. (smoothstep, Nearest and Farthest Distance of the Unity Toon Shader)\n  The shell color is multiplied by the sun color when the outline light color usage of the light set is on (default). (Divided by its intensity when the intensity is 1 or more, same as the Unity Toon Shader outline)\n- Skeleton: the joint matrices computed by writeSkinPose are passed to drawMesh. (Up to TOON_MAXIMUM_JOINTS)\n- GPU instancing: drawMeshInstanced draws many copies of the same model at once with a matrix and tint per instance. (Both body and outline, culled and uploaded on every draw)\n  Long-lived instances build a persistent buffer with createInstanceLayout and createInstanceBuffer and are drawn with drawMeshInstanceBuffer. (Not culled, the material vertex chunk reads user attributes)\n- Off-screen culling: the model's bounding sphere is tested against the frustum of view and projection and is not drawn if outside. (Instances are culled one by one and only the remaining ones are uploaded)\n- Shadows: cast into a ShadowMap with beginShadowPass and drawMesh, received with setShadow. (3x3 PCF, the bias is the texel-unit value of ShadowMap.setBias multiplied by the texel size and slope)\n  Point light and spotlight shadows are cast into a ShadowAtlas with beginShadowAtlasPass and, per tile, setShadowAtlasTile and drawMesh, and received with setLocalShadows. (A point light uses six cube tiles, a spotlight one perspective tile)\n  The shadow is multiplied into that light's received amount and goes into the shade ramp. (Same form as the sun) Only point lights with castsShadow true get tiles. (Up to SHADOW_ATLAS_MAXIMUM_LIGHTS)\n  Even when shadows are not received, a 1x1 comparison depth texture is bound to both shadow units. (Without a depth texture on a sampler2DShadow unit the Mac driver reports it, and if a color texture is bound WebGL refuses to draw)\n- HDR: setHdrOutput(true) outputs linear color without gamma. Draw into a float render target (ToonPostProcess) and finish with bloom and tone mapping.\n- Use: createMesh(arrays) → every frame beginFrame(view and projection) → drawMesh / drawMeshInstanced → endFrame() → deleteMesh when done.\n  beginFrame notes the previous draw state (blend, depth, face culling, program, vertex array) and turns on depth test and face culling, and endFrame restores the noted state.\n  (When inserted between engine 2D drawing, call Graphic.flushBatch before it)\n  beginFrameWithMatrices(view, projection) starts with two matrices. (Orthographic or raw matrix camera) The camera position and view rotation (highlight, rim, soft edge, matcap) are read from the view and projection.\n- Per program, frame values (view and projection, camera, shadow, HDR) and the light set are uploaded only when changed. Only values that change per draw (model matrix, tint, textures) are uploaded every time.\n- readProgramSources(material, instanceLayout) gives the sources to pass to ShaderWarmer.\n- Drawing inside a node rectangle: if setScreenRect(x, y, width, height) is given, beginFrame moves the clip space of view and projection into that rectangle and cuts the outside with the scissor.\n  The rectangle is in pixels inside the viewport at beginFrame (usually the whole drawing buffer) with the top left as the origin. (The position computed with graphic.getTransformMatrix in a 2D node's draw)\n  Off-screen culling uses the frustum before the move. endFrame releases the scissor. Match the camera aspect ratio to the rectangle's ratio. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) calls beginFrame with the camera's view and projection. It uses the same camera as the 2D display (Camera3D.projectToView).\n- drawMeshOutline draws only the outline shell. (When ToonDrawQueue draws all outlines together after all opaque bodies, drawn counts are not counted)\n- Textures: createTexture(image or { width, height, data }, { isMipmapped, isRepeated, isFiltered }) builds an RGBA texture. UV (0, 0) is the top left of the image. (Same as glTF)\n- Texture units: point light shadow atlas 0, ramp 1, matcap 2, sun shadow 3, base color 4, glow 5, decal 6, angel ring 7, material 8 ~ 15. beginFrame notes the binding of unit 0 and endFrame restores it.\n- Second UV: if the arrays have uv1Data, vertexUv is four values (UV, second UV). Shader chunks read it as ToonSurface.uv1. ((0, 1) if none)\n- Light color usage (setLightColorUsage), shade-side rim (setShadeRimLight) and light intensity limit (setLightIntensityLimited) live in the light set (ToonLightSet)."
+						"ko": "툰 렌더러. (MeshBuilder 와 readGlbArrays 의 배열을 한 색 재질과 바깥선으로 그린다)\n- 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).\n  셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)\n  해는 램프 색을 통째로, 채움 빛과 점광과 스포트라이트는 램프의 밝기 단계를 받는다. 하이라이트와 림은 단단한 툰 꼴에서 부드러운 꼴까지. 셈은 ToonLightSet 머리말에 있다.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel 은 기본 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음(createLightSet)을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 노멀: 모형 행렬과 본 행렬의 왼쪽 위 3x3 의 역행렬의 전치로 옮긴다. (늘이고 줄인 모형도 빛이 맞다, 정점 조각이 고친 행렬도 같다)\n- 재질: 꼭짓점의 색(sRGB), 빛남(바탕색에 곱해 더함), 빛을 받지 않음. 꼭짓점 UV(arrays.uvData, 2 씩)가 있으면 텍스처를 읽는다.\n- 그리기 꼴(options, 기본값이면 지금까지와 같은 화면):\n  tintColor [r, g, b, a] sRGB 와 alpha. tintAmount 를 주면(0 ~ 1) 틴트를 곱하지 않고 sRGB 로 섞는다. (맞은 번쩍임, 고장 빨강)\n  glowScale 꼭짓점 빛남의 배(기본 1), colorScale 마지막 선형 색의 배(기본 1, 거울에 비친 모습을 어둡게), emissiveColor [r, g, b] sRGB 와 emissiveIntensity(선형 배, 기본 1, 색 기본 검정).\n  baseColorTexture(바탕색에 곱함, 알파는 불투명도에), emissiveTexture(빛남 색에 곱함), uvTransform [u 옮김, v 옮김, u 배, v 배] (KHR_texture_transform 의 offset, scale).\n  decalTexture 는 바탕색 위에 알파로 덮는다(색 = 텍스처 x decalColor). decalEmission 만큼 그 색으로 빛난다. decalUvTransform 은 묶음 그림의 한 칸을 고를 때.\n  alphaCutoff 는 불투명도가 그보다 작은 화소를 버린다. (0 이면 끔, glTF MASK)\n  blendMode: ToonBlendMode.alpha(기본, 곧은 알파), premultiplied(미리 곱한 알파), additive(더하기). alpha 가 아니면 비치는 것으로 그린다.\n  softEdge 는 pow(|dot(N, V)|, softEdge) 를 불투명도에 곱해 가장자리를 엷게 한다. (0 이면 끔, 프레넬 꼴)\n  isMirrored 는 감기를 뒤집어 그린다. 주지 않으면 모형 행렬의 행렬식이 음수일 때 스스로 뒤집는다. 보기 행렬이 거울에 비쳤으면 그것도 더해 뒤집는다.\n  indexStart, indexCount 는 몸의 꼭짓점 번호 가운데 그 자리만 그린다. (GLB 재질 범위, 숨긴 부분) outlineIndexStart, outlineIndexCount 는 바깥선 껍데기.\n  material(ToonMaterial), textures({ 유니폼 이름: 텍스처 }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) 는 확장 자리다. (toonmaterial.js 머리말)\n  lightSet(ToonLightSet) 은 그 그리기의 빛 묶음이다.\n  receivesShadow (기본 true) 가 false 면 해의 그림자를 보지 않는다. shadeOffset 은 빛을 받는 몫에 더해 그늘 경계를 옮긴다. (길티기어 Xrd 의 꼭짓점 색 문턱, 유니티 툰 셰이더의 Shading Grade Map 꼴)\n  specularScale, rimScale (기본 1) 은 그 그리기의 하이라이트와 림 배다. (0 이면 없음, 재질마다의 세기)\n  matcapTexture 는 보기 공간 노멀로 읽는 매트캡이다. matcapStrength (기본 1), matcapBlend (ToonMatcapBlend.multiply 기본, add)\n  outlineColor [r, g, b, a] sRGB 는 그 그리기의 껍데기 바깥선 색 (주지 않으면 setOutlineColor), outlineWidthScale (기본 1) 은 지은 굵기의 배다.\n  outlineOffsetZ (기본 0) 는 껍데기를 카메라에서 먼 쪽으로 미는 월드 길이다. (몸 앞으로 비치지 않게, 유니티 툰 셰이더의 Offset Z)\n  angelRingTexture 는 천사 고리 텍스처다. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 angelRingOffsetV (기본 0.3) 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring)\n  angelRingColor [r, g, b] (선형 배, 기본 흰색), angelRingOffsetU (0 ~ 0.5, 기본 0), isAngelRingAlpha (기본 false 면 더하고 true 면 텍스처 알파로 덮는다)\n  천사 고리 UV 는 카메라 기울임만큼 되돌려 돌린다. (readCameraRoll, 유니티 툰 셰이더의 Camera Rolling Stabilizer, 카메라를 기울여도 고리는 머리에 붙어 있다)\n  lineId, hasScreenOutline, hasCreaseLine 은 ToonDrawQueue 가 화면 공간 바깥선에 넘기는 값이다. (렌더러는 읽지 않는다)\n- 바깥선 껍데기(inverted hull): MeshBuilder 가 지은 껍데기의 바탕 자리와 미는 쪽(지은 굵기, 같은 자리의 노멀을 평균한 쪽)을 올리고, 셰이더가 outlineWidthScale 만큼 밀어 뒷면만 그린다.\n  setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 를 주면 카메라까지의 거리 / 기준 거리 를 굵기에 곱해 화면 굵기를 맞춘다. (원근만)\n  setOutlineFadeDistance(가까운 거리, 먼 거리) 를 주면 모형의 자리에서 카메라까지가 먼 거리에 다가갈수록 굵기가 0 이 된다. (smoothstep, 유니티 툰 셰이더의 Nearest, Farthest Distance)\n  껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)\n- 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)\n- GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)\n  오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (버퍼 전체의 경계로 통째 거름, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)\n  고칠 때는 updateInstanceBuffer(전체) 나 updateInstanceBufferRange(일부, bufferSubData). 몸, 바깥선 껍데기, 그림자, 화면 공간 바깥선의 선의 판이 같은 GPU 버퍼를 같이 쓴다.\n- 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)\n- 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF, 치우침은 ShadowMap.setBias 의 텍셀 단위 값에 텍셀 크기와 기울기를 곱한다)\n  점광과 스포트라이트 그림자는 ShadowAtlas 에 beginShadowAtlasPass, 칸마다 setShadowAtlasTile 과 drawMesh 로 드리우고, setLocalShadows 로 받는다. (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)\n  그 빛의 받는 몫에 그림자를 곱해 그늘 램프에 넣는다. (해와 같은 꼴) castsShadow 가 true 인 점광만 칸을 받는다. (SHADOW_ATLAS_MAXIMUM_LIGHTS 까지)\n  그림자를 받지 않을 때도 두 그림자 유닛에 1x1 비교 깊이 텍스처를 묶는다. (sampler2DShadow 유닛에 깊이 텍스처가 없으면 맥 드라이버가 알리고, 색 텍스처가 묶여 있으면 WebGL 이 그리기를 거부한다)\n- HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.\n- 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.\n  beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.\n  (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)\n  beginFrameWithMatrices(보기, 투영) 는 두 행렬로 시작한다. (직교 원 행렬 카메라) 카메라의 자리와 보기 돌림(하이라이트, 림, 소프트 엣지, 매트캡)은 보기와 투영에서 읽는다.\n- 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR)과 빛 묶음은 바뀔 때만 올린다. 그리기마다 바뀌는 값(모형 행렬, 틴트, 텍스처)만 매번 올린다.\n- readProgramSources(material, instanceLayout) 로 ShaderWarmer 에 넘길 소스를 준다.\n- 노드 사각형 안에 그리기: setScreenRect(x, y, 너비, 높이) 를 주면 beginFrame 이 보기와 투영의 클립 공간을 그 사각형으로 옮기고 가위로 밖을 자른다.\n  사각형은 beginFrame 때의 뷰포트(보통 드로잉 버퍼 전체) 안의 픽셀이고 왼쪽 위가 원점이다. (2D 노드의 draw 에서 graphic.getTransformMatrix 로 셈한 자리)\n  화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.\n- drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)\n- 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)\n- 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.\n- 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))\n- 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.",
+						"en": "Toon renderer. (Draws MeshBuilder and readGlbArrays arrays with single-color material and outlines)\n- Light: holds one ToonLightSet as the default. Sun (direction and color, shadow), ambient light of sky color and ground color, fill light, point lights and spotlights (up to TOON_MAXIMUM_POINT_LIGHTS), rim light, highlight, light model (÷π).\n  Cel shading is a shade ramp. (Base, 1st shade, 2nd shade with Step and Feather of the Unity Toon Shader, shadows enter as the shade color, boundaries without stairs by fwidth, a ramp texture also works)\n  The sun receives the whole ramp color, while the fill light, point lights and spotlights receive the ramp's brightness level. Highlight and rim range from the hard toon form to the soft form. The math is in the ToonLightSet header.\n  setLight, setSunDirection, setFillLight, setShade, setShadeRamp, clearShadeRamp, setBandCount, setBandRamp, setRampTexture, setRimLight, setSpecular, setPointLights, setPointLightLimit,\n  setLightModel change the default set. Another set (createLightSet) can be given per draw with options.lightSet. (When the shade color differs per material)\n- Normals: transformed by the transpose of the inverse of the upper left 3x3 of the model matrix and the joint matrix. (Light stays correct on stretched and squashed models, the same goes for matrices changed by the vertex chunk)\n- Material: vertex color (sRGB), glow (multiplied by the base color and added), unlit. If there are vertex UVs (arrays.uvData, 2 each), textures are read.\n- Draw options (options, the defaults give the same picture as before):\n  tintColor [r, g, b, a] sRGB and alpha. If tintAmount (0 ~ 1) is given, the tint is mixed in sRGB instead of multiplied. (Hit flash, broken red)\n  glowScale multiplier of vertex glow (default 1), colorScale multiplier of the final linear color (default 1, darkens a mirrored image), emissiveColor [r, g, b] sRGB and emissiveIntensity (linear multiplier, default 1, color default black).\n  baseColorTexture (multiplied by the base color, alpha into opacity), emissiveTexture (multiplied by the glow color), uvTransform [u offset, v offset, u scale, v scale] (offset and scale of KHR_texture_transform).\n  decalTexture covers the base color with alpha (color = texture x decalColor). It glows in that color by decalEmission. decalUvTransform picks one cell of an atlas.\n  alphaCutoff discards pixels whose opacity is below it. (0 turns it off, glTF MASK)\n  blendMode: ToonBlendMode.alpha (default, straight alpha), premultiplied (premultiplied alpha), additive (add). Anything other than alpha is drawn as transparent.\n  softEdge multiplies pow(|dot(N, V)|, softEdge) into the opacity to thin the edges. (0 turns it off, Fresnel form)\n  isMirrored draws with the winding flipped. If not given, it flips by itself when the determinant of the model matrix is negative. If the view matrix is mirrored, that flip is added too.\n  indexStart, indexCount draw only that span of the body vertex indices. (GLB material ranges, hidden parts) outlineIndexStart, outlineIndexCount are for the outline shell.\n  material (ToonMaterial), textures ({ uniform name: texture }), onBeforeDraw(program, webGL2RenderingContext, ToonProgramKind) are extension points. (toonmaterial.js header)\n  lightSet (ToonLightSet) is the light set of that draw.\n  If receivesShadow (default true) is false, the sun's shadow is not looked up. shadeOffset is added to the received light amount to move the shade boundary. (Vertex color threshold of Guilty Gear Xrd, Shading Grade Map form of the Unity Toon Shader)\n  specularScale, rimScale (default 1) are the highlight and rim multipliers of that draw. (0 means none, strength per material)\n  matcapTexture is a matcap read with the view-space normal. matcapStrength (default 1), matcapBlend (ToonMatcapBlend.multiply default, add)\n  outlineColor [r, g, b, a] sRGB is the shell outline color of that draw (setOutlineColor if not given), outlineWidthScale (default 1) is the multiplier of the built thickness.\n  outlineOffsetZ (default 0) is the world length the shell is pushed away from the camera. (So it does not show in front of the body, Offset Z of the Unity Toon Shader)\n  angelRingTexture is the angel ring texture. u is the x of the view-space normal, v is the y of the second UV mixed with the y of the view normal by angelRingOffsetV (default 0.3). (Angel Ring of the Unity Toon Shader)\n  angelRingColor [r, g, b] (linear multiplier, default white), angelRingOffsetU (0 ~ 0.5, default 0), isAngelRingAlpha (default false adds, true covers with the texture alpha)\n  The angel ring UV is rotated back by the camera roll. (readCameraRoll, Camera Rolling Stabilizer of the Unity Toon Shader, the ring stays on the head even when the camera is tilted)\n  lineId, hasScreenOutline, hasCreaseLine are values ToonDrawQueue passes to the screen-space outline. (The renderer does not read them)\n- Outline shell (inverted hull): uploads the base position and push direction (built thickness, the averaged normal of the same position) of the shell MeshBuilder built, and the shader pushes it by outlineWidthScale and draws only back faces.\n  If setOutlineDistanceScale(reference distance, minimum scale, maximum scale) is given, distance to the camera / reference distance is multiplied into the thickness to keep the screen thickness. (Perspective only)\n  If setOutlineFadeDistance(near distance, far distance) is given, the thickness goes to 0 as the distance from the model position to the camera approaches the far distance. (smoothstep, Nearest and Farthest Distance of the Unity Toon Shader)\n  The shell color is multiplied by the sun color when the outline light color usage of the light set is on (default). (Divided by its intensity when the intensity is 1 or more, same as the Unity Toon Shader outline)\n- Skeleton: the joint matrices computed by writeSkinPose are passed to drawMesh. (Up to TOON_MAXIMUM_JOINTS)\n- GPU instancing: drawMeshInstanced draws many copies of the same model at once with a matrix and tint per instance. (Both body and outline, culled and uploaded on every draw)\n  Long-lived instances build a persistent buffer with createInstanceLayout and createInstanceBuffer and are drawn with drawMeshInstanceBuffer. (Culled as a whole by the bounds of the entire buffer, the material vertex chunk reads user attributes)\n  To change it use updateInstanceBuffer (whole) or updateInstanceBufferRange (part, bufferSubData). The body, outline shell, shadows and the screen-space outline's line target share the same GPU buffer.\n- Off-screen culling: the model's bounding sphere is tested against the frustum of view and projection and is not drawn if outside. (Instances are culled one by one and only the remaining ones are uploaded)\n- Shadows: cast into a ShadowMap with beginShadowPass and drawMesh, received with setShadow. (3x3 PCF, the bias is the texel-unit value of ShadowMap.setBias multiplied by the texel size and slope)\n  Point light and spotlight shadows are cast into a ShadowAtlas with beginShadowAtlasPass and, per tile, setShadowAtlasTile and drawMesh, and received with setLocalShadows. (A point light uses six cube tiles, a spotlight one perspective tile)\n  The shadow is multiplied into that light's received amount and goes into the shade ramp. (Same form as the sun) Only point lights with castsShadow true get tiles. (Up to SHADOW_ATLAS_MAXIMUM_LIGHTS)\n  Even when shadows are not received, a 1x1 comparison depth texture is bound to both shadow units. (Without a depth texture on a sampler2DShadow unit the Mac driver reports it, and if a color texture is bound WebGL refuses to draw)\n- HDR: setHdrOutput(true) outputs linear color without gamma. Draw into a float render target (ToonPostProcess) and finish with bloom and tone mapping.\n- Use: createMesh(arrays) → every frame beginFrame(view and projection) → drawMesh / drawMeshInstanced → endFrame() → deleteMesh when done.\n  beginFrame notes the previous draw state (blend, depth, face culling, program, vertex array) and turns on depth test and face culling, and endFrame restores the noted state.\n  (When inserted between engine 2D drawing, call Graphic.flushBatch before it)\n  beginFrameWithMatrices(view, projection) starts with two matrices. (Orthographic or raw matrix camera) The camera position and view rotation (highlight, rim, soft edge, matcap) are read from the view and projection.\n- Per program, frame values (view and projection, camera, shadow, HDR) and the light set are uploaded only when changed. Only values that change per draw (model matrix, tint, textures) are uploaded every time.\n- readProgramSources(material, instanceLayout) gives the sources to pass to ShaderWarmer.\n- Drawing inside a node rectangle: if setScreenRect(x, y, width, height) is given, beginFrame moves the clip space of view and projection into that rectangle and cuts the outside with the scissor.\n  The rectangle is in pixels inside the viewport at beginFrame (usually the whole drawing buffer) with the top left as the origin. (The position computed with graphic.getTransformMatrix in a 2D node's draw)\n  Off-screen culling uses the frustum before the move. endFrame releases the scissor. Match the camera aspect ratio to the rectangle's ratio. (Camera3D.setAspectRatio)\n- beginFrameWithCamera(Camera3D) calls beginFrame with the camera's view and projection. It uses the same camera as the 2D display (Camera3D.projectToView).\n- drawMeshOutline draws only the outline shell. (When ToonDrawQueue draws all outlines together after all opaque bodies, drawn counts are not counted)\n- Textures: createTexture(image or { width, height, data }, { isMipmapped, isRepeated, isFiltered }) builds an RGBA texture. UV (0, 0) is the top left of the image. (Same as glTF)\n- Texture units: point light shadow atlas 0, ramp 1, matcap 2, sun shadow 3, base color 4, glow 5, decal 6, angel ring 7, material 8 ~ 15. beginFrame notes the binding of unit 0 and endFrame restores it.\n- Second UV: if the arrays have uv1Data, vertexUv is four values (UV, second UV). Shader chunks read it as ToonSurface.uv1. ((0, 1) if none)\n- Light color usage (setLightColorUsage), shade-side rim (setShadeRimLight) and light intensity limit (setLightIntensityLimited) live in the light set (ToonLightSet)."
 					},
 					"examples": [
 						{
@@ -65233,8 +65373,8 @@
 							"returns": {
 								"type": "object",
 								"description": {
-									"ko": "인스턴스 버퍼. ({ layout, buffer, usage, floatCount, vertexArrays })",
-									"en": "Instance buffer. ({ layout, buffer, usage, floatCount, vertexArrays })"
+									"ko": "인스턴스 버퍼. ({ layout, buffer, usage, floatCount, vertexArrays, generation, bounds, data, renderer })\ngeneration 은 고치거나 지울 때마다 1 씩 는다. (그림자 캐시가 버퍼 바뀜을 안다) bounds 는 버퍼 전체의 경계다. (꼴에 행렬이 있을 때만, 아니면 null)\ndata 는 경계를 다시 셀 사본이다. (행렬이 있을 때만, 고치지 않는다) 그리는 길(drawMeshInstanceBuffer, ToonScreenOutline.drawMeshInstanceBuffer, ToonDrawQueue.addMeshInstanceBuffer)이 모두 이 한 GPU 버퍼를 같이 쓰고 다시 올리지 않는다.",
+									"en": "Instance buffer. ({ layout, buffer, usage, floatCount, vertexArrays, generation, bounds, data, renderer })\ngeneration grows by 1 each time it is changed or deleted. (The shadow cache learns the buffer changed) bounds is the bounds of the entire buffer. (Only when the layout has a matrix, otherwise null)\ndata is a copy for recomputing the bounds. (Only when there is a matrix, do not change it) All drawing paths (drawMeshInstanceBuffer, ToonScreenOutline.drawMeshInstanceBuffer, ToonDrawQueue.addMeshInstanceBuffer) share this one GPU buffer and do not upload it again."
 								}
 							},
 							"description": {
@@ -65297,6 +65437,53 @@
 						},
 						{
 							"kind": "method",
+							"name": "updateInstanceBufferRange",
+							"signature": "updateInstanceBufferRange(instanceBuffer, firstInstance, data)",
+							"params": [
+								{
+									"name": "instanceBuffer",
+									"type": "object",
+									"description": {
+										"ko": "createInstanceBuffer 의 결과.",
+										"en": "Result of createInstanceBuffer."
+									}
+								},
+								{
+									"name": "firstInstance",
+									"type": "number",
+									"description": {
+										"ko": "고칠 첫 인스턴스 번호. (0 부터)",
+										"en": "Number of the first instance to change. (From 0)"
+									}
+								},
+								{
+									"name": "data",
+									"type": "Float32Array",
+									"description": {
+										"ko": "꼴의 수 개수씩 고칠 인스턴스를 이어 담은 수. (버퍼에 든 인스턴스 수를 넘으면 던진다, 늘리려면 updateInstanceBuffer)",
+										"en": "Values holding the instances to change one after another, the layout's value count each. (Throws if it goes past the number of instances in the buffer, use updateInstanceBuffer to grow it)"
+									}
+								}
+							],
+							"description": {
+								"ko": "인스턴스 버퍼의 일부 고치기. (firstInstance 번째부터 data 의 인스턴스 수만큼만 올림, bufferSubData)",
+								"en": "Changes part of an instance buffer. (Uploads only as many instances as data holds, starting at the firstInstance-th, bufferSubData)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonrenderer.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "바위 하나만 옮기고 다시 올리지 않고 그리기",
+										"en": "Move only one rock and draw without uploading again"
+									},
+									"code": "import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), \"#909098\");\nconst rockMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceMatrix\", size: 16 }, { name: \"instanceTint\", size: 4 }]);\nconst data = new Float32Array(20 * 3);\nfor (let index = 0; index < 3; ++index) {\n\tdata.set(Matrix4.createTranslation(index - 1, 0, 0).getElements(), index * 20);\n\tdata.set([1, 1, 1, 1], index * 20 + 16);\n}\nconst instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data, \"dynamic\");\nconst moved = new Float32Array(20);\nmoved.set(Matrix4.createTranslation(0, 0.5, 0).getElements(), 0);\nmoved.set([1, 0.6, 0.6, 1], 16);\nrenderer.updateInstanceBufferRange(instanceBuffer, 1, moved);\nrenderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));\nrenderer.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3);\nrenderer.endFrame();\nif (instanceBuffer.generation !== 1) {\n\tthrow new Error(\"generation failed\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "deleteInstanceBuffer",
 							"signature": "deleteInstanceBuffer(instanceBuffer)",
 							"params": [
@@ -65310,8 +65497,8 @@
 								}
 							],
 							"description": {
-								"ko": "인스턴스 버퍼 지우기. (그 버퍼로 지은 버텍스 어레이도, 모형보다 먼저 지운다)",
-								"en": "Deletes an instance buffer. (also the vertex arrays built with it, delete before the model)"
+								"ko": "인스턴스 버퍼 지우기. (그 버퍼로 지은 버텍스 어레이도, 모형보다 먼저 지운다, 지운 버퍼로 그리면 아무것도 그리지 않는다)",
+								"en": "Deletes an instance buffer. (also the vertex arrays built with it, delete before the model, drawing with a deleted buffer draws nothing)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js",
@@ -66122,14 +66309,14 @@
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다)",
-										"en": "Same as drawMesh. (The material's vertex chunk reads user attributes)"
+										"ko": "drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다, isCulled 가 false 면 거르지 않는다)",
+										"en": "Same as drawMesh. (The material's vertex chunk reads user attributes, not culled if isCulled is false)"
 									}
 								}
 							],
 							"description": {
-								"ko": "영구 인스턴스 버퍼로 그리기. (거르지 않음, instanceCount 개, 꼴에 행렬이 없으면 정점 조각이 자리를 정한다)",
-								"en": "Draws with a persistent instance buffer. (no culling, instanceCount instances, if the layout has no matrix the vertex snippet decides the position)"
+								"ko": "영구 인스턴스 버퍼로 그리기. (버퍼 전체의 경계로 통째 거른다, instanceCount 개, 꼴에 행렬이 없으면 정점 조각이 자리를 정하고 거르지 않는다)",
+								"en": "Draws with a persistent instance buffer. (Culled as a whole by the bounds of the entire buffer, instanceCount instances, if the layout has no matrix the vertex chunk sets the position and it is not culled)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js",
@@ -67963,6 +68150,98 @@
 							"language": "javascript"
 						}
 					]
+				},
+				{
+					"kind": "method",
+					"name": "readInstanceBufferSphere",
+					"signature": "readInstanceBufferSphere(mesh, instanceBuffer)",
+					"params": [
+						{
+							"name": "mesh",
+							"type": "object",
+							"description": {
+								"ko": "ToonRenderer.createMesh 의 결과.",
+								"en": "Result of ToonRenderer.createMesh."
+							}
+						},
+						{
+							"name": "instanceBuffer",
+							"type": "object",
+							"description": {
+								"ko": "ToonRenderer.createInstanceBuffer 의 결과.",
+								"en": "The result of ToonRenderer.createInstanceBuffer."
+							}
+						}
+					],
+					"returns": {
+						"type": "Array<number> | null",
+						"description": {
+							"ko": "[x, y, z, 반지름]. (꼴에 행렬이 없어 경계를 모르면 null)",
+							"en": "[x, y, z, radius]. (null if the layout has no matrix and the bounds are unknown)"
+						}
+					},
+					"description": {
+						"ko": "모형을 인스턴스 버퍼로 그릴 때의 월드 경계 구. (버퍼의 경계에 모형의 경계 구를 가장 큰 크기로 더한 것, 걸러도 빠지는 화소가 없다)",
+						"en": "The world bounding sphere when drawing a model with an instance buffer. (The buffer's bounds plus the model's bounding sphere at the largest scale, culling with it drops no pixels)"
+					},
+					"since": "0.4.0",
+					"source": "src/graphics3d/toon/toonrenderer.js",
+					"examples": [
+						{
+							"title": {
+								"ko": "나무 버퍼 전체가 화면에 드는지 보기",
+								"en": "See whether a whole tree buffer is on screen"
+							},
+							"code": "import { ToonRenderer, MeshBuilder, createCylinderGeometry, readInstanceBufferSphere, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createCylinderGeometry(0.02, 0.4, 1, 8), Matrix4.createTranslation(0, 0.5, 0), \"#4a8040\");\nconst treeMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceMatrix\", size: 16 }]);\nconst data = new Float32Array(16 * 2);\ndata.set(Matrix4.createTranslation(-3, 0, 0).getElements(), 0);\ndata.set(Matrix4.createTranslation(3, 0, 0).getElements(), 16);\nconst sphere = readInstanceBufferSphere(treeMesh, renderer.createInstanceBuffer(instanceLayout, data));\nif (sphere === null || sphere[0] !== 0 || sphere[3] < 3) {\n\tthrow new Error(\"bounds failed\");\n}",
+							"language": "javascript"
+						}
+					]
+				},
+				{
+					"kind": "method",
+					"name": "isSphereInFrustum",
+					"signature": "isSphereInFrustum(frustumPlanes, sphere)",
+					"params": [
+						{
+							"name": "frustumPlanes",
+							"type": "Array<Array<number>>",
+							"description": {
+								"ko": "extractFrustumPlanes 의 결과.",
+								"en": "The result of extractFrustumPlanes."
+							}
+						},
+						{
+							"name": "sphere",
+							"type": "Array<number>",
+							"description": {
+								"ko": "[x, y, z, 반지름].",
+								"en": "[x, y, z, radius]."
+							}
+						}
+					],
+					"returns": {
+						"type": "boolean",
+						"description": {
+							"ko": "절두체 안에 들거나 걸치면 true.",
+							"en": "true if inside or straddling the frustum."
+						}
+					},
+					"description": {
+						"ko": "구가 절두체 안에 드는지. (extractFrustumPlanes 의 면 여섯)",
+						"en": "Whether a sphere is inside the frustum. (The six planes of extractFrustumPlanes)"
+					},
+					"since": "0.4.0",
+					"source": "src/graphics3d/toon/toonrenderer.js",
+					"examples": [
+						{
+							"title": {
+								"ko": "카메라 앞뒤의 구 가르기",
+								"en": "Tell spheres in front of and behind the camera apart"
+							},
+							"code": "import { extractFrustumPlanes, isSphereInFrustum, Matrix4, Vector3 } from \"./vanilla.js\";\nconst viewProjectionMatrix = Matrix4.createPerspective(0.8, 1, 0.1, 50);\nviewProjectionMatrix.multiply(Matrix4.createLookAt(Vector3.create(0, 0, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)));\nconst planes = extractFrustumPlanes(viewProjectionMatrix);\nif (!isSphereInFrustum(planes, [0, 0, 0, 1]) || isSphereInFrustum(planes, [0, 0, 20, 1])) {\n\tthrow new Error(\"unexpected culling\");\n}",
+							"language": "javascript"
+						}
+					]
 				}
 			],
 			"enums": [
@@ -68036,8 +68315,8 @@
 				{
 					"name": "ToonPostProcess",
 					"summary": {
-						"ko": "툰 HDR 마무리. (실수 렌더 타겟에 그린 선형 색을 블룸, 노출, 톤매핑, 감마로 화면에 낸다)\n- RenderTarget(반정밀 실수 색, 깊이), BloomEffect(또는 MultiLevelBloomEffect), FullscreenPass 를 엮는다.\n- 사용: ToonRenderer.setHdrOutput(true) 뒤 begin(바탕 선형 색) → ToonRenderer 로 그리기 → end(낼 프레임버퍼, 뷰포트)\n  end 는 (멀티샘플이면 풀고) 블룸을 셈하고 톤매핑한 색을 낼 프레임버퍼(null 이면 화면)에 그린다.\n- 생성 옵션: new ToonPostProcess(gl, 너비, 높이, { sampleCount, useFloatColor, depthBits, useDepthTexture }) (옵션이 없으면 지금과 같은 RGBA16F, 깊이 16, 멀티샘플 없음)\n  sampleCount 가 2 이상이면 씬을 멀티샘플(MSAA) 렌더버퍼에 그리고 end 앞에서 텍스처로 푼다. 기기가 받는 수로 줄인다. (getSampleCount, setSampleCount)\n  depthBits 24 는 깊이 24 비트. (먼 면이 먼 장면) useDepthTexture 는 씬 깊이를 텍스처로 남긴다. (setLitArea 가 쓴다)\n- 색 공간: 씬 렌더 타겟에는 선형 색을 쓴다. (ToonRenderer.setHdrOutput(true), ToonScreenOutline.setHdrOutput(true), ToonVfx 색도 선형으로 본다)\n  감마를 건 색 g 를 실수 판에 쓰고 합성에서 g^2.2 로 되돌리던 게임은 그 값을 미리 선형으로 바꿔 넘긴다. 색은 c^2.2, 감마 쪽에서 곱하던 밝기 배 k 는 선형 k^2.2 다.\n  (예: 1.37 은 선형 2, 1.6 은 2.81, 2.08 은 5, 밝기 1.6 에 배 1.6 이면 (1.6 x 1.6)^2.2 = 7.9) 블룸 문턱과 무릎은 선형 밝기다.\n- 실수 판을 못 쓰는 기기: useFloatColor(기본 true)여도 ToonPostProcess.isFloatColorSupported 가 false 면 RGBA8 판으로 짓는다. (getUseFloatColor 가 false)\n  그때와 useFloatColor: false 는 LDR 길이다. 씬에는 화면 색(감마를 건 색, ToonRenderer.setHdrOutput(false))을 그리고, 합성은 톤매핑과 감마 없이 블룸을 더해 색 보정만 건다.\n- 블룸: 기본은 반 해상도 9 탭 가우시안(BloomEffect, 문턱 0.9 ~ 1.6, 주고받는 판 RGBA8, setBloomFloatColor 로 RGBA16F).\n  setBloomLevels(단 수, 문턱, 무릎) 로 단 수를 1 이상 주면 MultiLevelBloomEffect(반씩 줄였다 천막 꼴로 키우며 더함, 씬과 같은 정밀도의 판)로 바꾼다. 0 이면 기본으로 돌린다. 세기는 setBloom 이 둘 다에 쓴다.\n- 톤매핑은 ACES 근사(Krzysztof Narkowicz 2016, 원문이 CC0 또는 MIT 로 쓰게 함)다. 노출(setExposure)을 곱한 뒤 매핑하고 sRGB 감마를 건다.\n- 색 보정: 감마를 건 뒤 밝기(setBrightness, 밝힌 자리 setLitArea 안은 1 쪽으로), 채도, 색조(밝기 1 로 맞춘 색을 곱함), 안개빛(어두운 곳을 그 색 쪽으로), 대비, 가장자리 어둡게 차례로 건다. (setColorGrade, setVignette)\n  기본은 밝기 1, 채도 1, 대비 1, 색조 0, 안개빛 0, 가장자리 0 이라 보정이 없다.\n- 해상도 배율: setResolutionScale(배율) 이면 씬 판을 출력 크기 x 배율로 짓고 end 의 뷰포트로 키워(선형 거르기) 낸다. (3D 만 낮춰 그리고 UI 는 기기 화소 그대로 둘 때, 기본 1)\n- 노드 사각형 안에 낼 때: resize(사각형 너비, 높이) → begin → 그리기(ToonRenderer 의 화면 사각형은 풀어 둔다) → end(null, [x, 드로잉 버퍼 높이 - y - 높이, 너비, 높이]).",
-						"en": "Toon HDR finishing. (outputs linear color drawn to a float render target to the screen with bloom, exposure, tone mapping and gamma)\n- Combines RenderTarget (half-float color, depth), BloomEffect (or MultiLevelBloomEffect) and FullscreenPass.\n- Usage: after ToonRenderer.setHdrOutput(true), begin(background linear color) → draw with ToonRenderer → end(output framebuffer, viewport)\n  end (resolves first if multisampled) computes bloom and draws the tone-mapped color into the output framebuffer (screen if null).\n- Constructor options: new ToonPostProcess(gl, width, height, { sampleCount, useFloatColor, depthBits, useDepthTexture }) (without options, same as now: RGBA16F, depth 16, no multisampling)\n  If sampleCount is 2 or more, the scene is drawn to a multisampled (MSAA) renderbuffer and resolved to a texture before end. Reduced to a count the device supports. (getSampleCount, setSampleCount)\n  depthBits 24 means 24-bit depth. (scenes with a distant far plane) useDepthTexture keeps the scene depth as a texture. (used by setLitArea)\n- Color space: linear color is written to the scene render target. (ToonRenderer.setHdrOutput(true), ToonScreenOutline.setHdrOutput(true), ToonVfx colors are also treated as linear)\n  Games that wrote gamma-encoded color g to the float target and converted back with g^2.2 in compositing should convert those values to linear beforehand. Colors become c^2.2, and a brightness multiplier k applied on the gamma side becomes linear k^2.2.\n  (e.g. 1.37 is linear 2, 1.6 is 2.81, 2.08 is 5, brightness 1.6 with multiplier 1.6 gives (1.6 x 1.6)^2.2 = 7.9) Bloom threshold and knee are linear brightness.\n- Devices that cannot use float targets: even with useFloatColor (default true), if ToonPostProcess.isFloatColorSupported is false, RGBA8 targets are built. (getUseFloatColor is false)\n  That case and useFloatColor: false take the LDR path. The scene is drawn in screen color (gamma-encoded color, ToonRenderer.setHdrOutput(false)), and compositing adds bloom without tone mapping and gamma and applies only color grading.\n- Bloom: default is a half-resolution 9-tap Gaussian (BloomEffect, threshold 0.9 ~ 1.6, ping-pong targets RGBA8, RGBA16F with setBloomFloatColor).\n  Giving setBloomLevels(level count, threshold, knee) a level count of 1 or more switches to MultiLevelBloomEffect (halves down then scales up with a tent filter while adding, targets at the same precision as the scene). 0 restores the default. Strength is applied to both by setBloom.\n- Tone mapping is the ACES approximation (Krzysztof Narkowicz 2016, whose post lets it be used under CC0 or MIT). Exposure (setExposure) is multiplied in before mapping, then sRGB gamma is applied.\n- Color grading: after gamma, applies in order brightness (setBrightness, toward 1 inside the lit area setLitArea), saturation, color tone (multiplies a color normalized to brightness 1), fog light (pulls dark areas toward that color), contrast, edge darkening. (setColorGrade, setVignette)\n  Defaults are brightness 1, saturation 1, contrast 1, color tone 0, fog light 0, edge 0, so there is no grading.\n- Resolution scale: with setResolutionScale(scale), the scene target is built at output size x scale and scaled up to end's viewport (linear filtering) for output. (to render only 3D at a lower resolution while leaving UI at device pixels, default 1)\n- Outputting inside a node rectangle: resize(rectangle width, height) → begin → draw (leave ToonRenderer's screen rectangle cleared) → end(null, [x, drawing buffer height - y - height, width, height])."
+						"ko": "툰 HDR 마무리. (실수 렌더 타겟에 그린 선형 색을 블룸, 노출, 톤매핑, 감마로 화면에 낸다)\n- RenderTarget(반정밀 실수 색, 깊이), BloomEffect(또는 MultiLevelBloomEffect), FullscreenPass 를 엮는다.\n- 사용: ToonRenderer.setHdrOutput(true) 뒤 begin(바탕 선형 색) → ToonRenderer 로 그리기 → end(낼 프레임버퍼, 뷰포트)\n  end 는 (멀티샘플이면 풀고) 블룸을 셈하고 톤매핑한 색을 낼 프레임버퍼(null 이면 화면)에 그린다.\n- 생성 옵션: new ToonPostProcess(gl, 너비, 높이, { sampleCount, useFloatColor, depthBits, useDepthTexture }) (옵션이 없으면 지금과 같은 RGBA16F, 깊이 16, 멀티샘플 없음)\n  sampleCount 가 2 이상이면 씬을 멀티샘플(MSAA) 렌더버퍼에 그리고 end 앞에서 텍스처로 푼다. 기기가 받는 수로 줄인다. (getSampleCount, setSampleCount)\n  depthBits 24 는 깊이 24 비트. (먼 면이 먼 장면) useDepthTexture 는 씬 깊이를 텍스처로 남긴다. (setLitArea 가 쓴다)\n- 색 공간: 씬 렌더 타겟에는 선형 색을 쓴다. (ToonRenderer.setHdrOutput(true), ToonScreenOutline.setHdrOutput(true), ToonVfx 색도 선형으로 본다)\n  감마를 건 색 g 를 실수 판에 쓰고 합성에서 g^2.2 로 되돌리던 게임은 그 값을 미리 선형으로 바꿔 넘긴다. 색은 c^2.2, 감마 쪽에서 곱하던 밝기 배 k 는 선형 k^2.2 다.\n  (예: 1.37 은 선형 2, 1.6 은 2.81, 2.08 은 5, 밝기 1.6 에 배 1.6 이면 (1.6 x 1.6)^2.2 = 7.9) 블룸 문턱과 무릎은 선형 밝기다.\n  이 예는 감마 쪽(감마를 건 색 g)에서 곱하던 배일 때만 맞다. 선형 색에 곱하던 배와 블룸 문턱, 무릎처럼 처음부터 선형인 값은 바꾸지 않고 그대로 넘긴다.\n- 실수 판을 못 쓰는 기기: useFloatColor(기본 true)여도 ToonPostProcess.isFloatColorSupported 가 false 면 RGBA8 판으로 짓는다. (getUseFloatColor 가 false)\n  그때와 useFloatColor: false 는 LDR 길이다. 씬에는 화면 색(감마를 건 색, ToonRenderer.setHdrOutput(false))을 그리고, 합성은 톤매핑과 감마 없이 블룸을 더해 색 보정만 건다.\n- 블룸: 기본은 반 해상도 9 탭 가우시안(BloomEffect, 문턱 0.9 ~ 1.6, 주고받는 판 RGBA8, setBloomFloatColor 로 RGBA16F).\n  setBloomLevels(단 수, 문턱, 무릎) 로 단 수를 1 이상 주면 MultiLevelBloomEffect(반씩 줄였다 천막 꼴로 키우며 더함, 씬과 같은 정밀도의 판)로 바꾼다. 0 이면 기본으로 돌린다. 세기는 setBloom 이 둘 다에 쓴다.\n- 톤매핑은 ACES 근사(Krzysztof Narkowicz 2016, 원문이 CC0 또는 MIT 로 쓰게 함)다. 노출(setExposure)을 곱한 뒤 매핑하고 sRGB 감마를 건다.\n- 색 보정: 감마를 건 뒤 밝기(setBrightness, 밝힌 자리 setLitArea 안은 1 쪽으로), 채도, 색조(밝기 1 로 맞춘 색을 곱함), 안개빛(어두운 곳을 그 색 쪽으로), 대비, 가장자리 어둡게 차례로 건다. (setColorGrade, setVignette)\n  기본은 밝기 1, 채도 1, 대비 1, 색조 0, 안개빛 0, 가장자리 0 이라 보정이 없다.\n- 해상도 배율: setResolutionScale(배율) 이면 씬 판을 출력 크기 x 배율로 짓고 end 의 뷰포트로 키워(선형 거르기) 낸다. (3D 만 낮춰 그리고 UI 는 기기 화소 그대로 둘 때, 기본 1)\n- 노드 사각형 안에 낼 때: resize(사각형 너비, 높이) → begin → 그리기(ToonRenderer 의 화면 사각형은 풀어 둔다) → end(null, [x, 드로잉 버퍼 높이 - y - 높이, 너비, 높이]).",
+						"en": "Toon HDR finishing. (outputs linear color drawn to a float render target to the screen with bloom, exposure, tone mapping and gamma)\n- Combines RenderTarget (half-float color, depth), BloomEffect (or MultiLevelBloomEffect) and FullscreenPass.\n- Usage: after ToonRenderer.setHdrOutput(true), begin(background linear color) → draw with ToonRenderer → end(output framebuffer, viewport)\n  end (resolves first if multisampled) computes bloom and draws the tone-mapped color into the output framebuffer (screen if null).\n- Constructor options: new ToonPostProcess(gl, width, height, { sampleCount, useFloatColor, depthBits, useDepthTexture }) (without options, same as now: RGBA16F, depth 16, no multisampling)\n  If sampleCount is 2 or more, the scene is drawn to a multisampled (MSAA) renderbuffer and resolved to a texture before end. Reduced to a count the device supports. (getSampleCount, setSampleCount)\n  depthBits 24 means 24-bit depth. (scenes with a distant far plane) useDepthTexture keeps the scene depth as a texture. (used by setLitArea)\n- Color space: linear color is written to the scene render target. (ToonRenderer.setHdrOutput(true), ToonScreenOutline.setHdrOutput(true), ToonVfx colors are also treated as linear)\n  Games that wrote gamma-encoded color g to the float target and converted back with g^2.2 in compositing should convert those values to linear beforehand. Colors become c^2.2, and a brightness multiplier k applied on the gamma side becomes linear k^2.2.\n  (e.g. 1.37 is linear 2, 1.6 is 2.81, 2.08 is 5, brightness 1.6 with multiplier 1.6 gives (1.6 x 1.6)^2.2 = 7.9) Bloom threshold and knee are linear brightness.\n  These examples hold only for a multiplier that was applied on the gamma side (to the gamma-encoded color g). A multiplier that was applied to linear colors, and values that are linear from the start such as the bloom threshold and knee, are passed as they are without conversion.\n- Devices that cannot use float targets: even with useFloatColor (default true), if ToonPostProcess.isFloatColorSupported is false, RGBA8 targets are built. (getUseFloatColor is false)\n  That case and useFloatColor: false take the LDR path. The scene is drawn in screen color (gamma-encoded color, ToonRenderer.setHdrOutput(false)), and compositing adds bloom without tone mapping and gamma and applies only color grading.\n- Bloom: default is a half-resolution 9-tap Gaussian (BloomEffect, threshold 0.9 ~ 1.6, ping-pong targets RGBA8, RGBA16F with setBloomFloatColor).\n  Giving setBloomLevels(level count, threshold, knee) a level count of 1 or more switches to MultiLevelBloomEffect (halves down then scales up with a tent filter while adding, targets at the same precision as the scene). 0 restores the default. Strength is applied to both by setBloom.\n- Tone mapping is the ACES approximation (Krzysztof Narkowicz 2016, whose post lets it be used under CC0 or MIT). Exposure (setExposure) is multiplied in before mapping, then sRGB gamma is applied.\n- Color grading: after gamma, applies in order brightness (setBrightness, toward 1 inside the lit area setLitArea), saturation, color tone (multiplies a color normalized to brightness 1), fog light (pulls dark areas toward that color), contrast, edge darkening. (setColorGrade, setVignette)\n  Defaults are brightness 1, saturation 1, contrast 1, color tone 0, fog light 0, edge 0, so there is no grading.\n- Resolution scale: with setResolutionScale(scale), the scene target is built at output size x scale and scaled up to end's viewport (linear filtering) for output. (to render only 3D at a lower resolution while leaving UI at device pixels, default 1)\n- Outputting inside a node rectangle: resize(rectangle width, height) → begin → draw (leave ToonRenderer's screen rectangle cleared) → end(null, [x, drawing buffer height - y - height, width, height])."
 					},
 					"examples": [
 						{
@@ -72767,6 +73046,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/shadowmap.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/shadowmap",
+								"class": "ShadowMap",
+								"name": "set_bias"
+							},
 							"examples": [
 								{
 									"title": {
@@ -72795,7 +73080,13 @@
 								"en": "Returns the depth bias."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/shadowmap.js"
+							"source": "src/graphics3d/shadowmap.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/shadowmap",
+								"class": "ShadowMap",
+								"name": "get_depth_bias"
+							}
 						},
 						{
 							"kind": "method",
@@ -72814,7 +73105,13 @@
 								"en": "Returns the normal bias."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/shadowmap.js"
+							"source": "src/graphics3d/shadowmap.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/shadowmap",
+								"class": "ShadowMap",
+								"name": "get_normal_bias"
+							}
 						},
 						{
 							"kind": "method",
@@ -87556,6 +87853,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "알면 참.",
+									"en": "True if known."
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형 셈하기. (오버라이드: 살아 있는 파티클이 그리는 쿼드를 모두 품는 사각형, 노드 내용 좌표)\n- 파티클마다 그리는 크기의 반에 √2 를 곱한 만큼(돌린 사각형, 그림), 꼬리 쿼드면 머리와 꼬리를 품고 굵기의 반만큼, 흔들림 폭만큼 좌우를 넓히고 한 단위 여유를 둔다.\n- 시뮬레이션(simulate)이 돌 때마다, 방출(emit)과 지움(stop)에, 그리는 꼴을 바꾸는 세터에 다시 셈하게 알린다. (그리는 것이 화면 밖이면 그리기를 건너뛰고 시뮬레이션은 tick 이라 그대로 돈다)\n- 파티클이 없으면 크기 0 (그리지 않는다).\n- 월드 공간이면서 수동 틱이면 모른다. (노드를 옮기면 그리는 자리가 바뀌는데 그때 다시 셈할 길이 없다)",
+								"en": "Calculates the drawn rectangle. (Override: a rectangle enclosing every quad the live particles draw, in node content coordinates)\n- Each particle grows by half its drawn size times √2 (rotated rectangles, images), streak quads enclose head and tail grown by half the width, the wobble amplitude is added left and right, plus one unit of margin.\n- Recalculation is requested whenever the simulation (simulate) runs, on emit and on clearing (stop), and in setters that change how particles are drawn. (Drawing is skipped when off screen while the simulation keeps running in tick)\n- With no particles the size is 0 (nothing is drawn).\n- Unknown when in world space with manual tick. (Moving the node moves where it draws and there is no point at which to recalculate)"
+							},
+							"since": "0.4.0",
+							"source": "src/effect/particlesystem.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "방출한 파티클을 품는 사각형",
+										"en": "A rectangle enclosing emitted particles"
+									},
+									"code": "import { WorldNode, ParticleSystem, Rect } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nconst particleSystem = node.addComponent(ParticleSystem);\nparticleSystem.setStartSpeed(0);\nparticleSystem.setStartSize(10);\nparticleSystem.emit(3);\nconst drawnRect = Rect.zero();\nconsole.log(particleSystem.calculateDrawnRect(drawnRect), drawnRect.size.x > 0);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "setEmissionRate",
 							"signature": "setEmissionRate(emissionRate)",
 							"params": [
@@ -88950,6 +89285,44 @@
 								"class": "TrailRenderer",
 								"name": "clear"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "calculateDrawnRect",
+							"signature": "calculateDrawnRect(rect)",
+							"params": [
+								{
+									"name": "rect",
+									"type": "Rect",
+									"description": {
+										"ko": "그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)",
+										"en": "Where to write the drawn rectangle. (origin at the top-left of the node's content area)"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "알면 참.",
+									"en": "True if known."
+								}
+							},
+							"description": {
+								"ko": "그리는 사각형 셈하기. (오버라이드: 점을 이은 띠를 모두 품는 사각형, 노드 내용 좌표)\n- 점은 노드 자리를 뺀 자리에 그리므로 지금 노드 자리로 옮기고, 두 굵기 가운데 큰 것의 반과 한 단위 여유만큼 넓힌다. (선 끝과 이음까지)\n- 점이 있으면 tick 마다, 지움(clear)과 굵기를 바꾸면 다시 셈하게 알린다. 점이 둘보다 적으면 그리지 않으므로 크기 0.",
+								"en": "Calculates the drawn rectangle. (Override: a rectangle enclosing the band joining the points, in node content coordinates)\n- Points are drawn relative to the node position, so they are moved by the current node position and grown by half the larger of the two widths plus one unit of margin. (Covering line ends and joins)\n- Recalculation is requested every tick while points exist, on clear, and when the width changes. With fewer than two points nothing is drawn, so the size is 0."
+							},
+							"since": "0.4.0",
+							"source": "src/effect/trailrenderer.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "지나간 자리를 품는 사각형",
+										"en": "A rectangle enclosing the path travelled"
+									},
+									"code": "import { WorldNode, TrailRenderer, Rect, Vector2 } from \"./build/vanilla.js\";\n\nconst node = new WorldNode();\nconst trailRenderer = node.addComponent(TrailRenderer);\ntrailRenderer.setWidth(10, 0);\ntrailRenderer.tick(0.016);\nnode.setLocalPosition(Vector2.create(100, 0));\ntrailRenderer.tick(0.016);\nconst drawnRect = Rect.zero();\nconsole.log(trailRenderer.calculateDrawnRect(drawnRect), drawnRect.position.x, drawnRect.size.x);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -98553,8 +98926,8 @@
 				{
 					"name": "ToonDrawQueue",
 					"summary": {
-						"ko": "툰 그리기 줄. (한 프레임에 그릴 모형을 담아 두었다가 ToonRenderer 로 차례를 맞춰 그린다)\n- 차례: (화면 공간 바깥선의 선의 판) → 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 껍데기 → 화면 공간 바깥선 → afterOutline\n  → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.\n  몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.\n- 불투명한 것(몸, 바깥선 껍데기, 그림자 깊이)은 재질, 모형, 바탕색 텍스처로 정렬해 그린다. (같은 것끼리는 담은 차례, 유니티 SRP Batcher 처럼 상태를 덜 바꾼다)\n  깊이 시험(LEQUAL)으로 가장 가까운 것이 남으므로 화면은 담은 차례와 같다. 깊이가 꼭 같은 면(겹친 평면)만 나중에 그린 것이 이겨 차례가 드러난다.\n  그런 것은 한 모형으로 합치거나 깊이를 띄운다. 비치는 것은 지금처럼 먼 것부터 담은 차례로 그린다.\n- 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선 껍데기도 함께(hasOutline) 그린다.\n- 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.\n  options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.\n  여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.\n- 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.\n  번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.\n  비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.\n- 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.\n- 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.\n- 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.\n  그림자 판의 setUpdateMode(ShadowUpdateMode) 를 따른다. 기본 onChange 는 빛과 드리우개가 그대로면 다시 그리지 않고, 오래 그대로인 것은 구워 두고 움직이는 것만 덧그린다. (화면은 매 프레임 그린 것과 같다)\n  점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)\n- 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)\n  draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)\n  화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)\n- 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.",
-						"en": "Toon draw queue. (Holds the models to draw in a frame, then draws them in order with ToonRenderer)\n- Order: (line target of the screen-space outline) → stage beforeOpaque → opaque bodies → afterOpaque → outline shells of opaque things → screen-space outline → afterOutline\n  → transparent things (farthest from the camera first, depth not written) → afterTransparent.\n  Outlines are drawn together after all bodies to switch programs less, and transparent things are blended last from the farthest so what is behind shows through.\n- Opaque things (bodies, outline shells, shadow depth) are drawn sorted by material, model and base color texture. (Ties keep the order they were added, so state changes less, like the Unity SRP Batcher)\n  The depth test (LEQUAL) keeps the nearest one, so the screen is the same as in the added order. Only faces at exactly the same depth (overlapping planes) show the order, because the one drawn later wins.\n  Merge such things into one model or offset their depth. Transparent things are drawn as before, farthest first in the added order.\n- Transparent things: those whose alpha or tintColor alpha at draw time is below 1, or whose blendMode is not alpha. Their outline shells are drawn with them too (hasOutline).\n- Groups: transparent things with the same options.group are sorted as one lump by the middle depth (average of the members) and drawn in the order they were added.\n  If even one member of a group has options.isDepthPrepassed, that lump draws depth first and then paints color only on pixels with the same depth (LEQUAL).\n  A hologram made of several overlapping parts shows through as one lump instead of being doubly bright. Lumps are drawn farthest first so they show through each other.\n- Screen-space outline: if setScreenOutline(ToonScreenOutline) is given, draw draws opaque things into the line target before the bodies and blends it after the outline shells.\n  The ID is options.lineId (the order added + 1 if not given, for instances instances[i].lineId comes first), and per model options.hasScreenOutline and options.hasCreaseLine turn it off and on.\n  Transparent things are not drawn into the line target. If there is a screen rectangle (ToonRenderer.setScreenRect), that rectangle is used as the drawing area of the line target.\n- Stage callbacks: callback(renderer, webGL2RenderingContext) of addPass(stage, callback) is called at that point. After the call, the renderer sets the frame's draw state again.\n- Instance batches (addMeshInstanced) draw body and outline shell at once if opaque, and if transparent are sorted as one lump by the center of the instance positions.\n- Shadows: drawShadows(renderer, shadowMap) draws only opaque things whose castsShadow is not false into the sun's shadow depth. Call it before draw.\n  It follows setUpdateMode(ShadowUpdateMode) of the shadow target. The default onChange does not redraw when the lights and casters are unchanged, bakes the ones that stay still and draws only the moving ones on top. (The screen is the same as drawing every frame)\n  For point light and spotlight shadows, drawLocalShadows(renderer, shadowAtlas) draws the same things per atlas tile. (Set on the renderer with setLocalShadows)\n- Use: every frame clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) or drawWithMatrices(renderer, view matrix, projection matrix)\n  draw calls renderer.beginFrameWithCamera(camera) and endFrame by itself. drawWithMatrices calls beginFrameWithMatrices. (Orthographic or raw matrix camera)\n  The screen rectangle (ToonRenderer.setScreenRect) is set before that. clear empties all added models and stage callbacks. (The screen-space outline is kept)\n- What is added are references to matrices and options. Do not change them until draw is called."
+						"ko": "툰 그리기 줄. (한 프레임에 그릴 모형을 담아 두었다가 ToonRenderer 로 차례를 맞춰 그린다)\n- 차례: (화면 공간 바깥선의 선의 판) → 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 껍데기 → 화면 공간 바깥선 → afterOutline\n  → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.\n  몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.\n- 불투명한 것(몸, 바깥선 껍데기, 그림자 깊이)은 재질, 모형, 바탕색 텍스처로 정렬해 그린다. (같은 것끼리는 담은 차례, 유니티 SRP Batcher 처럼 상태를 덜 바꾼다)\n  깊이 시험(LEQUAL)으로 가장 가까운 것이 남으므로 화면은 담은 차례와 같다. 깊이가 꼭 같은 면(겹친 평면)만 나중에 그린 것이 이겨 차례가 드러난다.\n  그런 것은 한 모형으로 합치거나 깊이를 띄운다. 비치는 것은 지금처럼 먼 것부터 담은 차례로 그린다.\n- 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선 껍데기도 함께(hasOutline) 그린다.\n- 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.\n  options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.\n  여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.\n- 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.\n  번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId, 인스턴스 버퍼는 꼴의 instanceLineId 칸이 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.\n  비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.\n- 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.\n- 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.\n  인스턴스마다 걸러 그릴 때마다 올린다. (몸, 그림자, 선의 판이 같은 배열을 따로 올림) 오래 두는 것은 addMeshInstanceBuffer 로 한 번 올린 버퍼를 같이 쓴다.\n- 인스턴스 버퍼(addMeshInstanceBuffer)는 유니티 Graphics.RenderMeshInstanced 와 GraphicsBuffer, 고도 MultiMesh 꼴이다. 버퍼 전체의 경계로 통째 거르고 다시 올리지 않는다.\n- 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.\n  그림자 판의 setUpdateMode(ShadowUpdateMode) 를 따른다. 기본 onChange 는 빛과 드리우개가 그대로면 다시 그리지 않고, 오래 그대로인 것은 구워 두고 움직이는 것만 덧그린다. (화면은 매 프레임 그린 것과 같다)\n  점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)\n- 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addMeshInstanceBuffer / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)\n  draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)\n  화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)\n- 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.",
+						"en": "Toon draw queue. (Holds the models to draw in a frame, then draws them in order with ToonRenderer)\n- Order: (line target of the screen-space outline) → stage beforeOpaque → opaque bodies → afterOpaque → outline shells of opaque things → screen-space outline → afterOutline\n  → transparent things (farthest from the camera first, depth not written) → afterTransparent.\n  Outlines are drawn together after all bodies to switch programs less, and transparent things are blended last from the farthest so what is behind shows through.\n- Opaque things (bodies, outline shells, shadow depth) are drawn sorted by material, model and base color texture. (Ties keep the order they were added, so state changes less, like the Unity SRP Batcher)\n  The depth test (LEQUAL) keeps the nearest one, so the screen is the same as in the added order. Only faces at exactly the same depth (overlapping planes) show the order, because the one drawn later wins.\n  Merge such things into one model or offset their depth. Transparent things are drawn as before, farthest first in the added order.\n- Transparent things: those whose alpha or tintColor alpha at draw time is below 1, or whose blendMode is not alpha. Their outline shells are drawn with them too (hasOutline).\n- Groups: transparent things with the same options.group are sorted as one lump by the middle depth (average of the members) and drawn in the order they were added.\n  If even one member of a group has options.isDepthPrepassed, that lump draws depth first and then paints color only on pixels with the same depth (LEQUAL).\n  A hologram made of several overlapping parts shows through as one lump instead of being doubly bright. Lumps are drawn farthest first so they show through each other.\n- Screen-space outline: if setScreenOutline(ToonScreenOutline) is given, draw draws opaque things into the line target before the bodies and blends it after the outline shells.\n  The ID is options.lineId (the order added + 1 if not given, for instances instances[i].lineId and for instance buffers the layout's instanceLineId slot comes first), and per model options.hasScreenOutline and options.hasCreaseLine turn it off and on.\n  Transparent things are not drawn into the line target. If there is a screen rectangle (ToonRenderer.setScreenRect), that rectangle is used as the drawing area of the line target.\n- Stage callbacks: callback(renderer, webGL2RenderingContext) of addPass(stage, callback) is called at that point. After the call, the renderer sets the frame's draw state again.\n- Instance batches (addMeshInstanced) draw body and outline shell at once if opaque, and if transparent are sorted as one lump by the center of the instance positions.\n  They are culled per instance and uploaded each time they are drawn. (The body, shadows and line target each upload the same array) Long-lived ones share a buffer uploaded once with addMeshInstanceBuffer.\n- Instance buffers (addMeshInstanceBuffer) follow the form of Unity's Graphics.RenderMeshInstanced with GraphicsBuffer and Godot's MultiMesh. They are culled as a whole by the bounds of the entire buffer and not uploaded again.\n- Shadows: drawShadows(renderer, shadowMap) draws only opaque things whose castsShadow is not false into the sun's shadow depth. Call it before draw.\n  It follows setUpdateMode(ShadowUpdateMode) of the shadow target. The default onChange does not redraw when the lights and casters are unchanged, bakes the ones that stay still and draws only the moving ones on top. (The screen is the same as drawing every frame)\n  For point light and spotlight shadows, drawLocalShadows(renderer, shadowAtlas) draws the same things per atlas tile. (Set on the renderer with setLocalShadows)\n- Use: every frame clear() → addMesh / addMeshInstanced / addMeshInstanceBuffer / addPass → (drawShadows) → draw(renderer, camera) or drawWithMatrices(renderer, view matrix, projection matrix)\n  draw calls renderer.beginFrameWithCamera(camera) and endFrame by itself. drawWithMatrices calls beginFrameWithMatrices. (Orthographic or raw matrix camera)\n  The screen rectangle (ToonRenderer.setScreenRect) is set before that. clear empties all added models and stage callbacks. (The screen-space outline is kept)\n- What is added are references to matrices and options. Do not change them until draw is called."
 					},
 					"examples": [
 						{
@@ -98809,6 +99182,61 @@
 								"class": "ToonDrawQueue",
 								"name": "add_mesh_instanced"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "addMeshInstanceBuffer",
+							"signature": "addMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, options = {})",
+							"params": [
+								{
+									"name": "mesh",
+									"type": "object | null",
+									"description": {
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
+									}
+								},
+								{
+									"name": "instanceBuffer",
+									"type": "object | null",
+									"description": {
+										"ko": "ToonRenderer.createInstanceBuffer 의 결과.",
+										"en": "The result of ToonRenderer.createInstanceBuffer."
+									}
+								},
+								{
+									"name": "instanceCount",
+									"type": "number",
+									"description": {
+										"ko": "그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다, 0 이하면 담지 않는다)",
+										"en": "Number of instances to draw. (Clipped if it exceeds the number in the buffer, not added if 0 or less)"
+									}
+								},
+								{
+									"name": "options",
+									"type": "object",
+									"description": {
+										"ko": "addMesh 와 같다.",
+										"en": "Same as addMesh."
+									}
+								}
+							],
+							"description": {
+								"ko": "영구 인스턴스 버퍼로 같은 모형 여럿 담기. (몸, 바깥선 껍데기, 그림자, 선의 판이 한 GPU 버퍼를 같이 쓰고 다시 올리지 않는다)\n- 버퍼는 ToonRenderer.createInstanceBuffer 로 짓고 updateInstanceBuffer, updateInstanceBufferRange 로 고친다. 버퍼 전체의 경계로 통째 거른다.\n- 인스턴스마다 선 번호는 꼴의 instanceLineId 칸, 없으면 options.lineId (주지 않으면 담은 차례 + 1).\n- 그림자 캐시(ShadowUpdateMode.onChange)는 버퍼의 generation 으로 고친 것을 안다.",
+								"en": "Adds many of the same model with a persistent instance buffer. (The body, outline shell, shadows and line target share one GPU buffer and do not upload it again)\n- Build the buffer with ToonRenderer.createInstanceBuffer and change it with updateInstanceBuffer or updateInstanceBufferRange. Culled as a whole by the bounds of the entire buffer.\n- The line ID of each instance is the layout's instanceLineId slot, otherwise options.lineId (the order added + 1 if not given).\n- The shadow cache (ShadowUpdateMode.onChange) learns of changes through the buffer's generation."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "광부의 바위 밭을 한 번 올린 버퍼로 그리고 하나만 고치기",
+										"en": "Draw the miner's rock field with a buffer uploaded once and change only one"
+									},
+									"code": "import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Camera3D, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), \"#a89880\");\nconst rockMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceMatrix\", size: 16 }, { name: \"instanceTint\", size: 4 }, { name: \"instanceLineId\", size: 1 }]);\nconst floatCount = instanceLayout.getFloatCount();\nconst data = new Float32Array(floatCount * 25);\nfor (let index = 0; index < 25; ++index) {\n\tdata.set(Matrix4.createTranslation(index % 5 - 2, 0, Math.floor(index / 5) - 2).getElements(), index * floatCount);\n\tdata.set([1, 1, 1, 1, 1 + index], index * floatCount + 16);\n}\nconst instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data, \"dynamic\");\nconst camera = new Camera3D();\ncamera.setPerspective(0.8, 0.1, 50);\ncamera.lookAt(Vector3.create(0, 5, 6), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));\nconst queue = new ToonDrawQueue();\nqueue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));\nqueue.addMeshInstanceBuffer(rockMesh, instanceBuffer, 25);\nqueue.draw(renderer, camera);\nconst brokenRock = data.slice(12 * floatCount, 13 * floatCount);\nbrokenRock.set([0.5, 0.5, 0.5, 1], 16);\nrenderer.updateInstanceBufferRange(instanceBuffer, 12, brokenRock);\nqueue.draw(renderer, camera);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -99122,8 +99550,8 @@
 								}
 							],
 							"description": {
-								"ko": "하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced)",
-								"en": "Draws one item. (A single model uses drawMesh, an instance group uses drawMeshInstanced)"
+								"ko": "하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced, 인스턴스 버퍼는 drawMeshInstanceBuffer)",
+								"en": "Draws one item. (A single model uses drawMesh, an instance group uses drawMeshInstanced, an instance buffer uses drawMeshInstanceBuffer)"
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toondrawqueue.js"
@@ -101906,8 +102334,8 @@
 				{
 					"name": "ToonScreenOutline",
 					"summary": {
-						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)",
-						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the two are farther apart than the depth threshold from each other's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. Twice the pixel size at that depth is added to the threshold so distant things mean the same.\n- Widening: the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines even when the widening target is reduced)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Per-ID color: setLineColor gives a line color per ID. (The Unreal Custom Stencil form; a line where two IDs touch takes the color of the nearer ID, and IDs not in the table, or an empty table, keep the setColor color)\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Cost: setResolutionScale reduces the widening (jump flooding) target. (The light path for phones) The line target and seeds stay at drawing area resolution, so line positions do not change when reduced.\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushBatch before it)"
+						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 넓히기 판을 줄여도 계단과 점선이 없다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 번호마다 색: setLineColor 로 번호마다 선 색을 준다. (언리얼 Custom Stencil 꼴, 맞닿은 선은 앞쪽 번호의 색, 표에 없는 번호와 표가 빈 때는 setColor 의 색 그대로)\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.\n- 인스턴스: drawMeshInstanced 는 인스턴스 배열을 걸러 그때 올린다. drawMeshInstanceBuffer 는 ToonRenderer.createInstanceBuffer 의 버퍼를 몸과 같이 쓰고 다시 올리지 않는다.\n  버퍼의 인스턴스마다 번호는 꼴의 instanceLineId 칸에서 읽는다. (없으면 공통 번호)\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)",
+						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, picks lines at the boundaries between direct neighbors, widens them with jump flooding, then computes coverage from distance and blends)\n- Line target: draws the result of ToonRenderer's createMesh once more with the same matrices and writes the normal (octahedral encoding), line ID (14 bits), flags (whether the silhouette line and crease line are on) and depth.\n- Picking: each boundary between a pixel and its four direct neighbors is looked at once. A line stands not on a pixel but in the middle of the boundary between pixels. (The same boundary is not drawn twice)\n  A silhouette line is where it touches empty space (the silhouette), where it touches a different ID, or where, even with the same ID, the two are farther apart than the depth threshold from each other's tangent plane (occluded silhouette).\n  A crease line is where two neighboring normals within the same ID open wider than the crease angle. Since only normals one pixel apart are compared, no band appears around the silhouette of round surfaces or on slanted surfaces.\n  Depth is compared as tangent plane distance, so no false lines appear on a floor seen at a grazing angle. Twice the pixel size at that depth is added to the threshold so distant things mean the same.\n- Widening: the distance to the boundary segments is spread with jump flooding. The step count is log2 regardless of thickness, and silhouette and crease lines are spread separately to give separate thicknesses.\n- Blending: each pixel of the drawing area is covered by clamp(thickness / 2 - distance + 0.5, 0, 1) from the distance to the nearest boundary. (Soft edges, and no stairs or dotted lines even when the widening target is reduced)\n- Per model: if hasScreenOutline of drawMesh is false, that model produces no line and only hides lines behind it. If hasCreaseLine is false, only crease lines are turned off.\n- Per-ID color: setLineColor gives a line color per ID. (The Unreal Custom Stencil form; a line where two IDs touch takes the color of the nearer ID, and IDs not in the table, or an empty table, keep the setColor color)\n- Thickness: the thickness of setWidth and setCrease is the thickness of one line. (Half on each side of the boundary) The unit is ToonOutlineWidthUnit, and it does not go below one pixel.\n- Depth: orthographic and perspective are told apart by the projection matrix, and depth is unpacked into view-space position for comparison. (Projections whose clip x and y were moved, like a screen rectangle, also work)\n- Cost: setResolutionScale reduces the widening (jump flooding) target. (The light path for phones) The line target and seeds stay at drawing area resolution, so line positions do not change when reduced.\n- Instances: drawMeshInstanced culls the instance array and uploads it then. drawMeshInstanceBuffer shares the ToonRenderer.createInstanceBuffer buffer with the body and does not upload it again.\n  The ID of each instance in the buffer is read from the layout's instanceLineId slot. (The common ID if there is none)\n- Use: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (computes seeds and widening) → draw the toon bodies → drawOutline().\n  beginLineIds notes the current viewport as the drawing area and builds the line target to fit its size. endLineIds and drawOutline restore the framebuffer, viewport and state.\n  If handed over with ToonDrawQueue.setScreenOutline, the draw queue does this sequence by itself. (When inserted between engine 2D drawing, call Graphic.flushBatch before it)"
 					},
 					"examples": [
 						{
@@ -102042,6 +102470,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonscreenoutline",
+								"class": "ToonScreenOutline",
+								"name": "set_line_color"
+							},
 							"examples": [
 								{
 									"title": {
@@ -102072,7 +102506,13 @@
 								"en": "Remove one ID from the color table. (Lines of that ID go back to the setColor color)"
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonscreenoutline.js"
+							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonscreenoutline",
+								"class": "ToonScreenOutline",
+								"name": "remove_line_color"
+							}
 						},
 						{
 							"kind": "method",
@@ -102085,6 +102525,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonscreenoutline",
+								"class": "ToonScreenOutline",
+								"name": "clear_line_colors"
+							},
 							"examples": [
 								{
 									"title": {
@@ -102113,7 +102559,13 @@
 								"en": "Return the number of IDs in the color table."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonscreenoutline.js"
+							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonscreenoutline",
+								"class": "ToonScreenOutline",
+								"name": "get_line_color_count"
+							}
 						},
 						{
 							"kind": "method",
@@ -102527,8 +102979,71 @@
 						},
 						{
 							"kind": "method",
+							"name": "drawMeshInstanceBuffer",
+							"signature": "drawMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, lineId, options = {})",
+							"params": [
+								{
+									"name": "mesh",
+									"type": "object | null",
+									"description": {
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
+									}
+								},
+								{
+									"name": "instanceBuffer",
+									"type": "object",
+									"description": {
+										"ko": "ToonRenderer.createInstanceBuffer 의 결과. (지은 렌더러의 버텍스 어레이를 같이 쓴다)",
+										"en": "The result of ToonRenderer.createInstanceBuffer. (Shares the vertex arrays of the renderer that built it)"
+									}
+								},
+								{
+									"name": "instanceCount",
+									"type": "number",
+									"description": {
+										"ko": "그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다)",
+										"en": "Number of instances to draw. (Clamped if more than the buffer holds)"
+									}
+								},
+								{
+									"name": "lineId",
+									"type": "number",
+									"description": {
+										"ko": "공통 번호. (꼴에 instanceLineId 가 없을 때)",
+										"en": "Common ID. (When the layout has no instanceLineId)"
+									}
+								},
+								{
+									"name": "options",
+									"type": "object",
+									"description": {
+										"ko": "drawMesh 와 같다. (꼴은 모든 인스턴스에 같다)",
+										"en": "Same as drawMesh. (The options are the same for all instances)"
+									}
+								}
+							],
+							"description": {
+								"ko": "영구 인스턴스 버퍼로 번호 그리기. (몸과 같은 GPU 버퍼를 쓰고 다시 올리지 않는다, 버퍼 전체의 경계로 통째 거른다)\n- 인스턴스마다 번호는 꼴의 instanceLineId 칸, 없으면 공통 번호. 꼴에 행렬이 없으면 자리를 몰라 그리지 않는다. (정점 조각은 선의 판에서 돌지 않는다)",
+								"en": "Draws IDs with a persistent instance buffer. (Uses the same GPU buffer as the body and does not upload it again, culled as a whole by the bounds of the entire buffer)\n- The ID of each instance is the layout's instanceLineId slot, otherwise the common ID. If the layout has no matrix the position is unknown and it is not drawn. (Vertex chunks do not run in the line target)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "돌 버퍼 하나로 몸과 선의 판을 같이 그리기",
+										"en": "Draw the body and line target together with one rock buffer"
+									},
+									"code": "import { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from \"./vanilla.js\";\nconst webGL2RenderingContext = document.createElement(\"canvas\").getContext(\"webgl2\");\nconst renderer = new ToonRenderer(webGL2RenderingContext);\nconst outline = new ToonScreenOutline(webGL2RenderingContext);\nconst builder = new MeshBuilder();\nbuilder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), \"#a89880\", { hasOutline: false });\nconst rockMesh = renderer.createMesh(builder.readArrays());\nconst instanceLayout = renderer.createInstanceLayout([{ name: \"instanceMatrix\", size: 16 }, { name: \"instanceTint\", size: 4 }, { name: \"instanceLineId\", size: 1 }]);\nconst data = new Float32Array(21 * 3);\nfor (let index = 0; index < 3; ++index) {\n\tdata.set(Matrix4.createTranslation(index * 0.5, 0, 0).getElements(), index * 21);\n\tdata.set([1, 1, 1, 1, 10 + index], index * 21 + 16);\n}\nconst instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data);\nconst viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));\nconst projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);\nif (outline.beginLineIds(viewMatrix, projectionMatrix)) {\n\toutline.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3, 10);\n\toutline.endLineIds();\n}\nrenderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);\nrenderer.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3);\nrenderer.endFrame();\noutline.drawOutline();",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "drawWithCount",
-							"signature": "drawWithCount(mesh, modelElements, instanceCount, lineId, isInstanceLineId, isMirrored, options)",
+							"signature": "drawWithCount(mesh, modelElements, instanceCount, lineId, lineIdSource, isMirrored, options, vertexArray)",
 							"params": [
 								{
 									"name": "mesh",
@@ -102563,11 +103078,11 @@
 									}
 								},
 								{
-									"name": "isInstanceLineId",
-									"type": "boolean",
+									"name": "lineIdSource",
+									"type": "number",
 									"description": {
-										"ko": "인스턴스의 번호를 읽을지.",
-										"en": "Whether to read the instance's ID."
+										"ko": "번호를 읽을 곳. (0 공통 번호, 1 틴트 칸의 x, 2 인스턴스 버퍼의 instanceLineId)",
+										"en": "Where to read the ID. (0 common ID, 1 the x of the tint slot, 2 the instance buffer's instanceLineId)"
 									}
 								},
 								{
@@ -102584,6 +103099,14 @@
 									"description": {
 										"ko": "drawMesh 의 꼴.",
 										"en": "Options of drawMesh."
+									}
+								},
+								{
+									"name": "vertexArray",
+									"type": "WebGLVertexArrayObject",
+									"description": {
+										"ko": "그릴 버텍스 어레이. (모형의 몸이나 모형과 인스턴스 버퍼를 묶은 것)",
+										"en": "Vertex array to draw. (The model's body, or the model bound with an instance buffer)"
 									}
 								}
 							],
@@ -109502,8 +110025,8 @@
 				{
 					"name": "ToonLightSet",
 					"summary": {
-						"ko": "툰 빛 묶음. (ToonRenderer 가 몸을 칠할 빛과 툰 빛 반응을 한 덩어리로 든다)\n- 렌더러는 기본 묶음 하나를 들고, setLight 같은 렌더러의 빛 설정은 그 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 해(주광): 방향(sunDirection)은 빛이 나아가는 쪽이다. 면에서 해 쪽을 가리키는 방향의 반대다. (위에서 내리쬐면 [0, -1, 0]) 그림자를 받는다.\n- 바탕빛: 하늘색과 땅색을 노멀의 위아래(N.y x 0.5 + 0.5)로 섞는다. (반구 빛)\n- 그늘 램프(셀 셰이딩): 빛을 받는 몫 x 를 램프에 대어 색을 고른다. x 는 반 램버트면 dot(N, L) x 0.5 + 0.5, 아니면 max(dot(N, L), 0) 이고,\n  그리기의 shadeOffset 을 더한 뒤 해는 그림자(받는 몫 0 ~ 1)를 곱한다. (그림자가 검정이 아니라 그늘 색으로 들어간다, 유니티 툰 셰이더의 System Shadows)\n  램프는 칸(stop)마다 자리, 색(선형 배), 부드러움이다. 칸 i 의 색은 x 가 (자리 - 부드러움) 에서 자리까지 오를 때 앞 칸 색에서 넘어간다. (유니티 툰 셰이더의 Step 과 Feather)\n  부드러움이 화소 하나 너비(fwidth)보다 작으면 그 너비로 막아 경계가 계단지지 않는다.\n  setShade 는 바탕, 1 차 그늘, 2 차 그늘 셋(유니티 툰 셰이더의 Base, 1st Shade, 2nd Shade)으로, setShadeRamp 는 칸을 바로, setBandCount 는 고른 칸으로, setBandRamp 는 회색 칸으로 램프를 짓는다.\n  setRampTexture 를 주면 칸 대신 그 텍스처의 가로(x 를 u 로, v 는 0.5)를 읽는다. (팀 포트리스 2 의 warp, 원신과 붕괴의 램프 텍스처)\n  칸이 없으면(clearShadeRamp, setBandCount(0)) 부드러운 램버트다.\n- 빛마다: 해는 램프 색을 통째로 받아 그늘도 해의 색으로 물든다. 채움 빛, 점광, 스포트라이트는 램프의 밝기 단계(바닥 칸이 0, 맨 위 칸이 1)를 받아 등진 면을 밝히지 않는다.\n- 채움 빛(fill): 그림자를 받지 않는 둘째 방향광. 방향의 뜻은 해와 같다. 기본 색 0 이면 없다.\n- 하이라이트(정반사): 블린 퐁 pow(max(dot(N, H), 0), exponent) 를 0.5 에서 가른 단단한 점(부드러움 0)에서 그대로의 부드러운 빛(부드러움 1)까지. 색 x 세기 x 빛 색 x 빛을 받는 단계.\n  해와 점광, 스포트라이트 모두에 선다. 기본 세기 0 이면 없다.\n- 림 빛(rim): pow(1 - max(dot(N, V), 0), power) 를 0.5 에서 가른 단단한 테(부드러움 0)에서 부드러운 테(1)까지. lightMask 가 1 이면 해를 받는 쪽에만. 바탕색과 상관없이 더한다.\n  그늘 쪽 림(setShadeRimLight)은 같은 테를 해와 등진 쪽에 (테 - (dot(N, L) x 0.5 + 0.5)) 만큼 더한다. (유니티 툰 셰이더의 Antipodean(Ap) Rim Light)\n- 빛 색 쓰기(setLightColorUsage): 색마다 빛 색을 곱할지 고른다. 끄면 그 색은 빛의 세기(0.299 R + 0.587 G + 0.114 B)만 받고, 림과 매트캡과 천사 고리와 바깥선은 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬)\n- 빛 세기 막기(setLightIntensityLimited): 빛마다 받은 몫을 1 로 막는다. 해와 채움 빛은 채널마다 1 로 자르고, 점광과 스포트라이트는 감쇠까지 곱한 색의 세기가 1 을 넘으면 세기로 나눈다.\n  (유니티 툰 셰이더의 Limit Light Intensity, 기본 켬) HDR 블룸에 센 빛을 쓰려면 끈다.\n- 점광과 스포트라이트: TOON_MAXIMUM_POINT_LIGHTS 까지. { position, color(선형), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle, castsShadow, shadowNear }\n  castsShadow 가 true 인 빛은 ShadowAtlas.updateLights 가 그림자 칸을 준다. (점광은 큐브 여섯 면, 스포트라이트는 원근 한 칸, 먼 거리는 range, 가까운 거리는 shadowNear 기본 0.05)\n  감쇠는 창 x 거리 감쇠다. 창은 range 가 0 보다 크면 (1 - (거리 / range)^rangeExponent) 를 0 ~ 1 로 막아 제곱, 0 이면 1. 거리 감쇠는 decay 가 0 보다 크면 1 / max(거리^decay, 0.01), 0 이면 1.\n  기본(decay 2, rangeExponent 4)은 three.js 와 언리얼, 고도 4 의 점광 꼴이다.\n  direction(빛이 나아가는 쪽)을 주면 스포트라이트다. 각 감쇠는 glTF KHR_lights_punctual 꼴로 clamp(cos 각 x scale + offset, 0, 1) 의 제곱이다. (innerConeAngle 기본 0, outerConeAngle 기본 π/4, 라디안)\n  받는 몫은 감싸기(wrap) (dot(N, L) + wrap) / (1 + wrap) 이다. (0 이면 램버트, GPU Gems 1 의 wrap lighting)\n- 빛 꼴: setLightModel({ isEnergyNormalized }) 가 true 면 바탕색 x 빛을 π 로 나누고 하이라이트에 (exponent + 8) / 8π 를 곱한다. (물리 빛 세기를 조도로 주는 약속)\n- 색은 모두 선형 색이다. (HDR 이면 1 을 넘어도 된다) 램프 텍스처는 sRGB 로 보고 선형으로 바꿔 읽는다.\n- 고치면 판 번호(getVersion)가 오른다. 렌더러는 묶음과 판 번호가 같으면 다시 올리지 않는다.",
-						"en": "Toon light set. (Holds as one bundle the lights ToonRenderer uses to shade bodies and the toon light response)\n- The renderer holds one default set, and the renderer's light settings such as setLight change that set. Another set can be given per draw with options.lightSet. (When the shade color differs per material)\n- Sun (key light): the direction (sunDirection) is the way the light travels. It is the opposite of the direction from the surface toward the sun. ([0, -1, 0] when shining down from above) It receives shadows.\n- Ambient light: sky color and ground color are mixed by the up and down of the normal (N.y x 0.5 + 0.5). (Hemisphere light)\n- Shade ramp (cel shading): the received light amount x is laid against the ramp to pick the color. x is dot(N, L) x 0.5 + 0.5 for half Lambert, otherwise max(dot(N, L), 0),\n  and after adding the draw's shadeOffset, for the sun it is multiplied by the shadow (received amount 0 ~ 1). (Shadows enter as the shade color rather than black, System Shadows of the Unity Toon Shader)\n  The ramp has a position, color (linear multiplier) and softness per cell (stop). The color of cell i transitions from the previous cell's color as x rises from (position - softness) to the position. (Step and Feather of the Unity Toon Shader)\n  If the softness is smaller than one pixel width (fwidth), it is held at that width so the boundary does not stair-step.\n  setShade builds the ramp from three, base, 1st shade and 2nd shade (Base, 1st Shade, 2nd Shade of the Unity Toon Shader), setShadeRamp from cells directly, setBandCount from even cells, setBandRamp from gray cells.\n  If setRampTexture is given, the horizontal of that texture (x as u, v is 0.5) is read instead of cells. (The warp of Team Fortress 2, the ramp textures of Genshin and Honkai)\n  Without cells (clearShadeRamp, setBandCount(0)) it is smooth Lambert.\n- Per light: the sun receives the whole ramp color so the shade also takes on the sun's color. The fill light, point lights and spotlights receive the ramp's brightness level (bottom cell 0, top cell 1) and do not light faces turned away.\n- Fill light (fill): a second directional light that receives no shadow. The direction means the same as the sun. With the default color 0 there is none.\n- Highlight (specular): Blinn-Phong pow(max(dot(N, H), 0), exponent), from a hard spot cut at 0.5 (softness 0) to the plain soft light (softness 1). Color x strength x light color x received light level.\n  It appears for the sun, point lights and spotlights alike. With the default strength 0 there is none.\n- Rim light (rim): pow(1 - max(dot(N, V), 0), power), from a hard rim cut at 0.5 (softness 0) to a soft rim (1). If lightMask is 1, only on the side receiving the sun. Added regardless of the base color.\n  The shade-side rim (setShadeRimLight) adds the same rim on the side facing away from the sun by (rim - (dot(N, L) x 0.5 + 0.5)). (Antipodean (Ap) Rim Light of the Unity Toon Shader)\n- Light color usage (setLightColorUsage): chooses per color whether the light color is multiplied. When off, that color receives only the light's intensity (0.299 R + 0.587 G + 0.114 B), and the rim, matcap, angel ring and outline receive no light. (Is_LightColor_* of the Unity Toon Shader, all on by default)\n- Light intensity limit (setLightIntensityLimited): limits what each light gives to 1. The sun and fill light are clamped to 1 per channel, and point lights and spotlights are divided by the intensity of their color with attenuation applied when it exceeds 1.\n  (Limit Light Intensity of the Unity Toon Shader, on by default) Turn it off to use strong lights for HDR bloom.\n- Point lights and spotlights: up to TOON_MAXIMUM_POINT_LIGHTS. { position, color (linear), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle, castsShadow, shadowNear }\n  Lights with castsShadow true get shadow tiles from ShadowAtlas.updateLights. (Six cube faces for a point light, one perspective tile for a spotlight, the far distance is range, the near distance is shadowNear default 0.05)\n  Attenuation is window x distance attenuation. The window is (1 - (distance / range)^rangeExponent) clamped to 0 ~ 1 and squared if range is above 0, and 1 if 0. Distance attenuation is 1 / max(distance^decay, 0.01) if decay is above 0, and 1 if 0.\n  The default (decay 2, rangeExponent 4) is the point light form of three.js, Unreal and Godot 4.\n  Giving direction (the way the light travels) makes a spotlight. Angular attenuation is the square of clamp(cos angle x scale + offset, 0, 1) in the glTF KHR_lights_punctual form. (innerConeAngle default 0, outerConeAngle default π/4, radians)\n  The received amount is the wrap (dot(N, L) + wrap) / (1 + wrap). (0 is Lambert, the wrap lighting of GPU Gems 1)\n- Light model: if setLightModel({ isEnergyNormalized }) is true, base color x light is divided by π and the highlight is multiplied by (exponent + 8) / 8π. (The convention of giving physical light intensity as illuminance)\n- All colors are linear colors. (They may exceed 1 for HDR) Ramp textures are treated as sRGB and read converted to linear.\n- Each change raises the version number (getVersion). The renderer does not upload again if the set and version number are the same."
+						"ko": "툰 빛 묶음. (ToonRenderer 가 몸을 칠할 빛과 툰 빛 반응을 한 덩어리로 든다)\n- 렌더러는 기본 묶음 하나를 들고, setLight 같은 렌더러의 빛 설정은 그 묶음을 고친다. 그리기마다 options.lightSet 으로 다른 묶음을 줄 수 있다. (재질마다 그늘 색이 다를 때)\n- 해(주광): 방향(sunDirection)은 빛이 나아가는 쪽이다. 면에서 해 쪽을 가리키는 방향의 반대다. (위에서 내리쬐면 [0, -1, 0]) 그림자를 받는다.\n- 바탕빛: 하늘색과 땅색을 노멀의 위아래(N.y x 0.5 + 0.5)로 섞는다. (반구 빛)\n- 그늘 램프(셀 셰이딩): 빛을 받는 몫 x 를 램프에 대어 색을 고른다. x 는 반 램버트면 dot(N, L) x 0.5 + 0.5, 아니면 max(dot(N, L), 0) 이고,\n  그리기의 shadeOffset 을 더한 뒤 해는 그림자(받는 몫 0 ~ 1)를 곱한다. (그림자가 검정이 아니라 그늘 색으로 들어간다, 유니티 툰 셰이더의 System Shadows)\n  램프는 칸(stop)마다 자리, 색(선형 배), 부드러움이다. 칸 i 의 색은 x 가 (자리 - 부드러움) 에서 자리까지 오를 때 앞 칸 색에서 넘어간다. (유니티 툰 셰이더의 Step 과 Feather)\n  부드러움이 화소 하나 너비(fwidth)보다 작으면 그 너비로 막아 경계가 계단지지 않는다.\n  setShade 는 바탕, 1 차 그늘, 2 차 그늘 셋(유니티 툰 셰이더의 Base, 1st Shade, 2nd Shade)으로, setShadeRamp 는 칸을 바로, setBandCount 는 고른 칸으로, setBandRamp 는 회색 칸으로 램프를 짓는다.\n  setRampTexture 를 주면 칸 대신 그 텍스처의 가로(x 를 u 로, v 는 0.5)를 읽는다. (팀 포트리스 2 의 warp, 원신과 붕괴의 램프 텍스처)\n  칸이 없으면(clearShadeRamp, setBandCount(0)) 부드러운 램버트다.\n- 빛마다: 해는 램프 색을 통째로 받아 그늘도 해의 색으로 물든다. 채움 빛, 점광, 스포트라이트는 램프의 밝기 단계(바닥 칸이 0, 맨 위 칸이 1)를 받아 등진 면을 밝히지 않는다.\n- 채움 빛(fill): 그림자를 받지 않는 둘째 방향광. 방향의 뜻은 해와 같다. 기본 색 0 이면 없다.\n- 하이라이트(정반사): 블린 퐁 pow(max(dot(N, H), 0), exponent) 를 0.5 에서 가른 단단한 점(부드러움 0)에서 그대로의 부드러운 빛(부드러움 1)까지. 색 x 세기 x 빛 색 x 빛을 받는 단계.\n  해와 점광, 스포트라이트 모두에 선다. 기본 세기 0 이면 없다.\n- 림 빛(rim): pow(1 - max(dot(N, V), 0), power) 를 0.5 에서 가른 단단한 테(부드러움 0)에서 부드러운 테(1)까지. lightMask 가 1 이면 해를 받는 쪽에만. 바탕색과 상관없이 더한다.\n  그늘 쪽 림(setShadeRimLight)은 같은 테를 해와 등진 쪽에 (테 - (dot(N, L) x 0.5 + 0.5)) 만큼 더한다. (유니티 툰 셰이더의 Antipodean(Ap) Rim Light)\n- 빛 색 쓰기(setLightColorUsage): 색마다 빛 색을 곱할지 고른다. 끄면 그 색은 빛의 세기(0.299 R + 0.587 G + 0.114 B)만 받고, 림과 매트캡과 천사 고리와 바깥선은 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬)\n- 빛 세기 막기(setLightIntensityLimited): 빛마다 받은 몫을 1 로 막는다. 해와 채움 빛은 채널마다 1 로 자르고, 점광과 스포트라이트는 감쇠까지 곱한 색의 세기가 1 을 넘으면 세기로 나눈다.\n  (유니티 툰 셰이더의 Limit Light Intensity, 기본 켬) HDR 블룸에 센 빛을 쓰려면 끈다.\n  옛 게임 셰이더(빛 세기를 막지 않던 것)를 옮길 때나 세기 1 을 넘는 점광, HDR 블룸을 쓸 때는 setLightIntensityLimited(false).\n- 점광과 스포트라이트: TOON_MAXIMUM_POINT_LIGHTS 까지. { position, color(선형), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle, castsShadow, shadowNear }\n  castsShadow 가 true 인 빛은 ShadowAtlas.updateLights 가 그림자 칸을 준다. (점광은 큐브 여섯 면, 스포트라이트는 원근 한 칸, 먼 거리는 range, 가까운 거리는 shadowNear 기본 0.05)\n  감쇠는 창 x 거리 감쇠다. 창은 range 가 0 보다 크면 (1 - (거리 / range)^rangeExponent) 를 0 ~ 1 로 막아 제곱, 0 이면 1. 거리 감쇠는 decay 가 0 보다 크면 1 / max(거리^decay, 0.01), 0 이면 1.\n  기본(decay 2, rangeExponent 4)은 three.js 와 언리얼, 고도 4 의 점광 꼴이다.\n  direction(빛이 나아가는 쪽)을 주면 스포트라이트다. 각 감쇠는 glTF KHR_lights_punctual 꼴로 clamp(cos 각 x scale + offset, 0, 1) 의 제곱이다. (innerConeAngle 기본 0, outerConeAngle 기본 π/4, 라디안)\n  받는 몫은 감싸기(wrap) (dot(N, L) + wrap) / (1 + wrap) 이다. (0 이면 램버트, GPU Gems 1 의 wrap lighting)\n- 빛 꼴: setLightModel({ isEnergyNormalized }) 가 true 면 바탕색 x 빛을 π 로 나누고 하이라이트에 (exponent + 8) / 8π 를 곱한다. (물리 빛 세기를 조도로 주는 약속)\n- 색은 모두 선형 색이다. (HDR 이면 1 을 넘어도 된다) 램프 텍스처는 sRGB 로 보고 선형으로 바꿔 읽는다.\n- 고치면 판 번호(getVersion)가 오른다. 렌더러는 묶음과 판 번호가 같으면 다시 올리지 않는다.",
+						"en": "Toon light set. (Holds as one bundle the lights ToonRenderer uses to shade bodies and the toon light response)\n- The renderer holds one default set, and the renderer's light settings such as setLight change that set. Another set can be given per draw with options.lightSet. (When the shade color differs per material)\n- Sun (key light): the direction (sunDirection) is the way the light travels. It is the opposite of the direction from the surface toward the sun. ([0, -1, 0] when shining down from above) It receives shadows.\n- Ambient light: sky color and ground color are mixed by the up and down of the normal (N.y x 0.5 + 0.5). (Hemisphere light)\n- Shade ramp (cel shading): the received light amount x is laid against the ramp to pick the color. x is dot(N, L) x 0.5 + 0.5 for half Lambert, otherwise max(dot(N, L), 0),\n  and after adding the draw's shadeOffset, for the sun it is multiplied by the shadow (received amount 0 ~ 1). (Shadows enter as the shade color rather than black, System Shadows of the Unity Toon Shader)\n  The ramp has a position, color (linear multiplier) and softness per cell (stop). The color of cell i transitions from the previous cell's color as x rises from (position - softness) to the position. (Step and Feather of the Unity Toon Shader)\n  If the softness is smaller than one pixel width (fwidth), it is held at that width so the boundary does not stair-step.\n  setShade builds the ramp from three, base, 1st shade and 2nd shade (Base, 1st Shade, 2nd Shade of the Unity Toon Shader), setShadeRamp from cells directly, setBandCount from even cells, setBandRamp from gray cells.\n  If setRampTexture is given, the horizontal of that texture (x as u, v is 0.5) is read instead of cells. (The warp of Team Fortress 2, the ramp textures of Genshin and Honkai)\n  Without cells (clearShadeRamp, setBandCount(0)) it is smooth Lambert.\n- Per light: the sun receives the whole ramp color so the shade also takes on the sun's color. The fill light, point lights and spotlights receive the ramp's brightness level (bottom cell 0, top cell 1) and do not light faces turned away.\n- Fill light (fill): a second directional light that receives no shadow. The direction means the same as the sun. With the default color 0 there is none.\n- Highlight (specular): Blinn-Phong pow(max(dot(N, H), 0), exponent), from a hard spot cut at 0.5 (softness 0) to the plain soft light (softness 1). Color x strength x light color x received light level.\n  It appears for the sun, point lights and spotlights alike. With the default strength 0 there is none.\n- Rim light (rim): pow(1 - max(dot(N, V), 0), power), from a hard rim cut at 0.5 (softness 0) to a soft rim (1). If lightMask is 1, only on the side receiving the sun. Added regardless of the base color.\n  The shade-side rim (setShadeRimLight) adds the same rim on the side facing away from the sun by (rim - (dot(N, L) x 0.5 + 0.5)). (Antipodean (Ap) Rim Light of the Unity Toon Shader)\n- Light color usage (setLightColorUsage): chooses per color whether the light color is multiplied. When off, that color receives only the light's intensity (0.299 R + 0.587 G + 0.114 B), and the rim, matcap, angel ring and outline receive no light. (Is_LightColor_* of the Unity Toon Shader, all on by default)\n- Light intensity limit (setLightIntensityLimited): limits what each light gives to 1. The sun and fill light are clamped to 1 per channel, and point lights and spotlights are divided by the intensity of their color with attenuation applied when it exceeds 1.\n  (Limit Light Intensity of the Unity Toon Shader, on by default) Turn it off to use strong lights for HDR bloom.\n  When porting an old game shader (one that did not limit light intensity), or when using point lights above intensity 1 or HDR bloom, use setLightIntensityLimited(false).\n- Point lights and spotlights: up to TOON_MAXIMUM_POINT_LIGHTS. { position, color (linear), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle, castsShadow, shadowNear }\n  Lights with castsShadow true get shadow tiles from ShadowAtlas.updateLights. (Six cube faces for a point light, one perspective tile for a spotlight, the far distance is range, the near distance is shadowNear default 0.05)\n  Attenuation is window x distance attenuation. The window is (1 - (distance / range)^rangeExponent) clamped to 0 ~ 1 and squared if range is above 0, and 1 if 0. Distance attenuation is 1 / max(distance^decay, 0.01) if decay is above 0, and 1 if 0.\n  The default (decay 2, rangeExponent 4) is the point light form of three.js, Unreal and Godot 4.\n  Giving direction (the way the light travels) makes a spotlight. Angular attenuation is the square of clamp(cos angle x scale + offset, 0, 1) in the glTF KHR_lights_punctual form. (innerConeAngle default 0, outerConeAngle default π/4, radians)\n  The received amount is the wrap (dot(N, L) + wrap) / (1 + wrap). (0 is Lambert, the wrap lighting of GPU Gems 1)\n- Light model: if setLightModel({ isEnergyNormalized }) is true, base color x light is divided by π and the highlight is multiplied by (exponent + 8) / 8π. (The convention of giving physical light intensity as illuminance)\n- All colors are linear colors. (They may exceed 1 for HDR) Ramp textures are treated as sRGB and read converted to linear.\n- Each change raises the version number (getVersion). The renderer does not upload again if the set and version number are the same."
 					},
 					"examples": [
 						{
@@ -110072,8 +110595,8 @@
 								}
 							],
 							"description": {
-								"ko": "빛 세기 막기 설정. (true 면 빛마다 받은 몫을 1 로 막아 하얗게 날지 않게 한다, 기본 true, 유니티 툰 셰이더의 Limit Light Intensity)\n- 해와 채움 빛은 색의 채널마다 1 로 자른다. (주광의 saturate)\n- 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. (추가 빛의 min(색, 색 / 세기))\n- 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 1 로 막는다.",
-								"en": "Set the light intensity limit. (If true, limits what each light gives to 1 so it does not wash out to white, default true, Limit Light Intensity of the Unity Toon Shader)\n- The sun and fill light are clamped to 1 per color channel. (saturate of the main light)\n- Point lights and spotlights are divided by the intensity (0.299 R + 0.587 G + 0.114 B) of their color with attenuation applied when it exceeds 1. (min(color, color / intensity) of additional lights)\n- If the light model is isEnergyNormalized, the share after dividing by π is limited to 1."
+								"ko": "빛 세기 막기 설정. (true 면 빛마다 받은 몫을 1 로 막아 하얗게 날지 않게 한다, 기본 true, 유니티 툰 셰이더의 Limit Light Intensity)\n- 해와 채움 빛은 색의 채널마다 1 로 자른다. (주광의 saturate)\n- 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. (추가 빛의 min(색, 색 / 세기))\n- 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 1 로 막는다.\n- 옛 게임 셰이더(빛 세기를 막지 않던 것)를 옮길 때나 세기 1 을 넘는 점광, HDR 블룸을 쓸 때는 setLightIntensityLimited(false).",
+								"en": "Set the light intensity limit. (If true, limits what each light gives to 1 so it does not wash out to white, default true, Limit Light Intensity of the Unity Toon Shader)\n- The sun and fill light are clamped to 1 per color channel. (saturate of the main light)\n- Point lights and spotlights are divided by the intensity (0.299 R + 0.587 G + 0.114 B) of their color with attenuation applied when it exceeds 1. (min(color, color / intensity) of additional lights)\n- If the light model is isEnergyNormalized, the share after dividing by π is limited to 1.\n- When porting an old game shader (one that did not limit light intensity), or when using point lights above intensity 1 or HDR bloom, use setLightIntensityLimited(false)."
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonlightset.js",
@@ -110929,8 +111452,8 @@
 				{
 					"name": "ToonInstanceLayout",
 					"summary": {
-						"ko": "인스턴스 꼴. (인스턴스 하나의 어트리뷰트 차례, ToonRenderer.createInstanceBuffer 와 drawMeshInstanceBuffer 가 쓴다)\n- 어트리뷰트마다 { name, size }. 이름이 instanceMatrix(16) 면 모형 행렬, instanceTint(4) 면 곱하는 색으로 엔진이 읽는다.\n  instanceMatrix 는 아핀 3x4 로 읽고 아래 줄 네 칸(원소 3, 7, 11, 15)은 그 인스턴스의 빛남(sRGB r, g, b 와 선형 세기, vertex.emissive)이다. Matrix4 원소를 그대로 담으면 빛남이 없다.\n- 그 밖의 이름은 사용자 어트리뷰트다. TOON_MAXIMUM_INSTANCE_ATTRIBUTES 개까지, 크기 1 ~ 4. 정점 조각이 그 이름의 in 으로 읽는다. (자리 13 부터)\n- instanceMatrix 가 없으면 모형 행렬은 단위 행렬이다. 정점 조각이 vertex.modelMatrix 를 지어 넣는다. (자리, 돌림, 크기를 몇 수로만 담을 때)\n- instanceTint 가 없으면 틴트는 1 이다.",
-						"en": "Instance layout. (the attribute order of one instance, used by ToonRenderer.createInstanceBuffer and drawMeshInstanceBuffer)\n- { name, size } per attribute. If the name is instanceMatrix (16) the engine reads it as the model matrix, and if instanceTint (4) as the multiplying color.\n  instanceMatrix is read as an affine 3x4, and the four values of the bottom row (elements 3, 7, 11, 15) are that instance's emission (sRGB r, g, b and a linear intensity, vertex.emissive). Storing Matrix4 elements as they are gives no emission.\n- Other names are user attributes. Up to TOON_MAXIMUM_INSTANCE_ATTRIBUTES, size 1 ~ 4. The vertex chunk reads them as ins of that name. (from location 13)\n- Without instanceMatrix, the model matrix is the identity matrix. The vertex chunk builds and fills in vertex.modelMatrix. (when position, rotation and scale are stored in only a few numbers)\n- Without instanceTint, the tint is 1."
+						"ko": "인스턴스 꼴. (인스턴스 하나의 어트리뷰트 차례, ToonRenderer.createInstanceBuffer 와 drawMeshInstanceBuffer 가 쓴다)\n- 어트리뷰트마다 { name, size }. 이름이 instanceMatrix(16) 면 모형 행렬, instanceTint(4) 면 곱하는 색으로 엔진이 읽는다.\n  instanceMatrix 는 아핀 3x4 로 읽고 아래 줄 네 칸(원소 3, 7, 11, 15)은 그 인스턴스의 빛남(sRGB r, g, b 와 선형 세기, vertex.emissive)이다. Matrix4 원소를 그대로 담으면 빛남이 없다.\n- instanceLineId(1) 는 화면 공간 바깥선의 인스턴스마다 선 번호다. (ToonScreenOutline.drawMeshInstanceBuffer, ToonDrawQueue.addMeshInstanceBuffer)\n  사용자 어트리뷰트의 마지막 자리(TOON_INSTANCE_LINE_ID_LOCATION)를 쓰므로 이것이 있으면 사용자 어트리뷰트는 하나 적게 넣는다. 정점 조각도 그 이름으로 읽을 수 있다.\n- 그 밖의 이름은 사용자 어트리뷰트다. TOON_MAXIMUM_INSTANCE_ATTRIBUTES 개까지, 크기 1 ~ 4. 정점 조각이 그 이름의 in 으로 읽는다. (자리 13 부터)\n- instanceMatrix 가 없으면 모형 행렬은 단위 행렬이다. 정점 조각이 vertex.modelMatrix 를 지어 넣는다. (자리, 돌림, 크기를 몇 수로만 담을 때)\n- instanceTint 가 없으면 틴트는 1 이다.",
+						"en": "Instance layout. (the attribute order of one instance, used by ToonRenderer.createInstanceBuffer and drawMeshInstanceBuffer)\n- { name, size } per attribute. If the name is instanceMatrix (16) the engine reads it as the model matrix, and if instanceTint (4) as the multiplying color.\n  instanceMatrix is read as an affine 3x4, and the four values of the bottom row (elements 3, 7, 11, 15) are that instance's emission (sRGB r, g, b and a linear intensity, vertex.emissive). Storing Matrix4 elements as they are gives no emission.\n- instanceLineId (1) is the per-instance line ID of the screen-space outline. (ToonScreenOutline.drawMeshInstanceBuffer, ToonDrawQueue.addMeshInstanceBuffer)\n  It uses the last user attribute location (TOON_INSTANCE_LINE_ID_LOCATION), so with it one fewer user attribute fits. The vertex chunk can read it by that name too.\n- Other names are user attributes. Up to TOON_MAXIMUM_INSTANCE_ATTRIBUTES, size 1 ~ 4. The vertex chunk reads them as ins of that name. (from location 13)\n- Without instanceMatrix, the model matrix is the identity matrix. The vertex chunk builds and fills in vertex.modelMatrix. (when position, rotation and scale are stored in only a few numbers)\n- Without instanceTint, the tint is 1."
 					},
 					"examples": [
 						{
@@ -111008,8 +111531,8 @@
 							"returns": {
 								"type": "Array<object>",
 								"description": {
-									"ko": "{ name, size, offset, location } 의 배열. (offset 은 수 단위, location 은 사용자 어트리뷰트만, 아니면 -1)",
-									"en": "Array of { name, size, offset, location }. (offset in floats, location only for user attributes, otherwise -1)"
+									"ko": "{ name, size, offset, location } 의 배열. (offset 은 수 단위, location 은 사용자 어트리뷰트와 instanceLineId 만, 아니면 -1)",
+									"en": "Array of { name, size, offset, location }. (offset in floats, location only for user attributes and instanceLineId, otherwise -1)"
 								}
 							},
 							"description": {
@@ -111099,6 +111622,35 @@
 								"class": "ToonInstanceLayout",
 								"name": "has_tint"
 							}
+						},
+						{
+							"kind": "method",
+							"name": "hasLineId",
+							"signature": "hasLineId()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "instanceLineId 가 있으면 true.",
+									"en": "true if there is instanceLineId."
+								}
+							},
+							"description": {
+								"ko": "인스턴스마다의 선 번호가 있는지.",
+								"en": "Whether there is a per-instance line ID."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonmaterial.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "행렬, 틴트, 선 번호를 담는 꼴",
+										"en": "Layout holding matrix, tint and line ID"
+									},
+									"code": "import { ToonInstanceLayout } from \"./vanilla.js\";\nconst instanceLayout = new ToonInstanceLayout([{ name: \"instanceMatrix\", size: 16 }, { name: \"instanceTint\", size: 4 }, { name: \"instanceLineId\", size: 1 }]);\nif (!instanceLayout.hasLineId() || instanceLayout.getFloatCount() !== 21) {\n\tthrow new Error(\"line id layout failed\");\n}",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -111224,6 +111776,37 @@
 						"module": "graphics3d/toon/toonmaterial",
 						"name": "TOON_INSTANCE_TINT_NAME"
 					}
+				},
+				{
+					"kind": "field",
+					"name": "TOON_INSTANCE_LINE_ID_NAME",
+					"signature": "TOON_INSTANCE_LINE_ID_NAME = \"instanceLineId\"",
+					"params": [],
+					"returns": {
+						"type": "string",
+						"description": {
+							"ko": "",
+							"en": ""
+						}
+					},
+					"description": {
+						"ko": "인스턴스 꼴에서 화면 공간 바깥선이 인스턴스마다의 선 번호로 읽는 이름. (수 1, 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID)",
+						"en": "The name the screen-space outline reads from an instance layout as the per-instance line ID. (1 value, 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID)"
+					},
+					"since": "0.4.0",
+					"source": "src/graphics3d/toon/toonmaterial.js"
+				},
+				{
+					"kind": "field",
+					"name": "TOON_INSTANCE_LINE_ID_LOCATION",
+					"signature": "TOON_INSTANCE_LINE_ID_LOCATION",
+					"params": [],
+					"description": {
+						"ko": "선 번호 어트리뷰트의 자리. (사용자 어트리뷰트의 마지막 자리, 선의 판 셰이더가 이 자리에서 읽는다)",
+						"en": "Location of the line ID attribute. (The last user attribute location, the line target shader reads from this location)"
+					},
+					"since": "0.4.0",
+					"source": "src/graphics3d/toon/toonmaterial.js"
 				}
 			],
 			"enums": [

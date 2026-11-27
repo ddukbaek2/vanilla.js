@@ -208,6 +208,8 @@
     TOON_ATTRIBUTE_LOCATIONS: () => TOON_ATTRIBUTE_LOCATIONS,
     TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION: () => TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION,
     TOON_INSTANCE_FLOAT_COUNT: () => TOON_INSTANCE_FLOAT_COUNT,
+    TOON_INSTANCE_LINE_ID_LOCATION: () => TOON_INSTANCE_LINE_ID_LOCATION,
+    TOON_INSTANCE_LINE_ID_NAME: () => TOON_INSTANCE_LINE_ID_NAME,
     TOON_INSTANCE_MATRIX_NAME: () => TOON_INSTANCE_MATRIX_NAME,
     TOON_INSTANCE_TINT_NAME: () => TOON_INSTANCE_TINT_NAME,
     TOON_MAXIMUM_BAND_STEPS: () => TOON_MAXIMUM_BAND_STEPS,
@@ -325,6 +327,7 @@
     decodeGlbImage: () => decodeGlbImage,
     detectTextDirection: () => detectTextDirection,
     extractFrustumPlanes: () => extractFrustumPlanes,
+    isSphereInFrustum: () => isSphereInFrustum,
     isViewPositionInsideNode: () => isViewPositionInsideNode,
     measureTextWithoutGraphic: () => measureTextWithoutGraphic,
     parseTimelineColor: () => parseTimelineColor,
@@ -337,6 +340,7 @@
     readGlbImages: () => readGlbImages,
     readGlbNodeArrays: () => readGlbNodeArrays,
     readGlbNodeInfos: () => readGlbNodeInfos,
+    readInstanceBufferSphere: () => readInstanceBufferSphere,
     readJumpFloodSteps: () => readJumpFloodSteps,
     readMatrixDeterminant: () => readMatrixDeterminant,
     readOutlineVertexData: () => readOutlineVertexData,
@@ -6468,6 +6472,16 @@
   var subtreeNodeRect = new Rect();
   var subtreeComponentRect = new Rect();
   var subtreeContentSize = Vector2.zero();
+  var drawBoundsStampCounter = 0;
+  var CHILD_RANGE_STRIDE = 5;
+  var CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM = 0;
+  var CHILD_RANGE_PREFIX_MAXIMUM_RIGHT = 1;
+  var CHILD_RANGE_SUFFIX_MINIMUM_TOP = 2;
+  var CHILD_RANGE_SUFFIX_MINIMUM_LEFT = 3;
+  var CHILD_RANGE_PREFIX_COUNT = 4;
+  var visibleChildRect = new Rect();
+  var visibleChildFirstIndex = 0;
+  var visibleChildLastIndex = 0;
   var TransformNode = class _TransformNode extends ComponentNode {
     static {
       __name(this, "TransformNode");
@@ -6511,6 +6525,27 @@
     /** @private @type { Rect | null } */
     #drawBounds;
     // 셈해 둔 하위 트리 그리기 경계. (이 노드의 내용 좌표, 처음 읽을 때 만든다)
+    /** @private @type { number } */
+    #drawBoundsStamp;
+    // 이 노드의 경계를 마지막으로 셈한 차례 번호. (0 이면 셈한 적 없다)
+    /** @private @type { number } */
+    #parentDrawBoundsStamp;
+    // 부모가 이 노드의 경계를 부모 좌표로 옮겨 적은 때 부모의 차례 번호. (-1 이면 적은 적 없다)
+    /** @private @type { Rect | null } */
+    #parentDrawBounds;
+    // 부모가 셈하며 적어 둔 이 노드의 하위 트리 경계. (부모의 내용 좌표, 처음 적을 때 만든다)
+    /** @private @type { boolean } */
+    #isParentDrawBoundsEmpty;
+    // 적어 둔 경계가 아무것도 그리지 않는지. (옮기기 전 크기가 0)
+    /** @private @type { Float64Array | null } */
+    #childRangeList;
+    // 자식 범위 칸. (자식마다 CHILD_RANGE_STRIDE 칸 + 끝에 건너뛰면 세는 수 합, 자식이 있는 노드가 처음 셀 때 만든다)
+    /** @private @type { number } */
+    #childRangeStamp;
+    // 자식 범위 칸을 적은 때의 차례 번호. (#drawBoundsStamp 와 같아야 맞다)
+    /** @private @type { number } */
+    #childRangeCount;
+    // 자식 범위 칸을 적은 때의 자식 수.
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -6532,6 +6567,13 @@
       this.#drawBoundsState = DRAW_BOUNDS_DIRTY;
       this.#drawBoundsGeneration = -1;
       this.#drawBounds = null;
+      this.#drawBoundsStamp = 0;
+      this.#parentDrawBoundsStamp = -1;
+      this.#parentDrawBounds = null;
+      this.#isParentDrawBoundsEmpty = false;
+      this.#childRangeList = null;
+      this.#childRangeStamp = -1;
+      this.#childRangeCount = 0;
     }
     //==============================================================================
     // 출력 상태 시작.
@@ -6589,11 +6631,131 @@
           }
           graphic.drawComponent(component);
         }
-        const children = this.getChildren();
-        for (const child of children) {
-          graphic.drawNode(child);
+        this.drawChildren(graphic);
+      }
+    }
+    //==============================================================================
+    // 자식 목록 출력. (자식 차례대로 Graphic.drawNode, draw 가 부른다)
+    // - 하위 트리 거르기가 켜졌으면 부모 좌표의 보이는 사각형(Graphic.readLocalVisibleBounds)으로 보이는 자식 범위를 이분 찾기로 좁혀 그 앞뒤 자식은 부르지 않는다.
+    //   범위는 하위 트리 경계를 셀 때 적어 둔 자식 경계(앞에서부터 모은 가장 큰 아래와 오른쪽, 뒤에서부터 모은 가장 작은 위와 왼쪽)로 찾으므로 자식이 어떤 차례로 놓여도 맞고,
+    //   줄처럼 차례대로 놓이면 보이는 줄만 남는다. 경계를 모르는 자식이 있으면 그 자식을 넘어 좁히지 않는다. 그리기 차례는 그대로다.
+    // - 그리는 동안 이 노드의 경계가 바뀌면(자식이 형제를 옮김 같은) 남은 자식을 모두 부른다.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic 그릴 그래픽.
+     * @example <caption>draw 를 덮어쓴 노드가 자식을 그리기</caption>
+     * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Colors, Rect, Vector2, Pivot } from "./build/vanilla.js";
+     *
+     * class FrameNode extends WorldNode {
+     * 	draw(graphic) {
+     * 		graphic.setFillColor(Colors.white);
+     * 		graphic.drawRect(Rect.create(0, 0, 20, 20));
+     * 		this.drawChildren(graphic);
+     * 	}
+     * 	calculateDrawnRect(rect) {
+     * 		rect.position.set(0, 0);
+     * 		rect.size.set(20, 20);
+     * 		return true;
+     * 	}
+     * }
+     *
+     * class MainScene extends Scene {
+     * 	initialize(engine) {
+     * 		super.initialize(engine);
+     * 		const frameNode = new FrameNode();
+     * 		frameNode.setPivot(Pivot.topLeft);
+     * 		this.getRoot().addChild(frameNode);
+     * 		const childNode = new WorldNode();
+     * 		childNode.setPivot(Pivot.topLeft);
+     * 		childNode.setRect(30, 0, 20, 20);
+     * 		childNode.addComponent(Paint);
+     * 		frameNode.addChild(childNode);
+     * 	}
+     * 	draw(graphic) {
+     * 		super.draw(graphic);
+     * 		console.log(graphic.getLastFrameCulledSubtreeCount());
+     * 	}
+     * }
+     *
+     * const engineConfiguration = new EngineConfiguration();
+     * const engine = new Engine(engineConfiguration);
+     * engine.run(new MainScene());
+     */
+    drawChildren(graphic) {
+      const children = this.getChildren();
+      let firstIndex = 0;
+      let lastIndex = System14.Number.MAX_SAFE_INTEGER;
+      if (this.#findVisibleChildRange(graphic, children.length)) {
+        firstIndex = visibleChildFirstIndex;
+        lastIndex = visibleChildLastIndex;
+      }
+      for (let childIndex = firstIndex; childIndex <= lastIndex && childIndex < children.length; ++childIndex) {
+        graphic.drawNode(children[childIndex]);
+        if (this.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+          lastIndex = System14.Number.MAX_SAFE_INTEGER;
         }
       }
+    }
+    //==============================================================================
+    // 보이는 자식 범위 찾기. (찾으면 visibleChildFirstIndex, visibleChildLastIndex 에 적고 범위 밖 자식 가운데 건너뛰면 세는 수를 graphic 에 더한 뒤 true)
+    // - 자식 범위 칸이 이번 경계 셈과 같은 차례이고 이 노드가 더럽지 않을 때만. 지금 변환은 이 노드의 내용 좌표.
+    // - 첫 자식: 앞에서부터 모은 가장 큰 아래가 보이는 위 이상이고 가장 큰 오른쪽이 보이는 왼쪽 이상인 첫 자리. (그 앞 자식은 모두 위나 왼쪽 밖)
+    // - 끝 자식: 뒤에서부터 모은 가장 작은 위가 보이는 아래 이하이고 가장 작은 왼쪽이 보이는 오른쪽 이하인 끝 자리. (그 뒤 자식은 모두 아래나 오른쪽 밖)
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic 그릴 그래픽.
+     * @param { number } childCount 자식 수.
+     * @returns { boolean } 찾았으면 참.
+     */
+    #findVisibleChildRange(graphic, childCount) {
+      if (childCount < 2 || this.#childRangeStamp !== this.#drawBoundsStamp || this.#childRangeCount !== childCount || this.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+        return false;
+      }
+      if (this.#drawBoundsGeneration !== Component.getDrawnRectGeneration() || typeof graphic.readLocalVisibleBounds !== "function" || !graphic.readLocalVisibleBounds(visibleChildRect)) {
+        return false;
+      }
+      const visibleMinimumX = visibleChildRect.position.x;
+      const visibleMinimumY = visibleChildRect.position.y;
+      const visibleMaximumX = visibleMinimumX + visibleChildRect.size.x;
+      const visibleMaximumY = visibleMinimumY + visibleChildRect.size.y;
+      const childRangeList = this.#childRangeList;
+      let lowIndex = 0;
+      let highIndex = childCount;
+      while (lowIndex < highIndex) {
+        const middleIndex = lowIndex + highIndex >>> 1;
+        const middleOffset = middleIndex * CHILD_RANGE_STRIDE;
+        if (childRangeList[middleOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] >= visibleMinimumY && childRangeList[middleOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] >= visibleMinimumX) {
+          highIndex = middleIndex;
+        } else {
+          lowIndex = middleIndex + 1;
+        }
+      }
+      const firstIndex = lowIndex;
+      lowIndex = 0;
+      highIndex = childCount;
+      while (lowIndex < highIndex) {
+        const middleIndex = lowIndex + highIndex >>> 1;
+        const middleOffset = middleIndex * CHILD_RANGE_STRIDE;
+        if (childRangeList[middleOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] <= visibleMaximumY && childRangeList[middleOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] <= visibleMaximumX) {
+          lowIndex = middleIndex + 1;
+        } else {
+          highIndex = middleIndex;
+        }
+      }
+      const lastIndex = lowIndex - 1;
+      const totalCount = childRangeList[childCount * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+      let culledCount = totalCount;
+      if (firstIndex <= lastIndex) {
+        const firstCount = childRangeList[firstIndex * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+        const afterLastCount = childRangeList[(lastIndex + 1) * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+        culledCount = firstCount + (totalCount - afterLastCount);
+      }
+      if (culledCount > 0) {
+        graphic.addCulledSubtreeCount(culledCount);
+      }
+      visibleChildFirstIndex = firstIndex;
+      visibleChildLastIndex = lastIndex;
+      return true;
     }
     //==============================================================================
     // 출력.
@@ -7142,6 +7304,8 @@
       }
       const drawnRectGeneration2 = Component.getDrawnRectGeneration();
       if (this.#drawBoundsState === DRAW_BOUNDS_DIRTY || this.#drawBoundsGeneration !== drawnRectGeneration2) {
+        drawBoundsStampCounter += 1;
+        this.#drawBoundsStamp = drawBoundsStampCounter;
         const isKnown = this.calculateSubtreeDrawBounds(drawBounds) === true;
         const leftX = drawBounds.position.x;
         const topY = drawBounds.position.y;
@@ -7156,6 +7320,76 @@
       }
       rect.position.set(drawBounds.position.x, drawBounds.position.y);
       rect.size.set(drawBounds.size.x, drawBounds.size.y);
+      return true;
+    }
+    //==============================================================================
+    // 부모가 셈해 둔 이 노드의 하위 트리 그리기 경계 읽기. (부모의 내용 좌표, 이 노드의 변환을 건 경계 상자, 맞으면 true)
+    // - 부모가 하위 트리 경계를 셈할 때(calculateSubtreeDrawBounds) 자식마다 옮겨 적어 둔 것이다. 이 노드의 변환이나 경계가 바뀌면 부모가 다시 셈하므로 그때까지 그대로 쓴다.
+    // - 그리기 순회가 부모의 변환 아래에서 이 사각형을 먼저 보아, 부모 좌표의 보이는 사각형 밖이면 이 노드에 변환을 걸지 않고 건너뛴다. (스크롤은 부모의 변환만 바뀌므로 자식마다 다시 셈하지 않는다)
+    // - 부모가 아직 셈하지 않았거나 셈한 뒤 바뀌었으면(다시 셈할 차례), 이 노드가 어디에 그리는지 모르거나 놓이는 곳을 모르면 false.
+    //==============================================================================
+    /**
+     * @param { Rect } rect 경계를 적을 곳. (부모의 내용 좌표, 크기가 0 이면 아무것도 그리지 않는다)
+     * @returns { boolean } 맞는 경계가 있으면 참. (없으면 rect 를 건드리지 않는다)
+     * @example <caption>부모가 셈해 둔 줄의 경계를 부모 좌표로 읽기</caption>
+     * import { WorldNode, Paint, Rect, Vector2, Pivot } from "./build/vanilla.js";
+     *
+     * const listNode = new WorldNode();
+     * listNode.setPivot(Pivot.topLeft);
+     * const rowNode = new WorldNode();
+     * rowNode.setPivot(Pivot.topLeft);
+     * rowNode.setRect(0, 120, 300, 40);
+     * rowNode.addComponent(Paint);
+     * listNode.addChild(rowNode);
+     * const drawBounds = Rect.zero();
+     * console.log(rowNode.readParentDrawBounds(drawBounds));
+     * listNode.readSubtreeDrawBounds(drawBounds);
+     * console.log(rowNode.readParentDrawBounds(drawBounds), drawBounds.position.y, drawBounds.size.y);
+     */
+    readParentDrawBounds(rect) {
+      const parent = this.getParent();
+      if (parent === null || parent === void 0 || !(#drawBoundsState in parent)) {
+        return false;
+      }
+      if (this.#parentDrawBoundsStamp !== parent.#drawBoundsStamp || parent.#drawBoundsState === DRAW_BOUNDS_DIRTY || parent.#drawBoundsGeneration !== Component.getDrawnRectGeneration()) {
+        return false;
+      }
+      const parentDrawBounds = this.#parentDrawBounds;
+      if (this.#isParentDrawBoundsEmpty) {
+        rect.position.set(parentDrawBounds.position.x, parentDrawBounds.position.y);
+        rect.size.set(0, 0);
+        return true;
+      }
+      rect.position.set(parentDrawBounds.position.x, parentDrawBounds.position.y);
+      rect.size.set(parentDrawBounds.size.x, parentDrawBounds.size.y);
+      return true;
+    }
+    //==============================================================================
+    // 부모가 셈한 이 노드의 부모 좌표 경계 적기. (부모의 calculateSubtreeDrawBounds 가 자식마다 부른다, 값이 수가 아니면 적지 않고 false)
+    //==============================================================================
+    /**
+     * @param { Rect } rect 부모 좌표로 옮긴 경계.
+     * @param { boolean } isEmpty 옮기기 전 크기가 0 이었는지.
+     * @param { number } parentStamp 부모의 차례 번호.
+     * @returns { boolean } 적었으면 참.
+     */
+    #writeParentDrawBounds(rect, isEmpty, parentStamp) {
+      const leftX = rect.position.x;
+      const topY = rect.position.y;
+      const width = rect.size.x;
+      const height = rect.size.y;
+      if (!isEmpty && !(System14.Number.isFinite(leftX) && System14.Number.isFinite(topY) && System14.Number.isFinite(width) && System14.Number.isFinite(height))) {
+        return false;
+      }
+      let parentDrawBounds = this.#parentDrawBounds;
+      if (parentDrawBounds === null) {
+        parentDrawBounds = new Rect();
+        this.#parentDrawBounds = parentDrawBounds;
+      }
+      parentDrawBounds.position.set(leftX, topY);
+      parentDrawBounds.size.set(width, height);
+      this.#isParentDrawBoundsEmpty = isEmpty;
+      this.#parentDrawBoundsStamp = parentStamp;
       return true;
     }
     //==============================================================================
@@ -7250,6 +7484,7 @@
     //   모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드와 내용 크기를 읽을 수 없는 노드(내용 영역 안 컴포넌트가 있을 때)도 모른다.
     // - 자식: 자식의 하위 트리 경계를 자식이 옮긴(transformDrawBoundsToParent) 이 노드의 내용 좌표 경계 상자. 놓이는 곳을 모르는 자식이 있으면 모른다.
     // - 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)
+    // - 부모 좌표로 옮긴 자식의 경계는 자식에 적어 둔다. (readParentDrawBounds, 그리기 순회가 자식에 변환을 걸기 전에 본다, 이 노드가 다시 셈할 때까지 맞다)
     // - 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)
     //==============================================================================
     /**
@@ -7340,12 +7575,33 @@
       }
       const childRect = childDrawBounds;
       const children = this.getChildren();
+      const childCount = children.length;
+      let childRangeList = this.#childRangeList;
+      if (childCount > 0 && (childRangeList === null || childRangeList.length < (childCount + 1) * CHILD_RANGE_STRIDE)) {
+        childRangeList = new System14.Float64Array((childCount + 1) * CHILD_RANGE_STRIDE);
+        this.#childRangeList = childRangeList;
+      }
+      let childIndex = -1;
       for (const child of children) {
+        childIndex += 1;
+        const rangeOffset = childIndex * CHILD_RANGE_STRIDE;
+        childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System14.Number.POSITIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System14.Number.POSITIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System14.Number.NEGATIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System14.Number.NEGATIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = 0;
         if (!(child instanceof _TransformNode)) {
           isKnown = false;
           continue;
         }
-        if (!child.isActive() || !child.isVisible()) {
+        if (!child.isActive()) {
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System14.Number.NEGATIVE_INFINITY;
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System14.Number.NEGATIVE_INFINITY;
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System14.Number.POSITIVE_INFINITY;
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System14.Number.POSITIVE_INFINITY;
+          continue;
+        }
+        if (!child.isVisible()) {
           continue;
         }
         if (!child.readSubtreeDrawBounds(childRect)) {
@@ -7356,6 +7612,20 @@
         if (!child.transformDrawBoundsToParent(childRect)) {
           isKnown = false;
           continue;
+        }
+        if (child.#writeParentDrawBounds(childRect, isChildEmpty, this.#drawBoundsStamp)) {
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = 1;
+          if (isChildEmpty) {
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System14.Number.NEGATIVE_INFINITY;
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System14.Number.NEGATIVE_INFINITY;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System14.Number.POSITIVE_INFINITY;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System14.Number.POSITIVE_INFINITY;
+          } else {
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = childRect.position.y + childRect.size.y;
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = childRect.position.x + childRect.size.x;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = childRect.position.y;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = childRect.position.x;
+          }
         }
         if (!isKnown || isChildEmpty) {
           continue;
@@ -7374,6 +7644,35 @@
           maximumX = System14.Math.max(maximumX, childRightX);
           maximumY = System14.Math.max(maximumY, childBottomY);
         }
+      }
+      if (childCount > 0 && childIndex === childCount - 1) {
+        let prefixMaximumBottom = System14.Number.NEGATIVE_INFINITY;
+        let prefixMaximumRight = System14.Number.NEGATIVE_INFINITY;
+        let prefixCount = 0;
+        for (let rangeIndex = 0; rangeIndex < childCount; ++rangeIndex) {
+          const rangeOffset = rangeIndex * CHILD_RANGE_STRIDE;
+          prefixMaximumBottom = System14.Math.max(prefixMaximumBottom, childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM]);
+          prefixMaximumRight = System14.Math.max(prefixMaximumRight, childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT]);
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = prefixMaximumBottom;
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = prefixMaximumRight;
+          const countable = childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT];
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = prefixCount;
+          prefixCount += countable;
+        }
+        childRangeList[childCount * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT] = prefixCount;
+        let suffixMinimumTop = System14.Number.POSITIVE_INFINITY;
+        let suffixMinimumLeft = System14.Number.POSITIVE_INFINITY;
+        for (let rangeIndex = childCount - 1; rangeIndex >= 0; --rangeIndex) {
+          const rangeOffset = rangeIndex * CHILD_RANGE_STRIDE;
+          suffixMinimumTop = System14.Math.min(suffixMinimumTop, childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP]);
+          suffixMinimumLeft = System14.Math.min(suffixMinimumLeft, childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT]);
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = suffixMinimumTop;
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = suffixMinimumLeft;
+        }
+        this.#childRangeStamp = this.#drawBoundsStamp;
+        this.#childRangeCount = childCount;
+      } else {
+        this.#childRangeStamp = -1;
       }
       if (!isKnown) {
         return false;
@@ -10859,6 +11158,21 @@ void main() {
     /** @private @type { number } */
     #lastFrameCulledSubtreeCount;
     // 지난 프레임에 그 수.
+    /** @private @type { Float64Array } */
+    #localVisibleKeyList;
+    // 지역 좌표의 보이는 사각형을 셈한 때의 변환(a, b, c, d, e, f)과 보이는 디바이스 사각형(왼쪽, 위, 오른쪽, 아래). (같으면 다시 셈하지 않는다)
+    /** @private @type { boolean } */
+    #isLocalVisibleBoundsKnown;
+    // 지역 좌표의 보이는 사각형을 셈할 수 있었는지. (변환을 거꾸로 걸 수 없으면 거짓)
+    /** @private @type { number } */
+    #localVisibleMinimumX;
+    // 지금 변환의 지역 좌표로 옮긴 보이는 사각형의 경계 상자. (화면과 걸린 자르기, 한 디바이스 픽셀 넉넉히)
+    /** @private @type { number } */
+    #localVisibleMinimumY;
+    /** @private @type { number } */
+    #localVisibleMaximumX;
+    /** @private @type { number } */
+    #localVisibleMaximumY;
     /** @private @type { boolean } */
     #isGeometryCachingEnabled;
     // 컴포넌트가 그린 정점을 캐시해 두고 바뀐 것만 다시 셈할지. (기본 켜짐)
@@ -11072,6 +11386,12 @@ void main() {
       this.#isSubtreeCullingEnabled = true;
       this.#culledSubtreeCount = 0;
       this.#lastFrameCulledSubtreeCount = 0;
+      this.#localVisibleKeyList = new System18.Float64Array(10).fill(System18.Number.NaN);
+      this.#isLocalVisibleBoundsKnown = false;
+      this.#localVisibleMinimumX = 0;
+      this.#localVisibleMinimumY = 0;
+      this.#localVisibleMaximumX = 0;
+      this.#localVisibleMaximumY = 0;
       this.#isGeometryCachingEnabled = true;
       this.#geometryCacheMap = /* @__PURE__ */ new WeakMap();
       this.#geometryActiveCache = null;
@@ -12283,6 +12603,155 @@ void main() {
         return true;
       }
       return !this.isLocalRectVisible(drawBounds);
+    }
+    //==============================================================================
+    // 노드를 부모 좌표에서 보아 화면 밖이라 건너뛸지 반환. (drawNode 가 노드에 변환을 걸기 전에 부른다, 지금 변환은 부모의 내용 좌표)
+    // - 부모가 셈해 둔 노드의 경계(TransformNode.readParentDrawBounds)를 부모 좌표의 보이는 사각형과 견준다. 경계가 없으면 건너뛰지 않는다(변환을 건 뒤 #isNodeSubtreeCulled 가 본다).
+    // - 보이는 사각형은 부모 하나에 한 번 셈한다. (변환과 자르기가 같으면 셈해 둔 것을 쓴다)
+    //==============================================================================
+    /**
+     * @param { TransformNode } node 그릴 노드.
+     * @returns { boolean } 건너뛰면 참.
+     */
+    #isNodeCulledInParent(node) {
+      if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || this.#isForceGizmosVisible || typeof node.readParentDrawBounds !== "function") {
+        return false;
+      }
+      const drawBounds = subtreeCullRect;
+      if (!node.readParentDrawBounds(drawBounds)) {
+        return false;
+      }
+      if (!(drawBounds.size.x > 0 && drawBounds.size.y > 0)) {
+        return true;
+      }
+      if (!this.#updateLocalVisibleBounds()) {
+        return false;
+      }
+      const leftX = drawBounds.position.x;
+      const topY = drawBounds.position.y;
+      return leftX > this.#localVisibleMaximumX || topY > this.#localVisibleMaximumY || leftX + drawBounds.size.x < this.#localVisibleMinimumX || topY + drawBounds.size.y < this.#localVisibleMinimumY;
+    }
+    //==============================================================================
+    // 보이는 사각형(화면과 걸린 자르기)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 읽기. (하위 트리 거르기가 켜졌을 때만, 알면 true)
+    // - 돌림이나 기울임이 있으면 넉넉하다(네 꼭짓점의 경계 상자, 한 디바이스 픽셀씩 넓힘). 이 사각형 밖에 그리는 것은 보이지 않는다.
+    // - 노드가 많은 자식 가운데 보이는 범위를 찾을 때 쓴다(TransformNode.drawChildren). 변환과 자르기가 같으면 다시 셈하지 않는다.
+    // - 화면 밖 거르기나 하위 트리 거르기가 꺼졌거나, 기즈모를 모두 그리거나, 뷰포트를 아직 정하지 않았거나, 변환을 거꾸로 걸 수 없으면(배율 0) false.
+    //==============================================================================
+    /**
+     * @param { Rect } rect 경계 상자를 적을 곳. (지금 변환의 지역 좌표)
+     * @returns { boolean } 알면 참. (모르면 rect 를 건드리지 않는다)
+     * @example <caption>지금 변환에서 보이는 사각형 읽기</caption>
+     * import { Engine, EngineConfiguration, Scene, Rect } from "./build/vanilla.js";
+     *
+     * class MainScene extends Scene {
+     * 	draw(graphic) {
+     * 		super.draw(graphic);
+     * 		const visibleRect = Rect.zero();
+     * 		graphic.pushState();
+     * 		graphic.translate(100, 0);
+     * 		console.log(graphic.readLocalVisibleBounds(visibleRect), visibleRect.position.x < -100);
+     * 		graphic.popState();
+     * 	}
+     * }
+     *
+     * const engineConfiguration = new EngineConfiguration();
+     * const engine = new Engine(engineConfiguration);
+     * engine.run(new MainScene());
+     */
+    readLocalVisibleBounds(rect) {
+      if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || this.#isForceGizmosVisible || !this.#updateLocalVisibleBounds()) {
+        return false;
+      }
+      rect.position.set(this.#localVisibleMinimumX, this.#localVisibleMinimumY);
+      rect.size.set(this.#localVisibleMaximumX - this.#localVisibleMinimumX, this.#localVisibleMaximumY - this.#localVisibleMinimumY);
+      return true;
+    }
+    //==============================================================================
+    // 이번 프레임에 화면 밖이라 그리기를 통째로 건너뛴 하위 트리 수 더하기. (TransformNode.drawChildren 이 보이는 범위 밖 자식을 한꺼번에 건너뛰고 부른다)
+    //==============================================================================
+    /**
+     * @param { number } culledSubtreeCount 더할 하위 트리 수.
+     */
+    addCulledSubtreeCount(culledSubtreeCount) {
+      this.#culledSubtreeCount += culledSubtreeCount;
+    }
+    //==============================================================================
+    // 보이는 사각형(화면과 걸린 자르기, isLocalRectVisible 과 같은 것)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 셈하기. (셈할 수 있으면 true)
+    // - 돌림이나 기울임이 있으면 네 꼭짓점을 옮긴 경계 상자라 넉넉하다. 셈의 오차를 덮으려고 디바이스 사각형을 한 픽셀씩 넓혀 옮긴다.
+    // - 변환과 보이는 디바이스 사각형이 지난번과 같으면 다시 셈하지 않는다. (한 부모의 자식들을 그리는 동안은 같다)
+    // - 뷰포트를 아직 정하지 않았거나 변환을 거꾸로 걸 수 없으면(배율 0) false.
+    //==============================================================================
+    /**
+     * @returns { boolean } 셈할 수 있으면 참.
+     */
+    #updateLocalVisibleBounds() {
+      const viewportWidth = this.#appliedViewportWidth;
+      const viewportHeight = this.#appliedViewportHeight;
+      if (viewportWidth <= 0 || viewportHeight <= 0) {
+        return false;
+      }
+      let visibleMinimumX = 0;
+      let visibleMinimumY = 0;
+      let visibleMaximumX = viewportWidth;
+      let visibleMaximumY = viewportHeight;
+      const clipStack = this.#clipStack;
+      if (clipStack.length > 0) {
+        const clipEntry = clipStack[clipStack.length - 1];
+        visibleMinimumX = System18.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
+        visibleMinimumY = System18.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
+        visibleMaximumX = System18.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
+        visibleMaximumY = System18.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
+      }
+      const transformMatrix = this.#transformMatrix;
+      const matrixA = transformMatrix.a;
+      const matrixB = transformMatrix.b;
+      const matrixC = transformMatrix.c;
+      const matrixD = transformMatrix.d;
+      const matrixE = transformMatrix.e;
+      const matrixF = transformMatrix.f;
+      const keyList = this.#localVisibleKeyList;
+      if (keyList[0] === matrixA && keyList[1] === matrixB && keyList[2] === matrixC && keyList[3] === matrixD && keyList[4] === matrixE && keyList[5] === matrixF && keyList[6] === visibleMinimumX && keyList[7] === visibleMinimumY && keyList[8] === visibleMaximumX && keyList[9] === visibleMaximumY) {
+        return this.#isLocalVisibleBoundsKnown;
+      }
+      keyList[0] = matrixA;
+      keyList[1] = matrixB;
+      keyList[2] = matrixC;
+      keyList[3] = matrixD;
+      keyList[4] = matrixE;
+      keyList[5] = matrixF;
+      keyList[6] = visibleMinimumX;
+      keyList[7] = visibleMinimumY;
+      keyList[8] = visibleMaximumX;
+      keyList[9] = visibleMaximumY;
+      const determinant = matrixA * matrixD - matrixB * matrixC;
+      if (determinant === 0 || !System18.Number.isFinite(determinant)) {
+        this.#isLocalVisibleBoundsKnown = false;
+        return false;
+      }
+      const inverseDeterminant = 1 / determinant;
+      const leftX = visibleMinimumX - 1 - matrixE;
+      const topY = visibleMinimumY - 1 - matrixF;
+      const rightX = visibleMaximumX + 1 - matrixE;
+      const bottomY = visibleMaximumY + 1 - matrixF;
+      const leftTopX = (matrixD * leftX - matrixC * topY) * inverseDeterminant;
+      const leftTopY = (matrixA * topY - matrixB * leftX) * inverseDeterminant;
+      const rightTopX = (matrixD * rightX - matrixC * topY) * inverseDeterminant;
+      const rightTopY = (matrixA * topY - matrixB * rightX) * inverseDeterminant;
+      const leftBottomX = (matrixD * leftX - matrixC * bottomY) * inverseDeterminant;
+      const leftBottomY = (matrixA * bottomY - matrixB * leftX) * inverseDeterminant;
+      const rightBottomX = (matrixD * rightX - matrixC * bottomY) * inverseDeterminant;
+      const rightBottomY = (matrixA * bottomY - matrixB * rightX) * inverseDeterminant;
+      const minimumX = System18.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const minimumY = System18.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const maximumX = System18.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const maximumY = System18.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const isFinite = System18.Number.isFinite(minimumX) && System18.Number.isFinite(minimumY) && System18.Number.isFinite(maximumX) && System18.Number.isFinite(maximumY);
+      this.#localVisibleMinimumX = minimumX;
+      this.#localVisibleMinimumY = minimumY;
+      this.#localVisibleMaximumX = maximumX;
+      this.#localVisibleMaximumY = maximumY;
+      this.#isLocalVisibleBoundsKnown = isFinite;
+      return isFinite;
     }
     //==============================================================================
     // 지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)과 걸린 자르기 안에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)
@@ -14957,6 +15426,10 @@ void main() {
      */
     drawNode(node) {
       if (node === null || node == void 0 || !node.isActive()) {
+        return;
+      }
+      if (this.#isNodeCulledInParent(node)) {
+        this.#culledSubtreeCount += 1;
         return;
       }
       node.pushTransform(this);
@@ -18863,10 +19336,7 @@ void main() {
       if (maskComponent) {
         maskComponent.beginClip(graphic);
       }
-      const children = this.getChildren();
-      for (const child of children) {
-        graphic.drawNode(child);
-      }
+      this.drawChildren(graphic);
       if (maskComponent) {
         maskComponent.endClip(graphic);
       }
@@ -47424,6 +47894,9 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
     stop(isClearing = false) {
       this.#isPlaying = false;
       if (isClearing) {
+        if (this.#particleList.length > 0) {
+          this.markDrawnRectDirty();
+        }
         this.#particleList.length = 0;
         this.#emissionAccumulator = 0;
         if (this.#random) {
@@ -47441,6 +47914,9 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
     emit(count, worldOffset = null) {
       for (let emitIndex = 0; emitIndex < count; ++emitIndex) {
         this.spawnParticle(worldOffset);
+      }
+      if (count > 0) {
+        this.markDrawnRectDirty();
       }
     }
     //==============================================================================
@@ -47463,6 +47939,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
      * @param { number } timeDelta 진행할 시간. (초)
      */
     simulate(timeDelta) {
+      const isAnyParticleBefore = this.#particleList.length > 0;
       if (this.#isPlaying) {
         const previousElapsed = this.#playElapsedSeconds;
         this.#playElapsedSeconds += timeDelta;
@@ -47518,6 +47995,9 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
         particle.rotation += particle.angularVelocity * timeDelta;
       }
       particleList.length = aliveCount;
+      if (isAnyParticleBefore || aliveCount > 0) {
+        this.markDrawnRectDirty();
+      }
     }
     //==============================================================================
     // 파티클 하나 생성.
@@ -47660,6 +48140,77 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
       if (this.#blendMode !== "source-over") {
         graphic.setBlendMode("source-over");
       }
+    }
+    //==============================================================================
+    // 그리는 사각형 셈하기. (오버라이드: 살아 있는 파티클이 그리는 쿼드를 모두 품는 사각형, 노드 내용 좌표)
+    // - 파티클마다 그리는 크기의 반에 √2 를 곱한 만큼(돌린 사각형, 그림), 꼬리 쿼드면 머리와 꼬리를 품고 굵기의 반만큼, 흔들림 폭만큼 좌우를 넓히고 한 단위 여유를 둔다.
+    // - 시뮬레이션(simulate)이 돌 때마다, 방출(emit)과 지움(stop)에, 그리는 꼴을 바꾸는 세터에 다시 셈하게 알린다. (그리는 것이 화면 밖이면 그리기를 건너뛰고 시뮬레이션은 tick 이라 그대로 돈다)
+    // - 파티클이 없으면 크기 0 (그리지 않는다).
+    // - 월드 공간이면서 수동 틱이면 모른다. (노드를 옮기면 그리는 자리가 바뀌는데 그때 다시 셈할 길이 없다)
+    //==============================================================================
+    /**
+     * @override
+     * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+     * @returns { boolean } 알면 참.
+     * @example <caption>방출한 파티클을 품는 사각형</caption>
+     * import { WorldNode, ParticleSystem, Rect } from "./build/vanilla.js";
+     *
+     * const node = new WorldNode();
+     * const particleSystem = node.addComponent(ParticleSystem);
+     * particleSystem.setStartSpeed(0);
+     * particleSystem.setStartSize(10);
+     * particleSystem.emit(3);
+     * const drawnRect = Rect.zero();
+     * console.log(particleSystem.calculateDrawnRect(drawnRect), drawnRect.size.x > 0);
+     */
+    calculateDrawnRect(rect) {
+      const particleList = this.#particleList;
+      if (particleList.length === 0) {
+        rect.position.set(0, 0);
+        rect.size.set(0, 0);
+        return true;
+      }
+      let baseOffsetX = 0;
+      let baseOffsetY = 0;
+      if (this.#isWorldSpace) {
+        const node = this.getNode();
+        if (this.#isManualTick || node === null || node === void 0) {
+          return false;
+        }
+        const nodePosition = node.getLocalPosition();
+        baseOffsetX = -nodePosition.x;
+        baseOffsetY = -nodePosition.y;
+      }
+      const isStreak = this.#renderShape === ParticleRenderShape.streak;
+      const wobbleExtent = System67.Math.abs(this.#wobbleAmplitude);
+      let minimumX = System67.Number.POSITIVE_INFINITY;
+      let minimumY = System67.Number.POSITIVE_INFINITY;
+      let maximumX = System67.Number.NEGATIVE_INFINITY;
+      let maximumY = System67.Number.NEGATIVE_INFINITY;
+      for (const particle of particleList) {
+        const lifeRatio = particle.age / particle.lifetime;
+        const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
+        const drawSize = System67.Math.max(0.1, particle.size * sizeScale);
+        const headX = particle.x + baseOffsetX;
+        const headY = particle.y + baseOffsetY;
+        let tailX = headX;
+        let tailY = headY;
+        let extent = drawSize * 0.5 * System67.Math.SQRT2;
+        if (isStreak) {
+          tailX = headX - particle.velocityX * this.#streakScale;
+          tailY = headY - particle.velocityY * this.#streakScale;
+          extent = drawSize * 0.5;
+        }
+        const extentX = extent + wobbleExtent + 1;
+        const extentY = extent + 1;
+        minimumX = System67.Math.min(minimumX, headX - extentX, tailX - extentX);
+        minimumY = System67.Math.min(minimumY, headY - extentY, tailY - extentY);
+        maximumX = System67.Math.max(maximumX, headX + extentX, tailX + extentX);
+        maximumY = System67.Math.max(maximumY, headY + extentY, tailY + extentY);
+      }
+      rect.position.set(minimumX, minimumY);
+      rect.size.set(maximumX - minimumX, maximumY - minimumY);
+      return true;
     }
     //==============================================================================
     // 배치 출력 본체. (circle / rect / streak)
@@ -47944,6 +48495,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
     setSizeOverLifetime(startScale, endScale) {
       this.#sizeOverLifetimeStart = startScale;
       this.#sizeOverLifetimeEnd = endScale;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 회전 속도 범위 설정. (기본 0)
@@ -47983,6 +48535,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
      */
     setRenderShape(renderShape) {
       this.#renderShape = renderShape;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 파티클 이미지 설정.
@@ -47992,6 +48545,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
      */
     setImage(image) {
       this.#image = image;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 가산 합성 설정.
@@ -48039,6 +48593,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
     setWobble(amplitude, frequency = 4) {
       this.#wobbleAmplitude = amplitude;
       this.#wobbleFrequency = frequency;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // streak 길이 배율 설정. (기본 0.06)
@@ -48048,6 +48603,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
      */
     setStreakScale(streakScale) {
       this.#streakScale = streakScale;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 월드 공간 설정. (기본 거짓)
@@ -48057,6 +48613,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
      */
     setWorldSpace(isWorldSpace) {
       this.#isWorldSpace = isWorldSpace;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 반복 방출 설정.
@@ -48265,6 +48822,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
      */
     setManualTick(isManualTick) {
       this.#isManualTick = isManualTick;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 수동 틱인지 반환.
@@ -49285,6 +49843,9 @@ void main() {
     tick(timeDelta) {
       const node = this.getNode();
       const localPosition = node.getLocalPosition();
+      if (this.#pointList.length > 0) {
+        this.markDrawnRectDirty();
+      }
       for (let pointIndex = this.#pointList.length - 1; pointIndex >= 0; --pointIndex) {
         const point = this.#pointList[pointIndex];
         point.age += timeDelta;
@@ -49304,6 +49865,7 @@ void main() {
         }
       }
       this.#pointList.push({ x: localPosition.x, y: localPosition.y, age: 0 });
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 출력. (세그먼트마다 굵기 / 색 보간, 노드 원점 기준 상대 좌표로 그린다)
@@ -49345,7 +49907,55 @@ void main() {
     // 흔적 지우기.
     //==============================================================================
     clear() {
+      if (this.#pointList.length > 0) {
+        this.markDrawnRectDirty();
+      }
       this.#pointList.length = 0;
+    }
+    //==============================================================================
+    // 그리는 사각형 셈하기. (오버라이드: 점을 이은 띠를 모두 품는 사각형, 노드 내용 좌표)
+    // - 점은 노드 자리를 뺀 자리에 그리므로 지금 노드 자리로 옮기고, 두 굵기 가운데 큰 것의 반과 한 단위 여유만큼 넓힌다. (선 끝과 이음까지)
+    // - 점이 있으면 tick 마다, 지움(clear)과 굵기를 바꾸면 다시 셈하게 알린다. 점이 둘보다 적으면 그리지 않으므로 크기 0.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+     * @returns { boolean } 알면 참.
+     * @example <caption>지나간 자리를 품는 사각형</caption>
+     * import { WorldNode, TrailRenderer, Rect, Vector2 } from "./build/vanilla.js";
+     *
+     * const node = new WorldNode();
+     * const trailRenderer = node.addComponent(TrailRenderer);
+     * trailRenderer.setWidth(10, 0);
+     * trailRenderer.tick(0.016);
+     * node.setLocalPosition(Vector2.create(100, 0));
+     * trailRenderer.tick(0.016);
+     * const drawnRect = Rect.zero();
+     * console.log(trailRenderer.calculateDrawnRect(drawnRect), drawnRect.position.x, drawnRect.size.x);
+     */
+    calculateDrawnRect(rect) {
+      const pointList = this.#pointList;
+      const node = this.getNode();
+      if (pointList.length < 2 || node === null || node === void 0) {
+        rect.position.set(0, 0);
+        rect.size.set(0, 0);
+        return true;
+      }
+      const nodePosition = node.getLocalPosition();
+      const extent = System69.Math.max(System69.Math.abs(this.#startWidth), System69.Math.abs(this.#endWidth), 0.1) * 0.5 + 1;
+      let minimumX = System69.Number.POSITIVE_INFINITY;
+      let minimumY = System69.Number.POSITIVE_INFINITY;
+      let maximumX = System69.Number.NEGATIVE_INFINITY;
+      let maximumY = System69.Number.NEGATIVE_INFINITY;
+      for (const point of pointList) {
+        minimumX = System69.Math.min(minimumX, point.x);
+        minimumY = System69.Math.min(minimumY, point.y);
+        maximumX = System69.Math.max(maximumX, point.x);
+        maximumY = System69.Math.max(maximumY, point.y);
+      }
+      rect.position.set(minimumX - nodePosition.x - extent, minimumY - nodePosition.y - extent);
+      rect.size.set(maximumX - minimumX + extent * 2, maximumY - minimumY + extent * 2);
+      return true;
     }
     //==============================================================================
     // 설정 메서드 목록.
@@ -49378,6 +49988,7 @@ void main() {
     setWidth(startWidth, endWidth) {
       this.#startWidth = startWidth;
       this.#endWidth = endWidth;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 색 설정. (갓 생긴 점의 색에서 끝 색으로 바뀐다)
@@ -51150,7 +51761,7 @@ void main() {
               return System76.Math.max(-innerSizes[valueIndex], System76.Math.min(innerSizes[valueIndex], value));
             });
             const direction = [point[0] - inner[0], point[1] - inner[1], point[2] - inner[2]];
-            const length = System76.Math.hypot(direction[0], direction[1], direction[2]);
+            const length = System76.Math.sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
             const normal = length > 0 ? direction.map((value) => {
               return value / length;
             }) : [0, 0, 0];
@@ -51182,7 +51793,7 @@ void main() {
       const angle = segmentIndex / radialSegments * System76.Math.PI * 2;
       const sine = System76.Math.sin(angle);
       const cosine = System76.Math.cos(angle);
-      const normalLength = System76.Math.hypot(1, slope);
+      const normalLength = System76.Math.sqrt(1 + slope * slope);
       geometry.positions.push(radiusTop * sine, halfHeight, radiusTop * cosine);
       geometry.normals.push(sine / normalLength, slope / normalLength, cosine / normalLength);
       geometry.positions.push(radiusBottom * sine, -halfHeight, radiusBottom * cosine);
@@ -51242,7 +51853,7 @@ void main() {
       const next = points[System76.Math.min(points.length - 1, pointIndex + 1)];
       const tangentX = next[0] - previous[0];
       const tangentY = next[1] - previous[1];
-      const length = System76.Math.hypot(tangentX, tangentY);
+      const length = System76.Math.sqrt(tangentX * tangentX + tangentY * tangentY);
       if (length <= 0) {
         return [1, 0];
       }
@@ -51334,7 +51945,7 @@ void main() {
     const faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
     const scaleCount = vertexScales.length;
     const corners = baseCorners.map((corner, cornerIndex) => {
-      const length = System76.Math.hypot(corner[0], corner[1], corner[2]);
+      const length = System76.Math.sqrt(corner[0] * corner[0] + corner[1] * corner[1] + corner[2] * corner[2]);
       const vertexScale = scaleCount > 0 ? vertexScales[cornerIndex % scaleCount] : 1;
       const scale = radius * vertexScale / length;
       return [corner[0] * scale * axisScale[0], corner[1] * scale * axisScale[1], corner[2] * scale * axisScale[2]];
@@ -51353,7 +51964,7 @@ void main() {
         third = swapped;
         normal = [-normal[0], -normal[1], -normal[2]];
       }
-      const normalLength = System76.Math.max(1e-6, System76.Math.hypot(normal[0], normal[1], normal[2]));
+      const normalLength = System76.Math.max(1e-6, System76.Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]));
       const startIndex = geometry.positions.length / 3;
       for (const corner of [first, second, third]) {
         geometry.positions.push(corner[0], corner[1], corner[2]);
@@ -51603,7 +52214,7 @@ void main() {
         const startIndex = this.#outlinePositions.length / 3;
         for (const corner of corners) {
           const entry = pointNormals.get(readPointKey(corner));
-          const sumLength = System76.Math.hypot(entry.sum[0], entry.sum[1], entry.sum[2]);
+          const sumLength = System76.Math.sqrt(entry.sum[0] * entry.sum[0] + entry.sum[1] * entry.sum[1] + entry.sum[2] * entry.sum[2]);
           const scale = sumLength > 0 ? outlineWidth / sumLength : 0;
           this.#outlinePositions.push(corner[0] + entry.sum[0] * scale, corner[1] + entry.sum[1] * scale, corner[2] + entry.sum[2] * scale);
           this.#outlineBasePositions.push(corner[0], corner[1], corner[2]);
@@ -52095,9 +52706,9 @@ void main() {
      * @returns { number } 세 축 길이 가운데 가장 큰 것.
      */
     readMaximumScale(elements) {
-      const scaleX = System76.Math.hypot(elements[0], elements[1], elements[2]);
-      const scaleY = System76.Math.hypot(elements[4], elements[5], elements[6]);
-      const scaleZ = System76.Math.hypot(elements[8], elements[9], elements[10]);
+      const scaleX = System76.Math.sqrt(elements[0] * elements[0] + elements[1] * elements[1] + elements[2] * elements[2]);
+      const scaleY = System76.Math.sqrt(elements[4] * elements[4] + elements[5] * elements[5] + elements[6] * elements[6]);
+      const scaleZ = System76.Math.sqrt(elements[8] * elements[8] + elements[9] * elements[9] + elements[10] * elements[10]);
       return System76.Math.max(scaleX, scaleY, scaleZ);
     }
     //==============================================================================
@@ -52531,6 +53142,7 @@ void main() {
     // - 해와 채움 빛은 색의 채널마다 1 로 자른다. (주광의 saturate)
     // - 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. (추가 빛의 min(색, 색 / 세기))
     // - 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 1 로 막는다.
+    // - 옛 게임 셰이더(빛 세기를 막지 않던 것)를 옮길 때나 세기 1 을 넘는 점광, HDR 블룸을 쓸 때는 setLightIntensityLimited(false).
     //==============================================================================
     /**
      * @param { boolean } isLimited - true 면 막는다.
@@ -53469,6 +54081,8 @@ void main() {
   var TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION = 13;
   var TOON_INSTANCE_MATRIX_NAME = "instanceMatrix";
   var TOON_INSTANCE_TINT_NAME = "instanceTint";
+  var TOON_INSTANCE_LINE_ID_NAME = "instanceLineId";
+  var TOON_INSTANCE_LINE_ID_LOCATION = TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION + TOON_MAXIMUM_INSTANCE_ATTRIBUTES - 1;
   var ToonBlendMode = System79.Object.freeze({
     alpha: "alpha",
     // 곧은 알파. (SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
@@ -53593,13 +54207,15 @@ void main() {
     #id;
     /** @private @type { Array<object> } */
     #attributes;
-    // { name, size, offset (수 단위), location (사용자 어트리뷰트만, 아니면 -1) }
+    // { name, size, offset (수 단위), location (사용자 어트리뷰트와 선 번호만, 아니면 -1) }
     /** @private @type { number } */
     #floatCount;
     /** @private @type { boolean } */
     #hasMatrix;
     /** @private @type { boolean } */
     #hasTint;
+    /** @private @type { boolean } */
+    #hasLineId;
     //==============================================================================
     // 생성. (이름이 겹치거나, 크기가 맞지 않거나, 사용자 어트리뷰트가 너무 많으면 던진다)
     //==============================================================================
@@ -53614,8 +54230,14 @@ void main() {
       this.#floatCount = 0;
       this.#hasMatrix = false;
       this.#hasTint = false;
+      this.#hasLineId = false;
       const names = new System79.Set();
       let customCount = 0;
+      const hasLineId = attributes.some((attribute) => {
+        return attribute.name === TOON_INSTANCE_LINE_ID_NAME;
+      });
+      const maximumCustomCount = hasLineId ? TOON_MAXIMUM_INSTANCE_ATTRIBUTES - 1 : TOON_MAXIMUM_INSTANCE_ATTRIBUTES;
+      this.#hasLineId = hasLineId;
       for (const attribute of attributes) {
         const name = attribute.name;
         const size = attribute.size;
@@ -53634,12 +54256,17 @@ void main() {
             throw new System79.Error("instanceTint \uC758 \uD06C\uAE30\uB294 4 \uC785\uB2C8\uB2E4.");
           }
           this.#hasTint = true;
+        } else if (name === TOON_INSTANCE_LINE_ID_NAME) {
+          if (size !== 1) {
+            throw new System79.Error("instanceLineId \uC758 \uD06C\uAE30\uB294 1 \uC785\uB2C8\uB2E4.");
+          }
+          location = TOON_INSTANCE_LINE_ID_LOCATION;
         } else {
           if (!System79.Number.isInteger(size) || size < 1 || size > 4) {
             throw new System79.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 ${name} \uC758 \uD06C\uAE30\uB294 1 ~ 4 \uC785\uB2C8\uB2E4.`);
           }
-          if (customCount >= TOON_MAXIMUM_INSTANCE_ATTRIBUTES) {
-            throw new System79.Error(`\uC0AC\uC6A9\uC790 \uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 ${TOON_MAXIMUM_INSTANCE_ATTRIBUTES} \uAC1C\uAE4C\uC9C0\uC785\uB2C8\uB2E4.`);
+          if (customCount >= maximumCustomCount) {
+            throw new System79.Error(`\uC0AC\uC6A9\uC790 \uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 ${maximumCustomCount} \uAC1C\uAE4C\uC9C0\uC785\uB2C8\uB2E4. (instanceLineId \uAC00 \uC788\uC73C\uBA74 \uD558\uB098 \uC801\uB2E4)`);
           }
           location = TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION + customCount;
           customCount += 1;
@@ -53661,7 +54288,7 @@ void main() {
     // 어트리뷰트 목록 반환.
     //==============================================================================
     /**
-     * @returns { Array<object> } { name, size, offset, location } 의 배열. (offset 은 수 단위, location 은 사용자 어트리뷰트만, 아니면 -1)
+     * @returns { Array<object> } { name, size, offset, location } 의 배열. (offset 은 수 단위, location 은 사용자 어트리뷰트와 instanceLineId 만, 아니면 -1)
      */
     getAttributes() {
       return this.#attributes;
@@ -53692,6 +54319,21 @@ void main() {
      */
     hasTint() {
       return this.#hasTint;
+    }
+    //==============================================================================
+    // 인스턴스마다의 선 번호가 있는지.
+    //==============================================================================
+    /**
+     * @returns { boolean } instanceLineId 가 있으면 true.
+     * @example <caption>행렬, 틴트, 선 번호를 담는 꼴</caption>
+     * import { ToonInstanceLayout } from "./vanilla.js";
+     * const instanceLayout = new ToonInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }, { name: "instanceLineId", size: 1 }]);
+     * if (!instanceLayout.hasLineId() || instanceLayout.getFloatCount() !== 21) {
+     * 	throw new Error("line id layout failed");
+     * }
+     */
+    hasLineId() {
+      return this.#hasLineId;
     }
     //==============================================================================
     // 사용자 어트리뷰트의 셰이더 선언. (in float / vec2 / vec3 / vec4 이름;)
@@ -54525,6 +55167,61 @@ void main() {
     return System80.Math.max(scaleX, scaleY, scaleZ);
   }
   __name(readMaximumScale, "readMaximumScale");
+  function readInstanceBounds(instanceLayout, data) {
+    if (!instanceLayout.hasMatrix()) {
+      return null;
+    }
+    const floatCount = instanceLayout.getFloatCount();
+    const instanceCount = System80.Math.floor(data.length / floatCount);
+    if (instanceCount <= 0) {
+      return null;
+    }
+    let matrixOffset = 0;
+    for (const attribute of instanceLayout.getAttributes()) {
+      if (attribute.name === TOON_INSTANCE_MATRIX_NAME) {
+        matrixOffset = attribute.offset;
+      }
+    }
+    const minimum = [System80.Infinity, System80.Infinity, System80.Infinity];
+    const maximum = [-System80.Infinity, -System80.Infinity, -System80.Infinity];
+    let scale = 0;
+    for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
+      const offset = instanceIndex * floatCount + matrixOffset;
+      for (let axis = 0; axis < 3; ++axis) {
+        const value = data[offset + 12 + axis];
+        minimum[axis] = System80.Math.min(minimum[axis], value);
+        maximum[axis] = System80.Math.max(maximum[axis], value);
+      }
+      scale = System80.Math.max(scale, readMaximumScale(data.subarray(offset, offset + 16)));
+    }
+    const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
+    let radius = 0;
+    for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
+      const offset = instanceIndex * floatCount + matrixOffset;
+      radius = System80.Math.max(radius, System80.Math.hypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
+    }
+    return { center, radius, scale };
+  }
+  __name(readInstanceBounds, "readInstanceBounds");
+  function readInstanceBufferSphere(mesh, instanceBuffer) {
+    const bounds = instanceBuffer.bounds;
+    if (bounds === null) {
+      return null;
+    }
+    const center = mesh.boundingCenter;
+    const meshReach = System80.Math.hypot(center[0], center[1], center[2]) + mesh.boundingRadius;
+    return [bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius + bounds.scale * meshReach];
+  }
+  __name(readInstanceBufferSphere, "readInstanceBufferSphere");
+  function isSphereInFrustum(frustumPlanes, sphere) {
+    for (const plane of frustumPlanes) {
+      if (plane[0] * sphere[0] + plane[1] * sphere[1] + plane[2] * sphere[2] + plane[3] < -sphere[3]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  __name(isSphereInFrustum, "isSphereInFrustum");
   function readBoundingSphere(positions, stride) {
     const minimum = [System80.Infinity, System80.Infinity, System80.Infinity];
     const maximum = [-System80.Infinity, -System80.Infinity, -System80.Infinity];
@@ -54926,7 +55623,9 @@ void main() {
      * @param { ToonInstanceLayout } instanceLayout - 인스턴스 하나의 꼴.
      * @param { Float32Array } data - 꼴의 수 개수씩 인스턴스를 이어 담은 수.
      * @param { string } [usage] - ToonBufferUsage 의 값. (기본 static)
-     * @returns { object } 인스턴스 버퍼. ({ layout, buffer, usage, floatCount, vertexArrays })
+     * @returns { object } 인스턴스 버퍼. ({ layout, buffer, usage, floatCount, vertexArrays, generation, bounds, data, renderer })
+     * generation 은 고치거나 지울 때마다 1 씩 는다. (그림자 캐시가 버퍼 바뀜을 안다) bounds 는 버퍼 전체의 경계다. (꼴에 행렬이 있을 때만, 아니면 null)
+     * data 는 경계를 다시 셀 사본이다. (행렬이 있을 때만, 고치지 않는다) 그리는 길(drawMeshInstanceBuffer, ToonScreenOutline.drawMeshInstanceBuffer, ToonDrawQueue.addMeshInstanceBuffer)이 모두 이 한 GPU 버퍼를 같이 쓰고 다시 올리지 않는다.
      * @example <caption>나무 아홉 그루의 행렬과 틴트를 한 번 올리기</caption>
      * import { ToonRenderer, Matrix4 } from "./vanilla.js";
      * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
@@ -54943,7 +55642,8 @@ void main() {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const glUsage = usage === ToonBufferUsage.dynamic ? webGL2RenderingContext.DYNAMIC_DRAW : webGL2RenderingContext.STATIC_DRAW;
       const buffer = this.createArrayBuffer(data, glUsage);
-      return { layout: instanceLayout, buffer, usage: glUsage, floatCount: data.length, vertexArrays: /* @__PURE__ */ new Map() };
+      const copy = instanceLayout.hasMatrix() ? new System80.Float32Array(data) : null;
+      return { layout: instanceLayout, buffer, usage: glUsage, floatCount: data.length, vertexArrays: /* @__PURE__ */ new Map(), generation: 0, bounds: readInstanceBounds(instanceLayout, data), data: copy, renderer: this };
     }
     //==============================================================================
     // 인스턴스 버퍼 고치기. (전체를 다시 올림)
@@ -54957,9 +55657,61 @@ void main() {
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer.buffer);
       webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, data, instanceBuffer.usage);
       instanceBuffer.floatCount = data.length;
+      instanceBuffer.data = instanceBuffer.layout.hasMatrix() ? new System80.Float32Array(data) : null;
+      instanceBuffer.bounds = readInstanceBounds(instanceBuffer.layout, data);
+      instanceBuffer.generation += 1;
     }
     //==============================================================================
-    // 인스턴스 버퍼 지우기. (그 버퍼로 지은 버텍스 어레이도, 모형보다 먼저 지운다)
+    // 인스턴스 버퍼의 일부 고치기. (firstInstance 번째부터 data 의 인스턴스 수만큼만 올림, bufferSubData)
+    //==============================================================================
+    /**
+     * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
+     * @param { number } firstInstance - 고칠 첫 인스턴스 번호. (0 부터)
+     * @param { Float32Array } data - 꼴의 수 개수씩 고칠 인스턴스를 이어 담은 수. (버퍼에 든 인스턴스 수를 넘으면 던진다, 늘리려면 updateInstanceBuffer)
+     * @example <caption>바위 하나만 옮기고 다시 올리지 않고 그리기</caption>
+     * import { ToonRenderer, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
+     * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+     * const builder = new MeshBuilder();
+     * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#909098");
+     * const rockMesh = renderer.createMesh(builder.readArrays());
+     * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }]);
+     * const data = new Float32Array(20 * 3);
+     * for (let index = 0; index < 3; ++index) {
+     * 	data.set(Matrix4.createTranslation(index - 1, 0, 0).getElements(), index * 20);
+     * 	data.set([1, 1, 1, 1], index * 20 + 16);
+     * }
+     * const instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data, "dynamic");
+     * const moved = new Float32Array(20);
+     * moved.set(Matrix4.createTranslation(0, 0.5, 0).getElements(), 0);
+     * moved.set([1, 0.6, 0.6, 1], 16);
+     * renderer.updateInstanceBufferRange(instanceBuffer, 1, moved);
+     * renderer.beginFrameWithMatrices(Matrix4.createLookAt(Vector3.create(0, 2, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0)), Matrix4.createPerspective(0.8, 1, 0.1, 30));
+     * renderer.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3);
+     * renderer.endFrame();
+     * if (instanceBuffer.generation !== 1) {
+     * 	throw new Error("generation failed");
+     * }
+     */
+    updateInstanceBufferRange(instanceBuffer, firstInstance, data) {
+      const layoutFloatCount = instanceBuffer.layout.getFloatCount();
+      const floatOffset = firstInstance * layoutFloatCount;
+      if (!System80.Number.isInteger(firstInstance) || firstInstance < 0 || data.length % layoutFloatCount !== 0 || floatOffset + data.length > instanceBuffer.floatCount) {
+        throw new System80.Error(`\uC778\uC2A4\uD134\uC2A4 \uBC84\uD37C\uC758 \uACE0\uCE60 \uC790\uB9AC\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4: ${firstInstance} \uBC88\uBD80\uD130 \uC218 ${data.length} \uAC1C (\uBC84\uD37C\uC758 \uC218 ${instanceBuffer.floatCount} \uAC1C)`);
+      }
+      if (data.length === 0) {
+        return;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer.buffer);
+      webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, floatOffset * 4, data);
+      if (instanceBuffer.data !== null) {
+        instanceBuffer.data.set(data, floatOffset);
+        instanceBuffer.bounds = readInstanceBounds(instanceBuffer.layout, instanceBuffer.data);
+      }
+      instanceBuffer.generation += 1;
+    }
+    //==============================================================================
+    // 인스턴스 버퍼 지우기. (그 버퍼로 지은 버텍스 어레이도, 모형보다 먼저 지운다, 지운 버퍼로 그리면 아무것도 그리지 않는다)
     //==============================================================================
     /**
      * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
@@ -54974,6 +55726,11 @@ void main() {
       }
       instanceBuffer.vertexArrays.clear();
       webGL2RenderingContext.deleteBuffer(instanceBuffer.buffer);
+      instanceBuffer.buffer = null;
+      instanceBuffer.floatCount = 0;
+      instanceBuffer.data = null;
+      instanceBuffer.bounds = null;
+      instanceBuffer.generation += 1;
     }
     //==============================================================================
     // 텍스처 짓기. (ImageBitmap, 캔버스, 이미지, ImageData 나 { width, height, data: Uint8Array RGBA })
@@ -55855,13 +56612,13 @@ void main() {
       this.drawWithCount(mesh, mirrorElements, instanceCount, options, null);
     }
     //==============================================================================
-    // 영구 인스턴스 버퍼로 그리기. (거르지 않음, instanceCount 개, 꼴에 행렬이 없으면 정점 조각이 자리를 정한다)
+    // 영구 인스턴스 버퍼로 그리기. (버퍼 전체의 경계로 통째 거른다, instanceCount 개, 꼴에 행렬이 없으면 정점 조각이 자리를 정하고 거르지 않는다)
     //==============================================================================
     /**
      * @param { object } mesh - createMesh 의 결과.
      * @param { object } instanceBuffer - createInstanceBuffer 의 결과.
      * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다)
-     * @param { object } [options] - drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다)
+     * @param { object } [options] - drawMesh 와 같다. (material 의 정점 조각이 사용자 어트리뷰트를 읽는다, isCulled 가 false 면 거르지 않는다)
      * @example <caption>자리만 담은 영구 버퍼로 풀숲 그리기</caption>
      * import { ToonRenderer, MeshBuilder, createCylinderGeometry, Matrix4, Vector3 } from "./vanilla.js";
      * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
@@ -55887,6 +56644,10 @@ void main() {
       const maximumCount = System80.Math.floor(instanceBuffer.floatCount / System80.Math.max(1, instanceBuffer.layout.getFloatCount()));
       const count = System80.Math.min(instanceCount, maximumCount);
       if (count <= 0) {
+        return;
+      }
+      if (options.isCulled !== false && instanceBuffer.bounds !== null && !isSphereInFrustum(this.#frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+        this.#frameStatistics.culledObjectCount += count;
         return;
       }
       this.#frameStatistics.drawnObjectCount += count;
@@ -70498,6 +71259,9 @@ void main() {
     const accessor = json.accessors[accessorIndex];
     const componentCount = TYPE_COMPONENT_COUNTS[accessor.type];
     const ArrayConstructor = COMPONENT_ARRAYS[accessor.componentType];
+    if (accessor.bufferView === void 0) {
+      return new ArrayConstructor(accessor.count * componentCount);
+    }
     const bufferView = json.bufferViews[accessor.bufferView];
     if ((bufferView.buffer || 0) !== 0) {
       throw new System107.Error(`GLB \uC758 \uBC14\uAE65 \uBC84\uD37C(buffers[${bufferView.buffer}])\uB294 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4. (\uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC buffers[0] \uB9CC \uC77D\uB294\uB2E4, EXT_meshopt_compression \uC758 fallback \uBC84\uD37C\uB3C4 \uC5EC\uAE30 \uB4E0\uB2E4)`);
@@ -70505,6 +71269,13 @@ void main() {
     const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
     const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
     const byteStride = bufferView.byteStride || 0;
+    const stride = byteStride === 0 ? tightByteSize : byteStride;
+    if (accessor.count > 0) {
+      const endOffset = elementOffset + (accessor.count - 1) * stride + tightByteSize;
+      if (endOffset > binaryBuffer.byteLength) {
+        throw new System107.Error(`GLB \uC811\uADFC\uC790 ${accessorIndex} \uAC00 \uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC \uBC16\uC744 \uC77D\uC2B5\uB2C8\uB2E4. (\uBC14\uC774\uD2B8 ${elementOffset} ~ ${endOffset}, \uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC ${binaryBuffer.byteLength} \uBC14\uC774\uD2B8)`);
+      }
+    }
     if (byteStride === 0 || byteStride === tightByteSize) {
       return new ArrayConstructor(binaryBuffer.slice(elementOffset, elementOffset + accessor.count * tightByteSize));
     }
@@ -82696,6 +83467,7 @@ in vec4 instanceMatrix1;
 in vec4 instanceMatrix2;
 in vec4 instanceMatrix3;
 in vec4 instanceTint;
+in float instanceLineId;
 uniform mat4 jointMatrices[${TOON_MAXIMUM_JOINTS}];
 uniform float skinned;
 uniform float instanced;
@@ -82715,7 +83487,7 @@ void main() {
 	mat4 skinMatrix = readSkinMatrix();
 	mat4 objectMatrix = instanced > 0.5 ? mat4(vec4(instanceMatrix0.xyz, 0.0), vec4(instanceMatrix1.xyz, 0.0), vec4(instanceMatrix2.xyz, 0.0), vec4(instanceMatrix3.xyz, 1.0)) : modelMatrix;
 	worldNormal = transpose(inverse(mat3(objectMatrix) * mat3(skinMatrix))) * vertexNormal;
-	surfaceLineId = instanced > 0.5 && instanceLineIds > 0.5 ? instanceTint.x : lineId;
+	surfaceLineId = instanced < 0.5 || instanceLineIds < 0.5 ? lineId : (instanceLineIds < 1.5 ? instanceTint.x : instanceLineId);
 	gl_Position = viewProjectionMatrix * objectMatrix * skinMatrix * vec4(vertexPosition, 1.0);
 }
 `;
@@ -83140,7 +83912,7 @@ void main() {
      */
     constructor(webGL2RenderingContext) {
       this.#webGL2RenderingContext = webGL2RenderingContext;
-      this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, TOON_ATTRIBUTE_LOCATIONS);
+      this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, System138.Object.assign({ instanceLineId: TOON_INSTANCE_LINE_ID_LOCATION }, TOON_ATTRIBUTE_LOCATIONS));
       this.#seedProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_FRAGMENT_SHADER, {});
       this.#seedGatherProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_GATHER_FRAGMENT_SHADER, {});
       this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
@@ -83463,7 +84235,7 @@ void main() {
       }
       this.addDrawnDistance(mesh, modelElements);
       const isMirrored = options.isMirrored !== void 0 ? options.isMirrored : readMatrixDeterminant(modelElements) < 0;
-      this.drawWithCount(mesh, modelElements, 0, lineId, false, isMirrored, options);
+      this.drawWithCount(mesh, modelElements, 0, lineId, 0, isMirrored, options, mesh.bodyVertexArray);
     }
     //==============================================================================
     // 같은 모형 여럿의 번호를 한 번에 그리기. (인스턴스에 lineId 가 있으면 그 번호, 없으면 공통 번호)
@@ -83519,7 +84291,78 @@ void main() {
       }
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
       webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, instanceCount * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
-      this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, true, options.isMirrored === true, options);
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, 1, options.isMirrored === true, options, mesh.bodyVertexArray);
+    }
+    //==============================================================================
+    // 영구 인스턴스 버퍼로 번호 그리기. (몸과 같은 GPU 버퍼를 쓰고 다시 올리지 않는다, 버퍼 전체의 경계로 통째 거른다)
+    // - 인스턴스마다 번호는 꼴의 instanceLineId 칸, 없으면 공통 번호. 꼴에 행렬이 없으면 자리를 몰라 그리지 않는다. (정점 조각은 선의 판에서 돌지 않는다)
+    //==============================================================================
+    /**
+     * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
+     * @param { object } instanceBuffer - ToonRenderer.createInstanceBuffer 의 결과. (지은 렌더러의 버텍스 어레이를 같이 쓴다)
+     * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다)
+     * @param { number } lineId - 공통 번호. (꼴에 instanceLineId 가 없을 때)
+     * @param { object } [options] - drawMesh 와 같다. (꼴은 모든 인스턴스에 같다)
+     * @example <caption>돌 버퍼 하나로 몸과 선의 판을 같이 그리기</caption>
+     * import { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
+     * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+     * const renderer = new ToonRenderer(webGL2RenderingContext);
+     * const outline = new ToonScreenOutline(webGL2RenderingContext);
+     * const builder = new MeshBuilder();
+     * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
+     * const rockMesh = renderer.createMesh(builder.readArrays());
+     * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }, { name: "instanceLineId", size: 1 }]);
+     * const data = new Float32Array(21 * 3);
+     * for (let index = 0; index < 3; ++index) {
+     * 	data.set(Matrix4.createTranslation(index * 0.5, 0, 0).getElements(), index * 21);
+     * 	data.set([1, 1, 1, 1, 10 + index], index * 21 + 16);
+     * }
+     * const instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data);
+     * const viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));
+     * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
+     * if (outline.beginLineIds(viewMatrix, projectionMatrix)) {
+     * 	outline.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3, 10);
+     * 	outline.endLineIds();
+     * }
+     * renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
+     * renderer.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3);
+     * renderer.endFrame();
+     * outline.drawOutline();
+     */
+    drawMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, lineId, options = {}) {
+      if (mesh === null || mesh === void 0 || this.#savedState === null || instanceBuffer.buffer === null) {
+        return;
+      }
+      const instanceLayout = instanceBuffer.layout;
+      if (!instanceLayout.hasMatrix()) {
+        return;
+      }
+      const layoutFloatCount = instanceLayout.getFloatCount();
+      const count = System138.Math.min(instanceCount, System138.Math.floor(instanceBuffer.floatCount / layoutFloatCount));
+      if (count <= 0) {
+        return;
+      }
+      const isCulled = options.isCulled !== false;
+      if (isCulled && !isSphereInFrustum(this.#frame.frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+        return;
+      }
+      if (this.#widthUnit === ToonOutlineWidthUnit.world && this.#focusDistance <= 0 && this.#frame.isPerspective && instanceBuffer.data !== null) {
+        let matrixOffset = 0;
+        for (const attribute of instanceLayout.getAttributes()) {
+          if (attribute.name === TOON_INSTANCE_MATRIX_NAME) {
+            matrixOffset = attribute.offset;
+          }
+        }
+        for (let instanceIndex = 0; instanceIndex < count; ++instanceIndex) {
+          const offset = instanceIndex * layoutFloatCount + matrixOffset;
+          const modelElements = instanceBuffer.data.subarray(offset, offset + 16);
+          if (!isCulled || this.isVisible(mesh, modelElements)) {
+            this.addDrawnDistance(mesh, modelElements);
+          }
+        }
+      }
+      const vertexArrays = instanceBuffer.renderer.readInstanceVertexArrays(mesh, instanceBuffer);
+      this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineId, instanceLayout.hasLineId() ? 2 : 0, options.isMirrored === true, options, vertexArrays.body);
     }
     //==============================================================================
     // 번호 그리기 본체.
@@ -83529,11 +84372,12 @@ void main() {
      * @param { Float32Array } modelElements - 모형 행렬의 수 16.
      * @param { number } instanceCount - 0 이면 보통 그리기.
      * @param { number } lineId - 공통 번호.
-     * @param { boolean } isInstanceLineId - 인스턴스의 번호를 읽을지.
+     * @param { number } lineIdSource - 번호를 읽을 곳. (0 공통 번호, 1 틴트 칸의 x, 2 인스턴스 버퍼의 instanceLineId)
      * @param { boolean } isMirrored - 감기를 뒤집어 그릴지.
      * @param { object } options - drawMesh 의 꼴.
+     * @param { WebGLVertexArrayObject } vertexArray - 그릴 버텍스 어레이. (모형의 몸이나 모형과 인스턴스 버퍼를 묶은 것)
      */
-    drawWithCount(mesh, modelElements, instanceCount, lineId, isInstanceLineId, isMirrored, options) {
+    drawWithCount(mesh, modelElements, instanceCount, lineId, lineIdSource, isMirrored, options, vertexArray) {
       const webGL2RenderingContext = this.#webGL2RenderingContext;
       const lineProgram = this.#lineProgram;
       const jointMatrices = options.jointMatrices !== void 0 ? options.jointMatrices : null;
@@ -83541,7 +84385,7 @@ void main() {
       const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
       webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("modelMatrix"), false, modelElements);
       webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanced"), instanceCount > 0 ? 1 : 0);
-      webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), isInstanceLineId ? 1 : 0);
+      webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), lineIdSource);
       webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
       webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System138.Math.max(0, System138.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
       webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
@@ -83558,7 +84402,7 @@ void main() {
       if (isMirrored) {
         webGL2RenderingContext.frontFace(webGL2RenderingContext.CW);
       }
-      webGL2RenderingContext.bindVertexArray(mesh.bodyVertexArray);
+      webGL2RenderingContext.bindVertexArray(vertexArray);
       if (instanceCount > 0) {
         webGL2RenderingContext.drawElementsInstanced(webGL2RenderingContext.TRIANGLES, indexCount, webGL2RenderingContext.UNSIGNED_INT, indexStart * 4, instanceCount);
       } else {
@@ -83983,11 +84827,15 @@ void main() {
   function writeCasterRecord(record, item) {
     const options = item.options;
     const jointMatrices = options.jointMatrices !== void 0 && options.jointMatrices !== null ? options.jointMatrices : null;
-    const matrixCount = item.instances !== null ? item.instances.length : 1;
-    const valueCount = 6 + matrixCount * 16 + (jointMatrices !== null ? jointMatrices.length : 0);
-    let isChanged = record.mesh !== item.mesh || record.material !== options.material;
+    const instanceBuffer = item.instanceBuffer;
+    const matrixCount = instanceBuffer !== null ? 0 : item.instances !== null ? item.instances.length : 1;
+    const valueCount = 6 + matrixCount * 16 + (instanceBuffer !== null ? 1 : 0) + (jointMatrices !== null ? jointMatrices.length : 0);
+    const generation = instanceBuffer !== null ? instanceBuffer.generation : -1;
+    let isChanged = record.mesh !== item.mesh || record.material !== options.material || record.instanceBuffer !== instanceBuffer || record.generation !== generation;
     record.mesh = item.mesh;
     record.material = options.material;
+    record.instanceBuffer = instanceBuffer;
+    record.generation = generation;
     if (record.values.length !== valueCount) {
       record.values = new System139.Float32Array(valueCount);
       isChanged = true;
@@ -84008,7 +84856,9 @@ void main() {
     write(options.isCulled === false ? 0 : 1);
     write(options.isMirrored === void 0 ? -1 : options.isMirrored === true ? 1 : 0);
     write(jointMatrices !== null ? jointMatrices.length : -1);
-    if (item.instances !== null) {
+    if (instanceBuffer !== null) {
+      write(item.instanceCount);
+    } else if (item.instances !== null) {
       for (const instance of item.instances) {
         const elements = instance.modelMatrix.getElements();
         for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
@@ -84060,7 +84910,7 @@ void main() {
     //==============================================================================
     /** @private @type { Array<object> } */
     #itemList;
-    // { mesh, modelMatrix, instances, options, isTransparent, depthPosition, depth }
+    // { mesh, modelMatrix, instances, instanceBuffer, instanceCount, options, isTransparent, depthPosition, depth }
     /** @private @type { Array<object> } */
     #passList;
     // { stage, callback }
@@ -84146,7 +84996,7 @@ void main() {
       const center = mesh.boundingCenter;
       const depthPosition = modelMatrix.transformPoint(center[0], center[1], center[2]);
       this.#opaqueItemList = null;
-      this.#itemList.push({ mesh, modelMatrix, instances: null, options, isTransparent: this.isTransparentOptions(options), depthPosition, depth: 0 });
+      this.#itemList.push({ mesh, modelMatrix, instances: null, instanceBuffer: null, instanceCount: 0, options, isTransparent: this.isTransparentOptions(options), depthPosition, depth: 0 });
     }
     //==============================================================================
     // 같은 모형 여럿 담기. (GPU 인스턴싱, 비어 있거나 null 이면 담지 않는다)
@@ -84171,7 +85021,54 @@ void main() {
       depthPosition.y /= instances.length;
       depthPosition.z /= instances.length;
       this.#opaqueItemList = null;
-      this.#itemList.push({ mesh, modelMatrix: null, instances, options, isTransparent: this.isTransparentOptions(options), depthPosition, depth: 0 });
+      this.#itemList.push({ mesh, modelMatrix: null, instances, instanceBuffer: null, instanceCount: 0, options, isTransparent: this.isTransparentOptions(options), depthPosition, depth: 0 });
+    }
+    //==============================================================================
+    // 영구 인스턴스 버퍼로 같은 모형 여럿 담기. (몸, 바깥선 껍데기, 그림자, 선의 판이 한 GPU 버퍼를 같이 쓰고 다시 올리지 않는다)
+    // - 버퍼는 ToonRenderer.createInstanceBuffer 로 짓고 updateInstanceBuffer, updateInstanceBufferRange 로 고친다. 버퍼 전체의 경계로 통째 거른다.
+    // - 인스턴스마다 선 번호는 꼴의 instanceLineId 칸, 없으면 options.lineId (주지 않으면 담은 차례 + 1).
+    // - 그림자 캐시(ShadowUpdateMode.onChange)는 버퍼의 generation 으로 고친 것을 안다.
+    //==============================================================================
+    /**
+     * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
+     * @param { object | null } instanceBuffer - ToonRenderer.createInstanceBuffer 의 결과.
+     * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다, 0 이하면 담지 않는다)
+     * @param { object } [options] - addMesh 와 같다.
+     * @example <caption>광부의 바위 밭을 한 번 올린 버퍼로 그리고 하나만 고치기</caption>
+     * import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+     * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+     * const renderer = new ToonRenderer(webGL2RenderingContext);
+     * const builder = new MeshBuilder();
+     * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880");
+     * const rockMesh = renderer.createMesh(builder.readArrays());
+     * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }, { name: "instanceLineId", size: 1 }]);
+     * const floatCount = instanceLayout.getFloatCount();
+     * const data = new Float32Array(floatCount * 25);
+     * for (let index = 0; index < 25; ++index) {
+     * 	data.set(Matrix4.createTranslation(index % 5 - 2, 0, Math.floor(index / 5) - 2).getElements(), index * floatCount);
+     * 	data.set([1, 1, 1, 1, 1 + index], index * floatCount + 16);
+     * }
+     * const instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data, "dynamic");
+     * const camera = new Camera3D();
+     * camera.setPerspective(0.8, 0.1, 50);
+     * camera.lookAt(Vector3.create(0, 5, 6), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+     * const queue = new ToonDrawQueue();
+     * queue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));
+     * queue.addMeshInstanceBuffer(rockMesh, instanceBuffer, 25);
+     * queue.draw(renderer, camera);
+     * const brokenRock = data.slice(12 * floatCount, 13 * floatCount);
+     * brokenRock.set([0.5, 0.5, 0.5, 1], 16);
+     * renderer.updateInstanceBufferRange(instanceBuffer, 12, brokenRock);
+     * queue.draw(renderer, camera);
+     */
+    addMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, options = {}) {
+      if (mesh === null || mesh === void 0 || instanceBuffer === null || instanceBuffer === void 0 || instanceCount <= 0) {
+        return;
+      }
+      const sphere = readInstanceBufferSphere(mesh, instanceBuffer);
+      const depthPosition = sphere !== null ? { x: sphere[0], y: sphere[1], z: sphere[2] } : { x: 0, y: 0, z: 0 };
+      this.#opaqueItemList = null;
+      this.#itemList.push({ mesh, modelMatrix: null, instances: null, instanceBuffer, instanceCount, options, isTransparent: this.isTransparentOptions(options), depthPosition, depth: 0 });
     }
     //==============================================================================
     // 그릴 꼴이 비치는지. (alpha 나 틴트의 알파가 1 보다 작거나 섞는 방식이 곧은 알파가 아님)
@@ -84319,7 +85216,7 @@ void main() {
       for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
         const item = casterList[casterIndex];
         if (casterIndex >= recordList.length) {
-          recordList.push({ mesh: null, material: void 0, values: new System139.Float32Array(0), stableFrameCount: 0, isStatic: false });
+          recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System139.Float32Array(0), stableFrameCount: 0, isStatic: false });
         }
         const record = recordList[casterIndex];
         const material = item.options.material;
@@ -84423,7 +85320,9 @@ void main() {
             continue;
           }
           const lineId = typeof item.options.lineId === "number" ? item.options.lineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
-          if (item.instances !== null) {
+          if (item.instanceBuffer !== null) {
+            screenOutline.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, lineId, item.options);
+          } else if (item.instances !== null) {
             screenOutline.drawMeshInstanced(item.mesh, item.instances, lineId, item.options);
           } else {
             screenOutline.drawMesh(item.mesh, item.modelMatrix, lineId, item.options);
@@ -84466,7 +85365,7 @@ void main() {
       this.runPasses(renderer, ToonDrawStage.beforeOpaque);
       const outlineItemList = [];
       for (const item of this.readOpaqueItemList()) {
-        if (item.instances !== null) {
+        if (item.instances !== null || item.instanceBuffer !== null) {
           this.drawItem(renderer, item, item.options);
           continue;
         }
@@ -84562,7 +85461,7 @@ void main() {
       return this.#opaqueItemList;
     }
     //==============================================================================
-    // 하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced)
+    // 하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced, 인스턴스 버퍼는 drawMeshInstanceBuffer)
     //==============================================================================
     /**
      * @param { object } renderer - ToonRenderer.
@@ -84570,7 +85469,9 @@ void main() {
      * @param { object } options - 이번에 쓸 그리기 꼴.
      */
     drawItem(renderer, item, options) {
-      if (item.instances !== null) {
+      if (item.instanceBuffer !== null) {
+        renderer.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, options);
+      } else if (item.instances !== null) {
         renderer.drawMeshInstanced(item.mesh, item.instances, options);
       } else {
         renderer.drawMesh(item.mesh, item.modelMatrix, options);

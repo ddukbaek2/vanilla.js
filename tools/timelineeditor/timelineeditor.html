@@ -4227,6 +4227,16 @@
   var subtreeNodeRect = new Rect();
   var subtreeComponentRect = new Rect();
   var subtreeContentSize = Vector2.zero();
+  var drawBoundsStampCounter = 0;
+  var CHILD_RANGE_STRIDE = 5;
+  var CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM = 0;
+  var CHILD_RANGE_PREFIX_MAXIMUM_RIGHT = 1;
+  var CHILD_RANGE_SUFFIX_MINIMUM_TOP = 2;
+  var CHILD_RANGE_SUFFIX_MINIMUM_LEFT = 3;
+  var CHILD_RANGE_PREFIX_COUNT = 4;
+  var visibleChildRect = new Rect();
+  var visibleChildFirstIndex = 0;
+  var visibleChildLastIndex = 0;
   var TransformNode = class _TransformNode extends ComponentNode {
     static {
       __name(this, "TransformNode");
@@ -4270,6 +4280,27 @@
     /** @private @type { Rect | null } */
     #drawBounds;
     // 셈해 둔 하위 트리 그리기 경계. (이 노드의 내용 좌표, 처음 읽을 때 만든다)
+    /** @private @type { number } */
+    #drawBoundsStamp;
+    // 이 노드의 경계를 마지막으로 셈한 차례 번호. (0 이면 셈한 적 없다)
+    /** @private @type { number } */
+    #parentDrawBoundsStamp;
+    // 부모가 이 노드의 경계를 부모 좌표로 옮겨 적은 때 부모의 차례 번호. (-1 이면 적은 적 없다)
+    /** @private @type { Rect | null } */
+    #parentDrawBounds;
+    // 부모가 셈하며 적어 둔 이 노드의 하위 트리 경계. (부모의 내용 좌표, 처음 적을 때 만든다)
+    /** @private @type { boolean } */
+    #isParentDrawBoundsEmpty;
+    // 적어 둔 경계가 아무것도 그리지 않는지. (옮기기 전 크기가 0)
+    /** @private @type { Float64Array | null } */
+    #childRangeList;
+    // 자식 범위 칸. (자식마다 CHILD_RANGE_STRIDE 칸 + 끝에 건너뛰면 세는 수 합, 자식이 있는 노드가 처음 셀 때 만든다)
+    /** @private @type { number } */
+    #childRangeStamp;
+    // 자식 범위 칸을 적은 때의 차례 번호. (#drawBoundsStamp 와 같아야 맞다)
+    /** @private @type { number } */
+    #childRangeCount;
+    // 자식 범위 칸을 적은 때의 자식 수.
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -4291,6 +4322,13 @@
       this.#drawBoundsState = DRAW_BOUNDS_DIRTY;
       this.#drawBoundsGeneration = -1;
       this.#drawBounds = null;
+      this.#drawBoundsStamp = 0;
+      this.#parentDrawBoundsStamp = -1;
+      this.#parentDrawBounds = null;
+      this.#isParentDrawBoundsEmpty = false;
+      this.#childRangeList = null;
+      this.#childRangeStamp = -1;
+      this.#childRangeCount = 0;
     }
     //==============================================================================
     // 출력 상태 시작.
@@ -4348,11 +4386,131 @@
           }
           graphic.drawComponent(component);
         }
-        const children = this.getChildren();
-        for (const child of children) {
-          graphic.drawNode(child);
+        this.drawChildren(graphic);
+      }
+    }
+    //==============================================================================
+    // 자식 목록 출력. (자식 차례대로 Graphic.drawNode, draw 가 부른다)
+    // - 하위 트리 거르기가 켜졌으면 부모 좌표의 보이는 사각형(Graphic.readLocalVisibleBounds)으로 보이는 자식 범위를 이분 찾기로 좁혀 그 앞뒤 자식은 부르지 않는다.
+    //   범위는 하위 트리 경계를 셀 때 적어 둔 자식 경계(앞에서부터 모은 가장 큰 아래와 오른쪽, 뒤에서부터 모은 가장 작은 위와 왼쪽)로 찾으므로 자식이 어떤 차례로 놓여도 맞고,
+    //   줄처럼 차례대로 놓이면 보이는 줄만 남는다. 경계를 모르는 자식이 있으면 그 자식을 넘어 좁히지 않는다. 그리기 차례는 그대로다.
+    // - 그리는 동안 이 노드의 경계가 바뀌면(자식이 형제를 옮김 같은) 남은 자식을 모두 부른다.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic 그릴 그래픽.
+     * @example <caption>draw 를 덮어쓴 노드가 자식을 그리기</caption>
+     * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Colors, Rect, Vector2, Pivot } from "./build/vanilla.js";
+     *
+     * class FrameNode extends WorldNode {
+     * 	draw(graphic) {
+     * 		graphic.setFillColor(Colors.white);
+     * 		graphic.drawRect(Rect.create(0, 0, 20, 20));
+     * 		this.drawChildren(graphic);
+     * 	}
+     * 	calculateDrawnRect(rect) {
+     * 		rect.position.set(0, 0);
+     * 		rect.size.set(20, 20);
+     * 		return true;
+     * 	}
+     * }
+     *
+     * class MainScene extends Scene {
+     * 	initialize(engine) {
+     * 		super.initialize(engine);
+     * 		const frameNode = new FrameNode();
+     * 		frameNode.setPivot(Pivot.topLeft);
+     * 		this.getRoot().addChild(frameNode);
+     * 		const childNode = new WorldNode();
+     * 		childNode.setPivot(Pivot.topLeft);
+     * 		childNode.setRect(30, 0, 20, 20);
+     * 		childNode.addComponent(Paint);
+     * 		frameNode.addChild(childNode);
+     * 	}
+     * 	draw(graphic) {
+     * 		super.draw(graphic);
+     * 		console.log(graphic.getLastFrameCulledSubtreeCount());
+     * 	}
+     * }
+     *
+     * const engineConfiguration = new EngineConfiguration();
+     * const engine = new Engine(engineConfiguration);
+     * engine.run(new MainScene());
+     */
+    drawChildren(graphic) {
+      const children = this.getChildren();
+      let firstIndex = 0;
+      let lastIndex = System10.Number.MAX_SAFE_INTEGER;
+      if (this.#findVisibleChildRange(graphic, children.length)) {
+        firstIndex = visibleChildFirstIndex;
+        lastIndex = visibleChildLastIndex;
+      }
+      for (let childIndex = firstIndex; childIndex <= lastIndex && childIndex < children.length; ++childIndex) {
+        graphic.drawNode(children[childIndex]);
+        if (this.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+          lastIndex = System10.Number.MAX_SAFE_INTEGER;
         }
       }
+    }
+    //==============================================================================
+    // 보이는 자식 범위 찾기. (찾으면 visibleChildFirstIndex, visibleChildLastIndex 에 적고 범위 밖 자식 가운데 건너뛰면 세는 수를 graphic 에 더한 뒤 true)
+    // - 자식 범위 칸이 이번 경계 셈과 같은 차례이고 이 노드가 더럽지 않을 때만. 지금 변환은 이 노드의 내용 좌표.
+    // - 첫 자식: 앞에서부터 모은 가장 큰 아래가 보이는 위 이상이고 가장 큰 오른쪽이 보이는 왼쪽 이상인 첫 자리. (그 앞 자식은 모두 위나 왼쪽 밖)
+    // - 끝 자식: 뒤에서부터 모은 가장 작은 위가 보이는 아래 이하이고 가장 작은 왼쪽이 보이는 오른쪽 이하인 끝 자리. (그 뒤 자식은 모두 아래나 오른쪽 밖)
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic 그릴 그래픽.
+     * @param { number } childCount 자식 수.
+     * @returns { boolean } 찾았으면 참.
+     */
+    #findVisibleChildRange(graphic, childCount) {
+      if (childCount < 2 || this.#childRangeStamp !== this.#drawBoundsStamp || this.#childRangeCount !== childCount || this.#drawBoundsState === DRAW_BOUNDS_DIRTY) {
+        return false;
+      }
+      if (this.#drawBoundsGeneration !== Component.getDrawnRectGeneration() || typeof graphic.readLocalVisibleBounds !== "function" || !graphic.readLocalVisibleBounds(visibleChildRect)) {
+        return false;
+      }
+      const visibleMinimumX = visibleChildRect.position.x;
+      const visibleMinimumY = visibleChildRect.position.y;
+      const visibleMaximumX = visibleMinimumX + visibleChildRect.size.x;
+      const visibleMaximumY = visibleMinimumY + visibleChildRect.size.y;
+      const childRangeList = this.#childRangeList;
+      let lowIndex = 0;
+      let highIndex = childCount;
+      while (lowIndex < highIndex) {
+        const middleIndex = lowIndex + highIndex >>> 1;
+        const middleOffset = middleIndex * CHILD_RANGE_STRIDE;
+        if (childRangeList[middleOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] >= visibleMinimumY && childRangeList[middleOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] >= visibleMinimumX) {
+          highIndex = middleIndex;
+        } else {
+          lowIndex = middleIndex + 1;
+        }
+      }
+      const firstIndex = lowIndex;
+      lowIndex = 0;
+      highIndex = childCount;
+      while (lowIndex < highIndex) {
+        const middleIndex = lowIndex + highIndex >>> 1;
+        const middleOffset = middleIndex * CHILD_RANGE_STRIDE;
+        if (childRangeList[middleOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] <= visibleMaximumY && childRangeList[middleOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] <= visibleMaximumX) {
+          lowIndex = middleIndex + 1;
+        } else {
+          highIndex = middleIndex;
+        }
+      }
+      const lastIndex = lowIndex - 1;
+      const totalCount = childRangeList[childCount * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+      let culledCount = totalCount;
+      if (firstIndex <= lastIndex) {
+        const firstCount = childRangeList[firstIndex * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+        const afterLastCount = childRangeList[(lastIndex + 1) * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT];
+        culledCount = firstCount + (totalCount - afterLastCount);
+      }
+      if (culledCount > 0) {
+        graphic.addCulledSubtreeCount(culledCount);
+      }
+      visibleChildFirstIndex = firstIndex;
+      visibleChildLastIndex = lastIndex;
+      return true;
     }
     //==============================================================================
     // 출력.
@@ -4901,6 +5059,8 @@
       }
       const drawnRectGeneration2 = Component.getDrawnRectGeneration();
       if (this.#drawBoundsState === DRAW_BOUNDS_DIRTY || this.#drawBoundsGeneration !== drawnRectGeneration2) {
+        drawBoundsStampCounter += 1;
+        this.#drawBoundsStamp = drawBoundsStampCounter;
         const isKnown = this.calculateSubtreeDrawBounds(drawBounds) === true;
         const leftX = drawBounds.position.x;
         const topY = drawBounds.position.y;
@@ -4915,6 +5075,76 @@
       }
       rect.position.set(drawBounds.position.x, drawBounds.position.y);
       rect.size.set(drawBounds.size.x, drawBounds.size.y);
+      return true;
+    }
+    //==============================================================================
+    // 부모가 셈해 둔 이 노드의 하위 트리 그리기 경계 읽기. (부모의 내용 좌표, 이 노드의 변환을 건 경계 상자, 맞으면 true)
+    // - 부모가 하위 트리 경계를 셈할 때(calculateSubtreeDrawBounds) 자식마다 옮겨 적어 둔 것이다. 이 노드의 변환이나 경계가 바뀌면 부모가 다시 셈하므로 그때까지 그대로 쓴다.
+    // - 그리기 순회가 부모의 변환 아래에서 이 사각형을 먼저 보아, 부모 좌표의 보이는 사각형 밖이면 이 노드에 변환을 걸지 않고 건너뛴다. (스크롤은 부모의 변환만 바뀌므로 자식마다 다시 셈하지 않는다)
+    // - 부모가 아직 셈하지 않았거나 셈한 뒤 바뀌었으면(다시 셈할 차례), 이 노드가 어디에 그리는지 모르거나 놓이는 곳을 모르면 false.
+    //==============================================================================
+    /**
+     * @param { Rect } rect 경계를 적을 곳. (부모의 내용 좌표, 크기가 0 이면 아무것도 그리지 않는다)
+     * @returns { boolean } 맞는 경계가 있으면 참. (없으면 rect 를 건드리지 않는다)
+     * @example <caption>부모가 셈해 둔 줄의 경계를 부모 좌표로 읽기</caption>
+     * import { WorldNode, Paint, Rect, Vector2, Pivot } from "./build/vanilla.js";
+     *
+     * const listNode = new WorldNode();
+     * listNode.setPivot(Pivot.topLeft);
+     * const rowNode = new WorldNode();
+     * rowNode.setPivot(Pivot.topLeft);
+     * rowNode.setRect(0, 120, 300, 40);
+     * rowNode.addComponent(Paint);
+     * listNode.addChild(rowNode);
+     * const drawBounds = Rect.zero();
+     * console.log(rowNode.readParentDrawBounds(drawBounds));
+     * listNode.readSubtreeDrawBounds(drawBounds);
+     * console.log(rowNode.readParentDrawBounds(drawBounds), drawBounds.position.y, drawBounds.size.y);
+     */
+    readParentDrawBounds(rect) {
+      const parent = this.getParent();
+      if (parent === null || parent === void 0 || !(#drawBoundsState in parent)) {
+        return false;
+      }
+      if (this.#parentDrawBoundsStamp !== parent.#drawBoundsStamp || parent.#drawBoundsState === DRAW_BOUNDS_DIRTY || parent.#drawBoundsGeneration !== Component.getDrawnRectGeneration()) {
+        return false;
+      }
+      const parentDrawBounds = this.#parentDrawBounds;
+      if (this.#isParentDrawBoundsEmpty) {
+        rect.position.set(parentDrawBounds.position.x, parentDrawBounds.position.y);
+        rect.size.set(0, 0);
+        return true;
+      }
+      rect.position.set(parentDrawBounds.position.x, parentDrawBounds.position.y);
+      rect.size.set(parentDrawBounds.size.x, parentDrawBounds.size.y);
+      return true;
+    }
+    //==============================================================================
+    // 부모가 셈한 이 노드의 부모 좌표 경계 적기. (부모의 calculateSubtreeDrawBounds 가 자식마다 부른다, 값이 수가 아니면 적지 않고 false)
+    //==============================================================================
+    /**
+     * @param { Rect } rect 부모 좌표로 옮긴 경계.
+     * @param { boolean } isEmpty 옮기기 전 크기가 0 이었는지.
+     * @param { number } parentStamp 부모의 차례 번호.
+     * @returns { boolean } 적었으면 참.
+     */
+    #writeParentDrawBounds(rect, isEmpty, parentStamp) {
+      const leftX = rect.position.x;
+      const topY = rect.position.y;
+      const width = rect.size.x;
+      const height = rect.size.y;
+      if (!isEmpty && !(System10.Number.isFinite(leftX) && System10.Number.isFinite(topY) && System10.Number.isFinite(width) && System10.Number.isFinite(height))) {
+        return false;
+      }
+      let parentDrawBounds = this.#parentDrawBounds;
+      if (parentDrawBounds === null) {
+        parentDrawBounds = new Rect();
+        this.#parentDrawBounds = parentDrawBounds;
+      }
+      parentDrawBounds.position.set(leftX, topY);
+      parentDrawBounds.size.set(width, height);
+      this.#isParentDrawBoundsEmpty = isEmpty;
+      this.#parentDrawBoundsStamp = parentStamp;
       return true;
     }
     //==============================================================================
@@ -5009,6 +5239,7 @@
     //   모르는 컴포넌트가 하나라도 있으면 모른다. 기즈모를 그리는 노드와 내용 크기를 읽을 수 없는 노드(내용 영역 안 컴포넌트가 있을 때)도 모른다.
     // - 자식: 자식의 하위 트리 경계를 자식이 옮긴(transformDrawBoundsToParent) 이 노드의 내용 좌표 경계 상자. 놓이는 곳을 모르는 자식이 있으면 모른다.
     // - 모르더라도 켜지고 보이는 자식의 경계는 모두 읽는다. (자식이 셈해 두어야 자손이 바뀐 것이 이 노드까지 번진다)
+    // - 부모 좌표로 옮긴 자식의 경계는 자식에 적어 둔다. (readParentDrawBounds, 그리기 순회가 자식에 변환을 걸기 전에 본다, 이 노드가 다시 셈할 때까지 맞다)
     // - 마스크로 자식을 잘라도 경계는 줄이지 않는다. (넉넉하게 본다)
     //==============================================================================
     /**
@@ -5099,12 +5330,33 @@
       }
       const childRect = childDrawBounds;
       const children = this.getChildren();
+      const childCount = children.length;
+      let childRangeList = this.#childRangeList;
+      if (childCount > 0 && (childRangeList === null || childRangeList.length < (childCount + 1) * CHILD_RANGE_STRIDE)) {
+        childRangeList = new System10.Float64Array((childCount + 1) * CHILD_RANGE_STRIDE);
+        this.#childRangeList = childRangeList;
+      }
+      let childIndex = -1;
       for (const child of children) {
+        childIndex += 1;
+        const rangeOffset = childIndex * CHILD_RANGE_STRIDE;
+        childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System10.Number.POSITIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System10.Number.POSITIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System10.Number.NEGATIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System10.Number.NEGATIVE_INFINITY;
+        childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = 0;
         if (!(child instanceof _TransformNode)) {
           isKnown = false;
           continue;
         }
-        if (!child.isActive() || !child.isVisible()) {
+        if (!child.isActive()) {
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System10.Number.NEGATIVE_INFINITY;
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System10.Number.NEGATIVE_INFINITY;
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System10.Number.POSITIVE_INFINITY;
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System10.Number.POSITIVE_INFINITY;
+          continue;
+        }
+        if (!child.isVisible()) {
           continue;
         }
         if (!child.readSubtreeDrawBounds(childRect)) {
@@ -5115,6 +5367,20 @@
         if (!child.transformDrawBoundsToParent(childRect)) {
           isKnown = false;
           continue;
+        }
+        if (child.#writeParentDrawBounds(childRect, isChildEmpty, this.#drawBoundsStamp)) {
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = 1;
+          if (isChildEmpty) {
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = System10.Number.NEGATIVE_INFINITY;
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = System10.Number.NEGATIVE_INFINITY;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = System10.Number.POSITIVE_INFINITY;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = System10.Number.POSITIVE_INFINITY;
+          } else {
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = childRect.position.y + childRect.size.y;
+            childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = childRect.position.x + childRect.size.x;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = childRect.position.y;
+            childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = childRect.position.x;
+          }
         }
         if (!isKnown || isChildEmpty) {
           continue;
@@ -5133,6 +5399,35 @@
           maximumX = System10.Math.max(maximumX, childRightX);
           maximumY = System10.Math.max(maximumY, childBottomY);
         }
+      }
+      if (childCount > 0 && childIndex === childCount - 1) {
+        let prefixMaximumBottom = System10.Number.NEGATIVE_INFINITY;
+        let prefixMaximumRight = System10.Number.NEGATIVE_INFINITY;
+        let prefixCount = 0;
+        for (let rangeIndex = 0; rangeIndex < childCount; ++rangeIndex) {
+          const rangeOffset = rangeIndex * CHILD_RANGE_STRIDE;
+          prefixMaximumBottom = System10.Math.max(prefixMaximumBottom, childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM]);
+          prefixMaximumRight = System10.Math.max(prefixMaximumRight, childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT]);
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_BOTTOM] = prefixMaximumBottom;
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_MAXIMUM_RIGHT] = prefixMaximumRight;
+          const countable = childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT];
+          childRangeList[rangeOffset + CHILD_RANGE_PREFIX_COUNT] = prefixCount;
+          prefixCount += countable;
+        }
+        childRangeList[childCount * CHILD_RANGE_STRIDE + CHILD_RANGE_PREFIX_COUNT] = prefixCount;
+        let suffixMinimumTop = System10.Number.POSITIVE_INFINITY;
+        let suffixMinimumLeft = System10.Number.POSITIVE_INFINITY;
+        for (let rangeIndex = childCount - 1; rangeIndex >= 0; --rangeIndex) {
+          const rangeOffset = rangeIndex * CHILD_RANGE_STRIDE;
+          suffixMinimumTop = System10.Math.min(suffixMinimumTop, childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP]);
+          suffixMinimumLeft = System10.Math.min(suffixMinimumLeft, childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT]);
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_TOP] = suffixMinimumTop;
+          childRangeList[rangeOffset + CHILD_RANGE_SUFFIX_MINIMUM_LEFT] = suffixMinimumLeft;
+        }
+        this.#childRangeStamp = this.#drawBoundsStamp;
+        this.#childRangeCount = childCount;
+      } else {
+        this.#childRangeStamp = -1;
       }
       if (!isKnown) {
         return false;
@@ -8909,6 +9204,21 @@ void main() {
     /** @private @type { number } */
     #lastFrameCulledSubtreeCount;
     // 지난 프레임에 그 수.
+    /** @private @type { Float64Array } */
+    #localVisibleKeyList;
+    // 지역 좌표의 보이는 사각형을 셈한 때의 변환(a, b, c, d, e, f)과 보이는 디바이스 사각형(왼쪽, 위, 오른쪽, 아래). (같으면 다시 셈하지 않는다)
+    /** @private @type { boolean } */
+    #isLocalVisibleBoundsKnown;
+    // 지역 좌표의 보이는 사각형을 셈할 수 있었는지. (변환을 거꾸로 걸 수 없으면 거짓)
+    /** @private @type { number } */
+    #localVisibleMinimumX;
+    // 지금 변환의 지역 좌표로 옮긴 보이는 사각형의 경계 상자. (화면과 걸린 자르기, 한 디바이스 픽셀 넉넉히)
+    /** @private @type { number } */
+    #localVisibleMinimumY;
+    /** @private @type { number } */
+    #localVisibleMaximumX;
+    /** @private @type { number } */
+    #localVisibleMaximumY;
     /** @private @type { boolean } */
     #isGeometryCachingEnabled;
     // 컴포넌트가 그린 정점을 캐시해 두고 바뀐 것만 다시 셈할지. (기본 켜짐)
@@ -9122,6 +9432,12 @@ void main() {
       this.#isSubtreeCullingEnabled = true;
       this.#culledSubtreeCount = 0;
       this.#lastFrameCulledSubtreeCount = 0;
+      this.#localVisibleKeyList = new System14.Float64Array(10).fill(System14.Number.NaN);
+      this.#isLocalVisibleBoundsKnown = false;
+      this.#localVisibleMinimumX = 0;
+      this.#localVisibleMinimumY = 0;
+      this.#localVisibleMaximumX = 0;
+      this.#localVisibleMaximumY = 0;
       this.#isGeometryCachingEnabled = true;
       this.#geometryCacheMap = /* @__PURE__ */ new WeakMap();
       this.#geometryActiveCache = null;
@@ -10333,6 +10649,155 @@ void main() {
         return true;
       }
       return !this.isLocalRectVisible(drawBounds);
+    }
+    //==============================================================================
+    // 노드를 부모 좌표에서 보아 화면 밖이라 건너뛸지 반환. (drawNode 가 노드에 변환을 걸기 전에 부른다, 지금 변환은 부모의 내용 좌표)
+    // - 부모가 셈해 둔 노드의 경계(TransformNode.readParentDrawBounds)를 부모 좌표의 보이는 사각형과 견준다. 경계가 없으면 건너뛰지 않는다(변환을 건 뒤 #isNodeSubtreeCulled 가 본다).
+    // - 보이는 사각형은 부모 하나에 한 번 셈한다. (변환과 자르기가 같으면 셈해 둔 것을 쓴다)
+    //==============================================================================
+    /**
+     * @param { TransformNode } node 그릴 노드.
+     * @returns { boolean } 건너뛰면 참.
+     */
+    #isNodeCulledInParent(node) {
+      if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || this.#isForceGizmosVisible || typeof node.readParentDrawBounds !== "function") {
+        return false;
+      }
+      const drawBounds = subtreeCullRect;
+      if (!node.readParentDrawBounds(drawBounds)) {
+        return false;
+      }
+      if (!(drawBounds.size.x > 0 && drawBounds.size.y > 0)) {
+        return true;
+      }
+      if (!this.#updateLocalVisibleBounds()) {
+        return false;
+      }
+      const leftX = drawBounds.position.x;
+      const topY = drawBounds.position.y;
+      return leftX > this.#localVisibleMaximumX || topY > this.#localVisibleMaximumY || leftX + drawBounds.size.x < this.#localVisibleMinimumX || topY + drawBounds.size.y < this.#localVisibleMinimumY;
+    }
+    //==============================================================================
+    // 보이는 사각형(화면과 걸린 자르기)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 읽기. (하위 트리 거르기가 켜졌을 때만, 알면 true)
+    // - 돌림이나 기울임이 있으면 넉넉하다(네 꼭짓점의 경계 상자, 한 디바이스 픽셀씩 넓힘). 이 사각형 밖에 그리는 것은 보이지 않는다.
+    // - 노드가 많은 자식 가운데 보이는 범위를 찾을 때 쓴다(TransformNode.drawChildren). 변환과 자르기가 같으면 다시 셈하지 않는다.
+    // - 화면 밖 거르기나 하위 트리 거르기가 꺼졌거나, 기즈모를 모두 그리거나, 뷰포트를 아직 정하지 않았거나, 변환을 거꾸로 걸 수 없으면(배율 0) false.
+    //==============================================================================
+    /**
+     * @param { Rect } rect 경계 상자를 적을 곳. (지금 변환의 지역 좌표)
+     * @returns { boolean } 알면 참. (모르면 rect 를 건드리지 않는다)
+     * @example <caption>지금 변환에서 보이는 사각형 읽기</caption>
+     * import { Engine, EngineConfiguration, Scene, Rect } from "./build/vanilla.js";
+     *
+     * class MainScene extends Scene {
+     * 	draw(graphic) {
+     * 		super.draw(graphic);
+     * 		const visibleRect = Rect.zero();
+     * 		graphic.pushState();
+     * 		graphic.translate(100, 0);
+     * 		console.log(graphic.readLocalVisibleBounds(visibleRect), visibleRect.position.x < -100);
+     * 		graphic.popState();
+     * 	}
+     * }
+     *
+     * const engineConfiguration = new EngineConfiguration();
+     * const engine = new Engine(engineConfiguration);
+     * engine.run(new MainScene());
+     */
+    readLocalVisibleBounds(rect) {
+      if (!this.#isCullingEnabled || !this.#isSubtreeCullingEnabled || this.#isForceGizmosVisible || !this.#updateLocalVisibleBounds()) {
+        return false;
+      }
+      rect.position.set(this.#localVisibleMinimumX, this.#localVisibleMinimumY);
+      rect.size.set(this.#localVisibleMaximumX - this.#localVisibleMinimumX, this.#localVisibleMaximumY - this.#localVisibleMinimumY);
+      return true;
+    }
+    //==============================================================================
+    // 이번 프레임에 화면 밖이라 그리기를 통째로 건너뛴 하위 트리 수 더하기. (TransformNode.drawChildren 이 보이는 범위 밖 자식을 한꺼번에 건너뛰고 부른다)
+    //==============================================================================
+    /**
+     * @param { number } culledSubtreeCount 더할 하위 트리 수.
+     */
+    addCulledSubtreeCount(culledSubtreeCount) {
+      this.#culledSubtreeCount += culledSubtreeCount;
+    }
+    //==============================================================================
+    // 보이는 사각형(화면과 걸린 자르기, isLocalRectVisible 과 같은 것)을 지금 변환의 지역 좌표로 거꾸로 옮긴 경계 상자 셈하기. (셈할 수 있으면 true)
+    // - 돌림이나 기울임이 있으면 네 꼭짓점을 옮긴 경계 상자라 넉넉하다. 셈의 오차를 덮으려고 디바이스 사각형을 한 픽셀씩 넓혀 옮긴다.
+    // - 변환과 보이는 디바이스 사각형이 지난번과 같으면 다시 셈하지 않는다. (한 부모의 자식들을 그리는 동안은 같다)
+    // - 뷰포트를 아직 정하지 않았거나 변환을 거꾸로 걸 수 없으면(배율 0) false.
+    //==============================================================================
+    /**
+     * @returns { boolean } 셈할 수 있으면 참.
+     */
+    #updateLocalVisibleBounds() {
+      const viewportWidth = this.#appliedViewportWidth;
+      const viewportHeight = this.#appliedViewportHeight;
+      if (viewportWidth <= 0 || viewportHeight <= 0) {
+        return false;
+      }
+      let visibleMinimumX = 0;
+      let visibleMinimumY = 0;
+      let visibleMaximumX = viewportWidth;
+      let visibleMaximumY = viewportHeight;
+      const clipStack = this.#clipStack;
+      if (clipStack.length > 0) {
+        const clipEntry = clipStack[clipStack.length - 1];
+        visibleMinimumX = System14.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
+        visibleMinimumY = System14.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
+        visibleMaximumX = System14.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
+        visibleMaximumY = System14.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
+      }
+      const transformMatrix = this.#transformMatrix;
+      const matrixA = transformMatrix.a;
+      const matrixB = transformMatrix.b;
+      const matrixC = transformMatrix.c;
+      const matrixD = transformMatrix.d;
+      const matrixE = transformMatrix.e;
+      const matrixF = transformMatrix.f;
+      const keyList = this.#localVisibleKeyList;
+      if (keyList[0] === matrixA && keyList[1] === matrixB && keyList[2] === matrixC && keyList[3] === matrixD && keyList[4] === matrixE && keyList[5] === matrixF && keyList[6] === visibleMinimumX && keyList[7] === visibleMinimumY && keyList[8] === visibleMaximumX && keyList[9] === visibleMaximumY) {
+        return this.#isLocalVisibleBoundsKnown;
+      }
+      keyList[0] = matrixA;
+      keyList[1] = matrixB;
+      keyList[2] = matrixC;
+      keyList[3] = matrixD;
+      keyList[4] = matrixE;
+      keyList[5] = matrixF;
+      keyList[6] = visibleMinimumX;
+      keyList[7] = visibleMinimumY;
+      keyList[8] = visibleMaximumX;
+      keyList[9] = visibleMaximumY;
+      const determinant = matrixA * matrixD - matrixB * matrixC;
+      if (determinant === 0 || !System14.Number.isFinite(determinant)) {
+        this.#isLocalVisibleBoundsKnown = false;
+        return false;
+      }
+      const inverseDeterminant = 1 / determinant;
+      const leftX = visibleMinimumX - 1 - matrixE;
+      const topY = visibleMinimumY - 1 - matrixF;
+      const rightX = visibleMaximumX + 1 - matrixE;
+      const bottomY = visibleMaximumY + 1 - matrixF;
+      const leftTopX = (matrixD * leftX - matrixC * topY) * inverseDeterminant;
+      const leftTopY = (matrixA * topY - matrixB * leftX) * inverseDeterminant;
+      const rightTopX = (matrixD * rightX - matrixC * topY) * inverseDeterminant;
+      const rightTopY = (matrixA * topY - matrixB * rightX) * inverseDeterminant;
+      const leftBottomX = (matrixD * leftX - matrixC * bottomY) * inverseDeterminant;
+      const leftBottomY = (matrixA * bottomY - matrixB * leftX) * inverseDeterminant;
+      const rightBottomX = (matrixD * rightX - matrixC * bottomY) * inverseDeterminant;
+      const rightBottomY = (matrixA * bottomY - matrixB * rightX) * inverseDeterminant;
+      const minimumX = System14.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const minimumY = System14.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const maximumX = System14.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const maximumY = System14.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const isFinite = System14.Number.isFinite(minimumX) && System14.Number.isFinite(minimumY) && System14.Number.isFinite(maximumX) && System14.Number.isFinite(maximumY);
+      this.#localVisibleMinimumX = minimumX;
+      this.#localVisibleMinimumY = minimumY;
+      this.#localVisibleMaximumX = maximumX;
+      this.#localVisibleMaximumY = maximumY;
+      this.#isLocalVisibleBoundsKnown = isFinite;
+      return isFinite;
     }
     //==============================================================================
     // 지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)과 걸린 자르기 안에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)
@@ -13007,6 +13472,10 @@ void main() {
      */
     drawNode(node) {
       if (node === null || node == void 0 || !node.isActive()) {
+        return;
+      }
+      if (this.#isNodeCulledInParent(node)) {
+        this.#culledSubtreeCount += 1;
         return;
       }
       node.pushTransform(this);
@@ -16842,10 +17311,7 @@ void main() {
       if (maskComponent) {
         maskComponent.beginClip(graphic);
       }
-      const children = this.getChildren();
-      for (const child of children) {
-        graphic.drawNode(child);
-      }
+      this.drawChildren(graphic);
       if (maskComponent) {
         maskComponent.endClip(graphic);
       }
@@ -22774,6 +23240,9 @@ void main() {
     stop(isClearing = false) {
       this.#isPlaying = false;
       if (isClearing) {
+        if (this.#particleList.length > 0) {
+          this.markDrawnRectDirty();
+        }
         this.#particleList.length = 0;
         this.#emissionAccumulator = 0;
         if (this.#random) {
@@ -22791,6 +23260,9 @@ void main() {
     emit(count, worldOffset = null) {
       for (let emitIndex = 0; emitIndex < count; ++emitIndex) {
         this.spawnParticle(worldOffset);
+      }
+      if (count > 0) {
+        this.markDrawnRectDirty();
       }
     }
     //==============================================================================
@@ -22813,6 +23285,7 @@ void main() {
      * @param { number } timeDelta 진행할 시간. (초)
      */
     simulate(timeDelta) {
+      const isAnyParticleBefore = this.#particleList.length > 0;
       if (this.#isPlaying) {
         const previousElapsed = this.#playElapsedSeconds;
         this.#playElapsedSeconds += timeDelta;
@@ -22868,6 +23341,9 @@ void main() {
         particle.rotation += particle.angularVelocity * timeDelta;
       }
       particleList.length = aliveCount;
+      if (isAnyParticleBefore || aliveCount > 0) {
+        this.markDrawnRectDirty();
+      }
     }
     //==============================================================================
     // 파티클 하나 생성.
@@ -23010,6 +23486,77 @@ void main() {
       if (this.#blendMode !== "source-over") {
         graphic.setBlendMode("source-over");
       }
+    }
+    //==============================================================================
+    // 그리는 사각형 셈하기. (오버라이드: 살아 있는 파티클이 그리는 쿼드를 모두 품는 사각형, 노드 내용 좌표)
+    // - 파티클마다 그리는 크기의 반에 √2 를 곱한 만큼(돌린 사각형, 그림), 꼬리 쿼드면 머리와 꼬리를 품고 굵기의 반만큼, 흔들림 폭만큼 좌우를 넓히고 한 단위 여유를 둔다.
+    // - 시뮬레이션(simulate)이 돌 때마다, 방출(emit)과 지움(stop)에, 그리는 꼴을 바꾸는 세터에 다시 셈하게 알린다. (그리는 것이 화면 밖이면 그리기를 건너뛰고 시뮬레이션은 tick 이라 그대로 돈다)
+    // - 파티클이 없으면 크기 0 (그리지 않는다).
+    // - 월드 공간이면서 수동 틱이면 모른다. (노드를 옮기면 그리는 자리가 바뀌는데 그때 다시 셈할 길이 없다)
+    //==============================================================================
+    /**
+     * @override
+     * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+     * @returns { boolean } 알면 참.
+     * @example <caption>방출한 파티클을 품는 사각형</caption>
+     * import { WorldNode, ParticleSystem, Rect } from "./build/vanilla.js";
+     *
+     * const node = new WorldNode();
+     * const particleSystem = node.addComponent(ParticleSystem);
+     * particleSystem.setStartSpeed(0);
+     * particleSystem.setStartSize(10);
+     * particleSystem.emit(3);
+     * const drawnRect = Rect.zero();
+     * console.log(particleSystem.calculateDrawnRect(drawnRect), drawnRect.size.x > 0);
+     */
+    calculateDrawnRect(rect) {
+      const particleList = this.#particleList;
+      if (particleList.length === 0) {
+        rect.position.set(0, 0);
+        rect.size.set(0, 0);
+        return true;
+      }
+      let baseOffsetX = 0;
+      let baseOffsetY = 0;
+      if (this.#isWorldSpace) {
+        const node = this.getNode();
+        if (this.#isManualTick || node === null || node === void 0) {
+          return false;
+        }
+        const nodePosition = node.getLocalPosition();
+        baseOffsetX = -nodePosition.x;
+        baseOffsetY = -nodePosition.y;
+      }
+      const isStreak = this.#renderShape === ParticleRenderShape.streak;
+      const wobbleExtent = System31.Math.abs(this.#wobbleAmplitude);
+      let minimumX = System31.Number.POSITIVE_INFINITY;
+      let minimumY = System31.Number.POSITIVE_INFINITY;
+      let maximumX = System31.Number.NEGATIVE_INFINITY;
+      let maximumY = System31.Number.NEGATIVE_INFINITY;
+      for (const particle of particleList) {
+        const lifeRatio = particle.age / particle.lifetime;
+        const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
+        const drawSize = System31.Math.max(0.1, particle.size * sizeScale);
+        const headX = particle.x + baseOffsetX;
+        const headY = particle.y + baseOffsetY;
+        let tailX = headX;
+        let tailY = headY;
+        let extent = drawSize * 0.5 * System31.Math.SQRT2;
+        if (isStreak) {
+          tailX = headX - particle.velocityX * this.#streakScale;
+          tailY = headY - particle.velocityY * this.#streakScale;
+          extent = drawSize * 0.5;
+        }
+        const extentX = extent + wobbleExtent + 1;
+        const extentY = extent + 1;
+        minimumX = System31.Math.min(minimumX, headX - extentX, tailX - extentX);
+        minimumY = System31.Math.min(minimumY, headY - extentY, tailY - extentY);
+        maximumX = System31.Math.max(maximumX, headX + extentX, tailX + extentX);
+        maximumY = System31.Math.max(maximumY, headY + extentY, tailY + extentY);
+      }
+      rect.position.set(minimumX, minimumY);
+      rect.size.set(maximumX - minimumX, maximumY - minimumY);
+      return true;
     }
     //==============================================================================
     // 배치 출력 본체. (circle / rect / streak)
@@ -23294,6 +23841,7 @@ void main() {
     setSizeOverLifetime(startScale, endScale) {
       this.#sizeOverLifetimeStart = startScale;
       this.#sizeOverLifetimeEnd = endScale;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 회전 속도 범위 설정. (기본 0)
@@ -23333,6 +23881,7 @@ void main() {
      */
     setRenderShape(renderShape) {
       this.#renderShape = renderShape;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 파티클 이미지 설정.
@@ -23342,6 +23891,7 @@ void main() {
      */
     setImage(image) {
       this.#image = image;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 가산 합성 설정.
@@ -23389,6 +23939,7 @@ void main() {
     setWobble(amplitude, frequency = 4) {
       this.#wobbleAmplitude = amplitude;
       this.#wobbleFrequency = frequency;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // streak 길이 배율 설정. (기본 0.06)
@@ -23398,6 +23949,7 @@ void main() {
      */
     setStreakScale(streakScale) {
       this.#streakScale = streakScale;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 월드 공간 설정. (기본 거짓)
@@ -23407,6 +23959,7 @@ void main() {
      */
     setWorldSpace(isWorldSpace) {
       this.#isWorldSpace = isWorldSpace;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 반복 방출 설정.
@@ -23615,6 +24168,7 @@ void main() {
      */
     setManualTick(isManualTick) {
       this.#isManualTick = isManualTick;
+      this.markDrawnRectDirty();
     }
     //==============================================================================
     // 수동 틱인지 반환.
