@@ -10,7 +10,7 @@
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 const System = globalThis;
-const FRACTION_COUNT_LIMIT = 167; // 소수 자리에서 예전 길과 다른 화소 수 상한. (헤드리스 크롬 맥에서 잰 값, 가장자리 되풀이 전 dev 0bcfd84 는 185)
+const FRACTION_COUNT_LIMIT = 167; // 소수 자리에서 예전 길과 다른 화소 수 상한. (헤드리스 크롬 맥에서 잰 값, 줄 높이를 넘는 잉크를 자르지 않게 한 뒤도 167, 가장자리 되풀이 전 dev 0bcfd84 는 185)
 const FRACTION_MAXIMUM_LIMIT = 17; // 소수 자리에서 가장 큰 화소 차이 상한. (255 단계, dev 0bcfd84 도 17)
 import fs from "node:fs";
 import http from "node:http";
@@ -108,7 +108,7 @@ try {
 					});
 				}
 				else if (phase === "reference") {
-					// 예전 길: 문자열을 fillText 로 캔버스 한 장에 굽고(여유 2, 펜은 정수 자리) 텍스처 하나로 그린다.
+					// 예전 길: 문자열을 fillText 로 캔버스 한 장에 굽고(여유 2, 펜은 정수 자리, 세로는 글꼴 상자와 잉크 가운데 큰 쪽) 텍스처 하나로 그린다.
 					const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 					lineList.forEach(([fontString, text], lineIndex) => {
 						if (referenceTextureList[lineIndex] === undefined) {
@@ -119,9 +119,9 @@ try {
 							bakeContext.textAlign = "left";
 							const textMetrics = bakeContext.measureText(text);
 							const penX = 2 + System.Math.ceil(System.Math.max(textMetrics.actualBoundingBoxLeft, 0));
-							const baselineY = 2 + System.Math.ceil(textMetrics.fontBoundingBoxAscent);
+							const baselineY = 2 + System.Math.ceil(System.Math.max(textMetrics.fontBoundingBoxAscent, textMetrics.actualBoundingBoxAscent));
 							bakeCanvas.width = penX + System.Math.ceil(System.Math.max(textMetrics.actualBoundingBoxRight, 0)) + 2;
-							bakeCanvas.height = baselineY + System.Math.ceil(textMetrics.fontBoundingBoxDescent) + 2;
+							bakeCanvas.height = baselineY + System.Math.ceil(System.Math.max(textMetrics.fontBoundingBoxDescent, textMetrics.actualBoundingBoxDescent)) + 2;
 							bakeContext.font = fontString;
 							bakeContext.textAlign = "left";
 							bakeContext.fillStyle = "#ffffff";
