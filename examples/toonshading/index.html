@@ -2870,7 +2870,7 @@
 		webGL2RenderingContext.clearColor(0, 0, 0, 0);
 		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
-		backgroundPass.use();
+		backgroundPass.useProgram();
 		webGL2RenderingContext.uniform1f(backgroundPass.getUniformLocation("aspectRatio"), aspectRatio);
 		webGL2RenderingContext.uniform3f(backgroundPass.getUniformLocation("backgroundColor"), 0.014, 0.013, 0.016);
 		webGL2RenderingContext.uniform3f(backgroundPass.getUniformLocation("glowColor"), 0.085, 0.07, 0.05);
@@ -2920,7 +2920,7 @@
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
 		}
-		compositePass.use();
+		compositePass.useProgram();
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("normalTexture"), 1);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("depthTexture"), 2);
@@ -2960,7 +2960,7 @@
 		if (useAntialias) {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
-			antialiasPass.use();
+			antialiasPass.useProgram();
 			webGL2RenderingContext.uniform1i(antialiasPass.getUniformLocation("sourceTexture"), 0);
 			webGL2RenderingContext.uniform2f(antialiasPass.getUniformLocation("texelSize"), 1 / renderWidth, 1 / renderHeight);
 			webGL2RenderingContext.uniform1f(antialiasPass.getUniformLocation("sharpenStrength"), sliderStates.antialias >= 2 ? 0.5 : 0);

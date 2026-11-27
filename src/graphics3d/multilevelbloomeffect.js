@@ -254,7 +254,7 @@ export class MultiLevelBloomEffect extends Object {
 		const extractPass = this.#extractPass;
 		const firstRenderTarget = levelRenderTargetList[0];
 		firstRenderTarget.bind();
-		extractPass.use();
+		extractPass.useProgram();
 		webGL2RenderingContext.uniform1i(extractPass.getUniformLocation("sourceTexture"), 0);
 		webGL2RenderingContext.uniform2f(extractPass.getUniformLocation("sourceTexel"), 1 / this.#sceneWidth, 1 / this.#sceneHeight);
 		webGL2RenderingContext.uniform1f(extractPass.getUniformLocation("threshold"), this.#threshold);
@@ -264,7 +264,7 @@ export class MultiLevelBloomEffect extends Object {
 
 		// 2. 반씩 줄이기.
 		const downsamplePass = this.#downsamplePass;
-		downsamplePass.use();
+		downsamplePass.useProgram();
 		webGL2RenderingContext.uniform1i(downsamplePass.getUniformLocation("sourceTexture"), 0);
 		const downsampleTexelLocation = downsamplePass.getUniformLocation("sourceTexel");
 		for (let levelIndex = 1; levelIndex < levelCount; ++levelIndex) {
@@ -283,7 +283,7 @@ export class MultiLevelBloomEffect extends Object {
 		const blendSourceAlpha = webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_SRC_ALPHA);
 		const blendDestinationAlpha = webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_DST_ALPHA);
 		const upsamplePass = this.#upsamplePass;
-		upsamplePass.use();
+		upsamplePass.useProgram();
 		webGL2RenderingContext.uniform1i(upsamplePass.getUniformLocation("sourceTexture"), 0);
 		const upsampleTexelLocation = upsamplePass.getUniformLocation("sourceTexel");
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);

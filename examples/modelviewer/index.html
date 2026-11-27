@@ -331,7 +331,7 @@ class ModelViewerScene extends Scene {
 		// 4. 합성 → 화면.
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 		webGL2RenderingContext.viewport(0, 0, drawingBufferWidth, drawingBufferHeight);
-		compositePass.use();
+		compositePass.useProgram();
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("bloomTexture"), 1);
 		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("bloomStrength"), 0.8);

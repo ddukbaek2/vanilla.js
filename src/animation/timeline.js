@@ -19,6 +19,9 @@ import { AudioAsset } from "../resource/audioasset.js";
 //==============================================================================
 // 이징 이름 목록. ("linear" / "step" / "bezier" / "<종류>.<in|out|inOut>")
 //==============================================================================
+// 자료 속 방향 이름("in", "out", "inOut")과 트윈 함수 이름(easeIn, easeOut, easeInOut)의 짝. (자료 꼴은 그대로 둔다)
+const TIMELINE_EASING_DIRECTION_FUNCTION_NAMES = { in: "easeIn", out: "easeOut", inOut: "easeInOut" };
+
 export const TIMELINE_EASING_NAMES = (() => {
 	const nameList = ["linear", "step", "bezier"];
 	for (const familyName of ["quadratic", "cubic", "quartic", "quintic", "sinusoidal", "exponential", "circular", "elastic", "back", "bounce"]) {
@@ -109,10 +112,11 @@ export function resolveTimelineEasing(easingName, curve = null) {
 	const familyName = easingName.substring(0, separatorIndex);
 	const directionName = easingName.substring(separatorIndex + 1);
 	const family = Tween.easingFunction[familyName];
-	if (!family || typeof family[directionName] !== "function") {
+	const functionName = TIMELINE_EASING_DIRECTION_FUNCTION_NAMES[directionName];
+	if (!family || !functionName || typeof family[functionName] !== "function") {
 		return Tween.easingFunction.linear;
 	}
-	return family[directionName];
+	return family[functionName];
 }
 
 

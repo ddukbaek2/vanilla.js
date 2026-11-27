@@ -262,7 +262,7 @@ export class AmbientOcclusionEffect extends Object {
 
 		// 1. 차폐.
 		const occlusionPass = this.getOcclusionPass();
-		occlusionPass.use();
+		occlusionPass.useProgram();
 		const depthTextureLocation = occlusionPass.getUniformLocation("depthTexture");
 		webGL2RenderingContext.uniform1i(depthTextureLocation, 0);
 		const normalTextureLocation = occlusionPass.getUniformLocation("normalTexture");
@@ -297,7 +297,7 @@ export class AmbientOcclusionEffect extends Object {
 
 		// 2. 블러. (가로 → 핑, 세로 → 퐁)
 		const blurPass = this.getBlurPass();
-		blurPass.use();
+		blurPass.useProgram();
 		const sourceTextureLocation = blurPass.getUniformLocation("sourceTexture");
 		webGL2RenderingContext.uniform1i(sourceTextureLocation, 0);
 		const texelSizeLocation = blurPass.getUniformLocation("texelSize");

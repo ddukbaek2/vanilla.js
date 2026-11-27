@@ -89,7 +89,7 @@ void main() {
  * const compositePass = new FullscreenPass(webGL2RenderingContext, compositeShaderSource);
  * webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
  * webGL2RenderingContext.viewport(0, 0, width, height);
- * compositePass.use();
+ * compositePass.useProgram();
  * const sceneTextureLocation = compositePass.getUniformLocation("sceneTexture");
  * const bloomTextureLocation = compositePass.getUniformLocation("bloomTexture");
  * webGL2RenderingContext.uniform1i(sceneTextureLocation, 0);
@@ -166,7 +166,7 @@ export class BloomEffect extends Object {
 		const pongRenderTarget = this.getPongRenderTarget();
 		pingRenderTarget.bind();
 		const brightPass = this.getBrightPass();
-		brightPass.use();
+		brightPass.useProgram();
 		const brightSceneTextureLocation = brightPass.getUniformLocation("sceneTexture");
 		webGL2RenderingContext.uniform1i(brightSceneTextureLocation, 0);
 		const brightThresholdRangeLocation = brightPass.getUniformLocation("thresholdRange");
@@ -176,7 +176,7 @@ export class BloomEffect extends Object {
 
 		// 2. 가로/세로 가우시안 블러 핑퐁.
 		const blurPass = this.getBlurPass();
-		blurPass.use();
+		blurPass.useProgram();
 		const blurSourceTextureLocation = blurPass.getUniformLocation("sourceTexture");
 		webGL2RenderingContext.uniform1i(blurSourceTextureLocation, 0);
 		const blurDirectionLocation = blurPass.getUniformLocation("blurDirection");

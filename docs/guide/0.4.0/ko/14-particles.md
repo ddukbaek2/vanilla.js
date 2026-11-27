@@ -329,7 +329,7 @@ class DissolveScene extends Scene {
 		const shaderSprite = this.#shaderSprite;
 		const tween = new Tween({ progress: startProgress });
 		tween.to({ progress: endProgress }, 1.5);
-		tween.easing(Tween.easingFunction.sinusoidal.inOut);
+		tween.easing(Tween.easingFunction.sinusoidal.easeInOut);
 		tween.setUpdate((values) => {
 			shaderSprite.setEffectProgress(values.progress);
 		});

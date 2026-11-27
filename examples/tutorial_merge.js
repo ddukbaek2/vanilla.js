@@ -218,7 +218,7 @@ class TutorialMerge extends Scene {
 
 						const tween = new Tween({ scale: 0 })
 							.to({ scale: finalScaleValue }, 0.4)
-							.easing(Tween.easingFunction.back.out)
+							.easing(Tween.easingFunction.back.easeOut)
 							.setUpdate(v => {
 								targetJelly.node.setScale(Vec2.one().multiply(v.scale));
 							})
@@ -239,7 +239,7 @@ class TutorialMerge extends Scene {
 						const startPosition = releasedJelly.node.getPosition();
 						const tween = new Tween({ x: startPosition.x, y: startPosition.y })
 							.to({ x: newPosition.x, y: newPosition.y }, 0.2)
-							.easing(Tween.easingFunction.back.out)
+							.easing(Tween.easingFunction.back.easeOut)
 							.setUpdate(v => {
 								releasedJelly.node.setPosition(Vec2.create(v.x, v.y));
 							})
@@ -259,7 +259,7 @@ class TutorialMerge extends Scene {
 							const startPosition = releasedJelly.node.getPosition();
 							const tween = new Tween({ x: startPosition.x, y: startPosition.y })
 								.to({ x: originalPosition.x, y: originalPosition.y }, 0.3)
-								.easing(Tween.easingFunction.back.out)
+								.easing(Tween.easingFunction.back.easeOut)
 								.setUpdate(v => {
 									releasedJelly.node.setPosition(Vec2.create(v.x, v.y));
 								})
@@ -412,7 +412,7 @@ class TutorialMerge extends Scene {
 
 		const tween = new Tween({ scale: 0 })
 			.to({ scale: finalScaleValue }, 0.4)
-			.easing(Tween.easingFunction.back.out)
+			.easing(Tween.easingFunction.back.easeOut)
 			.setUpdate(v => {
 				jelly.node.setScale(Vec2.one().multiply(v.scale));
 			})

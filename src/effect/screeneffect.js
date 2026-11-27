@@ -1123,7 +1123,7 @@ export class ScreenEffect extends Object {
 			const passWidth = isHalfTarget ? this.#halfTargetA.width : width;
 			const passHeight = isHalfTarget ? this.#halfTargetA.height : height;
 
-			pass.use();
+			pass.useProgram();
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
 			webGL2RenderingContext.uniform1i(pass.getUniformLocation("sourceTexture"), 0);

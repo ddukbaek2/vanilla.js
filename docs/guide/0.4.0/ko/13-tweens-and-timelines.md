@@ -15,7 +15,7 @@ import { Tween } from "./build/vanilla.js";
 
 const tween = new Tween({ x: 0, alpha: 1 });
 tween.to({ x: 100, alpha: 0 }, 0.5);
-tween.easing(Tween.easingFunction.quadratic.out);
+tween.easing(Tween.easingFunction.quadratic.easeOut);
 tween.setUpdate((values) => {
 	console.log(values.x, values.alpha);
 });
@@ -31,7 +31,7 @@ console.log(tween.isFinished());
 
 ### 이징
 
-`Tween.easingFunction` 에 `linear` 와 `quadratic`, `cubic`, `quartic`, `quintic`, `sinusoidal`, `exponential`, `circular`, `elastic`, `back`, `bounce` 가 있고, `linear` 를 뺀 것은 저마다 `in`, `out`, `inOut` 을 가집니다(`Tween.easingFunction.back.out` 처럼). 진행률(0 ~ 1)을 받아 바뀐 진행률을 돌려주는 함수면 무엇이든 `easing` 에 줄 수 있습니다.
+`Tween.easingFunction` 에 `linear` 와 `quadratic`, `cubic`, `quartic`, `quintic`, `sinusoidal`, `exponential`, `circular`, `elastic`, `back`, `bounce` 가 있고, `linear` 를 뺀 것은 저마다 `easeIn`, `easeOut`, `easeInOut` 을 가집니다(`Tween.easingFunction.back.easeOut` 처럼). 진행률(0 ~ 1)을 받아 바뀐 진행률을 돌려주는 함수면 무엇이든 `easing` 에 줄 수 있습니다.
 
 ### 노드 속성 트윈
 
@@ -79,7 +79,7 @@ class TweenScene extends Scene {
 		const moveTween = new Tween({ localPosition: Vector2.create(160, 360), localOpacity: 0 });
 		moveTween.to({ localPosition: Vector2.create(1120, 360), localOpacity: 1 }, 1.5);
 		moveTween.delay(0.2);
-		moveTween.easing(Tween.easingFunction.cubic.inOut);
+		moveTween.easing(Tween.easingFunction.cubic.easeInOut);
 		moveTween.setTarget(boxNode);
 		moveTween.setComplete(() => {
 			this.startPulse(1, 1.4);
@@ -89,7 +89,7 @@ class TweenScene extends Scene {
 
 	startPulse(startScale, endScale) {
 		const pulseTween = Tween.createNodeTween(this.#boxNode, TweenProperty.localScale, startScale, endScale, 0.4);
-		pulseTween.easing(Tween.easingFunction.sinusoidal.inOut);
+		pulseTween.easing(Tween.easingFunction.sinusoidal.easeInOut);
 		pulseTween.setComplete(() => {
 			this.startPulse(endScale, startScale);
 		});

@@ -214,7 +214,7 @@ export class Tutorial_3 extends Scene {
 
 							const tween = new Tween({ scale: 0 })
 								.to({ scale: finalScaleValue }, 0.4)
-								.easing(Tween.easingFunction.back.out)
+								.easing(Tween.easingFunction.back.easeOut)
 								.setUpdate(v => {
 									targetJelly.node.setScale(Vector2.one().multiply(v.scale));
 								})
@@ -234,7 +234,7 @@ export class Tutorial_3 extends Scene {
 
 							const tween = new Tween({ x: releasedJelly.node.getPosition().x, y: releasedJelly.node.getPosition().y })
 								.to({ x: newPos.x, y: newPos.y }, 0.2)
-								.easing(Tween.easingFunction.back.out)
+								.easing(Tween.easingFunction.back.easeOut)
 								.setUpdate(v => {
 									releasedJelly.node.setPosition(Vector2.create(v.x, v.y));
 								})
@@ -253,7 +253,7 @@ export class Tutorial_3 extends Scene {
 
 								const tween = new Tween({ x: releasedJelly.node.getPosition().x, y: releasedJelly.node.getPosition().y })
 									.to({ x: originalPosition.x, y: originalPosition.y }, 0.3)
-									.easing(Tween.easingFunction.back.out)
+									.easing(Tween.easingFunction.back.easeOut)
 									.setUpdate(v => {
 										releasedJelly.node.setPosition(Vector2.create(v.x, v.y));
 									})
@@ -401,7 +401,7 @@ export class Tutorial_3 extends Scene {
 
 		const tween = new Tween({ scale: 0 })
 			.to({ scale: finalScaleValue }, 0.4)
-			.easing(Tween.easingFunction.back.out)
+			.easing(Tween.easingFunction.back.easeOut)
 			.setUpdate(v => {
 				jelly.node.setScale(Vector2.one().multiply(v.scale));
 			})

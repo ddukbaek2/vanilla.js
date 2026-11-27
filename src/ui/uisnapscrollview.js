@@ -491,7 +491,7 @@ export class UISnapScrollView extends UIScrollView {
 		const startOffsetY = currentOffset.y;
 		this.#snapTween = new Tween({ x: startOffsetX, y: startOffsetY });
 		this.#snapTween.to({ x: targetOffsetX, y: targetOffsetY }, 0.3);
-		this.#snapTween.easing(Tween.easingFunction.cubic.out);
+		this.#snapTween.easing(Tween.easingFunction.cubic.easeOut);
 		this.#snapTween.setUpdate((values) => {
 			this.setScrollOffset(Vector2.create(values.x, values.y));
 		});
