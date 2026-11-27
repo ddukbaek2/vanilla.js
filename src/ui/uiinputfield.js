@@ -189,6 +189,7 @@ export class UIInputField extends WorldNode {
 	/** @private @type { string | null } */ #caretRevealRequest; // 다음 배치에서 커서가 보이게 스크롤할지. ("ifNeeded", "always", null)
 	/** @private @type { TextAreaLayout | null } */ #textAreaLayout; // 여러 줄 배치.
 	/** @private @type { string | null } */ #textAreaLayoutKey; // 여러 줄 배치의 열쇠. (보인 글, 폰트, 폭, 줄 높이, 탭 크기)
+	/** @private @type { number } */ #textAreaScrollbarGutter; // 클래식 스크롤 막대가 차지한 폭. (여러 줄 필드, 얹는 막대거나 넘치지 않으면 0)
 	/** @private @type { Component | null } */ #textAreaWheelReceiver; // 여러 줄일 때만 붙는 휠 받기 컴포넌트. (TextAreaWheelReceiver)
 
 	//==============================================================================
@@ -259,6 +260,7 @@ export class UIInputField extends WorldNode {
 		this.#textAreaLayout = null;
 		this.#textAreaLayoutKey = null;
 		this.#textAreaWheelReceiver = null;
+		this.#textAreaScrollbarGutter = 0;
 
 		// 1) 배경 (드로 순서: 가장 먼저).
 		this.#bgPaint = this.addComponent(Paint);
@@ -695,7 +697,8 @@ export class UIInputField extends WorldNode {
 	#getDisplayCursorIndex() { return this.#cursorIndex + this.#composition.length; }
 	//==============================================================================
 	// 여러 줄 배치 맞추기. (보인 글, 폰트, 폭, 줄 높이, 탭 크기가 바뀌었을 때만 다시 짓는다)
-	// - 글 폭은 그릴 때와 같은 2D 캔버스 measureText 로 잰다. 줄 폭은 내용 폭에서 좌우 여백을 뺀 것이다.
+	// - 크롬 textarea 는 overflow: auto 라, 클래식 스크롤 막대(윈도우, 리눅스, 맥 클래식 설정)는 넘칠 때 테두리 안쪽의 막대 두께만큼 글 폭을 줄인다.
+	//   막대 없이 지어 보고 넘치면 막대 자리를 덜고 다시 짓는다. (러스트 판 ensure_text_area_layout)
 	//==============================================================================
 	/**
 	 * @returns { TextAreaLayout } 줄 배치.
@@ -703,9 +706,37 @@ export class UIInputField extends WorldNode {
 	 */
 	#ensureTextAreaLayout() {
 		const contentSize = this.getContentSize();
+		const metrics = readClassicScrollbarMetrics();
+		const scrollbarThickness = metrics ? metrics.thickness : 0;
+		// 폭이 좁으면 글이 길어질 뿐이라, 막대를 둬도 넘치지 않으면 막대 없이도 넘치지 않는다. 지난 칸부터 본다.
+		let scrollbarGutter = this.#textAreaScrollbarGutter > 0 ? scrollbarThickness : 0;
+		let layout = null;
+		for (let passIndex = 0; passIndex < 2; ++passIndex) {
+			layout = this.#buildTextAreaLayoutWithGutter(contentSize, scrollbarGutter);
+			this.#textAreaScrollbarGutter = scrollbarGutter;
+			const isOverflowing = layout.getContentHeight() + this.#padding * 2 > contentSize.y + 0.5;
+			const wantedGutter = isOverflowing ? scrollbarThickness : 0;
+			if (wantedGutter === scrollbarGutter) {
+				break;
+			}
+			scrollbarGutter = wantedGutter;
+		}
+		return layout;
+	}
+	//==============================================================================
+	// 막대 자리를 던 폭으로 여러 줄 배치 짓기. (열쇠가 같으면 지난 배치)
+	// - 글 폭은 그릴 때와 같은 2D 캔버스 measureText 로 잰다. 줄 폭은 내용 폭에서 좌우 여백과 막대 자리를 뺀 것이다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } contentSize 노드 크기.
+	 * @param { number } scrollbarGutter 막대 자리.
+	 * @returns { TextAreaLayout } 줄 배치.
+	 * @private
+	 */
+	#buildTextAreaLayoutWithGutter(contentSize, scrollbarGutter) {
 		const displayText = this.getDisplayText();
 		const fontString = buildFontString(this.#fontFace, this.#fontSize, false, false);
-		const wrapWidth = System.Math.max(0, contentSize.x - this.#padding * 2);
+		const wrapWidth = System.Math.max(0, contentSize.x - this.#padding * 2 - scrollbarGutter);
 		const lineHeight = this.getLineHeight();
 		const layoutKey = `${fontString}\u0000${wrapWidth}\u0000${lineHeight}\u0000${this.#tabSize}\u0000${displayText}`;
 		if (this.#textAreaLayout && this.#textAreaLayoutKey === layoutKey) {
@@ -950,10 +981,17 @@ export class UIInputField extends WorldNode {
 			}
 		}
 		graphic.endClipRect();
-		// 썸. (넘칠 때, 얹는 스크롤 막대)
+		// 썸. (넘칠 때, 클래식 막대면 막대 칸 안 양끝 단추 사이의 크롬 치수 썸, 아니면 얹는 막대)
 		if (isOverlay) {
 			const scrollHeight = layout.getContentHeight() + padding * 2;
-			if (scrollHeight > contentSize.y + 0.5) {
+			const metrics = this.#textAreaScrollbarGutter > 0 ? readClassicScrollbarMetrics() : null;
+			const classicThumbSpan = metrics ? calculateClassicThumbSpan(metrics, contentSize.y, contentSize.y, scrollHeight, this.#scrollTop) : null;
+			if (classicThumbSpan) {
+				const trackLeft = contentSize.x - this.#textAreaScrollbarGutter;
+				graphic.setFillColor(new Color(121 / 255, 121 / 255, 121 / 255, 0.4).toHEXString());
+				graphic.drawRect(Rect.create(trackLeft + metrics.thumbCrossOffset, classicThumbSpan.start + metrics.thumbLengthInset, metrics.thumbThickness, System.Math.max(0, classicThumbSpan.length - metrics.thumbLengthInset * 2)));
+			}
+			else if (!metrics && scrollHeight > contentSize.y + 0.5) {
 				const thumbLength = System.Math.min(contentSize.y, System.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / scrollHeight));
 				const maximumScrollTop = scrollHeight - contentSize.y;
 				const thumbTop = (contentSize.y - thumbLength) * System.Math.max(0, System.Math.min(1, this.#scrollTop / maximumScrollTop));
@@ -965,7 +1003,7 @@ export class UIInputField extends WorldNode {
 	}
 
 	//==============================================================================
-	// 값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다)
+	// 값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다, 되돌리기와 다시 하기 목록을 비운다)
 	//==============================================================================
 	/**
 	 * @param { string } text 넣을 글. (거짓 값이면 빈 글, 그 밖은 String 으로 바꾼다)
@@ -3910,6 +3948,74 @@ function measureNormalLineHeight(fontString) {
 }
 /** 잰 CSS normal 줄 높이. (폰트 문자열과 글꼴 상태 → 높이) */
 const normalLineHeightTable = new Map();
+
+
+/** 잰 클래식 스크롤 막대 두께. (null 이면 아직 재지 않았다) */
+let classicScrollbarThickness = null;
+//==============================================================================
+// 클래식 스크롤 막대 치수 읽기. (러스트 판 web/pane.rs 의 read_classic_scrollbar_metrics 웹 갈래, 얹는 막대면 null)
+// - 브라우저가 놓은 막대 두께(overflow: scroll 인 요소의 offsetWidth - clientWidth)를 읽는다. 0 이면 얹는 막대다.
+// - 단추, 썸 두께, 썸 가장 짧은 길이는 크롬 Aura 막대(두께 15, 단추 18, 썸 9, 가장 짧은 길이 17)를 두께에 비례해 줄인다.
+//==============================================================================
+/**
+ * @returns { { thickness: number, buttonLength: number, thumbThickness: number, thumbCrossOffset: number, thumbMinimumLength: number, thumbLengthInset: number } | null } 치수.
+ */
+function readClassicScrollbarMetrics() {
+	if (classicScrollbarThickness === null) {
+		classicScrollbarThickness = 0;
+		const doc = System.document;
+		if (doc && doc.body) {
+			const probeElement = doc.createElement("div");
+			const style = probeElement.style;
+			style.position = "absolute";
+			style.visibility = "hidden";
+			style.left = "-10000px";
+			style.top = "-10000px";
+			style.width = "100px";
+			style.height = "100px";
+			style.overflow = "scroll";
+			style.scrollbarWidth = "auto";
+			doc.body.appendChild(probeElement);
+			classicScrollbarThickness = System.Math.max(0, probeElement.offsetWidth - probeElement.clientWidth);
+			probeElement.remove();
+		}
+	}
+	const thickness = classicScrollbarThickness;
+	if (thickness <= 0) {
+		return null;
+	}
+	const proportion = thickness / 15;
+	const thumbThickness = System.Math.floor(9 * proportion);
+	return {
+		thickness,
+		buttonLength: System.Math.floor(18 * proportion),
+		thumbThickness,
+		thumbCrossOffset: System.Math.floor((thickness - thumbThickness) * 0.5),
+		thumbMinimumLength: System.Math.floor(17 * proportion),
+		thumbLengthInset: 0,
+	};
+}
+//==============================================================================
+// 클래식 막대의 썸 자리. (러스트 판 calculate_classic_thumb_span, 넘치지 않거나 썸 칸이 모자라면 null)
+//==============================================================================
+/**
+ * @param { object } metrics readClassicScrollbarMetrics 의 치수.
+ * @param { number } trackLength 막대 길이.
+ * @param { number } viewportLength 보이는 길이.
+ * @param { number } extentLength 내용 길이.
+ * @param { number } offset 넘긴 만큼.
+ * @returns { { start: number, length: number } | null } 썸 시작과 길이.
+ */
+function calculateClassicThumbSpan(metrics, trackLength, viewportLength, extentLength, offset) {
+	const thumbRoom = trackLength - metrics.buttonLength * 2;
+	if (extentLength <= viewportLength + 0.5 || thumbRoom < metrics.thumbMinimumLength || viewportLength <= 0) {
+		return null;
+	}
+	const thumbLength = System.Math.min(thumbRoom, System.Math.max(metrics.thumbMinimumLength, System.Math.round(thumbRoom * viewportLength / extentLength)));
+	const maximumOffset = extentLength - viewportLength;
+	const thumbStart = metrics.buttonLength + (thumbRoom - thumbLength) * System.Math.max(0, System.Math.min(1, offset / maximumOffset));
+	return { start: thumbStart, length: thumbLength };
+}
 
 
 //==============================================================================

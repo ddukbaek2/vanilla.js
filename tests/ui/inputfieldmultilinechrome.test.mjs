@@ -28,6 +28,12 @@ const server = http.createServer((request, response) => {
 		response.end("<!doctype html><title>inputfieldmultiline</title><link rel=\"icon\" href=\"data:,\"><style>body{margin:0}</style>");
 		return;
 	}
+	if (requestPath === "/classic") {
+		// 자리를 차지하는 15px 스크롤 막대. (맥 헤드리스는 얹는 막대라 클래식 막대 길을 이렇게 본다)
+		response.writeHead(200, { "Content-Type": "text/html" });
+		response.end("<!doctype html><title>inputfieldmultiline</title><link rel=\"icon\" href=\"data:,\"><style>body{margin:0}::-webkit-scrollbar{width:15px;height:15px}</style>");
+		return;
+	}
 	const filePath = path.join(repositoryPath, requestPath);
 	if (!filePath.startsWith(repositoryPath) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
 		response.writeHead(404);
@@ -61,7 +67,8 @@ const lineBreakTextList = [
 	"ABC-DEF?ghi", "あ〜い゠う", "ぁぃぅ々〻", "「中」〜〜", "a\u2010b\u2013c\u2014d",
 ];
 
-const browser = await puppeteer.launch({ executablePath, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+// 스크롤 막대를 숨기지 않는다. (클래식 막대 시험, puppeteer 의 헤드리스 기본 --hide-scrollbars 를 뺀다)
+const browser = await puppeteer.launch({ executablePath, headless: true, ignoreDefaultArgs: ["--hide-scrollbars"], args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
 	const page = await browser.newPage();
 	await page.setViewport({ width: 640, height: 360 });
@@ -369,6 +376,56 @@ try {
 		globalThis.domField.detach();
 		globalThis.domField.getParent().removeChild(globalThis.domField);
 	});
+
+	// 8) 클래식 스크롤 막대: 넘치면 막대 두께만큼 글 폭을 줄인다. (크롬 textarea 의 overflow: auto, 러스트 판 ensure_text_area_layout)
+	await page.goto("http://127.0.0.1:" + port + "/classic");
+	const classicResult = await page.evaluate(async () => {
+		const { UIInputField, Vector2 } = await import("/import.js");
+		const { buildFontString } = await import("/src/core/component/text.js");
+		const field = new UIInputField();
+		field.setMultiline(true);
+		field.setContentSize(Vector2.create(200, 80));
+		const fontString = buildFontString(null, 28, false, false);
+		const lineHeight = field.getLineHeight();
+		const readChromeLineList = (text) => {
+			const element = document.createElement("div");
+			element.style.cssText = "position:absolute;left:0;top:0;box-sizing:border-box;width:200px;height:80px;padding:16px;margin:0;border:0;overflow:auto;white-space:pre-wrap;overflow-wrap:break-word;";
+			element.style.font = fontString;
+			element.style.lineHeight = lineHeight + "px";
+			element.appendChild(document.createTextNode(text));
+			document.body.appendChild(element);
+			const scrollbarWidth = element.offsetWidth - element.clientWidth;
+			const textNode = element.firstChild;
+			const range = document.createRange();
+			const startList = [0];
+			let previousTop = null;
+			for (let index = 0; index < text.length; ++index) {
+				range.setStart(textNode, index);
+				range.setEnd(textNode, index + 1);
+				const rectList = range.getClientRects();
+				if (rectList.length === 0) {
+					continue;
+				}
+				if (previousTop !== null && rectList[0].top > previousTop + 0.5) {
+					startList.push(index);
+				}
+				previousTop = rectList[0].top;
+			}
+			element.remove();
+			return { startList, scrollbarWidth };
+		};
+		const output = [];
+		for (const text of ["short", "the quick brown fox jumps over the lazy dog again and again", "abcdefghijk lmnopq"]) {
+			field.setText(text);
+			const chrome = readChromeLineList(text);
+			output.push({ text, engine: field.getTextAreaLineRangeList().map((line) => line.start), chrome: chrome.startList, scrollbarWidth: chrome.scrollbarWidth });
+		}
+		return output;
+	});
+	for (const caseResult of classicResult) {
+		checkJson(caseResult.engine, caseResult.chrome, "클래식 막대 줄 (" + caseResult.text + ", 막대 " + caseResult.scrollbarWidth + ")");
+	}
+	check(classicResult.some((caseResult) => caseResult.scrollbarWidth > 0), "넘치는 글은 막대가 자리를 차지한다");
 }
 finally {
 	await browser.close();

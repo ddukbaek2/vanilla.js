@@ -9906,5 +9906,6 @@
 	"이어 친 글자를 한 번에 되돌리기": "Undo consecutively typed characters at once",
 	"다시 할 묶음이 있으면 참.": "True if there is a group to redo.",
 	"다시 할 것이 있는지.": "Whether there is anything to redo.",
-	"넣을 글. (빈 글이면 선택을 지운다, 글자 넣기 되돌리기 묶음이다)": "Text to insert. (an empty string deletes the selection, it is an insert text undo group)"
+	"넣을 글. (빈 글이면 선택을 지운다, 글자 넣기 되돌리기 묶음이다)": "Text to insert. (an empty string deletes the selection, it is an insert text undo group)",
+	"값 설정. (최대 길이를 넘으면 서로게이트 쌍을 쪼개지 않는 데까지 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다, 되돌리기와 다시 하기 목록을 비운다)": "Sets the value. (Cuts it to the maximum length without splitting a surrogate pair and puts the cursor at the end, does not call the change callback, clears the undo and redo lists)"
 }
