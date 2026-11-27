@@ -27,6 +27,12 @@ const GIZMO_CHECKBOX_MARGIN = 4;
 const FONT_SIZE = 12;
 const PADDING = 7;
 const LABEL_COLUMN_WIDTH = 144;
+
+// 속성 칸에서 빼는 게터. (러스트 판에서 #[reflect(skip)] 인 게터의 짝)
+const COMPONENT_GETTER_EXCLUDE_NAMES = new System.Set([
+	"constructor", "getNode",
+	"getImagePath", // 그림 경로. (UIDocument 가 imagePath 로 따로 적는다, 러스트 판 Sprite, ShadowImage, UIImageView 의 get_image_path 는 #[reflect(skip)])
+]);
 const RESIZE_HANDLE_SIZE = 10;
 const SPLITTER_HIT_SIZE = 8;
 const MIN_PANEL_WIDTH = 300;
@@ -1035,7 +1041,7 @@ export class DEVTools extends Object {
 				if (!isGetter) {
 					continue;
 				}
-				if (methodName === "constructor" || methodName === "getNode") {
+				if (COMPONENT_GETTER_EXCLUDE_NAMES.has(methodName)) {
 					continue;
 				}
 				try {
