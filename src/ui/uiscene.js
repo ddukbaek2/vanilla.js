@@ -250,10 +250,24 @@ export class UIScene extends Scene {
 		};
 		System.window.addEventListener("pointerdown", skipHandler, { once: true });
 
+		// 찍기 모드는 최소 노출 시간을 엔진 시계(프레임마다 1/60 초)로 엔진 프레임마다 센다. (실제 시각으로 세면 씬이 처음 그려지는 프레임이 실행마다 밀린다)
+		const isCaptureTimeStepFixed = engine.isCaptureTimeStepFixed();
+		const timeManager = engine.getTimeManager();
+		const captureLoadStartTime = timeManager.getRealtimeSinceStartup();
+
 		try {
 			await this.loadAssets();
-			while (System.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
-				await new Promise((resolve) => System.setTimeout(resolve, 50));
+			// 애셋을 다 받았으니 찍기 모드의 프레임 세우기를 푼다. (아래 최소 노출 시간은 엔진 시계로 센다)
+			this.setCaptureFrameHeld(false);
+			if (isCaptureTimeStepFixed) {
+				while ((timeManager.getRealtimeSinceStartup() - captureLoadStartTime) * 1000 < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
+					await engine.waitForNextEngineFrame();
+				}
+			}
+			else {
+				while (System.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
+					await new Promise((resolve) => System.setTimeout(resolve, 50));
+				}
 			}
 		}
 		finally {

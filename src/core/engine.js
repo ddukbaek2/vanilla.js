@@ -190,6 +190,7 @@ export class Engine extends Object {
 	/** @private @type { Version } */ #version;
 	/** @private @type { Map<number, Array<Function>> } */ #frameCaptureRequests; // 프레임 번호 → 화면을 받을 함수 목록. (검증용 화면 저장)
 	/** @private @type { boolean } */ #isCaptureTimeStepFixed; // 찍기 모드라 시간을 프레임마다 1/60 초씩 보내는지. (주소 쿼리 capture)
+	/** @private @type { Array<() => boolean> } */ #engineFrameCallbacks; // 엔진 프레임마다 시간을 올린 바로 뒤 부를 함수 목록. (참을 돌려주면 뺀다, 찍기 모드의 로딩 기다림)
 	/** @private @type { boolean } */ #isExitRequested; // 종료를 요청했는지.
 	/** @private @type { boolean } */ #isPageHidden; // 페이지가 가려져 있는지.
 	/** @private @type { Array<Function> } */ #pageEventListeners; // 페이지 이벤트 리스너. ((pageEvent) => void)
@@ -244,6 +245,7 @@ export class Engine extends Object {
 		this.#version = Version.create(0, 3, 2);
 		this.#frameCaptureRequests = new System.Map();
 		this.#isCaptureTimeStepFixed = false;
+		this.#engineFrameCallbacks = [];
 		this.#isExitRequested = false;
 		this.#isPageHidden = System.document.visibilityState === "hidden";
 		this.#pageEventListeners = [];
@@ -1067,6 +1069,24 @@ export class Engine extends Object {
 		timeManager.update(timestamp);
 		const timeDelta = timeManager.getTimeDelta();
 
+		// 엔진 프레임 함수 부르기. (시간을 올린 바로 뒤, 씬 갱신 앞. 찍기 모드의 로딩 기다림이 여기서 엔진 시계를 본다)
+		if (this.#engineFrameCallbacks.length > 0) {
+			const engineFrameCallbacks = this.#engineFrameCallbacks;
+			this.#engineFrameCallbacks = [];
+			for (const engineFrameCallback of engineFrameCallbacks) {
+				let isFinished = true;
+				try {
+					isFinished = engineFrameCallback() !== false;
+				}
+				catch (error) {
+					console.error(error);
+				}
+				if (!isFinished) {
+					this.#engineFrameCallbacks.push(engineFrameCallback);
+				}
+			}
+		}
+
 		// 입력 처리.
 		const inputManager = this.getInputManager();
 		inputManager.tick(timeDelta);
@@ -1155,7 +1175,11 @@ export class Engine extends Object {
 		this.captureFrameIfRequested();
 
 		// 다음 프레임 호출 요청.
-		++this.#frameNumber;
+		// 찍기 모드에서 실제 시간이 드는 불러오기(애셋 받기) 중인 씬이 있으면 프레임 번호를 올리지 않는다. (시계도 서고, 다 받은 뒤부터 센다)
+		const isCaptureFrameHeld = this.#isCaptureTimeStepFixed && sceneManager.getAllLoadedScenes().some((loadedScene) => !loadedScene.isLoaded() && loadedScene.isCaptureFrameHeld());
+		if (!isCaptureFrameHeld) {
+			++this.#frameNumber;
+		}
 		System.window.requestAnimationFrame(this.#updateEngineCallback);
 	}
 
@@ -1327,6 +1351,47 @@ export class Engine extends Object {
 		catch (closeError) {
 			// 브라우저가 거부하면 할 수 있는 것이 없다.
 		}
+	}
+
+	//==============================================================================
+	// 찍기 모드 여부 반환. (주소 쿼리 capture 로 시간을 프레임마다 1/60 초씩 보내는지)
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { boolean } 찍기 모드면 참. (씬 매니저와 게임 씬이 로딩 기다림을 엔진 시계로 셀 때 읽는다)
+	 */
+	isCaptureTimeStepFixed() {
+		return this.#isCaptureTimeStepFixed;
+	}
+
+	//==============================================================================
+	// 엔진 프레임 함수 걸기.
+	// - 엔진 갱신이 시간을 올린 바로 뒤, 씬 갱신 앞에 프레임마다 부른다. false 를 돌려주면 다음 프레임에 또 부르고, 그 밖의 값이면 뺀다.
+	// - 찍기 모드의 로딩 기다림이 실제 시각(setTimeout) 대신 엔진 시계로 세게 해, 같은 예제를 두 번 찍으면 같은 프레임에 같은 그림이 나오게 한다. (러스트 판이 프레임 머리에서 씬을 initialize 하는 자리와 같다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { () => boolean } engineFrameCallback 프레임마다 부를 함수. (끝났으면 참)
+	 */
+	addEngineFrameCallback(engineFrameCallback) {
+		this.#engineFrameCallbacks.push(engineFrameCallback);
+	}
+
+	//==============================================================================
+	// 다음 엔진 프레임까지 기다리기.
+	// - 엔진 갱신이 시간을 올린 바로 뒤 푼다. 이어지는 일은 그 프레임의 갱신과 그리기가 끝난 뒤 돈다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { Promise<void> } 다음 엔진 프레임에 풀리는 약속.
+	 */
+	waitForNextEngineFrame() {
+		return new System.Promise((resolve) => {
+			this.addEngineFrameCallback(() => {
+				resolve();
+				return true;
+			});
+		});
 	}
 
 	//==============================================================================

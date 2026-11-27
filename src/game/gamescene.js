@@ -452,11 +452,20 @@ export class GameScene extends Scene {
 		this.#loadTouchedToSkip = false;
 
 		await this.loadAssets();
+		// 애셋을 다 받았으니 찍기 모드의 프레임 세우기를 푼다. (아래 최소 노출 시간은 엔진 시계로 센다)
+		this.setCaptureFrameHeld(false);
 		if (this.#isLoadingProgressReported) {
 			this.#loadingProgress.setProgress(1);
 		}
+		// 찍기 모드는 엔진 프레임마다 본다. (50 밀리초 실제 시각으로 보면 문이 열리는 프레임이 실행마다 밀린다, 러스트 판은 프레임마다 본다)
+		const isCaptureTimeStepFixed = engine.isCaptureTimeStepFixed();
 		while (!this.#loadTouchedToSkip && (this.#isLoadStartTimePending || (timeManager.getRealtimeSinceStartup() - this.#loadStartTime) * 1000 < this.#loadMinDurationMs)) {
-			await new Promise((resolve) => System.setTimeout(resolve, 50));
+			if (isCaptureTimeStepFixed) {
+				await engine.waitForNextEngineFrame();
+			}
+			else {
+				await new Promise((resolve) => System.setTimeout(resolve, 50));
+			}
 		}
 	}
 
