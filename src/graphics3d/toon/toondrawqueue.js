@@ -4,6 +4,7 @@
 const System = globalThis;
 import { ToonBlendMode } from "./toonmaterial.js";
 import { TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID } from "./toonscreenoutline.js";
+import { readInstanceBufferSphere } from "./toonrenderer.js";
 import { ShadowUpdateMode } from "../shadowmap.js";
 
 
@@ -77,11 +78,15 @@ const SHADOW_STATIC_FRAME_COUNT = 30;
 function writeCasterRecord(record, item) {
 	const options = item.options;
 	const jointMatrices = options.jointMatrices !== undefined && options.jointMatrices !== null ? options.jointMatrices : null;
-	const matrixCount = item.instances !== null ? item.instances.length : 1;
-	const valueCount = 6 + matrixCount * 16 + (jointMatrices !== null ? jointMatrices.length : 0);
-	let isChanged = record.mesh !== item.mesh || record.material !== options.material;
+	const instanceBuffer = item.instanceBuffer;
+	const matrixCount = instanceBuffer !== null ? 0 : (item.instances !== null ? item.instances.length : 1);
+	const valueCount = 6 + matrixCount * 16 + (instanceBuffer !== null ? 1 : 0) + (jointMatrices !== null ? jointMatrices.length : 0);
+	const generation = instanceBuffer !== null ? instanceBuffer.generation : -1;
+	let isChanged = record.mesh !== item.mesh || record.material !== options.material || record.instanceBuffer !== instanceBuffer || record.generation !== generation;
 	record.mesh = item.mesh;
 	record.material = options.material;
+	record.instanceBuffer = instanceBuffer;
+	record.generation = generation;
 	if (record.values.length !== valueCount) {
 		record.values = new System.Float32Array(valueCount);
 		isChanged = true;
@@ -102,7 +107,10 @@ function writeCasterRecord(record, item) {
 	write(options.isCulled === false ? 0 : 1);
 	write(options.isMirrored === undefined ? -1 : (options.isMirrored === true ? 1 : 0));
 	write(jointMatrices !== null ? jointMatrices.length : -1);
-	if (item.instances !== null) {
+	if (instanceBuffer !== null) {
+		write(item.instanceCount);
+	}
+	else if (item.instances !== null) {
 		for (const instance of item.instances) {
 			const elements = instance.modelMatrix.getElements();
 			for (let elementIndex = 0; elementIndex < 16; ++elementIndex) {
@@ -182,14 +190,16 @@ export const ToonDrawStage = System.Object.freeze({
 //   options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.
 //   여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.
 // - 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.
-//   번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.
+//   번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId, 인스턴스 버퍼는 꼴의 instanceLineId 칸이 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.
 //   비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.
 // - 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.
 // - 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.
+//   인스턴스마다 걸러 그릴 때마다 올린다. (몸, 그림자, 선의 판이 같은 배열을 따로 올림) 오래 두는 것은 addMeshInstanceBuffer 로 한 번 올린 버퍼를 같이 쓴다.
+// - 인스턴스 버퍼(addMeshInstanceBuffer)는 유니티 Graphics.RenderMeshInstanced 와 GraphicsBuffer, 고도 MultiMesh 꼴이다. 버퍼 전체의 경계로 통째 거르고 다시 올리지 않는다.
 // - 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.
 //   그림자 판의 setUpdateMode(ShadowUpdateMode) 를 따른다. 기본 onChange 는 빛과 드리우개가 그대로면 다시 그리지 않고, 오래 그대로인 것은 구워 두고 움직이는 것만 덧그린다. (화면은 매 프레임 그린 것과 같다)
 //   점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)
-// - 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)
+// - 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addMeshInstanceBuffer / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)
 //   draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)
 //   화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)
 // - 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.
@@ -218,7 +228,7 @@ export class ToonDrawQueue {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Array<object> } */ #itemList; // { mesh, modelMatrix, instances, options, isTransparent, depthPosition, depth }
+	/** @private @type { Array<object> } */ #itemList; // { mesh, modelMatrix, instances, instanceBuffer, instanceCount, options, isTransparent, depthPosition, depth }
 	/** @private @type { Array<object> } */ #passList; // { stage, callback }
 	/** @private @type { object | null } */ #screenOutline; // ToonScreenOutline. (없으면 null)
 	/** @private @type { Array<object> | null } */ #opaqueItemList; // 정렬한 불투명한 것. (담거나 비우면 null, 처음 그릴 때 만든다)
@@ -305,7 +315,7 @@ export class ToonDrawQueue {
 		const center = mesh.boundingCenter;
 		const depthPosition = modelMatrix.transformPoint(center[0], center[1], center[2]);
 		this.#opaqueItemList = null;
-		this.#itemList.push({ mesh: mesh, modelMatrix: modelMatrix, instances: null, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
+		this.#itemList.push({ mesh: mesh, modelMatrix: modelMatrix, instances: null, instanceBuffer: null, instanceCount: 0, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
 	}
 
 	//==============================================================================
@@ -331,7 +341,55 @@ export class ToonDrawQueue {
 		depthPosition.y /= instances.length;
 		depthPosition.z /= instances.length;
 		this.#opaqueItemList = null;
-		this.#itemList.push({ mesh: mesh, modelMatrix: null, instances: instances, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
+		this.#itemList.push({ mesh: mesh, modelMatrix: null, instances: instances, instanceBuffer: null, instanceCount: 0, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
+	}
+
+	//==============================================================================
+	// 영구 인스턴스 버퍼로 같은 모형 여럿 담기. (몸, 바깥선 껍데기, 그림자, 선의 판이 한 GPU 버퍼를 같이 쓰고 다시 올리지 않는다)
+	// - 버퍼는 ToonRenderer.createInstanceBuffer 로 짓고 updateInstanceBuffer, updateInstanceBufferRange 로 고친다. 버퍼 전체의 경계로 통째 거른다.
+	// - 인스턴스마다 선 번호는 꼴의 instanceLineId 칸, 없으면 options.lineId (주지 않으면 담은 차례 + 1).
+	// - 그림자 캐시(ShadowUpdateMode.onChange)는 버퍼의 generation 으로 고친 것을 안다.
+	//==============================================================================
+	/**
+	 * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
+	 * @param { object | null } instanceBuffer - ToonRenderer.createInstanceBuffer 의 결과.
+	 * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다, 0 이하면 담지 않는다)
+	 * @param { object } [options] - addMesh 와 같다.
+	 * @example <caption>광부의 바위 밭을 한 번 올린 버퍼로 그리고 하나만 고치기</caption>
+	 * import { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880");
+	 * const rockMesh = renderer.createMesh(builder.readArrays());
+	 * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }, { name: "instanceLineId", size: 1 }]);
+	 * const floatCount = instanceLayout.getFloatCount();
+	 * const data = new Float32Array(floatCount * 25);
+	 * for (let index = 0; index < 25; ++index) {
+	 * 	data.set(Matrix4.createTranslation(index % 5 - 2, 0, Math.floor(index / 5) - 2).getElements(), index * floatCount);
+	 * 	data.set([1, 1, 1, 1, 1 + index], index * floatCount + 16);
+	 * }
+	 * const instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data, "dynamic");
+	 * const camera = new Camera3D();
+	 * camera.setPerspective(0.8, 0.1, 50);
+	 * camera.lookAt(Vector3.create(0, 5, 6), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+	 * const queue = new ToonDrawQueue();
+	 * queue.setScreenOutline(new ToonScreenOutline(webGL2RenderingContext));
+	 * queue.addMeshInstanceBuffer(rockMesh, instanceBuffer, 25);
+	 * queue.draw(renderer, camera);
+	 * const brokenRock = data.slice(12 * floatCount, 13 * floatCount);
+	 * brokenRock.set([0.5, 0.5, 0.5, 1], 16);
+	 * renderer.updateInstanceBufferRange(instanceBuffer, 12, brokenRock);
+	 * queue.draw(renderer, camera);
+	 */
+	addMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, options = {}) {
+		if (mesh === null || mesh === undefined || instanceBuffer === null || instanceBuffer === undefined || instanceCount <= 0) {
+			return;
+		}
+		const sphere = readInstanceBufferSphere(mesh, instanceBuffer);
+		const depthPosition = sphere !== null ? { x: sphere[0], y: sphere[1], z: sphere[2] } : { x: 0, y: 0, z: 0 };
+		this.#opaqueItemList = null;
+		this.#itemList.push({ mesh: mesh, modelMatrix: null, instances: null, instanceBuffer: instanceBuffer, instanceCount: instanceCount, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
 	}
 
 	//==============================================================================
@@ -485,7 +543,7 @@ export class ToonDrawQueue {
 		for (let casterIndex = 0; casterIndex < casterList.length; ++casterIndex) {
 			const item = casterList[casterIndex];
 			if (casterIndex >= recordList.length) {
-				recordList.push({ mesh: null, material: undefined, values: new System.Float32Array(0), stableFrameCount: 0, isStatic: false });
+				recordList.push({ mesh: null, material: undefined, instanceBuffer: null, generation: -1, values: new System.Float32Array(0), stableFrameCount: 0, isStatic: false });
 			}
 			const record = recordList[casterIndex];
 			const material = item.options.material;
@@ -595,7 +653,10 @@ export class ToonDrawQueue {
 					continue;
 				}
 				const lineId = typeof item.options.lineId === "number" ? item.options.lineId : (itemIndex - 1) % TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1;
-				if (item.instances !== null) {
+				if (item.instanceBuffer !== null) {
+					screenOutline.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, lineId, item.options);
+				}
+				else if (item.instances !== null) {
 					screenOutline.drawMeshInstanced(item.mesh, item.instances, lineId, item.options);
 				}
 				else {
@@ -640,10 +701,10 @@ export class ToonDrawQueue {
 		const webGL2RenderingContext = renderer.getWebGL2RenderingContext();
 		this.runPasses(renderer, ToonDrawStage.beforeOpaque);
 
-		// 1. 불투명한 몸. (인스턴스 묶음은 바깥선까지 한 번에)
+		// 1. 불투명한 몸. (인스턴스 묶음과 인스턴스 버퍼는 바깥선까지 한 번에)
 		const outlineItemList = [];
 		for (const item of this.readOpaqueItemList()) {
-			if (item.instances !== null) {
+			if (item.instances !== null || item.instanceBuffer !== null) {
 				this.drawItem(renderer, item, item.options);
 				continue;
 			}
@@ -746,7 +807,7 @@ export class ToonDrawQueue {
 	}
 
 	//==============================================================================
-	// 하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced)
+	// 하나 그리기. (모형 하나는 drawMesh, 인스턴스 묶음은 drawMeshInstanced, 인스턴스 버퍼는 drawMeshInstanceBuffer)
 	//==============================================================================
 	/**
 	 * @param { object } renderer - ToonRenderer.
@@ -754,7 +815,10 @@ export class ToonDrawQueue {
 	 * @param { object } options - 이번에 쓸 그리기 꼴.
 	 */
 	drawItem(renderer, item, options) {
-		if (item.instances !== null) {
+		if (item.instanceBuffer !== null) {
+			renderer.drawMeshInstanceBuffer(item.mesh, item.instanceBuffer, item.instanceCount, options);
+		}
+		else if (item.instances !== null) {
 			renderer.drawMeshInstanced(item.mesh, item.instances, options);
 		}
 		else {

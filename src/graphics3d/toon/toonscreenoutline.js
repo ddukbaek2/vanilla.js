@@ -3,7 +3,8 @@
 //==============================================================================
 const System = globalThis;
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
-import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant } from "./toonrenderer.js";
+import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, readInstanceBufferSphere, isSphereInFrustum } from "./toonrenderer.js";
+import { TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_LINE_ID_LOCATION } from "./toonmaterial.js";
 
 
 /**
@@ -69,7 +70,8 @@ const COMPOSITE_DEPTH_TEXTURE_UNIT = 7;
 // 번호 색 표 텍스처의 너비. (선 번호 0 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID 를 128 x 128 칸에 하나씩, 번호 % 128 이 x, 번호 / 128 이 y)
 const LINE_COLOR_TABLE_WIDTH = 128;
 
-// 선의 판에 노멀과 선 번호를 그리는 셰이더. (툰 렌더러의 몸 버텍스 어레이를 그대로 쓴다, 인스턴스는 틴트 칸의 x 를 번호로 읽을 수 있다)
+// 선의 판에 노멀과 선 번호를 그리는 셰이더. (툰 렌더러의 몸 버텍스 어레이를 그대로 쓴다)
+// - instanceLineIds: 0 이면 공통 번호, 1 이면 틴트 칸의 x (drawMeshInstanced 가 담은 것), 2 면 인스턴스 버퍼의 instanceLineId (drawMeshInstanceBuffer).
 const LINE_VERTEX_SHADER = `#version 300 es
 in vec3 vertexPosition;
 in vec3 vertexNormal;
@@ -80,6 +82,7 @@ in vec4 instanceMatrix1;
 in vec4 instanceMatrix2;
 in vec4 instanceMatrix3;
 in vec4 instanceTint;
+in float instanceLineId;
 uniform mat4 jointMatrices[${TOON_MAXIMUM_JOINTS}];
 uniform float skinned;
 uniform float instanced;
@@ -99,7 +102,7 @@ void main() {
 	mat4 skinMatrix = readSkinMatrix();
 	mat4 objectMatrix = instanced > 0.5 ? mat4(vec4(instanceMatrix0.xyz, 0.0), vec4(instanceMatrix1.xyz, 0.0), vec4(instanceMatrix2.xyz, 0.0), vec4(instanceMatrix3.xyz, 1.0)) : modelMatrix;
 	worldNormal = transpose(inverse(mat3(objectMatrix) * mat3(skinMatrix))) * vertexNormal;
-	surfaceLineId = instanced > 0.5 && instanceLineIds > 0.5 ? instanceTint.x : lineId;
+	surfaceLineId = instanced < 0.5 || instanceLineIds < 0.5 ? lineId : (instanceLineIds < 1.5 ? instanceTint.x : instanceLineId);
 	gl_Position = viewProjectionMatrix * objectMatrix * skinMatrix * vec4(vertexPosition, 1.0);
 }
 `;
@@ -480,7 +483,9 @@ export function readJumpFloodSteps(reach) {
 // - 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.
 // - 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)
 // - 값: setResolutionScale 로 넓히기(점프 플러딩) 판을 줄인다. (폰의 가벼운 길) 선의 판과 씨앗은 그리는 영역 해상도라 줄여도 선 자리는 그대로다.
-// - 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().
+// - 인스턴스: drawMeshInstanced 는 인스턴스 배열을 걸러 그때 올린다. drawMeshInstanceBuffer 는 ToonRenderer.createInstanceBuffer 의 버퍼를 몸과 같이 쓰고 다시 올리지 않는다.
+//   버퍼의 인스턴스마다 번호는 꼴의 instanceLineId 칸에서 읽는다. (없으면 공통 번호)
+// - 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced / drawMeshInstanceBuffer → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().
 //   beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.
 //   ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushBatch)
 //==============================================================================
@@ -535,7 +540,7 @@ export class ToonScreenOutline {
 	 */
 	constructor(webGL2RenderingContext) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
-		this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, TOON_ATTRIBUTE_LOCATIONS);
+		this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, System.Object.assign({ instanceLineId: TOON_INSTANCE_LINE_ID_LOCATION }, TOON_ATTRIBUTE_LOCATIONS));
 		this.#seedProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_FRAGMENT_SHADER, {});
 		this.#seedGatherProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_GATHER_FRAGMENT_SHADER, {});
 		this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
@@ -874,7 +879,7 @@ export class ToonScreenOutline {
 		}
 		this.addDrawnDistance(mesh, modelElements);
 		const isMirrored = options.isMirrored !== undefined ? options.isMirrored : readMatrixDeterminant(modelElements) < 0;
-		this.drawWithCount(mesh, modelElements, 0, lineId, false, isMirrored, options);
+		this.drawWithCount(mesh, modelElements, 0, lineId, 0, isMirrored, options, mesh.bodyVertexArray);
 	}
 
 	//==============================================================================
@@ -931,7 +936,80 @@ export class ToonScreenOutline {
 		}
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, instanceCount * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
-		this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, true, options.isMirrored === true, options);
+		this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, 1, options.isMirrored === true, options, mesh.bodyVertexArray);
+	}
+
+	//==============================================================================
+	// 영구 인스턴스 버퍼로 번호 그리기. (몸과 같은 GPU 버퍼를 쓰고 다시 올리지 않는다, 버퍼 전체의 경계로 통째 거른다)
+	// - 인스턴스마다 번호는 꼴의 instanceLineId 칸, 없으면 공통 번호. 꼴에 행렬이 없으면 자리를 몰라 그리지 않는다. (정점 조각은 선의 판에서 돌지 않는다)
+	//==============================================================================
+	/**
+	 * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
+	 * @param { object } instanceBuffer - ToonRenderer.createInstanceBuffer 의 결과. (지은 렌더러의 버텍스 어레이를 같이 쓴다)
+	 * @param { number } instanceCount - 그릴 인스턴스 수. (버퍼에 든 수를 넘으면 자른다)
+	 * @param { number } lineId - 공통 번호. (꼴에 instanceLineId 가 없을 때)
+	 * @param { object } [options] - drawMesh 와 같다. (꼴은 모든 인스턴스에 같다)
+	 * @example <caption>돌 버퍼 하나로 몸과 선의 판을 같이 그리기</caption>
+	 * import { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const outline = new ToonScreenOutline(webGL2RenderingContext);
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
+	 * const rockMesh = renderer.createMesh(builder.readArrays());
+	 * const instanceLayout = renderer.createInstanceLayout([{ name: "instanceMatrix", size: 16 }, { name: "instanceTint", size: 4 }, { name: "instanceLineId", size: 1 }]);
+	 * const data = new Float32Array(21 * 3);
+	 * for (let index = 0; index < 3; ++index) {
+	 * 	data.set(Matrix4.createTranslation(index * 0.5, 0, 0).getElements(), index * 21);
+	 * 	data.set([1, 1, 1, 1, 10 + index], index * 21 + 16);
+	 * }
+	 * const instanceBuffer = renderer.createInstanceBuffer(instanceLayout, data);
+	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));
+	 * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
+	 * if (outline.beginLineIds(viewMatrix, projectionMatrix)) {
+	 * 	outline.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3, 10);
+	 * 	outline.endLineIds();
+	 * }
+	 * renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
+	 * renderer.drawMeshInstanceBuffer(rockMesh, instanceBuffer, 3);
+	 * renderer.endFrame();
+	 * outline.drawOutline();
+	 */
+	drawMeshInstanceBuffer(mesh, instanceBuffer, instanceCount, lineId, options = {}) {
+		if (mesh === null || mesh === undefined || this.#savedState === null || instanceBuffer.buffer === null) {
+			return;
+		}
+		const instanceLayout = instanceBuffer.layout;
+		if (!instanceLayout.hasMatrix()) {
+			return;
+		}
+		const layoutFloatCount = instanceLayout.getFloatCount();
+		const count = System.Math.min(instanceCount, System.Math.floor(instanceBuffer.floatCount / layoutFloatCount));
+		if (count <= 0) {
+			return;
+		}
+		const isCulled = options.isCulled !== false;
+		if (isCulled && !isSphereInFrustum(this.#frame.frustumPlanes, readInstanceBufferSphere(mesh, instanceBuffer))) {
+			return;
+		}
+		// 초점 거리를 모형 거리로 셀 때만 인스턴스마다의 거리를 더한다. (drawMeshInstanced 와 같은 굵기)
+		if (this.#widthUnit === ToonOutlineWidthUnit.world && this.#focusDistance <= 0 && this.#frame.isPerspective && instanceBuffer.data !== null) {
+			let matrixOffset = 0;
+			for (const attribute of instanceLayout.getAttributes()) {
+				if (attribute.name === TOON_INSTANCE_MATRIX_NAME) {
+					matrixOffset = attribute.offset;
+				}
+			}
+			for (let instanceIndex = 0; instanceIndex < count; ++instanceIndex) {
+				const offset = instanceIndex * layoutFloatCount + matrixOffset;
+				const modelElements = instanceBuffer.data.subarray(offset, offset + 16);
+				if (!isCulled || this.isVisible(mesh, modelElements)) {
+					this.addDrawnDistance(mesh, modelElements);
+				}
+			}
+		}
+		const vertexArrays = instanceBuffer.renderer.readInstanceVertexArrays(mesh, instanceBuffer);
+		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineId, instanceLayout.hasLineId() ? 2 : 0, options.isMirrored === true, options, vertexArrays.body);
 	}
 
 	//==============================================================================
@@ -942,11 +1020,12 @@ export class ToonScreenOutline {
 	 * @param { Float32Array } modelElements - 모형 행렬의 수 16.
 	 * @param { number } instanceCount - 0 이면 보통 그리기.
 	 * @param { number } lineId - 공통 번호.
-	 * @param { boolean } isInstanceLineId - 인스턴스의 번호를 읽을지.
+	 * @param { number } lineIdSource - 번호를 읽을 곳. (0 공통 번호, 1 틴트 칸의 x, 2 인스턴스 버퍼의 instanceLineId)
 	 * @param { boolean } isMirrored - 감기를 뒤집어 그릴지.
 	 * @param { object } options - drawMesh 의 꼴.
+	 * @param { WebGLVertexArrayObject } vertexArray - 그릴 버텍스 어레이. (모형의 몸이나 모형과 인스턴스 버퍼를 묶은 것)
 	 */
-	drawWithCount(mesh, modelElements, instanceCount, lineId, isInstanceLineId, isMirrored, options) {
+	drawWithCount(mesh, modelElements, instanceCount, lineId, lineIdSource, isMirrored, options, vertexArray) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const lineProgram = this.#lineProgram;
 		const jointMatrices = options.jointMatrices !== undefined ? options.jointMatrices : null;
@@ -954,7 +1033,7 @@ export class ToonScreenOutline {
 		const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
 		webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("modelMatrix"), false, modelElements);
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanced"), instanceCount > 0 ? 1 : 0);
-		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), isInstanceLineId ? 1 : 0);
+		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), lineIdSource);
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System.Math.max(0, System.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
@@ -971,7 +1050,7 @@ export class ToonScreenOutline {
 		if (isMirrored) {
 			webGL2RenderingContext.frontFace(webGL2RenderingContext.CW);
 		}
-		webGL2RenderingContext.bindVertexArray(mesh.bodyVertexArray);
+		webGL2RenderingContext.bindVertexArray(vertexArray);
 		if (instanceCount > 0) {
 			webGL2RenderingContext.drawElementsInstanced(webGL2RenderingContext.TRIANGLES, indexCount, webGL2RenderingContext.UNSIGNED_INT, indexStart * 4, instanceCount);
 		}
