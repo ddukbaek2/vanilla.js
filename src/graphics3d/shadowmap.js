@@ -13,6 +13,10 @@ import { Vector3 } from "../base/vector3.js";
 // 그림자 아틀라스가 받는 점광과 스포트라이트 수의 상한. (셰이더의 유니폼 배열 크기)
 export const SHADOW_ATLAS_MAXIMUM_LIGHTS = 4;
 
+// 해 그림자 치우침의 기본값. (그림자 텍셀 단위, 유니티 URP 애셋의 Depth Bias 1, Normal Bias 1 과 같은 단위와 값)
+const DEFAULT_SHADOW_DEPTH_BIAS = 1;
+const DEFAULT_SHADOW_NORMAL_BIAS = 1;
+
 // 점광 큐브 여섯 면의 앞쪽과 위쪽. (+x, -x, +y, -y, +z, -z 차례, 오른쪽은 앞쪽 x 위쪽, 셰이더의 면 고르기와 같다)
 const CUBE_FACE_FORWARDS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 const CUBE_FACE_UPS = [[0, 1, 0], [0, 1, 0], [0, 0, 1], [0, 0, 1], [0, 1, 0], [0, 1, 0]];
@@ -238,6 +242,8 @@ export class ShadowMap extends Object {
 	/** @private @type { number } */ #resolution;
 	/** @private @type { Matrix4 } */ #lightViewProjectionMatrix;
 	/** @private @type { object } */ #shadowCache; // 갱신 방식과 구운 판. (createShadowCache)
+	/** @private @type { number } */ #depthBias; // 깊이 치우침. (그림자 텍셀 단위)
+	/** @private @type { number } */ #normalBias; // 노멀 치우침. (그림자 텍셀 단위)
 
 	//==============================================================================
 	// 생성.
@@ -257,6 +263,8 @@ export class ShadowMap extends Object {
 		this.#framebuffer = depthTarget.framebuffer;
 		this.#depthTexture = depthTarget.depthTexture;
 		this.#shadowCache = createShadowCache(resolution);
+		this.#depthBias = DEFAULT_SHADOW_DEPTH_BIAS;
+		this.#normalBias = DEFAULT_SHADOW_NORMAL_BIAS;
 	}
 
 	//==============================================================================
@@ -418,6 +426,50 @@ export class ShadowMap extends Object {
 	 */
 	getLightViewProjectionMatrix() {
 		return this.#lightViewProjectionMatrix;
+	}
+
+	//==============================================================================
+	// 그림자 치우침 정하기. (그림자 텍셀 단위, 기본 깊이 1, 노멀 1, 받는 쪽이 읽을 때 쓴다)
+	// - 텍셀 하나의 월드 크기(빛 행렬의 가로 폭 / 해상도)를 곱해 월드 거리로 바꾸므로 extent 와 해상도가 바뀌어도 같은 몫으로 걸린다. (유니티 URP 의 Depth Bias, Normal Bias 와 같은 단위)
+	// - 깊이 치우침은 빛 쪽으로 견줄 깊이를 당긴다. 노멀 치우침은 받는 점을 면의 노멀 쪽으로 밀어 읽는다. 둘 다 3x3 PCF 의 반지름 1.5 텍셀을 곱한다.
+	// - ToonRenderer 는 여기에 기울기 비례 치우침(빛과 면이 스칠수록 커짐, 텍셀 2.5 x 기울기, 기울기는 10 까지)을 더한다.
+	// - 줄이면 그림자가 붙고 제 그림자 여드름이 생기기 쉽다. 늘리면 여드름은 없어지고 그림자가 떠 보인다(피터 패닝).
+	//==============================================================================
+	/**
+	 * @param { number } depthBias - 깊이 치우침. (텍셀 단위, 0 이상)
+	 * @param { number } normalBias - 노멀 치우침. (텍셀 단위, 0 이상)
+	 * @example <caption>텍셀 단위로 그림자 치우침 정하기</caption>
+	 * import { ShadowMap, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const shadowMap = new ShadowMap(webGL2RenderingContext, 1024);
+	 * shadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.3, -1, -0.2), 20, 1, 100);
+	 * shadowMap.setBias(0.5, 1.5);
+	 * console.log(shadowMap.getDepthBias(), shadowMap.getNormalBias());
+	 * shadowMap.destroy();
+	 */
+	setBias(depthBias, normalBias) {
+		this.#depthBias = System.Math.max(0, depthBias);
+		this.#normalBias = System.Math.max(0, normalBias);
+	}
+
+	//==============================================================================
+	// 깊이 치우침 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 깊이 치우침. (그림자 텍셀 단위, 기본 1)
+	 */
+	getDepthBias() {
+		return this.#depthBias;
+	}
+
+	//==============================================================================
+	// 노멀 치우침 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 노멀 치우침. (그림자 텍셀 단위, 기본 1)
+	 */
+	getNormalBias() {
+		return this.#normalBias;
 	}
 
 	//==============================================================================
