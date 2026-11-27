@@ -6,7 +6,7 @@
 // - 기대값과 허용 오차는 러스트 판 시험과 같다. (러스트 판이 원본 node 실행 값을 지킨다)
 //==============================================================================
 import { TIMELINE_EASING_NAMES, Timeline, composeTimelineColor, createBezierEasing, parseTimelineColor, resolveTimelineEasing } from "../../src/animation/timeline.js";
-import { check, checkEqual, checkJson, checkNear, finish, knownDifference } from "../testcheck.mjs";
+import { check, checkEqual, checkJson, checkNear, finish } from "../testcheck.mjs";
 
 const PROGRESS_LIST = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1];
 
@@ -109,14 +109,10 @@ for (const [track, expectedValueList] of numberTrackTable) {
 	}
 }
 const colorTrack = { property: "color", keys: [{ time: 0, value: "#ff000080", easing: "sinusoidal.inOut" }, { time: 2, value: "#0000ffff" }] };
-const expectedColorList = ["#ff000080", "#ff000080", "#f1000e87", "#da002593", "#82007dbf", "#800080c0", "#3500cae5", "#0000ffff", "#0000ffff", "#0000ffff"];
+// 1 초는 감속 비율을 두 엔진 다 f64(0.49999999999999994)로 셈해 파랑이 7f 다. (러스트 판 시험과 같은 값)
+const expectedColorList = ["#ff000080", "#ff000080", "#f1000e87", "#da002593", "#82007dbf", "#80007fc0", "#3500cae5", "#0000ffff", "#0000ffff", "#0000ffff"];
 for (let timeIndex = 0; timeIndex < timeList.length; timeIndex++) {
 	const colorText = Timeline.sampleTrack(colorTrack, timeList[timeIndex]);
-	if (timeList[timeIndex] === 1.0 && colorText !== expectedColorList[timeIndex]) {
-		// 원본은 sinusoidal.inOut(0.5) 를 f64(0.49999999999999994)로 셈해 파랑이 7f, 러스트 판 감속 함수는 f32(0.5)라 80 이다.
-		knownDifference("src/animation/timeline.rs::sample_track_matches_original", "색 트랙 1 초 (sinusoidal.inOut 0.5 의 f64 와 f32 셈)", colorText, expectedColorList[timeIndex]);
-		continue;
-	}
 	checkEqual(colorText, expectedColorList[timeIndex], "색 트랙 " + timeList[timeIndex] + " 초");
 }
 const textTrack = { property: "text", keys: [{ time: 0, value: "A" }, { time: 1, value: "B" }] };

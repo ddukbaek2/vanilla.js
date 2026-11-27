@@ -163,6 +163,14 @@ try {
 			return pixels;
 		};
 		const enginePixels = readFrame();
+		// 찍은 것이 글이 그려진 장면인지(전부 검정이 아닌지) 센다. 로딩 화면이나 빈 화면끼리 견주면 아무것도 확인하지 못한다.
+		let litPixelCount = 0;
+		for (let index = 0; index < enginePixels.length; index += 4) {
+			if (enginePixels[index] !== 0 || enginePixels[index + 1] !== 0 || enginePixels[index + 2] !== 0) {
+				litPixelCount += 1;
+			}
+		}
+		statistics.litPixelCount = litPixelCount;
 		phase = "reference";
 		await waitFrames(3);
 		const referencePixels = readFrame();
@@ -193,6 +201,7 @@ try {
 		return { lineDifferenceList, statistics };
 	});
 	checkEqual(pageErrorList.length, 0, "페이지 오류 " + pageErrorList.join(" / "));
+	check(result.statistics.litPixelCount >= 2000, `글이 그려진 장면을 찍었다 (검정이 아닌 화소 ${result.statistics.litPixelCount})`);
 	result.lineDifferenceList.forEach((lineDifference, lineIndex) => {
 		// 글리프 잉크가 겹치는 화소(기울임, 이모지)는 8 비트 겹치기 반올림으로 1, 2 단계 다를 수 있다.
 		check(lineDifference.count <= 4 && lineDifference.maximum <= 6, `줄 ${lineIndex} 예전 길과 다른 화소 ${lineDifference.count} 개, 최대 ${lineDifference.maximum}`);
