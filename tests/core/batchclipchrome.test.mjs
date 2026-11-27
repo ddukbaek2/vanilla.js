@@ -3,6 +3,8 @@
 // - 축에 맞고 화소 경계에 놓인 자르기는 스텐실 대신 묶음 셰이더로 자른다. 같은 장면을 아주 조금 돌려(1e-9 라디안) 스텐실 길로 그린 것과 화소가 모두 같은지 본다.
 //   장면: 스크롤 칸(UIScrollView, 줄 40 개), 겹친 자르기, 둥근 자르기 안팎, 정점 색 쿼드, 더하기와 셰이더 섞기, 불투명도 층, 바깥 WebGL 패스.
 // - 셰이더 길이 드로 콜이 더 적고, 스크롤 칸 밖 줄의 컴포넌트를 거르는지(getLastFrameCulledNodeCount) 본다.
+// - 씬이 그려진 다섯째 프레임을 찍는다. (씬은 불러온 뒤 로딩 화면을 0.3 초 더 보여서, 정한 프레임 번호로 찍으면 로딩 화면끼리 견주거나 한쪽만 로딩 화면이 된다)
+//   찍은 화면이 로딩 화면(검정)이 아닌지도 본다.
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 import fs from "node:fs";
@@ -17,10 +19,11 @@ const puppeteer = require("puppeteer-core");
 const repositoryPath = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "../..");
 const contentTypeTable = { ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".html": "text/html" };
 
-const PAGE_SOURCE = `<!doctype html><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{position:absolute;left:0;top:0;width:100%;height:100%}</style><canvas id="mainCanvas"></canvas>
+const PAGE_SOURCE = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{position:absolute;left:0;top:0;width:100%;height:100%}</style><canvas id="mainCanvas"></canvas>
 <script type="module">
 const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Rect, Color, Pivot, Paint, TextAlign, ViewScaleMode, UILabel, UIButton, UIScrollView } = await import("/import.js");
 const rotation = new URLSearchParams(location.search).get("rotation") === "1" ? 1e-9 : 0;
+const CAPTURE_DRAWN_FRAME_COUNT = 5;
 function createBoxNode(parentNode, position, size) {
 	const node = new WorldNode();
 	parentNode.addChild(node);
@@ -30,6 +33,7 @@ function createBoxNode(parentNode, position, size) {
 	return node;
 }
 let externalProgram = null;
+let drawnFrameCount = 0;
 class BatchClipScene extends Scene {
 	initialize(engine) {
 		super.initialize(engine);
@@ -73,6 +77,11 @@ class BatchClipScene extends Scene {
 		graphic.drawColoredQuads(8 * 6, graphic.getSoftDiscTexture());
 	}
 	draw(graphic) {
+		// 씬이 그려진 다섯째 프레임을 찍는다. (이 프레임 끝에 캔버스를 넘긴다)
+		drawnFrameCount += 1;
+		if (drawnFrameCount === CAPTURE_DRAWN_FRAME_COUNT) {
+			window.capturePromise = engine.requestFrameCapture(engine.getFrameNumber());
+		}
 		graphic.rotate(rotation);
 		super.draw(graphic);
 		graphic.beginClipRect(Rect.create(340, 20, 120, 80));
@@ -141,7 +150,6 @@ engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
 const engine = new Engine(engineConfiguration);
 engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
 engine.run(new BatchClipScene());
-window.capturePromise = engine.requestFrameCapture(20);
 </script>`;
 
 const server = http.createServer((request, response) => {
@@ -220,13 +228,21 @@ try {
 		}
 	}
 	checkEqual(differentPixelCount, 0, "셰이더 자르기와 스텐실 자르기 화소");
+	// 찍은 것이 로딩 화면(검정)이 아니라 장면인지. (스크롤 칸만 900 x 600 화소)
+	let drawnPixelCount = 0;
+	for (let index = 0; index < shaderClipResult.pixels.length; index += 4) {
+		if (shaderClipResult.pixels[index] !== 0 || shaderClipResult.pixels[index + 1] !== 0 || shaderClipResult.pixels[index + 2] !== 0) {
+			drawnPixelCount += 1;
+		}
+	}
+	check(drawnPixelCount >= 540000, `장면을 찍었다 (검정이 아닌 화소 ${drawnPixelCount})`);
 	const shaderDrawCallCount = shaderClipResult.drawCallCountList[shaderClipResult.drawCallCountList.length - 1];
 	const stencilDrawCallCount = stencilClipResult.drawCallCountList[stencilClipResult.drawCallCountList.length - 1];
 	check(shaderDrawCallCount < stencilDrawCallCount, `셰이더 자르기 드로 콜이 더 적다 (${shaderDrawCallCount} < ${stencilDrawCallCount})`);
 	const culledNodeCount = shaderClipResult.culledNodeCountList[shaderClipResult.culledNodeCountList.length - 1];
 	check(culledNodeCount >= 30, `스크롤 칸 밖 줄을 거른다 (${culledNodeCount})`);
 	checkEqual(stencilClipResult.culledNodeCountList[stencilClipResult.culledNodeCountList.length - 1], culledNodeCount, "두 길 거른 노드 수");
-	console.log(`드로 콜: 셰이더 자르기 ${shaderDrawCallCount}, 스텐실 자르기 ${stencilDrawCallCount}, 거른 노드 ${culledNodeCount}`);
+	console.log(`드로 콜: 셰이더 자르기 ${shaderDrawCallCount}, 스텐실 자르기 ${stencilDrawCallCount}, 거른 노드 ${culledNodeCount}, 그린 화소 ${drawnPixelCount}`);
 }
 finally {
 	await browser.close();
