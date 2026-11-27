@@ -130,6 +130,7 @@ export class UIListView extends Component {
 	// - 노드를 직렬화해 두고 필요할 때 복제한다. 원본은 감춘다.
 	//   항목 크기는 템플릿의 contentSize 진행 축 값에서 읽는다.
 	// - 엔진 기본 종류만 등록한 새 UIDocument 로 복제한다. 게임 컴포넌트가 든 템플릿은 setTemplateNodeWithDocument 를 쓴다.
+	// - 항목은 템플릿의 그림을 그대로 쓴다. (문서가 템플릿을 적을 때 imagePath 를 적은 컴포넌트의 그림을 기억한다, UIDocument.serializeNode)
 	//==============================================================================
 	/**
 	 * @param { import("../core/node/worldnode.js").WorldNode } templateNode 항목의 본이 될 노드. (UIDocument 로 직렬화해 쥐고 이 노드는 끈다, 항목 크기를 정하지 않았으면 이 노드의 contentSize 진행 축 값을 쓴다, 앞서 준 만들기 함수는 지운다)
