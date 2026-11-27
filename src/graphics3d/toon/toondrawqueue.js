@@ -544,6 +544,7 @@ export class ToonDrawQueue {
 	/** @private @type { Float32Array } */ #localLightKey; // 점광과 스포트라이트 그림자의 빛 열쇠. (칸 수가 늘 때만 다시 짓는다)
 	/** @private @type { Array<object> } */ #lineGroupPool; // 선의 판 묶음 칸. ({ item, lineFlags, indexStart, indexCount, itemIndexList, nextIndex }, 다시 쓴다)
 	/** @private @type { number } */ #lineGroupCount; // 지금 쓰는 묶음 칸 수.
+	/** @private @type { number } */ #lineBatchSlotCount; // 이 프레임 선의 판에서 지금까지 쓴 묶음 자리 수. (프레임마다 같은 차례로 자리를 준다)
 	/** @private @type { number } */ #lineGroupSerial; // 묶음을 비울 때마다 오르는 번호. (모형마다 기억한 첫 묶음이 지금 것인지)
 	/** @private @type { WeakMap<object, object> } */ #lineGroupOfMesh; // 모형 → { serial, firstIndex, lastIndex } (모형마다 한 번 짓는다)
 	/** @private @type { Array<object> } */ #transparentPool; // 비치는 것 덩어리 칸. ({ depthSum, itemList, isDepthPrepassed, group }, 다시 쓴다)
@@ -581,6 +582,7 @@ export class ToonDrawQueue {
 		this.#lineGroupPool = [];
 		this.#lineGroupCount = 0;
 		this.#lineGroupSerial = 0;
+		this.#lineBatchSlotCount = 0;
 		this.#lineGroupOfMesh = new System.WeakMap();
 		this.#transparentPool = [];
 		this.#transparentList = [];
@@ -1335,6 +1337,7 @@ export class ToonDrawQueue {
 			this.#lineMatrixCount = 0;
 			this.#lineGroupCount = 0;
 			this.#lineGroupSerial += 1;
+			this.#lineBatchSlotCount = 0;
 			const itemList = this.#itemList;
 			for (let itemIndex = 1; itemIndex <= this.#itemCount; ++itemIndex) {
 				const item = itemList[itemIndex - 1];
@@ -1436,7 +1439,8 @@ export class ToonDrawQueue {
 				const sourceIndex = group.itemIndexList[index];
 				this.pushLineMatrix(lineMatrices[sourceIndex], lineIds[sourceIndex]);
 			}
-			screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options);
+			screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options, this.#lineBatchSlotCount);
+			this.#lineBatchSlotCount += 1;
 			group.item = null;
 		}
 		this.#lineGroupCount = 0;

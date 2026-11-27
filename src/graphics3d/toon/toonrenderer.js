@@ -1461,6 +1461,72 @@ function isSameNumber(value, other) {
 	return value === other && (value !== 0 || 1 / value === 1 / other);
 }
 
+//==============================================================================
+// 몸의 뼈대 어트리뷰트를 지금 묶인 버텍스 어레이에 붙이기. (렌더러 메서드와 선의 판이 같이 쓴다)
+//==============================================================================
+function attachSkinAttributes(webGL2RenderingContext, skinBuffer) {
+	const stride = SKIN_FLOAT_COUNT * 4;
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, skinBuffer);
+	webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexJoints);
+	webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexJoints, 4, webGL2RenderingContext.FLOAT, false, stride, 0);
+	webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexWeights);
+	webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexWeights, 4, webGL2RenderingContext.FLOAT, false, stride, 16);
+}
+
+//==============================================================================
+// 몸의 꼭짓점, 뼈대, UV 어트리뷰트와 번호 버퍼를 지금 묶인 버텍스 어레이에 붙이기.
+//==============================================================================
+function attachBodyAttributes(webGL2RenderingContext, mesh) {
+	const stride = VERTEX_FLOAT_COUNT * 4;
+	const attributeLayouts = [
+		[TOON_ATTRIBUTE_LOCATIONS.vertexPosition, 3, 0],
+		[TOON_ATTRIBUTE_LOCATIONS.vertexNormal, 3, 12],
+		[TOON_ATTRIBUTE_LOCATIONS.vertexColor, 3, 24],
+		[TOON_ATTRIBUTE_LOCATIONS.vertexMaterial, 2, 36],
+		[TOON_ATTRIBUTE_LOCATIONS.vertexDetail, 4, 44],
+	];
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.vertexBuffer);
+	for (const attributeLayout of attributeLayouts) {
+		webGL2RenderingContext.enableVertexAttribArray(attributeLayout[0]);
+		webGL2RenderingContext.vertexAttribPointer(attributeLayout[0], attributeLayout[1], webGL2RenderingContext.FLOAT, false, stride, attributeLayout[2]);
+	}
+	if (mesh.skinBuffer !== null) {
+		attachSkinAttributes(webGL2RenderingContext, mesh.skinBuffer);
+	}
+	if (mesh.uvBuffer !== null) {
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.uvBuffer);
+		webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexUv);
+		webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexUv, mesh.hasSecondUv ? 4 : 2, webGL2RenderingContext.FLOAT, false, mesh.hasSecondUv ? 16 : 8, 0);
+	}
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, mesh.bodyIndexBuffer);
+}
+
+//==============================================================================
+// 인스턴스 버퍼를 지금 묶인 버텍스 어레이의 인스턴스 어트리뷰트로. (행렬 네 줄, 틴트, 인스턴스마다 하나씩)
+//==============================================================================
+function attachInstanceAttributes(webGL2RenderingContext, instanceBuffer) {
+	const stride = TOON_INSTANCE_FLOAT_COUNT * 4;
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer);
+	for (let columnIndex = 0; columnIndex < 5; ++columnIndex) {
+		const location = TOON_ATTRIBUTE_LOCATIONS.instanceMatrix0 + columnIndex;
+		webGL2RenderingContext.enableVertexAttribArray(location);
+		webGL2RenderingContext.vertexAttribPointer(location, 4, webGL2RenderingContext.FLOAT, false, stride, columnIndex * 16);
+		webGL2RenderingContext.vertexAttribDivisor(location, 1);
+	}
+}
+
+//==============================================================================
+// 모형의 몸과 인스턴스 버퍼 하나를 묶은 버텍스 어레이 짓기. (선의 판이 몸 묶음 자리와 따로 쓰는 인스턴스 버퍼용, 드로우 호출을 몸과 같이 묶음 자리로 둔다)
+//==============================================================================
+export function createMeshInstanceVertexArray(webGL2RenderingContext, mesh, instanceBuffer) {
+	const vertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(vertexArray);
+	attachBodyAttributes(webGL2RenderingContext, mesh);
+	attachInstanceAttributes(webGL2RenderingContext, instanceBuffer);
+	webGL2RenderingContext.bindVertexArray(null);
+	return vertexArray;
+}
+
 
 //==============================================================================
 // 전역 상수 목록. (재질 블록)
@@ -2680,29 +2746,7 @@ export class ToonRenderer {
 	 * @private
 	 */
 	attachBodyAttributes(mesh) {
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const stride = VERTEX_FLOAT_COUNT * 4;
-		const attributeLayouts = [
-			[TOON_ATTRIBUTE_LOCATIONS.vertexPosition, 3, 0],
-			[TOON_ATTRIBUTE_LOCATIONS.vertexNormal, 3, 12],
-			[TOON_ATTRIBUTE_LOCATIONS.vertexColor, 3, 24],
-			[TOON_ATTRIBUTE_LOCATIONS.vertexMaterial, 2, 36],
-			[TOON_ATTRIBUTE_LOCATIONS.vertexDetail, 4, 44],
-		];
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.vertexBuffer);
-		for (const attributeLayout of attributeLayouts) {
-			webGL2RenderingContext.enableVertexAttribArray(attributeLayout[0]);
-			webGL2RenderingContext.vertexAttribPointer(attributeLayout[0], attributeLayout[1], webGL2RenderingContext.FLOAT, false, stride, attributeLayout[2]);
-		}
-		if (mesh.skinBuffer !== null) {
-			this.attachSkinAttributes(mesh.skinBuffer);
-		}
-		if (mesh.uvBuffer !== null) {
-			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.uvBuffer);
-			webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexUv);
-			webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexUv, mesh.hasSecondUv ? 4 : 2, webGL2RenderingContext.FLOAT, false, mesh.hasSecondUv ? 16 : 8, 0);
-		}
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, mesh.bodyIndexBuffer);
+		attachBodyAttributes(this.getWebGL2RenderingContext(), mesh);
 	}
 
 	//==============================================================================
@@ -2733,13 +2777,7 @@ export class ToonRenderer {
 	 * @private
 	 */
 	attachSkinAttributes(skinBuffer) {
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const stride = SKIN_FLOAT_COUNT * 4;
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, skinBuffer);
-		webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexJoints);
-		webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexJoints, 4, webGL2RenderingContext.FLOAT, false, stride, 0);
-		webGL2RenderingContext.enableVertexAttribArray(TOON_ATTRIBUTE_LOCATIONS.vertexWeights);
-		webGL2RenderingContext.vertexAttribPointer(TOON_ATTRIBUTE_LOCATIONS.vertexWeights, 4, webGL2RenderingContext.FLOAT, false, stride, 16);
+		attachSkinAttributes(this.getWebGL2RenderingContext(), skinBuffer);
 	}
 
 	//==============================================================================
@@ -2750,15 +2788,7 @@ export class ToonRenderer {
 	 * @private
 	 */
 	attachInstanceAttributes(instanceBuffer) {
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const stride = TOON_INSTANCE_FLOAT_COUNT * 4;
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer);
-		for (let columnIndex = 0; columnIndex < 5; ++columnIndex) {
-			const location = TOON_ATTRIBUTE_LOCATIONS.instanceMatrix0 + columnIndex;
-			webGL2RenderingContext.enableVertexAttribArray(location);
-			webGL2RenderingContext.vertexAttribPointer(location, 4, webGL2RenderingContext.FLOAT, false, stride, columnIndex * 16);
-			webGL2RenderingContext.vertexAttribDivisor(location, 1);
-		}
+		attachInstanceAttributes(this.getWebGL2RenderingContext(), instanceBuffer);
 	}
 
 	//==============================================================================
