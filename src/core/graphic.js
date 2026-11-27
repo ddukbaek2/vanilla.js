@@ -730,7 +730,6 @@ export class Graphic extends Object {
 	/** @private @type { (WebGLTexture | null)[] } */ #batchTextureList; // 쌓인 정점이 쓰는 텍스처. (칸 번호 차례)
 	/** @private @type { number } */ #batchTextureCount; // 쌓인 정점이 쓰는 텍스처 수.
 	/** @private @type { number } */ #batchTextureSlotCount; // 텍스처 칸 수. (기기의 MAX_TEXTURE_IMAGE_UNITS 와 BATCH_TEXTURE_SLOT_LIMIT 가운데 작은 것)
-	/** @private @type { (WebGLTexture | null)[] } */ #batchBoundTextureList; // 1 번부터의 텍스처 유닛에 묶어 둔 것. (0 번은 #boundTexture 가 기억한다, null 이면 모른다)
 	/** @private @type { Float32Array | null } */ #batchClipRectData; // 자르기 사각형 표. (칸마다 왼쪽, 위, 오른쪽, 아래 디바이스 픽셀)
 	/** @private @type { number } */ #batchClipRectCount; // 표에 적은 칸 수. (0 번 자르지 않는 칸 포함)
 	/** @private @type { number } */ #batchGeneration; // 묶음을 그릴 때마다 늘어나는 번호. (자르기 칸 번호가 지금 묶음 것인지 견준다)
@@ -759,7 +758,6 @@ export class Graphic extends Object {
 	/** @private @type { object[] } */ #opacityLayerStack; // 열린 투명도 층. ({ target, previousFramebuffer, globalAlpha }, beginOpacityLayer 가 쌓는다)
 	/** @private @type { object[] } */ #opacityLayerTargetPool; // 다 쓴 투명도 층 칸. ({ texture, framebuffer, stencilRenderbuffer, width, height }, 다시 쓴다)
 	/** @private @type { object } */ #backdropRect; // 떠 올 영역. ({ x, y, width, height } GL 픽셀, 왼쪽 아래 원점, 고쳐 쓴다)
-	/** @private @type { WebGLTexture | null } */ #boundBackdropTexture; // 1 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
 	/** @private @type { boolean } */ #isStencilRecording; // 스텐실에 자르기 영역을 적는 중인지. (색을 쓰지 않으므로 섞지 않는다)
 	/** @private @type { TransformMatrix } */ #identityTransformMatrix; // 덧그림 칸을 옮겨 그릴 때 쓰는 단위 행렬.
 	/** @private @type { object[] } */ #particleGroupRectList; // 셰이더 섞기로 함께 그릴 파티클 쿼드의 영역. (SHADER_BLEND_PARTICLE_GROUP_CAPACITY 칸, 고쳐 쓴다)
@@ -815,9 +813,7 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #geometryRebuildCount; // 이번 프레임에 draw 를 불러 다시 셈한 컴포넌트 수. (캐시하는 컴포넌트만)
 	/** @private @type { number } */ #lastFrameGeometryCacheHitCount; // 지난 프레임에 캐시로 그린 컴포넌트 수.
 	/** @private @type { number } */ #lastFrameGeometryRebuildCount; // 지난 프레임에 다시 셈한 컴포넌트 수.
-	/** @private @type { ShaderProgram | null } */ #boundShaderProgram; // 마지막으로 쓰게 한 셰이더 프로그램. (null 이면 모른다)
-	/** @private @type { WebGLTexture | null } */ #boundTexture; // 0 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
-	/** @private @type { WebGLStateCache } */ #webGLStateCache; // 컨텍스트의 GL 상태 기억. (getParameter, isEnabled 를 GL 에 묻지 않고 답한다)
+	/** @private @type { WebGLStateCache } */ #webGLStateCache; // 컨텍스트의 GL 상태 기억. (getParameter, isEnabled 를 GL 에 묻지 않고 답한다, Graphic 은 묶음과 상태를 따로 기억하지 않고 이것에 견준다)
 
 	//==============================================================================
 	// 생성.
@@ -849,14 +845,11 @@ export class Graphic extends Object {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		// 그리는 중에 GL 상태를 읽지 않게 컨텍스트의 상태 함수를 가로채 기억한다. (다른 GL 호출보다 먼저 건다)
 		this.#webGLStateCache = WebGLStateCache.attach(webGL2RenderingContext);
-		this.#boundShaderProgram = null;
-		this.#boundTexture = null;
 
-		// 컨텍스트를 잃으면 GL 묶음 기억과 기하 캐시, 남긴 묶음을 잊는다. (잃은 뒤의 호출이 옛 기억을 믿지 않게 하는 것뿐이다)
+		// 컨텍스트를 잃으면 기하 캐시와 남긴 묶음을 잊는다. (GL 묶음 기억은 상태 캐시가 스스로 잊는다, 잃은 뒤의 호출이 옛 기억을 믿지 않게 하는 것뿐이다)
 		// 엔진은 컨텍스트를 되살리지 않는다. webglcontextlost 에서 preventDefault 를 하지 않아 브라우저가 webglcontextrestored 를 보내지 않는다.
 		// 게임이 preventDefault 로 되살려도 셰이더 프로그램, 버텍스 어레이, 흰 텍스처, 글자 아틀라스, 그림 텍스처는 잃은 컨텍스트의 객체라 그려지지 않는다. (되살림은 아직 없다)
 		const contextChangeCallback = () => {
-			this.invalidateRenderStateCache();
 			this.#geometryCacheGeneration += 1;
 			for (const retainedFlush of this.#batchRetainedFlushList) {
 				retainedFlush.vertexArray = null;
@@ -918,7 +911,6 @@ export class Graphic extends Object {
 		this.#batchTextureList = [];
 		this.#batchTextureCount = 0;
 		this.#batchTextureSlotCount = 1;
-		this.#batchBoundTextureList = [];
 		this.#batchClipRectData = null;
 		this.#batchClipRectCount = 1;
 		this.#batchGeneration = 0;
@@ -959,7 +951,6 @@ export class Graphic extends Object {
 		this.#opacityLayerStack = [];
 		this.#opacityLayerTargetPool = [];
 		this.#backdropRect = { x: 0, y: 0, width: 0, height: 0 };
-		this.#boundBackdropTexture = null;
 		this.#isStencilRecording = false;
 		this.#identityTransformMatrix = new TransformMatrix();
 		this.#particleGroupRectList = [];
@@ -1088,9 +1079,7 @@ export class Graphic extends Object {
 			this.#appliedViewportHeight = drawingBufferHeight;
 		}
 
-		// 프로그램/버퍼 바인딩 및 프로젝션 업로드.
-		// 프레임 사이에 바깥 WebGL(3D 패스, 애셋 올리기 등)이 프로그램과 텍스처를 바꿨을 수 있으므로 기억을 잊고 시작한다.
-		this.invalidateRenderStateCache();
+		// 프로그램/버퍼 바인딩 및 프로젝션 업로드. (바깥 WebGL 이 바꾼 묶음은 상태 캐시가 알므로 따로 잊지 않는다)
 		this.useShaderProgram(shaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.getVertexBuffer());
@@ -1717,6 +1706,8 @@ export class Graphic extends Object {
 		}
 		this.breakGeometryRecord();
 		this.flushBatch();
+		this.applyDrawState();
+		this.bindDefaultVertexArray();
 
 		// 묶지 않고 그리는 것에는 셰이더 자르기를 가위로 건다. (화소 가운데 기준이 같아 결과가 같다)
 		this.applyClipScissor();
@@ -1922,12 +1913,10 @@ export class Graphic extends Object {
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.DRAW_FRAMEBUFFER, backdropTarget.framebuffer);
 		webGL2RenderingContext.blitFramebuffer(leftX, bottomY, rightX, topY, leftX, bottomY, rightX, topY, webGL2RenderingContext.COLOR_BUFFER_BIT, webGL2RenderingContext.NEAREST);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
-		if (backdropTarget.texture !== this.#boundBackdropTexture) {
+		if (!this.#webGLStateCache.isTextureBound(webGL2RenderingContext.TEXTURE1, webGL2RenderingContext.TEXTURE_2D, backdropTarget.texture)) {
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, backdropTarget.texture);
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-			this.#boundBackdropTexture = backdropTarget.texture;
-			this.#batchBoundTextureList[1] = null;
 		}
 	}
 
@@ -2052,12 +2041,6 @@ export class Graphic extends Object {
 	 */
 	destroyOffscreenTarget(offscreenTarget) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		if (offscreenTarget.texture === this.#boundTexture) {
-			this.#boundTexture = null;
-		}
-		if (offscreenTarget.texture === this.#boundBackdropTexture) {
-			this.#boundBackdropTexture = null;
-		}
 		webGL2RenderingContext.deleteFramebuffer(offscreenTarget.framebuffer);
 		webGL2RenderingContext.deleteTexture(offscreenTarget.texture);
 	}
@@ -2389,7 +2372,6 @@ export class Graphic extends Object {
 		this.#batchTextureSlotCount = textureSlotCount;
 		this.#batchTextureList = new Array(textureSlotCount).fill(null);
 		this.#batchTextureCount = 0;
-		this.#batchBoundTextureList = new Array(textureSlotCount).fill(null);
 		this.#batchClipRectData = new Float32Array(BATCH_CLIP_SLOT_CAPACITY * 4);
 		this.#batchClipRectData[0] = -BATCH_UNCLIPPED_EXTENT;
 		this.#batchClipRectData[1] = -BATCH_UNCLIPPED_EXTENT;
@@ -2759,6 +2741,7 @@ export class Graphic extends Object {
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		this.releaseClipScissor();
+		this.applyDrawState();
 
 		this.useShaderProgram(this.#batchShaderProgram);
 		const retainedFlush = this.#batchRetainedFlush;
@@ -2806,25 +2789,22 @@ export class Graphic extends Object {
 		webGL2RenderingContext.uniform1f(batchShaderProgram.getUniformLocation("framebufferHeight"), this.#appliedViewportHeight);
 		webGL2RenderingContext.uniform4fv(batchShaderProgram.getUniformLocation("clipRectList"), this.#batchClipRectData, 0, this.#batchClipRectCount * 4);
 
-		// 텍스처 묶기. (0 번 유닛은 bindTexture 가 기억하고, 1 번 유닛은 셰이더 섞기의 떠 온 아래와 같이 쓴다)
+		// 텍스처 묶기. (상태 캐시가 이미 묶였다고 기억하는 유닛은 건너뛴다, 1 번 유닛은 셰이더 섞기의 떠 온 아래와 같이 쓴다)
 		const batchTextureList = this.#batchTextureList;
-		const batchBoundTextureList = this.#batchBoundTextureList;
 		const textureCount = this.#batchTextureCount;
 		this.bindTexture(batchTextureList[0]);
 		const whiteTexture = this.getWhiteTexture();
+		const webGLStateCache = this.#webGLStateCache;
 		let isTextureUnitChanged = false;
 		for (let slotIndex = 1; slotIndex < this.#batchTextureSlotCount; ++slotIndex) {
 			const texture = slotIndex < textureCount ? batchTextureList[slotIndex] : whiteTexture;
-			if (batchBoundTextureList[slotIndex] === texture) {
+			const textureUnit = webGL2RenderingContext.TEXTURE0 + slotIndex;
+			if (webGLStateCache.isTextureBound(textureUnit, webGL2RenderingContext.TEXTURE_2D, texture)) {
 				continue;
 			}
-			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + slotIndex);
+			webGL2RenderingContext.activeTexture(textureUnit);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-			batchBoundTextureList[slotIndex] = texture;
 			isTextureUnitChanged = true;
-			if (slotIndex === 1) {
-				this.#boundBackdropTexture = null;
-			}
 		}
 		if (isTextureUnitChanged) {
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
@@ -3559,6 +3539,7 @@ export class Graphic extends Object {
 			return;
 		}
 		this.flushBatch();
+		this.applyDrawState();
 		this.applyClipScissor();
 		this.ensureParticleBatchResources();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -5708,7 +5689,7 @@ export class Graphic extends Object {
 	// GL 상태 기억 다시 맞추기. (three.js 의 resetState 처럼 바깥 GL 코드가 상태를 바꾼 뒤 부른다)
 	// - 엔진은 컨텍스트의 상태 함수(bindFramebuffer, viewport, enable 같은 것)를 가로채 기억하므로, 같은 컨텍스트 객체로 부른 것은 따로 알리지 않아도 된다.
 	// - 프로토타입 함수를 직접 부르는 것처럼 가로채지 못한 길로 바꿨을 때 부른다. 기억을 모두 잊고 다음에 읽을 때 GL 에 한 번씩 묻는다.
-	//   마지막으로 쓰게 한 프로그램과 묶은 텍스처의 기억도 잊는다. (invalidateRenderStateCache)
+	//   Graphic 은 묶음과 상태를 따로 기억하지 않고 이 기억에 견주므로, 그 뒤의 2D 그리기도 제 프로그램, 텍스처, 섞기를 다시 건다.
 	//==============================================================================
 	/**
 	 * @example <caption>가로채지 못한 길로 상태를 바꾼 뒤 기억 맞추기</caption>
@@ -5732,7 +5713,6 @@ export class Graphic extends Object {
 	 */
 	resetGLStateCache() {
 		this.#webGLStateCache.reset();
-		this.invalidateRenderStateCache();
 	}
 
 	//==============================================================================
@@ -5817,14 +5797,12 @@ export class Graphic extends Object {
 
 	//==============================================================================
 	// 렌더 상태 복구. (외부 WebGL 패스가 프로그램 / 버텍스 어레이 / 뷰포트를 바꾼 뒤 Graphic 출력을 이어갈 때)
-	// - 마지막으로 쓰게 한 프로그램과 묶은 텍스처의 기억도 잊는다. (invalidateRenderStateCache)
 	//==============================================================================
 	restoreRenderState() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		webGL2RenderingContext.viewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight);
 		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
 		this.#isClipScissorEnabled = false;
-		this.invalidateRenderStateCache();
 		const shaderProgram = this.getShaderProgram();
 		this.useShaderProgram(shaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
@@ -5842,45 +5820,92 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 셰이더 프로그램 쓰게 하기. (마지막으로 쓰게 한 것과 같으면 다시 걸지 않는다)
+	// 셰이더 프로그램 쓰게 하기. (상태 캐시가 이미 이 프로그램을 쓴다고 기억하면 다시 걸지 않는다)
+	// - Graphic 은 쓰게 한 프로그램을 따로 기억하지 않는다. 게임이 같은 컨텍스트로 다른 프로그램을 쓰게 해도 다음 그리기가 제 프로그램을 다시 건다.
 	//==============================================================================
 	/**
 	 * @param { ShaderProgram } shaderProgram 쓸 셰이더 프로그램.
 	 */
 	useShaderProgram(shaderProgram) {
-		if (shaderProgram === this.#boundShaderProgram) {
-			return;
-		}
 		shaderProgram.useProgram();
-		this.#boundShaderProgram = shaderProgram;
 	}
 
 	//==============================================================================
-	// 0 번 텍스처 유닛에 텍스처 묶기. (마지막으로 묶은 것과 같으면 다시 묶지 않는다)
+	// 0 번 텍스처 유닛에 텍스처 묶기. (상태 캐시가 이미 묶였다고 기억하면 다시 묶지 않는다)
+	// - 활성 유닛이 0 번이 아니면 0 번으로 돌린다. (게임이 다른 유닛을 활성으로 두고 돌아와도 0 번에 묶는다)
 	//==============================================================================
 	/**
 	 * @param { WebGLTexture } texture 묶을 텍스처.
 	 */
 	bindTexture(texture) {
-		if (texture === this.#boundTexture) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const webGLStateCache = this.#webGLStateCache;
+		const textureUnit = webGL2RenderingContext.TEXTURE0;
+		if (!webGLStateCache.isActiveTexture(textureUnit)) {
+			webGL2RenderingContext.activeTexture(textureUnit);
+		}
+		if (webGLStateCache.isTextureBound(textureUnit, webGL2RenderingContext.TEXTURE_2D, texture)) {
 			return;
 		}
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-		this.#boundTexture = texture;
 	}
 
 	//==============================================================================
-	// 묶음 기억 잊기.
-	// - Graphic 은 마지막으로 쓰게 한 셰이더 프로그램과 0 번 유닛에 묶은 텍스처(셰이더 섞기 모드면 1 번 유닛에 묶은 떠 온 아래도)를 기억해, 같으면 다시 걸지 않는다.
-	// - Graphic 을 거치지 않고 WebGL 로 프로그램이나 텍스처를 바꾼 뒤 Graphic 출력을 이어갈 때 부른다.
-	//   (restoreRenderState, applySettings 와 컨텍스트를 잃거나 되살릴 때는 스스로 잊는다)
+	// 2D 그리기 상태 맞추기. (그리기 바로 앞에서 부른다)
+	// - 섞기(켬, FUNC_ADD, 지금 블렌드 모드의 인자), 깊이 시험과 면 가리기 끔, 드로잉 버퍼 전체 뷰포트, 자르기 가위가 아니면 가위 끔.
+	// - 상태 캐시가 이미 그렇다고 기억하는 것은 다시 걸지 않는다. (바뀌지 않은 프레임에는 GL 을 더 부르지 않는다)
+	//   게임이 runExternalPass 밖에서 같은 컨텍스트로 이것들을 바꿔 두고 돌아와도 다음 2D 그리기가 맞게 된다.
 	//==============================================================================
-	invalidateRenderStateCache() {
-		this.#boundShaderProgram = null;
-		this.#boundTexture = null;
-		this.#boundBackdropTexture = null;
-		this.#batchBoundTextureList.fill(null);
+	/**
+	 * @private
+	 */
+	applyDrawState() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const webGLStateCache = this.#webGLStateCache;
+		if (!webGLStateCache.isCapabilitySet(webGL2RenderingContext.BLEND, true)) {
+			webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		}
+		if (!webGLStateCache.isCapabilitySet(webGL2RenderingContext.DEPTH_TEST, false)) {
+			webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		}
+		if (!webGLStateCache.isCapabilitySet(webGL2RenderingContext.CULL_FACE, false)) {
+			webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		}
+		if (!this.#isClipScissorEnabled && !webGLStateCache.isCapabilitySet(webGL2RenderingContext.SCISSOR_TEST, false)) {
+			webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		}
+		if (!webGLStateCache.isBlendEquation(webGL2RenderingContext.FUNC_ADD)) {
+			webGL2RenderingContext.blendEquation(webGL2RenderingContext.FUNC_ADD);
+		}
+		let blendFunction = this.#blendFunctionTable.get(this.#blendMode);
+		if (!blendFunction) {
+			blendFunction = this.#blendFunctionTable.get("source-over");
+		}
+		if (!webGLStateCache.isBlendFunction(blendFunction[0], blendFunction[1])) {
+			webGL2RenderingContext.blendFunc(blendFunction[0], blendFunction[1]);
+		}
+		if (!webGLStateCache.isViewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight)) {
+			webGL2RenderingContext.viewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight);
+		}
+	}
+
+	//==============================================================================
+	// 기본 경로의 버텍스 어레이와 정점 버퍼 묶기. (상태 캐시가 이미 묶였다고 기억하면 다시 묶지 않는다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	bindDefaultVertexArray() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const webGLStateCache = this.#webGLStateCache;
+		const vertexArray = this.getVertexArray();
+		if (!webGLStateCache.isVertexArrayBound(vertexArray)) {
+			webGL2RenderingContext.bindVertexArray(vertexArray);
+		}
+		const vertexBuffer = this.#vertexBuffer;
+		if (!webGLStateCache.isArrayBufferBound(vertexBuffer)) {
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, vertexBuffer);
+		}
 	}
 
 	//==============================================================================
@@ -5896,9 +5921,11 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 2D 그리기 사이에 WebGL 패스 끼우기. (앞의 2D 묶음을 그리고, 상태 기억을 잊고, 깊이를 비운 뒤 callback, 끝나면 restoreRenderState)
+	// 2D 그리기 사이에 WebGL 패스 끼우기. (앞의 2D 묶음을 그리고, 깊이를 비운 뒤 callback, 끝나면 restoreRenderState)
 	// - callback 은 WebGL2 컨텍스트를 받아 프로그램, 버텍스 어레이, 뷰포트, 섞기, 깊이, 면 가리기를 마음대로 바꿔도 된다. (스텐실 자르기는 그대로 걸려 있고, 스텐실 상태는 되돌리지 않으므로 바꾸지 않는다)
 	// - callback 이 던지면 상태를 되돌린 뒤 다시 던진다.
+	// - 이 함수 밖에서 같은 컨텍스트로 WebGL 을 써도 다음 2D 그리기가 프로그램, 버텍스 어레이, 텍스처 유닛, 섞기, 깊이, 면 가리기, 가위, 뷰포트를 상태 캐시에 견주어 다시 건다.
+	//   남는 약속은 둘이다. 2D 는 지금 묶인 프레임 버퍼에 그리므로 게임 프레임 버퍼를 묶었으면 들어올 때 것으로 돌려 두고, 스텐실 상태는 바꾸지 않는다.
 	//==============================================================================
 	/**
 	 * @param { Function } callback (webGL2RenderingContext) => any
@@ -5938,7 +5965,6 @@ export class Graphic extends Object {
 		}
 		// 셰이더 자르기는 바깥 패스가 모르므로 그동안 스텐실에 적어 둔다.
 		const shaderClipCount = this.writeShaderClipsToStencil(true);
-		this.invalidateRenderStateCache();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		try {
 			return callback(webGL2RenderingContext);

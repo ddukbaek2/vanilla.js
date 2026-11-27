@@ -2,6 +2,7 @@
 // WebGL 상태 캐시의 크롬 시험. (NODE_PATH=$(npm root -g) node tests/core/webglstatecachechrome.test.mjs)
 // - 헤드리스 크롬(puppeteer-core 와 시스템 크롬, 창을 띄우지 않는다)에서 Graphic 을 만들고, 상태 함수를 마구 불러 가며
 //   캐시가 답한 getParameter, isEnabled 가 프로토타입의 진짜 getParameter, isEnabled 와 같은지 견준다. (틀린 인자, 지우기, 컨텍스트 잃기 포함)
+// - 견주기 함수(isProgramInUse, isArrayBufferBound, isCapabilitySet, isBlendFunction, isViewport 같은 것)가 참이라고 답하면 진짜 GL 값도 그런지 본다.
 // - 그리는 중에 GL 에 묻는 횟수가 0 인지(프레임 버퍼, 뷰포트, 섞기, 깊이, 면, 프로그램 같은 것), resetGLStateCache 뒤에 다시 맞는지 본다.
 // - antialias 설정이 컨텍스트 속성으로 들어가는지 본다. (기본 켬, 끄면 끔)
 //   puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
@@ -62,7 +63,7 @@ try {
 		const { Graphic } = await import("/src/core/graphic.js");
 		const { WebGLStateCache } = await import("/src/core/graphic/webglstatecache.js");
 		const mismatchList = [];
-		const candidateTable = { programList: [], vertexArrayList: [], textureList: [] }; // 견줄 객체. (만든 뒤 채운다)
+		const candidateTable = { programList: [], vertexArrayList: [], textureList: [], bufferList: [] }; // 견줄 객체. (만든 뒤 채운다)
 		let knownAnswerCount = 0; // 견주기 함수(isProgramInUse 같은 것)가 참이라고 답한 수. (모두 거짓이면 시험이 헛돈다)
 		const canvas = document.createElement("canvas");
 		canvas.width = 320;
@@ -150,6 +151,35 @@ try {
 			for (const mode of [gl.FRONT, gl.BACK, gl.FRONT_AND_BACK]) {
 				expectKnown("isCullFace", stateCache.isCullFace(mode), mode === realCullFace);
 			}
+			const realArrayBuffer = realGetParameter(gl.ARRAY_BUFFER_BINDING);
+			for (const buffer of [...candidateTable.bufferList, null]) {
+				expectKnown("isArrayBufferBound", stateCache.isArrayBufferBound(buffer), buffer === realArrayBuffer);
+			}
+			for (const capability of capabilityList) {
+				const realEnabled = realIsEnabled(capability);
+				expectKnown("isCapabilitySet 켬", stateCache.isCapabilitySet(capability, true), realEnabled === true);
+				expectKnown("isCapabilitySet 끔", stateCache.isCapabilitySet(capability, false), realEnabled === false);
+			}
+			const realBlendFactors = [gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA].map(realGetParameter);
+			for (const sourceFactor of [gl.ONE, gl.ZERO, gl.SRC_ALPHA, gl.DST_COLOR]) {
+				for (const destinationFactor of [gl.ONE, gl.ZERO, gl.ONE_MINUS_SRC_ALPHA, gl.SRC_COLOR]) {
+					expectKnown("isBlendFunction", stateCache.isBlendFunction(sourceFactor, destinationFactor), realBlendFactors[0] === sourceFactor && realBlendFactors[1] === destinationFactor && realBlendFactors[2] === sourceFactor && realBlendFactors[3] === destinationFactor);
+				}
+			}
+			const realBlendEquationRGB = realGetParameter(gl.BLEND_EQUATION_RGB);
+			const realBlendEquationAlpha = realGetParameter(gl.BLEND_EQUATION_ALPHA);
+			for (const mode of [gl.FUNC_ADD, gl.FUNC_SUBTRACT, gl.FUNC_REVERSE_SUBTRACT, gl.MIN, gl.MAX]) {
+				expectKnown("isBlendEquation", stateCache.isBlendEquation(mode), realBlendEquationRGB === mode && realBlendEquationAlpha === mode);
+			}
+			// 컨텍스트를 잃은 동안은 진짜 뷰포트가 null 이다. (그때 캐시는 모른다고 답해야 한다)
+			const realViewport = realGetParameter(gl.VIEWPORT);
+			if (realViewport === null) {
+				expectKnown("isViewport 잃은 컨텍스트", stateCache.isViewport(0, 0, 320, 200), false);
+			}
+			else {
+				expectKnown("isViewport", stateCache.isViewport(realViewport[0], realViewport[1], realViewport[2], realViewport[3]), true);
+				expectKnown("isViewport 다른 값", stateCache.isViewport(realViewport[0], realViewport[1], realViewport[2] + 1, realViewport[3]), false);
+			}
 		};
 
 		// 처음 값.
@@ -176,6 +206,8 @@ try {
 		candidateTable.programList = programList;
 		candidateTable.vertexArrayList = vertexArrayList;
 		candidateTable.textureList = textureList;
+		const bufferList = [gl.createBuffer(), gl.createBuffer(), gl.createBuffer()];
+		candidateTable.bufferList = bufferList;
 
 		// 정해진 경우들. (틀린 인자 포함)
 		gl.viewport(10, 20, 30, 40); compareAll("뷰포트");
@@ -223,6 +255,13 @@ try {
 		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 5); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 3); gl.pixelStorei(gl.PACK_ALIGNMENT, 2); compareAll("픽셀 설정");
 		gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE); compareAll("색 공간 끔");
 		gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, 42); compareAll("색 공간 틀림");
+		gl.bindBuffer(gl.ARRAY_BUFFER, bufferList[0]); compareAll("정점 버퍼");
+		gl.bindVertexArray(null); compareAll("버텍스 어레이를 바꿔도 정점 버퍼는 그대로");
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufferList[1]); gl.bindBuffer(gl.ARRAY_BUFFER, bufferList[1]); compareAll("색인 버퍼를 정점 버퍼로 묶음(틀림)");
+		gl.bindBuffer(gl.ARRAY_BUFFER, bufferList[0]); gl.bindBuffer(0x1234, bufferList[2]); compareAll("틀린 버퍼 대상");
+		gl.bindBuffer(gl.ARRAY_BUFFER, bufferList[2]); gl.deleteBuffer(bufferList[2]); compareAll("묶인 정점 버퍼 지움");
+		gl.bindBuffer(gl.ARRAY_BUFFER, bufferList[2]); compareAll("지운 버퍼 묶음(틀림)");
+		gl.bindBuffer(gl.ARRAY_BUFFER, undefined); compareAll("정점 버퍼 undefined");
 
 		// 마구 부르기. (정한 씨앗의 의사 난수)
 		let seed = 12345;
@@ -234,6 +273,8 @@ try {
 		const liveFramebufferList = [null, gl.createFramebuffer(), gl.createFramebuffer()];
 		const liveTextureList = [null, gl.createTexture(), gl.createTexture()];
 		const liveVertexArrayList = [null, gl.createVertexArray()];
+		const liveBufferList = [null, gl.createBuffer(), gl.createBuffer()];
+		candidateTable.bufferList = [...bufferList, ...liveBufferList.slice(1)];
 		const operationList = [
 			() => gl.viewport(Math.floor(random() * 50), Math.floor(random() * 50), Math.floor(random() * 400), Math.floor(random() * 400)),
 			() => gl.scissor(Math.floor(random() * 50), Math.floor(random() * 50), Math.floor(random() * 400), Math.floor(random() * 400)),
@@ -250,6 +291,7 @@ try {
 			() => gl.bindFramebuffer(pick([gl.FRAMEBUFFER, gl.DRAW_FRAMEBUFFER, gl.READ_FRAMEBUFFER]), pick(liveFramebufferList)),
 			() => gl.useProgram(pick([null, programList[0]])),
 			() => gl.bindVertexArray(pick(liveVertexArrayList)),
+			() => gl.bindBuffer(gl.ARRAY_BUFFER, pick(liveBufferList)),
 			() => gl.activeTexture(gl.TEXTURE0 + Math.floor(random() * 4)),
 			() => gl.bindTexture(gl.TEXTURE_2D, pick(liveTextureList)),
 			() => gl.pixelStorei(pick([gl.UNPACK_FLIP_Y_WEBGL, gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL]), random() < 0.5 ? 1 : 0),

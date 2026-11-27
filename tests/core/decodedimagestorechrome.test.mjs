@@ -162,7 +162,6 @@ try {
 			gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 			const pixels = readTexture(texture, width, height);
 			gl.deleteTexture(texture);
-			graphic.invalidateRenderStateCache();
 			return pixels;
 		};
 		// 캔버스로 JPEG 과 WebP 짓기. (알파 없는 WebP 는 불투명하게, 알파 WebP 는 반투명 갈래로)
