@@ -1420,7 +1420,7 @@
 
 			const contentTween = new Tween({ progress: 0 })
 				.to({ progress: 1 }, 0.26)
-				.easing(Tween.easingFunction.quadratic.out)
+				.easing(Tween.easingFunction.quadratic.easeOut)
 				.setUpdate((values) => {
 					nextRootNode.setLocalOpacity(values.progress);
 					nextRootNode.setLocalPosition(Vector2.create(0, 14 * (1 - values.progress)));
@@ -1445,7 +1445,7 @@
 				activeHighlightNode.setLocalPosition(Vector2.create(0, startOffsetY));
 				const slideTween = new Tween({ progress: 0 })
 					.to({ progress: 1 }, 0.22)
-					.easing(Tween.easingFunction.quadratic.out)
+					.easing(Tween.easingFunction.quadratic.easeOut)
 					.setUpdate((values) => {
 						activeHighlightNode.setLocalPosition(Vector2.create(0, startOffsetY * (1 - values.progress)));
 					})

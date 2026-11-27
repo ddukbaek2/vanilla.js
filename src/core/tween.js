@@ -76,7 +76,7 @@ export function applyTweenProperty(node, tweenProperty, value) {
  *
  * const tween = new Tween({ x: 0, alpha: 1 });
  * tween.to({ x: 100, alpha: 0 }, 0.5);
- * tween.easing(Tween.easingFunction.quadratic.out);
+ * tween.easing(Tween.easingFunction.quadratic.easeOut);
  * tween.setUpdate((values) => {
  * 	console.log(values.x, values.alpha);
  * });
@@ -151,7 +151,7 @@ export class Tween extends Object {
 	 * 		const root = this.getRoot();
 	 * 		root.addChild(node);
 	 * 		const tween = Tween.createNodeTween(node, TweenProperty.localPosition, Vector2.create(0, 0), Vector2.create(200, 100), 0.5);
-	 * 		tween.easing(Tween.easingFunction.cubic.inOut);
+	 * 		tween.easing(Tween.easingFunction.cubic.easeInOut);
 	 * 		tween.setComplete(() => {
 	 * 			const localPosition = node.getLocalPosition();
 	 * 			console.log(localPosition.x, localPosition.y);
@@ -391,46 +391,46 @@ export class Tween extends Object {
 Tween.easingFunction = {
     linear: function(k) { return k; },
     quadratic: {
-        in: function(k) { return k * k; },
-        out: function(k) { return k * (2 - k); },
-        inOut: function(k) {
+        easeIn: function(k) { return k * k; },
+        easeOut: function(k) { return k * (2 - k); },
+        easeInOut: function(k) {
             if ((k *= 2) < 1) { return 0.5 * k * k; }
             return -0.5 * (--k * (k - 2) - 1);
         }
     },
     cubic: {
-		in: function ( k ) { return k * k * k; },
-		out: function ( k ) { return --k * k * k + 1; },
-		inOut: function ( k ) {
+		easeIn: function ( k ) { return k * k * k; },
+		easeOut: function ( k ) { return --k * k * k + 1; },
+		easeInOut: function ( k ) {
 			if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k;
 			return 0.5 * ( ( k -= 2 ) * k * k + 2 );
 		}
 	},
     quartic: {
-        in: function ( k ) { return k * k * k * k; },
-        out: function ( k ) { return 1 - ( --k * k * k * k ); },
-        inOut: function ( k ) {
+        easeIn: function ( k ) { return k * k * k * k; },
+        easeOut: function ( k ) { return 1 - ( --k * k * k * k ); },
+        easeInOut: function ( k ) {
             if ( ( k *= 2 ) < 1) return 0.5 * k * k * k * k;
             return - 0.5 * ( ( k -= 2 ) * k * k * k - 2 );
         }
     },
     quintic: {
-        in: function ( k ) { return k * k * k * k * k; },
-        out: function ( k ) { return --k * k * k * k * k + 1; },
-        inOut: function ( k ) {
+        easeIn: function ( k ) { return k * k * k * k * k; },
+        easeOut: function ( k ) { return --k * k * k * k * k + 1; },
+        easeInOut: function ( k ) {
             if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k * k * k;
             return 0.5 * ( ( k -= 2 ) * k * k * k * k + 2 );
         }
     },
     sinusoidal: {
-		in: function ( k ) { return 1 - Math.cos( k * Math.PI / 2 ); },
-		out: function ( k ) { return Math.sin( k * Math.PI / 2 ); },
-		inOut: function ( k ) { return 0.5 * ( 1 - Math.cos( Math.PI * k ) ); }
+		easeIn: function ( k ) { return 1 - Math.cos( k * Math.PI / 2 ); },
+		easeOut: function ( k ) { return Math.sin( k * Math.PI / 2 ); },
+		easeInOut: function ( k ) { return 0.5 * ( 1 - Math.cos( Math.PI * k ) ); }
 	},
     exponential: {
-        in: function(k) { return k === 0 ? 0 : Math.pow(1024, k - 1); },
-        out: function(k) { return k === 1 ? 1 : 1 - Math.pow(2, -10 * k); },
-        inOut: function(k) {
+        easeIn: function(k) { return k === 0 ? 0 : Math.pow(1024, k - 1); },
+        easeOut: function(k) { return k === 1 ? 1 : 1 - Math.pow(2, -10 * k); },
+        easeInOut: function(k) {
             if (k === 0) return 0;
             if (k === 1) return 1;
             if ((k *= 2) < 1) return 0.5 * Math.pow(1024, k - 1);
@@ -438,15 +438,15 @@ Tween.easingFunction = {
         }
     },
     circular: {
-        in: function(k) { return 1 - Math.sqrt(1 - k * k); },
-        out: function(k) { return Math.sqrt(1 - (--k * k)); },
-        inOut: function(k) {
+        easeIn: function(k) { return 1 - Math.sqrt(1 - k * k); },
+        easeOut: function(k) { return Math.sqrt(1 - (--k * k)); },
+        easeInOut: function(k) {
             if ((k *= 2) < 1) return -0.5 * (Math.sqrt(1 - k * k) - 1);
             return 0.5 * (Math.sqrt(1 - (k -= 2) * k) + 1);
         }
     },
     elastic: {
-        in: function(k) {
+        easeIn: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
@@ -454,7 +454,7 @@ Tween.easingFunction = {
             else s = p * Math.asin(1 / a) / (2 * Math.PI);
             return -(a * Math.pow(2, 10 * (k -= 1)) * Math.sin((k - s) * (2 * Math.PI) / p));
         },
-        out: function(k) {
+        easeOut: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
@@ -462,7 +462,7 @@ Tween.easingFunction = {
             else s = p * Math.asin(1 / a) / (2 * Math.PI);
             return (a * Math.pow(2, -10 * k) * Math.sin((k - s) * (2 * Math.PI) / p) + 1);
         },
-        inOut: function(k) {
+        easeInOut: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
@@ -473,23 +473,23 @@ Tween.easingFunction = {
         }
     },
     back: {
-        in: function(k) {
+        easeIn: function(k) {
             const s = 1.70158;
             return k * k * ((s + 1) * k - s);
         },
-        out: function(k) {
+        easeOut: function(k) {
             const s = 1.70158;
             return --k * k * ((s + 1) * k + s) + 1;
         },
-        inOut: function(k) {
+        easeInOut: function(k) {
             const s = 1.70158 * 1.525;
             if ((k *= 2) < 1) return 0.5 * (k * k * ((s + 1) * k - s));
             return 0.5 * ((k -= 2) * k * ((s + 1) * k + s) + 2);
         }
     },
     bounce: {
-        in: function(k) { return 1 - Tween.easingFunction.bounce.out(1 - k); },
-        out: function(k) {
+        easeIn: function(k) { return 1 - Tween.easingFunction.bounce.easeOut(1 - k); },
+        easeOut: function(k) {
             if (k < (1 / 2.75)) {
                 return 7.5625 * k * k;
             } else if (k < (2 / 2.75)) {
@@ -500,9 +500,9 @@ Tween.easingFunction = {
                 return 7.5625 * (k -= (2.625 / 2.75)) * k + 0.984375;
             }
         },
-        inOut: function(k) {
-            if (k < 0.5) return Tween.easingFunction.bounce.in(k * 2) * 0.5;
-            return Tween.easingFunction.bounce.out(k * 2 - 1) * 0.5 + 0.5;
+        easeInOut: function(k) {
+            if (k < 0.5) return Tween.easingFunction.bounce.easeIn(k * 2) * 0.5;
+            return Tween.easingFunction.bounce.easeOut(k * 2 - 1) * 0.5 + 0.5;
         }
     }
 };

@@ -418,7 +418,7 @@ export class ToonPostProcess {
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		const compositePass = this.#compositePass;
-		compositePass.use();
+		compositePass.useProgram();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneTexture);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);

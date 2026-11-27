@@ -15,7 +15,7 @@ import { UINode } from "./uinode.js";
 import { LayoutSolver } from "./autolayout/layoutsolver.js";
 import { LayoutStrength } from "./autolayout/layoutstrength.js";
 import { LayoutConstraint } from "./autolayout/layoutconstraint.js";
-import { DEVTools } from "../misc/devtools.js";
+import { DevTools } from "../misc/devtools.js";
 import { ImageAsset } from "../resource/imageasset.js";
 
 //==============================================================================
@@ -85,7 +85,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { DEVTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
+	/** @private @type { DevTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
 	/** @private @type { TouchRecognizer } */ #touchRaycaster;
 	/** @private @type { number } */ #lastViewSizeX;
 	/** @private @type { number } */ #lastViewSizeY;
@@ -354,7 +354,7 @@ export class UIScene extends Scene {
 		this.#devtools = null;
 		const engineConfiguration = engine.getEngineConfiguration();
 		if (engineConfiguration.useDevTools !== false) {
-			this.#devtools = new DEVTools();
+			this.#devtools = new DevTools();
 			this.#devtools.setEngine(engine);
 			this.#devtools.setRootNodes([this.getRoot()]);
 		}
@@ -451,7 +451,7 @@ export class UIScene extends Scene {
 	//   (모바일 주소창 토글로 100vh 가 동적으로 변하는 경우 등에서 resize 이벤트만으론
 	//    누락될 수 있어 매 tick 보정.)
 	// - 트리 내 새로 추가된 UINode 들을 솔버에 자동 부착 후 솔버 한 번 풀이.
-	// - DEVTools tick.
+	// - DevTools tick.
 	//==============================================================================
 	/**
 	 * @override
@@ -593,7 +593,7 @@ export class UIScene extends Scene {
 	// 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
 	//==============================================================================
 	/**
-	 * @returns { DEVTools | null } 개발자 도구. (만들지 않았으면 null)
+	 * @returns { DevTools | null } 개발자 도구. (만들지 않았으면 null)
 	 * @example <caption>개발자 도구를 끈 엔진에서는 null</caption>
 	 * import { Engine, EngineConfiguration, UIScene, Vector2 } from "./build/vanilla.js";
 	 *
@@ -721,7 +721,7 @@ export class UIScene extends Scene {
 	}
 
 	//==============================================================================
-	// postDraw. DEVTools 를 화면 위에 그린다.
+	// postDraw. DevTools 를 화면 위에 그린다.
 	//==============================================================================
 	/**
 	 * @override

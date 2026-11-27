@@ -12,7 +12,7 @@ import { TransformNode } from "./node/transformnode.js";
 import { TransformMatrix } from "../base/transformmatrix.js";
 import { ShaderProgram } from "./graphic/shaderprogram.js";
 import { ImageTextureCache } from "./graphic/imagetexturecache.js";
-import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
+import { TextStringTextureCache, setTextAntialiasEnabled, isTextAntialiasOn } from "./graphic/textstringtexturecache.js";
 import { WebGLStateCache } from "./graphic/webglstatecache.js";
 import * as Math from "../base/math.js";
 
@@ -3760,6 +3760,51 @@ export class Graphic extends Object {
 	 */
 	isTextPixelSnapEnabled() {
 		return this.#isTextPixelSnapEnabled;
+	}
+
+	//==============================================================================
+	// 글자 안티앨리어싱 켬 / 끔. (러스트 Graphic::set_text_antialias_enabled 와 같다)
+	//
+	// 끄면 구운 글자의 알파를 문턱값 128 로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다. (도트 글꼴용)
+	// 켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다. (기본 켬)
+	//==============================================================================
+	/**
+	 * @param { boolean } isTextAntialiasEnabled 켜면 참.
+	 * @example <caption>도트 글꼴처럼 또렷한 글자</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		engine.getGraphic().setTextAntialiasEnabled(false);
+	 * 	}
+	 *
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.setFillColor("#ffffff");
+	 * 		graphic.setFontString("16px sans-serif");
+	 * 		graphic.setTextAlign("left");
+	 * 		graphic.setTextBaseline("top");
+	 * 		graphic.drawFillText("PIXEL 123", 20, 20);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	setTextAntialiasEnabled(isTextAntialiasEnabled) {
+		setTextAntialiasEnabled(isTextAntialiasEnabled);
+	}
+
+	//==============================================================================
+	// 글자 안티앨리어싱이 켜져 있는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 켜졌으면 참.
+	 */
+	isTextAntialiasEnabled() {
+		return isTextAntialiasOn();
 	}
 
 	//==============================================================================

@@ -8,14 +8,14 @@ import { Object } from "./object.js";
 //==============================================================================
 // 쿨다운.
 // - "timer -= dt; if (timer <= 0) ..." 를 매번 손으로 쓰던 것을 표준화했다.
-// - use() 로 발동하면 지정한 시간 동안 isReady() 가 거짓이 된다.
+// - activate() 로 발동하면 지정한 시간 동안 isReady() 가 거짓이 된다.
 //==============================================================================
 /**
  * @example <caption>발동하고 시간이 지나 다시 준비되기</caption>
  * import { Cooldown } from "./build/vanilla.js";
  *
  * const cooldown = new Cooldown(0.5);
- * console.log(cooldown.use(), cooldown.use());
+ * console.log(cooldown.activate(), cooldown.activate());
  * cooldown.tick(0.25);
  * console.log(cooldown.getRemainSeconds(), cooldown.getProgress());
  * cooldown.tick(0.25);
@@ -65,28 +65,17 @@ export class Cooldown extends Object {
 	}
 
 	//==============================================================================
-	// 발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환)
-	//==============================================================================
-	/**
-	 * @returns { boolean } 발동했으면 참. (쿨다운 중이면 거짓, 남은 시간은 그대로)
-	 */
-	use() {
-		if (!this.isReady()) {
-			return false;
-		}
-		this.#remainSeconds = this.#duration;
-		return true;
-	}
-
-	//==============================================================================
-	// 발동. (use 와 같다, use 를 이름으로 쓸 수 없는 언어와 같은 코드로 쓰려고 둔다)
+	// 발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환, 러스트 판 activate 와 같다)
 	//==============================================================================
 	/**
 	 * @returns { boolean } 발동했으면 참. (쿨다운 중이면 거짓, 남은 시간은 그대로)
 	 */
 	activate() {
-		const isActivated = this.use();
-		return isActivated;
+		if (!this.isReady()) {
+			return false;
+		}
+		this.#remainSeconds = this.#duration;
+		return true;
 	}
 
 	//==============================================================================

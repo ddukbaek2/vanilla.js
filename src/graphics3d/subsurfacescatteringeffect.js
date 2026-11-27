@@ -266,7 +266,7 @@ export class SubsurfaceScatteringEffect extends Object {
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 
 		const scatterPass = this.getScatterPass();
-		scatterPass.use();
+		scatterPass.useProgram();
 		const sourceTextureLocation = scatterPass.getUniformLocation("sourceTexture");
 		webGL2RenderingContext.uniform1i(sourceTextureLocation, 0);
 		const depthTextureLocation = scatterPass.getUniformLocation("depthTexture");

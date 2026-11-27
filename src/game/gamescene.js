@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
 import { Pivot } from "../base/pivot.js";
@@ -13,17 +14,60 @@ import { ViewScaleMode } from "../core/viewmanager.js";
 import { TouchRecognizer } from "../ui/touchrecognizer.js";
 import { UIWindowLayer } from "../ui/uiwindowlayer.js";
 import { WorldNode } from "../core/node/worldnode.js";
-import { DEVTools } from "../misc/devtools.js";
+import { DevTools } from "../misc/devtools.js";
 import { ImageAsset } from "../resource/imageasset.js";
 import { LoadingProgress } from "../misc/loadingprogress.js";
+
+//==============================================================================
+// 화면 페이드를 어둡게 붙잡는 손잡이. (러스트 판 ScreenFadeHold 와 같다)
+// - fadeScreen 의 onDark 가 돌려주거나 fadeScreenWithHold 의 onDark 가 받는다. release 를 부를 때까지 어둡게 둔다.
+//==============================================================================
+/**
+ * @example <caption>다 어두워지면 손잡이를 받고, 놓을 때까지 어둡게 두기</caption>
+ * import { ScreenFadeHold } from "./build/vanilla.js";
+ *
+ * const screenFadeHold = new ScreenFadeHold();
+ * console.log(screenFadeHold.isReleased());
+ * screenFadeHold.release();
+ * console.log(screenFadeHold.isReleased());
+ */
+export class ScreenFadeHold extends Object {
+	/** @private @type { boolean } */ #isReleased;
+
+	//==============================================================================
+	// 생성. (아직 놓지 않음)
+	//==============================================================================
+	constructor() {
+		super();
+		this.#isReleased = false;
+	}
+
+	//==============================================================================
+	// 놓기. (막이 밝아진다)
+	//==============================================================================
+	release() {
+		this.#isReleased = true;
+	}
+
+	//==============================================================================
+	// 놓았는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } release 를 불렀으면 참.
+	 */
+	isReleased() {
+		return this.#isReleased;
+	}
+}
+
 
 //==============================================================================
 // 게임 공통 베이스 씬.
 // - 로딩 화면 (중앙 이미지 + 게이지 + 터치 단축).
 //   색은 setLoadingColors, 그림 전체는 setLoadingDrawer 로 바꾼다. 게이지는 기본으로 최소 노출 시간의 경과를 보이고,
 //   setLoadingProgress 나 trackAssetLoader 로 진행률을 알리면 그 진행률을 부드럽게 따라간다. (LoadingProgress)
-// - 개발자 도구 (DEVTools).
-// - 터치 입력 라우팅 (TouchRecognizer + DEVTools 캡처 시 무시).
+// - 개발자 도구 (DevTools).
+// - 터치 입력 라우팅 (TouchRecognizer + DevTools 캡처 시 무시).
 // - 세이프 에어리어 노드 + env(safe-area-inset-*) 계산.
 // - viewSize 변화 자동 감지 → layout 재호출.
 // - 캔버스 배경 클리어.
@@ -78,7 +122,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { DEVTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
+	/** @private @type { DevTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
 	/** @private @type { TouchRecognizer } */ #touchRaycaster;
 	/** @private @type { WorldNode } */ #safeAreaNode;
 	/** @private @type { Rect } */ #lastSafeAreaRect;
@@ -103,6 +147,7 @@ export class GameScene extends Scene {
 	/** @private @type { number } */ #screenFadeDirection; // 1 이면 어두워지는 중, -1 이면 밝아지는 중, 0 이면 멈춤.
 	/** @private @type { boolean } */ #isScreenFadeWaiting; // 다 어두워진 뒤 onDark 가 끝나기를 기다리는 중인지.
 	/** @private @type { Function | null } */ #screenFadeEvent; // 다 어두워지면 부를 함수.
+	/** @private @type { ScreenFadeHold | null } */ #screenFadeHold; // onDark 가 돌려준, 놓기를 기다리는 손잡이.
 	/** @private @type { Color } */ #screenFadeColor;
 	/** @private @type { number } */ #screenFadeSeconds; // 어두워지는 시간과 밝아지는 시간. (초)
 	/** @private @type { object | null } */ #playInputHandler; // { press, move, release, wheel } (UI 가 받지 않은 입력, 게임 영역 좌표)
@@ -136,6 +181,7 @@ export class GameScene extends Scene {
 		this.#screenFadeAlpha = 0;
 		this.#screenFadeDirection = 0;
 		this.#isScreenFadeWaiting = false;
+		this.#screenFadeHold = null;
 		this.#screenFadeEvent = null;
 		this.#screenFadeColor = Color.black();
 		this.#screenFadeSeconds = 0.35;
@@ -274,7 +320,7 @@ export class GameScene extends Scene {
 	// 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
 	//==============================================================================
 	/**
-	 * @returns { DEVTools | null } 개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
+	 * @returns { DevTools | null } 개발자 도구. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
 	 */
 	getDevTools() {
 		return this.#devtools ?? null;
@@ -530,7 +576,7 @@ export class GameScene extends Scene {
 		this.#devtools = null;
 		const engineConfiguration = engine.getEngineConfiguration();
 		if (engineConfiguration.useDevTools !== false) {
-			this.#devtools = new DEVTools();
+			this.#devtools = new DevTools();
 			this.#devtools.setEngine(engine);
 			this.#devtools.setRootNodes([this.getRoot()]);
 		}
@@ -616,7 +662,7 @@ export class GameScene extends Scene {
 	// - viewSize 변화 감지 → 자동 layout 재호출.
 	//   (모바일 주소창 표시/숨김으로 100vh 가 동적으로 변하는 경우 등에서
 	//    resize 이벤트만으로는 누락될 수 있어 매 tick 보정.)
-	// - DEVTools tick 처리.
+	// - DevTools tick 처리.
 	//==============================================================================
 	/**
 	 * @override
@@ -779,7 +825,7 @@ export class GameScene extends Scene {
 	}
 
 	//==============================================================================
-	// postDraw. 어두워지는 막과 DEVTools 를 화면 위에 그린다.
+	// postDraw. 어두워지는 막과 DevTools 를 화면 위에 그린다.
 	//==============================================================================
 	/**
 	 * @override
@@ -795,12 +841,12 @@ export class GameScene extends Scene {
 
 	//==============================================================================
 	// 어두워졌다 밝아지기.
-	// - 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도) 어둡게 두었다가 밝힌다.
+	// - 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도), ScreenFadeHold 를 돌려주면 release 할 때까지 어둡게 두었다가 밝힌다.
 	// - 막이 걸린 동안(어두워지고, 기다리고, 밝아지는 동안)은 누름과 휠을 받지 않는다.
 	// - 이미 페이드 중이면 무시하고 false.
 	//==============================================================================
 	/**
-	 * @param { Function | null } onDark () => void | Promise
+	 * @param { Function | null } onDark () => void | Promise | ScreenFadeHold
 	 * @returns { boolean } 시작했는지.
 	 */
 	fadeScreen(onDark) {
@@ -810,6 +856,23 @@ export class GameScene extends Scene {
 		this.#screenFadeEvent = onDark;
 		this.#screenFadeDirection = 1;
 		return true;
+	}
+
+	//==============================================================================
+	// 어두워졌다 밝아지기의 손잡이 꼴. (러스트 판 fade_screen_with_hold 와 같다)
+	// - 다 어두워지면 onDark 에 새 ScreenFadeHold 를 넘기고, 그 손잡이를 release 할 때까지 어둡게 둔다.
+	// - 이미 페이드 중이면 무시하고 false.
+	//==============================================================================
+	/**
+	 * @param { function(ScreenFadeHold): void } onDark 다 어두워지면 손잡이를 받아 부를 함수.
+	 * @returns { boolean } 시작했는지.
+	 */
+	fadeScreenWithHold(onDark) {
+		return this.fadeScreen(() => {
+			const screenFadeHold = new ScreenFadeHold();
+			onDark(screenFadeHold);
+			return screenFadeHold;
+		});
 	}
 
 	//==============================================================================
@@ -857,6 +920,11 @@ export class GameScene extends Scene {
 	// 막 갱신. (tick 이 부른다, 배율을 곱하지 않은 시간으로 움직여 놀이를 멈춰도 돈다, 한 프레임은 0.1 초까지)
 	//==============================================================================
 	updateScreenFade() {
+		if (this.#screenFadeHold !== null && this.#screenFadeHold.isReleased()) {
+			this.#screenFadeHold = null;
+			this.#isScreenFadeWaiting = false;
+			this.#screenFadeDirection = -1;
+		}
 		if (this.#screenFadeDirection === 0) {
 			return;
 		}
@@ -896,7 +964,10 @@ export class GameScene extends Scene {
 		catch (error) {
 			console.error(error);
 		}
-		if (result && typeof result.then === "function") {
+		if (result instanceof ScreenFadeHold) {
+			this.#screenFadeHold = result;
+		}
+		else if (result && typeof result.then === "function") {
 			result.then(brighten, (error) => {
 				console.error(error);
 				brighten();

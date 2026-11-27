@@ -2894,7 +2894,7 @@
 
 		// === 2. 하늘 (엔진 FullscreenPass) ===
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
-		skyPass.use();
+		skyPass.useProgram();
 		const upBasisX = -System.Math.sin(cameraPitch) * System.Math.sin(cameraYaw);
 		const upBasisY = System.Math.cos(cameraPitch);
 		const upBasisZ = System.Math.sin(cameraPitch) * System.Math.cos(cameraYaw);
@@ -3032,7 +3032,7 @@
 		// === 8. 최종 합성 → 화면 (블룸 가산 + 모션 블러 + 비네트 + 그레인 + ACES) ===
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 		webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
-		compositePass.use();
+		compositePass.useProgram();
 		webGL2RenderingContext.uniform1i(compositeSceneTextureLocation, 0);
 		webGL2RenderingContext.uniform1i(compositeBloomTextureLocation, 1);
 		webGL2RenderingContext.uniform2f(compositeResolutionLocation, canvas.width, canvas.height);

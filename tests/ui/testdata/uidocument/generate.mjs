@@ -4,7 +4,7 @@
 // - editor_components.json: 원본 에디터가 등록하는 컴포넌트(엔진이 내보내는 Component 하위 클래스)마다 빈 노드에 붙인 serializeNode.
 // - editor_node_types.json: 원본 에디터가 등록하는 노드 종류(WorldNode 하위 클래스)마다 new 한 serializeNode.
 // - editor_palette.json, editor_palette_before_tick.json: 원본 에디터 addWidgetNode 의 팔레트 15 종을 팔레트 차례로 지은 toJsonText. (한 번 tick 한 뒤, 하기 전)
-// - inspector_getters.json: 원본 DEVTools.getComponentProperties 가 보이는 게터 이름. (노드에 붙인 컴포넌트)
+// - inspector_getters.json: 원본 DevTools.getComponentProperties 가 보이는 게터 이름. (노드에 붙인 컴포넌트)
 // - reflected_properties.json: 원본 UIDocument.getReflectedProperties 의 이름과 saveByReflection. (노드에 붙인 컴포넌트)
 //==============================================================================
 import * as fs from "node:fs";
@@ -34,9 +34,9 @@ for (const exportName of Object.keys(Engine)) {
 }
 
 // 원본 misc/devtools.js 의 getComponentProperties 를 그대로 부른다. (부르기만 하고 이름을 모은다, 인스턴스 상태를 쓰지 않는 함수)
-const { DEVTools } = await import(path.join(repositoryPath, "src/misc/devtools.js"));
+const { DevTools } = await import(path.join(repositoryPath, "src/misc/devtools.js"));
 function collectGetterNames(component) {
-	return DEVTools.prototype.getComponentProperties.call(null, component).map((property) => property.name);
+	return DevTools.prototype.getComponentProperties.call(null, component).map((property) => property.name);
 }
 
 const componentDocuments = {};

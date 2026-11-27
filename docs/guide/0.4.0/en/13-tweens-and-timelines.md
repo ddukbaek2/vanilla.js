@@ -15,7 +15,7 @@ import { Tween } from "./build/vanilla.js";
 
 const tween = new Tween({ x: 0, alpha: 1 });
 tween.to({ x: 100, alpha: 0 }, 0.5);
-tween.easing(Tween.easingFunction.quadratic.out);
+tween.easing(Tween.easingFunction.quadratic.easeOut);
 tween.setUpdate((values) => {
 	console.log(values.x, values.alpha);
 });
@@ -31,7 +31,7 @@ console.log(tween.isFinished());
 
 ### Easing
 
-`Tween.easingFunction` has `linear` plus `quadratic`, `cubic`, `quartic`, `quintic`, `sinusoidal`, `exponential`, `circular`, `elastic`, `back`, and `bounce`, and every one except `linear` has `in`, `out`, and `inOut` (as in `Tween.easingFunction.back.out`). Any function that takes progress (0 to 1) and returns changed progress can be passed to `easing`.
+`Tween.easingFunction` has `linear` plus `quadratic`, `cubic`, `quartic`, `quintic`, `sinusoidal`, `exponential`, `circular`, `elastic`, `back`, and `bounce`, and every one except `linear` has `easeIn`, `easeOut`, and `easeInOut` (as in `Tween.easingFunction.back.easeOut`). Any function that takes progress (0 to 1) and returns changed progress can be passed to `easing`.
 
 ### Node property tweens
 
@@ -79,7 +79,7 @@ class TweenScene extends Scene {
 		const moveTween = new Tween({ localPosition: Vector2.create(160, 360), localOpacity: 0 });
 		moveTween.to({ localPosition: Vector2.create(1120, 360), localOpacity: 1 }, 1.5);
 		moveTween.delay(0.2);
-		moveTween.easing(Tween.easingFunction.cubic.inOut);
+		moveTween.easing(Tween.easingFunction.cubic.easeInOut);
 		moveTween.setTarget(boxNode);
 		moveTween.setComplete(() => {
 			this.startPulse(1, 1.4);
@@ -89,7 +89,7 @@ class TweenScene extends Scene {
 
 	startPulse(startScale, endScale) {
 		const pulseTween = Tween.createNodeTween(this.#boxNode, TweenProperty.localScale, startScale, endScale, 0.4);
-		pulseTween.easing(Tween.easingFunction.sinusoidal.inOut);
+		pulseTween.easing(Tween.easingFunction.sinusoidal.easeInOut);
 		pulseTween.setComplete(() => {
 			this.startPulse(endScale, startScale);
 		});

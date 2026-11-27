@@ -156,7 +156,7 @@
 		 */
 		startPulse(startScale, endScale) {
 			const tween = Tween.createNodeTween(this.#pulseNode, TweenProperty.localScale, startScale, endScale, 0.8)
-				.easing(Tween.easingFunction.sinusoidal.inOut)
+				.easing(Tween.easingFunction.sinusoidal.easeInOut)
 				.setComplete(() => {
 					this.startPulse(endScale, startScale);
 				});

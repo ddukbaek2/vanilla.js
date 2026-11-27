@@ -19,7 +19,7 @@ src/core/graphic/          # ShaderProgram, ShaderWarmer, ImageTextureCache, Tex
 src/resource/              # Asset derivatives (Image/Audio/Text/Json/Font/Blob/Bunch/Visual) + AnimationClip, AssetLoader, SpriteAtlas
 src/effect/                # ParticleSystem, TrailRenderer, ShaderSprite, ScreenEffect, HeatHazeEffect
 src/ui/                    # Two-branch UI (Component-family UIView / Node-family UINode) + window stacking, motion + autolayout/
-src/misc/                  # DEVTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
+src/misc/                  # DevTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
                            #     GraphicsQualityGovernor, FixedStepper, LoadingProgress, BuildInfo, VirtualPad, Visual, Indicator and other add-on features
 src/web/                   # DOM-area utilities (Pane, WebSocketClient). The world outside the canvas
 src/game/                  # GameScene (common base scene for games)
@@ -92,7 +92,7 @@ Object (base/object.js)
 │                AmbientOcclusionEffect, SubsurfaceScatteringEffect
 ├── Math/data: Vector2/3, Matrix4, Quaternion, TransformMatrix, Rect, OBB, Color,
 │                List/Dictionary/Queue/Stack/Set, FiniteStateMachine, ObjectPool, SeededRandom
-└── Other: Tween, Animation, Frame, Animator, Action, Timeline, DEVTools, NodeLayout, AssetLoader, SpriteAtlas,
+└── Other: Tween, Animation, Frame, Animator, Action, Timeline, DevTools, NodeLayout, AssetLoader, SpriteAtlas,
           DynamicFont, VirtualPad, WebSocketClient, Camera2D, FixedStepper, LoadingProgress, BuildInfo ...
 ```
 
@@ -155,7 +155,7 @@ Component ── owning node (reference)
 UIScene
 ├── LayoutSolver ─────────── the scene owns the solver. UINode receives it via setSolver() and uses it
 ├── screenNode / safeAreaLayoutGuide (UINode) ── pure guides not put into the tree
-├── DEVTools (F2 hierarchy/inspector, absent if EngineConfiguration.useDevTools is off)
+├── DevTools (F2 hierarchy/inspector, absent if EngineConfiguration.useDevTools is off)
 └── TouchRecognizer ──────── UIKit-style gestures (drag threshold + delaysContentTouches)
 
 UINode
@@ -289,7 +289,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 - A single barrel file at the repository root. Its 13 comment-section blocks (built-in/base/core/basic components/UI/resources/other/collections/animation/shaders and fullscreen pass/3D graphics/to be deprecated/experimental) are the logical layer divisions, and after the experimental block come exports with a one-line comment per branch.
 - Enums are exported on the same line together with their class (`export { ViewScaleMode, ViewManager }`).
 - Function-collection modules are exported as namespaces (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
-- **Intentionally unexposed** = treated as internal implementation: `AudioManager` (used via Engine), `Layer`, `DEVTools`, `GameScene`, `FbxLoader` (via SkinnedModel), the 2 texture caches and sharedbakecache, autolayout internal types (`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), all of src/web (`Pane`, `WebSocketClient`). Projects that need an unexposed class import it directly by file path.
+- **Intentionally unexposed** = treated as internal implementation: `AudioManager` (used via Engine), `Layer`, `DevTools`, `FbxLoader` (via SkinnedModel), the 2 texture caches and sharedbakecache, autolayout internal types (`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), all of src/web (`Pane`, `WebSocketClient`). Projects that need an unexposed class import it directly by file path.
 
 ---
 

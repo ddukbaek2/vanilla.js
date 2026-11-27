@@ -230,7 +230,7 @@ export class Action extends Object {
 	 * 	target.count += 1;
 	 * });
 	 * const action = new Action();
-	 * action.loop((target) => {
+	 * action.repeatWhile((target) => {
 	 * 	return target.count < 3;
 	 * }, incrementAction);
 	 * action.start(counter);
@@ -239,7 +239,7 @@ export class Action extends Object {
 	 * }
 	 * console.log(counter.count, action.isDone());
 	 */
-	loop(conditionFn, innerAction) {
+	repeatWhile(conditionFn, innerAction) {
 		this.#steps.push({ type: "loop", conditionFn: conditionFn, innerAction: innerAction });
 		return this;
 	}

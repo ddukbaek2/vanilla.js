@@ -50,7 +50,7 @@ void main() {
  * `;
  * const fullscreenPass = new FullscreenPass(webGL2RenderingContext, fragmentShaderSource);
  * webGL2RenderingContext.viewport(0, 0, width, height);
- * fullscreenPass.use();
+ * fullscreenPass.useProgram();
  * const tintColorLocation = fullscreenPass.getUniformLocation("tintColor");
  * webGL2RenderingContext.uniform3f(tintColorLocation, 1.0, 0.6, 0.3);
  * fullscreenPass.draw();
@@ -82,9 +82,9 @@ export class FullscreenPass extends Object {
 	}
 
 	//==============================================================================
-	// 패스 사용 시작. (프로그램 + 빈 버텍스 어레이 바인드)
+	// 패스 사용 시작. (프로그램 + 빈 버텍스 어레이 바인드, 러스트 판 use_program 과 같다)
 	//==============================================================================
-	use() {
+	useProgram() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
 		shaderProgram.use();

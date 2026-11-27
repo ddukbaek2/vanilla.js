@@ -9,7 +9,7 @@ import { Vector2 } from "../base/vector2.js";
 //==============================================================================
 // 포인터 제스처 인식기. (헤드리스)
 // - 탭 / 드래그 / 롱프레스를 임계값으로 분류한다. 노드에 얽매이지 않아 어디서나 쓴다.
-// - 사용: press(x, y) → move(x, y) → tick(dt) → release() 순으로 넘기고,
+// - 사용: press(x, y) → movePointer(x, y) → tick(dt) → release() 순으로 넘기고,
 //   콜백(setTapEvent / setDragEvent / setLongPressEvent)으로 결과를 받는다.
 // - 여러 게임이 pressedTime / dragMoved 변수를 제각각 들고 다니던 것을 표준화했다.
 //==============================================================================
@@ -35,8 +35,8 @@ import { Vector2 } from "../base/vector2.js";
  * pointerGesture.release();
  *
  * pointerGesture.press(100, 100);
- * pointerGesture.move(105, 100);
- * pointerGesture.move(130, 100);
+ * pointerGesture.movePointer(105, 100);
+ * pointerGesture.movePointer(130, 100);
  * pointerGesture.release();
  *
  * pointerGesture.press(50, 50);
@@ -110,7 +110,7 @@ export class PointerGesture extends Object {
 	 * @param { number } x 포인터 X 좌표.
 	 * @param { number } y 포인터 Y 좌표.
 	 */
-	move(x, y) {
+	movePointer(x, y) {
 		if (!this.#isPressed) {
 			return;
 		}

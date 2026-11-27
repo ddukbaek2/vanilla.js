@@ -48,7 +48,8 @@ const EASING_REFERENCE_TABLE = [
 
 function findEasingFunction(easingName) {
 	const [groupName, kindName] = easingName.split(".");
-	return kindName === undefined ? Tween.easingFunction[groupName] : Tween.easingFunction[groupName][kindName];
+	const functionName = { in: "easeIn", out: "easeOut", inOut: "easeInOut" }[kindName];
+	return kindName === undefined ? Tween.easingFunction[groupName] : Tween.easingFunction[groupName][functionName];
 }
 
 // 감속 값이 기준표와 같고, 모든 감속은 0 에서 0, 1 에서 1.
@@ -85,7 +86,7 @@ checkEqual(completeCount, 1, "끝난 뒤 완료 없음");
 
 // 감속을 걸면 진행률 대신 감속 값으로 보간한다. 아무 함수나 감속으로 쓸 수 있다.
 let easedValue = 0;
-const easingTween = new Tween({ value: 0 }).to({ value: 100 }, 2).easing(Tween.easingFunction.quadratic.in);
+const easingTween = new Tween({ value: 0 }).to({ value: 100 }, 2).easing(Tween.easingFunction.quadratic.easeIn);
 easingTween.setUpdate((values) => {
 	easedValue = values.value;
 });
