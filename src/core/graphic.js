@@ -13,7 +13,7 @@ import { TransformMatrix } from "../base/transformmatrix.js";
 import { ShaderProgram } from "./graphic/shaderprogram.js";
 import { ImageTextureCache } from "./graphic/imagetexturecache.js";
 import { DecodedImageStore } from "./graphic/decodedimagestore.js";
-import { TextStringTextureCache, setTextAntialiasEnabled, isTextAntialiasOn } from "./graphic/textstringtexturecache.js";
+import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
 import { WebGLStateCache } from "./graphic/webglstatecache.js";
 import * as Math from "../base/math.js";
 
@@ -4889,7 +4889,7 @@ export class Graphic extends Object {
 	// 글자 안티앨리어싱 켬 / 끔. (러스트 Graphic::set_text_antialias_enabled 와 같다)
 	//
 	// 끄면 구운 글자의 알파를 문턱값 128 로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다. (도트 글꼴용)
-	// 켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다. (기본 켬)
+	// 이 Graphic 에만 걸린다. 바꾼 뒤 그리는 글부터 새 꼴이다. (이미 만든 글도 다음 그리기부터, 구운 글은 꼴마다 따로 남아 되돌리면 다시 굽지 않는다, 기본 켬)
 	//==============================================================================
 	/**
 	 * @param { boolean } isTextAntialiasEnabled 켜면 참.
@@ -4917,7 +4917,16 @@ export class Graphic extends Object {
 	 * engine.run(new MainScene());
 	 */
 	setTextAntialiasEnabled(isTextAntialiasEnabled) {
-		setTextAntialiasEnabled(isTextAntialiasEnabled);
+		const textStringTextureCache = this.getTextStringTextureCache();
+		const isEnabled = isTextAntialiasEnabled !== false;
+		if (textStringTextureCache.isTextAntialiasOn() === isEnabled) {
+			return;
+		}
+		// 남긴 묶음과 기하 캐시에 든 글은 옛 꼴의 글자 칸을 짚으므로 다시 적게 한다.
+		this.breakGeometryRecord();
+		this.flushBatch();
+		textStringTextureCache.setTextAntialiasEnabled(isEnabled);
+		this.#geometryCacheGeneration += 1;
 	}
 
 	//==============================================================================
@@ -4927,7 +4936,7 @@ export class Graphic extends Object {
 	 * @returns { boolean } 켜졌으면 참.
 	 */
 	isTextAntialiasEnabled() {
-		return isTextAntialiasOn();
+		return this.getTextStringTextureCache().isTextAntialiasOn();
 	}
 
 	//==============================================================================

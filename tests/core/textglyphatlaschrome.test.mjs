@@ -7,6 +7,7 @@
 //   소수 자리(맞추기 끔, 가로 세로 소수 자리)는 덩어리마다 선형 거르기가 따로 걸려 잉크가 닿는 이웃의 겹친 가장자리만 조금 다르다.
 //   그 차이가 정해 둔 상한(화면 전체 다른 화소 수, 가장 큰 차이)을 넘지 않는지 본다. (칸 위아래 가장자리 되풀이로 다른 줄을 뽑지 않는다)
 // - 이미 구운 덩어리로만 된 새 문자열, 숫자만 바뀌는 새 문자열은 굽지 않고(올린 수가 늘지 않고), 글자 많은 화면이 드로 콜 하나로 묶이는지 본다.
+// - 글자 안티앨리어싱을 도중에 끄면 이미 만든 글도 새 꼴(NEAREST 장)로 다시 굽고, 다시 켜면 처음 글을 그대로 쓰는지, 다른 Graphic 에는 걸리지 않는지 본다.
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 const System = globalThis;
@@ -60,7 +61,7 @@ try {
 	await page.goto(`http://127.0.0.1:${port}/`);
 	const result = await page.evaluate(async () => {
 		const System = globalThis;
-		const { Engine, EngineConfiguration, Scene, Vector2 } = await import("/import.js");
+		const { Engine, EngineConfiguration, Scene, Vector2, Graphic } = await import("/import.js");
 		const lineList = [
 			["16px sans-serif", "Score 12345 HP 98/100"],
 			["bold 13px sans-serif", "안녕하세요 뚝백이님 가격 1,234원"],
@@ -239,8 +240,26 @@ try {
 		statistics.numberUploadCountGrowth = textStringTextureCache.readAtlasStatistics().uploadCount - numberUploadCountBefore;
 		statistics.numberDrawCallCount = graphic.getLastFrameDrawCallCount();
 		statistics.atlasPageCount = textStringTextureCache.readAtlasStatistics().atlasPageCount;
+
+		// 글자 안티앨리어싱을 도중에 바꾸기. (같은 글을 다시 달라고 할 때 바뀐 꼴의 글을 준다)
+		const antialiasArgumentList = ["fill", "Antialias 글 0.5", "16px sans-serif", "#ffffff", 0, 1, "ltr"];
+		const antialiasEntry = textStringTextureCache.getEntry(...antialiasArgumentList);
+		graphic.setTextAntialiasEnabled(false);
+		const aliasedEntry = textStringTextureCache.getEntry(...antialiasArgumentList);
+		const otherGraphic = new Graphic(document.createElement("canvas"), false);
+		statistics.antialias = {
+			isRebuilt: aliasedEntry !== antialiasEntry,
+			isNearest: aliasedEntry.atlasPages.length > 0 && aliasedEntry.atlasPages.every((atlasPage) => atlasPage.isNearest),
+			isOtherGraphicOn: otherGraphic.isTextAntialiasEnabled(),
+		};
+		graphic.setTextAntialiasEnabled(true);
+		statistics.antialias.isReused = textStringTextureCache.getEntry(...antialiasArgumentList) === antialiasEntry;
 		return { lineDifferenceList, fractionLineDifferenceList, statistics };
 	});
+	check(result.statistics.antialias.isRebuilt, "안티앨리어싱을 끈 뒤 같은 글을 새로 굽는다");
+	check(result.statistics.antialias.isNearest, "안티앨리어싱을 끈 뒤의 글은 NEAREST 장에 있다");
+	check(result.statistics.antialias.isReused, "안티앨리어싱을 다시 켜면 처음 글을 그대로 쓴다");
+	check(result.statistics.antialias.isOtherGraphicOn, "안티앨리어싱은 그 Graphic 에만 걸린다");
 	checkEqual(pageErrorList.length, 0, "페이지 오류 " + pageErrorList.join(" / "));
 	check(result.statistics.litPixelCount >= 2000, `글이 그려진 장면을 찍었다 (검정이 아닌 화소 ${result.statistics.litPixelCount})`);
 	result.lineDifferenceList.forEach((lineDifference, lineIndex) => {
