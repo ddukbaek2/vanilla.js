@@ -278,3 +278,7 @@ export { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from
 export { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_MAXIMUM_INSTANCE_ATTRIBUTES, TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME } from "./src/graphics3d/toon/toonmaterial.js";
 export { ToonProgramKind, TOON_MAXIMUM_MATERIAL_TEXTURES, composeToonProgramSources, createReflectionMatrix, readFrameCamera, readMatrixDeterminant, readViewRotation, readCameraRoll, readOutlineVertexData, readUvData } from "./src/graphics3d/toon/toonrenderer.js";
 export { ToonDrawStage } from "./src/graphics3d/toon/toondrawqueue.js";
+export { AudioManager } from "./src/core/audiomanager.js";
+export { DevTools } from "./src/misc/devtools.js";
+export { Pane, PaneStyle, PaneTheme } from "./src/web/pane.js";
+export { WebSocketClient } from "./src/web/websocketclient.js";

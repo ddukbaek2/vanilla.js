@@ -575,6 +575,7 @@
 - ShadowAtlas: 칸 크기를 유니티 URP 기본과 같게 했다. new ShadowAtlas(컨텍스트, 해상도 기본 2048, 칸 해상도 기본 1024) 로 칸마다 1024 를 바라고, 다 들어가지 않으면 다 들어갈 때까지 반씩 줄인다 (URP 추가 빛 그림자 아틀라스 기본 2048, 해상도 단계 High 기본 1024, 빛의 기본 단계 High). getTileResolution
   - 지금까지는 칸 수의 제곱근으로 격자를 나눠 점광 하나가 682 였는데 이제 512, 스포트라이트 하나는 2048 이었는데 이제 1024 다. 더 곱게 하려면 해상도와 칸 해상도를 올린다
 - 예제 toonstyle: ?roll=라디안 으로 카메라를 기울인다 (천사 고리 기울임 되돌리기)
+- 맨 위 내보내기에 여섯을 더함(러스트와 같게): import.js 가 AudioManager, DevTools, Pane, PaneStyle, PaneTheme, WebSocketClient 를 내보낸다(러스트 판 lib.rs 의 pub use 와 같다). 문서와 예제도 채웠다.
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

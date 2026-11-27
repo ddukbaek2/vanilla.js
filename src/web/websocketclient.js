@@ -13,6 +13,19 @@ const RECEIVED_MESSAGE_LIMIT = 1024;
 // 웹소켓 통신 처리기.
 // - 받은 JSON 은 수신 콜백이 있으면 그것을 부르고, 없으면 모아 두었다가 takeReceivedMessages 로 꺼낸다. (매 프레임 꺼내 쓰는 게임용)
 //==============================================================================
+/**
+ * @example <caption>받은 JSON 을 콜백으로 받거나 모아서 꺼내기</caption>
+ * import { WebSocketClient } from "./build/vanilla.js";
+ *
+ * const client = new WebSocketClient();
+ * client.receiveMessage({ type: "hello" });
+ * console.log(client.isConnected(), client.takeReceivedMessages().length);
+ * client.setReceiveEvent((message) => {
+ * 	console.log(message.type);
+ * });
+ * client.receiveMessage({ type: "ping" });
+ * console.log(client.getReceiveEvent() !== null);
+ */
 export class WebSocketClient extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -41,7 +54,7 @@ export class WebSocketClient extends Object {
 	// 접속.
 	//==============================================================================
 	/**
-	 * @param { string } url
+	 * @param { string } url 접속할 웹소켓 주소. (ws:// 나 wss://, 이미 접속 중이면 무시한다)
 	 */
 	connect(url) {
 		if (this.#isConnected) {
@@ -87,7 +100,7 @@ export class WebSocketClient extends Object {
 	// 받은 JSON 넘기기. (수신 콜백이 있으면 콜백, 없으면 모아 두었다가 takeReceivedMessages 로 꺼낸다)
 	//==============================================================================
 	/**
-	 * @param { object } obj
+	 * @param { object } obj 받은 JSON 객체. (수신 콜백이 있으면 콜백으로, 없으면 모아 둔다)
 	 */
 	receiveMessage(obj) {
 		const receiveEvent = this.#receiveEvent;
@@ -105,7 +118,7 @@ export class WebSocketClient extends Object {
 	// 모아 둔 받은 메시지 꺼내기. (수신 콜백이 없을 때 모인 것, 받은 차례, 꺼내면 비운다)
 	//==============================================================================
 	/**
-	 * @returns { Array<object> }
+	 * @returns { Array<object> } 모아 둔 받은 메시지. (받은 차례, 꺼내면 비운다)
 	 */
 	takeReceivedMessages() {
 		const receivedMessageList = this.#receivedMessageList;
@@ -136,7 +149,7 @@ export class WebSocketClient extends Object {
 	// JSON 송신.
 	//==============================================================================
 	/**
-	 * @param { object } obj
+	 * @param { object } obj 보낼 JSON 객체. (접속 중이 아니면 보내지 않는다)
 	 */
 	send(obj) {
 		const isConnected = this.isConnected();
@@ -158,7 +171,7 @@ export class WebSocketClient extends Object {
 	// 접속 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 접속 중이면 참.
 	 */
 	isConnected() {
 		return this.#isConnected;
@@ -168,7 +181,7 @@ export class WebSocketClient extends Object {
 	// 웹소켓 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebSocket | null } callback
+	 * @returns { WebSocket | null } 안쪽 웹소켓. (접속하지 않았으면 null)
 	 */
 	getWebSocket() {
 		return this.#webSocket;
@@ -178,7 +191,7 @@ export class WebSocketClient extends Object {
 	// 수신 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { Function | null } callback
+	 * @param { Function | null } callback 받은 JSON 객체를 넘겨 받을 함수. (null 이면 모아 두는 쪽으로 돌아간다)
 	 */
 	setReceiveEvent(callback) {
 		this.#receiveEvent = callback;
@@ -188,7 +201,7 @@ export class WebSocketClient extends Object {
 	// 수신 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { Function | null }
+	 * @returns { Function | null } 수신 콜백. (없으면 null)
 	 */
 	getReceiveEvent() {
 		return this.#receiveEvent;
