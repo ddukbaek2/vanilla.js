@@ -31,6 +31,25 @@ const CONTEXT_CLOCK_CHECK_INTERVAL = 0.5;
 const CONTEXT_CLOCK_MINIMUM_RATIO = 0.25;
 
 
+/**
+ * @example <caption>오디오 플레이어와 버스 만들기</caption>
+ * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		const engine = this.getEngine();
+ * 		const audioManager = engine.getAudioManager();
+ * 		console.log(audioManager.hasUserGesture(), audioManager.getContextTime());
+ * 		const audioPlayer = audioManager.createAudioPlayer();
+ * 		const audioBus = audioManager.createAudioBus();
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class AudioManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -45,7 +64,7 @@ export class AudioManager extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { Engine } engine
+	 * @param { Engine } engine 소리를 맡을 엔진. (플랫폼 정보로 iOS 인지 가린다)
 	 */
 	constructor(engine) {
 		super();
@@ -73,7 +92,7 @@ export class AudioManager extends Object {
 	// user gesture 이후인지 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 첫 사용자 입력(클릭, 터치, 키)이 이미 있었으면 참.
 	 */
 	hasUserGesture() {
 		return this.#hasUserGesture;
@@ -188,7 +207,7 @@ export class AudioManager extends Object {
 	// 오디오 플레이어 생성.
 	//==============================================================================
 	/**
-	 * @returns { AudioPlayer }
+	 * @returns { AudioPlayer } 공유 오디오 컨텍스트로 만든 새 오디오 플레이어.
 	 */
 	createAudioPlayer() {
 		const audioContext = this.ensureAudioContext();
@@ -199,7 +218,7 @@ export class AudioManager extends Object {
 	// 오디오 버스 생성. (AudioContext 가 없으면 만든다, 만들지 못하면 소리 없는 버스)
 	//==============================================================================
 	/**
-	 * @returns { AudioBus }
+	 * @returns { AudioBus } 공유 오디오 컨텍스트로 만든 새 오디오 버스. (컨텍스트를 만들 수 없으면 소리 없는 버스)
 	 */
 	createAudioBus() {
 		const audioContext = this.ensureAudioContext();
@@ -210,7 +229,7 @@ export class AudioManager extends Object {
 	// 오디오 컨텍스트 시계. (초, audioContext.currentTime, AudioContext 가 없으면 0)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 오디오 컨텍스트 시계. (초, 컨텍스트가 아직 없으면 0)
 	 */
 	getContextTime() {
 		const audioContext = this.getAudioContext();
@@ -224,7 +243,7 @@ export class AudioManager extends Object {
 	// 오디오 컨텍스트 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { AudioContext | null }
+	 * @returns { AudioContext | null } 공유 오디오 컨텍스트. (아직 만들지 않았으면 null)
 	 */
 	getAudioContext() {
 		return this.#audioContext;

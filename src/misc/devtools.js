@@ -98,9 +98,7 @@ class DevToolsFlatItem {
 	// 생성.
 	//==============================================================================
 	/**
-	 * @param { TransformNode } node
-	 * @param { number } depth
-	 * @param { boolean } effectiveActive
+	 * @constructor
 	 */
 	constructor(node, depth, effectiveActive) {
 		this.node = node;
@@ -158,6 +156,16 @@ class InspectorLine {
 // - 중앙 구분선 드래그로 좌우 비율 조절.
 // - 컴포넌트 헤더 클릭으로 프로퍼티 목록 펼침/접힘 (기본값: 펼침).
 //==============================================================================
+/**
+ * @example <caption>패널을 열고 탭 고르기</caption>
+ * import { DevTools } from "./build/vanilla.js";
+ *
+ * const devTools = new DevTools();
+ * devTools.setActiveTab(1);
+ * devTools.setVisible(true);
+ * console.log(devTools.isVisible(), devTools.getActiveTab());
+ * console.log(devTools.getPanelRect().width > 0, devTools.isFramePerSecondVisible());
+ */
 export class DevTools extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -280,7 +288,7 @@ export class DevTools extends Object {
 	// 엔진 설정.
 	//==============================================================================
 	/**
-	 * @param { Engine } engine
+	 * @param { Engine } engine 개발 도구가 들여다볼 엔진. (기즈모 표시는 도구가 맡으므로 강제 기즈모를 끈다)
 	 */
 	setEngine(engine) {
 		this.#engine = engine;
@@ -292,7 +300,7 @@ export class DevTools extends Object {
 	// 루트 노드 목록 설정.
 	//==============================================================================
 	/**
-	 * @param { TransformNode[] } rootNodes
+	 * @param { TransformNode[] } rootNodes 트리에 보일 루트 노드 목록. (루트는 처음부터 펼친다)
 	 */
 	setRootNodes(rootNodes) {
 		this.#rootNodes = rootNodes;
@@ -305,7 +313,7 @@ export class DevTools extends Object {
 	// 표시 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 패널이 보이면 참.
 	 */
 	isVisible() {
 		return this.#isVisible;
@@ -315,7 +323,7 @@ export class DevTools extends Object {
 	// 보이기와 숨기기. (F2 와 같다. 보일 때 패널을 창 오른쪽 아래에 붙이고, 모든 기즈모 설정을 건다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isVisible
+	 * @param { boolean } isVisible 패널을 보이면 참, 숨기면 거짓.
 	 */
 	setVisible(isVisible) {
 		this.#isVisible = isVisible;
@@ -338,7 +346,7 @@ export class DevTools extends Object {
 	// 지금 탭 반환. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지금 탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
 	 */
 	getActiveTab() {
 		return this.#activeTab;
@@ -348,7 +356,7 @@ export class DevTools extends Object {
 	// 탭 설정. (없는 탭이면 무시)
 	//==============================================================================
 	/**
-	 * @param { number } tabIndex
+	 * @param { number } tabIndex 탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
 	 */
 	setActiveTab(tabIndex) {
 		if (tabIndex >= 0 && tabIndex < TABS.length) {
@@ -360,7 +368,7 @@ export class DevTools extends Object {
 	// 고른 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { TransformNode | null }
+	 * @returns { TransformNode | null } 고른 노드. (없으면 null)
 	 */
 	getSelectedNode() {
 		return this.#selectedNode;
@@ -370,7 +378,7 @@ export class DevTools extends Object {
 	// 노드 고르기. (인스펙터 스크롤은 맨 위로)
 	//==============================================================================
 	/**
-	 * @param { TransformNode | null } node
+	 * @param { TransformNode | null } node 고를 노드. (null 이면 선택을 푼다)
 	 */
 	setSelectedNode(node) {
 		this.#selectedNode = node;
@@ -381,8 +389,8 @@ export class DevTools extends Object {
 	// 트리에서 노드를 펼쳤는지.
 	//==============================================================================
 	/**
-	 * @param { TransformNode } node
-	 * @returns { boolean }
+	 * @param { TransformNode } node 확인할 노드.
+	 * @returns { boolean } 트리에서 그 노드를 펼쳤으면 참.
 	 */
 	isNodeExpanded(node) {
 		return this.#expandedNodes.has(node);
@@ -392,8 +400,8 @@ export class DevTools extends Object {
 	// 트리에서 노드 펼치기와 접기.
 	//==============================================================================
 	/**
-	 * @param { TransformNode } node
-	 * @param { boolean } isExpanded
+	 * @param { TransformNode } node 펼치거나 접을 노드.
+	 * @param { boolean } isExpanded 펼치면 참, 접으면 거짓.
 	 */
 	setNodeExpanded(node, isExpanded) {
 		if (isExpanded) {
@@ -408,7 +416,7 @@ export class DevTools extends Object {
 	// 패널 영역 반환. (창 안쪽 논리 좌표)
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 패널 영역. (창 안쪽 논리 좌표)
 	 */
 	getPanelRect() {
 		return Rect.create(this.#panelX, this.#panelY, this.#panelWidth, this.#panelHeight);
@@ -418,7 +426,7 @@ export class DevTools extends Object {
 	// 현재 터치 위치가 패널 내부에 있는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 지금 포인터가 패널 안에 있으면 참. (패널이 숨겨져 있으면 거짓)
 	 */
 	isPointerInsidePanel() {
 		if (!this.#isVisible || !this.#engine) {
@@ -437,7 +445,7 @@ export class DevTools extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임과의 간격. (초)
 	 */
 	tick(timeDelta) {
 		if (!this.#engine) {
@@ -484,6 +492,7 @@ export class DevTools extends Object {
 	// 리사이즈 드래그 시작.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { string } mode
 	 * @param { number } touchX
 	 * @param { number } touchY
@@ -503,6 +512,7 @@ export class DevTools extends Object {
 	// 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 */
@@ -705,6 +715,7 @@ export class DevTools extends Object {
 	// 이동 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 */
@@ -803,6 +814,7 @@ export class DevTools extends Object {
 	// 뗌 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 */
@@ -819,6 +831,7 @@ export class DevTools extends Object {
 	// 로컬 스토리지 탭 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 * @param { number } panelX
@@ -976,6 +989,9 @@ export class DevTools extends Object {
 	//==============================================================================
 	// 트리 목록 재구성.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	rebuildFlatList() {
 		this.#flatList = [];
 		for (let rootIndex = 0; rootIndex < this.#rootNodes.length; ++rootIndex) {
@@ -988,6 +1004,7 @@ export class DevTools extends Object {
 	// 노드를 플랫 목록에 재귀 추가.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { TransformNode } node
 	 * @param { number } depth
 	 * @param { boolean } parentActive
@@ -1013,6 +1030,7 @@ export class DevTools extends Object {
 	// 컴포넌트의 get*/is* 프로퍼티 목록 수집.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Component } component
 	 * @returns { { name: string, value: * }[] }
 	 */
@@ -1062,6 +1080,7 @@ export class DevTools extends Object {
 	// get* 메서드명을 프로퍼티명 형식으로 변환. (getTextColor → textColor)
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { string } methodName
 	 * @returns { string }
 	 */
@@ -1077,6 +1096,7 @@ export class DevTools extends Object {
 	// 프로퍼티 값을 문자열로 포맷.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { * } value
 	 * @returns { string }
 	 */
@@ -1134,6 +1154,7 @@ export class DevTools extends Object {
 	// 인스펙터 라인 목록 구성.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { TransformNode } node
 	 * @returns { InspectorLine[] }
 	 */
@@ -1235,7 +1256,7 @@ export class DevTools extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		if (!this.#isVisible) {
@@ -1375,6 +1396,7 @@ export class DevTools extends Object {
 	// - 패널처럼 ViewScaleMode 와 무관하게 canvas-native 좌표계에서 그린다.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic 그릴 그래픽. (끝나면 들어올 때의 그리기 상태로 돌린다)
 	 */
 	drawFramePerSecond(graphic) {
@@ -1406,6 +1428,7 @@ export class DevTools extends Object {
 	// 트리 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -1559,6 +1582,7 @@ export class DevTools extends Object {
 	// 인스펙터 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -1690,6 +1714,7 @@ export class DevTools extends Object {
 	// 로컬 스토리지 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -1892,6 +1917,7 @@ export class DevTools extends Object {
 	// 화면 비율 가이드라인 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 */
 	drawAspectGuide(graphic) {
@@ -1950,6 +1976,7 @@ export class DevTools extends Object {
 	// 세팅 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -2067,6 +2094,7 @@ export class DevTools extends Object {
 	// 세팅 탭 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 * @param { number } panelX
@@ -2140,6 +2168,9 @@ export class DevTools extends Object {
 	//==============================================================================
 	// 설정 불러오기.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	loadSettings() {
 		if (!LocalStorage.containsKey(SETTINGS_STORAGE_KEY)) {
 			return;
@@ -2171,6 +2202,9 @@ export class DevTools extends Object {
 	//==============================================================================
 	// 설정 저장.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	saveSettings() {
 		const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
 		const settingsJson = System.JSON.stringify(settingsObject);
@@ -2190,6 +2224,9 @@ export class DevTools extends Object {
 	//==============================================================================
 	// 통계 항목 수집.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	gatherStatisticsItems() {
 		const items = [];
 		const platform = this.#engine.getPlatform();
@@ -2276,6 +2313,7 @@ export class DevTools extends Object {
 	// 통계 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -2402,6 +2440,7 @@ export class DevTools extends Object {
 	// 통계 탭 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 * @param { number } panelX
