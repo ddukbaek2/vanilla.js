@@ -201,6 +201,26 @@ try {
 		const unknownAsset = new AudioAsset();
 		unknownAsset.setLoadType("nothing");
 
+		// 소리 표에 loadType 칸이 없을 때의 기본. (배경음악은 streaming, 효과음은 decompressOnLoad, 줄에 적으면 그것)
+		const rowLoadTypes = {};
+		const originalSetLoadType = AudioAsset.prototype.setLoadType;
+		let rowLoadTypeKey = "";
+		AudioAsset.prototype.setLoadType = function (loadType) {
+			rowLoadTypes[rowLoadTypeKey] = loadType;
+			return originalSetLoadType.call(this, loadType);
+		};
+		const rowWavUrl = URL.createObjectURL(new Blob([makeWav(0.5, 440, 0.5)], { type: "audio/wav" }));
+		const rowSystem = new SoundSystem(new Engine(new EngineConfiguration()).getAudioManager(), []);
+		for (const [key, soundRow] of [
+			["musicDefault", { id: "musicDefault", path: rowWavUrl, isMusic: true }],
+			["effectDefault", { id: "effectDefault", path: rowWavUrl }],
+			["musicExplicit", { id: "musicExplicit", path: rowWavUrl, isMusic: true, loadType: "decompressOnLoad" }]
+		]) {
+			rowLoadTypeKey = key;
+			await rowSystem.loadSound(soundRow);
+		}
+		AudioAsset.prototype.setLoadType = originalSetLoadType;
+
 		// SoundSystem 배경음악. (스트리밍 애셋을 소리 표에 걸고 틀었다가 끈다)
 		const engine = new Engine(new EngineConfiguration());
 		const soundSystem = new SoundSystem(engine.getAudioManager(), [{ id: "music", isMusic: true, volume: 1 }]);
@@ -234,6 +254,7 @@ try {
 			unloadStreaming: unloadAsset.isStreaming(),
 			unloadLoaded: unloadAsset.isLoaded(),
 			unknownLoadType: unknownAsset.getLoadType(),
+			rowLoadTypes,
 			defaultLoadType: new AudioAsset().getLoadType(),
 			musicPeak,
 			musicPeakAfter,
@@ -278,6 +299,9 @@ check(result.automaticShortStreaming === false, "자동: 작은 소리는 통째
 check(result.unloadStreaming === false && result.unloadLoaded === false, "내리면 스트리밍 주소를 놓음");
 check(result.unknownLoadType === "decompressOnLoad", "모르는 읽기 방식은 decompressOnLoad");
 check(result.defaultLoadType === "decompressOnLoad", "기본 읽기 방식은 decompressOnLoad");
+check(result.rowLoadTypes.musicDefault === "streaming", "소리 표에 loadType 이 없으면 배경음악은 streaming");
+check(result.rowLoadTypes.effectDefault === "decompressOnLoad", "소리 표에 loadType 이 없으면 효과음은 decompressOnLoad");
+check(result.rowLoadTypes.musicExplicit === "decompressOnLoad", "소리 표의 loadType 이 먼저");
 check(near(result.musicPeak, 0.5, 0.06), "SoundSystem 스트리밍 배경음악 진폭 " + result.musicPeak);
 check(result.musicPeakAfter < 0.01, "SoundSystem 배경음악을 끄면 조용 " + result.musicPeakAfter);
 check(near(result.musicPeakResumed, 0.5, 0.06), "SoundSystem 배경음악 이어 틀기 " + result.musicPeakResumed);
