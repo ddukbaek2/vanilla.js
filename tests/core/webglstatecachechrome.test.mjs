@@ -60,7 +60,10 @@ try {
 	await page.goto("http://127.0.0.1:" + port + "/");
 	result = await page.evaluate(async () => {
 		const { Graphic } = await import("/src/core/graphic.js");
+		const { WebGLStateCache } = await import("/src/core/graphic/webglstatecache.js");
 		const mismatchList = [];
+		const candidateTable = { programList: [], vertexArrayList: [], textureList: [] }; // 견줄 객체. (만든 뒤 채운다)
+		let knownAnswerCount = 0; // 견주기 함수(isProgramInUse 같은 것)가 참이라고 답한 수. (모두 거짓이면 시험이 헛돈다)
 		const canvas = document.createElement("canvas");
 		canvas.width = 320;
 		canvas.height = 200;
@@ -101,8 +104,51 @@ try {
 					mismatchList.push(label + " isEnabled 0x" + capability.toString(16));
 				}
 			}
+			compareKnownValues(label);
 			while (gl.getError() !== gl.NO_ERROR) {
 				// 일부러 낸 오류를 비운다.
+			}
+		};
+		// 견주기 함수가 참이면 진짜 GL 값도 그것이어야 한다. (같은 값 호출을 건너뛸 때 쓰므로 틀린 참은 그리기를 망친다, 거짓은 모른다는 뜻이라 괜찮다)
+		const compareKnownValues = (label) => {
+			const stateCache = WebGLStateCache.find(gl);
+			const expectKnown = (name, isKnown, isReal) => {
+				if (isKnown) {
+					knownAnswerCount += 1;
+					if (!isReal) {
+						mismatchList.push(label + " " + name + " 캐시는 같다고 했으나 진짜는 다름");
+					}
+				}
+			};
+			const realProgram = realGetParameter(gl.CURRENT_PROGRAM);
+			for (const program of [...candidateTable.programList, null]) {
+				expectKnown("isProgramInUse", stateCache.isProgramInUse(program), program === realProgram);
+			}
+			const realVertexArray = realGetParameter(gl.VERTEX_ARRAY_BINDING);
+			for (const vertexArray of [...candidateTable.vertexArrayList, null]) {
+				expectKnown("isVertexArrayBound", stateCache.isVertexArrayBound(vertexArray), vertexArray === realVertexArray);
+			}
+			const realActiveTexture = realGetParameter(gl.ACTIVE_TEXTURE);
+			const realActivate = (textureUnit) => WebGL2RenderingContext.prototype.activeTexture.call(gl, textureUnit);
+			for (let unit = 0; unit < 8; unit++) {
+				expectKnown("isActiveTexture", stateCache.isActiveTexture(gl.TEXTURE0 + unit), gl.TEXTURE0 + unit === realActiveTexture);
+				// 진짜 묶음은 프로토타입으로 유닛을 바꿔 읽고 되돌린다. (캐시가 모르게 바꾸고 되돌리므로 기억은 그대로 맞다)
+				realActivate(gl.TEXTURE0 + unit);
+				const realTexture2D = realGetParameter(gl.TEXTURE_BINDING_2D);
+				const realTextureCube = realGetParameter(gl.TEXTURE_BINDING_CUBE_MAP);
+				realActivate(realActiveTexture);
+				for (const texture of [...candidateTable.textureList, null]) {
+					expectKnown("isTextureBound 2D", stateCache.isTextureBound(gl.TEXTURE0 + unit, gl.TEXTURE_2D, texture), texture === realTexture2D);
+					expectKnown("isTextureBound 큐브", stateCache.isTextureBound(gl.TEXTURE0 + unit, gl.TEXTURE_CUBE_MAP, texture), texture === realTextureCube);
+				}
+			}
+			const realFrontFace = realGetParameter(gl.FRONT_FACE);
+			for (const mode of [gl.CW, gl.CCW]) {
+				expectKnown("isFrontFace", stateCache.isFrontFace(mode), mode === realFrontFace);
+			}
+			const realCullFace = realGetParameter(gl.CULL_FACE_MODE);
+			for (const mode of [gl.FRONT, gl.BACK, gl.FRONT_AND_BACK]) {
+				expectKnown("isCullFace", stateCache.isCullFace(mode), mode === realCullFace);
 			}
 		};
 
@@ -127,6 +173,9 @@ try {
 			return program;
 		};
 		const programList = [makeProgram(true), makeProgram(true), makeProgram(false)];
+		candidateTable.programList = programList;
+		candidateTable.vertexArrayList = vertexArrayList;
+		candidateTable.textureList = textureList;
 
 		// 정해진 경우들. (틀린 인자 포함)
 		gl.viewport(10, 20, 30, 40); compareAll("뷰포트");
@@ -274,6 +323,7 @@ try {
 		const antialiasOff = new Graphic(antialiasOffCanvas, false, false).getWebGL2RenderingContext().getContextAttributes().antialias;
 		return {
 			mismatchList,
+			knownAnswerCount,
 			isStaleBeforeReset,
 			resetViewport: [resetViewport.position.x, resetViewport.position.y, resetViewport.width, resetViewport.height],
 			realQueryCount,
@@ -294,6 +344,8 @@ for (const mismatch of result.mismatchList.slice(0, 20)) {
 	console.log("  다름: " + mismatch);
 }
 check(result.mismatchList.length === 0, "캐시와 진짜 GL 값이 다름 " + result.mismatchList.length + " 곳");
+check(result.knownAnswerCount > 0, "견주기 함수가 한 번도 참이라고 답하지 않음 (시험이 헛돈다)");
+console.log("  견주기 함수가 참이라고 답한 수 " + result.knownAnswerCount);
 check(result.isStaleBeforeReset, "프로토타입으로 바꾼 뷰포트는 reset 전에 모르는 것이 맞음");
 check(result.resetViewport.join(",") === "3,4,50,60", "resetGLStateCache 뒤 뷰포트 " + result.resetViewport.join(","));
 check(result.realQueryCount === 0, "그리는 중 GL 에 물은 횟수 " + result.realQueryCount + " (0 이어야)");

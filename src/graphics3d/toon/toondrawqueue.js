@@ -30,6 +30,34 @@ import { TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID } from "./toonscreenoutline.js";
 
 
 //==============================================================================
+// 전역 변수 목록.
+//==============================================================================
+const sortIdTable = new System.WeakMap(); // 정렬 번호. (재질, 모형, 텍스처마다 처음 본 차례)
+let nextSortId = 1;
+
+
+//==============================================================================
+// 정렬 번호 읽기. (객체마다 처음 본 차례로 매긴다, 없으면 0)
+//==============================================================================
+/**
+ * @param { any } value - 재질, 모형, 텍스처 같은 객체.
+ * @returns { number } 정렬 번호.
+ */
+function readSortId(value) {
+	if (value === undefined || value === null || typeof value !== "object") {
+		return 0;
+	}
+	let sortId = sortIdTable.get(value);
+	if (sortId === undefined) {
+		sortId = nextSortId;
+		nextSortId += 1;
+		sortIdTable.set(value, sortId);
+	}
+	return sortId;
+}
+
+
+//==============================================================================
 // 전역 상수 목록.
 //==============================================================================
 /**
@@ -58,6 +86,9 @@ export const ToonDrawStage = System.Object.freeze({
 // - 차례: (화면 공간 바깥선의 선의 판) → 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 껍데기 → 화면 공간 바깥선 → afterOutline
 //   → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.
 //   몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.
+// - 불투명한 것(몸, 바깥선 껍데기, 그림자 깊이)은 재질, 모형, 바탕색 텍스처로 정렬해 그린다. (같은 것끼리는 담은 차례, 유니티 SRP Batcher 처럼 상태를 덜 바꾼다)
+//   깊이 시험(LEQUAL)으로 가장 가까운 것이 남으므로 화면은 담은 차례와 같다. 깊이가 꼭 같은 면(겹친 평면)만 나중에 그린 것이 이겨 차례가 드러난다.
+//   그런 것은 한 모형으로 합치거나 깊이를 띄운다. 비치는 것은 지금처럼 먼 것부터 담은 차례로 그린다.
 // - 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선 껍데기도 함께(hasOutline) 그린다.
 // - 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.
 //   options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.
@@ -101,6 +132,7 @@ export class ToonDrawQueue {
 	/** @private @type { Array<object> } */ #itemList; // { mesh, modelMatrix, instances, options, isTransparent, depthPosition, depth }
 	/** @private @type { Array<object> } */ #passList; // { stage, callback }
 	/** @private @type { object | null } */ #screenOutline; // ToonScreenOutline. (없으면 null)
+	/** @private @type { Array<object> | null } */ #opaqueItemList; // 정렬한 불투명한 것. (담거나 비우면 null, 처음 그릴 때 만든다)
 
 	//==============================================================================
 	// 생성.
@@ -109,6 +141,7 @@ export class ToonDrawQueue {
 		this.#itemList = [];
 		this.#passList = [];
 		this.#screenOutline = null;
+		this.#opaqueItemList = null;
 	}
 
 	//==============================================================================
@@ -117,6 +150,7 @@ export class ToonDrawQueue {
 	clear() {
 		this.#itemList.length = 0;
 		this.#passList.length = 0;
+		this.#opaqueItemList = null;
 	}
 
 	//==============================================================================
@@ -181,6 +215,7 @@ export class ToonDrawQueue {
 		}
 		const center = mesh.boundingCenter;
 		const depthPosition = modelMatrix.transformPoint(center[0], center[1], center[2]);
+		this.#opaqueItemList = null;
 		this.#itemList.push({ mesh: mesh, modelMatrix: modelMatrix, instances: null, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
 	}
 
@@ -206,6 +241,7 @@ export class ToonDrawQueue {
 		depthPosition.x /= instances.length;
 		depthPosition.y /= instances.length;
 		depthPosition.z /= instances.length;
+		this.#opaqueItemList = null;
 		this.#itemList.push({ mesh: mesh, modelMatrix: null, instances: instances, options: options, isTransparent: this.isTransparentOptions(options), depthPosition: depthPosition, depth: 0 });
 	}
 
@@ -232,8 +268,8 @@ export class ToonDrawQueue {
 	 */
 	drawShadows(renderer, shadowMap) {
 		renderer.beginShadowPass(shadowMap);
-		for (const item of this.#itemList) {
-			if (item.isTransparent || item.options.castsShadow === false) {
+		for (const item of this.readOpaqueItemList()) {
+			if (item.options.castsShadow === false) {
 				continue;
 			}
 			this.drawItem(renderer, item, item.options);
@@ -271,8 +307,8 @@ export class ToonDrawQueue {
 		renderer.beginShadowAtlasPass(shadowAtlas);
 		for (let tileIndex = 0; tileIndex < shadowAtlas.getTileCount(); ++tileIndex) {
 			renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
-			for (const item of this.#itemList) {
-				if (item.isTransparent || item.options.castsShadow === false) {
+			for (const item of this.readOpaqueItemList()) {
+				if (item.options.castsShadow === false) {
 					continue;
 				}
 				this.drawItem(renderer, item, item.options);
@@ -391,10 +427,7 @@ export class ToonDrawQueue {
 
 		// 1. 불투명한 몸. (인스턴스 묶음은 바깥선까지 한 번에)
 		const outlineItemList = [];
-		for (const item of itemList) {
-			if (item.isTransparent) {
-				continue;
-			}
+		for (const item of this.readOpaqueItemList()) {
 			if (item.instances !== null) {
 				this.drawItem(renderer, item, item.options);
 				continue;
@@ -468,6 +501,33 @@ export class ToonDrawQueue {
 			webGL2RenderingContext.depthMask(true);
 		}
 		this.runPasses(renderer, ToonDrawStage.afterTransparent);
+	}
+
+	//==============================================================================
+	// 정렬한 불투명한 것 읽기. (재질, 모형, 바탕색 텍스처의 차례, 같으면 담은 차례, 담은 것이 그대로면 앞서 만든 것을 쓴다)
+	//==============================================================================
+	/**
+	 * @returns { Array<object> } 불투명한 것의 목록. (고치지 않는다)
+	 * @private
+	 */
+	readOpaqueItemList() {
+		if (this.#opaqueItemList !== null) {
+			return this.#opaqueItemList;
+		}
+		const keyList = [];
+		for (const item of this.#itemList) {
+			if (item.isTransparent) {
+				continue;
+			}
+			keyList.push({ item: item, order: keyList.length, materialId: readSortId(item.options.material), meshId: readSortId(item.mesh), textureId: readSortId(item.options.baseColorTexture) });
+		}
+		keyList.sort((key, other) => {
+			return key.materialId - other.materialId || key.meshId - other.meshId || key.textureId - other.textureId || key.order - other.order;
+		});
+		this.#opaqueItemList = keyList.map((key) => {
+			return key.item;
+		});
+		return this.#opaqueItemList;
 	}
 
 	//==============================================================================

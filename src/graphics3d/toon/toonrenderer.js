@@ -4,6 +4,7 @@
 const System = globalThis;
 import { Matrix4 } from "../../base/matrix4.js";
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
+import { WebGLStateCache } from "../../core/graphic/webglstatecache.js";
 import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
 import { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./toonlightset.js";
 import { SHADOW_ATLAS_MAXIMUM_LIGHTS } from "../shadowmap.js";
@@ -1096,6 +1097,19 @@ function readBoundingSphere(positions, stride) {
 
 
 //==============================================================================
+// 두 수가 GL 에 같은 값으로 올라가는지. (0 과 -0 을 가르고, NaN 은 늘 다르다고 본다)
+//==============================================================================
+/**
+ * @param { number } value - 기억한 값.
+ * @param { number } other - 새 값.
+ * @returns { boolean } 같으면 참.
+ */
+function isSameNumber(value, other) {
+	return value === other && (value !== 0 || 1 / value === 1 / other);
+}
+
+
+//==============================================================================
 // 툰 렌더러. (ToonMesh 와 ToonGlb 의 배열을 한 색 재질과 바깥선으로 그린다)
 // - 빛: ToonLightSet 하나를 기본으로 든다. 해(방향과 색, 그림자), 하늘색과 땅색의 바탕빛, 채움 빛, 점광과 스포트라이트(TOON_MAXIMUM_POINT_LIGHTS 까지), 림 빛, 하이라이트, 빛 꼴(÷π).
 //   셀 셰이딩은 그늘 램프다. (유니티 툰 셰이더의 바탕, 1 차 그늘, 2 차 그늘과 Step, Feather, 그림자는 그늘 색으로 들어간다, 경계는 fwidth 로 계단 없이, 램프 텍스처도 된다)
@@ -1220,6 +1234,9 @@ export class ToonRenderer {
 	/** @private @type { Float32Array } */ #localShadowForwardValues;
 	/** @private @type { Float32Array } */ #localShadowUpValues;
 	/** @private @type { Float32Array } */ #localShadowTileValues;
+	/** @private @type { WebGLStateCache } */ #stateCache; // 컨텍스트의 GL 상태 기억. (같은 프로그램, 텍스처, 버텍스 어레이, 감김을 다시 걸지 않을 때 묻는다)
+	/** @private @type { WeakMap<ShaderProgram, Map<string, object>> } */ #uniformSlotTable; // 프로그램마다 유니폼 이름별 위치와 마지막으로 올린 값.
+	/** @private @type { number } */ #uniformSerial; // 올린 유니폼 값이 아직 맞는 판 번호. (바뀌면 모든 프로그램의 기억한 값을 잊는다)
 
 	//==============================================================================
 	// 생성.
@@ -1230,6 +1247,9 @@ export class ToonRenderer {
 	 */
 	constructor(webGL2RenderingContext) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
+		this.#stateCache = WebGLStateCache.attach(webGL2RenderingContext);
+		this.#uniformSlotTable = new System.WeakMap();
+		this.#uniformSerial = 1;
 		this.#programSets = new Map();
 		this.#emptyShadowTexture = this.createEmptyShadowTexture();
 		this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
@@ -2003,6 +2023,7 @@ export class ToonRenderer {
 	restoreState(isFramebufferRestored) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const savedState = this.#savedState;
+		this.forgetAllUniformValues();
 		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
 		webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
 		webGL2RenderingContext.colorMask(true, true, true, true);
@@ -2050,6 +2071,7 @@ export class ToonRenderer {
 	//==============================================================================
 	applyFrameState() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		this.forgetAllUniformValues();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -2261,6 +2283,7 @@ export class ToonRenderer {
 		this.#isShadowPass = true;
 		this.#isFrameMirrored = false;
 		this.#frameSerial += 1;
+		this.forgetAllUniformValues();
 		shadowMap.beginRender();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -2297,6 +2320,7 @@ export class ToonRenderer {
 		this.#isShadowPass = true;
 		this.#isFrameMirrored = false;
 		this.#frameSerial += 1;
+		this.forgetAllUniformValues();
 		shadowAtlas.beginRender();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -2689,14 +2713,13 @@ export class ToonRenderer {
 	 * @param { Float32Array | null } jointMatrices - 본 행렬의 수. (뼈대가 아니면 null)
 	 */
 	uploadDrawUniforms(shaderProgram, modelElements, isSkinned, instancedMode, jointMatrices) {
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("modelMatrix"), false, modelElements);
-		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("instanced"), instancedMode);
-		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
+		this.writeUniformMatrix4(shaderProgram, "modelMatrix", modelElements);
+		this.writeUniformFloats(shaderProgram, "instanced", 1, instancedMode);
+		this.writeUniformFloats(shaderProgram, "skinned", 1, isSkinned ? 1 : 0);
 		if (isSkinned) {
 			const jointFloatCount = System.Math.floor(System.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
 			const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
-			webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("jointMatrices"), false, jointValues);
+			this.writeUniformMatrix4(shaderProgram, "jointMatrices", jointValues);
 		}
 	}
 
@@ -2709,9 +2732,249 @@ export class ToonRenderer {
 	 * @private
 	 */
 	bindTextureUnit(unit, texture) {
+		this.bindTexture2D(unit, texture !== undefined && texture !== null ? texture : this.#whiteTexture);
+	}
+
+	//==============================================================================
+	// 텍스처 유닛에 2D 텍스처 묶기. (상태 캐시가 이미 묶였다고 기억하면 건너뛰고, 유닛도 다를 때만 고른다)
+	//==============================================================================
+	/**
+	 * @param { number } unit - 텍스처 유닛 번호.
+	 * @param { WebGLTexture | null } texture - 묶을 텍스처.
+	 * @private
+	 */
+	bindTexture2D(unit, texture) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + unit);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture !== undefined && texture !== null ? texture : this.#whiteTexture);
+		const stateCache = this.#stateCache;
+		const textureUnit = webGL2RenderingContext.TEXTURE0 + unit;
+		if (stateCache.isTextureBound(textureUnit, webGL2RenderingContext.TEXTURE_2D, texture)) {
+			return;
+		}
+		if (!stateCache.isActiveTexture(textureUnit)) {
+			webGL2RenderingContext.activeTexture(textureUnit);
+		}
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+	}
+
+	//==============================================================================
+	// 텍스처 유닛 고르기. (상태 캐시가 이미 같은 유닛이라고 기억하면 GL 에 다시 걸지 않는다)
+	//==============================================================================
+	/**
+	 * @param { number } textureUnit - 고를 유닛. (TEXTURE0 + 번호)
+	 * @private
+	 */
+	applyActiveTexture(textureUnit) {
+		if (!this.#stateCache.isActiveTexture(textureUnit)) {
+			this.getWebGL2RenderingContext().activeTexture(textureUnit);
+		}
+	}
+
+	//==============================================================================
+	// 앞면 감김 방향 걸기. (상태 캐시가 같은 값이라고 기억하면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { number } mode - 앞면 감김 방향. (CW, CCW)
+	 * @private
+	 */
+	applyFrontFace(mode) {
+		if (!this.#stateCache.isFrontFace(mode)) {
+			this.getWebGL2RenderingContext().frontFace(mode);
+		}
+	}
+
+	//==============================================================================
+	// 가릴 면 걸기. (상태 캐시가 같은 값이라고 기억하면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { number } mode - 가릴 면. (FRONT, BACK)
+	 * @private
+	 */
+	applyCullFace(mode) {
+		if (!this.#stateCache.isCullFace(mode)) {
+			this.getWebGL2RenderingContext().cullFace(mode);
+		}
+	}
+
+	//==============================================================================
+	// 버텍스 어레이 묶기. (상태 캐시가 같은 것이라고 기억하면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { WebGLVertexArrayObject | null } vertexArray - 묶을 버텍스 어레이.
+	 * @private
+	 */
+	applyVertexArray(vertexArray) {
+		if (!this.#stateCache.isVertexArrayBound(vertexArray)) {
+			this.getWebGL2RenderingContext().bindVertexArray(vertexArray);
+		}
+	}
+
+	//==============================================================================
+	// 유니폼 값 기억하며 올리기. (프로그램마다 이름별로 마지막에 올린 값을 기억해 같은 값이면 GL 에 다시 올리지 않는다)
+	// - 유니폼 값은 프로그램에 남으므로 프로그램이 같은 동안 같은 값은 다시 올릴 필요가 없다. (three.js 의 WebGLUniforms 캐시와 같은 꼴)
+	// - 렌더러 밖의 코드가 같은 유니폼을 바꿨을 수 있는 때는 기억을 잊는다:
+	//   프레임과 그림자 판의 시작, applyFrameState(단계 콜백과 화면 공간 바깥선 뒤), 상태 되돌리기, 그 프로그램의 onBeforeDraw 를 부른 뒤.
+	// - 값은 주어진 수 그대로 견준다. (0 과 -0 도 가른다, NaN 은 늘 다시 올린다) 셰이더에서 빠진 유니폼(위치 null)은 올리지 않는다.
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram - 유니폼을 가진 프로그램.
+	 * @param { string } uniformName - 유니폼 이름.
+	 * @returns { object } 그 유니폼의 칸. ({ location, serial, values, count(배열의 쓴 수) })
+	 * @private
+	 */
+	readUniformSlot(shaderProgram, uniformName) {
+		let slotTable = this.#uniformSlotTable.get(shaderProgram);
+		if (slotTable === undefined) {
+			slotTable = new System.Map();
+			this.#uniformSlotTable.set(shaderProgram, slotTable);
+		}
+		let slot = slotTable.get(uniformName);
+		if (slot === undefined) {
+			slot = { location: shaderProgram.getUniformLocation(uniformName), serial: 0, values: null, count: 0 };
+			slotTable.set(uniformName, slot);
+		}
+		return slot;
+	}
+
+	//==============================================================================
+	// 모든 프로그램의 기억한 유니폼 값 잊기. (다음 그리기가 모두 다시 올린다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	forgetAllUniformValues() {
+		this.#uniformSerial += 1;
+	}
+
+	//==============================================================================
+	// 한 프로그램의 기억한 유니폼 값 잊기. (onBeforeDraw 뒤)
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram - 잊을 프로그램.
+	 * @private
+	 */
+	forgetUniformValues(shaderProgram) {
+		const slotTable = this.#uniformSlotTable.get(shaderProgram);
+		if (slotTable === undefined) {
+			return;
+		}
+		for (const slot of slotTable.values()) {
+			slot.serial = 0;
+		}
+	}
+
+	//==============================================================================
+	// float 유니폼 하나 올리기. (uniform1f ~ uniform4f, 같은 값이면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram - 지금 쓰는 프로그램.
+	 * @param { string } uniformName - 유니폼 이름.
+	 * @param { number } componentCount - 성분 수. (1 ~ 4)
+	 * @param { number } x - 첫 성분.
+	 * @param { number } [y] - 둘째 성분.
+	 * @param { number } [z] - 셋째 성분.
+	 * @param { number } [w] - 넷째 성분.
+	 * @private
+	 */
+	writeUniformFloats(shaderProgram, uniformName, componentCount, x, y = 0, z = 0, w = 0) {
+		const slot = this.readUniformSlot(shaderProgram, uniformName);
+		const location = slot.location;
+		if (location === null) {
+			return;
+		}
+		let values = slot.values;
+		if (slot.serial === this.#uniformSerial && isSameNumber(values[0], x) && isSameNumber(values[1], y) && isSameNumber(values[2], z) && isSameNumber(values[3], w)) {
+			return;
+		}
+		if (values === null) {
+			values = new System.Float64Array(4);
+			slot.values = values;
+		}
+		values[0] = x;
+		values[1] = y;
+		values[2] = z;
+		values[3] = w;
+		slot.serial = this.#uniformSerial;
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		switch (componentCount) {
+			case 1:
+				webGL2RenderingContext.uniform1f(location, x);
+				break;
+			case 2:
+				webGL2RenderingContext.uniform2f(location, x, y);
+				break;
+			case 3:
+				webGL2RenderingContext.uniform3f(location, x, y, z);
+				break;
+			default:
+				webGL2RenderingContext.uniform4f(location, x, y, z, w);
+				break;
+		}
+	}
+
+	//==============================================================================
+	// int 유니폼 하나 올리기. (uniform1i, 같은 값이면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram - 지금 쓰는 프로그램.
+	 * @param { string } uniformName - 유니폼 이름.
+	 * @param { number } value - 값.
+	 * @private
+	 */
+	writeUniform1i(shaderProgram, uniformName, value) {
+		const slot = this.readUniformSlot(shaderProgram, uniformName);
+		const location = slot.location;
+		if (location === null) {
+			return;
+		}
+		if (slot.serial === this.#uniformSerial && slot.values[0] === value) {
+			return;
+		}
+		if (slot.values === null) {
+			slot.values = new System.Float64Array(1);
+		}
+		slot.values[0] = value;
+		slot.serial = this.#uniformSerial;
+		this.getWebGL2RenderingContext().uniform1i(location, value);
+	}
+
+	//==============================================================================
+	// mat4 유니폼이나 그 배열 올리기. (uniformMatrix4fv, 전치 없음, 같은 값이면 건너뛴다)
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram - 지금 쓰는 프로그램.
+	 * @param { string } uniformName - 유니폼 이름.
+	 * @param { ArrayLike<number> } elements - 행렬의 수. (16 의 배수)
+	 * @private
+	 */
+	writeUniformMatrix4(shaderProgram, uniformName, elements) {
+		const slot = this.readUniformSlot(shaderProgram, uniformName);
+		const location = slot.location;
+		if (location === null) {
+			return;
+		}
+		const elementCount = elements.length;
+		let values = slot.values;
+		if (slot.serial === this.#uniformSerial && slot.count === elementCount) {
+			let isSame = true;
+			for (let index = 0; index < elementCount; ++index) {
+				if (!isSameNumber(values[index], elements[index])) {
+					isSame = false;
+					break;
+				}
+			}
+			if (isSame) {
+				return;
+			}
+		}
+		if (values === null || values.length < elementCount) {
+			// 길이가 다른 배열(뼈 수가 다른 모형)이 번갈아 와도 다시 만들지 않게 가장 긴 것에 맞춰 둔다.
+			values = new System.Float32Array(elementCount);
+			slot.values = values;
+		}
+		values.set(elements);
+		slot.count = elementCount;
+		slot.serial = this.#uniformSerial;
+		this.getWebGL2RenderingContext().uniformMatrix4fv(location, false, elements);
 	}
 
 	//==============================================================================
@@ -2753,7 +3016,7 @@ export class ToonRenderer {
 		const outlineIndexCount = options.outlineIndexCount !== undefined && options.outlineIndexCount > 0 ? System.Math.min(options.outlineIndexCount, mesh.outlineIndexCount - outlineIndexStart) : mesh.outlineIndexCount - outlineIndexStart;
 		const isMirroredDraw = options.isMirrored !== undefined ? options.isMirrored === true : readMatrixDeterminant(modelElements) < 0;
 		const isMirrored = isMirroredDraw !== this.#isFrameMirrored;
-		webGL2RenderingContext.frontFace(isMirrored ? webGL2RenderingContext.CW : webGL2RenderingContext.CCW);
+		this.applyFrontFace(isMirrored ? webGL2RenderingContext.CW : webGL2RenderingContext.CCW);
 		const onBeforeDraw = typeof options.onBeforeDraw === "function" ? options.onBeforeDraw : null;
 		const drawElements = (start, count) => {
 			if (count <= 0) {
@@ -2776,10 +3039,11 @@ export class ToonRenderer {
 			this.uploadDrawUniforms(depthEntry.program, modelElements, isSkinned, instancedMode, jointMatrices);
 			if (onBeforeDraw !== null) {
 				onBeforeDraw(depthEntry.program, webGL2RenderingContext, ToonProgramKind.depth);
+				this.forgetUniformValues(depthEntry.program);
 			}
-			webGL2RenderingContext.bindVertexArray(bodyVertexArray);
+			this.applyVertexArray(bodyVertexArray);
 			drawElements(indexStart, indexCount);
-			webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
+			this.applyFrontFace(webGL2RenderingContext.CCW);
 			return;
 		}
 
@@ -2813,27 +3077,28 @@ export class ToonRenderer {
 			this.uploadFrameUniforms(outlineEntry);
 			this.uploadDrawUniforms(outlineProgram, modelElements, isSkinned, instancedMode, jointMatrices);
 			const outlineColor = options.outlineColor !== undefined && options.outlineColor !== null ? options.outlineColor : this.#outlineColor;
-			webGL2RenderingContext.uniform4f(outlineProgram.getUniformLocation("outlineColor"), outlineColor[0], outlineColor[1], outlineColor[2], outlineColor.length > 3 ? outlineColor[3] : 1);
-			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineWidthScale"), options.outlineWidthScale !== undefined ? System.Math.max(0, options.outlineWidthScale) : 1);
-			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineOffsetZ"), options.outlineOffsetZ !== undefined ? options.outlineOffsetZ : 0);
+			this.writeUniformFloats(outlineProgram, "outlineColor", 4, outlineColor[0], outlineColor[1], outlineColor[2], outlineColor.length > 3 ? outlineColor[3] : 1);
+			this.writeUniformFloats(outlineProgram, "outlineWidthScale", 1, options.outlineWidthScale !== undefined ? System.Math.max(0, options.outlineWidthScale) : 1);
+			this.writeUniformFloats(outlineProgram, "outlineOffsetZ", 1, options.outlineOffsetZ !== undefined ? options.outlineOffsetZ : 0);
 			const outlineLightSet = options.lightSet !== undefined && options.lightSet !== null ? options.lightSet : this.#lightSet;
 			const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? readOutlineLightColor(outlineLightSet.getSunColor()) : [1, 1, 1];
-			webGL2RenderingContext.uniform3f(outlineProgram.getUniformLocation("outlineLightColor"), outlineLightColor[0], outlineLightColor[1], outlineLightColor[2]);
-			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("alpha"), alpha);
-			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("premultipliedOutput"), premultipliedOutput);
+			this.writeUniformFloats(outlineProgram, "outlineLightColor", 3, outlineLightColor[0], outlineLightColor[1], outlineLightColor[2]);
+			this.writeUniformFloats(outlineProgram, "alpha", 1, alpha);
+			this.writeUniformFloats(outlineProgram, "premultipliedOutput", 1, premultipliedOutput);
 			if (onBeforeDraw !== null) {
 				onBeforeDraw(outlineProgram, webGL2RenderingContext, ToonProgramKind.outline);
+				this.forgetUniformValues(outlineProgram);
 			}
-			webGL2RenderingContext.cullFace(webGL2RenderingContext.FRONT);
-			webGL2RenderingContext.bindVertexArray(outlineVertexArray);
+			this.applyCullFace(webGL2RenderingContext.FRONT);
+			this.applyVertexArray(outlineVertexArray);
 			drawElements(outlineIndexStart, outlineIndexCount);
 		}
 		if (options.isBodyDrawn === false) {
 			if (isTransparent) {
 				webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 			}
-			webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
-			webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
+			this.applyCullFace(webGL2RenderingContext.BACK);
+			this.applyFrontFace(webGL2RenderingContext.CCW);
 			return;
 		}
 
@@ -2852,39 +3117,37 @@ export class ToonRenderer {
 		const baseColorTexture = options.baseColorTexture !== undefined ? options.baseColorTexture : null;
 		const emissiveTexture = options.emissiveTexture !== undefined ? options.emissiveTexture : null;
 		const decalTexture = options.decalTexture !== undefined ? options.decalTexture : null;
-		webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("tintColor"), tintColor[0], tintColor[1], tintColor[2], tintColor[3]);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("tintAmount"), options.tintAmount !== undefined && options.tintAmount !== null ? System.Math.max(0, System.Math.min(1, options.tintAmount)) : -1);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("alpha"), alpha);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("glowScale"), options.glowScale !== undefined ? options.glowScale : 1);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("colorScale"), options.colorScale !== undefined ? options.colorScale : 1);
-		webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("emissiveColor"), emissiveColor[0], emissiveColor[1], emissiveColor[2], options.emissiveIntensity !== undefined ? options.emissiveIntensity : 1);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("softEdge"), options.softEdge !== undefined ? options.softEdge : 0);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("alphaCutoff"), options.alphaCutoff !== undefined ? options.alphaCutoff : 0);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("premultipliedOutput"), premultipliedOutput);
-		webGL2RenderingContext.uniform3f(solidProgram.getUniformLocation("textureEnabled"), baseColorTexture !== null ? 1 : 0, emissiveTexture !== null ? 1 : 0, decalTexture !== null ? 1 : 0);
-		webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("uvTransform"), uvTransform[0], uvTransform[1], uvTransform[2], uvTransform[3]);
-		webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("decalUvTransform"), decalUvTransform[0], decalUvTransform[1], decalUvTransform[2], decalUvTransform[3]);
-		webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("decalColor"), decalColor[0], decalColor[1], decalColor[2], options.decalEmission !== undefined ? options.decalEmission : 0);
+		this.writeUniformFloats(solidProgram, "tintColor", 4, tintColor[0], tintColor[1], tintColor[2], tintColor[3]);
+		this.writeUniformFloats(solidProgram, "tintAmount", 1, options.tintAmount !== undefined && options.tintAmount !== null ? System.Math.max(0, System.Math.min(1, options.tintAmount)) : -1);
+		this.writeUniformFloats(solidProgram, "alpha", 1, alpha);
+		this.writeUniformFloats(solidProgram, "glowScale", 1, options.glowScale !== undefined ? options.glowScale : 1);
+		this.writeUniformFloats(solidProgram, "colorScale", 1, options.colorScale !== undefined ? options.colorScale : 1);
+		this.writeUniformFloats(solidProgram, "emissiveColor", 4, emissiveColor[0], emissiveColor[1], emissiveColor[2], options.emissiveIntensity !== undefined ? options.emissiveIntensity : 1);
+		this.writeUniformFloats(solidProgram, "softEdge", 1, options.softEdge !== undefined ? options.softEdge : 0);
+		this.writeUniformFloats(solidProgram, "alphaCutoff", 1, options.alphaCutoff !== undefined ? options.alphaCutoff : 0);
+		this.writeUniformFloats(solidProgram, "premultipliedOutput", 1, premultipliedOutput);
+		this.writeUniformFloats(solidProgram, "textureEnabled", 3, baseColorTexture !== null ? 1 : 0, emissiveTexture !== null ? 1 : 0, decalTexture !== null ? 1 : 0);
+		this.writeUniformFloats(solidProgram, "uvTransform", 4, uvTransform[0], uvTransform[1], uvTransform[2], uvTransform[3]);
+		this.writeUniformFloats(solidProgram, "decalUvTransform", 4, decalUvTransform[0], decalUvTransform[1], decalUvTransform[2], decalUvTransform[3]);
+		this.writeUniformFloats(solidProgram, "decalColor", 4, decalColor[0], decalColor[1], decalColor[2], options.decalEmission !== undefined ? options.decalEmission : 0);
 		const matcapTexture = options.matcapTexture !== undefined ? options.matcapTexture : null;
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("receivesShadow"), options.receivesShadow !== false ? 1 : 0);
-		webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("shadeOffset"), options.shadeOffset !== undefined ? options.shadeOffset : 0);
-		webGL2RenderingContext.uniform2f(solidProgram.getUniformLocation("highlightScale"), options.specularScale !== undefined ? System.Math.max(0, options.specularScale) : 1, options.rimScale !== undefined ? System.Math.max(0, options.rimScale) : 1);
-		webGL2RenderingContext.uniform3f(solidProgram.getUniformLocation("matcapSettings"), matcapTexture !== null ? 1 : 0, options.matcapStrength !== undefined ? options.matcapStrength : 1, options.matcapBlend === ToonMatcapBlend.add ? 1 : 0);
+		this.writeUniformFloats(solidProgram, "receivesShadow", 1, options.receivesShadow !== false ? 1 : 0);
+		this.writeUniformFloats(solidProgram, "shadeOffset", 1, options.shadeOffset !== undefined ? options.shadeOffset : 0);
+		this.writeUniformFloats(solidProgram, "highlightScale", 2, options.specularScale !== undefined ? System.Math.max(0, options.specularScale) : 1, options.rimScale !== undefined ? System.Math.max(0, options.rimScale) : 1);
+		this.writeUniformFloats(solidProgram, "matcapSettings", 3, matcapTexture !== null ? 1 : 0, options.matcapStrength !== undefined ? options.matcapStrength : 1, options.matcapBlend === ToonMatcapBlend.add ? 1 : 0);
 		const angelRingTexture = options.angelRingTexture !== undefined ? options.angelRingTexture : null;
 		const angelRingColor = options.angelRingColor !== undefined ? options.angelRingColor : [1, 1, 1];
-		webGL2RenderingContext.uniform4f(solidProgram.getUniformLocation("angelRingSettings"), angelRingTexture !== null ? 1 : 0, options.angelRingOffsetU !== undefined ? options.angelRingOffsetU : 0, options.angelRingOffsetV !== undefined ? options.angelRingOffsetV : 0.3, options.isAngelRingAlpha === true ? 1 : 0);
-		webGL2RenderingContext.uniform3f(solidProgram.getUniformLocation("angelRingColor"), angelRingColor[0], angelRingColor[1], angelRingColor[2]);
+		this.writeUniformFloats(solidProgram, "angelRingSettings", 4, angelRingTexture !== null ? 1 : 0, options.angelRingOffsetU !== undefined ? options.angelRingOffsetU : 0, options.angelRingOffsetV !== undefined ? options.angelRingOffsetV : 0.3, options.isAngelRingAlpha === true ? 1 : 0);
+		this.writeUniformFloats(solidProgram, "angelRingColor", 3, angelRingColor[0], angelRingColor[1], angelRingColor[2]);
 		const shadowInput = this.#shadowInput;
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + SHADOW_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, shadowInput !== null ? shadowInput.depthTexture : this.#emptyShadowTexture);
+		this.bindTexture2D(SHADOW_TEXTURE_UNIT, shadowInput !== null ? shadowInput.depthTexture : this.#emptyShadowTexture);
 		this.bindTextureUnit(BASE_COLOR_TEXTURE_UNIT, baseColorTexture);
 		this.bindTextureUnit(EMISSIVE_TEXTURE_UNIT, emissiveTexture);
 		this.bindTextureUnit(DECAL_TEXTURE_UNIT, decalTexture);
 		this.bindTextureUnit(RAMP_TEXTURE_UNIT, lightSet.getRampTexture());
 		this.bindTextureUnit(MATCAP_TEXTURE_UNIT, matcapTexture);
 		this.bindTextureUnit(ANGEL_RING_TEXTURE_UNIT, angelRingTexture);
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LOCAL_SHADOW_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#localShadowInput !== null ? this.#localShadowInput.depthTexture : this.#emptyShadowTexture);
+		this.bindTexture2D(LOCAL_SHADOW_TEXTURE_UNIT, this.#localShadowInput !== null ? this.#localShadowInput.depthTexture : this.#emptyShadowTexture);
 		if (options.textures !== undefined && options.textures !== null) {
 			let unit = FIRST_MATERIAL_TEXTURE_UNIT;
 			for (const [uniformName, texture] of System.Object.entries(options.textures)) {
@@ -2892,21 +3155,22 @@ export class ToonRenderer {
 					break;
 				}
 				this.bindTextureUnit(unit, texture);
-				webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation(uniformName), unit);
+				this.writeUniform1i(solidProgram, uniformName, unit);
 				unit += 1;
 			}
 		}
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		this.applyActiveTexture(webGL2RenderingContext.TEXTURE0);
 		if (onBeforeDraw !== null) {
 			onBeforeDraw(solidProgram, webGL2RenderingContext, ToonProgramKind.solid);
+			this.forgetUniformValues(solidProgram);
 		}
-		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
-		webGL2RenderingContext.bindVertexArray(bodyVertexArray);
+		this.applyCullFace(webGL2RenderingContext.BACK);
+		this.applyVertexArray(bodyVertexArray);
 		drawElements(indexStart, indexCount);
 		if (isTransparent) {
 			webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		}
-		webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
+		this.applyFrontFace(webGL2RenderingContext.CCW);
 	}
 
 	//==============================================================================
