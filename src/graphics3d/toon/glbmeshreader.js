@@ -33,6 +33,7 @@ import { MeshBuilder } from "./meshbuilder.js";
 //
 // 재질 색으로 칠하는 모형을 읽는다. 텍스처 좌표와 재질 텍스처가 있으면 그것도 읽는다.
 //   - 부품 하나가 노드 하나이고, 노드의 메시는 색마다 프리미티브 하나이다. 꼭짓점은 위치와 노멀, 뼈대가 있으면 본 번호와 무게이다.
+//     노멀이 없는 프리미티브는 glTF 2.0 명세대로 평평한 노멀(삼각형마다 하나)로 읽는다. 꼭짓점을 삼각형마다 따로 풀어 면 노멀을 준다. (새로 짓는 바깥선 껍데기도 같다)
 //   - 재질의 baseColorFactor 는 선형 색이라 sRGB 로 바꿔 담고, emissiveFactor 가 있으면 빛남으로 담는다. (emissiveTexture 가 있으면 빛남은 재질 범위로만 넘긴다)
 //   - TEXCOORD_0 이 있으면 uvData 로, TEXCOORD_1 이 있으면 uv1Data(2 번 UV, 천사 고리)로 담는다. 프리미티브마다 재질 범위(materialRanges)를 담는다.
 //     { name 재질 이름, materialIndex, nodeName, indexStart, indexCount, extras 재질 extras, alphaMode, alphaCutoff, baseColorFactor 선형, emissiveFactor 선형, baseColorImage, emissiveImage (images 차례, 없으면 -1), hasUv }
@@ -208,6 +209,78 @@ function applyTextureTransform(uvs, textureInfo, texCoordIndex) {
 }
 
 //==============================================================================
+// 꼭짓점 속성을 삼각형 꼭짓점마다 따로 풀기. (번호 차례대로 componentCount 씩 옮김, 범위 밖 번호는 0)
+//==============================================================================
+/**
+ * @param { ArrayLike<number> } values - 꼭짓점마다 componentCount 개의 값.
+ * @param { ArrayLike<number> } indices - 삼각형마다 꼭짓점 번호 셋.
+ * @param { number } componentCount - 꼭짓점 하나의 값 수.
+ * @returns { Float64Array } 번호마다 푼 값. (indices.length x componentCount 개)
+ */
+function unweldAttribute(values, indices, componentCount) {
+	const result = new System.Float64Array(indices.length * componentCount);
+	for (let cornerIndex = 0; cornerIndex < indices.length; ++cornerIndex) {
+		for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
+			const valueIndex = indices[cornerIndex] * componentCount + componentIndex;
+			result[cornerIndex * componentCount + componentIndex] = valueIndex < values.length ? values[valueIndex] : 0;
+		}
+	}
+	return result;
+}
+
+//==============================================================================
+// 노멀이 없는 프리미티브의 평평한 노멀 짓기. (glTF 2.0 명세: 노멀이 없으면 삼각형마다 노멀 하나인 평평한 노멀이다)
+//   - 꼭짓점을 삼각형마다 따로 풀고(번호는 0 부터 차례로), 삼각형마다 (p1 - p0) x (p2 - p0) 을 길이 1 로 줄여 세 꼭짓점에 준다. (넓이가 0 인 삼각형은 0)
+//   - 없던 속성(null)은 null 그대로 둔다.
+//==============================================================================
+/**
+ * @param { ArrayLike<number> } positions - 꼭짓점마다 [x, y, z].
+ * @param { ArrayLike<number> } indices - 삼각형마다 꼭짓점 번호 셋.
+ * @param { ArrayLike<number> | null } joints - 꼭짓점마다 뼈대 번호 넷.
+ * @param { ArrayLike<number> | null } weights - 꼭짓점마다 무게 넷.
+ * @param { ArrayLike<number> | null } uvs - 꼭짓점마다 텍스처 좌표 둘.
+ * @param { ArrayLike<number> | null } uvs1 - 꼭짓점마다 2 번 텍스처 좌표 둘.
+ * @returns { object } { positions, normals, indices, joints, weights, uvs, uvs1 } 삼각형마다 푼 것.
+ */
+function createFlatNormals(positions, indices, joints, weights, uvs, uvs1) {
+	const flatPositions = unweldAttribute(positions, indices, 3);
+	const flatNormals = new System.Float64Array(flatPositions.length);
+	const triangleCount = System.Math.floor(flatPositions.length / 9);
+	for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+		const offset = triangleIndex * 9;
+		const firstEdgeX = flatPositions[offset + 3] - flatPositions[offset];
+		const firstEdgeY = flatPositions[offset + 4] - flatPositions[offset + 1];
+		const firstEdgeZ = flatPositions[offset + 5] - flatPositions[offset + 2];
+		const secondEdgeX = flatPositions[offset + 6] - flatPositions[offset];
+		const secondEdgeY = flatPositions[offset + 7] - flatPositions[offset + 1];
+		const secondEdgeZ = flatPositions[offset + 8] - flatPositions[offset + 2];
+		const crossX = firstEdgeY * secondEdgeZ - firstEdgeZ * secondEdgeY;
+		const crossY = firstEdgeZ * secondEdgeX - firstEdgeX * secondEdgeZ;
+		const crossZ = firstEdgeX * secondEdgeY - firstEdgeY * secondEdgeX;
+		const length = System.Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+		if (length <= 0) {
+			continue;
+		}
+		for (let cornerIndex = 0; cornerIndex < 3; ++cornerIndex) {
+			flatNormals[offset + cornerIndex * 3] = crossX / length;
+			flatNormals[offset + cornerIndex * 3 + 1] = crossY / length;
+			flatNormals[offset + cornerIndex * 3 + 2] = crossZ / length;
+		}
+	}
+	return {
+		positions: flatPositions,
+		normals: flatNormals,
+		indices: System.Array.from({ length: indices.length }, (value, index) => {
+			return index;
+		}),
+		joints: joints !== null ? unweldAttribute(joints, indices, 4) : null,
+		weights: weights !== null ? unweldAttribute(weights, indices, 4) : null,
+		uvs: uvs !== null ? unweldAttribute(uvs, indices, 2) : null,
+		uvs1: uvs1 !== null ? unweldAttribute(uvs1, indices, 2) : null,
+	};
+}
+
+//==============================================================================
 // 필수 확장 확인. (extensionsRequired 에 읽지 못하는 확장이 있으면 오류를 던진다)
 //==============================================================================
 /**
@@ -333,7 +406,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 	if (mode !== TRIANGLES_MODE || attributes.POSITION === undefined) {
 		return;
 	}
-	const positions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
+	let positions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
 	let indices = null;
 	if (primitive.indices !== undefined) {
 		indices = readAccessor(json, binaryBuffer, primitive.indices);
@@ -345,8 +418,8 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 	}
 	const isSkinned = node.skin !== undefined && attributes.JOINTS_0 !== undefined && attributes.WEIGHTS_0 !== undefined;
 	const partMatrix = isSkinned ? Matrix4.createIdentity() : matrix;
-	const joints = isSkinned ? readAccessor(json, binaryBuffer, attributes.JOINTS_0) : null;
-	const weights = isSkinned ? readWeightAccessor(json, binaryBuffer, attributes.WEIGHTS_0) : null;
+	let joints = isSkinned ? readAccessor(json, binaryBuffer, attributes.JOINTS_0) : null;
+	let weights = isSkinned ? readWeightAccessor(json, binaryBuffer, attributes.WEIGHTS_0) : null;
 	const material = primitive.material !== undefined && json.materials !== undefined ? json.materials[primitive.material] : {};
 	const extras = material.extras !== undefined ? material.extras : {};
 	if (extras.outline === true) {
@@ -356,16 +429,24 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 		builder.addOutlineTriangles(positions, indices, partMatrix, joints, weights);
 		return;
 	}
-	if (attributes.NORMAL === undefined) {
-		return;
-	}
-	const normals = readFloatAccessor(json, binaryBuffer, attributes.NORMAL);
+	let normals = attributes.NORMAL !== undefined ? readFloatAccessor(json, binaryBuffer, attributes.NORMAL) : null;
 	const pbrMetallicRoughness = material.pbrMetallicRoughness !== undefined ? material.pbrMetallicRoughness : {};
 	const transformedTextureInfo = pbrMetallicRoughness.baseColorTexture !== undefined ? pbrMetallicRoughness.baseColorTexture : material.emissiveTexture;
 	const sourceUvs = attributes.TEXCOORD_0 !== undefined ? readFloatAccessor(json, binaryBuffer, attributes.TEXCOORD_0) : null;
 	const sourceUvs1 = attributes.TEXCOORD_1 !== undefined ? readFloatAccessor(json, binaryBuffer, attributes.TEXCOORD_1) : null;
-	const uvs = applyTextureTransform(sourceUvs, transformedTextureInfo, 0);
-	const uvs1 = applyTextureTransform(sourceUvs1, transformedTextureInfo, 1);
+	let uvs = applyTextureTransform(sourceUvs, transformedTextureInfo, 0);
+	let uvs1 = applyTextureTransform(sourceUvs1, transformedTextureInfo, 1);
+	if (normals === null) {
+		// 노멀이 없으면 명세대로 평평한 노멀을 짓는다. (꼭짓점을 삼각형마다 따로 푼다)
+		const flatPrimitive = createFlatNormals(positions, indices, joints, weights, uvs, uvs1);
+		positions = flatPrimitive.positions;
+		normals = flatPrimitive.normals;
+		indices = flatPrimitive.indices;
+		joints = flatPrimitive.joints;
+		weights = flatPrimitive.weights;
+		uvs = flatPrimitive.uvs;
+		uvs1 = flatPrimitive.uvs1;
+	}
 	const baseColor = pbrMetallicRoughness.baseColorFactor !== undefined ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
 	const color = [0, 1, 2].map((channelIndex) => {
 		return System.Math.pow(System.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
@@ -439,7 +520,7 @@ function readRebuiltOutlineWidth(node, nodeNames, outlineOptions) {
 }
 
 //==============================================================================
-// 노드의 몸으로 바깥선 껍데기 짓기. (색마다 나뉜 프리미티브를 이어 붙여 한 번에 넘김, 바깥선 재질과 노멀이 없는 것은 뺌)
+// 노드의 몸으로 바깥선 껍데기 짓기. (색마다 나뉜 프리미티브를 이어 붙여 한 번에 넘김, 바깥선 재질은 뺌, 노멀이 없는 것은 평평한 노멀로)
 //==============================================================================
 /**
  * @param { MeshBuilder } builder - 담을 MeshBuilder.
@@ -460,7 +541,7 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 	for (const primitive of json.meshes[node.mesh].primitives) {
 		const mode = primitive.mode !== undefined ? primitive.mode : TRIANGLES_MODE;
 		const attributes = primitive.attributes;
-		if (mode !== TRIANGLES_MODE || attributes.POSITION === undefined || attributes.NORMAL === undefined) {
+		if (mode !== TRIANGLES_MODE || attributes.POSITION === undefined) {
 			continue;
 		}
 		const material = primitive.material !== undefined && json.materials !== undefined ? json.materials[primitive.material] : {};
@@ -471,26 +552,36 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 		}
 		const startIndex = positions.length / 3;
 		hasIntegerPositions = hasIntegerPositions || json.accessors[attributes.POSITION].componentType !== FLOAT_COMPONENT_TYPE;
-		const primitivePositions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
-		const primitiveNormals = readFloatAccessor(json, binaryBuffer, attributes.NORMAL);
+		let primitivePositions = readFloatAccessor(json, binaryBuffer, attributes.POSITION);
+		let primitiveNormals = attributes.NORMAL !== undefined ? readFloatAccessor(json, binaryBuffer, attributes.NORMAL) : null;
+		let primitiveIndices = null;
+		if (primitive.indices !== undefined) {
+			primitiveIndices = readAccessor(json, binaryBuffer, primitive.indices);
+		}
+		else {
+			primitiveIndices = System.Array.from({ length: primitivePositions.length / 3 }, (value, index) => {
+				return index;
+			});
+		}
+		let primitiveJoints = isSkinned ? readAccessor(json, binaryBuffer, attributes.JOINTS_0) : null;
+		let primitiveWeights = isSkinned ? readWeightAccessor(json, binaryBuffer, attributes.WEIGHTS_0) : null;
+		if (primitiveNormals === null) {
+			// 노멀이 없으면 몸과 같이 평평한 노멀로 짓는다. (껍데기는 같은 자리 점을 함께 밀어 이어진다)
+			const flatPrimitive = createFlatNormals(primitivePositions, primitiveIndices, primitiveJoints, primitiveWeights, null, null);
+			primitivePositions = flatPrimitive.positions;
+			primitiveNormals = flatPrimitive.normals;
+			primitiveIndices = flatPrimitive.indices;
+			primitiveJoints = flatPrimitive.joints;
+			primitiveWeights = flatPrimitive.weights;
+		}
 		for (let valueIndex = 0; valueIndex < primitivePositions.length; ++valueIndex) {
 			positions.push(primitivePositions[valueIndex]);
 			normals.push(primitiveNormals[valueIndex]);
 		}
-		if (primitive.indices !== undefined) {
-			const primitiveIndices = readAccessor(json, binaryBuffer, primitive.indices);
-			for (const index of primitiveIndices) {
-				indices.push(startIndex + index);
-			}
-		}
-		else {
-			for (let pointIndex = 0; pointIndex < primitivePositions.length / 3; ++pointIndex) {
-				indices.push(startIndex + pointIndex);
-			}
+		for (const index of primitiveIndices) {
+			indices.push(startIndex + index);
 		}
 		if (isSkinned) {
-			const primitiveJoints = readAccessor(json, binaryBuffer, attributes.JOINTS_0);
-			const primitiveWeights = readWeightAccessor(json, binaryBuffer, attributes.WEIGHTS_0);
 			for (let valueIndex = 0; valueIndex < primitiveJoints.length; ++valueIndex) {
 				joints.push(primitiveJoints[valueIndex]);
 				weights.push(primitiveWeights[valueIndex]);

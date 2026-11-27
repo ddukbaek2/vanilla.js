@@ -134,14 +134,15 @@ check(asset.getKey() === "models/triangle.glb", "정규화한 키: " + asset.get
 check(asset.getReferenceCount() === 3, "참조 수 3");
 check(SkinnedModelAsset.getCachedCount() === 1, "캐시 하나");
 check(gl.liveTable.vertexArray.size === 1, "버텍스 어레이 하나: " + gl.liveTable.vertexArray.size);
-check(gl.liveTable.buffer.size === 5, "버퍼 다섯(위치, 노멀, 조인트, 가중치, 인덱스): " + gl.liveTable.buffer.size);
+// 삼각형에 노멀이 없어 glTF 2.0 명세대로 평평한 노멀로 풀고 번호 없이 그린다. (인덱스 버퍼 없음)
+check(gl.liveTable.buffer.size === 4, "버퍼 넷(위치, 노멀, 조인트, 가중치): " + gl.liveTable.buffer.size);
 // 머티리얼 둘(Body, 기본) x 슬롯 8 + 모프 텍스처 1
 check(gl.liveTable.texture.size === 17, "텍스처 17: " + gl.liveTable.texture.size);
 const uploadBufferDataCount = gl.callTable.bufferData;
 const uploadTexImageCount = gl.callTable.texImage2D;
-check(uploadBufferDataCount === 5 && uploadTexImageCount === 17, "올리기 한 벌: " + uploadBufferDataCount + ", " + uploadTexImageCount);
-// 위치 36 + 노멀 36 + 조인트 24 + 가중치 48 + 인덱스 6 + 모프 텍스처 3 x 2 x 16 + 머티리얼 텍스처 16 x 4
-const expectedGpuByteCount = 36 + 36 + 24 + 48 + 6 + 3 * 2 * 16 + 16 * 4;
+check(uploadBufferDataCount === 4 && uploadTexImageCount === 17, "올리기 한 벌: " + uploadBufferDataCount + ", " + uploadTexImageCount);
+// 위치 36 + 노멀 36 + 조인트 24 + 가중치 48 + 모프 텍스처 3 x 2 x 16 + 머티리얼 텍스처 16 x 4 (번호 없이 그려 인덱스 버퍼 없음)
+const expectedGpuByteCount = 36 + 36 + 24 + 48 + 3 * 2 * 16 + 16 * 4;
 check(asset.getGpuByteCount() === expectedGpuByteCount, "GPU 바이트: " + asset.getGpuByteCount() + " != " + expectedGpuByteCount);
 
 // 인스턴스는 포즈와 재생 상태가 따로다. (첫 클립을 돌리고 한 쪽만 움직인다)
@@ -173,7 +174,7 @@ check(firstModel.getDrawableList()[0].morphTargetList.length === 1 && thirdModel
 thirdModel.destroy();
 check(gl.liveTable.texture.size === 17 && asset.getReferenceCount() === 2, "셋째 해제: 제 모프 텍스처만");
 firstModel.destroy();
-check(gl.liveTable.vertexArray.size === 1 && gl.liveTable.buffer.size === 5 && gl.liveTable.texture.size === 17, "첫째 해제: 자산 그대로");
+check(gl.liveTable.vertexArray.size === 1 && gl.liveTable.buffer.size === 4 && gl.liveTable.texture.size === 17, "첫째 해제: 자산 그대로");
 check(asset.getReferenceCount() === 1 && !asset.isDestroyed(), "참조 수 1");
 // 남은 인스턴스로 새 인스턴스를 지어도 올리지 않는다.
 const fourthModel = secondModel.createInstance();

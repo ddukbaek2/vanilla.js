@@ -61,7 +61,7 @@ function readArrayBuffer(filePath) {
 	check(Array.from(skinnedModel.getNodeList()[hipsIndex].worldMatrix.getElements()).every((value) => Number.isFinite(value)), "pelvis 전역 행렬 유한");
 }
 
-// 여우 glb: 조인트 24, 클립 Survey/Walk/Run, 노멀과 인덱스 없음, PNG 텍스처, 걷기 중간 조인트 행렬은 바인드 포즈와 다르다.
+// 여우 glb: 조인트 24, 클립 Survey/Walk/Run, 노멀과 인덱스 없음(glTF 2.0 명세대로 평평한 노멀), PNG 텍스처, 걷기 중간 조인트 행렬은 바인드 포즈와 다르다.
 {
 	const { json, binaryBuffer } = SkinnedModel.readGlbChunks(readArrayBuffer(path.join(exampleAssetPath, "fox.glb")));
 	const skinnedModel = SkinnedModel.createWithoutShaderProgram();
@@ -70,10 +70,17 @@ function readArrayBuffer(filePath) {
 	checkEqual(skinnedModel.getSkinList()[0].jointNodeIndices.length, 24, "여우 조인트 수");
 	checkEqual(meshDescriptionList.length, 1, "여우 메시 수");
 	const foxMesh = meshDescriptionList[0];
-	check(!foxMesh.normals && !foxMesh.indices, "여우 노멀과 인덱스 없음");
+	const foxPrimitive = json.meshes[0].primitives[0];
+	check(foxPrimitive.attributes.NORMAL === undefined && foxPrimitive.indices === undefined, "여우 GLB 는 노멀과 인덱스 없음");
+	check(foxMesh.indices === null, "여우 인덱스 없음");
 	checkEqual(foxMesh.positions.length / 3, foxMesh.weights.length / 4, "정점 수와 가중치 수");
+	checkEqual(foxMesh.normals.length, foxMesh.positions.length, "여우 평평한 노멀 수");
+	checkNear(Math.hypot(foxMesh.normals[0], foxMesh.normals[1], foxMesh.normals[2]), 1, 1e-6, "여우 평평한 노멀 길이");
+	checkNear(Array.from(foxMesh.normals.subarray(3, 9)), Array.from(foxMesh.normals.subarray(0, 3)).concat(Array.from(foxMesh.normals.subarray(0, 3))), 0, "여우 평평한 노멀은 삼각형의 세 꼭짓점이 같다");
+	// 번호 없는 메시는 꼭짓점마다 삼각형 하나라 부드러운 노멀(업로드 때 노멀이 없는 서술에 짓는 것)도 면 노멀이다.
 	const normals = skinnedModel.generateSmoothNormals(foxMesh.positions, null);
 	checkNear(Math.hypot(normals[0], normals[1], normals[2]), 1, 1e-4, "부드러운 노멀 길이");
+	checkNear(Array.from(normals), Array.from(foxMesh.normals), 1e-5, "번호 없는 메시의 부드러운 노멀은 평평한 노멀");
 	const baseColorImage = materialDescriptionList[0].baseColorImage;
 	checkEqual(baseColorImage.mimeType, "image/png", "여우 텍스처 형식");
 	checkJson(Array.from(new Uint8Array(baseColorImage.bytes.buffer || baseColorImage.bytes, baseColorImage.bytes.byteOffset || 0, 8)), [137, 80, 78, 71, 13, 10, 26, 10], "여우 텍스처 PNG 머리");
