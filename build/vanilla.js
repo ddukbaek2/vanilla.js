@@ -4764,11 +4764,36 @@ var ShaderProgram = class extends Object2 {
   #program;
   #attributeLocations;
   #uniformLocations;
-  constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null) {
+  #pendingVertexShader;
+  #pendingFragmentShader;
+  constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null, isDeferred = false) {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#attributeLocations = /* @__PURE__ */ new Map();
     this.#uniformLocations = /* @__PURE__ */ new Map();
+    this.#pendingVertexShader = null;
+    this.#pendingFragmentShader = null;
+    if (isDeferred) {
+      const vertexShader2 = webGL2RenderingContext.createShader(webGL2RenderingContext.VERTEX_SHADER);
+      webGL2RenderingContext.shaderSource(vertexShader2, vertexShaderSource);
+      webGL2RenderingContext.compileShader(vertexShader2);
+      const fragmentShader2 = webGL2RenderingContext.createShader(webGL2RenderingContext.FRAGMENT_SHADER);
+      webGL2RenderingContext.shaderSource(fragmentShader2, fragmentShaderSource);
+      webGL2RenderingContext.compileShader(fragmentShader2);
+      const program2 = webGL2RenderingContext.createProgram();
+      webGL2RenderingContext.attachShader(program2, vertexShader2);
+      webGL2RenderingContext.attachShader(program2, fragmentShader2);
+      if (attributeLocationTable) {
+        for (const attributeName in attributeLocationTable) {
+          webGL2RenderingContext.bindAttribLocation(program2, attributeLocationTable[attributeName], attributeName);
+        }
+      }
+      webGL2RenderingContext.linkProgram(program2);
+      this.#pendingVertexShader = vertexShader2;
+      this.#pendingFragmentShader = fragmentShader2;
+      this.#program = program2;
+      return;
+    }
     const vertexShader = this.createShader(webGL2RenderingContext.VERTEX_SHADER, vertexShaderSource);
     let fragmentShader = null;
     try {
@@ -4796,6 +4821,45 @@ var ShaderProgram = class extends Object2 {
     webGL2RenderingContext.deleteShader(vertexShader);
     webGL2RenderingContext.deleteShader(fragmentShader);
     this.#program = program;
+  }
+  static isParallelCompileSupported(webGL2RenderingContext) {
+    return webGL2RenderingContext.getExtension("KHR_parallel_shader_compile") !== null;
+  }
+  isBuildComplete() {
+    if (this.#pendingVertexShader === null) {
+      return true;
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const extension = webGL2RenderingContext.getExtension("KHR_parallel_shader_compile");
+    if (extension === null) {
+      return true;
+    }
+    return webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+  }
+  finishBuild() {
+    const vertexShader = this.#pendingVertexShader;
+    if (vertexShader === null) {
+      return;
+    }
+    const fragmentShader = this.#pendingFragmentShader;
+    this.#pendingVertexShader = null;
+    this.#pendingFragmentShader = null;
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const program = this.#program;
+    let errorMessage = null;
+    if (!webGL2RenderingContext.getShaderParameter(vertexShader, webGL2RenderingContext.COMPILE_STATUS)) {
+      errorMessage = `ShaderProgram compile failed: ${webGL2RenderingContext.getShaderInfoLog(vertexShader)}`;
+    } else if (!webGL2RenderingContext.getShaderParameter(fragmentShader, webGL2RenderingContext.COMPILE_STATUS)) {
+      errorMessage = `ShaderProgram compile failed: ${webGL2RenderingContext.getShaderInfoLog(fragmentShader)}`;
+    } else if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
+      errorMessage = `ShaderProgram link failed: ${webGL2RenderingContext.getProgramInfoLog(program)}`;
+    }
+    webGL2RenderingContext.deleteShader(vertexShader);
+    webGL2RenderingContext.deleteShader(fragmentShader);
+    if (errorMessage !== null) {
+      webGL2RenderingContext.deleteProgram(program);
+      throw new Error(errorMessage);
+    }
   }
   createShader(shaderType, shaderSource) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -32447,6 +32511,7 @@ var TOON_FEATURE_SHADE_RIM = 256;
 var TOON_FEATURE_SHADOW = 512;
 var TOON_FEATURE_INTENSITY_LIMIT = 1024;
 var TOON_FEATURE_ALL = 2047;
+var PREWARM_FINISH_PER_STEP = 3;
 var TOON_FEATURE_DRAW_BITS = TOON_FEATURE_BASE_TEXTURE | TOON_FEATURE_EMISSIVE_TEXTURE | TOON_FEATURE_DECAL_TEXTURE | TOON_FEATURE_MATCAP | TOON_FEATURE_ANGEL_RING | TOON_FEATURE_SHADOW;
 var SOLID_FRAGMENT_HEAD = `#version 300 es
 precision highp float;
@@ -33689,6 +33754,7 @@ var ToonRenderer = class {
   #webGL2RenderingContext;
   #programSets;
   #defaultProgramSet;
+  #pendingBuilds;
   #emptyShadowTexture;
   #whiteTexture;
   #viewProjectionElements;
@@ -33766,6 +33832,7 @@ var ToonRenderer = class {
     this.#outlineBlocks = createBlockCache(OUTLINE_BLOCK_BINDING, OUTLINE_BLOCK_FLOAT_COUNT);
     this.#lastProgramKey = null;
     this.#programSets = /* @__PURE__ */ new Map();
+    this.#pendingBuilds = /* @__PURE__ */ new Map();
     this.#emptyShadowTexture = this.createEmptyShadowTexture();
     this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System82.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
     this.#defaultProgramSet = this.createProgramSet(null, null);
@@ -33839,15 +33906,35 @@ var ToonRenderer = class {
     }
     webGL2RenderingContext.useProgram(previousProgram);
   }
-  createProgramSet(material, instanceLayout, baseProgramSet = null) {
+  startProgramList(material, instanceLayout, isAmbientOcclusion, isDeferred) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const sources = composeToonProgramSources(material, instanceLayout, baseProgramSet !== null, this.#colorSpace);
+    const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace);
     const programList = [];
     try {
-      programList.push(new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable));
-      if (baseProgramSet === null) {
-        programList.push(new ShaderProgram(webGL2RenderingContext, sources.outlineVertexShader, sources.outlineFragmentShader, sources.attributeLocationTable));
-        programList.push(new ShaderProgram(webGL2RenderingContext, sources.depthVertexShader, sources.depthFragmentShader, sources.attributeLocationTable));
+      programList.push(new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable, isDeferred));
+      if (!isAmbientOcclusion) {
+        programList.push(new ShaderProgram(webGL2RenderingContext, sources.outlineVertexShader, sources.outlineFragmentShader, sources.attributeLocationTable, isDeferred));
+        programList.push(new ShaderProgram(webGL2RenderingContext, sources.depthVertexShader, sources.depthFragmentShader, sources.attributeLocationTable, isDeferred));
+      }
+    } catch (error) {
+      for (const shaderProgram of programList) {
+        webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
+      }
+      throw error;
+    }
+    return programList;
+  }
+  readProgramKey(material, instanceLayout, isAmbientOcclusion, featureMask = -1) {
+    const baseKey = `${material !== null ? material.getId() : 0}/${instanceLayout !== null ? instanceLayout.getId() : 0}`;
+    const key = isAmbientOcclusion ? `${baseKey}/ao` : baseKey;
+    return featureMask >= 0 ? `${key}/v${featureMask}` : key;
+  }
+  createProgramSet(material, instanceLayout, baseProgramSet = null, startedProgramList = null) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const programList = startedProgramList !== null ? startedProgramList : this.startProgramList(material, instanceLayout, baseProgramSet !== null, false);
+    try {
+      for (const shaderProgram of programList) {
+        shaderProgram.finishBuild();
       }
     } catch (error) {
       for (const shaderProgram of programList) {
@@ -33896,10 +33983,12 @@ var ToonRenderer = class {
       this.#lastProgramKey = { material, instanceLayout, isAmbientOcclusion, programSet: programSet2 };
       return programSet2;
     }
+    const startedProgramList = this.takePendingBuild(key);
     let baseProgramSet = null;
     if (isAmbientOcclusion) {
       baseProgramSet = this.readProgramSetVariant(material, instanceLayout, false);
       if (baseProgramSet === null) {
+        this.deletePendingPrograms(startedProgramList);
         if (!this.getWebGL2RenderingContext().isContextLost()) {
           this.#programSets.set(key, null);
         }
@@ -33908,7 +33997,7 @@ var ToonRenderer = class {
     }
     let programSet = null;
     try {
-      programSet = this.createProgramSet(material, instanceLayout, baseProgramSet);
+      programSet = this.createProgramSet(material, instanceLayout, baseProgramSet, startedProgramList);
     } catch (error) {
       const name = material !== null && material.getName() !== "" ? material.getName() : key;
       System82.console.error(`ToonRenderer: \uBA38\uD2F0\uB9AC\uC5BC ${name} \uC758 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.`, error);
@@ -33928,9 +34017,109 @@ var ToonRenderer = class {
   prepareMaterial(material, instanceLayout = null) {
     return this.readProgramSet(material, instanceLayout) !== null;
   }
+  prewarmDrawQueue(queue) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const programRequests = queue.readProgramRequests(this);
+    const isAmbientOcclusion = programRequests.isAmbientOcclusion || this.#ambientOcclusionInput !== null;
+    const unitList = [];
+    if (!ShaderProgram.isParallelCompileSupported(webGL2RenderingContext)) {
+      for (const request of programRequests.requests) {
+        const programSet = this.readProgramSetVariant(request.material, request.instanceLayout, isAmbientOcclusion);
+        if (programSet !== null && request.featureMask >= 0) {
+          this.readSolidVariant(programSet, request.material, request.instanceLayout, request.featureMask);
+        }
+      }
+      return new ToonProgramPrewarm(this, unitList);
+    }
+    const startSet = __name((material, instanceLayout, isAmbientOcclusionSet) => {
+      if (material === null && instanceLayout === null && !isAmbientOcclusionSet) {
+        return;
+      }
+      const key = this.readProgramKey(material, instanceLayout, isAmbientOcclusionSet);
+      if (this.#programSets.has(key) || this.#pendingBuilds.has(key)) {
+        return;
+      }
+      try {
+        this.#pendingBuilds.set(key, this.startProgramList(material, instanceLayout, isAmbientOcclusionSet, true));
+        unitList.push({ isVariant: false, material, instanceLayout, isAmbientOcclusion: isAmbientOcclusionSet, featureMask: -1 });
+      } catch (error) {
+      }
+    }, "startSet");
+    for (const request of programRequests.requests) {
+      startSet(request.material, request.instanceLayout, false);
+      if (isAmbientOcclusion) {
+        startSet(request.material, request.instanceLayout, true);
+      }
+    }
+    for (const request of programRequests.requests) {
+      const featureMask = request.featureMask;
+      if (featureMask < 0 || featureMask === TOON_FEATURE_ALL) {
+        continue;
+      }
+      const setKey = this.readProgramKey(request.material, request.instanceLayout, isAmbientOcclusion);
+      const builtSet = this.#programSets.get(setKey);
+      if (builtSet === null || builtSet !== void 0 && (builtSet.isShared === true || builtSet.variants !== void 0 && builtSet.variants.has(featureMask))) {
+        continue;
+      }
+      const key = this.readProgramKey(request.material, request.instanceLayout, isAmbientOcclusion, featureMask);
+      if (this.#pendingBuilds.has(key)) {
+        continue;
+      }
+      try {
+        this.#pendingBuilds.set(key, this.startSolidVariant(request.material, request.instanceLayout, isAmbientOcclusion, featureMask, true));
+        unitList.push({ isVariant: true, material: request.material, instanceLayout: request.instanceLayout, isAmbientOcclusion, featureMask });
+      } catch (error) {
+      }
+    }
+    return new ToonProgramPrewarm(this, unitList);
+  }
+  advancePrewarm(unitList) {
+    let finishBudget = PREWARM_FINISH_PER_STEP;
+    for (let index = 0; index < unitList.length; ) {
+      const unit = unitList[index];
+      const key = this.readProgramKey(unit.material, unit.instanceLayout, unit.isAmbientOcclusion, unit.featureMask);
+      const pending = this.#pendingBuilds.get(key);
+      let isDone = false;
+      if (pending === void 0) {
+        isDone = true;
+      } else if (!unit.isVariant) {
+        const baseKey = this.readProgramKey(unit.material, unit.instanceLayout, false);
+        const isBaseWaiting = unit.isAmbientOcclusion && this.#pendingBuilds.has(baseKey);
+        if (!isBaseWaiting && finishBudget > 0 && pending.every((shaderProgram) => shaderProgram.isBuildComplete())) {
+          this.readProgramSetVariant(unit.material, unit.instanceLayout, unit.isAmbientOcclusion);
+          finishBudget -= 1;
+          isDone = true;
+        }
+      } else {
+        const setKey = this.readProgramKey(unit.material, unit.instanceLayout, unit.isAmbientOcclusion);
+        if (!this.#pendingBuilds.has(setKey)) {
+          const programSet = this.#programSets.get(setKey);
+          if (programSet === void 0 || programSet === null || programSet.isShared === true) {
+            this.deletePendingPrograms(this.takePendingBuild(key));
+            isDone = true;
+          } else if (finishBudget > 0 && pending.isBuildComplete()) {
+            this.readSolidVariant(programSet, unit.material, unit.instanceLayout, unit.featureMask);
+            finishBudget -= 1;
+            isDone = true;
+          }
+        }
+      }
+      if (isDone) {
+        unitList.splice(index, 1);
+      } else {
+        index += 1;
+      }
+    }
+    return unitList.length === 0;
+  }
   deleteMaterial(material) {
     this.#lastProgramKey = null;
     const prefix = `${material.getId()}/`;
+    for (const key of System82.Array.from(this.#pendingBuilds.keys())) {
+      if (key.startsWith(prefix)) {
+        this.deletePendingPrograms(this.takePendingBuild(key));
+      }
+    }
     for (const [key, programSet] of System82.Array.from(this.#programSets.entries())) {
       if (!key.startsWith(prefix)) {
         continue;
@@ -33966,16 +34155,13 @@ var ToonRenderer = class {
     }
     entry = programSet.solid;
     try {
-      const disabledFeatures = [];
-      for (let index = 0; index < TOON_FEATURE_DEFINE_LIST.length; ++index) {
-        if ((featureMask & 1 << index) === 0) {
-          disabledFeatures.push(TOON_FEATURE_DEFINE_LIST[index]);
-        }
-      }
       const isAmbientOcclusion = programSet.isAmbientOcclusion === true;
-      const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace, disabledFeatures);
-      const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const solidProgram = new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable);
+      const pendingKey = this.readProgramKey(material, instanceLayout, isAmbientOcclusion, featureMask);
+      let solidProgram = this.takePendingBuild(pendingKey);
+      if (solidProgram === null) {
+        solidProgram = this.startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, false);
+      }
+      solidProgram.finishBuild();
       this.prepareSolidProgram(solidProgram, isAmbientOcclusion);
       entry = { program: solidProgram, kind: ToonProgramKind.solid, lightSet: null, lightVersion: -1 };
     } catch (error) {
@@ -33983,6 +34169,33 @@ var ToonRenderer = class {
     }
     variants.set(featureMask, entry);
     return entry;
+  }
+  startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, isDeferred) {
+    const disabledFeatures = [];
+    for (let index = 0; index < TOON_FEATURE_DEFINE_LIST.length; ++index) {
+      if ((featureMask & 1 << index) === 0) {
+        disabledFeatures.push(TOON_FEATURE_DEFINE_LIST[index]);
+      }
+    }
+    const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace, disabledFeatures);
+    return new ShaderProgram(this.getWebGL2RenderingContext(), sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable, isDeferred);
+  }
+  takePendingBuild(key) {
+    const pending = this.#pendingBuilds.get(key);
+    if (pending === void 0) {
+      return null;
+    }
+    this.#pendingBuilds.delete(key);
+    return pending;
+  }
+  deletePendingPrograms(pending) {
+    if (pending === null) {
+      return;
+    }
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    for (const shaderProgram of System82.Array.isArray(pending) ? pending : [pending]) {
+      webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
+    }
   }
   deleteProgramSet(programSet) {
     if (programSet === null) {
@@ -34264,6 +34477,10 @@ var ToonRenderer = class {
       this.deleteProgramSet(programSet);
     }
     this.#programSets.clear();
+    for (const pending of this.#pendingBuilds.values()) {
+      this.deletePendingPrograms(pending);
+    }
+    this.#pendingBuilds.clear();
     this.#lastProgramKey = null;
     this.clearBlockCache(this.#materialBlocks);
     this.clearBlockCache(this.#outlineBlocks);
@@ -35547,6 +35764,51 @@ var ToonRenderer = class {
   getDepthProgram(material = null) {
     const programSet = this.readProgramSet(material, null);
     return programSet !== null ? programSet.depth.program : null;
+  }
+};
+var ToonProgramPrewarm = class {
+  static {
+    __name(this, "ToonProgramPrewarm");
+  }
+  #renderer;
+  #unitList;
+  #isReady;
+  #promise;
+  #resolve;
+  constructor(renderer, unitList) {
+    this.#renderer = renderer;
+    this.#unitList = unitList;
+    this.#isReady = false;
+    this.#resolve = null;
+    this.#promise = new System82.Promise((resolve) => {
+      this.#resolve = resolve;
+    });
+    this.step();
+  }
+  step() {
+    if (this.#isReady) {
+      return;
+    }
+    if (this.#renderer.advancePrewarm(this.#unitList)) {
+      this.#isReady = true;
+      this.#resolve();
+      return;
+    }
+    if (typeof System82.requestAnimationFrame === "function") {
+      System82.requestAnimationFrame(() => {
+        this.step();
+      });
+    } else {
+      System82.setTimeout(() => {
+        this.step();
+      }, 16);
+    }
+  }
+  isReady() {
+    return this.#isReady;
+  }
+  wait() {
+    return this.#promise;
   }
 };
 var System83 = globalThis;
@@ -53916,6 +54178,34 @@ var ToonDrawQueue = class {
     this.#itemCount = itemCount + 1;
     return item;
   }
+  readProgramRequests(renderer) {
+    renderer.beginTrustedOptions();
+    try {
+      this.resolveItems(renderer);
+      const requests = [];
+      const keySet = new System142.Set();
+      const itemList = this.#itemList;
+      for (let index = 0; index < this.#itemCount; ++index) {
+        const item = itemList[index];
+        const state = item.state;
+        const material = state[DRAW_STATE_MATERIAL];
+        const instanceLayout = item.instanceBuffer !== null ? item.instanceBuffer.layout : null;
+        const lightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : renderer.getLightSet();
+        const isBodyDrawn = state[DRAW_STATE_IS_BODY_DRAWN];
+        const featureMask = isBodyDrawn ? renderer.readFeatureMask(state, lightSet) : -1;
+        const key = `${material !== null ? material.getId() : 0}/${instanceLayout !== null ? instanceLayout.getId() : 0}/${featureMask}`;
+        if (keySet.has(key)) {
+          continue;
+        }
+        keySet.add(key);
+        requests.push({ material, instanceLayout, featureMask, isBodyDrawn });
+      }
+      const postProcess = this.#postProcess;
+      return { isAmbientOcclusion: postProcess !== null && postProcess.isAmbientOcclusionEnabled(), requests };
+    } finally {
+      renderer.endTrustedOptions();
+    }
+  }
   clear() {
     const itemList = this.#itemList;
     for (let index = 0; index < this.#itemCount; ++index) {
@@ -58029,6 +58319,7 @@ export {
   ToonOutlineWidthUnit,
   ToonPostProcess,
   ToonProgramKind,
+  ToonProgramPrewarm,
   ToonRenderer,
   ToonScreenOutline,
   ToonVfx,

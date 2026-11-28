@@ -59138,7 +59138,7 @@
 						{
 							"kind": "constructor",
 							"name": "constructor",
-							"signature": "constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null)",
+							"signature": "constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null, isDeferred = false)",
 							"params": [
 								{
 									"name": "webGL2RenderingContext",
@@ -59171,6 +59171,14 @@
 										"ko": "링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 }, 다른 프로그램의 버텍스 어레이를 함께 쓸 때)",
 										"en": "Attribute locations fixed before linking. ({ name: location }, when sharing vertex arrays with another program)"
 									}
+								},
+								{
+									"name": "isDeferred",
+									"type": "boolean",
+									"description": {
+										"ko": "true 면 컴파일과 링크를 맡기기만 하고 결과는 확인하지 않는다. (기본 false, finishBuild 를 불러야 쓸 수 있다)",
+										"en": "If true, only hands off compiling and linking without checking the result. (Default false; call finishBuild before use)"
+									}
 								}
 							],
 							"description": {
@@ -59185,6 +59193,65 @@
 								"class": "ShaderProgram",
 								"name": "new"
 							}
+						},
+						{
+							"kind": "static",
+							"name": "isParallelCompileSupported",
+							"signature": "static isParallelCompileSupported(webGL2RenderingContext)",
+							"params": [
+								{
+									"name": "webGL2RenderingContext",
+									"type": "WebGL2RenderingContext",
+									"description": {
+										"ko": "WebGL2 렌더링 컨텍스트.",
+										"en": "WebGL2 rendering context."
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "있으면 true.",
+									"en": "True if present."
+								}
+							},
+							"description": {
+								"ko": "병렬 셰이더 컴파일 확장이 있는지. (KHR_parallel_shader_compile, 있으면 컴파일과 링크를 맡기고 주 스레드를 막지 않고 끝을 물을 수 있다)",
+								"en": "Whether the parallel shader compile extension exists. (KHR_parallel_shader_compile; if present, compiling and linking can be handed off and completion polled without blocking the main thread)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic/shaderprogram.js"
+						},
+						{
+							"kind": "method",
+							"name": "isBuildComplete",
+							"signature": "isBuildComplete()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "끝났으면 true. (true 여도 finishBuild 로 결과를 확인해야 쓴다)",
+									"en": "True if done. (Even when true, call finishBuild to check the result before use)"
+								}
+							},
+							"description": {
+								"ko": "맡긴 짓기가 끝났는지. (맡기지 않았거나 이미 끝냈으면 true, 확장이 없으면 true, 물을 뿐 주 스레드를 막지 않는다)",
+								"en": "Whether the handed-off build is done. (True if nothing was handed off or it is already finished, or if the extension is missing; it only asks and never blocks the main thread)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic/shaderprogram.js"
+						},
+						{
+							"kind": "method",
+							"name": "finishBuild",
+							"signature": "finishBuild()",
+							"params": [],
+							"description": {
+								"ko": "맡긴 짓기 끝내기. (컴파일과 링크 결과를 확인한다, 안 끝났으면 끝날 때까지 기다린다, 맡기지 않았거나 이미 끝냈으면 아무것도 하지 않는다)\n- 실패하면 셰이더와 프로그램을 지우고 오류를 던진다. (생성자와 같은 글)",
+								"en": "Finishes the handed-off build. (Checks the compile and link results and waits until done if not; does nothing if nothing was handed off or it is already finished)\n- On failure, deletes the shaders and program and throws. (Same message as the constructor)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic/shaderprogram.js"
 						},
 						{
 							"kind": "method",
@@ -66473,6 +66540,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "prewarmDrawQueue",
+							"signature": "prewarmDrawQueue(queue)",
+							"params": [
+								{
+									"name": "queue",
+									"type": "ToonDrawQueue",
+									"description": {
+										"ko": "변형을 읽을 그리기 줄. (담은 것만 읽고 그리지 않는다)",
+										"en": "Draw queue to read the variants from. (Only reads what was added; does not draw)"
+									}
+								}
+							],
+							"returns": {
+								"type": "ToonProgramPrewarm",
+								"description": {
+									"ko": "미리 짓기의 진행. (isReady, wait)",
+									"en": "Progress of the prewarm. (isReady, wait)"
+								}
+							},
+							"description": {
+								"ko": "그리기 줄에 담긴 것이 쓸 프로그램 변형을 그리지 않고 미리 짓기. (유니티 ShaderVariantCollection.WarmUp, 언리얼 PSO 캐시 꼴)\n- 머티리얼, 인스턴스 꼴, 몸 기능 비트(빛 묶음과 그리기 꼴이 정함), 모서리 어둠 몸, 바깥선, 그림자 깊이를 그리기 줄이 그릴 때와 같은 열쇠로 짓는다.\n- 첫 그리기에서 처음 보는 조합의 프로그램을 짓느라 한 프레임이 끊기는 것을 불러오는 동안으로 옮긴다. 장면을 담은 뒤 첫 프레임 앞에서 한 번 부른다.\n- KHR_parallel_shader_compile 이 있으면 컴파일만 맡기고 프레임마다 끝났는지 물어 주 스레드를 막지 않는다. 없으면 이 호출 안에서 짓는다.\n- 미리 짓기가 끝나기 전에 그려도 된다. 아직 안 지어진 변형은 그 자리에서 지어 쓴다. (동작은 같다)",
+								"en": "Prewarms, without drawing, the program variants that the items in a draw queue will use. (Same idea as Unity ShaderVariantCollection.WarmUp and Unreal PSO caches)\n- Builds the material, instance layout, body feature bits (decided by the light set and draw options), ambient occlusion body, outline and shadow depth programs with the same keys the draw queue uses when drawing.\n- Moves the one-frame hitch of building a program for a combination first seen in the first draw into loading time. Call it once after adding the scene and before the first frame.\n- With KHR_parallel_shader_compile it only hands off compiling and polls for completion each frame so the main thread is not blocked. Without it, programs are built inside this call.\n- Drawing before the prewarm finishes is fine. A variant not built yet is built on the spot. (Same behavior)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonrenderer.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "장면을 담은 뒤 첫 프레임 앞에 변형을 미리 짓기",
+										"en": "Prewarming variants after adding the scene and before the first frame"
+									},
+									"code": "import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 16, 10), Matrix4.createIdentity(), \"#f0e8e0\");\nconst mesh = renderer.createMesh(builder.readArrays());\nconst queue = new ToonDrawQueue();\nqueue.addMesh(mesh, Matrix4.createIdentity(), { castsShadow: false });\nconst prewarm = renderer.prewarmDrawQueue(queue);\nprewarm.wait().then(() => {\n\tif (!prewarm.isReady()) {\n\t\tthrow new Error(\"prewarm is not ready\");\n\t}\n});",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "deleteMaterial",
 							"signature": "deleteMaterial(material)",
 							"params": [
@@ -69012,6 +69117,63 @@
 								"class": "ToonRenderer",
 								"name": "get_depth_program"
 							}
+						}
+					]
+				},
+				{
+					"name": "ToonProgramPrewarm",
+					"summary": {
+						"ko": "프로그램 변형 미리 짓기의 진행. (ToonRenderer.prewarmDrawQueue 의 결과)\n- 컴파일이 끝난 것을 프레임마다 나눠 끝낸다. (requestAnimationFrame, 병렬 컴파일 확장이 없으면 만들 때 이미 끝나 있다)",
+						"en": "Progress of prewarming program variants. (The result of ToonRenderer.prewarmDrawQueue)\n- Finishes compiled programs a few per frame. (requestAnimationFrame; without the parallel compile extension it is already finished when created)"
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "불러오는 동안 미리 짓고 끝나면 시작하기",
+								"en": "Prewarming while loading and starting once done"
+							},
+							"code": "import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 16, 10), Matrix4.createIdentity(), \"#c0d0ff\");\nconst mesh = renderer.createMesh(builder.readArrays());\nconst queue = new ToonDrawQueue();\nqueue.addMesh(mesh, Matrix4.createIdentity(), { castsShadow: false });\nconst prewarm = renderer.prewarmDrawQueue(queue);\nawait prewarm.wait();\nconsole.log(prewarm.isReady());",
+							"language": "javascript"
+						}
+					],
+					"members": [
+						{
+							"kind": "method",
+							"name": "isReady",
+							"signature": "isReady()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "모두 지었으면 true. (그려도 되지만 안 지은 것은 그 자리에서 짓는다)",
+									"en": "True if everything is built. (Drawing is allowed anyway; anything not built is built on the spot)"
+								}
+							},
+							"description": {
+								"ko": "다 지었는지.",
+								"en": "Whether everything is built."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonrenderer.js"
+						},
+						{
+							"kind": "method",
+							"name": "wait",
+							"signature": "wait()",
+							"params": [],
+							"returns": {
+								"type": "Promise<void>",
+								"description": {
+									"ko": "다 지으면 풀리는 약속.",
+									"en": "Promise that resolves when everything is built."
+								}
+							},
+							"description": {
+								"ko": "다 지을 때까지 기다리기.",
+								"en": "Waiting until everything is built."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonrenderer.js"
 						}
 					]
 				}

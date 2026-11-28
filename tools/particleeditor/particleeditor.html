@@ -7014,6 +7014,11 @@
     #attributeLocations;
     /** @private @type { Map<string, WebGLUniformLocation> } */
     #uniformLocations;
+    /** @private @type { WebGLShader | null } */
+    #pendingVertexShader;
+    // 짓기를 맡긴 채 아직 끝내지 않은 셰이더. (맡기지 않았거나 끝냈으면 null)
+    /** @private @type { WebGLShader | null } */
+    #pendingFragmentShader;
     //==============================================================================
     // 생성.
     // - 컴파일이나 링크에 실패하면 그때까지 지은 셰이더와 프로그램을 지우고 오류를 던진다.
@@ -7024,12 +7029,36 @@
      * @param { string } vertexShaderSource 버텍스 셰이더 GLSL 소스.
      * @param { string } fragmentShaderSource 프래그먼트 셰이더 GLSL 소스.
      * @param { object | null } attributeLocationTable - 링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 }, 다른 프로그램의 버텍스 어레이를 함께 쓸 때)
+     * @param { boolean } [isDeferred] - true 면 컴파일과 링크를 맡기기만 하고 결과는 확인하지 않는다. (기본 false, finishBuild 를 불러야 쓸 수 있다)
      */
-    constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null) {
+    constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null, isDeferred = false) {
       super();
       this.#webGL2RenderingContext = webGL2RenderingContext;
       this.#attributeLocations = /* @__PURE__ */ new Map();
       this.#uniformLocations = /* @__PURE__ */ new Map();
+      this.#pendingVertexShader = null;
+      this.#pendingFragmentShader = null;
+      if (isDeferred) {
+        const vertexShader2 = webGL2RenderingContext.createShader(webGL2RenderingContext.VERTEX_SHADER);
+        webGL2RenderingContext.shaderSource(vertexShader2, vertexShaderSource);
+        webGL2RenderingContext.compileShader(vertexShader2);
+        const fragmentShader2 = webGL2RenderingContext.createShader(webGL2RenderingContext.FRAGMENT_SHADER);
+        webGL2RenderingContext.shaderSource(fragmentShader2, fragmentShaderSource);
+        webGL2RenderingContext.compileShader(fragmentShader2);
+        const program2 = webGL2RenderingContext.createProgram();
+        webGL2RenderingContext.attachShader(program2, vertexShader2);
+        webGL2RenderingContext.attachShader(program2, fragmentShader2);
+        if (attributeLocationTable) {
+          for (const attributeName in attributeLocationTable) {
+            webGL2RenderingContext.bindAttribLocation(program2, attributeLocationTable[attributeName], attributeName);
+          }
+        }
+        webGL2RenderingContext.linkProgram(program2);
+        this.#pendingVertexShader = vertexShader2;
+        this.#pendingFragmentShader = fragmentShader2;
+        this.#program = program2;
+        return;
+      }
       const vertexShader = this.createShader(webGL2RenderingContext.VERTEX_SHADER, vertexShaderSource);
       let fragmentShader = null;
       try {
@@ -7057,6 +7086,62 @@
       webGL2RenderingContext.deleteShader(vertexShader);
       webGL2RenderingContext.deleteShader(fragmentShader);
       this.#program = program;
+    }
+    //==============================================================================
+    // 병렬 셰이더 컴파일 확장이 있는지. (KHR_parallel_shader_compile, 있으면 컴파일과 링크를 맡기고 주 스레드를 막지 않고 끝을 물을 수 있다)
+    //==============================================================================
+    /**
+     * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+     * @returns { boolean } 있으면 true.
+     */
+    static isParallelCompileSupported(webGL2RenderingContext) {
+      return webGL2RenderingContext.getExtension("KHR_parallel_shader_compile") !== null;
+    }
+    //==============================================================================
+    // 맡긴 짓기가 끝났는지. (맡기지 않았거나 이미 끝냈으면 true, 확장이 없으면 true, 물을 뿐 주 스레드를 막지 않는다)
+    //==============================================================================
+    /**
+     * @returns { boolean } 끝났으면 true. (true 여도 finishBuild 로 결과를 확인해야 쓴다)
+     */
+    isBuildComplete() {
+      if (this.#pendingVertexShader === null) {
+        return true;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      const extension = webGL2RenderingContext.getExtension("KHR_parallel_shader_compile");
+      if (extension === null) {
+        return true;
+      }
+      return webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+    }
+    //==============================================================================
+    // 맡긴 짓기 끝내기. (컴파일과 링크 결과를 확인한다, 안 끝났으면 끝날 때까지 기다린다, 맡기지 않았거나 이미 끝냈으면 아무것도 하지 않는다)
+    // - 실패하면 셰이더와 프로그램을 지우고 오류를 던진다. (생성자와 같은 글)
+    //==============================================================================
+    finishBuild() {
+      const vertexShader = this.#pendingVertexShader;
+      if (vertexShader === null) {
+        return;
+      }
+      const fragmentShader = this.#pendingFragmentShader;
+      this.#pendingVertexShader = null;
+      this.#pendingFragmentShader = null;
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      const program = this.#program;
+      let errorMessage = null;
+      if (!webGL2RenderingContext.getShaderParameter(vertexShader, webGL2RenderingContext.COMPILE_STATUS)) {
+        errorMessage = `ShaderProgram compile failed: ${webGL2RenderingContext.getShaderInfoLog(vertexShader)}`;
+      } else if (!webGL2RenderingContext.getShaderParameter(fragmentShader, webGL2RenderingContext.COMPILE_STATUS)) {
+        errorMessage = `ShaderProgram compile failed: ${webGL2RenderingContext.getShaderInfoLog(fragmentShader)}`;
+      } else if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
+        errorMessage = `ShaderProgram link failed: ${webGL2RenderingContext.getProgramInfoLog(program)}`;
+      }
+      webGL2RenderingContext.deleteShader(vertexShader);
+      webGL2RenderingContext.deleteShader(fragmentShader);
+      if (errorMessage !== null) {
+        webGL2RenderingContext.deleteProgram(program);
+        throw new Error(errorMessage);
+      }
     }
     //==============================================================================
     // 셰이더 객체 생성.
