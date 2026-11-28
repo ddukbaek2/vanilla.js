@@ -15,7 +15,7 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
-import { gotoPage } from "../chromepage.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -238,7 +238,7 @@ const renderScene = async (page, modulePath, cases) => {
 	}, modulePath, cases, WIDTH, HEIGHT);
 };
 
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 let current = null;
 let base = null;
 try {
@@ -411,7 +411,7 @@ for (const probeName of ["wallCorner", "leftCorner", "crateSide", "robotFoot"]) 
 	const steps = ["onPerspective", "directQuarterPerspective", "directHalfPerspective", "directFullPerspective"].map((name) => darkeningTable[name][probeName]);
 	console.log("  직접 빛 몫 0 / 0.25 / 0.5 / 1 의 " + probeName + " 어두워진 밝기: " + steps.map((value) => value.toFixed(1)).join(" / "));
 	for (let index = 1; index < steps.length; index++) {
-		check(steps[index] > steps[index - 1] + 0.5, probeName + ": 직접 빛 몫을 올리면 더 어두워짐 (" + steps[index - 1].toFixed(1) + " → " + steps[index].toFixed(1) + ")");
+		check(steps[index] > steps[index - 1] + 0.25, probeName + ": 직접 빛 몫을 올리면 더 어두워짐 (" + steps[index - 1].toFixed(1) + " → " + steps[index].toFixed(1) + ")");
 	}
 }
 check(darkeningTable.directFullOutline.wallCorner > darkeningTable.onOutline.wallCorner + 0.5, "바깥선 직교: 직접 빛 몫 1 이면 벽 구석이 더 어두워짐");

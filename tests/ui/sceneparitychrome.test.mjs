@@ -13,6 +13,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, checkJson, checkNear, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -48,7 +49,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 let result = null;
 try {
 	const page = await browser.newPage();
@@ -62,7 +63,7 @@ try {
 			console.log("콘솔 오류: " + message.text() + (message.location()?.url ? " (" + message.location().url + ")" : ""));
 		}
 	});
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	result = await page.evaluate(async () => {
 		const Vanilla = await import("/import.js");
 		const { Engine, EngineConfiguration, UIScene, GameScene, Scene, Vector2, ViewScaleMode, ToonVfx, Matrix4, Vector3 } = Vanilla;

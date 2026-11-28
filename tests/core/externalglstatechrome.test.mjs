@@ -14,6 +14,7 @@ import path from "node:path";
 import url from "node:url";
 import crypto from "node:crypto";
 import { createRequire } from "node:module";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -55,7 +56,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 
 // 한 갈래 그려 뜨기. (20 번째 프레임의 화소, GL 오류, 19 번째 프레임의 GL 부름 수)
 const capture = async (mode) => {
@@ -63,12 +64,13 @@ const capture = async (mode) => {
 	const warningList = [];
 	page.on("console", (message) => {
 		const text = message.text();
-		if (/WebGL|GL_|INVALID/.test(text)) {
+		// 크롬이 드라이버 성능 힌트("GL Driver Message (OpenGL, Performance, ...): GPU stall due to ReadPixels")를 콘솔에 찍는 것은 엔진의 GL 오류, 경고가 아니다. (소프트웨어 렌더러, 시험이 화소를 읽는 곳)
+		if (/WebGL|GL_|INVALID/.test(text) && !/GL Driver Message \(OpenGL, Performance/.test(text)) {
 			warningList.push(text);
 		}
 	});
 	await page.setViewport({ width: 400, height: 300, deviceScaleFactor: 1 });
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	const captured = await page.evaluate(async (mode) => {
 		const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Mask, ToonView3D, ToonDrawQueue, MeshBuilder, createSphereGeometry } = await import("/import.js");
 		return await new Promise((resolve) => {

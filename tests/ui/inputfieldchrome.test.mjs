@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { checkEqual, checkJson, check, finish } from "../testcheck.mjs";
+import { launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -26,7 +27,7 @@ check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
 const isWindows = process.platform === "win32";
 const isMac = process.platform === "darwin";
 
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 try {
 	const page = await browser.newPage();
 	await page.setContent("<!doctype html><style>body{margin:0}textarea{position:absolute;left:0;top:0;width:600px;height:200px;margin:0;padding:0;border:0;outline:0;resize:none;font:20px/20px monospace;white-space:pre;}</style><textarea spellcheck=\"false\"></textarea>");

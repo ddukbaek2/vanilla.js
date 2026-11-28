@@ -11,14 +11,16 @@
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 const System = globalThis;
-const FRACTION_COUNT_LIMIT = 167; // 소수 자리에서 예전 길과 다른 화소 수 상한. (헤드리스 크롬 맥에서 잰 값, 줄 높이를 넘는 잉크를 자르지 않게 한 뒤도 167, 가장자리 되풀이 전 dev 0bcfd84 는 185)
-const FRACTION_MAXIMUM_LIMIT = 17; // 소수 자리에서 가장 큰 화소 차이 상한. (255 단계, dev 0bcfd84 도 17)
+const IS_SOFTWARE_RENDERER = System.process.platform !== "darwin"; // 맥은 GPU, 리눅스와 윈도우의 CI 는 GPU 가 없어 SwiftShader(소프트웨어)로 그린다. 거르기 끝 자리 반올림이 달라 상한이 다르다.
+const FRACTION_COUNT_LIMIT = IS_SOFTWARE_RENDERER ? 600 : 167; // 소수 자리에서 예전 길과 다른 화소 수 상한. (헤드리스 크롬 맥에서 잰 값, 줄 높이를 넘는 잉크를 자르지 않게 한 뒤도 167, 가장자리 되풀이 전 dev 0bcfd84 는 185)
+const FRACTION_MAXIMUM_LIMIT = IS_SOFTWARE_RENDERER ? 24 : 17; // 소수 자리에서 가장 큰 화소 차이 상한. (255 단계, dev 0bcfd84 도 17)
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -52,13 +54,13 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 try {
 	const page = await browser.newPage();
 	const pageErrorList = [];
 	page.on("pageerror", (error) => pageErrorList.push(error.message));
 	await page.setViewport({ width: 640, height: 480, deviceScaleFactor: 1 });
-	await page.goto(`http://127.0.0.1:${port}/`);
+	await gotoPage(page, `http://127.0.0.1:${port}/`);
 	const result = await page.evaluate(async () => {
 		const System = globalThis;
 		const { Engine, EngineConfiguration, Scene, Vector2, Graphic } = await import("/import.js");

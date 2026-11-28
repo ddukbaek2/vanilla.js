@@ -11,6 +11,7 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -52,11 +53,11 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 const captureScale = async (renderScale) => {
 	const page = await browser.newPage();
 	await page.setViewport({ width: 400, height: 300, deviceScaleFactor: 2 });
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	const captured = await page.evaluate(async (renderScale) => {
 		const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, ToonView3D, ToonDrawQueue, MeshBuilder, createSphereGeometry } = await import("/import.js");
 		return await new Promise((resolve) => {

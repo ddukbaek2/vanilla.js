@@ -14,6 +14,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -48,7 +49,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 
 //==============================================================================
 // 예제 하나를 찍기 모드로 한 번 찍기. (프레임 번호 → data URL)
@@ -70,7 +71,7 @@ async function captureExample(exampleName) {
 		};
 	});
 	const captureQuery = "?capture=" + CAPTURE_FRAME_LIST.join(",") + "&captureName={frame}";
-	await page.goto("http://127.0.0.1:" + port + "/examples/" + exampleName + "/index.html" + captureQuery);
+	await gotoPage(page, "http://127.0.0.1:" + port + "/examples/" + exampleName + "/index.html" + captureQuery);
 	await page.waitForFunction((frameCount) => Object.keys(window.captureDataUrlTable).length >= frameCount, { timeout: 60000 }, CAPTURE_FRAME_LIST.length);
 	const captureDataUrlTable = await page.evaluate(() => window.captureDataUrlTable);
 	// 넘어간 뒤 프레임이 한 가지 색(로딩 화면)이 아닌지. (마지막 프레임의 화소 가짓수)

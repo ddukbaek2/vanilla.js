@@ -14,6 +14,7 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -55,13 +56,13 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true, protocolTimeout: 60000 });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true, protocolTimeout: 60000 });
 
 // 한 장면 그리기. (벽의 두 옆면 7x7 화소와, 벽 그늘 쪽 바닥 x=0 줄의 z -1.5 ~ -2.3 화소 밝기)
 const capture = async (extent, resolution, wallHeight, receivesShadow) => {
 	const page = await browser.newPage();
 	await page.setViewport({ width: 400, height: 300, deviceScaleFactor: 1 });
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	const captured = await page.evaluate(async (extent, resolution, wallHeight, receivesShadow) => {
 		const { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Matrix4, Pivot, ToonView3D, ToonDrawQueue, MeshBuilder, createBoxGeometry, ShadowMap } = await import("/import.js");
 		return await new Promise((resolve) => {

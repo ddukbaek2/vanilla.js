@@ -16,6 +16,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -237,7 +238,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 
 // 한 길(하위 트리 거르기 켬, 끔)로 그린 장면의 찍은 화면들과 프레임마다 센 값.
 async function renderScene(queryText) {
@@ -250,7 +251,7 @@ async function renderScene(queryText) {
 			errorList.push(message.text());
 		}
 	});
-	await page.goto("http://127.0.0.1:" + port + "/?" + queryText);
+	await gotoPage(page, "http://127.0.0.1:" + port + "/?" + queryText);
 	await page.waitForFunction(() => window.isFinished === true, { timeout: 60000 });
 	const captureCount = await page.evaluate(() => window.captureList.length);
 	const captureResultList = [];

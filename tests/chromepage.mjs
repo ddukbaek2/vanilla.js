@@ -22,3 +22,19 @@ export async function gotoPage(page, url, options) {
 		}
 	}
 }
+
+//==============================================================================
+// 브라우저를 띄운다. (puppeteer.launch 와 같은 인자, 같은 돌려줌)
+// - GPU 가 없는 기계(CI 의 리눅스, 윈도우)의 크롬은 --enable-unsafe-swiftshader 가 있어야 WebGL 을 소프트웨어(SwiftShader)로 돌린다.
+//   없으면 리눅스는 "Automatic fallback to software WebGL has been deprecated" 경고를 내고, 윈도우는 WebGL2 를 못 만든다.
+//   이 인자는 GPU 가 있으면 GPU 를 그대로 쓰므로(맥), GPU 가 있는 기계의 화면은 바뀌지 않는다.
+//==============================================================================
+export async function launchBrowser(puppeteer, options) {
+	const launchOptions = { ...options };
+	const argumentList = [...(launchOptions.args ?? [])];
+	if (!argumentList.includes("--enable-unsafe-swiftshader")) {
+		argumentList.push("--enable-unsafe-swiftshader");
+	}
+	launchOptions.args = argumentList;
+	return await puppeteer.launch(launchOptions);
+}

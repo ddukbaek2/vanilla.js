@@ -14,6 +14,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -173,7 +174,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 
 // 한 길(캐시 켬, 끔)로 그린 장면의 찍은 화면들과 프레임마다 잰 값.
 async function renderScene(cacheFlag) {
@@ -186,7 +187,7 @@ async function renderScene(cacheFlag) {
 			errorList.push(message.text());
 		}
 	});
-	await page.goto("http://127.0.0.1:" + port + "/?cache=" + cacheFlag);
+	await gotoPage(page, "http://127.0.0.1:" + port + "/?cache=" + cacheFlag);
 	await page.waitForFunction(() => window.isFinished === true, { timeout: 60000 });
 	// 찍은 화면은 하나씩 base64 로 받는다. (한 번에 받으면 CDP 가 넘길 수 있는 크기를 넘는다)
 	const captureCount = await page.evaluate(() => window.captureList.length);

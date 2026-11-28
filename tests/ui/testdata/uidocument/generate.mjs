@@ -36,7 +36,7 @@ for (const exportName of Object.keys(Engine)) {
 }
 
 // 원본 misc/devtools.js 의 getComponentProperties 를 그대로 부른다. (부르기만 하고 이름을 모은다, 인스턴스 상태를 쓰지 않는 함수)
-const { DevTools } = await import(path.join(repositoryPath, "src/misc/devtools.js"));
+const { DevTools } = await import(url.pathToFileURL(path.join(repositoryPath, "src/misc/devtools.js")).href);
 function collectGetterNames(component) {
 	return DevTools.prototype.getComponentProperties.call(null, component).map((property) => property.name);
 }

@@ -10,6 +10,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -43,12 +44,12 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 try {
 	const page = await browser.newPage();
 	const pageErrorList = [];
 	page.on("pageerror", (error) => pageErrorList.push(error.message));
-	await page.goto(`http://127.0.0.1:${port}/`);
+	await gotoPage(page, `http://127.0.0.1:${port}/`);
 	const result = await page.evaluate(async () => {
 		const { Text, Engine } = await import("/import.js");
 		// 바깥 주소 열기. (window.open 을 가로채 부른 인자를 본다)
