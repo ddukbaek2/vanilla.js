@@ -1,8 +1,32 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Object } from "../../base/object.js";
 import { WebGLStateCache } from "./webglstatecache.js";
+
+
+//==============================================================================
+// 셰이더 짓기 실패 알리기. (엔진이 짓는 프로그램이 실패해 건너뛰기로 할 때 부른다)
+// - 컨텍스트를 이미 잃은 뒤의 실패는 셰이더 탓이 아니다. 알리지 않고 거짓을 돌려, 부른 쪽이 실패를 기억하지 않고 되살린 뒤 다시 짓게 한다.
+// - 그 밖의 실패는 엔진 오류 길(addGraphicErrorListener)로 { kind, name, error } 를 한 번 알리고 참을 돌려 기억하게 한다.
+//==============================================================================
+/**
+ * @param { WebGL2RenderingContext } webGL2RenderingContext 프로그램을 짓던 컨텍스트.
+ * @param { string } name 짓지 못한 것의 이름.
+ * @param { unknown } error 던져진 오류.
+ * @returns { boolean } 셰이더 탓이라 실패를 기억해도 되면 참. (컨텍스트를 잃은 탓이면 거짓)
+ */
+export function reportShaderBuildFailure(webGL2RenderingContext, name, error) {
+	if (webGL2RenderingContext.isContextLost()) {
+		return false;
+	}
+	const engine = System.vanillaEngine;
+	if (engine !== undefined && engine !== null && typeof engine.dispatchGraphicError === "function") {
+		engine.dispatchGraphicError({ kind: "shaderBuildFailed", name: name, error: error });
+	}
+	return true;
+}
 
 
 //==============================================================================

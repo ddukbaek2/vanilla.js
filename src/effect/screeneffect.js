@@ -6,6 +6,7 @@ import { Object } from "../base/object.js";
 import { Color } from "../base/color.js";
 import { Graphic } from "../core/graphic.js";
 import { FullscreenPass } from "../core/fullscreenpass.js";
+import { reportShaderBuildFailure } from "../core/graphic/shaderprogram.js";
 
 
 //==============================================================================
@@ -1221,6 +1222,10 @@ export class ScreenEffect extends Object {
 		}
 		catch (error) {
 			console.error(`ScreenEffect: pass "${passName}" failed: ${error && error.message !== undefined ? error.message : error}`);
+			// 컨텍스트를 잃은 탓이면 기억하지 않는다. (되살린 뒤 다시 짓는다)
+			if (!reportShaderBuildFailure(this.#webGL2RenderingContext, `ScreenEffect.${passName}`, error)) {
+				return null;
+			}
 			pass = null;
 		}
 		this.#passTable.set(passName, pass);

@@ -11391,6 +11391,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "add_graphic_context_event_listener"
+							},
 							"examples": [
 								{
 									"title": {
@@ -11422,6 +11428,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "remove_graphic_context_event_listener"
+							},
 							"examples": [
 								{
 									"title": {
@@ -11432,6 +11444,107 @@
 									"language": "javascript"
 								}
 							]
+						},
+						{
+							"kind": "method",
+							"name": "addGraphicErrorListener",
+							"signature": "addGraphicErrorListener(graphicErrorListener)",
+							"params": [
+								{
+									"name": "graphicErrorListener",
+									"type": "Function",
+									"description": {
+										"ko": "({ kind, name, error }) => void. 같은 함수는 한 번만 더한다.",
+										"en": "({ kind, name, error }) => void. The same function is added only once."
+									}
+								}
+							],
+							"description": {
+								"ko": "그래픽 오류 리스너 더하기. (({ kind, name, error }) => void, kind 는 GraphicErrorKind 의 값)",
+								"en": "Adds a graphic error listener. (({ kind, name, error }) => void, kind is a GraphicErrorKind value)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "add_graphic_error_listener"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "셰이더 짓기 실패를 받아 기록하기",
+										"en": "Recording shader build failures"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, GraphicErrorKind } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nconst failedNameList = [];\nengine.addGraphicErrorListener((graphicError) => {\n\tif (graphicError.kind === GraphicErrorKind.shaderBuildFailed) {\n\t\tfailedNameList.push(graphicError.name);\n\t}\n});\nconsole.log(failedNameList.length);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "removeGraphicErrorListener",
+							"signature": "removeGraphicErrorListener(graphicErrorListener)",
+							"params": [
+								{
+									"name": "graphicErrorListener",
+									"type": "Function",
+									"description": {
+										"ko": "더했던 리스너. (없으면 아무것도 하지 않는다)",
+										"en": "A listener added before. (does nothing if not found)"
+									}
+								}
+							],
+							"description": {
+								"ko": "그래픽 오류 리스너 빼기.",
+								"en": "Removes a graphic error listener."
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "remove_graphic_error_listener"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "더한 오류 리스너 빼기",
+										"en": "Removing an added error listener"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nconst graphicErrorListener = (graphicError) => {\n\tconsole.log(graphicError.kind);\n};\nengine.addGraphicErrorListener(graphicErrorListener);\nengine.removeGraphicErrorListener(graphicErrorListener);",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "dispatchGraphicError",
+							"signature": "dispatchGraphicError(graphicError)",
+							"params": [
+								{
+									"name": "graphicError",
+									"type": "object",
+									"description": {
+										"ko": "{ kind: GraphicErrorKind 의 값, name: 짓지 못한 것의 이름, error: 던져진 오류 }",
+										"en": "{ kind: a GraphicErrorKind value, name: the name of what could not be built, error: the thrown error }"
+									}
+								}
+							],
+							"description": {
+								"ko": "그래픽 오류 알리기. (리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)",
+								"en": "Notifies a graphic error. (Passes it to the listeners on the spot, a listener's exception is reported and it moves on to the next)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "dispatch_graphic_error"
+							}
 						},
 						{
 							"kind": "method",
@@ -11452,7 +11565,13 @@
 								"en": "Notifies a graphic context event. (Passes it to the listeners on the spot, a listener's exception is reported and it moves on to the next)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/engine.js"
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "dispatch_graphic_context_event"
+							}
 						},
 						{
 							"kind": "method",
@@ -11668,6 +11787,11 @@
 						"ko": "그래픽 컨텍스트 이벤트. (엔진이 리스너에 넘긴다, addGraphicContextEventListener)",
 						"en": "Graphic context event. (Passed to listeners by the engine, addGraphicContextEventListener)"
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/engine",
+						"class": "GraphicContextEvent"
+					},
 					"values": [
 						{
 							"name": "lost",
@@ -11683,6 +11807,28 @@
 							"description": {
 								"ko": "컨텍스트가 되살아나 엔진이 기본 자원을 다시 지음. (게임이 지은 GL 객체와 3D 렌더러, 렌더 타겟은 죽었으니 이때 다시 짓는다)",
 								"en": "The context was restored and the engine rebuilt its base resources. (GL objects the game made and 3D renderers and render targets are dead, rebuild them now)"
+							}
+						}
+					]
+				},
+				{
+					"name": "GraphicErrorKind",
+					"summary": {
+						"ko": "그래픽 오류 갈래. (엔진이 그래픽 오류 리스너에 넘기는 { kind, name, error } 의 kind, addGraphicErrorListener)",
+						"en": "Graphic error kinds. (The kind of the { kind, name, error } the engine passes to graphic error listeners, addGraphicErrorListener)"
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/engine",
+						"class": "GraphicErrorKind"
+					},
+					"values": [
+						{
+							"name": "shaderBuildFailed",
+							"value": "shaderBuildFailed",
+							"description": {
+								"ko": "셰이더 프로그램을 짓지 못함. (컴파일이나 링크 실패, 같은 프로그램은 다시 알리지 않고 짓지도 않는다. 컨텍스트를 잃은 탓의 실패는 알리지 않는다)",
+								"en": "A shader program could not be built. (A compile or link failure, the same program is neither reported again nor rebuilt. A failure caused by losing the context is not reported)"
 							}
 						}
 					]
@@ -19393,6 +19539,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "is_context_lost"
+							},
 							"examples": [
 								{
 									"title": {

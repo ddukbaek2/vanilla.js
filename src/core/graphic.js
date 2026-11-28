@@ -10,7 +10,7 @@ import { Engine } from "./engine.js";
 import { Color } from "../base/color.js";
 import { TransformNode } from "./node/transformnode.js";
 import { TransformMatrix } from "../base/transformmatrix.js";
-import { ShaderProgram } from "./graphic/shaderprogram.js";
+import { ShaderProgram, reportShaderBuildFailure } from "./graphic/shaderprogram.js";
 import { ImageTextureCache } from "./graphic/imagetexturecache.js";
 import { DecodedImageStore } from "./graphic/decodedimagestore.js";
 import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
@@ -7035,6 +7035,10 @@ export class Graphic extends Object {
 		}
 		catch (error) {
 			console.error(`Graphic: shader program "${programGroupName}.${programName}" failed: ${error && error.message !== undefined ? error.message : error}`);
+			// 컨텍스트를 잃은 탓이면 기억하지 않는다. (되살린 뒤 다시 짓는다)
+			if (!reportShaderBuildFailure(this.getWebGL2RenderingContext(), `${programGroupName}.${programName}`, error)) {
+				return null;
+			}
 			shaderProgram = null;
 		}
 		this.#resolvedShaderProgramTable.set(cacheKey, shaderProgram);

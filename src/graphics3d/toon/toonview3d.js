@@ -6,6 +6,7 @@ import { Component } from "../../core/component.js";
 import { Rect } from "../../base/rect.js";
 import { Camera3D } from "../camera3d.js";
 import { ToonRenderer } from "./toonrenderer.js";
+import { reportShaderBuildFailure } from "../../core/graphic/shaderprogram.js";
 import { RenderTarget } from "../rendertarget.js";
 
 
@@ -292,8 +293,11 @@ export class ToonView3D extends Component {
 		}
 		catch (error) {
 			System.console.error("[ToonView3D] 툰 렌더러를 짓지 못해 대체 그리기로 갑니다.", error);
-			this.#isRendererFailed = true;
 			this.#renderer = null;
+			// 셰이더 탓이면 게임에 한 번 알리고 다시 짓지 않는다. 컨텍스트를 잃은 탓이면 알리지도 기억하지도 않고, 되살린 뒤 다시 짓는다.
+			if (reportShaderBuildFailure(graphic.getWebGL2RenderingContext(), "ToonRenderer", error)) {
+				this.#isRendererFailed = true;
+			}
 		}
 		graphic.restoreRenderState();
 		return this.#renderer;
