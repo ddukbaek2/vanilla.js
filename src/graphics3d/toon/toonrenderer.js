@@ -3,7 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Matrix4 } from "../../base/matrix4.js";
-import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
+import { ShaderProgram, reportShaderBuildFailure } from "../../core/graphic/shaderprogram.js";
 import { WebGLStateCache } from "../../core/graphic/webglstatecache.js";
 import { ColorSpace, readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../../core/graphic/colorspace.js";
 import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
@@ -2307,7 +2307,10 @@ export class ToonRenderer {
 		if (isAmbientOcclusion) {
 			baseProgramSet = this.readProgramSetVariant(material, instanceLayout, false);
 			if (baseProgramSet === null) {
-				this.#programSets.set(key, null);
+				// 컨텍스트를 잃은 탓이면 기억하지 않는다. (되살린 뒤 다시 짓는다)
+				if (!this.getWebGL2RenderingContext().isContextLost()) {
+					this.#programSets.set(key, null);
+				}
 				return null;
 			}
 		}
@@ -2318,6 +2321,10 @@ export class ToonRenderer {
 		catch (error) {
 			const name = material !== null && material.getName() !== "" ? material.getName() : key;
 			System.console.error(`ToonRenderer: 머티리얼 ${name} 의 셰이더를 짓지 못했습니다.`, error);
+			// 셰이더 탓이면 게임에 한 번 알리고 기억한다. 컨텍스트를 잃은 탓이면 알리지도 기억하지도 않고, 되살린 뒤 다시 짓는다.
+			if (!reportShaderBuildFailure(this.getWebGL2RenderingContext(), `ToonRenderer.${name}`, error)) {
+				return null;
+			}
 			if (baseProgramSet !== null) {
 				programSet = { solid: baseProgramSet.solid, outline: baseProgramSet.outline, depth: baseProgramSet.depth, isAmbientOcclusion: true, isShared: true };
 			}

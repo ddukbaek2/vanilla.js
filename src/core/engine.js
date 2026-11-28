@@ -66,6 +66,14 @@ export const GraphicContextEvent = System.Object.freeze({
 
 
 //==============================================================================
+// 그래픽 오류 갈래. (엔진이 그래픽 오류 리스너에 넘기는 { kind, name, error } 의 kind, addGraphicErrorListener)
+//==============================================================================
+export const GraphicErrorKind = System.Object.freeze({
+	shaderBuildFailed: "shaderBuildFailed", // 셰이더 프로그램을 짓지 못함. (컴파일이나 링크 실패, 같은 프로그램은 다시 알리지 않고 짓지도 않는다. 컨텍스트를 잃은 탓의 실패는 알리지 않는다)
+});
+
+
+//==============================================================================
 // 엔진 설정.
 //==============================================================================
 /**
@@ -215,6 +223,7 @@ export class Engine extends Object {
 	/** @private @type { Array<() => boolean> } */ #engineFrameCallbacks; // 엔진 프레임마다 시간을 올린 바로 뒤 부를 함수 목록. (참을 돌려주면 뺀다, 찍기 모드의 로딩 기다림)
 	/** @private @type { boolean } */ #isExitRequested; // 종료를 요청했는지.
 	/** @private @type { boolean } */ #isPageHidden; // 페이지가 가려져 있는지.
+	/** @private @type { Array<Function> } */ #graphicErrorListeners; // 그래픽 오류 리스너. (({ kind, name, error }) => void)
 	/** @private @type { Array<Function> } */ #graphicContextEventListeners; // 그래픽 컨텍스트 이벤트 리스너. ((graphicContextEvent) => void)
 	/** @private @type { Array<Function> } */ #pageEventListeners; // 페이지 이벤트 리스너. ((pageEvent) => void)
 	/** @private @type { object | null } */ #gpuThroughputMeasurement; // 재고 있는 GPU 처리량. (없으면 null, measureGpuThroughput)
@@ -274,6 +283,7 @@ export class Engine extends Object {
 		this.#isPageHidden = System.document.visibilityState === "hidden";
 		this.#pageEventListeners = [];
 		this.#graphicContextEventListeners = [];
+		this.#graphicErrorListeners = [];
 		// 컨텍스트를 잃으면 엔진 오류 길(console.error)로 한 번 알리고 리스너에 넘긴다. 되살아나면 리스너에 넘긴다.
 		this.#graphic.setContextEventCallback((graphicContextEvent) => {
 			if (graphicContextEvent === GraphicContextEvent.lost) {
@@ -2031,6 +2041,76 @@ export class Engine extends Object {
 			return;
 		}
 		this.#graphicContextEventListeners.splice(listenerIndex, 1);
+	}
+
+	//==============================================================================
+	// 그래픽 오류 리스너 더하기. (({ kind, name, error }) => void, kind 는 GraphicErrorKind 의 값)
+	//==============================================================================
+	/**
+	 * 엔진이 셰이더 프로그램을 짓지 못했을 때(툰 렌더러의 머티리얼, 화면 효과의 패스, resolveShaderProgram 의 프로그램) 한 번 알린다.
+	 * 짓지 못한 프로그램은 다시 짓지 않고 건너뛰어 그리므로, 게임은 이 알림으로 대체 그리기나 오류 보고를 정한다.
+	 * 컨텍스트를 잃은 탓의 실패는 셰이더 탓이 아니라 알리지 않고, 기억하지도 않는다.
+	 * @param { Function } graphicErrorListener ({ kind, name, error }) => void. 같은 함수는 한 번만 더한다.
+	 * @example <caption>셰이더 짓기 실패를 받아 기록하기</caption>
+	 * import { Engine, EngineConfiguration, Scene, GraphicErrorKind } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * const failedNameList = [];
+	 * engine.addGraphicErrorListener((graphicError) => {
+	 * 	if (graphicError.kind === GraphicErrorKind.shaderBuildFailed) {
+	 * 		failedNameList.push(graphicError.name);
+	 * 	}
+	 * });
+	 * console.log(failedNameList.length);
+	 */
+	addGraphicErrorListener(graphicErrorListener) {
+		if (this.#graphicErrorListeners.includes(graphicErrorListener)) {
+			return;
+		}
+		this.#graphicErrorListeners.push(graphicErrorListener);
+	}
+
+	//==============================================================================
+	// 그래픽 오류 리스너 빼기.
+	//==============================================================================
+	/**
+	 * @param { Function } graphicErrorListener 더했던 리스너. (없으면 아무것도 하지 않는다)
+	 * @example <caption>더한 오류 리스너 빼기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * const graphicErrorListener = (graphicError) => {
+	 * 	console.log(graphicError.kind);
+	 * };
+	 * engine.addGraphicErrorListener(graphicErrorListener);
+	 * engine.removeGraphicErrorListener(graphicErrorListener);
+	 */
+	removeGraphicErrorListener(graphicErrorListener) {
+		const listenerIndex = this.#graphicErrorListeners.indexOf(graphicErrorListener);
+		if (listenerIndex < 0) {
+			return;
+		}
+		this.#graphicErrorListeners.splice(listenerIndex, 1);
+	}
+
+	//==============================================================================
+	// 그래픽 오류 알리기. (리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)
+	//==============================================================================
+	/**
+	 * @param { object } graphicError { kind: GraphicErrorKind 의 값, name: 짓지 못한 것의 이름, error: 던져진 오류 }
+	 */
+	dispatchGraphicError(graphicError) {
+		const graphicErrorListeners = this.#graphicErrorListeners.slice();
+		for (const graphicErrorListener of graphicErrorListeners) {
+			try {
+				graphicErrorListener(graphicError);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
 	}
 
 	//==============================================================================

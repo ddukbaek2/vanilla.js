@@ -10594,5 +10594,14 @@
 	"지은 텍스처의 바이트 읽기": "Reading the bytes of a created texture",
 	"텍스처.": "Texture.",
 	"렌더버퍼. (멀티샘플 렌더 타겟의 색, 깊이)": "Renderbuffer. (Color and depth of a multisample render target)",
-	"버퍼. (정점, 인덱스, 인스턴스, 유니폼)": "Buffer. (Vertex, index, instance, uniform)"
+	"버퍼. (정점, 인덱스, 인스턴스, 유니폼)": "Buffer. (Vertex, index, instance, uniform)",
+	"({ kind, name, error }) => void. 같은 함수는 한 번만 더한다.": "({ kind, name, error }) => void. The same function is added only once.",
+	"그래픽 오류 리스너 더하기. (({ kind, name, error }) => void, kind 는 GraphicErrorKind 의 값)": "Adds a graphic error listener. (({ kind, name, error }) => void, kind is a GraphicErrorKind value)",
+	"셰이더 짓기 실패를 받아 기록하기": "Recording shader build failures",
+	"그래픽 오류 리스너 빼기.": "Removes a graphic error listener.",
+	"더한 오류 리스너 빼기": "Removing an added error listener",
+	"{ kind: GraphicErrorKind 의 값, name: 짓지 못한 것의 이름, error: 던져진 오류 }": "{ kind: a GraphicErrorKind value, name: the name of what could not be built, error: the thrown error }",
+	"그래픽 오류 알리기. (리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)": "Notifies a graphic error. (Passes it to the listeners on the spot, a listener's exception is reported and it moves on to the next)",
+	"그래픽 오류 갈래. (엔진이 그래픽 오류 리스너에 넘기는 { kind, name, error } 의 kind, addGraphicErrorListener)": "Graphic error kinds. (The kind of the { kind, name, error } the engine passes to graphic error listeners, addGraphicErrorListener)",
+	"셰이더 프로그램을 짓지 못함. (컴파일이나 링크 실패, 같은 프로그램은 다시 알리지 않고 짓지도 않는다. 컨텍스트를 잃은 탓의 실패는 알리지 않는다)": "A shader program could not be built. (A compile or link failure, the same program is neither reported again nor rebuilt. A failure caused by losing the context is not reported)"
 }
