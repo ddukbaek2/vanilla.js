@@ -1598,6 +1598,45 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
+	// 바깥 주소 열기. (새 탭, 러스트 판 Engine::open_url 과 같다)
+	// - 웹: window.open(주소, "_blank", "noopener") 로 새 탭에 연다. 기존 페이지는 새 탭이 건드릴 수 없다.
+	// - 사용자 입력(누름, 탭, 키) 처리 안에서 부를 때만 열린다. 브라우저의 팝업 차단 규칙이다. 입력과 상관없이(타이머, 프레임) 부르면 막혀 열리지 않는다.
+	// - 열 수 있는 것은 http, https, mailto, tel 뿐이다. 그 밖의 꼴(javascript:, file: 같은)은 열지 않고 false.
+	//==============================================================================
+	/**
+	 * @param { string } url 열 주소. (http, https, mailto, tel)
+	 * @returns { boolean } 열기를 브라우저에 넘겼으면 참. (브라우저가 막았거나 주소가 맞지 않으면 거짓)
+	 * @example <caption>열 수 없는 꼴은 거짓</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const isOpened = engine.openUrl("javascript:alert(1)");
+	 * 		console.log(isOpened);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	openUrl(url) {
+		if (typeof url !== "string" || !/^(https?:\/\/|mailto:|tel:)/i.test(url)) {
+			return false;
+		}
+		try {
+			const openedWindow = System.window.open(url, "_blank", "noopener");
+			// noopener 로 열면 새 창 손잡이는 null 이라 막힘과 구별되지 않는다. 던지지 않으면 넘긴 것으로 본다.
+			return openedWindow !== undefined;
+		}
+		catch (openError) {
+			return false;
+		}
+	}
+
+	//==============================================================================
 	// 찍기 모드 여부 반환. (주소 쿼리 capture 로 시간을 프레임마다 1/60 초씩 보내는지)
 	//==============================================================================
 	/**
