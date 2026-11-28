@@ -103,7 +103,7 @@ try {
 			camera.setPerspective(0.9, 0.1, 30);
 			camera.setAspectRatio(1);
 			camera.lookAt(Vector3.create(0, 4, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
-			// 담을 것: [모형, 꼴, 자리]. 상자 같은 꼴 여섯, 상자 다른 틴트 셋, 공 같은 꼴 셋, 상자 같은 꼴에 머티리얼 둘, 상자 뒤집은 감기 하나, 비치는 상자 하나.
+			// 담을 것: [모형, 꼴, 자리]. 상자 같은 꼴 여섯, 상자 다른 틴트 셋, 공 같은 꼴 셋, 상자 같은 꼴에 머티리얼 둘, 상자 뒤집은 감기 셋(뒤집은 것끼리만 묶는다), 비치는 상자 하나.
 			const plainLook = { tintColor: [0.9, 0.8, 0.7, 1] };
 			const redLook = { tintColor: [1, 0.4, 0.4, 1] };
 			const entryList = [];
@@ -116,6 +116,8 @@ try {
 			}
 			entryList.push([boxMesh, plainLook, stripe, false]);
 			entryList.push([boxMesh, plainLook, stripe, false]);
+			entryList.push([boxMesh, plainLook, null, true]);
+			entryList.push([boxMesh, plainLook, null, true]);
 			entryList.push([boxMesh, plainLook, null, true]);
 			const itemList = entryList.map(([mesh, look, material, isMirrored], index) => {
 				const modelMatrix = Matrix4.createTranslation((index % 5) * 0.9 - 1.8, 0.25, Math.floor(index / 5) * 0.9 - 1.2);
@@ -183,8 +185,8 @@ finally {
 	await browser.close();
 	server.close();
 }
-// 그림자, 몸, 바깥선 껍데기는 [상자 같은 꼴 6, 상자 빨강 3, 공 3, 상자 머티리얼 2], 선의 판은 [상자 11 (머티리얼과 틴트는 선의 판과 상관없음), 공 3].
-const EXPECTED_INSTANCE_COUNTS = [11, 6, 6, 6, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2];
+// 그림자, 몸, 바깥선 껍데기는 [상자 같은 꼴 6, 상자 빨강 3, 공 3, 상자 머티리얼 2, 상자 뒤집은 감기 3], 선의 판은 [상자 11 (머티리얼과 틴트는 선의 판과 상관없음), 공 3, 상자 뒤집은 감기 3 (뒤집은 것은 뒤집은 것끼리 묶음)].
+const EXPECTED_INSTANCE_COUNTS = [11, 6, 6, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2];
 for (let frame = 0; frame < result.frames.length; ++frame) {
 	const entry = result.frames[frame];
 	const sorted = [...entry.mainInstanceCounts].sort((first, second) => second - first);
@@ -194,7 +196,7 @@ for (let frame = 0; frame < result.frames.length; ++frame) {
 	check(entry.litCount > 1000, frame + " 프레임 무언가 그렸다 (" + entry.litCount + ")");
 	check(entry.differentCount === 0, frame + " 프레임 화면이 묶지 않고 그린 것과 바이트까지 같음 (다른 바이트 " + entry.differentCount + ")");
 }
-// 묶음 자리는 값이 같으면 다시 올리지 않는다. (몸, 그림자 묶음 넷씩 여덟, 바깥선 껍데기는 몸의 자리를 같이 씀, 선의 판 둘도 자기 묶음 자리라 올리지 않음)
-check(result.frames[1].mainUploadCount === result.frames[0].mainUploadCount - 10 && result.frames[2].mainUploadCount === result.frames[1].mainUploadCount, "같은 행렬이면 묶음 자리를 다시 올리지 않음 (" + result.frames.map((entry) => entry.mainUploadCount).join(", ") + ")");
+// 묶음 자리는 값이 같으면 다시 올리지 않는다. (몸, 그림자 묶음 다섯씩 열, 바깥선 껍데기는 몸의 자리를 같이 씀, 선의 판 셋도 자기 묶음 자리라 올리지 않음)
+check(result.frames[1].mainUploadCount === result.frames[0].mainUploadCount - 13 && result.frames[2].mainUploadCount === result.frames[1].mainUploadCount, "같은 행렬이면 묶음 자리를 다시 올리지 않음 (" + result.frames.map((entry) => entry.mainUploadCount).join(", ") + ")");
 check(result.error === 0, "GL 오류 없음 (" + result.error + ")");
 console.log("툰 자동 인스턴싱 크롬 시험 통과 (" + checkCount + " 개 확인)");

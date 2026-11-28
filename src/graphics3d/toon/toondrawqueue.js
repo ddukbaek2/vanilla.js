@@ -1331,7 +1331,7 @@ export class ToonDrawQueue {
 		if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
 			// 자동 인스턴싱: 보통 모형은 담은 차례로 거르고 초점 거리에 더한 뒤(acceptMesh), 같은 모형과 선 꼴인 것을 모아 인스턴스 그리기 한 번으로.
 			// (번호는 인스턴스마다, 깊이가 같은 곳이 아니면 그리는 차례와 상관없이 같은 판)
-			// 묶지 않는 것(인스턴스 묶음, 인스턴스 버퍼, 뒤집은 감기, 뼈대)을 만나면 모은 것을 먼저 그려 그것과의 차례는 담은 차례 그대로 둔다. (선의 판은 LEQUAL)
+			// 감기를 뒤집는 것(행렬식이 음수, 거울에 비친 모습)은 뒤집는 것끼리 묶는다. 묶지 않는 것(인스턴스 묶음, 인스턴스 버퍼, 뼈대)을 만나면 모은 것을 먼저 그려 그것과의 차례는 담은 차례 그대로 둔다. (선의 판은 LEQUAL)
 			const lineMatrices = this.#lineMatrices;
 			const lineIds = this.#lineIds;
 			this.#lineMatrixCount = 0;
@@ -1356,7 +1356,7 @@ export class ToonDrawQueue {
 					screenOutline.drawMeshInstanced(item.mesh, item.instances, lineId, item.options);
 					continue;
 				}
-				if (item.mirrorSign === 1 || item.state[DRAW_STATE_JOINT_MATRICES] !== null) {
+				if (item.state[DRAW_STATE_JOINT_MATRICES] !== null) {
 					this.flushLineGroups(screenOutline);
 					screenOutline.drawMesh(item.mesh, item.modelMatrix, lineId, item.options);
 					continue;
@@ -1368,6 +1368,7 @@ export class ToonDrawQueue {
 				const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
 				const indexStart = options.indexStart;
 				const indexCount = options.indexCount;
+				const isMirrored = item.mirrorSign === 1;
 				// 모형마다 그 모형의 묶음을 잇는다. (모형마다 기억한 첫 묶음 자리, 묶음 번호가 지금 것이 아니면 비었다)
 				let meshGroups = this.#lineGroupOfMesh.get(item.mesh);
 				if (meshGroups === undefined) {
@@ -1383,7 +1384,7 @@ export class ToonDrawQueue {
 				let group = null;
 				for (let groupIndex = meshGroups.firstIndex; groupIndex >= 0; groupIndex = groupPool[groupIndex].nextIndex) {
 					const candidate = groupPool[groupIndex];
-					if (candidate.lineFlags === lineFlags && candidate.indexStart === indexStart && candidate.indexCount === indexCount) {
+					if (candidate.lineFlags === lineFlags && candidate.isMirrored === isMirrored && candidate.indexStart === indexStart && candidate.indexCount === indexCount) {
 						group = candidate;
 						break;
 					}
@@ -1392,11 +1393,12 @@ export class ToonDrawQueue {
 					const groupIndex = this.#lineGroupCount;
 					group = groupPool[groupIndex];
 					if (group === undefined) {
-						group = { item: null, lineFlags: 0, indexStart: undefined, indexCount: undefined, itemIndexList: [], itemIndexCount: 0, nextIndex: -1 };
+						group = { item: null, lineFlags: 0, isMirrored: false, indexStart: undefined, indexCount: undefined, itemIndexList: [], itemIndexCount: 0, nextIndex: -1 };
 						groupPool.push(group);
 					}
 					group.item = item;
 					group.lineFlags = lineFlags;
+					group.isMirrored = isMirrored;
 					group.indexStart = indexStart;
 					group.indexCount = indexCount;
 					group.itemIndexCount = 0;
@@ -1439,7 +1441,7 @@ export class ToonDrawQueue {
 				const sourceIndex = group.itemIndexList[index];
 				this.pushLineMatrix(lineMatrices[sourceIndex], lineIds[sourceIndex]);
 			}
-			screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options, this.#lineBatchSlotCount);
+			screenOutline.drawMeshBatch(group.item.mesh, lineMatrices, lineIds, start, this.#lineMatrixCount - start, group.item.options, this.#lineBatchSlotCount, group.isMirrored);
 			this.#lineBatchSlotCount += 1;
 			group.item = null;
 		}
