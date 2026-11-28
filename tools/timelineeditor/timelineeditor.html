@@ -24195,6 +24195,42 @@ void main() {
       }
     }
     //==============================================================================
+    // 바깥 주소 열기. (새 탭, 러스트 판 Engine::open_url 과 같다)
+    // - 웹: window.open(주소, "_blank", "noopener") 로 새 탭에 연다. 기존 페이지는 새 탭이 건드릴 수 없다.
+    // - 사용자 입력(누름, 탭, 키) 처리 안에서 부를 때만 열린다. 브라우저의 팝업 차단 규칙이다. 입력과 상관없이(타이머, 프레임) 부르면 막혀 열리지 않는다.
+    // - 열 수 있는 것은 http, https, mailto, tel 뿐이다. 그 밖의 꼴(javascript:, file: 같은)은 열지 않고 false.
+    //==============================================================================
+    /**
+     * @param { string } url 열 주소. (http, https, mailto, tel)
+     * @returns { boolean } 열기를 브라우저에 넘겼으면 참. (브라우저가 막았거나 주소가 맞지 않으면 거짓)
+     * @example <caption>열 수 없는 꼴은 거짓</caption>
+     * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+     *
+     * class MainScene extends Scene {
+     * 	async load(engine) {
+     * 		await super.load(engine);
+     * 		const isOpened = engine.openUrl("javascript:alert(1)");
+     * 		console.log(isOpened);
+     * 	}
+     * }
+     *
+     * const engineConfiguration = new EngineConfiguration();
+     * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+     * const engine = new Engine(engineConfiguration);
+     * engine.run(new MainScene());
+     */
+    openUrl(url) {
+      if (typeof url !== "string" || !/^(https?:\/\/|mailto:|tel:)/i.test(url)) {
+        return false;
+      }
+      try {
+        const openedWindow = System32.window.open(url, "_blank", "noopener");
+        return openedWindow !== void 0;
+      } catch (openError) {
+        return false;
+      }
+    }
+    //==============================================================================
     // 찍기 모드 여부 반환. (주소 쿼리 capture 로 시간을 프레임마다 1/60 초씩 보내는지)
     //==============================================================================
     /**
@@ -28243,6 +28279,9 @@ void main() {
     #lineSpacing;
     // 줄 간격 배율.
     /** @private @type { number } */
+    #letterSpacing;
+    // 글자 간격. (픽셀, CSS letter-spacing 과 같은 뜻, 글자 묶음마다 뒤에 더한다)
+    /** @private @type { number } */
     #visibleCharacterCount;
     // 표시 글자 수. (글자 묶음 단위) -1 이면 전체.
     /** @private @type { object } */
@@ -28274,6 +28313,7 @@ void main() {
         italic: false,
         wrapWidth: -1,
         wrapMode: "",
+        letterSpacing: 0,
         fontLoadCount: -1,
         fontFaceCount: -1,
         lineList: null
@@ -28288,6 +28328,7 @@ void main() {
         italic: false,
         fitWidth: -1,
         fitMinimumRatio: -1,
+        letterSpacing: 0,
         fontLoadCount: -1,
         fontFaceCount: -1,
         fittedFontSize: 0
@@ -28309,6 +28350,7 @@ void main() {
       this.#wordWrapWidth = 0;
       this.#wrapMode = "word";
       this.#lineSpacing = 1.25;
+      this.#letterSpacing = 0;
       this.#visibleCharacterCount = -1;
     }
     //==============================================================================
@@ -28432,10 +28474,10 @@ void main() {
         const lineY = blockTop + (lineIndex + 0.5) * lineHeight;
         if (strokeColor && this.#strokeWidth > 0) {
           graphic.setStrokeColor(strokeColor);
-          graphic.drawStrokeText(lineText, drawX, lineY, this.#strokeWidth);
+          this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, true);
         }
         graphic.setFillColor(textColor);
-        graphic.drawFillText(lineText, drawX, lineY);
+        this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, false);
         if (this.#underline || this.#strikethrough) {
           const lineWidth = this.measurePlainTextWidth(lineText);
           const startX = this.computeUnderlineStartX(drawX, lineWidth, textAlign);
@@ -28462,7 +28504,7 @@ void main() {
     readWrappedLines(text, wrapWidth) {
       const wrapCache = this.#wrapCache;
       const fontFaceCount = readFontFaceCount();
-      const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === wrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === fontFaceCount;
+      const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === wrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.letterSpacing === this.#letterSpacing && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === fontFaceCount;
       if (isSame) {
         return wrapCache.lineList;
       }
@@ -28474,6 +28516,7 @@ void main() {
       wrapCache.italic = this.#italic;
       wrapCache.wrapWidth = wrapWidth;
       wrapCache.wrapMode = this.#wrapMode;
+      wrapCache.letterSpacing = this.#letterSpacing;
       wrapCache.fontLoadCount = fontLoadCount;
       wrapCache.fontFaceCount = fontFaceCount;
       wrapCache.lineList = lineList;
@@ -28499,7 +28542,7 @@ void main() {
       measurementContext.save();
       measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
       const measureWidth = /* @__PURE__ */ __name((candidateText) => {
-        return measurementContext.measureText(candidateText).width;
+        return measurementContext.measureText(candidateText).width + countGraphemes(candidateText) * this.#letterSpacing;
       }, "measureWidth");
       const lineList = [];
       const appendByCharacter = /* @__PURE__ */ __name((chunkText, seedText) => {
@@ -28636,11 +28679,11 @@ void main() {
       const strokeColor = this.getStrokeColor();
       if (strokeColor && this.#strokeWidth > 0) {
         graphic.setStrokeColor(strokeColor);
-        graphic.drawStrokeText(text, drawX, drawY, this.#strokeWidth);
+        this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, true);
       }
       const textColor = this.getTextColor();
       graphic.setFillColor(textColor);
-      graphic.drawFillText(text, drawX, drawY);
+      this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, false);
       if (this.#underline || this.#strikethrough) {
         const textWidth = this.measureText(text, fontSize);
         const startX = this.computeUnderlineStartX(drawX, textWidth, textAlign);
@@ -28680,12 +28723,78 @@ void main() {
       if (!text) {
         return 0;
       }
+      const textWidth = this.measureTextWithoutSpacing(text, fontSize);
+      if (this.#letterSpacing === 0) {
+        return textWidth;
+      }
+      return textWidth + countGraphemes(text) * this.#letterSpacing;
+    }
+    //==============================================================================
+    // 글자 간격을 더하지 않은 글 너비. (measureText 와 drawTextLine 의 바탕)
+    //==============================================================================
+    /**
+     * @param { string } text 잴 글.
+     * @param { number } fontSize 글자 크기.
+     * @returns { number } 글자 간격을 빼고 잰 너비. (문서가 없으면 0)
+     */
+    measureTextWithoutSpacing(text, fontSize) {
       const fontString = buildFontString(this.#fontFace, fontSize, this.#bold, this.#italic);
       const textMetrics = measureTextMetrics(fontString, text);
       if (textMetrics === null) {
         return 0;
       }
       return textMetrics.width;
+    }
+    //==============================================================================
+    // 한 줄 글 그리기. (글자 간격이 0 이면 한 번에, 아니면 글자 묶음마다 간격을 더한 자리에)
+    // - 자리(k) = 자리(k-1) + (앞 글자 묶음과 이 묶음을 붙인 너비) - (이 묶음만의 너비) + 글자 간격. 짝 커닝은 그대로 남는다.
+    // - 글 전체 너비는 글자 묶음 수 x 글자 간격을 더한 값이다. (CSS letter-spacing 처럼 마지막 글자 뒤에도 더한다) 정렬은 이 너비로 잡는다.
+    // - 오른쪽에서 왼쪽으로 쓰는 글은 글자 간격 없이 그린다.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic 그래픽. (글꼴, 색, 정렬, 세로 기준이 이미 정해진 것)
+     * @param { string } text 그릴 한 줄 글.
+     * @param { number } x 정렬의 기준 X.
+     * @param { number } y 세로 기준 Y.
+     * @param { string } textAlign 실제 가로 정렬. ("left", "right", "center")
+     * @param { number } fontSize 글자 크기. (자리 재기용)
+     * @param { boolean } isStroke 참이면 바깥선, 거짓이면 채움.
+     */
+    drawTextLine(graphic, text, x, y, textAlign, fontSize, isStroke) {
+      const letterSpacing = this.#letterSpacing;
+      if (letterSpacing === 0 || graphic.getTextDirection() === "rtl") {
+        if (isStroke) {
+          graphic.drawStrokeText(text, x, y, this.#strokeWidth);
+        } else {
+          graphic.drawFillText(text, x, y);
+        }
+        return;
+      }
+      const graphemeList = splitGraphemes(text);
+      const totalWidth = this.measureTextWithoutSpacing(text, fontSize) + graphemeList.length * letterSpacing;
+      let drawX = x;
+      if (textAlign === "right") {
+        drawX = x - totalWidth;
+      } else if (textAlign === "center") {
+        drawX = x - totalWidth * 0.5;
+      }
+      graphic.setTextAlign("left");
+      let previousGrapheme = null;
+      let position = 0;
+      for (const grapheme of graphemeList) {
+        if (previousGrapheme !== null) {
+          const pairWidth = this.measureTextWithoutSpacing(previousGrapheme + grapheme, fontSize);
+          const graphemeWidth = this.measureTextWithoutSpacing(grapheme, fontSize);
+          position += pairWidth - graphemeWidth + letterSpacing;
+        }
+        if (isStroke) {
+          graphic.drawStrokeText(grapheme, drawX + position, y, this.#strokeWidth);
+        } else {
+          graphic.drawFillText(grapheme, drawX + position, y);
+        }
+        previousGrapheme = grapheme;
+      }
+      graphic.setTextAlign(textAlign);
     }
     //==============================================================================
     // 한 줄 글을 너비에 맞추기 설정. (넘치면 처음 크기에서 최소 비율까지 줄여 그린다)
@@ -28759,7 +28868,7 @@ void main() {
       }
       const fitCache = this.#fitCache;
       const fontFaceCount = readFontFaceCount();
-      const isSame = fitCache.text === text && fitCache.fontFace === this.#fontFace && fitCache.fontSize === this.#fontSize && fitCache.bold === this.#bold && fitCache.italic === this.#italic && fitCache.fitWidth === this.#fitWidth && fitCache.fitMinimumRatio === this.#fitMinimumRatio && fitCache.fontLoadCount === fontLoadCount && fitCache.fontFaceCount === fontFaceCount;
+      const isSame = fitCache.text === text && fitCache.fontFace === this.#fontFace && fitCache.fontSize === this.#fontSize && fitCache.bold === this.#bold && fitCache.italic === this.#italic && fitCache.fitWidth === this.#fitWidth && fitCache.fitMinimumRatio === this.#fitMinimumRatio && fitCache.letterSpacing === this.#letterSpacing && fitCache.fontLoadCount === fontLoadCount && fitCache.fontFaceCount === fontFaceCount;
       if (isSame) {
         return fitCache.fittedFontSize;
       }
@@ -28776,6 +28885,7 @@ void main() {
       fitCache.italic = this.#italic;
       fitCache.fitWidth = this.#fitWidth;
       fitCache.fitMinimumRatio = this.#fitMinimumRatio;
+      fitCache.letterSpacing = this.#letterSpacing;
       fitCache.fontLoadCount = fontLoadCount;
       fitCache.fontFaceCount = fontFaceCount;
       fitCache.fittedFontSize = fittedFontSize;
@@ -28825,6 +28935,7 @@ void main() {
       geometryKey.add(this.#wordWrapWidth);
       geometryKey.add(this.#wrapMode);
       geometryKey.add(this.#lineSpacing);
+      geometryKey.add(this.#letterSpacing);
       geometryKey.add(this.#visibleCharacterCount);
       geometryKey.add(this.#fitWidth);
       geometryKey.add(this.#fitMinimumRatio);
@@ -28970,7 +29081,7 @@ void main() {
         return -1;
       }
       const wrapCache = this.#wrapCache;
-      const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === this.#wordWrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === readFontFaceCount();
+      const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === this.#wordWrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.letterSpacing === this.#letterSpacing && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === readFontFaceCount();
       return isSame ? wrapCache.lineList.length : -1;
     }
     //==============================================================================
@@ -29061,7 +29172,7 @@ void main() {
       }
       measurementContext.save();
       measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-      const width = measurementContext.measureText(text).width;
+      const width = measurementContext.measureText(text).width + countGraphemes(text) * this.#letterSpacing;
       measurementContext.restore();
       return Vector2.create(width, this.#fontSize);
     }
@@ -29172,6 +29283,25 @@ void main() {
      */
     getLineSpacing() {
       return this.#lineSpacing;
+    }
+    //==============================================================================
+    // 글자 간격 설정. (CSS letter-spacing, 언리얼 UMG 글자 간격과 같은 뜻)
+    //==============================================================================
+    /**
+     * @param { number } letterSpacing 글자 묶음마다 뒤에 더하는 간격. (픽셀, 음수는 좁힘, 처음은 0)
+     */
+    setLetterSpacing(letterSpacing) {
+      this.#letterSpacing = letterSpacing;
+      this.markDrawnRectDirty();
+    }
+    //==============================================================================
+    // 글자 간격 반환.
+    //==============================================================================
+    /**
+     * @returns { number } 글자 간격. (픽셀, 처음은 0)
+     */
+    getLetterSpacing() {
+      return this.#letterSpacing;
     }
     //==============================================================================
     // 표시 글자 수 설정. (-1 이면 전체, 타자기 연출용. 글자 묶음 단위)

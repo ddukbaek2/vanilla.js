@@ -314,6 +314,7 @@ export class Text extends Component {
 	/** @private @type { number } */ #wordWrapWidth; // 0 이면 한 줄. 넘으면 이 폭에서 줄을 바꾼다.
 	/** @private @type { string } */ #wrapMode; // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
 	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
+	/** @private @type { number } */ #letterSpacing; // 글자 간격. (픽셀, CSS letter-spacing 과 같은 뜻, 글자 묶음마다 뒤에 더한다)
 	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. (글자 묶음 단위) -1 이면 전체.
 	/** @private @type { object } */ #wrapCache; // 그릴 때 나눈 줄과 그때의 글, 글꼴, 크기, 폭, 줄바꿈 방식. (같으면 다시 나누지 않는다)
 	/** @private @type { number } */ #fitWidth; // 한 줄 글을 맞출 너비. (0 이면 맞추지 않는다)
@@ -335,6 +336,7 @@ export class Text extends Component {
 			italic: false,
 			wrapWidth: -1,
 			wrapMode: "",
+			letterSpacing: 0,
 			fontLoadCount: -1,
 			fontFaceCount: -1,
 			lineList: null,
@@ -349,6 +351,7 @@ export class Text extends Component {
 			italic: false,
 			fitWidth: -1,
 			fitMinimumRatio: -1,
+			letterSpacing: 0,
 			fontLoadCount: -1,
 			fontFaceCount: -1,
 			fittedFontSize: 0,
@@ -370,6 +373,7 @@ export class Text extends Component {
 		this.#wordWrapWidth = 0;
 		this.#wrapMode = "word";
 		this.#lineSpacing = 1.25;
+		this.#letterSpacing = 0;
 		this.#visibleCharacterCount = -1;
 	}
 
@@ -509,10 +513,10 @@ export class Text extends Component {
 			const lineY = blockTop + (lineIndex + 0.5) * lineHeight;
 			if (strokeColor && this.#strokeWidth > 0) {
 				graphic.setStrokeColor(strokeColor);
-				graphic.drawStrokeText(lineText, drawX, lineY, this.#strokeWidth);
+				this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, true);
 			}
 			graphic.setFillColor(textColor);
-			graphic.drawFillText(lineText, drawX, lineY);
+			this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, false);
 
 			if (this.#underline || this.#strikethrough) {
 				const lineWidth = this.measurePlainTextWidth(lineText);
@@ -549,6 +553,7 @@ export class Text extends Component {
 			&& wrapCache.italic === this.#italic
 			&& wrapCache.wrapWidth === wrapWidth
 			&& wrapCache.wrapMode === this.#wrapMode
+			&& wrapCache.letterSpacing === this.#letterSpacing
 			&& wrapCache.fontLoadCount === fontLoadCount
 			&& wrapCache.fontFaceCount === fontFaceCount;
 		if (isSame) {
@@ -562,6 +567,7 @@ export class Text extends Component {
 		wrapCache.italic = this.#italic;
 		wrapCache.wrapWidth = wrapWidth;
 		wrapCache.wrapMode = this.#wrapMode;
+		wrapCache.letterSpacing = this.#letterSpacing;
 		wrapCache.fontLoadCount = fontLoadCount;
 		wrapCache.fontFaceCount = fontFaceCount;
 		wrapCache.lineList = lineList;
@@ -588,7 +594,7 @@ export class Text extends Component {
 		measurementContext.save();
 		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
 		const measureWidth = (candidateText) => {
-			return measurementContext.measureText(candidateText).width;
+			return measurementContext.measureText(candidateText).width + countGraphemes(candidateText) * this.#letterSpacing;
 		};
 
 		const lineList = [];
@@ -742,12 +748,12 @@ export class Text extends Component {
 		const strokeColor = this.getStrokeColor();
 		if (strokeColor && this.#strokeWidth > 0) {
 			graphic.setStrokeColor(strokeColor);
-			graphic.drawStrokeText(text, drawX, drawY, this.#strokeWidth);
+			this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, true);
 		}
 
 		const textColor = this.getTextColor();
 		graphic.setFillColor(textColor);
-		graphic.drawFillText(text, drawX, drawY);
+		this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, false);
 
 		if (this.#underline || this.#strikethrough) {
 			const textWidth = this.measureText(text, fontSize);
@@ -790,12 +796,83 @@ export class Text extends Component {
 		if (!text) {
 			return 0;
 		}
+		const textWidth = this.measureTextWithoutSpacing(text, fontSize);
+		if (this.#letterSpacing === 0) {
+			return textWidth;
+		}
+		return textWidth + countGraphemes(text) * this.#letterSpacing;
+	}
+
+	//==============================================================================
+	// 글자 간격을 더하지 않은 글 너비. (measureText 와 drawTextLine 의 바탕)
+	//==============================================================================
+	/**
+	 * @param { string } text 잴 글.
+	 * @param { number } fontSize 글자 크기.
+	 * @returns { number } 글자 간격을 빼고 잰 너비. (문서가 없으면 0)
+	 */
+	measureTextWithoutSpacing(text, fontSize) {
 		const fontString = buildFontString(this.#fontFace, fontSize, this.#bold, this.#italic);
 		const textMetrics = measureTextMetrics(fontString, text);
 		if (textMetrics === null) {
 			return 0;
 		}
 		return textMetrics.width;
+	}
+
+	//==============================================================================
+	// 한 줄 글 그리기. (글자 간격이 0 이면 한 번에, 아니면 글자 묶음마다 간격을 더한 자리에)
+	// - 자리(k) = 자리(k-1) + (앞 글자 묶음과 이 묶음을 붙인 너비) - (이 묶음만의 너비) + 글자 간격. 짝 커닝은 그대로 남는다.
+	// - 글 전체 너비는 글자 묶음 수 x 글자 간격을 더한 값이다. (CSS letter-spacing 처럼 마지막 글자 뒤에도 더한다) 정렬은 이 너비로 잡는다.
+	// - 오른쪽에서 왼쪽으로 쓰는 글은 글자 간격 없이 그린다.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그래픽. (글꼴, 색, 정렬, 세로 기준이 이미 정해진 것)
+	 * @param { string } text 그릴 한 줄 글.
+	 * @param { number } x 정렬의 기준 X.
+	 * @param { number } y 세로 기준 Y.
+	 * @param { string } textAlign 실제 가로 정렬. ("left", "right", "center")
+	 * @param { number } fontSize 글자 크기. (자리 재기용)
+	 * @param { boolean } isStroke 참이면 바깥선, 거짓이면 채움.
+	 */
+	drawTextLine(graphic, text, x, y, textAlign, fontSize, isStroke) {
+		const letterSpacing = this.#letterSpacing;
+		if (letterSpacing === 0 || graphic.getTextDirection() === "rtl") {
+			if (isStroke) {
+				graphic.drawStrokeText(text, x, y, this.#strokeWidth);
+			}
+			else {
+				graphic.drawFillText(text, x, y);
+			}
+			return;
+		}
+		const graphemeList = splitGraphemes(text);
+		const totalWidth = this.measureTextWithoutSpacing(text, fontSize) + graphemeList.length * letterSpacing;
+		let drawX = x;
+		if (textAlign === "right") {
+			drawX = x - totalWidth;
+		}
+		else if (textAlign === "center") {
+			drawX = x - totalWidth * 0.5;
+		}
+		graphic.setTextAlign("left");
+		let previousGrapheme = null;
+		let position = 0;
+		for (const grapheme of graphemeList) {
+			if (previousGrapheme !== null) {
+				const pairWidth = this.measureTextWithoutSpacing(previousGrapheme + grapheme, fontSize);
+				const graphemeWidth = this.measureTextWithoutSpacing(grapheme, fontSize);
+				position += pairWidth - graphemeWidth + letterSpacing;
+			}
+			if (isStroke) {
+				graphic.drawStrokeText(grapheme, drawX + position, y, this.#strokeWidth);
+			}
+			else {
+				graphic.drawFillText(grapheme, drawX + position, y);
+			}
+			previousGrapheme = grapheme;
+		}
+		graphic.setTextAlign(textAlign);
 	}
 
 	//==============================================================================
@@ -880,6 +957,7 @@ export class Text extends Component {
 			&& fitCache.italic === this.#italic
 			&& fitCache.fitWidth === this.#fitWidth
 			&& fitCache.fitMinimumRatio === this.#fitMinimumRatio
+			&& fitCache.letterSpacing === this.#letterSpacing
 			&& fitCache.fontLoadCount === fontLoadCount
 			&& fitCache.fontFaceCount === fontFaceCount;
 		if (isSame) {
@@ -898,6 +976,7 @@ export class Text extends Component {
 		fitCache.italic = this.#italic;
 		fitCache.fitWidth = this.#fitWidth;
 		fitCache.fitMinimumRatio = this.#fitMinimumRatio;
+		fitCache.letterSpacing = this.#letterSpacing;
 		fitCache.fontLoadCount = fontLoadCount;
 		fitCache.fontFaceCount = fontFaceCount;
 		fitCache.fittedFontSize = fittedFontSize;
@@ -949,6 +1028,7 @@ export class Text extends Component {
 		geometryKey.add(this.#wordWrapWidth);
 		geometryKey.add(this.#wrapMode);
 		geometryKey.add(this.#lineSpacing);
+		geometryKey.add(this.#letterSpacing);
 		geometryKey.add(this.#visibleCharacterCount);
 		geometryKey.add(this.#fitWidth);
 		geometryKey.add(this.#fitMinimumRatio);
@@ -1117,6 +1197,7 @@ export class Text extends Component {
 			&& wrapCache.italic === this.#italic
 			&& wrapCache.wrapWidth === this.#wordWrapWidth
 			&& wrapCache.wrapMode === this.#wrapMode
+			&& wrapCache.letterSpacing === this.#letterSpacing
 			&& wrapCache.fontLoadCount === fontLoadCount
 			&& wrapCache.fontFaceCount === readFontFaceCount();
 		return isSame ? wrapCache.lineList.length : -1;
@@ -1214,7 +1295,7 @@ export class Text extends Component {
 		}
 		measurementContext.save();
 		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-		const width = measurementContext.measureText(text).width;
+		const width = measurementContext.measureText(text).width + countGraphemes(text) * this.#letterSpacing;
 		measurementContext.restore();
 		return Vector2.create(width, this.#fontSize);
 	}
@@ -1335,6 +1416,27 @@ export class Text extends Component {
 	 */
 	getLineSpacing() {
 		return this.#lineSpacing;
+	}
+
+	//==============================================================================
+	// 글자 간격 설정. (CSS letter-spacing, 언리얼 UMG 글자 간격과 같은 뜻)
+	//==============================================================================
+	/**
+	 * @param { number } letterSpacing 글자 묶음마다 뒤에 더하는 간격. (픽셀, 음수는 좁힘, 처음은 0)
+	 */
+	setLetterSpacing(letterSpacing) {
+		this.#letterSpacing = letterSpacing;
+		this.markDrawnRectDirty();
+	}
+
+	//==============================================================================
+	// 글자 간격 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 글자 간격. (픽셀, 처음은 0)
+	 */
+	getLetterSpacing() {
+		return this.#letterSpacing;
 	}
 
 	//==============================================================================

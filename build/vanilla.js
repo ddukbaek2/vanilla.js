@@ -15021,6 +15021,17 @@ var Engine = class extends Object2 {
     } catch (closeError) {
     }
   }
+  openUrl(url) {
+    if (typeof url !== "string" || !/^(https?:\/\/|mailto:|tel:)/i.test(url)) {
+      return false;
+    }
+    try {
+      const openedWindow = System35.window.open(url, "_blank", "noopener");
+      return openedWindow !== void 0;
+    } catch (openError) {
+      return false;
+    }
+  }
   isCaptureTimeStepFixed() {
     return this.#isCaptureTimeStepFixed;
   }
@@ -15310,6 +15321,917 @@ var Engine = class extends Object2 {
     return System35.vanillaEngine;
   }
 };
+var FULLSCREEN_VERTEXSHADER_SOURCE = `#version 300 es
+out vec2 fragmentCoordinate;
+out vec2 fragmentTextureCoordinate;
+void main() {
+	vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+	vec2 position = positions[gl_VertexID];
+	fragmentCoordinate = position;
+	fragmentTextureCoordinate = position * 0.5 + 0.5;
+	gl_Position = vec4(position, 0.999, 1.0);
+}
+`;
+var FullscreenPass = class extends Object2 {
+  static {
+    __name(this, "FullscreenPass");
+  }
+  #webGL2RenderingContext;
+  #shaderProgram;
+  #vertexArray;
+  constructor(webGL2RenderingContext, fragmentShaderSource) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE.trim(), fragmentShaderSource.trim());
+    this.#vertexArray = webGL2RenderingContext.createVertexArray();
+  }
+  useProgram() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shaderProgram = this.getShaderProgram();
+    shaderProgram.useProgram();
+    const vertexArray = this.getVertexArray();
+    webGL2RenderingContext.bindVertexArray(vertexArray);
+  }
+  draw() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+  }
+  getUniformLocation(uniformName) {
+    const shaderProgram = this.getShaderProgram();
+    const uniformLocation = shaderProgram.getUniformLocation(uniformName);
+    return uniformLocation;
+  }
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  getShaderProgram() {
+    return this.#shaderProgram;
+  }
+  getVertexArray() {
+    return this.#vertexArray;
+  }
+  destroy() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shaderProgram = this.getShaderProgram();
+    webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
+    webGL2RenderingContext.deleteVertexArray(this.#vertexArray);
+  }
+};
+var System36 = globalThis;
+var ScreenEffectType = { lensDistortion: "lensDistortion", bulge: "bulge", swirl: "swirl", kaleidoscope: "kaleidoscope", mirror: "mirror", ripple: "ripple", heatHaze: "heatHaze", jitter: "jitter", doubleVision: "doubleVision", pixelate: "pixelate", shockwave: "shockwave", wave: "wave", motionBlur: "motionBlur", zoomBlur: "zoomBlur", blur: "blur", tiltShift: "tiltShift", godRays: "godRays", bloom: "bloom", anamorphic: "anamorphic", glitch: "glitch", vhs: "vhs", chromatic: "chromatic", whiteBalance: "whiteBalance", liftGammaGain: "liftGammaGain", colorGrade: "colorGrade", hueShift: "hueShift", splitToning: "splitToning", tonemap: "tonemap", gradientMap: "gradientMap", sepia: "sepia", grayscale: "grayscale", posterize: "posterize", dither: "dither", halftone: "halftone", sharpen: "sharpen", edgeDetect: "edgeDetect", oldFilm: "oldFilm", nightVision: "nightVision", invert: "invert", scanline: "scanline", grain: "grain", rain: "rain", fog: "fog", vignette: "vignette", spotlight: "spotlight", speedLines: "speedLines", letterbox: "letterbox", pixelDissolve: "pixelDissolve", wipe: "wipe", irisWipe: "irisWipe", diamondWipe: "diamondWipe", clockWipe: "clockWipe", blinds: "blinds", checkerWipe: "checkerWipe", noiseFade: "noiseFade", burn: "burn", tvOff: "tvOff", fade: "fade" };
+var EFFECT_ORDER = ["lensDistortion", "bulge", "swirl", "kaleidoscope", "mirror", "ripple", "heatHaze", "jitter", "doubleVision", "pixelate", "shockwave", "wave", "motionBlur", "zoomBlur", "blur", "tiltShift", "godRays", "bloom", "anamorphic", "glitch", "vhs", "chromatic", "whiteBalance", "liftGammaGain", "colorGrade", "hueShift", "splitToning", "tonemap", "gradientMap", "sepia", "grayscale", "posterize", "dither", "halftone", "sharpen", "edgeDetect", "oldFilm", "nightVision", "invert", "scanline", "grain", "rain", "fog", "vignette", "spotlight", "speedLines", "letterbox", "pixelDissolve", "wipe", "irisWipe", "diamondWipe", "clockWipe", "blinds", "checkerWipe", "noiseFade", "burn", "tvOff", "fade"];
+var DEFAULT_PARAMETER_TABLE = { lensDistortion: [0.35, 0, 0, 0], bulge: [0.5, 0.5, 0.5, 0.5], swirl: [0.5, 0.5, 0.6, 0.5], kaleidoscope: [6, 0, 0, 0], mirror: [0, 0, 0, 0], ripple: [0.5, 0.5, 40, 6], heatHaze: [6, 1.5, 0, 0], jitter: [8, 24, 0, 0], doubleVision: [0.02, 3, 0, 0], pixelate: [12, 0, 0, 0], shockwave: [0.5, 0.5, 0, 0.1], wave: [18, 4, 0, 0], motionBlur: [0, 24, 0, 0], zoomBlur: [0.5, 0.5, 0.35, 0], blur: [4, 0, 0, 0], tiltShift: [0.5, 0.18, 6, 0], godRays: [0.5, 0.35, 0.6, 0.94], bloom: [0.65, 1.2, 4, 0], anamorphic: [0.75, 1.5, 24, 0], glitch: [20, 10, 0.08, 0], vhs: [0.01, 0.35, 0, 0], chromatic: [1, 0, 0, 0], whiteBalance: [0.4, 0, 0, 0], liftGammaGain: [0, 1, 1, 0], colorGrade: [1, 1, 1, 0], hueShift: [1, 0, 0, 0], splitToning: [0.1, 0.15, 0.45, 0.5], tonemap: [1, 0, 0, 0], gradientMap: [0.05, 0.03, 0.2, 0], sepia: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], posterize: [5, 0, 0, 0], dither: [4, 2, 0, 0], halftone: [6, 0, 0, 0], sharpen: [0, 0, 0, 0], edgeDetect: [0, 0, 0, 0], oldFilm: [0, 0, 0, 0], nightVision: [0, 0, 0, 0], invert: [0, 0, 0, 0], scanline: [0.15, 0.5, 0, 0], grain: [0, 0, 0, 0], rain: [90, 8, 1.6, 0], fog: [0.35, 1, 0, 0], vignette: [0.45, 1.1, 0, 0], spotlight: [0.5, 0.5, 0.25, 0.2], speedLines: [0.5, 0.5, 14, 6], letterbox: [0.12, 0, 0, 0], pixelDissolve: [24, 0, 0, 0], wipe: [1, 0, 0.05, 0], irisWipe: [0.5, 0.5, 0.05, 0], diamondWipe: [0.05, 0, 0, 0], clockWipe: [0.02, 0, 0, 0], blinds: [10, 0.05, 0, 0], checkerWipe: [10, 0, 0, 0], noiseFade: [5, 0.2, 0, 0], burn: [5, 0.06, 0, 0], tvOff: [0, 0, 0, 0], fade: [0, 0, 0, 0] };
+var SCREEN_EFFECT_PARAMETER_NAMES = { lensDistortion: ["intensity"], bulge: ["centerX", "centerY", "intensity", "radius"], swirl: ["centerX", "centerY", "turns", "radius"], kaleidoscope: ["segments"], mirror: ["axis"], ripple: ["centerX", "centerY", "frequency", "speed"], heatHaze: ["scale", "speed"], jitter: ["amplitude", "rate"], doubleVision: ["offset", "speed"], pixelate: ["blockSize"], shockwave: ["centerX", "centerY", "radius", "width"], wave: ["frequency", "speed"], motionBlur: ["angle", "length"], zoomBlur: ["centerX", "centerY", "length"], blur: ["radius"], tiltShift: ["focusY", "focusWidth", "radius"], godRays: ["centerX", "centerY", "threshold", "decay"], bloom: ["threshold", "intensity", "radius"], anamorphic: ["threshold", "intensity", "width"], glitch: ["rows", "rate", "shift"], vhs: ["wobble", "noise"], chromatic: ["scale"], whiteBalance: ["temperature", "tint"], liftGammaGain: ["lift", "gamma", "gain"], colorGrade: ["contrast", "saturation", "brightness"], hueShift: ["turns"], splitToning: ["shadowRed", "shadowGreen", "shadowBlue", "balance"], tonemap: ["exposure"], gradientMap: ["darkRed", "darkGreen", "darkBlue"], sepia: [], grayscale: [], posterize: ["levels"], dither: ["levels", "pixelSize"], halftone: ["cellSize"], sharpen: [], edgeDetect: [], oldFilm: [], nightVision: [], invert: [], scanline: ["curvature", "density"], grain: [], rain: ["columns", "density", "speed"], fog: ["start", "end"], vignette: ["inner", "outer"], spotlight: ["centerX", "centerY", "radius", "softness"], speedLines: ["centerX", "centerY", "density", "speed"], letterbox: ["vertical", "horizontal"], pixelDissolve: ["blocks"], wipe: ["directionX", "directionY", "softness"], irisWipe: ["centerX", "centerY", "softness"], diamondWipe: ["softness"], clockWipe: ["softness"], blinds: ["count", "softness"], checkerWipe: ["cells"], noiseFade: ["scale", "softness"], burn: ["scale", "width"], tvOff: [], fade: [] };
+var DEFAULT_COLOR_TABLE = { shockwave: [1, 1, 1, 0.6], godRays: [1, 0.95, 0.8, 1], anamorphic: [0.5, 0.7, 1, 1], colorGrade: [1, 1, 1, 0], splitToning: [1, 0.85, 0.55, 1], gradientMap: [1, 0.9, 0.6, 1], edgeDetect: [1, 1, 1, 1], nightVision: [0.35, 1, 0.45, 1], rain: [0.8, 0.9, 1, 0.45], fog: [0.75, 0.8, 0.9, 1], vignette: [0, 0, 0, 1], spotlight: [0, 0, 0, 1], speedLines: [1, 1, 1, 0.8], letterbox: [0, 0, 0, 1], pixelDissolve: [0, 0, 0, 1], wipe: [0, 0, 0, 1], irisWipe: [0, 0, 0, 1], diamondWipe: [0, 0, 0, 1], clockWipe: [0, 0, 0, 1], blinds: [0, 0, 0, 1], checkerWipe: [0, 0, 0, 1], noiseFade: [0, 0, 0, 1], burn: [0, 0, 0, 1], tvOff: [0, 0, 0, 1], fade: [0, 0, 0, 1] };
+var FRAGMENTSHADER_HEADER = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D sourceTexture;
+uniform sampler2D auxiliaryTexture;
+uniform vec2 resolution;
+uniform float time;
+uniform float strength;
+uniform vec4 parameters;
+uniform vec4 effectColor;
+out vec4 outputColor;
+
+// \uC810 \uD574\uC2DC. \uB450 float \uC758 \uBE44\uD2B8\uB97C MurmurHash3 \uC758 fmix32 \uB9C8\uBB34\uB9AC(Austin Appleby, \uACF5\uAC1C \uB3C4\uBA54\uC778)\uB85C \uC11E\uC5B4 [0, 1) \uB85C \uB0B8\uB2E4.
+highp uint hashMix32(highp uint value) {
+	value ^= value >> 16u;
+	value *= 0x85ebca6bu;
+	value ^= value >> 13u;
+	value *= 0xc2b2ae35u;
+	value ^= value >> 16u;
+	return value;
+}
+
+float hash21(vec2 point) {
+	highp uvec2 bits = floatBitsToUint(point);
+	highp uint value = hashMix32(bits.x ^ hashMix32(bits.y + 0x9e3779b9u));
+	return float(value >> 8u) * (1.0 / 16777216.0);
+}
+
+float valueNoise(vec2 point) {
+	vec2 cell = floor(point);
+	vec2 fraction = fract(point);
+	vec2 blend = fraction * fraction * (3.0 - 2.0 * fraction);
+	float bottom = mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), blend.x);
+	float top = mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0, 1.0)), blend.x);
+	return mix(bottom, top, blend.y);
+}
+
+vec4 sampleScreen(vec2 screenUv) {
+	vec2 clamped = clamp(screenUv, 0.0, 1.0);
+	return texture(sourceTexture, vec2(clamped.x, 1.0 - clamped.y));
+}
+
+float luminanceAt(vec2 uv) {
+	return dot(texture(sourceTexture, uv).rgb, vec3(0.299, 0.587, 0.114));
+}
+
+void main() {
+	vec2 uv = fragmentTextureCoordinate;
+	vec2 screenUv = vec2(uv.x, 1.0 - uv.y);
+	vec4 color = texture(sourceTexture, uv);
+`;
+var FRAGMENTSHADER_FOOTER = `
+	outputColor = vec4(color.rgb, 1.0);
+}
+`;
+var EFFECT_BODY_TABLE = { copy: ``, lensDistortion: `
+	vec2 centered = uv - 0.5;
+	float radiusSquared = dot(centered, centered);
+	float distortion = parameters.x * strength;
+	vec2 warped = uv + centered * radiusSquared * distortion;
+	warped = 0.5 + (warped - 0.5) / (1.0 + 0.25 * max(distortion, 0.0));
+	vec2 insideMask = step(vec2(0.0), warped) * step(warped, vec2(1.0));
+	color = texture(sourceTexture, warped) * insideMask.x * insideMask.y;
+	`, bulge: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float bulgeDistance = length(fromCenter) / max(parameters.w, 0.001);
+	float bulgeFactor = 1.0 - parameters.z * strength * (1.0 - clamp(bulgeDistance, 0.0, 1.0));
+	vec2 warpedScreen = parameters.xy + fromCenter * bulgeFactor / vec2(aspect, 1.0);
+	color = sampleScreen(warpedScreen);
+	`, swirl: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float swirlDistance = length(fromCenter) / max(parameters.w, 0.001);
+	float swirlAngle = parameters.z * strength * 6.28318530718 * pow(1.0 - clamp(swirlDistance, 0.0, 1.0), 2.0);
+	float cosine = cos(swirlAngle);
+	float sine = sin(swirlAngle);
+	vec2 rotated = vec2(fromCenter.x * cosine - fromCenter.y * sine, fromCenter.x * sine + fromCenter.y * cosine);
+	color = sampleScreen(parameters.xy + rotated / vec2(aspect, 1.0));
+	`, kaleidoscope: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - 0.5) * vec2(aspect, 1.0);
+	float kaleidoRadius = length(fromCenter);
+	float segmentAngle = 6.28318530718 / max(parameters.x, 1.0);
+	float kaleidoAngle = atan(fromCenter.y, fromCenter.x);
+	kaleidoAngle = abs(mod(kaleidoAngle, segmentAngle) - segmentAngle * 0.5);
+	vec2 mirroredScreen = 0.5 + vec2(cos(kaleidoAngle), sin(kaleidoAngle)) * kaleidoRadius / vec2(aspect, 1.0);
+	color = mix(color, sampleScreen(mirroredScreen), strength);
+	`, mirror: `
+	vec2 mirroredScreen = screenUv;
+	if (parameters.x < 0.5) {
+		mirroredScreen.x = screenUv.x < 0.5 ? screenUv.x : 1.0 - screenUv.x;
+	}
+	else {
+		mirroredScreen.y = screenUv.y < 0.5 ? screenUv.y : 1.0 - screenUv.y;
+	}
+	color = mix(color, sampleScreen(mirroredScreen), step(0.5, strength));
+	`, ripple: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float rippleDistance = length(fromCenter);
+	float rippleWave = sin(rippleDistance * parameters.z - time * parameters.w) * strength * 0.012 / (1.0 + rippleDistance * 4.0);
+	vec2 rippleDirection = rippleDistance > 0.0001 ? fromCenter / rippleDistance : vec2(0.0);
+	color = sampleScreen(screenUv + rippleDirection * rippleWave / vec2(aspect, 1.0));
+	`, heatHaze: `
+	vec2 hazeOffset = vec2(valueNoise(uv * parameters.x + vec2(0.0, time * parameters.y)), valueNoise(uv * parameters.x + vec2(time * parameters.y, 7.3))) - 0.5;
+	color = texture(sourceTexture, uv + hazeOffset * strength * 0.03);
+	`, jitter: `
+	float jitterSeed = floor(time * parameters.y);
+	vec2 jitterOffset = (vec2(hash21(vec2(jitterSeed, 1.0)), hash21(vec2(jitterSeed, 2.0))) - 0.5) * parameters.x * strength / resolution;
+	color = texture(sourceTexture, clamp(uv + jitterOffset, 0.0, 1.0));
+	`, doubleVision: `
+	vec2 visionOffset = vec2(sin(time * parameters.y) * parameters.x, cos(time * parameters.y * 0.7) * parameters.x * 0.5) * strength;
+	color = (texture(sourceTexture, uv + visionOffset) + texture(sourceTexture, uv - visionOffset)) * 0.5;
+	`, pixelate: `
+	float block = max(1.0, parameters.x * strength);
+	vec2 pixelUv = (floor(uv * resolution / block) + 0.5) * block / resolution;
+	color = texture(sourceTexture, pixelUv);
+	`, shockwave: `
+	float aspect = resolution.x / resolution.y;
+	vec2 delta = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float ringDistance = length(delta);
+	float ringWidth = max(parameters.w, 0.001);
+	float ring = 1.0 - smoothstep(0.0, ringWidth, abs(ringDistance - parameters.z));
+	float wave = sin((ringDistance - parameters.z) / ringWidth * 3.14159265) * ring;
+	vec2 direction = ringDistance > 0.0001 ? delta / ringDistance : vec2(0.0);
+	vec2 uvDirection = vec2(direction.x, -direction.y);
+	vec2 displaced = uv - uvDirection / vec2(aspect, 1.0) * wave * strength * 0.06;
+	color = texture(sourceTexture, displaced);
+	color.rgb += effectColor.rgb * ring * ring * strength * effectColor.a;
+	`, wave: `
+	vec2 displaced = uv + vec2(sin(uv.y * parameters.x + time * parameters.y), cos(uv.x * parameters.x * 0.7 + time * parameters.y * 0.8)) * strength * 0.012;
+	color = texture(sourceTexture, displaced);
+	`, motionBlur: `
+	vec2 blurDirection = vec2(cos(parameters.x), -sin(parameters.x)) * parameters.y * strength / resolution;
+	vec4 sum = vec4(0.0);
+	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
+		float offset = (float(sampleIndex) - 5.5) / 5.5;
+		sum += texture(sourceTexture, uv + blurDirection * offset);
+	}
+	color = sum / 12.0;
+	`, zoomBlur: `
+	vec2 toCenter = (parameters.xy - screenUv) * strength * parameters.z;
+	toCenter.y = -toCenter.y;
+	vec4 sum = vec4(0.0);
+	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
+		sum += texture(sourceTexture, uv + toCenter * (float(sampleIndex) / 12.0));
+	}
+	color = sum / 12.0;
+	`, blur: `
+	vec2 blurStep = parameters.zw / resolution * parameters.x * strength;
+	vec4 sum = color * 0.227027;
+	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
+	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
+	color = sum;
+	`, tiltShift: `
+	float focusDistance = smoothstep(parameters.y * 0.5, parameters.y * 1.5, abs(screenUv.y - parameters.x));
+	vec2 blurStep = parameters.zw / resolution * focusDistance * strength;
+	vec4 sum = color * 0.227027;
+	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
+	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
+	color = sum;
+	`, godRays: `
+	vec2 rayCenter = vec2(parameters.x, 1.0 - parameters.y);
+	vec2 rayStep = (rayCenter - uv) / 16.0;
+	vec3 rays = vec3(0.0);
+	float weight = 1.0;
+	vec2 sampleUv = uv;
+	for (int sampleIndex = 0; sampleIndex < 16; ++sampleIndex) {
+		sampleUv += rayStep;
+		vec3 sampled = texture(sourceTexture, sampleUv).rgb;
+		float luminance = dot(sampled, vec3(0.299, 0.587, 0.114));
+		rays += sampled * smoothstep(parameters.z - 0.1, parameters.z + 0.1, luminance) * weight;
+		weight *= parameters.w;
+	}
+	color.rgb += rays / 16.0 * effectColor.rgb * strength * 2.0;
+	`, bloomBright: `
+	float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	float knee = smoothstep(parameters.x - 0.1, parameters.x + 0.1, luminance);
+	color.rgb *= knee;
+	`, bloomComposite: `
+	vec3 bloom = texture(auxiliaryTexture, uv).rgb;
+	color.rgb += bloom * strength * parameters.y;
+	`, anamorphicComposite: `
+	vec3 flare = texture(auxiliaryTexture, uv).rgb;
+	color.rgb += flare * effectColor.rgb * strength * parameters.y;
+	`, glitch: `
+	float seed = floor(time * parameters.y);
+	float row = floor(uv.y * parameters.x);
+	float rowRandom = hash21(vec2(row, seed));
+	float shift = step(0.8, rowRandom) * (hash21(vec2(seed, row)) - 0.5) * parameters.z * strength;
+	vec2 shifted = uv + vec2(shift, 0.0);
+	color = texture(sourceTexture, shifted);
+	float split = strength * 0.012 * step(0.5, rowRandom);
+	color.r = texture(sourceTexture, shifted + vec2(split, 0.0)).r;
+	color.b = texture(sourceTexture, shifted - vec2(split, 0.0)).b;
+	float blockNoise = step(0.93, hash21(floor(uv * vec2(8.0, 6.0)) + seed)) * strength;
+	color.rgb = mix(color.rgb, 1.0 - color.rgb, blockNoise * 0.6);
+	`, vhs: `
+	float band = fract(time * 0.35);
+	float bandMask = smoothstep(0.0, 0.05, abs(screenUv.y - band)) ;
+	float wobble = (sin(time * 9.0 + uv.y * 40.0) * 0.5 + (1.0 - bandMask) * 3.0) * parameters.x * strength;
+	vec2 shifted = uv + vec2(wobble, 0.0);
+	color = texture(sourceTexture, shifted);
+	color.r = texture(sourceTexture, shifted + vec2(0.006 * strength, 0.0)).r;
+	color.b = texture(sourceTexture, shifted - vec2(0.006 * strength, 0.0)).b;
+	float lineNoise = hash21(vec2(floor(uv.y * resolution.y * 0.5), floor(time * 30.0)));
+	float noiseLine = step(1.0 - parameters.y * 0.08, lineNoise) * strength;
+	color.rgb = mix(color.rgb, vec3(0.9), noiseLine * 0.6);
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, vec3(gray), 0.2 * strength);
+	color.rgb += (hash21(uv * resolution + fract(time * 5.0) * 100.0) - 0.5) * parameters.y * 0.3 * strength;
+	`, chromatic: `
+	vec2 offset = (uv - 0.5) * strength * 0.03 * parameters.x;
+	color.r = texture(sourceTexture, uv + offset).r;
+	color.b = texture(sourceTexture, uv - offset).b;
+	`, whiteBalance: `
+	vec3 balanced = color.rgb * vec3(1.0 + parameters.x * 0.25, 1.0 + parameters.y * 0.15, 1.0 - parameters.x * 0.25);
+	color.rgb = mix(color.rgb, clamp(balanced, 0.0, 1.0), strength);
+	`, liftGammaGain: `
+	vec3 graded = color.rgb * parameters.z + parameters.x * (1.0 - color.rgb);
+	graded = pow(max(graded, vec3(0.0)), vec3(1.0 / max(parameters.y, 0.01)));
+	color.rgb = mix(color.rgb, clamp(graded, 0.0, 1.0), strength);
+	`, colorGrade: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 graded = mix(vec3(gray), color.rgb, parameters.y);
+	graded = (graded - 0.5) * parameters.x + 0.5;
+	graded *= parameters.z;
+	graded *= mix(vec3(1.0), effectColor.rgb, effectColor.a);
+	color.rgb = mix(color.rgb, clamp(graded, 0.0, 1.0), strength);
+	`, hueShift: `
+	float hueAngle = strength * parameters.x * 6.28318530718;
+	vec3 yiq = mat3(0.299, 0.596, 0.211, 0.587, -0.274, -0.523, 0.114, -0.322, 0.312) * color.rgb;
+	float chroma = length(yiq.yz);
+	float hue = atan(yiq.z, yiq.y) + hueAngle;
+	yiq.yz = vec2(cos(hue), sin(hue)) * chroma;
+	color.rgb = clamp(mat3(1.0, 1.0, 1.0, 0.956, -0.272, -1.106, 0.621, -0.647, 1.703) * yiq, 0.0, 1.0);
+	`, splitToning: `
+	float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	float highlightWeight = smoothstep(parameters.w - 0.3, parameters.w + 0.3, luminance);
+	vec3 toned = color.rgb * mix(parameters.xyz * 2.0, effectColor.rgb * 2.0, highlightWeight);
+	color.rgb = mix(color.rgb, clamp(mix(color.rgb, toned, 0.5), 0.0, 1.0), strength);
+	`, tonemap: `
+	vec3 exposed = color.rgb * parameters.x;
+	// ACES \uADFC\uC0AC. (Krzysztof Narkowicz 2016, CC0)
+	vec3 mapped = (exposed * (2.51 * exposed + 0.03)) / (exposed * (2.43 * exposed + 0.59) + 0.14);
+	color.rgb = mix(color.rgb, clamp(mapped, 0.0, 1.0), strength);
+	`, gradientMap: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, mix(parameters.xyz, effectColor.rgb, gray), strength);
+	`, sepia: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, gray * vec3(1.2, 1.0, 0.78), strength);
+	`, grayscale: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, vec3(gray), strength);
+	`, posterize: `
+	float levels = max(parameters.x, 1.0);
+	color.rgb = mix(color.rgb, floor(color.rgb * levels + 0.5) / levels, strength);
+	`, dither: `
+	float pixelSize = max(parameters.y, 1.0);
+	vec2 pixelCell = floor(uv * resolution / pixelSize);
+	vec3 sampled = texture(sourceTexture, (pixelCell + 0.5) * pixelSize / resolution).rgb;
+	int bayerX = int(mod(pixelCell.x, 4.0));
+	int bayerY = int(mod(pixelCell.y, 4.0));
+	int bayerIndex = bayerX + bayerY * 4;
+	float bayerValues[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+	float bayerThreshold = (bayerValues[bayerIndex] + 0.5) / 16.0 - 0.5;
+	float levels = max(parameters.x, 2.0) - 1.0;
+	vec3 dithered = floor(sampled * levels + bayerThreshold + 0.5) / levels;
+	color.rgb = mix(color.rgb, clamp(dithered, 0.0, 1.0), strength);
+	`, halftone: `
+	float cellSize = max(parameters.x, 2.0);
+	vec2 cell = floor(uv * resolution / cellSize);
+	vec2 cellCenter = (cell + 0.5) * cellSize / resolution;
+	vec3 sampled = texture(sourceTexture, cellCenter).rgb;
+	float luminance = dot(sampled, vec3(0.299, 0.587, 0.114));
+	float dotRadius = (1.0 - luminance) * 0.7;
+	float cellDistance = length((uv * resolution / cellSize) - (cell + 0.5));
+	float dotMask = 1.0 - smoothstep(dotRadius - 0.1, dotRadius + 0.1, cellDistance);
+	vec3 halftoned = mix(vec3(1.0), vec3(0.05), dotMask);
+	color.rgb = mix(color.rgb, halftoned * mix(vec3(1.0), sampled + 0.3, 0.4), strength);
+	`, sharpen: `
+	vec2 texel = 1.0 / resolution;
+	vec3 neighbors = texture(sourceTexture, uv + vec2(texel.x, 0.0)).rgb + texture(sourceTexture, uv - vec2(texel.x, 0.0)).rgb + texture(sourceTexture, uv + vec2(0.0, texel.y)).rgb + texture(sourceTexture, uv - vec2(0.0, texel.y)).rgb;
+	vec3 sharpened = clamp(color.rgb * 5.0 - neighbors, 0.0, 1.0);
+	color.rgb = mix(color.rgb, sharpened, strength);
+	`, edgeDetect: `
+	vec2 texel = 1.0 / resolution;
+	float gradientX = 0.0;
+	float gradientY = 0.0;
+	gradientX += luminanceAt(uv + vec2(-texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, -texel.y));
+	gradientX += luminanceAt(uv + vec2(-texel.x, 0.0)) * -2.0 + luminanceAt(uv + vec2(texel.x, 0.0)) * 2.0;
+	gradientX += luminanceAt(uv + vec2(-texel.x, texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, texel.y));
+	gradientY += luminanceAt(uv + vec2(-texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(-texel.x, texel.y));
+	gradientY += luminanceAt(uv + vec2(0.0, -texel.y)) * -2.0 + luminanceAt(uv + vec2(0.0, texel.y)) * 2.0;
+	gradientY += luminanceAt(uv + vec2(texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, texel.y));
+	float edge = clamp(length(vec2(gradientX, gradientY)) * 2.0, 0.0, 1.0);
+	color.rgb = mix(color.rgb, effectColor.rgb * edge, strength);
+	`, oldFilm: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 filmColor = gray * vec3(1.15, 1.0, 0.8);
+	float grain = (hash21(uv * resolution + fract(time * 9.1) * 100.0) - 0.5) * 0.25;
+	float scratchSeed = floor(time * 8.0);
+	float scratchX = hash21(vec2(scratchSeed, 1.0));
+	float scratch = (1.0 - smoothstep(0.0, 0.003, abs(uv.x - scratchX))) * step(0.6, hash21(vec2(scratchSeed, 3.0)));
+	float flicker = 0.9 + 0.1 * hash21(vec2(floor(time * 12.0), 5.0));
+	float vignette = 1.0 - smoothstep(0.5, 1.0, distance(uv, vec2(0.5)) * 1.4142) * 0.6;
+	vec3 aged = (filmColor + grain + scratch * 0.8) * flicker * vignette;
+	color.rgb = mix(color.rgb, clamp(aged, 0.0, 1.0), strength);
+	`, nightVision: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	float amplified = clamp(gray * 1.8 + 0.08, 0.0, 1.0);
+	float noise = (hash21(uv * resolution + fract(time * 7.0) * 100.0) - 0.5) * 0.25;
+	float lines = 0.9 + 0.1 * sin(uv.y * resolution.y * 1.5);
+	float vignette = 1.0 - smoothstep(0.55, 1.0, distance(uv, vec2(0.5)) * 1.4142);
+	vec3 visionColor = effectColor.rgb * (amplified + noise) * lines * vignette;
+	color.rgb = mix(color.rgb, clamp(visionColor, 0.0, 1.0), strength);
+	`, invert: `
+	color.rgb = mix(color.rgb, vec3(1.0) - color.rgb, strength);
+	`, scanline: `
+	vec2 centered = uv - 0.5;
+	float radiusSquared = dot(centered, centered);
+	vec2 warped = uv + centered * radiusSquared * parameters.x * strength;
+	vec2 insideMask = step(vec2(0.0), warped) * step(warped, vec2(1.0));
+	color = texture(sourceTexture, warped) * insideMask.x * insideMask.y;
+	float lines = 0.5 + 0.5 * sin(warped.y * resolution.y * 3.14159265 * parameters.y);
+	color.rgb *= 1.0 - strength * 0.35 * lines;
+	float maskPhase = warped.x * resolution.x * 2.0943951;
+	color.rgb *= 1.0 + strength * 0.08 * vec3(sin(maskPhase), sin(maskPhase + 2.0943951), sin(maskPhase + 4.1887902));
+	`, grain: `
+	float grainValue = hash21(uv * resolution + fract(time * 7.13) * 100.0) - 0.5;
+	color.rgb += grainValue * strength * 0.25;
+	`, rain: `
+	float column = floor(screenUv.x * parameters.x);
+	float columnRandom = hash21(vec2(column, 1.0));
+	float streakY = fract(screenUv.y * parameters.y * (0.6 + columnRandom * 0.8) - time * parameters.z * (0.8 + columnRandom * 0.6) + columnRandom * 7.0);
+	float columnX = fract(screenUv.x * parameters.x);
+	float streak = smoothstep(0.7, 1.0, streakY) * (1.0 - smoothstep(0.0, 0.25, abs(columnX - 0.5))) * step(0.35, columnRandom);
+	color.rgb = mix(color.rgb, effectColor.rgb, streak * strength * effectColor.a);
+	`, fog: `
+	float fogMask = smoothstep(parameters.x, parameters.y, screenUv.y) * strength;
+	color.rgb = mix(color.rgb, effectColor.rgb, fogMask * effectColor.a);
+	`, vignette: `
+	float vignetteDistance = distance(uv, vec2(0.5)) * 1.4142;
+	float vignetteMask = smoothstep(parameters.x, parameters.y, vignetteDistance) * strength;
+	color.rgb = mix(color.rgb, effectColor.rgb, vignetteMask * effectColor.a);
+	`, spotlight: `
+	float aspect = resolution.x / resolution.y;
+	float spotDistance = length((screenUv - parameters.xy) * vec2(aspect, 1.0));
+	float spotMask = smoothstep(parameters.z, parameters.z + max(parameters.w, 0.001), spotDistance) * strength;
+	color.rgb = mix(color.rgb, effectColor.rgb, spotMask * effectColor.a);
+	`, speedLines: `
+	float aspect = resolution.x / resolution.y;
+	vec2 delta = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float lineDistance = length(delta);
+	float angle = atan(delta.y, delta.x);
+	float streak = valueNoise(vec2(cos(angle), sin(angle)) * parameters.z + vec2(time * parameters.w, 0.0));
+	float lineMask = smoothstep(0.55, 0.75, streak) * smoothstep(0.15, 0.6, lineDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, lineMask * strength * effectColor.a);
+	`, letterbox: `
+	float bar = parameters.x * strength;
+	float pillar = parameters.y * strength;
+	float inside = step(bar, uv.y) * step(uv.y, 1.0 - bar) * step(pillar, uv.x) * step(uv.x, 1.0 - pillar);
+	color.rgb = mix(effectColor.rgb, color.rgb, inside);
+	`, pixelDissolve: `
+	vec2 blockCell = floor(screenUv * vec2(parameters.x, parameters.x * resolution.y / resolution.x));
+	float blockRandom = hash21(blockCell + 3.7);
+	color.rgb = mix(color.rgb, effectColor.rgb, step(blockRandom, strength) * effectColor.a);
+	`, wipe: `
+	vec2 wipeDirection = normalize(parameters.xy + vec2(0.0001, 0.0));
+	float wipeDistance = dot(screenUv - 0.5, wipeDirection) + 0.5;
+	float softness = max(parameters.z, 0.0001);
+	float cover = 1.0 - smoothstep(strength * (1.0 + softness) - softness, strength * (1.0 + softness), wipeDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`, irisWipe: `
+	float aspect = resolution.x / resolution.y;
+	float irisDistance = length((screenUv - parameters.xy) * vec2(aspect, 1.0));
+	float softness = max(parameters.z, 0.0001);
+	float visibleRadius = (1.0 - strength) * 0.9 * max(aspect, 1.0);
+	float cover = smoothstep(visibleRadius, visibleRadius + softness, irisDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`, diamondWipe: `
+	float diamondDistance = abs(screenUv.x - 0.5) + abs(screenUv.y - 0.5);
+	float softness = max(parameters.x, 0.0001);
+	float cover = 1.0 - smoothstep(strength * (1.0 + softness), strength * (1.0 + softness) + softness, diamondDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`, clockWipe: `
+	vec2 fromCenter = screenUv - 0.5;
+	float clockAngle = (atan(fromCenter.x, -fromCenter.y) + 3.14159265) / 6.28318530718;
+	float softness = max(parameters.x, 0.0001);
+	float cover = 1.0 - smoothstep(strength, strength + softness, clockAngle);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`, blinds: `
+	float stripe = fract(screenUv.y * parameters.x);
+	float softness = max(parameters.y, 0.0001);
+	float cover = 1.0 - smoothstep(strength, strength + softness, stripe);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`, checkerWipe: `
+	vec2 checkerCell = floor(screenUv * vec2(parameters.x, parameters.x * resolution.y / resolution.x));
+	float parity = mod(checkerCell.x + checkerCell.y, 2.0);
+	float cellThreshold = parity * 0.5 + hash21(checkerCell + 1.3) * 0.5;
+	color.rgb = mix(color.rgb, effectColor.rgb, step(cellThreshold, strength * 1.0001) * effectColor.a);
+	`, noiseFade: `
+	float fadeNoise = valueNoise(screenUv * vec2(parameters.x * resolution.x / resolution.y, parameters.x) + 2.1);
+	float softness = max(parameters.y, 0.001);
+	float cover = 1.0 - smoothstep(strength * (1.0 + softness) - softness, strength * (1.0 + softness), fadeNoise);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`, burn: `
+	float burnNoise = valueNoise(screenUv * vec2(parameters.x * resolution.x / resolution.y, parameters.x) + 5.3);
+	float threshold = strength * (1.0 + parameters.y * 4.0) - parameters.y * 2.0;
+	float burned = 1.0 - step(threshold, burnNoise);
+	float innerBand = smoothstep(threshold, threshold + parameters.y, burnNoise);
+	float outerBand = smoothstep(threshold + parameters.y, threshold + parameters.y * 2.0, burnNoise);
+	vec3 emberColor = vec3(1.0, 0.55, 0.15);
+	vec3 sootColor = vec3(0.05, 0.02, 0.01);
+	vec3 burning = mix(emberColor, mix(sootColor, color.rgb, outerBand), innerBand);
+	color.rgb = mix(burning, effectColor.rgb, burned * effectColor.a);
+	`, tvOff: `
+	float collapse = max(1.0 - strength, 0.0);
+	float squeeze = max(collapse * collapse, 0.002);
+	float centeredY = (screenUv.y - 0.5) / squeeze + 0.5;
+	float widthSqueeze = smoothstep(0.0, 0.15, collapse);
+	float centeredX = (screenUv.x - 0.5) / max(widthSqueeze, 0.002) + 0.5;
+	float inside = step(0.0, centeredY) * step(centeredY, 1.0) * step(0.0, centeredX) * step(centeredX, 1.0);
+	vec3 collapsed = sampleScreen(vec2(centeredX, centeredY)).rgb * (1.0 + (1.0 - collapse) * 2.0);
+	float glowLine = (1.0 - smoothstep(0.0, 0.01 + squeeze * 0.5, abs(screenUv.y - 0.5))) * (1.0 - collapse) * step(0.02, widthSqueeze);
+	color.rgb = mix(effectColor.rgb, collapsed, inside) + vec3(glowLine);
+	color.rgb = mix(color.rgb, effectColor.rgb, step(0.999, strength));
+	`, fade: `
+	color.rgb = mix(color.rgb, effectColor.rgb, strength * effectColor.a);
+	`, regionComposite: `
+	vec4 original = texture(auxiliaryTexture, uv);
+	vec2 pixel = uv * resolution;
+	vec2 halfSize = resolution * 0.5;
+	float cornerRadius = min(parameters.x, min(halfSize.x, halfSize.y));
+	vec2 cornerOffset = abs(pixel - halfSize) - (halfSize - cornerRadius);
+	float cornerDistance = length(max(cornerOffset, 0.0)) + min(max(cornerOffset.x, cornerOffset.y), 0.0) - cornerRadius;
+	float inside = 1.0 - smoothstep(-0.75, 0.75, cornerDistance);
+	color = mix(original, color, inside);
+	` };
+function createColorTexture(webGL2RenderingContext, width, height, isOpaque = false) {
+  const texture = webGL2RenderingContext.createTexture();
+  webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+  if (isOpaque) {
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGB8, width, height, 0, webGL2RenderingContext.RGB, webGL2RenderingContext.UNSIGNED_BYTE, null);
+  } else {
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+  }
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+  return texture;
+}
+__name(createColorTexture, "createColorTexture");
+function createRenderTarget(webGL2RenderingContext, width, height, useStencil, isOpaque = false) {
+  const texture = createColorTexture(webGL2RenderingContext, width, height, isOpaque);
+  const framebuffer = webGL2RenderingContext.createFramebuffer();
+  webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+  webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
+  let stencilRenderbuffer = null;
+  if (useStencil) {
+    stencilRenderbuffer = webGL2RenderingContext.createRenderbuffer();
+    webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
+    webGL2RenderingContext.renderbufferStorage(webGL2RenderingContext.RENDERBUFFER, webGL2RenderingContext.DEPTH24_STENCIL8, width, height);
+    webGL2RenderingContext.framebufferRenderbuffer(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT, webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
+  }
+  webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+  return { framebuffer, texture, stencilRenderbuffer, width, height };
+}
+__name(createRenderTarget, "createRenderTarget");
+function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
+  if (!renderTarget) {
+    return;
+  }
+  webGL2RenderingContext.deleteFramebuffer(renderTarget.framebuffer);
+  webGL2RenderingContext.deleteTexture(renderTarget.texture);
+  if (renderTarget.stencilRenderbuffer) {
+    webGL2RenderingContext.deleteRenderbuffer(renderTarget.stencilRenderbuffer);
+  }
+}
+__name(destroyRenderTarget, "destroyRenderTarget");
+var ScreenEffect = class extends Object2 {
+  static {
+    __name(this, "ScreenEffect");
+  }
+  #webGL2RenderingContext;
+  #passTable;
+  #effectTable;
+  #sceneTarget;
+  #pingTarget;
+  #pongTarget;
+  #halfTargetA;
+  #halfTargetB;
+  #time;
+  #isBound;
+  #region;
+  constructor() {
+    super();
+    this.#webGL2RenderingContext = null;
+    this.#passTable = new System36.Map();
+    this.#effectTable = new System36.Map();
+    this.#sceneTarget = null;
+    this.#pingTarget = null;
+    this.#pongTarget = null;
+    this.#halfTargetA = null;
+    this.#halfTargetB = null;
+    this.#time = 0;
+    this.#isBound = false;
+    this.#region = null;
+    this.resetAll();
+  }
+  resetAll() {
+    for (const effectType of EFFECT_ORDER) {
+      const defaultParameters = DEFAULT_PARAMETER_TABLE[effectType];
+      const defaultColor = DEFAULT_COLOR_TABLE[effectType] ? DEFAULT_COLOR_TABLE[effectType] : [1, 1, 1, 1];
+      this.#effectTable.set(effectType, { isEnabled: false, strength: 1, parameters: [defaultParameters[0], defaultParameters[1], defaultParameters[2], defaultParameters[3]], color: new Color(defaultColor[0], defaultColor[1], defaultColor[2], defaultColor[3]) });
+    }
+  }
+  setRegion(x, y, width, height, cornerRadius = 0) {
+    this.#region = { x, y, width, height, cornerRadius: System36.Math.max(0, cornerRadius) };
+  }
+  clearRegion() {
+    this.#region = null;
+  }
+  getRegion() {
+    return this.#region;
+  }
+  tick(timeDelta) {
+    this.#time += timeDelta;
+  }
+  begin(graphic) {
+    this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+    this.#isBound = this.hasActiveEffect();
+  }
+  end(graphic) {
+    if (!this.#isBound) {
+      return;
+    }
+    this.#isBound = false;
+    this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+    graphic.flushBatch();
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
+    const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
+    if (bufferWidth <= 0 || bufferHeight <= 0) {
+      return;
+    }
+    let regionX = 0;
+    let regionY = 0;
+    let regionWidth = bufferWidth;
+    let regionHeight = bufferHeight;
+    let cornerRadius = 0;
+    if (this.#region) {
+      regionX = System36.Math.max(0, System36.Math.round(this.#region.x));
+      regionY = System36.Math.max(0, System36.Math.round(this.#region.y));
+      regionWidth = System36.Math.min(bufferWidth - regionX, System36.Math.round(this.#region.width));
+      regionHeight = System36.Math.min(bufferHeight - regionY, System36.Math.round(this.#region.height));
+      cornerRadius = this.#region.cornerRadius;
+    }
+    if (regionWidth <= 0 || regionHeight <= 0) {
+      return;
+    }
+    const width = regionWidth;
+    const height = regionHeight;
+    this.ensureTargets(width, height);
+    const glRegionY = bufferHeight - (regionY + regionHeight);
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#sceneTarget.texture);
+    webGL2RenderingContext.copyTexSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, 0, 0, regionX, glRegionY, width, height);
+    webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+    webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
+    const stepList = [];
+    for (const effectType of EFFECT_ORDER) {
+      const effectState = this.#effectTable.get(effectType);
+      if (!effectState.isEnabled || effectState.strength <= 0) {
+        continue;
+      }
+      if (effectType === "blur") {
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 1, 0], target: "pingpong" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 0, 1], target: "pingpong" });
+        continue;
+      }
+      if (effectType === "bloom") {
+        stepList.push({ passName: "bloomBright", state: effectState, parameters: effectState.parameters, target: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 1, 0], target: "halfB", source: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 0, 1], target: "halfA", source: "halfB" });
+        stepList.push({ passName: "bloomComposite", state: effectState, parameters: effectState.parameters, target: "pingpong", auxiliary: "halfA", source: "previous" });
+        continue;
+      }
+      if (effectType === "anamorphic") {
+        stepList.push({ passName: "bloomBright", state: effectState, parameters: effectState.parameters, target: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 1, 0], target: "halfB", source: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2] * 0.5, 0, 1, 0], target: "halfA", source: "halfB" });
+        stepList.push({ passName: "anamorphicComposite", state: effectState, parameters: effectState.parameters, target: "pingpong", auxiliary: "halfA", source: "previous" });
+        continue;
+      }
+      if (effectType === "tiltShift") {
+        stepList.push({ passName: "tiltShift", state: effectState, parameters: [effectState.parameters[0], effectState.parameters[1], effectState.parameters[2], 0], target: "pingpong" });
+        stepList.push({ passName: "tiltShift", state: effectState, parameters: [effectState.parameters[0], effectState.parameters[1], 0, effectState.parameters[2]], target: "pingpong" });
+        continue;
+      }
+      stepList.push({ passName: effectType, state: effectState, parameters: effectState.parameters, target: "pingpong" });
+    }
+    if (stepList.length === 0) {
+      stepList.push({ passName: "copy", state: null, parameters: [0, 0, 0, 0], target: "pingpong" });
+    }
+    if (cornerRadius > 0) {
+      stepList.push({ passName: "regionComposite", state: null, parameters: [cornerRadius, 0, 0, 0], target: "pingpong", auxiliary: "scene" });
+    }
+    let lastScreenIndex = -1;
+    for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
+      if (stepList[stepIndex].target === "pingpong") {
+        lastScreenIndex = stepIndex;
+      }
+    }
+    let previousTexture = this.#sceneTarget.texture;
+    let pingPongTurn = 0;
+    for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
+      const step = stepList[stepIndex];
+      const pass = this.resolvePass(step.passName);
+      if (pass === null) {
+        continue;
+      }
+      let targetTexture = null;
+      if (stepIndex === lastScreenIndex) {
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+        webGL2RenderingContext.viewport(regionX, glRegionY, width, height);
+        webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+        webGL2RenderingContext.scissor(regionX, glRegionY, width, height);
+      } else if (step.target === "halfA" || step.target === "halfB") {
+        const halfTarget = step.target === "halfA" ? this.#halfTargetA : this.#halfTargetB;
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, halfTarget.framebuffer);
+        webGL2RenderingContext.viewport(0, 0, halfTarget.width, halfTarget.height);
+        targetTexture = halfTarget.texture;
+      } else {
+        const pingPongTarget = pingPongTurn % 2 === 0 ? this.#pingTarget : this.#pongTarget;
+        pingPongTurn += 1;
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, pingPongTarget.framebuffer);
+        webGL2RenderingContext.viewport(0, 0, width, height);
+        targetTexture = pingPongTarget.texture;
+      }
+      let sourceTexture = previousTexture;
+      if (step.source === "halfA") {
+        sourceTexture = this.#halfTargetA.texture;
+      } else if (step.source === "halfB") {
+        sourceTexture = this.#halfTargetB.texture;
+      }
+      const isHalfTarget = step.target === "halfA" || step.target === "halfB";
+      const passWidth = isHalfTarget ? this.#halfTargetA.width : width;
+      const passHeight = isHalfTarget ? this.#halfTargetA.height : height;
+      pass.useProgram();
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
+      webGL2RenderingContext.uniform1i(pass.getUniformLocation("sourceTexture"), 0);
+      if (step.auxiliary) {
+        let auxiliaryTexture = this.#halfTargetB.texture;
+        if (step.auxiliary === "halfA") {
+          auxiliaryTexture = this.#halfTargetA.texture;
+        } else if (step.auxiliary === "scene") {
+          auxiliaryTexture = this.#sceneTarget.texture;
+        }
+        webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+        webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, auxiliaryTexture);
+        webGL2RenderingContext.uniform1i(pass.getUniformLocation("auxiliaryTexture"), 1);
+        webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+      }
+      webGL2RenderingContext.uniform2f(pass.getUniformLocation("resolution"), passWidth, passHeight);
+      webGL2RenderingContext.uniform1f(pass.getUniformLocation("time"), this.#time);
+      const strength = step.state ? step.state.strength : 1;
+      webGL2RenderingContext.uniform1f(pass.getUniformLocation("strength"), strength);
+      webGL2RenderingContext.uniform4f(pass.getUniformLocation("parameters"), step.parameters[0], step.parameters[1], step.parameters[2], step.parameters[3]);
+      const color = step.state ? step.state.color : Color.white();
+      webGL2RenderingContext.uniform4f(pass.getUniformLocation("effectColor"), color.red, color.green, color.blue, color.alpha);
+      pass.draw();
+      if (!isHalfTarget) {
+        previousTexture = targetTexture;
+      }
+    }
+    webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+    webGL2RenderingContext.bindVertexArray(null);
+    graphic.restoreRenderState();
+  }
+  hasActiveEffect() {
+    for (const effectState of this.#effectTable.values()) {
+      if (effectState.isEnabled && effectState.strength > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+  ensureTargets(width, height) {
+    if (this.#sceneTarget && this.#sceneTarget.width === width && this.#sceneTarget.height === height) {
+      return;
+    }
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    destroyRenderTarget(webGL2RenderingContext, this.#sceneTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pingTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
+    const halfWidth = System36.Math.max(1, System36.Math.round(width / 2));
+    const halfHeight = System36.Math.max(1, System36.Math.round(height / 2));
+    this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, false, true);
+    this.#pingTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
+    this.#pongTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
+    this.#halfTargetA = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
+    this.#halfTargetB = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
+  }
+  resolvePass(passName) {
+    if (this.#passTable.has(passName)) {
+      return this.#passTable.get(passName);
+    }
+    const effectBody = EFFECT_BODY_TABLE[passName] !== void 0 ? EFFECT_BODY_TABLE[passName] : "";
+    const fragmentShaderSource = FRAGMENTSHADER_HEADER + effectBody + FRAGMENTSHADER_FOOTER;
+    let pass = null;
+    try {
+      pass = new FullscreenPass(this.#webGL2RenderingContext, fragmentShaderSource);
+    } catch (error) {
+      console.error(`ScreenEffect: pass "${passName}" failed: ${error && error.message !== void 0 ? error.message : error}`);
+      if (!reportShaderBuildFailure(this.#webGL2RenderingContext, `ScreenEffect.${passName}`, error)) {
+        return null;
+      }
+      pass = null;
+    }
+    this.#passTable.set(passName, pass);
+    return pass;
+  }
+  setEnabled(effectType, isEnabled) {
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState) {
+      effectState.isEnabled = isEnabled;
+    }
+  }
+  isEnabled(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.isEnabled : false;
+  }
+  setStrength(effectType, strength) {
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState) {
+      effectState.strength = strength;
+    }
+  }
+  getStrength(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.strength : 0;
+  }
+  setParameters(effectType, x, y = 0, z = 0, w = 0) {
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState) {
+      effectState.parameters = [x, y, z, w];
+    }
+  }
+  setParameter(effectType, parameterName, value) {
+    const effectState = this.#effectTable.get(effectType);
+    const parameterNames = SCREEN_EFFECT_PARAMETER_NAMES[effectType];
+    if (!effectState || !parameterNames) {
+      return;
+    }
+    const parameterIndex = parameterNames.indexOf(parameterName);
+    if (parameterIndex >= 0) {
+      effectState.parameters[parameterIndex] = value;
+    }
+  }
+  getParameters(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.parameters : [0, 0, 0, 0];
+  }
+  setColor(effectType, color) {
+    color = Color.from(color);
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState && color) {
+      effectState.color = color.clone();
+    }
+  }
+  getColor(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.color : Color.white();
+  }
+  disableAll() {
+    for (const effectState of this.#effectTable.values()) {
+      effectState.isEnabled = false;
+    }
+  }
+  setTimelineProperty(propertyName, value) {
+    const separatorIndex = propertyName.indexOf(".");
+    const effectType = separatorIndex >= 0 ? propertyName.substring(0, separatorIndex) : propertyName;
+    const memberName = separatorIndex >= 0 ? propertyName.substring(separatorIndex + 1) : "";
+    const effectState = this.#effectTable.get(effectType);
+    if (!effectState) {
+      return;
+    }
+    if (memberName === "") {
+      const strength = System36.Number(value);
+      effectState.strength = strength;
+      effectState.isEnabled = strength > 0;
+      return;
+    }
+    if (memberName === "color") {
+      effectState.color = typeof value === "string" ? Color.createFromHEX(value) : effectState.color;
+      return;
+    }
+    if (memberName === "enabled") {
+      effectState.isEnabled = value === true || value === "true";
+      return;
+    }
+    this.setParameter(effectType, memberName, System36.Number(value));
+  }
+  getTime() {
+    return this.#time;
+  }
+  getSceneTexture() {
+    return this.#sceneTarget ? this.#sceneTarget.texture : null;
+  }
+  static getEffectOrder() {
+    return EFFECT_ORDER.slice();
+  }
+  destroy() {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    if (webGL2RenderingContext === null) {
+      super.destroy();
+      return;
+    }
+    for (const pass of this.#passTable.values()) {
+      if (pass === null) {
+        continue;
+      }
+      webGL2RenderingContext.deleteProgram(pass.getShaderProgram().getProgram());
+      webGL2RenderingContext.deleteVertexArray(pass.getVertexArray());
+    }
+    this.#passTable.clear();
+    destroyRenderTarget(webGL2RenderingContext, this.#sceneTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pingTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
+    this.#sceneTarget = null;
+    this.#pingTarget = null;
+    this.#pongTarget = null;
+    this.#halfTargetA = null;
+    this.#halfTargetB = null;
+    super.destroy();
+  }
+};
+var System37 = globalThis;
 var geometryKeyContentSize = Vector2.zero();
 var UIView = class _UIView extends Component {
   static {
@@ -15318,12 +16240,16 @@ var UIView = class _UIView extends Component {
   #engine;
   #content;
   #backgroundColor;
+  #backdropBlurRadius;
+  #backdropScreenEffect;
   constructor() {
     super();
     this.setComponentType("View");
     this.#engine = null;
     this.#content = null;
     this.#backgroundColor = new Color(1, 1, 1, 0);
+    this.#backdropBlurRadius = 0;
+    this.#backdropScreenEffect = null;
   }
   setEngine(engine) {
     this.#engine = engine;
@@ -15348,7 +16274,7 @@ var UIView = class _UIView extends Component {
     return this.draw === _UIView.prototype.draw;
   }
   writeGeometryKey(geometryKey) {
-    if (this.draw !== _UIView.prototype.draw) {
+    if (this.draw !== _UIView.prototype.draw || this.#backdropBlurRadius > 0) {
       return false;
     }
     const node = this.getNode();
@@ -15376,6 +16302,9 @@ var UIView = class _UIView extends Component {
     if (!node) {
       return;
     }
+    if (this.#backdropBlurRadius > 0) {
+      this.drawBackdropBlur(graphic, node);
+    }
     const backgroundColor = this.getBackgroundColor();
     if (backgroundColor.alpha <= 0) {
       return;
@@ -15384,6 +16313,52 @@ var UIView = class _UIView extends Component {
     const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
     graphic.setFillColor(backgroundColor);
     graphic.drawRect(backgroundRect);
+  }
+  drawBackdropBlur(graphic, node) {
+    const contentSize = node.getContentSize();
+    if (!(contentSize.x > 0 && contentSize.y > 0)) {
+      return;
+    }
+    const transformMatrix = graphic.getTransformMatrix();
+    const cornerList = [transformMatrix.transformPoint(0, 0), transformMatrix.transformPoint(contentSize.x, 0), transformMatrix.transformPoint(contentSize.x, contentSize.y), transformMatrix.transformPoint(0, contentSize.y)];
+    let leftX = System37.Infinity;
+    let topY = System37.Infinity;
+    let rightX = -System37.Infinity;
+    let bottomY = -System37.Infinity;
+    for (const corner of cornerList) {
+      leftX = System37.Math.min(leftX, corner.x);
+      topY = System37.Math.min(topY, corner.y);
+      rightX = System37.Math.max(rightX, corner.x);
+      bottomY = System37.Math.max(bottomY, corner.y);
+    }
+    const regionX = System37.Math.round(leftX);
+    const regionY = System37.Math.round(topY);
+    const regionWidth = System37.Math.round(rightX) - regionX;
+    const regionHeight = System37.Math.round(bottomY) - regionY;
+    if (regionWidth <= 0 || regionHeight <= 0) {
+      return;
+    }
+    graphic.runExternalPass((webGL2RenderingContext) => {
+      if (webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING) !== null) {
+        return;
+      }
+      let screenEffect = this.#backdropScreenEffect;
+      if (screenEffect === null) {
+        screenEffect = new ScreenEffect();
+        screenEffect.setEnabled("blur", true);
+        this.#backdropScreenEffect = screenEffect;
+      }
+      screenEffect.setParameters("blur", this.#backdropBlurRadius);
+      screenEffect.setRegion(regionX, regionY, regionWidth, regionHeight);
+      screenEffect.begin(graphic);
+      screenEffect.end(graphic);
+    }, { clearDepth: false });
+  }
+  setBackdropBlur(blurRadius) {
+    this.#backdropBlurRadius = System37.Math.max(0, blurRadius);
+  }
+  getBackdropBlur() {
+    return this.#backdropBlurRadius;
   }
   touchPress(viewInputPosition) {
   }
@@ -15706,7 +16681,7 @@ var UIScrollBar = class extends WorldNode {
     this.#isDraggingThumb = false;
   }
 };
-var System36 = globalThis;
+var System38 = globalThis;
 var SCROLLBAR_THICKNESS = 12;
 var SCROLLBAR_MARGIN = 6;
 var WHEEL_SCROLL_SCALE = 1;
@@ -15955,8 +16930,8 @@ var UIScrollView = class extends UIView {
     if (horizontalEnabled && verticalEnabled) {
       return true;
     }
-    const absoluteX = System36.Math.abs(deltaX);
-    const absoluteY = System36.Math.abs(deltaY);
+    const absoluteX = System38.Math.abs(deltaX);
+    const absoluteY = System38.Math.abs(deltaY);
     if (verticalEnabled) {
       return absoluteY >= absoluteX;
     }
@@ -16083,7 +17058,7 @@ var UIScrollView = class extends UIView {
     this.#wheelScrollScale = scale;
   }
 };
-var System37 = globalThis;
+var System39 = globalThis;
 var DRAG_THRESHOLD = 10;
 var DELAY_PRESS_MS = 150;
 var TouchRecognizer = class extends TouchRaycaster {
@@ -16118,7 +17093,7 @@ var TouchRecognizer = class extends TouchRaycaster {
     }
     if (this.#scrollView) {
       const pressPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-      this.#pressTimerId = System37.setTimeout(() => {
+      this.#pressTimerId = System39.setTimeout(() => {
         this.#pressTimerId = null;
         if (this.#isDragging) return;
         if (this.#target !== target) return;
@@ -16140,20 +17115,20 @@ var TouchRecognizer = class extends TouchRaycaster {
     if (this.#scrollView && this.#pressPosition) {
       const dx = viewInputPosition.x - this.#pressPosition.x;
       const dy = viewInputPosition.y - this.#pressPosition.y;
-      if ((System37.Math.abs(dx) > DRAG_THRESHOLD || System37.Math.abs(dy) > DRAG_THRESHOLD) && !this.#scrollView.isScrollDrag(dx, dy)) {
+      if ((System39.Math.abs(dx) > DRAG_THRESHOLD || System39.Math.abs(dy) > DRAG_THRESHOLD) && !this.#scrollView.isScrollDrag(dx, dy)) {
         this.#scrollView = null;
         if (this.#pressTimerId !== null) {
-          System37.clearTimeout(this.#pressTimerId);
+          System39.clearTimeout(this.#pressTimerId);
           this.#pressTimerId = null;
           if (this.#target) {
             this.#pressDelivered = true;
             this.#target.touchPress(this.#pressPosition);
           }
         }
-      } else if (System37.Math.abs(dx) > DRAG_THRESHOLD || System37.Math.abs(dy) > DRAG_THRESHOLD) {
+      } else if (System39.Math.abs(dx) > DRAG_THRESHOLD || System39.Math.abs(dy) > DRAG_THRESHOLD) {
         this.#isDragging = true;
         if (this.#pressTimerId !== null) {
-          System37.clearTimeout(this.#pressTimerId);
+          System39.clearTimeout(this.#pressTimerId);
           this.#pressTimerId = null;
         } else if (this.#pressDelivered && this.#target) {
           this.#target.touchCancel(viewInputPosition);
@@ -16176,7 +17151,7 @@ var TouchRecognizer = class extends TouchRaycaster {
       }
     } else if (this.#target) {
       if (this.#pressTimerId !== null) {
-        System37.clearTimeout(this.#pressTimerId);
+        System39.clearTimeout(this.#pressTimerId);
         this.#pressTimerId = null;
         this.#target.touchPress(this.#pressPosition || viewInputPosition);
         this.#pressDelivered = true;
@@ -16206,7 +17181,7 @@ var TouchRecognizer = class extends TouchRaycaster {
   }
   reset() {
     if (this.#pressTimerId !== null) {
-      System37.clearTimeout(this.#pressTimerId);
+      System39.clearTimeout(this.#pressTimerId);
       this.#pressTimerId = null;
     }
     this.#target = null;
@@ -16238,7 +17213,7 @@ var UIControl = class extends UIView {
     this.setComponentType("UIControl");
   }
 };
-var System38 = globalThis;
+var System40 = globalThis;
 var ImageAsset = class extends Asset {
   static {
     __name(this, "ImageAsset");
@@ -16247,7 +17222,7 @@ var ImageAsset = class extends Asset {
   constructor() {
     super();
     this.setAssetType(AssetType.image);
-    this.image = new System38.window.Image();
+    this.image = new System40.window.Image();
   }
   async load(assetPath) {
     const isLoaded = this.isLoaded();
@@ -16258,7 +17233,7 @@ var ImageAsset = class extends Asset {
     await super.load(assetPath);
     let response = null;
     try {
-      response = await System38.fetch(assetPath);
+      response = await System40.fetch(assetPath);
     } catch (error) {
       response = null;
     }
@@ -16272,7 +17247,7 @@ var ImageAsset = class extends Asset {
       return;
     }
     DecodedImageStore.release(this.image);
-    this.image = new System38.window.Image();
+    this.image = new System40.window.Image();
     this.image.src = assetPath;
     await new Promise((resolve, reject) => {
       this.image.onload = () => {
@@ -16289,14 +17264,14 @@ var ImageAsset = class extends Asset {
     this.setLoaded(false);
     this.setAssetPath(assetPath);
     const owner = DecodedImageStore.getLoadingOwner();
-    const blob = bytes instanceof System38.Blob ? bytes : new System38.Blob([bytes]);
+    const blob = bytes instanceof System40.Blob ? bytes : new System40.Blob([bytes]);
     await this.loadFromBlob(assetPath, blob, owner);
     this.setLoaded(true);
   }
   async loadFromBlob(assetPath, blob, owner) {
     DecodedImageStore.release(this.image);
-    const objectUrl = System38.URL.createObjectURL(blob);
-    const image = new System38.window.Image();
+    const objectUrl = System40.URL.createObjectURL(blob);
+    const image = new System40.window.Image();
     this.image = image;
     const decodePromise = DecodedImageStore.decode(blob);
     try {
@@ -16316,7 +17291,7 @@ var ImageAsset = class extends Asset {
       }
       throw error;
     } finally {
-      System38.URL.revokeObjectURL(objectUrl);
+      System40.URL.revokeObjectURL(objectUrl);
     }
     let imageBitmap = await decodePromise;
     if (imageBitmap !== null && (imageBitmap.width !== image.width || imageBitmap.height !== image.height)) {
@@ -16619,14 +17594,14 @@ var Sprite = class _Sprite extends Paint {
     }
   }
 };
-var System39 = globalThis;
+var System41 = globalThis;
 var geometryKeyContentSize3 = Vector2.zero();
 var TextAlign = { left: "left", center: "center", right: "right", start: "start", end: "end" };
 var TextBaseline = { top: "top", middle: "middle", bottom: "bottom", ideographic: "ideographic", hanging: "hanging", alphabetic: "alphabetic" };
 var measurementCanvasRenderingContext = null;
 function getMeasurementCanvasRenderingContext() {
   if (measurementCanvasRenderingContext === null) {
-    const document2 = System39.document;
+    const document2 = System41.document;
     if (document2 === null || document2 === void 0) {
       return null;
     }
@@ -16640,11 +17615,11 @@ var graphemeSegmenter2 = null;
 var wordSegmenter = null;
 var NO_BREAK_SPACE = "\xA0";
 function splitGraphemes(text) {
-  if (graphemeSegmenter2 === null && System39.Intl && typeof System39.Intl.Segmenter === "function") {
-    graphemeSegmenter2 = new System39.Intl.Segmenter(void 0, { granularity: "grapheme" });
+  if (graphemeSegmenter2 === null && System41.Intl && typeof System41.Intl.Segmenter === "function") {
+    graphemeSegmenter2 = new System41.Intl.Segmenter(void 0, { granularity: "grapheme" });
   }
   if (graphemeSegmenter2 === null) {
-    return System39.Array.from(text);
+    return System41.Array.from(text);
   }
   const pieces = [];
   for (const segmentData of graphemeSegmenter2.segment(text)) {
@@ -16654,8 +17629,8 @@ function splitGraphemes(text) {
 }
 __name(splitGraphemes, "splitGraphemes");
 function splitWords(text) {
-  if (wordSegmenter === null && System39.Intl && typeof System39.Intl.Segmenter === "function") {
-    wordSegmenter = new System39.Intl.Segmenter(void 0, { granularity: "word" });
+  if (wordSegmenter === null && System41.Intl && typeof System41.Intl.Segmenter === "function") {
+    wordSegmenter = new System41.Intl.Segmenter(void 0, { granularity: "word" });
   }
   if (wordSegmenter === null) {
     return [text];
@@ -16715,8 +17690,8 @@ function buildFontString(fontFace, fontSize, bold, italic) {
 __name(buildFontString, "buildFontString");
 var drawnRectContentSize = Vector2.zero();
 var fontLoadCount = 0;
-if (System39.document !== void 0 && System39.document.fonts !== void 0) {
-  System39.document.fonts.addEventListener("loadingdone", () => {
+if (System41.document !== void 0 && System41.document.fonts !== void 0) {
+  System41.document.fonts.addEventListener("loadingdone", () => {
     fontLoadCount += 1;
     Component.markAllDrawnRectsDirty();
   });
@@ -16732,7 +17707,7 @@ function addColorToGeometryKey(geometryKey, color) {
 }
 __name(addColorToGeometryKey, "addColorToGeometryKey");
 function readFontFaceCount() {
-  const document2 = System39.document;
+  const document2 = System41.document;
   if (document2 === void 0 || document2.fonts === void 0) {
     return 0;
   }
@@ -16759,6 +17734,7 @@ var Text = class _Text extends Component {
   #wordWrapWidth;
   #wrapMode;
   #lineSpacing;
+  #letterSpacing;
   #visibleCharacterCount;
   #wrapCache;
   #fitWidth;
@@ -16768,10 +17744,10 @@ var Text = class _Text extends Component {
   constructor() {
     super();
     this.setComponentType("Text");
-    this.#wrapCache = { text: "", fontFace: null, fontSize: 0, bold: false, italic: false, wrapWidth: -1, wrapMode: "", fontLoadCount: -1, fontFaceCount: -1, lineList: null };
+    this.#wrapCache = { text: "", fontFace: null, fontSize: 0, bold: false, italic: false, wrapWidth: -1, wrapMode: "", letterSpacing: 0, fontLoadCount: -1, fontFaceCount: -1, lineList: null };
     this.#fitWidth = 0;
     this.#fitMinimumRatio = 0.55;
-    this.#fitCache = { text: "", fontFace: null, fontSize: 0, bold: false, italic: false, fitWidth: -1, fitMinimumRatio: -1, fontLoadCount: -1, fontFaceCount: -1, fittedFontSize: 0 };
+    this.#fitCache = { text: "", fontFace: null, fontSize: 0, bold: false, italic: false, fitWidth: -1, fitMinimumRatio: -1, letterSpacing: 0, fontLoadCount: -1, fontFaceCount: -1, fittedFontSize: 0 };
     this.#textColorString = null;
     this.#fontFace = null;
     this.#text = "";
@@ -16789,6 +17765,7 @@ var Text = class _Text extends Component {
     this.#wordWrapWidth = 0;
     this.#wrapMode = "word";
     this.#lineSpacing = 1.25;
+    this.#letterSpacing = 0;
     this.#visibleCharacterCount = -1;
   }
   tick(timeDelta) {
@@ -16855,7 +17832,7 @@ var Text = class _Text extends Component {
     graphic.setTextBaseline("middle");
     const strokeColor = this.getStrokeColor();
     const textColor = this.getTextColor();
-    const decorationLineWidth = System39.Math.max(1, this.#fontSize / 16);
+    const decorationLineWidth = System41.Math.max(1, this.#fontSize / 16);
     let remainCount = this.#visibleCharacterCount;
     for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
       let lineText = lineList[lineIndex];
@@ -16867,7 +17844,7 @@ var Text = class _Text extends Component {
         if (lineCharacterCount > remainCount) {
           lineText = sliceGraphemes(lineText, remainCount);
         }
-        remainCount = System39.Math.max(0, remainCount - lineCharacterCount);
+        remainCount = System41.Math.max(0, remainCount - lineCharacterCount);
       }
       if (lineText.length === 0) {
         continue;
@@ -16875,10 +17852,10 @@ var Text = class _Text extends Component {
       const lineY = blockTop + (lineIndex + 0.5) * lineHeight;
       if (strokeColor && this.#strokeWidth > 0) {
         graphic.setStrokeColor(strokeColor);
-        graphic.drawStrokeText(lineText, drawX, lineY, this.#strokeWidth);
+        this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, true);
       }
       graphic.setFillColor(textColor);
-      graphic.drawFillText(lineText, drawX, lineY);
+      this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, false);
       if (this.#underline || this.#strikethrough) {
         const lineWidth = this.measurePlainTextWidth(lineText);
         const startX = this.computeUnderlineStartX(drawX, lineWidth, textAlign);
@@ -16895,7 +17872,7 @@ var Text = class _Text extends Component {
   readWrappedLines(text, wrapWidth) {
     const wrapCache = this.#wrapCache;
     const fontFaceCount = readFontFaceCount();
-    const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === wrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === fontFaceCount;
+    const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === wrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.letterSpacing === this.#letterSpacing && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === fontFaceCount;
     if (isSame) {
       return wrapCache.lineList;
     }
@@ -16907,6 +17884,7 @@ var Text = class _Text extends Component {
     wrapCache.italic = this.#italic;
     wrapCache.wrapWidth = wrapWidth;
     wrapCache.wrapMode = this.#wrapMode;
+    wrapCache.letterSpacing = this.#letterSpacing;
     wrapCache.fontLoadCount = fontLoadCount;
     wrapCache.fontFaceCount = fontFaceCount;
     wrapCache.lineList = lineList;
@@ -16920,7 +17898,7 @@ var Text = class _Text extends Component {
     measurementContext.save();
     measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
     const measureWidth = __name((candidateText) => {
-      return measurementContext.measureText(candidateText).width;
+      return measurementContext.measureText(candidateText).width + countGraphemes(candidateText) * this.#letterSpacing;
     }, "measureWidth");
     const lineList = [];
     const appendByCharacter = __name((chunkText, seedText) => {
@@ -17000,11 +17978,11 @@ var Text = class _Text extends Component {
     if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
       return { width: this.measurePlainTextWidth(text), height: this.#fontSize * this.#lineSpacing, lineCount: 1 };
     }
-    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : System39.Number.POSITIVE_INFINITY;
+    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : System41.Number.POSITIVE_INFINITY;
     const lineList = this.wrapTextToLines(text, wrapWidth);
     let maxLineWidth = 0;
     for (const lineText of lineList) {
-      maxLineWidth = System39.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
+      maxLineWidth = System41.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
     }
     return { width: maxLineWidth, height: lineList.length * this.#fontSize * this.#lineSpacing, lineCount: lineList.length };
   }
@@ -17035,16 +18013,16 @@ var Text = class _Text extends Component {
     const strokeColor = this.getStrokeColor();
     if (strokeColor && this.#strokeWidth > 0) {
       graphic.setStrokeColor(strokeColor);
-      graphic.drawStrokeText(text, drawX, drawY, this.#strokeWidth);
+      this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, true);
     }
     const textColor = this.getTextColor();
     graphic.setFillColor(textColor);
-    graphic.drawFillText(text, drawX, drawY);
+    this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, false);
     if (this.#underline || this.#strikethrough) {
       const textWidth = this.measureText(text, fontSize);
       const startX = this.computeUnderlineStartX(drawX, textWidth, textAlign);
       graphic.setStrokeColor(textColor);
-      const lineWidth = System39.Math.max(1, fontSize / 16);
+      const lineWidth = System41.Math.max(1, fontSize / 16);
       if (this.#underline) {
         const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
         this.strokeHorizontalLine(graphic, startX, underlineY, textWidth, lineWidth);
@@ -17062,6 +18040,13 @@ var Text = class _Text extends Component {
     if (!text) {
       return 0;
     }
+    const textWidth = this.measureTextWithoutSpacing(text, fontSize);
+    if (this.#letterSpacing === 0) {
+      return textWidth;
+    }
+    return textWidth + countGraphemes(text) * this.#letterSpacing;
+  }
+  measureTextWithoutSpacing(text, fontSize) {
     const fontString = buildFontString(this.#fontFace, fontSize, this.#bold, this.#italic);
     const textMetrics = measureTextMetrics(fontString, text);
     if (textMetrics === null) {
@@ -17069,9 +18054,45 @@ var Text = class _Text extends Component {
     }
     return textMetrics.width;
   }
+  drawTextLine(graphic, text, x, y, textAlign, fontSize, isStroke) {
+    const letterSpacing = this.#letterSpacing;
+    if (letterSpacing === 0 || graphic.getTextDirection() === "rtl") {
+      if (isStroke) {
+        graphic.drawStrokeText(text, x, y, this.#strokeWidth);
+      } else {
+        graphic.drawFillText(text, x, y);
+      }
+      return;
+    }
+    const graphemeList = splitGraphemes(text);
+    const totalWidth = this.measureTextWithoutSpacing(text, fontSize) + graphemeList.length * letterSpacing;
+    let drawX = x;
+    if (textAlign === "right") {
+      drawX = x - totalWidth;
+    } else if (textAlign === "center") {
+      drawX = x - totalWidth * 0.5;
+    }
+    graphic.setTextAlign("left");
+    let previousGrapheme = null;
+    let position = 0;
+    for (const grapheme of graphemeList) {
+      if (previousGrapheme !== null) {
+        const pairWidth = this.measureTextWithoutSpacing(previousGrapheme + grapheme, fontSize);
+        const graphemeWidth = this.measureTextWithoutSpacing(grapheme, fontSize);
+        position += pairWidth - graphemeWidth + letterSpacing;
+      }
+      if (isStroke) {
+        graphic.drawStrokeText(grapheme, drawX + position, y, this.#strokeWidth);
+      } else {
+        graphic.drawFillText(grapheme, drawX + position, y);
+      }
+      previousGrapheme = grapheme;
+    }
+    graphic.setTextAlign(textAlign);
+  }
   setFitWidth(width, minimumRatio = 0.55) {
-    this.#fitWidth = System39.Math.max(0, width);
-    this.#fitMinimumRatio = System39.Math.min(1, System39.Math.max(0, minimumRatio));
+    this.#fitWidth = System41.Math.max(0, width);
+    this.#fitMinimumRatio = System41.Math.min(1, System41.Math.max(0, minimumRatio));
     this.markDrawnRectDirty();
   }
   getFitWidth() {
@@ -17087,15 +18108,15 @@ var Text = class _Text extends Component {
     }
     const fitCache = this.#fitCache;
     const fontFaceCount = readFontFaceCount();
-    const isSame = fitCache.text === text && fitCache.fontFace === this.#fontFace && fitCache.fontSize === this.#fontSize && fitCache.bold === this.#bold && fitCache.italic === this.#italic && fitCache.fitWidth === this.#fitWidth && fitCache.fitMinimumRatio === this.#fitMinimumRatio && fitCache.fontLoadCount === fontLoadCount && fitCache.fontFaceCount === fontFaceCount;
+    const isSame = fitCache.text === text && fitCache.fontFace === this.#fontFace && fitCache.fontSize === this.#fontSize && fitCache.bold === this.#bold && fitCache.italic === this.#italic && fitCache.fitWidth === this.#fitWidth && fitCache.fitMinimumRatio === this.#fitMinimumRatio && fitCache.letterSpacing === this.#letterSpacing && fitCache.fontLoadCount === fontLoadCount && fitCache.fontFaceCount === fontFaceCount;
     if (isSame) {
       return fitCache.fittedFontSize;
     }
     let fittedFontSize = this.#fontSize;
     const textWidth = this.measureText(text, this.#fontSize);
     if (textWidth > this.#fitWidth) {
-      const fitRatio = System39.Math.max(this.#fitMinimumRatio, this.#fitWidth / textWidth);
-      fittedFontSize = System39.Math.floor(this.#fontSize * fitRatio * 10) / 10;
+      const fitRatio = System41.Math.max(this.#fitMinimumRatio, this.#fitWidth / textWidth);
+      fittedFontSize = System41.Math.floor(this.#fontSize * fitRatio * 10) / 10;
     }
     fitCache.text = text;
     fitCache.fontFace = this.#fontFace;
@@ -17104,6 +18125,7 @@ var Text = class _Text extends Component {
     fitCache.italic = this.#italic;
     fitCache.fitWidth = this.#fitWidth;
     fitCache.fitMinimumRatio = this.#fitMinimumRatio;
+    fitCache.letterSpacing = this.#letterSpacing;
     fitCache.fontLoadCount = fontLoadCount;
     fitCache.fontFaceCount = fontFaceCount;
     fitCache.fittedFontSize = fittedFontSize;
@@ -17136,6 +18158,7 @@ var Text = class _Text extends Component {
     geometryKey.add(this.#wordWrapWidth);
     geometryKey.add(this.#wrapMode);
     geometryKey.add(this.#lineSpacing);
+    geometryKey.add(this.#letterSpacing);
     geometryKey.add(this.#visibleCharacterCount);
     geometryKey.add(this.#fitWidth);
     geometryKey.add(this.#fitMinimumRatio);
@@ -17184,8 +18207,8 @@ var Text = class _Text extends Component {
       leftX = (contentSize.x - textWidth) * 0.5;
       rightX = leftX + textWidth;
     } else {
-      leftX = System39.Math.min(0, contentSize.x - textWidth);
-      rightX = System39.Math.max(textWidth, contentSize.x);
+      leftX = System41.Math.min(0, contentSize.x - textWidth);
+      rightX = System41.Math.max(textWidth, contentSize.x);
     }
     let anchorY;
     if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
@@ -17206,7 +18229,7 @@ var Text = class _Text extends Component {
     const lineList = this.readWrappedLines(text, wrapWidth);
     let maximumLineWidth = 0;
     for (const lineText of lineList) {
-      maximumLineWidth = System39.Math.max(maximumLineWidth, this.measureText(lineText, this.#fontSize));
+      maximumLineWidth = System41.Math.max(maximumLineWidth, this.measureText(lineText, this.#fontSize));
     }
     const textAlign = this.#textAlign;
     let leftX;
@@ -17221,8 +18244,8 @@ var Text = class _Text extends Component {
       leftX = (contentSize.x - maximumLineWidth) * 0.5;
       rightX = leftX + maximumLineWidth;
     } else {
-      leftX = System39.Math.min(0, contentSize.x - maximumLineWidth);
-      rightX = System39.Math.max(maximumLineWidth, contentSize.x);
+      leftX = System41.Math.min(0, contentSize.x - maximumLineWidth);
+      rightX = System41.Math.max(maximumLineWidth, contentSize.x);
     }
     const lineHeight = this.#fontSize * this.#lineSpacing;
     const blockHeight = lineList.length * lineHeight;
@@ -17252,7 +18275,7 @@ var Text = class _Text extends Component {
       return -1;
     }
     const wrapCache = this.#wrapCache;
-    const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === this.#wordWrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === readFontFaceCount();
+    const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === this.#wordWrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.letterSpacing === this.#letterSpacing && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === readFontFaceCount();
     return isSame ? wrapCache.lineList.length : -1;
   }
   computeUnderlineStartX(drawX, textWidth, textAlign = this.#textAlign) {
@@ -17299,7 +18322,7 @@ var Text = class _Text extends Component {
     }
     measurementContext.save();
     measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-    const width = measurementContext.measureText(text).width;
+    const width = measurementContext.measureText(text).width + countGraphemes(text) * this.#letterSpacing;
     measurementContext.restore();
     return Vector2.create(width, this.#fontSize);
   }
@@ -17317,7 +18340,7 @@ var Text = class _Text extends Component {
     return this.#fontFace;
   }
   setWordWrapWidth(wordWrapWidth) {
-    this.#wordWrapWidth = System39.Math.max(0, wordWrapWidth);
+    this.#wordWrapWidth = System41.Math.max(0, wordWrapWidth);
     this.markDrawnRectDirty();
   }
   getWordWrapWidth() {
@@ -17331,14 +18354,21 @@ var Text = class _Text extends Component {
     return this.#wrapMode;
   }
   setLineSpacing(lineSpacing) {
-    this.#lineSpacing = System39.Math.max(0.1, lineSpacing);
+    this.#lineSpacing = System41.Math.max(0.1, lineSpacing);
     this.markDrawnRectDirty();
   }
   getLineSpacing() {
     return this.#lineSpacing;
   }
+  setLetterSpacing(letterSpacing) {
+    this.#letterSpacing = letterSpacing;
+    this.markDrawnRectDirty();
+  }
+  getLetterSpacing() {
+    return this.#letterSpacing;
+  }
   setVisibleCharacterCount(visibleCharacterCount) {
-    this.#visibleCharacterCount = System39.Math.max(-1, System39.Math.floor(visibleCharacterCount));
+    this.#visibleCharacterCount = System41.Math.max(-1, System41.Math.floor(visibleCharacterCount));
   }
   getVisibleCharacterCount() {
     return this.#visibleCharacterCount;
@@ -17559,7 +18589,7 @@ var UIImageView = class extends UIView {
     }
   }
 };
-var System40 = globalThis;
+var System42 = globalThis;
 var NAMED_COLORS = { red: "#ff0000", green: "#00ff00", blue: "#0000ff", white: "#ffffff", black: "#000000", yellow: "#ffff00", cyan: "#00ffff", magenta: "#ff00ff", gray: "#808080", grey: "#808080", orange: "#ffa500", purple: "#800080", brown: "#a52a2a", pink: "#ffc0cb", silver: "#c0c0c0", maroon: "#800000", olive: "#808000", navy: "#000080", teal: "#008080", lime: "#00ff00", aqua: "#00ffff", fuchsia: "#ff00ff" };
 function parseColorValue2(value) {
   if (value === null || value === void 0) {
@@ -17591,8 +18621,8 @@ function buildAttributesForTag(tagName, value) {
     }
     case "size": {
       const trimmed = value !== void 0 && value !== null ? value.trim() : "";
-      const fontSize = System40.parseInt(trimmed, 10);
-      if (System40.Number.isFinite(fontSize) === false || fontSize <= 0) {
+      const fontSize = System42.parseInt(trimmed, 10);
+      if (System42.Number.isFinite(fontSize) === false || fontSize <= 0) {
         return null;
       }
       return { fontSize };
@@ -17618,7 +18648,7 @@ __name(buildAttributesForTag, "buildAttributesForTag");
 function mergeAttributeStack(stack) {
   const result = {};
   for (const attributes of stack) {
-    for (const key of System40.Object.keys(attributes)) {
+    for (const key of System42.Object.keys(attributes)) {
       if (key === "__tagName") {
         continue;
       }
@@ -17727,8 +18757,8 @@ var RichText = class extends Text {
       measurementContext.font = buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic);
       totalWidth += measurementContext.measureText(segmentText).width;
       measurementContext.restore();
-      maximumFontSize = System40.Math.max(maximumFontSize, segmentFontSize);
-      maximumStrokeWidth = System40.Math.max(maximumStrokeWidth, segmentStrokeWidth);
+      maximumFontSize = System42.Math.max(maximumFontSize, segmentFontSize);
+      maximumStrokeWidth = System42.Math.max(maximumStrokeWidth, segmentStrokeWidth);
     }
     if (maximumFontSize === 0) {
       rect.position.set(0, 0);
@@ -17746,8 +18776,8 @@ var RichText = class extends Text {
       leftX = contentSize.x - totalWidth;
       rightX = contentSize.x;
     } else if (textAlign === "start" || textAlign === "end") {
-      leftX = System40.Math.min(0, contentSize.x - totalWidth);
-      rightX = System40.Math.max(totalWidth, contentSize.x);
+      leftX = System42.Math.min(0, contentSize.x - totalWidth);
+      rightX = System42.Math.max(totalWidth, contentSize.x);
     } else {
       leftX = (contentSize.x - totalWidth) * 0.5;
       rightX = leftX + totalWidth;
@@ -17892,7 +18922,7 @@ var RichText = class extends Text {
       }
       graphic.setFillColor(segmentTextColor.toHEXString());
       graphic.drawFillText(segmentText, cursorX, baselineY);
-      const segmentLineWidth = System40.Math.max(1, segmentFontSize / 16);
+      const segmentLineWidth = System42.Math.max(1, segmentFontSize / 16);
       if (segmentUnderline) {
         const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
         graphic.setStrokeColor(segmentTextColor.toHEXString());
@@ -18112,6 +19142,18 @@ var UILabel = class extends UIView {
     }
     this.invalidateIntrinsicContentSize();
   }
+  setLetterSpacing(letterSpacing) {
+    if (this.#text) {
+      this.#text.setLetterSpacing(letterSpacing);
+    }
+    this.invalidateIntrinsicContentSize();
+  }
+  getLetterSpacing() {
+    if (this.#text) {
+      return this.#text.getLetterSpacing();
+    }
+    return 0;
+  }
   setVisibleCharacterCount(visibleCharacterCount) {
     if (this.#text) {
       this.#text.setVisibleCharacterCount(visibleCharacterCount);
@@ -18265,7 +19307,7 @@ var UILabel = class extends UIView {
     return "middle";
   }
 };
-var System41 = globalThis;
+var System43 = globalThis;
 var ButtonState = { normal: Enum.begin(), hover: Enum.auto(), pressed: Enum.auto(), released: Enum.auto(), disabled: Enum.auto() };
 var UIButton = class _UIButton extends UIControl {
   static {
@@ -18368,7 +19410,7 @@ var UIButton = class _UIButton extends UIControl {
     if (currentButtonState === ButtonState.pressed || currentButtonState === ButtonState.disabled) {
       return;
     }
-    const engine = System41.vanillaEngine;
+    const engine = System43.vanillaEngine;
     if (!engine) {
       return;
     }
@@ -18588,7 +19630,7 @@ var UIButton = class _UIButton extends UIControl {
     return this.#longPressSeconds;
   }
   setMinimumPressedSeconds(minimumPressedSeconds) {
-    this.#minimumPressedSeconds = System41.Math.max(0, minimumPressedSeconds);
+    this.#minimumPressedSeconds = System43.Math.max(0, minimumPressedSeconds);
   }
   getMinimumPressedSeconds() {
     return this.#minimumPressedSeconds;
@@ -18661,7 +19703,7 @@ var UIButton = class _UIButton extends UIControl {
     return this.#isInteractable;
   }
 };
-var System42 = globalThis;
+var System44 = globalThis;
 var PopupMotionState = { closed: "closed", opening: "opening", open: "open", closing: "closing" };
 var PopupMotion = class extends Object2 {
   static {
@@ -18739,14 +19781,14 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      const ratio2 = System42.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      const ratio2 = System44.Math.min(1, this.#elapsedSeconds / this.#openDuration);
       const smooth = ratio2 * ratio2 * (3 - 2 * ratio2);
       if (smooth < 0.72) {
         return 0.45 + (1.18 - 0.45) * (smooth / 0.72);
       }
       return 1.18 - (1.18 - 1) * ((smooth - 0.72) / 0.28);
     }
-    const ratio = System42.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    const ratio = System44.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
     if (ratio < 0.25) {
       return 1 + (1.08 - 1) * (ratio / 0.25);
     }
@@ -18762,9 +19804,9 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      return System42.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      return System44.Math.min(1, this.#elapsedSeconds / this.#openDuration);
     }
-    return 1 - System42.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    return 1 - System44.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
   }
   isInteractive() {
     return this.#state === PopupMotionState.open;
@@ -18788,7 +19830,7 @@ var PopupMotion = class extends Object2 {
     this.#closedEvent = closedEvent;
   }
 };
-var System43 = globalThis;
+var System45 = globalThis;
 var DEFAULT_MAXIMUM_WIDTH = 480;
 var DEFAULT_MARGIN = 16;
 var DEFAULT_PANEL_HEIGHT = 240;
@@ -18904,19 +19946,19 @@ var UIWindow = class extends WorldNode {
     this.#closeEvent = closeEvent;
   }
   setMaximumWidth(maximumWidth) {
-    this.#maximumWidth = System43.Math.max(1, maximumWidth);
+    this.#maximumWidth = System45.Math.max(1, maximumWidth);
   }
   getMaximumWidth() {
     return this.#maximumWidth;
   }
   setMargin(margin) {
-    this.#margin = System43.Math.max(0, margin);
+    this.#margin = System45.Math.max(0, margin);
   }
   getMargin() {
     return this.#margin;
   }
   setPanelHeight(panelHeight) {
-    this.#panelHeight = System43.Math.max(1, panelHeight);
+    this.#panelHeight = System45.Math.max(1, panelHeight);
   }
   getPanelHeight() {
     return this.#panelHeight;
@@ -18954,10 +19996,10 @@ var UIWindow = class extends WorldNode {
     }
   }
   setViewBleed(top, right, bottom, left) {
-    this.#viewBleed.top = System43.Math.max(0, top);
-    this.#viewBleed.right = System43.Math.max(0, right);
-    this.#viewBleed.bottom = System43.Math.max(0, bottom);
-    this.#viewBleed.left = System43.Math.max(0, left);
+    this.#viewBleed.top = System45.Math.max(0, top);
+    this.#viewBleed.right = System45.Math.max(0, right);
+    this.#viewBleed.bottom = System45.Math.max(0, bottom);
+    this.#viewBleed.left = System45.Math.max(0, left);
     this.placeDimNode();
   }
   placeDimNode() {
@@ -18969,8 +20011,8 @@ var UIWindow = class extends WorldNode {
     dimNode.setContentSize(Vector2.create(viewWidth + viewBleed.left + viewBleed.right, viewHeight + viewBleed.top + viewBleed.bottom));
   }
   setViewSize(viewWidth, viewHeight) {
-    this.#viewWidth = System43.Math.max(1, viewWidth);
-    this.#viewHeight = System43.Math.max(1, viewHeight);
+    this.#viewWidth = System45.Math.max(1, viewWidth);
+    this.#viewHeight = System45.Math.max(1, viewHeight);
     this.refreshLayout();
   }
   refreshLayout() {
@@ -18980,14 +20022,14 @@ var UIWindow = class extends WorldNode {
     this.setContentSize(Vector2.create(viewWidth, viewHeight));
     this.placeDimNode();
     const maximumWidth = this.getMaximumWidth();
-    const panelWidth = System43.Math.max(1, System43.Math.min(viewWidth - margin * 2, maximumWidth));
-    const panelHeight = System43.Math.max(1, this.layoutContent(panelWidth));
-    const availableHeight = System43.Math.max(1, viewHeight - margin * 2);
+    const panelWidth = System45.Math.max(1, System45.Math.min(viewWidth - margin * 2, maximumWidth));
+    const panelHeight = System45.Math.max(1, this.layoutContent(panelWidth));
+    const availableHeight = System45.Math.max(1, viewHeight - margin * 2);
     const panelScale = panelHeight > availableHeight ? availableHeight / panelHeight : 1;
     const scaledWidth = panelWidth * panelScale;
     const scaledHeight = panelHeight * panelScale;
     const panelLeft = (viewWidth - scaledWidth) * 0.5;
-    const panelTop = System43.Math.max(margin * panelScale, (viewHeight - scaledHeight) * 0.5);
+    const panelTop = System45.Math.max(margin * panelScale, (viewHeight - scaledHeight) * 0.5);
     this.#panelRect = Rect.create(panelLeft, panelTop, scaledWidth, scaledHeight);
     this.#panelScale = panelScale;
     const frameNode = this.getFrameNode();
@@ -19047,7 +20089,7 @@ var UIWindow = class extends WorldNode {
   dispose() {
   }
 };
-var System44 = globalThis;
+var System46 = globalThis;
 var DEFAULT_MINIMUM_CSS_SCALE = 0.8;
 var DEFAULT_MAXIMUM_SCALE = 1.8;
 var DEFAULT_MINIMUM_LAYER_HEIGHT = 0;
@@ -19068,13 +20110,13 @@ var UIScale = class _UIScale {
     const desiredScale = minimumCssScale / cssPixelScale;
     const isPortrait = _UIScale.isPortrait(viewWidth, viewHeight, portraitRatio);
     if (isPortrait) {
-      return System44.Math.max(1, desiredScale);
+      return System46.Math.max(1, desiredScale);
     }
-    let uiScale = System44.Math.min(maximumScale, desiredScale);
+    let uiScale = System46.Math.min(maximumScale, desiredScale);
     if (minimumLayerHeight > 0 && viewHeight > 0) {
-      uiScale = System44.Math.min(uiScale, viewHeight / minimumLayerHeight);
+      uiScale = System46.Math.min(uiScale, viewHeight / minimumLayerHeight);
     }
-    return System44.Math.max(1, uiScale);
+    return System46.Math.max(1, uiScale);
   }
   static isPortrait(viewWidth, viewHeight, portraitRatio = DEFAULT_PORTRAIT_RATIO) {
     return viewWidth <= viewHeight * portraitRatio;
@@ -19088,7 +20130,7 @@ var UIScale = class _UIScale {
     return viewManager.getCssPixelScale();
   }
 };
-var System45 = globalThis;
+var System47 = globalThis;
 var UIWindowLayer = class _UIWindowLayer extends WorldNode {
   static {
     __name(this, "UIWindowLayer");
@@ -19147,8 +20189,8 @@ var UIWindowLayer = class _UIWindowLayer extends WorldNode {
     return null;
   }
   setViewSize(viewWidth, viewHeight) {
-    this.#viewWidth = System45.Math.max(1, viewWidth);
-    this.#viewHeight = System45.Math.max(1, viewHeight);
+    this.#viewWidth = System47.Math.max(1, viewWidth);
+    this.#viewHeight = System47.Math.max(1, viewHeight);
     const uiScaleOptions = this.#uiScaleOptions;
     this.#uiScale = uiScaleOptions === null ? 1 : UIScale.read(this.#viewWidth, this.#viewHeight, uiScaleOptions);
     const uiScale = this.getUIScale();
@@ -19157,10 +20199,10 @@ var UIWindowLayer = class _UIWindowLayer extends WorldNode {
     this.placeAllWindows();
   }
   setViewBleed(top, right, bottom, left) {
-    this.#viewBleed.top = System45.Math.max(0, top);
-    this.#viewBleed.right = System45.Math.max(0, right);
-    this.#viewBleed.bottom = System45.Math.max(0, bottom);
-    this.#viewBleed.left = System45.Math.max(0, left);
+    this.#viewBleed.top = System47.Math.max(0, top);
+    this.#viewBleed.right = System47.Math.max(0, right);
+    this.#viewBleed.bottom = System47.Math.max(0, bottom);
+    this.#viewBleed.left = System47.Math.max(0, left);
     this.placeAllWindows();
   }
   placeAllWindows() {
@@ -19309,13 +20351,13 @@ var UIWindowLayer = class _UIWindowLayer extends WorldNode {
     return null;
   }
 };
-var System46 = globalThis;
+var System48 = globalThis;
 var LocalStorage = class _LocalStorage extends Object2 {
   static {
     __name(this, "LocalStorage");
   }
   static #backend = null;
-  static #memoryItemMap = new System46.Map();
+  static #memoryItemMap = new System48.Map();
   static #isMemoryFallback = false;
   constructor() {
     super();
@@ -19339,7 +20381,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
       return backend;
     }
     try {
-      const storage = System46.window.localStorage;
+      const storage = System48.window.localStorage;
       return storage !== void 0 && storage !== null ? storage : null;
     } catch (error) {
       return null;
@@ -19359,7 +20401,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
       if (value === null || value === void 0) {
         return null;
       }
-      return System46.String(value);
+      return System48.String(value);
     } catch (error) {
       return null;
     }
@@ -19467,7 +20509,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
     return _LocalStorage.getItem(key) !== null;
   }
   static getKeys() {
-    const keySet = new System46.Set();
+    const keySet = new System48.Set();
     const storage = _LocalStorage.#readStorage();
     if (storage !== null) {
       try {
@@ -19491,7 +20533,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
     for (const key of _LocalStorage.#memoryItemMap.keys()) {
       keySet.add(key);
     }
-    const keys = System46.Array.from(keySet);
+    const keys = System48.Array.from(keySet);
     keys.sort();
     return keys;
   }
@@ -19501,7 +20543,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
       return defaultValue;
     }
     try {
-      return System46.JSON.parse(stringValue);
+      return System48.JSON.parse(stringValue);
     } catch (error) {
       return defaultValue;
     }
@@ -19509,7 +20551,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   static setJson(key, value) {
     let stringValue = "";
     try {
-      stringValue = System46.JSON.stringify(value);
+      stringValue = System48.JSON.stringify(value);
     } catch (error) {
       console.warn(`[LocalStorage] JSON \uC73C\uB85C \uBC14\uAFC0 \uC218 \uC5C6\uB294 \uAC12\uC785\uB2C8\uB2E4: ${key}`, error);
       return false;
@@ -19520,7 +20562,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
     return _LocalStorage.setItem(key, stringValue);
   }
 };
-var System47 = globalThis;
+var System49 = globalThis;
 var TITLE_HEIGHT = 28;
 var TAB_HEIGHT = 24;
 var ITEM_HEIGHT = 20;
@@ -19531,7 +20573,7 @@ var GIZMO_CHECKBOX_MARGIN = 4;
 var FONT_SIZE = 12;
 var PADDING = 7;
 var LABEL_COLUMN_WIDTH = 144;
-var COMPONENT_GETTER_EXCLUDE_NAMES = new System47.Set(["constructor", "getNode", "getImagePath"]);
+var COMPONENT_GETTER_EXCLUDE_NAMES = new System49.Set(["constructor", "getNode", "getImagePath"]);
 var RESIZE_HANDLE_SIZE = 10;
 var SPLITTER_HIT_SIZE = 8;
 var MIN_PANEL_WIDTH = 300;
@@ -19890,7 +20932,7 @@ var DevTools = class extends Object2 {
     }
     if (touchY <= panelY + TITLE_HEIGHT + TAB_HEIGHT) {
       const tabWidth = panelWidth / TABS.length;
-      const tabIndex = System47.Math.floor((touchX - panelX) / tabWidth);
+      const tabIndex = System49.Math.floor((touchX - panelX) / tabWidth);
       if (tabIndex >= 0 && tabIndex < TABS.length) {
         this.#activeTab = tabIndex;
       }
@@ -19922,7 +20964,7 @@ var DevTools = class extends Object2 {
     if (touchX < panelX + leftWidth) {
       const treeItemsY = contentY + ITEM_HEIGHT * 2;
       const localY2 = touchY - treeItemsY + this.#treeScrollY;
-      const clickedIndex = System47.Math.floor(localY2 / ITEM_HEIGHT);
+      const clickedIndex = System49.Math.floor(localY2 / ITEM_HEIGHT);
       if (clickedIndex >= 0 && clickedIndex < this.#flatList.length) {
         const clickedItem = this.#flatList[clickedIndex];
         const clickedNode = clickedItem.node;
@@ -19960,7 +21002,7 @@ var DevTools = class extends Object2 {
       return;
     }
     const localY = touchY - contentY + this.#inspectorScrollY;
-    const clickedLineIndex = System47.Math.floor(localY / ITEM_HEIGHT);
+    const clickedLineIndex = System49.Math.floor(localY / ITEM_HEIGHT);
     if (clickedLineIndex >= 0 && clickedLineIndex < this.#cachedInspectorLines.length) {
       const clickedLine = this.#cachedInspectorLines[clickedLineIndex];
       if (clickedLine.isComponentHeader && clickedLine.componentRef) {
@@ -19990,7 +21032,7 @@ var DevTools = class extends Object2 {
       const isRightMode = this.#resizeMode === ResizeMode.right || this.#resizeMode === ResizeMode.bottomRight;
       if (isRightMode) {
         const newWidth = this.#resizeDragStartPanelWidth + deltaX;
-        this.#panelWidth = System47.Math.max(MIN_PANEL_WIDTH, newWidth);
+        this.#panelWidth = System49.Math.max(MIN_PANEL_WIDTH, newWidth);
       }
       const isLeftMode = this.#resizeMode === ResizeMode.left || this.#resizeMode === ResizeMode.topLeft || this.#resizeMode === ResizeMode.bottomLeft;
       if (isLeftMode) {
@@ -20003,7 +21045,7 @@ var DevTools = class extends Object2 {
       const isBottomMode = this.#resizeMode === ResizeMode.bottom || this.#resizeMode === ResizeMode.bottomRight || this.#resizeMode === ResizeMode.bottomLeft;
       if (isBottomMode) {
         const newHeight = this.#resizeDragStartPanelHeight + deltaY;
-        this.#panelHeight = System47.Math.max(MIN_PANEL_HEIGHT, newHeight);
+        this.#panelHeight = System49.Math.max(MIN_PANEL_HEIGHT, newHeight);
       }
       const isTopMode = this.#resizeMode === ResizeMode.top || this.#resizeMode === ResizeMode.topLeft;
       if (isTopMode) {
@@ -20016,28 +21058,28 @@ var DevTools = class extends Object2 {
       if (this.#resizeMode === ResizeMode.splitter) {
         const newLeftWidth = this.#resizeDragStartLeftWidth + deltaX;
         const maxLeftWidth = this.#panelWidth - MIN_LEFT_WIDTH;
-        this.#leftWidth = System47.Math.max(MIN_LEFT_WIDTH, System47.Math.min(maxLeftWidth, newLeftWidth));
+        this.#leftWidth = System49.Math.max(MIN_LEFT_WIDTH, System49.Math.min(maxLeftWidth, newLeftWidth));
       }
     }
     if (this.#isTreeScrollDragging) {
       const deltaY = touchY - this.#treeScrollDragStartMouseY;
       const newScrollY = this.#treeScrollDragStartScrollY - deltaY;
-      this.#treeScrollY = System47.Math.max(0, newScrollY);
+      this.#treeScrollY = System49.Math.max(0, newScrollY);
     }
     if (this.#isInspectorScrollDragging) {
       const deltaY = touchY - this.#inspectorScrollDragStartMouseY;
       const newScrollY = this.#inspectorScrollDragStartScrollY - deltaY;
-      this.#inspectorScrollY = System47.Math.max(0, newScrollY);
+      this.#inspectorScrollY = System49.Math.max(0, newScrollY);
     }
     if (this.#isLocalStorageScrollDragging) {
       const deltaY = touchY - this.#localStorageScrollDragStartMouseY;
       const newScrollY = this.#localStorageScrollDragStartScrollY - deltaY;
-      this.#localStorageScrollY = System47.Math.max(0, newScrollY);
+      this.#localStorageScrollY = System49.Math.max(0, newScrollY);
     }
     if (this.#isStatisticsScrollDragging) {
       const deltaY = touchY - this.#statisticsScrollDragStartMouseY;
       const newScrollY = this.#statisticsScrollDragStartScrollY - deltaY;
-      this.#statisticsScrollY = System47.Math.max(0, newScrollY);
+      this.#statisticsScrollY = System49.Math.max(0, newScrollY);
     }
   }
   handleRelease(touchX, touchY) {
@@ -20140,7 +21182,7 @@ var DevTools = class extends Object2 {
     const keys = LocalStorage.getKeys();
     const delColWidth = 24;
     const localY = touchY - itemsY + this.#localStorageScrollY;
-    const clickedIndex = System47.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System49.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < keys.length) {
       const clickedKey = keys[clickedIndex];
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
@@ -20193,9 +21235,9 @@ var DevTools = class extends Object2 {
   getComponentProperties(component) {
     const properties = [];
     const seenNames = /* @__PURE__ */ new Set();
-    let proto = System47.Object.getPrototypeOf(component);
-    while (proto && proto.constructor && proto.constructor !== Component && proto !== System47.Object.prototype) {
-      const methodNames = System47.Object.getOwnPropertyNames(proto);
+    let proto = System49.Object.getPrototypeOf(component);
+    while (proto && proto.constructor && proto.constructor !== Component && proto !== System49.Object.prototype) {
+      const methodNames = System49.Object.getOwnPropertyNames(proto);
       for (let i = 0; i < methodNames.length; ++i) {
         const methodName = methodNames[i];
         if (seenNames.has(methodName)) {
@@ -20221,7 +21263,7 @@ var DevTools = class extends Object2 {
         } catch (error) {
         }
       }
-      proto = System47.Object.getPrototypeOf(proto);
+      proto = System49.Object.getPrototypeOf(proto);
     }
     return properties;
   }
@@ -20267,9 +21309,9 @@ var DevTools = class extends Object2 {
         return `(${rectX}, ${rectY}, ${value.width.toFixed(1)}, ${value.height.toFixed(1)})`;
       }
       if (typeof value.red === "number" && typeof value.green === "number" && typeof value.blue === "number") {
-        const r = System47.Math.round(value.red * 255);
-        const g = System47.Math.round(value.green * 255);
-        const b = System47.Math.round(value.blue * 255);
+        const r = System49.Math.round(value.red * 255);
+        const g = System49.Math.round(value.green * 255);
+        const b = System49.Math.round(value.blue * 255);
         const a = typeof value.alpha === "number" ? value.alpha.toFixed(2) : "1";
         return `rgba(${r}, ${g}, ${b}, ${a})`;
       }
@@ -20448,7 +21490,7 @@ var DevTools = class extends Object2 {
     graphic.setTextAlign("left");
     graphic.setTextBaseline("middle");
     const textMetrics = graphic.measureText(framePerSecondText);
-    const boxWidth = System47.Math.ceil(textMetrics.width) + PADDING * 2;
+    const boxWidth = System49.Math.ceil(textMetrics.width) + PADDING * 2;
     graphic.setFillColor(COLOR_BACKGROUND);
     graphic.drawRect(Rect.create(PADDING, PADDING, boxWidth, ITEM_HEIGHT));
     graphic.setStrokeColor(COLOR_BORDER_NORMAL);
@@ -20488,7 +21530,7 @@ var DevTools = class extends Object2 {
     const totalItemsHeight = this.#flatList.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
-      this.#treeScrollY = System47.Math.min(this.#treeScrollY, maxTreeScrollY);
+      this.#treeScrollY = System49.Math.min(this.#treeScrollY, maxTreeScrollY);
     } else {
       this.#treeScrollY = 0;
     }
@@ -20533,7 +21575,7 @@ var DevTools = class extends Object2 {
         graphic.setTextAlign("right");
         const checkboxRightX = panelX + panelWidth - SCROLL_BAR_WIDTH - GIZMO_CHECKBOX_MARGIN;
         const checkboxX = checkboxRightX - GIZMO_CHECKBOX_SIZE;
-        const checkboxY = System47.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+        const checkboxY = System49.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
         const isGizmoVisible = typeof node.isGizmoVisible === "function" ? node.isGizmoVisible() : false;
         graphic.setFillColor(COLOR_ACCENT);
         graphic.drawRect(Rect.create(checkboxX, checkboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
@@ -20558,7 +21600,7 @@ var DevTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#treeScrollY / maxTreeScrollY;
-      const barHeight = System47.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System49.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -20580,7 +21622,7 @@ var DevTools = class extends Object2 {
     const totalContentHeight = inspectorLines.length * ITEM_HEIGHT;
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
-      this.#inspectorScrollY = System47.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
+      this.#inspectorScrollY = System49.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
     } else {
       this.#inspectorScrollY = 0;
     }
@@ -20649,7 +21691,7 @@ var DevTools = class extends Object2 {
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
       const scrollRatio = this.#inspectorScrollY / maxInspectorScrollY;
-      const barHeight = System47.Math.max(20, panelHeight * panelHeight / totalContentHeight);
+      const barHeight = System49.Math.max(20, panelHeight * panelHeight / totalContentHeight);
       const barY = panelY + scrollRatio * (panelHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -20687,7 +21729,7 @@ var DevTools = class extends Object2 {
     graphic.drawRect(Rect.create(panelX, columnHeaderY, panelWidth, ITEM_HEIGHT));
     const delColWidth = 24;
     const availableWidth = panelWidth - delColWidth - SCROLL_BAR_WIDTH;
-    const keyColWidth = System47.Math.floor(availableWidth * 0.4);
+    const keyColWidth = System49.Math.floor(availableWidth * 0.4);
     const valueColWidth = availableWidth - keyColWidth;
     graphic.setFillColor(COLOR_TEXT_DIM);
     graphic.setFontString(`${FONT_SIZE - 1}px monospace`);
@@ -20705,7 +21747,7 @@ var DevTools = class extends Object2 {
     const totalItemsHeight = keys.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
-      this.#localStorageScrollY = System47.Math.min(this.#localStorageScrollY, maxScrollY);
+      this.#localStorageScrollY = System49.Math.min(this.#localStorageScrollY, maxScrollY);
     } else {
       this.#localStorageScrollY = 0;
     }
@@ -20729,12 +21771,12 @@ var DevTools = class extends Object2 {
       graphic.setFontString(`${FONT_SIZE}px monospace`);
       graphic.setTextAlign("left");
       graphic.setTextBaseline("middle");
-      const maxKeyChars = System47.Math.floor(keyColWidth / 7);
+      const maxKeyChars = System49.Math.floor(keyColWidth / 7);
       const keyText = key.length > maxKeyChars ? key.slice(0, maxKeyChars - 3) + "..." : key;
       graphic.drawFillText(keyText, panelX + PADDING, itemMidY);
       graphic.setFillColor(COLOR_PROPERTY_VALUE);
       const valueStr = rawValue !== null ? rawValue : "(null)";
-      const maxValueChars = System47.Math.floor(valueColWidth / 7);
+      const maxValueChars = System49.Math.floor(valueColWidth / 7);
       const valueText = valueStr.length > maxValueChars ? valueStr.slice(0, maxValueChars - 3) + "..." : valueStr;
       graphic.drawFillText(valueText, panelX + keyColWidth + PADDING, itemMidY);
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
@@ -20756,7 +21798,7 @@ var DevTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#localStorageScrollY / maxScrollY;
-      const barHeight = System47.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System49.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -20778,7 +21820,7 @@ var DevTools = class extends Object2 {
       const contextButtonWidths = [];
       for (let labelIndex = 0; labelIndex < contextButtonCount; ++labelIndex) {
         const measuredTextWidth = graphic.measureText(contextButtonTexts[labelIndex]).width;
-        contextButtonWidths.push(System47.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
+        contextButtonWidths.push(System49.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
       }
       let totalContextButtonWidth = contextButtonGap * (contextButtonCount - 1);
       for (let widthIndex = 0; widthIndex < contextButtonWidths.length; ++widthIndex) {
@@ -20861,7 +21903,7 @@ var DevTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Dim Background", panelX + PADDING, dimRowMidY);
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System47.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System49.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isDimEnabled ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(dimCheckboxX, dimCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isDimEnabled) {
@@ -20876,7 +21918,7 @@ var DevTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show All Gizmos", panelX + PADDING, gizmosRowMidY);
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System47.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System49.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isAllGizmosVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(gizmosCheckboxX, gizmosCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isAllGizmosVisible) {
@@ -20891,7 +21933,7 @@ var DevTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Height Aspect Guide", panelX + PADDING, heightAspectGuideRowMidY);
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System47.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System49.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isHeightAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(heightAspectGuideCheckboxX, heightAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isHeightAspectGuideVisible) {
@@ -20906,7 +21948,7 @@ var DevTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Width Aspect Guide", panelX + PADDING, widthAspectGuideRowMidY);
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System47.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System49.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isWidthAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(widthAspectGuideCheckboxX, widthAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isWidthAspectGuideVisible) {
@@ -20921,7 +21963,7 @@ var DevTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show FPS", panelX + PADDING, framePerSecondRowMidY);
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System47.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System49.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isFramePerSecondVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(framePerSecondCheckboxX, framePerSecondCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isFramePerSecondVisible) {
@@ -20934,7 +21976,7 @@ var DevTools = class extends Object2 {
     const dimRowY = panelY + ITEM_HEIGHT;
     const dimRowMidY = dimRowY + ITEM_HEIGHT * 0.5;
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System47.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System49.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isDimCheckboxHit = touchX >= dimCheckboxX && touchX <= dimCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= dimCheckboxY && touchY <= dimCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isDimCheckboxHit) {
       this.#isDimEnabled = !this.#isDimEnabled;
@@ -20944,7 +21986,7 @@ var DevTools = class extends Object2 {
     const gizmosRowY = panelY + ITEM_HEIGHT * 2;
     const gizmosRowMidY = gizmosRowY + ITEM_HEIGHT * 0.5;
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System47.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System49.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isGizmosCheckboxHit = touchX >= gizmosCheckboxX && touchX <= gizmosCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= gizmosCheckboxY && touchY <= gizmosCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isGizmosCheckboxHit) {
       this.#isAllGizmosVisible = !this.#isAllGizmosVisible;
@@ -20956,7 +21998,7 @@ var DevTools = class extends Object2 {
     const heightAspectGuideRowY = panelY + ITEM_HEIGHT * 3;
     const heightAspectGuideRowMidY = heightAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System47.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System49.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isHeightAspectGuideCheckboxHit = touchX >= heightAspectGuideCheckboxX && touchX <= heightAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= heightAspectGuideCheckboxY && touchY <= heightAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isHeightAspectGuideCheckboxHit) {
       this.#isHeightAspectGuideVisible = !this.#isHeightAspectGuideVisible;
@@ -20966,7 +22008,7 @@ var DevTools = class extends Object2 {
     const widthAspectGuideRowY = panelY + ITEM_HEIGHT * 4;
     const widthAspectGuideRowMidY = widthAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System47.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System49.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isWidthAspectGuideCheckboxHit = touchX >= widthAspectGuideCheckboxX && touchX <= widthAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= widthAspectGuideCheckboxY && touchY <= widthAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isWidthAspectGuideCheckboxHit) {
       this.#isWidthAspectGuideVisible = !this.#isWidthAspectGuideVisible;
@@ -20976,7 +22018,7 @@ var DevTools = class extends Object2 {
     const framePerSecondRowY = panelY + ITEM_HEIGHT * 5;
     const framePerSecondRowMidY = framePerSecondRowY + ITEM_HEIGHT * 0.5;
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System47.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System49.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isFramePerSecondCheckboxHit = touchX >= framePerSecondCheckboxX && touchX <= framePerSecondCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= framePerSecondCheckboxY && touchY <= framePerSecondCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isFramePerSecondCheckboxHit) {
       this.#isFramePerSecondVisible = !this.#isFramePerSecondVisible;
@@ -20989,7 +22031,7 @@ var DevTools = class extends Object2 {
     }
     const settingsJson = LocalStorage.getString(SETTINGS_STORAGE_KEY);
     try {
-      const settingsObject = System47.JSON.parse(settingsJson);
+      const settingsObject = System49.JSON.parse(settingsJson);
       if (typeof settingsObject.dimEnabled === "boolean") {
         this.#isDimEnabled = settingsObject.dimEnabled;
       }
@@ -21010,7 +22052,7 @@ var DevTools = class extends Object2 {
   }
   saveSettings() {
     const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
-    const settingsJson = System47.JSON.stringify(settingsObject);
+    const settingsJson = System49.JSON.stringify(settingsObject);
     LocalStorage.setString(SETTINGS_STORAGE_KEY, settingsJson);
   }
   isFramePerSecondVisible() {
@@ -21072,7 +22114,7 @@ var DevTools = class extends Object2 {
     const timeDeltaText = `${timeDelta.toFixed(3)}s`;
     items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
     items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
-    const performanceMemory = System47.window.performance ? System47.window.performance.memory : null;
+    const performanceMemory = System49.window.performance ? System49.window.performance.memory : null;
     const isHeapRead = !!performanceMemory && typeof performanceMemory.usedJSHeapSize === "number" && typeof performanceMemory.totalJSHeapSize === "number";
     if (isHeapRead) {
       const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
@@ -21098,20 +22140,20 @@ var DevTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Statistics", panelX + PADDING, panelY + ITEM_HEIGHT * 0.5);
     const availableWidth = panelWidth - SCROLL_BAR_WIDTH;
-    const keyColumnWidth = System47.Math.floor(availableWidth * 0.4);
+    const keyColumnWidth = System49.Math.floor(availableWidth * 0.4);
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const itemsHeight = panelHeight - ITEM_HEIGHT;
     const totalItemsHeight = statisticsItems.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
-      this.#statisticsScrollY = System47.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
+      this.#statisticsScrollY = System49.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
     } else {
       this.#statisticsScrollY = 0;
     }
     const valueColumnWidth = availableWidth - keyColumnWidth;
-    const maxKeyCharacters = System47.Math.floor(keyColumnWidth / 7);
-    const maxValueCharacters = System47.Math.floor(valueColumnWidth / 7);
+    const maxKeyCharacters = System49.Math.floor(keyColumnWidth / 7);
+    const maxValueCharacters = System49.Math.floor(valueColumnWidth / 7);
     graphic.beginClipRect(Rect.create(panelX, itemsY, panelWidth, itemsHeight));
     for (let itemIndex = 0; itemIndex < statisticsItems.length; ++itemIndex) {
       const statisticsItem = statisticsItems[itemIndex];
@@ -21158,7 +22200,7 @@ var DevTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#statisticsScrollY / maxStatisticsScrollY;
-      const barHeight = System47.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System49.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -21169,7 +22211,7 @@ var DevTools = class extends Object2 {
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const localY = touchY - itemsY + this.#statisticsScrollY;
-    const clickedIndex = System47.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System49.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < statisticsItems.length) {
       const clickedItem = statisticsItems[clickedIndex];
       if (!clickedItem.isSeparator && !clickedItem.isSectionHeader) {
@@ -21189,7 +22231,7 @@ var DevTools = class extends Object2 {
     }
   }
 };
-var System48 = globalThis;
+var System50 = globalThis;
 var DEFAULT_FOLLOW_RATE = 6;
 var SNAP_DISTANCE = 5e-4;
 var LoadingProgress = class extends Object2 {
@@ -21207,11 +22249,11 @@ var LoadingProgress = class extends Object2 {
     this.setFollowRate(followRate);
   }
   setProgress(progress) {
-    if (typeof progress !== "number" || System48.Number.isNaN(progress)) {
+    if (typeof progress !== "number" || System50.Number.isNaN(progress)) {
       return;
     }
-    const clampedProgress = System48.Math.max(0, System48.Math.min(1, progress));
-    this.#targetProgress = System48.Math.max(this.#targetProgress, clampedProgress);
+    const clampedProgress = System50.Math.max(0, System50.Math.min(1, progress));
+    this.#targetProgress = System50.Math.max(this.#targetProgress, clampedProgress);
   }
   getProgress() {
     return this.#targetProgress;
@@ -21220,19 +22262,19 @@ var LoadingProgress = class extends Object2 {
     return this.#shownProgress;
   }
   update(timeDelta) {
-    if (typeof timeDelta !== "number" || !System48.Number.isFinite(timeDelta) || timeDelta <= 0) {
+    if (typeof timeDelta !== "number" || !System50.Number.isFinite(timeDelta) || timeDelta <= 0) {
       return;
     }
     const targetProgress = this.getProgress();
     const followRate = this.getFollowRate();
-    const followRatio = 1 - System48.Math.exp(-followRate * timeDelta);
+    const followRatio = 1 - System50.Math.exp(-followRate * timeDelta);
     this.#shownProgress += (targetProgress - this.#shownProgress) * followRatio;
-    if (System48.Math.abs(targetProgress - this.#shownProgress) < SNAP_DISTANCE) {
+    if (System50.Math.abs(targetProgress - this.#shownProgress) < SNAP_DISTANCE) {
       this.#shownProgress = targetProgress;
     }
   }
   setFollowRate(followRate) {
-    if (typeof followRate !== "number" || !System48.Number.isFinite(followRate) || followRate <= 0) {
+    if (typeof followRate !== "number" || !System50.Number.isFinite(followRate) || followRate <= 0) {
       return;
     }
     this.#followRate = followRate;
@@ -21248,7 +22290,7 @@ var LoadingProgress = class extends Object2 {
     this.#shownProgress = 0;
   }
 };
-var System49 = globalThis;
+var System51 = globalThis;
 var ScreenFadeHold = class extends Object2 {
   static {
     __name(this, "ScreenFadeHold");
@@ -21394,8 +22436,8 @@ var GameScene = class _GameScene extends Scene {
     const insetRight = insets.right / scale;
     const insetBottom = insets.bottom / scale;
     const insetLeft = insets.left / scale;
-    const width = System49.Math.max(viewSize.x - insetLeft - insetRight, 0);
-    const height = System49.Math.max(viewSize.y - insetTop - insetBottom, 0);
+    const width = System51.Math.max(viewSize.x - insetLeft - insetRight, 0);
+    const height = System51.Math.max(viewSize.y - insetTop - insetBottom, 0);
     return Rect.create(insetLeft, insetTop, width, height);
   }
   setLoadingProgress(progress) {
@@ -21462,7 +22504,7 @@ var GameScene = class _GameScene extends Scene {
         if (isCaptureTimeStepFixed) {
           await engine.waitForNextEngineFrame();
         } else {
-          await new Promise((resolve) => System49.setTimeout(resolve, 50));
+          await new Promise((resolve) => System51.setTimeout(resolve, 50));
         }
       }
     } finally {
@@ -21496,7 +22538,7 @@ var GameScene = class _GameScene extends Scene {
     const loadingProgress = this.#loadingProgress;
     loadingProgress.update(unscaledTimeDelta);
     const elapsed = (currentTime - this.#loadStartTime) * 1e3;
-    let progress = System49.Math.min(1, System49.Math.max(0, elapsed / this.#loadMinDurationMs));
+    let progress = System51.Math.min(1, System51.Math.max(0, elapsed / this.#loadMinDurationMs));
     if (this.#isLoadingProgressReported) {
       progress = loadingProgress.getShownProgress();
     }
@@ -21583,8 +22625,8 @@ var GameScene = class _GameScene extends Scene {
     const safeAreaInsets = viewManager.getSafeAreaInsets();
     const x = safeAreaInsets.left;
     const y = safeAreaInsets.top;
-    const width = System49.Math.max(viewWidth - safeAreaInsets.left - safeAreaInsets.right, 0);
-    const height = System49.Math.max(viewHeight - safeAreaInsets.top - safeAreaInsets.bottom, 0);
+    const width = System51.Math.max(viewWidth - safeAreaInsets.left - safeAreaInsets.right, 0);
+    const height = System51.Math.max(viewHeight - safeAreaInsets.top - safeAreaInsets.bottom, 0);
     return Rect.create(x, y, width, height);
   }
   tick(timeDelta) {
@@ -21700,7 +22742,7 @@ var GameScene = class _GameScene extends Scene {
     this.#screenFadeColor = color;
   }
   setScreenFadeSeconds(seconds2) {
-    this.#screenFadeSeconds = System49.Math.max(0, seconds2);
+    this.#screenFadeSeconds = System51.Math.max(0, seconds2);
   }
   getScreenFadeAlpha() {
     return this.#screenFadeAlpha;
@@ -21716,17 +22758,17 @@ var GameScene = class _GameScene extends Scene {
     }
     const engine = this.getEngine();
     const timeManager = engine.getTimeManager();
-    const unscaledTimeDelta = System49.Math.min(timeManager.getUnscaleDeltaTime(), 0.1);
+    const unscaledTimeDelta = System51.Math.min(timeManager.getUnscaleDeltaTime(), 0.1);
     const screenFadeSeconds = this.#screenFadeSeconds;
     const fadeStep = screenFadeSeconds > 0 ? unscaledTimeDelta / screenFadeSeconds : 1;
     if (this.#screenFadeDirection < 0) {
-      this.#screenFadeAlpha = System49.Math.max(0, this.#screenFadeAlpha - fadeStep);
+      this.#screenFadeAlpha = System51.Math.max(0, this.#screenFadeAlpha - fadeStep);
       if (this.#screenFadeAlpha <= 0) {
         this.#screenFadeDirection = 0;
       }
       return;
     }
-    this.#screenFadeAlpha = System49.Math.min(1, this.#screenFadeAlpha + fadeStep);
+    this.#screenFadeAlpha = System51.Math.min(1, this.#screenFadeAlpha + fadeStep);
     if (this.#screenFadeAlpha < 1) {
       return;
     }
@@ -21824,7 +22866,7 @@ var GameScene = class _GameScene extends Scene {
     this.dispatchPlayInput("release", viewPosition, null);
   }
   setPlayAreaReference(fixedLength, isLandscape) {
-    this.#playAreaFixedLength = System49.Math.max(0, fixedLength);
+    this.#playAreaFixedLength = System51.Math.max(0, fixedLength);
     this.#isPlayAreaLandscape = isLandscape;
     if (this.#playAreaFixedLength <= 0) {
       return;
@@ -21858,7 +22900,7 @@ var GameScene = class _GameScene extends Scene {
     }
     const referenceResolutionSize = viewManager.getReferenceResolutionSize();
     const currentReferenceLength = isLandscape ? referenceResolutionSize.x : referenceResolutionSize.y;
-    if (System49.Math.abs(currentReferenceLength - referenceLength) < 1e-4) {
+    if (System51.Math.abs(currentReferenceLength - referenceLength) < 1e-4) {
       return;
     }
     viewManager.applyReferenceResolutionSize(Vector2.create(referenceLength, referenceLength));
@@ -21968,7 +23010,7 @@ var LayoutStrength = class _LayoutStrength {
     return _LayoutStrength.createStrength(0, priority, 0);
   }
 };
-var System50 = globalThis;
+var System52 = globalThis;
 var LayoutConstraint = class _LayoutConstraint {
   static {
     __name(this, "LayoutConstraint");
@@ -21978,7 +23020,7 @@ var LayoutConstraint = class _LayoutConstraint {
   #strength;
   constructor(expression, relation, strength) {
     if (!(expression instanceof LayoutExpression)) {
-      throw new System50.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
+      throw new System52.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
     }
     this.#expression = expression;
     this.#relation = relation;
@@ -22001,7 +23043,7 @@ var LayoutConstraint = class _LayoutConstraint {
     return constraint;
   }
 };
-var System51 = globalThis;
+var System53 = globalThis;
 var LayoutExpression = class _LayoutExpression {
   static {
     __name(this, "LayoutExpression");
@@ -22009,7 +23051,7 @@ var LayoutExpression = class _LayoutExpression {
   #terms;
   #constant;
   constructor(terms, constant) {
-    this.#terms = System51.Array.isArray(terms) ? terms.slice() : [];
+    this.#terms = System53.Array.isArray(terms) ? terms.slice() : [];
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   static fromVariable(variable) {
@@ -22034,7 +23076,7 @@ var LayoutExpression = class _LayoutExpression {
     if (typeof input === "number") {
       return _LayoutExpression.fromConstant(input);
     }
-    throw new System51.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
+    throw new System53.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
   }
   getTerms() {
     return this.#terms;
@@ -22075,7 +23117,7 @@ var LayoutExpression = class _LayoutExpression {
   }
   multiply(coefficient) {
     if (typeof coefficient !== "number") {
-      throw new System51.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System53.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     const ownTerms = this.getTerms();
     const newTerms = [];
@@ -22091,10 +23133,10 @@ var LayoutExpression = class _LayoutExpression {
   }
   divide(denominator) {
     if (typeof denominator !== "number") {
-      throw new System51.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System53.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     if (denominator === 0) {
-      throw new System51.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
+      throw new System53.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
     }
     const result = this.multiply(1 / denominator);
     return result;
@@ -22163,7 +23205,7 @@ var LayoutSymbol = class _LayoutSymbol {
     return this.getType() === LayoutSymbolType.invalid;
   }
 };
-var System52 = globalThis;
+var System54 = globalThis;
 var LayoutRow = class _LayoutRow {
   static {
     __name(this, "LayoutRow");
@@ -22171,7 +23213,7 @@ var LayoutRow = class _LayoutRow {
   #cells;
   #constant;
   constructor(constant) {
-    this.#cells = new System52.Map();
+    this.#cells = new System54.Map();
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   getCells() {
@@ -22234,7 +23276,7 @@ var LayoutRow = class _LayoutRow {
     const inverse = -1 / subjectCoefficient;
     cells.delete(subject);
     this.setConstant(this.getConstant() * inverse);
-    const updatedCells = new System52.Map();
+    const updatedCells = new System54.Map();
     for (const [symbol, value] of cells) {
       updatedCells.set(symbol, value * inverse);
     }
@@ -22269,7 +23311,7 @@ function nearZero(value) {
   return value < 0 ? -value < NEAR_ZERO_EPS : value < NEAR_ZERO_EPS;
 }
 __name(nearZero, "nearZero");
-var System53 = globalThis;
+var System55 = globalThis;
 var LayoutSolver = class {
   static {
     __name(this, "LayoutSolver");
@@ -22282,31 +23324,31 @@ var LayoutSolver = class {
   #objective;
   #artificial;
   constructor() {
-    this.#constraintTags = new System53.Map();
-    this.#rows = new System53.Map();
-    this.#variableSymbols = new System53.Map();
-    this.#editInfos = new System53.Map();
+    this.#constraintTags = new System55.Map();
+    this.#rows = new System55.Map();
+    this.#variableSymbols = new System55.Map();
+    this.#editInfos = new System55.Map();
     this.#infeasibleRows = [];
     this.#objective = new LayoutRow(0);
     this.#artificial = null;
   }
   addConstraint(constraint) {
     if (this.#constraintTags.has(constraint)) {
-      throw new System53.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
+      throw new System55.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
     }
     const tag = new LayoutTag();
     const row = this.createRow(constraint, tag);
     let subject = this.chooseSubject(row, tag);
     if (subject.isInvalid() && allDummies(row)) {
       if (!nearZero2(row.getConstant())) {
-        throw new System53.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System55.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
       subject = tag.getMarker();
     }
     if (subject.isInvalid()) {
       const success = this.addWithArtificialVariable(row);
       if (!success) {
-        throw new System53.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System55.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
     } else {
       row.solveFor(subject);
@@ -22319,7 +23361,7 @@ var LayoutSolver = class {
   removeConstraint(constraint) {
     const tag = this.#constraintTags.get(constraint);
     if (tag === void 0) {
-      throw new System53.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
+      throw new System55.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
     }
     this.#constraintTags.delete(constraint);
     this.removeConstraintEffects(constraint, tag);
@@ -22329,7 +23371,7 @@ var LayoutSolver = class {
     } else {
       const leavingSymbol = this.getMarkerLeavingSymbol(marker);
       if (leavingSymbol.isInvalid()) {
-        throw new System53.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328: leaving row \uC5C6\uC74C.");
+        throw new System55.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328: leaving row \uC5C6\uC74C.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -22343,11 +23385,11 @@ var LayoutSolver = class {
   }
   addEditVariable(variable, strength) {
     if (this.#editInfos.has(variable)) {
-      throw new System53.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
+      throw new System55.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
     }
     const clipped = LayoutStrength.clipStrength(strength);
     if (clipped >= LayoutStrength.required) {
-      throw new System53.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
+      throw new System55.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
     }
     const expression = LayoutExpression.fromVariable(variable);
     const constraint = new LayoutConstraint(expression, LayoutRelation.equal, clipped);
@@ -22359,7 +23401,7 @@ var LayoutSolver = class {
   removeEditVariable(variable) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System53.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System55.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     this.removeConstraint(editInfo.getConstraint());
     this.#editInfos.delete(variable);
@@ -22370,7 +23412,7 @@ var LayoutSolver = class {
   suggestValue(variable, value) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System53.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System55.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     const delta = value - editInfo.getConstant();
     editInfo.setConstant(value);
@@ -22550,7 +23592,7 @@ var LayoutSolver = class {
       }
       const leavingSymbol = this.getLeavingSymbol(enteringSymbol);
       if (leavingSymbol.isInvalid()) {
-        throw new System53.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300: bound \uAC00 \uBD80\uC871\uD568.");
+        throw new System55.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300: bound \uAC00 \uBD80\uC871\uD568.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -22558,7 +23600,7 @@ var LayoutSolver = class {
       this.substitute(enteringSymbol, leavingRow);
       this.#rows.set(enteringSymbol, leavingRow);
     }
-    throw new System53.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System55.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   dualOptimize() {
     const safeguard = 1e5;
@@ -22576,17 +23618,17 @@ var LayoutSolver = class {
       }
       const enteringSymbol = this.getDualEnteringSymbol(row);
       if (enteringSymbol.isInvalid()) {
-        throw new System53.Error("[LayoutSolver] dual optimize \uC2E4\uD328: entering \uC5C6\uC74C.");
+        throw new System55.Error("[LayoutSolver] dual optimize \uC2E4\uD328: entering \uC5C6\uC74C.");
       }
       this.#rows.delete(leavingSymbol);
       row.solveForPair(leavingSymbol, enteringSymbol);
       this.substitute(enteringSymbol, row);
       this.#rows.set(enteringSymbol, row);
     }
-    throw new System53.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System55.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   getLeavingSymbol(enteringSymbol) {
-    let ratio = System53.Number.POSITIVE_INFINITY;
+    let ratio = System55.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     for (const [symbol, row] of this.#rows) {
       if (symbol.getType() === LayoutSymbolType.external) {
@@ -22604,7 +23646,7 @@ var LayoutSolver = class {
     return result;
   }
   getDualEnteringSymbol(row) {
-    let ratio = System53.Number.POSITIVE_INFINITY;
+    let ratio = System55.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     const cells = row.getCells();
     for (const [symbol, value] of cells) {
@@ -22620,8 +23662,8 @@ var LayoutSolver = class {
     return result;
   }
   getMarkerLeavingSymbol(marker) {
-    let ratio1 = System53.Number.POSITIVE_INFINITY;
-    let ratio2 = System53.Number.POSITIVE_INFINITY;
+    let ratio1 = System55.Number.POSITIVE_INFINITY;
+    let ratio2 = System55.Number.POSITIVE_INFINITY;
     let result1 = LayoutSymbol.invalid();
     let result2 = LayoutSymbol.invalid();
     let result3 = LayoutSymbol.invalid();
@@ -22766,9 +23808,9 @@ var LayoutPriority = class {
   static defaultLow = 250;
   static fittingSizeLevel = 50;
 };
-var System54 = globalThis;
-var LayoutConstraintAxis = System54.Object.freeze({ horizontal: "horizontal", vertical: "vertical" });
-var System55 = globalThis;
+var System56 = globalThis;
+var LayoutConstraintAxis = System56.Object.freeze({ horizontal: "horizontal", vertical: "vertical" });
+var System57 = globalThis;
 var LOCAL_SCALE = Vector2.create(1, 1);
 var NO_INTRINSIC_METRIC = -1;
 var UINode = class _UINode extends TransformNode {
@@ -22947,7 +23989,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalHuggingPriority;
     }
-    throw new System55.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System57.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   setContentHuggingPriority(priority, axis) {
     if (axis === LayoutConstraintAxis.horizontal) {
@@ -22955,7 +23997,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalHuggingPriority = priority;
     } else {
-      throw new System55.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System57.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -22966,7 +24008,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalCompressionResistancePriority;
     }
-    throw new System55.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System57.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   setContentCompressionResistancePriority(priority, axis) {
     if (axis === LayoutConstraintAxis.horizontal) {
@@ -22974,7 +24016,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalCompressionResistancePriority = priority;
     } else {
-      throw new System55.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System57.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -23268,7 +24310,7 @@ var UINode = class _UINode extends TransformNode {
   }
 };
 UINode.noIntrinsicMetric = NO_INTRINSIC_METRIC;
-var System56 = globalThis;
+var System58 = globalThis;
 var Frame = class extends Object2 {
   static {
     __name(this, "Frame");
@@ -23279,7 +24321,7 @@ var Frame = class extends Object2 {
     super();
     this.#image = image;
     if (image === null || image === void 0) {
-      throw new System56.Error("image is null.");
+      throw new System58.Error("image is null.");
     }
     if (rect === null || rect === void 0) {
       this.#rect = Rect.create(0, 0, image.width, image.height);
@@ -23424,7 +24466,7 @@ var Animation = class extends Object2 {
     return this.#frames.length;
   }
 };
-var System57 = globalThis;
+var System59 = globalThis;
 var outlineRect = new Rect();
 var outlineContentSize = new Vector2();
 var outlineCenter = new Vector2();
@@ -23461,7 +24503,7 @@ var Outline = class _Outline extends Component {
     const color = this.getColor();
     graphic.setStrokeColor(color);
     if (this.isCircle()) {
-      const radius = System57.Math.min(contentSize.x, contentSize.y) * 0.5 - halfLineWidth;
+      const radius = System59.Math.min(contentSize.x, contentSize.y) * 0.5 - halfLineWidth;
       if (radius <= 0) {
         return;
       }
@@ -23477,7 +24519,7 @@ var Outline = class _Outline extends Component {
     const rect = outlineRect;
     rect.position.set(halfLineWidth, halfLineWidth);
     rect.size.set(width, height);
-    const roundSize = System57.Math.max(0, this.getRoundSize() - halfLineWidth);
+    const roundSize = System59.Math.max(0, this.getRoundSize() - halfLineWidth);
     graphic.drawStrokeRoundRect(rect, roundSize, lineWidth);
   }
   isDrawnInsideContent() {
@@ -23514,11 +24556,11 @@ var Outline = class _Outline extends Component {
     return this.#isCircle;
   }
 };
-var System58 = globalThis;
+var System60 = globalThis;
 var MAXIMUM_IDLE_BAKE_COUNT = 128;
-var bakeEntries = new System58.Map();
+var bakeEntries = new System60.Map();
 var idleBakeCount = 0;
-var holderRegistry = typeof System58.FinalizationRegistry === "function" ? new System58.FinalizationRegistry((bakeKey) => {
+var holderRegistry = typeof System60.FinalizationRegistry === "function" ? new System60.FinalizationRegistry((bakeKey) => {
   dereferenceBake(bakeKey);
 }) : null;
 function acquireSharedBake(bakeKey, holder, createBake) {
@@ -23575,16 +24617,16 @@ function dereferenceBake(bakeKey) {
   }
 }
 __name(dereferenceBake, "dereferenceBake");
-var System59 = globalThis;
+var System61 = globalThis;
 var BAKE_PADDING = 2;
 var fontLoadCount2 = 0;
-if (System59.document !== void 0 && System59.document.fonts !== void 0) {
-  System59.document.fonts.addEventListener("loadingdone", () => {
+if (System61.document !== void 0 && System61.document.fonts !== void 0) {
+  System61.document.fonts.addEventListener("loadingdone", () => {
     fontLoadCount2 += 1;
   });
 }
 function buildRGBAString(color, opacity) {
-  return color.withAlpha(System59.Math.min(1, System59.Math.max(0, opacity))).toRGBAString();
+  return color.withAlpha(System61.Math.min(1, System61.Math.max(0, opacity))).toRGBAString();
 }
 __name(buildRGBAString, "buildRGBAString");
 function readColor(color) {
@@ -23683,8 +24725,8 @@ var ShadowText = class extends Component {
     const isPixelSnapEnabled = graphic.isTextPixelSnapEnabled();
     if (isPixelSnapEnabled && transformMatrix.b === 0 && transformMatrix.c === 0 && transformMatrix.a > 0 && transformMatrix.d > 0) {
       const devicePoint = transformMatrix.transformPoint(quadX, quadY);
-      quadX += (System59.Math.round(devicePoint.x) - devicePoint.x) / transformMatrix.a;
-      quadY += (System59.Math.round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
+      quadX += (System61.Math.round(devicePoint.x) - devicePoint.x) / transformMatrix.a;
+      quadY += (System61.Math.round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
     }
     const quadWidth = bakeCanvas.width / bakeMetrics.scale;
     const quadHeight = bakeCanvas.height / bakeMetrics.scale;
@@ -23720,19 +24762,19 @@ var ShadowText = class extends Component {
       leftX = contentSize.x - textWidth;
       rightX = contentSize.x;
     } else if (textAlign === "start" || textAlign === "end") {
-      leftX = System59.Math.min(0, contentSize.x - textWidth);
-      rightX = System59.Math.max(textWidth, contentSize.x);
+      leftX = System61.Math.min(0, contentSize.x - textWidth);
+      rightX = System61.Math.max(textWidth, contentSize.x);
     } else {
       leftX = (contentSize.x - textWidth) * 0.5;
       rightX = leftX + textWidth;
     }
-    const blurMargin = System59.Math.max(0, this.#shadowBlur) * 2 + BAKE_PADDING;
+    const blurMargin = System61.Math.max(0, this.#shadowBlur) * 2 + BAKE_PADDING;
     const shadowOffset = this.#shadowOffset;
     const horizontalMargin = this.#fontSize * 0.5 + blurMargin;
     const verticalMargin = this.#fontSize * 1.5 + blurMargin;
     const middleY = contentSize.y * 0.5;
-    const topY = middleY - verticalMargin + System59.Math.min(0, shadowOffset);
-    const bottomY = middleY + verticalMargin + System59.Math.max(0, shadowOffset);
+    const topY = middleY - verticalMargin + System61.Math.min(0, shadowOffset);
+    const bottomY = middleY + verticalMargin + System61.Math.max(0, shadowOffset);
     rect.position.set(leftX - horizontalMargin, topY);
     rect.size.set(rightX - leftX + horizontalMargin * 2, bottomY - topY);
     return true;
@@ -23744,7 +24786,7 @@ var ShadowText = class extends Component {
     super.detach(node);
   }
   bakeText(graphic, text, fitWidth, bakeScale, textDirection, fontFace) {
-    const bakeCanvas = System59.document.createElement("canvas");
+    const bakeCanvas = System61.document.createElement("canvas");
     const canvasRenderingContext = bakeCanvas.getContext("2d");
     if (canvasRenderingContext === null) {
       this.#bakeCanvas = null;
@@ -23753,16 +24795,16 @@ var ShadowText = class extends Component {
     let fontSize = this.#fontSize;
     const textWidth = this.measureTextWidth(graphic);
     if (fitWidth > 0 && textWidth > fitWidth) {
-      const fitRatio = System59.Math.max(this.#fitMinimumRatio, fitWidth / textWidth);
-      fontSize = System59.Math.floor(this.#fontSize * fitRatio * 10) / 10;
+      const fitRatio = System61.Math.max(this.#fitMinimumRatio, fitWidth / textWidth);
+      fontSize = System61.Math.floor(this.#fontSize * fitRatio * 10) / 10;
     }
     const scaledFontString = buildFontString(fontFace, fontSize * bakeScale, this.#isBold, this.#isItalic);
     canvasRenderingContext.font = scaledFontString;
     canvasRenderingContext.direction = textDirection;
     canvasRenderingContext.textAlign = "left";
     const textMetrics = canvasRenderingContext.measureText(text);
-    const actualLeft = System59.Math.ceil(System59.Math.max(textMetrics.actualBoundingBoxLeft || 0, 0));
-    const actualRight = System59.Math.ceil(System59.Math.max(textMetrics.actualBoundingBoxRight || textMetrics.width, 0));
+    const actualLeft = System61.Math.ceil(System61.Math.max(textMetrics.actualBoundingBoxLeft || 0, 0));
+    const actualRight = System61.Math.ceil(System61.Math.max(textMetrics.actualBoundingBoxRight || textMetrics.width, 0));
     let scaledFontAscent = textMetrics.fontBoundingBoxAscent;
     if (scaledFontAscent === void 0) {
       scaledFontAscent = textMetrics.actualBoundingBoxAscent || 0;
@@ -23773,18 +24815,18 @@ var ShadowText = class extends Component {
     }
     const scaledShadowOffset = this.#shadowOffset * bakeScale;
     const scaledShadowBlur = this.#shadowBlur * bakeScale;
-    const bakePadding = BAKE_PADDING + System59.Math.ceil(scaledShadowBlur) * 2;
+    const bakePadding = BAKE_PADDING + System61.Math.ceil(scaledShadowBlur) * 2;
     const scaledPenX = bakePadding + actualLeft;
-    const scaledInkAscent = System59.Math.max(scaledFontAscent, textMetrics.actualBoundingBoxAscent || 0);
-    const scaledInkDescent = System59.Math.max(scaledFontDescent, textMetrics.actualBoundingBoxDescent || 0);
-    const scaledBaselineY = bakePadding + System59.Math.ceil(scaledInkAscent);
+    const scaledInkAscent = System61.Math.max(scaledFontAscent, textMetrics.actualBoundingBoxAscent || 0);
+    const scaledInkDescent = System61.Math.max(scaledFontDescent, textMetrics.actualBoundingBoxDescent || 0);
+    const scaledBaselineY = bakePadding + System61.Math.ceil(scaledInkAscent);
     const bakeWidth = scaledPenX + actualRight + bakePadding;
-    const scaledDecorationLineWidth = System59.Math.max(1, fontSize / 16) * bakeScale;
+    const scaledDecorationLineWidth = System61.Math.max(1, fontSize / 16) * bakeScale;
     const scaledMiddleY = scaledBaselineY - (scaledFontAscent - scaledFontDescent) * 0.5;
     const scaledUnderlineY = scaledMiddleY + (fontSize * 0.5 + 2) * bakeScale;
-    let bakeHeight = scaledBaselineY + System59.Math.ceil(scaledInkDescent + scaledShadowOffset) + bakePadding;
+    let bakeHeight = scaledBaselineY + System61.Math.ceil(scaledInkDescent + scaledShadowOffset) + bakePadding;
     if (this.#isUnderline) {
-      bakeHeight = System59.Math.max(bakeHeight, System59.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
+      bakeHeight = System61.Math.max(bakeHeight, System61.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
     }
     if (bakeWidth <= 0 || bakeHeight <= 0) {
       this.#bakeCanvas = null;
@@ -23900,7 +24942,7 @@ var ShadowText = class extends Component {
     this.markDrawnRectDirty();
   }
   setFitMinimumRatio(fitMinimumRatio) {
-    this.#fitMinimumRatio = System59.Math.max(0.01, System59.Math.min(1, fitMinimumRatio));
+    this.#fitMinimumRatio = System61.Math.max(0.01, System61.Math.min(1, fitMinimumRatio));
   }
   getFitMinimumRatio() {
     return this.#fitMinimumRatio;
@@ -23909,13 +24951,13 @@ var ShadowText = class extends Component {
     return this.#bakeCanvas;
   }
 };
-var System60 = globalThis;
-var SoftShadeShape = System60.Object.freeze({ band: "band", bottom: "bottom" });
+var System62 = globalThis;
+var SoftShadeShape = System62.Object.freeze({ band: "band", bottom: "bottom" });
 function readSmoothRise(edge, value) {
   if (edge <= 0) {
     return value > 0 ? 1 : 0;
   }
-  const ratio = System60.Math.min(1, System60.Math.max(0, value / edge));
+  const ratio = System62.Math.min(1, System62.Math.max(0, value / edge));
   return ratio * ratio * (3 - 2 * ratio);
 }
 __name(readSmoothRise, "readSmoothRise");
@@ -23954,10 +24996,10 @@ var SoftShade = class _SoftShade extends Component {
     }
     const bakeUnit = this.getBakeUnit();
     const bakeMaximumSize = this.getBakeMaximumSize();
-    const bakeWidth = System60.Math.max(2, System60.Math.min(bakeMaximumSize, System60.Math.ceil(contentWidth / bakeUnit)));
-    const bakeHeight = System60.Math.max(2, System60.Math.min(bakeMaximumSize, System60.Math.ceil(contentHeight / bakeUnit)));
+    const bakeWidth = System62.Math.max(2, System62.Math.min(bakeMaximumSize, System62.Math.ceil(contentWidth / bakeUnit)));
+    const bakeHeight = System62.Math.max(2, System62.Math.min(bakeMaximumSize, System62.Math.ceil(contentHeight / bakeUnit)));
     const fadeWidth = this.getFadeWidth();
-    const fadeRatio = System60.Math.min(0.5, fadeWidth / contentWidth);
+    const fadeRatio = System62.Math.min(0.5, fadeWidth / contentWidth);
     const shape = this.getShape();
     const color = this.getColor();
     const fadeRatioText = fadeRatio.toFixed(3);
@@ -23987,7 +25029,7 @@ var SoftShade = class _SoftShade extends Component {
     super.detach(node);
   }
   bakeShade(bakeWidth, bakeHeight, fadeRatio) {
-    const bakeCanvas = System60.document.createElement("canvas");
+    const bakeCanvas = System62.document.createElement("canvas");
     const canvasRenderingContext = bakeCanvas.getContext("2d");
     if (canvasRenderingContext === null) {
       this.#bakeCanvas = null;
@@ -23996,9 +25038,9 @@ var SoftShade = class _SoftShade extends Component {
     bakeCanvas.width = bakeWidth;
     bakeCanvas.height = bakeHeight;
     const color = this.getColor();
-    const red = System60.Math.min(255, System60.Math.max(0, System60.Math.round(color.red * 255)));
-    const green = System60.Math.min(255, System60.Math.max(0, System60.Math.round(color.green * 255)));
-    const blue = System60.Math.min(255, System60.Math.max(0, System60.Math.round(color.blue * 255)));
+    const red = System62.Math.min(255, System62.Math.max(0, System62.Math.round(color.red * 255)));
+    const green = System62.Math.min(255, System62.Math.max(0, System62.Math.round(color.green * 255)));
+    const blue = System62.Math.min(255, System62.Math.max(0, System62.Math.round(color.blue * 255)));
     const opacity = this.getOpacity();
     const shape = this.getShape();
     const isBand = shape === SoftShadeShape.band;
@@ -24006,15 +25048,15 @@ var SoftShade = class _SoftShade extends Component {
     const pixels = imageData.data;
     for (let row = 0; row < bakeHeight; ++row) {
       const down = (row + 0.5) / bakeHeight;
-      const rowShade = isBand ? readSmoothRise(0.5, System60.Math.min(down, 1 - down)) : down;
+      const rowShade = isBand ? readSmoothRise(0.5, System62.Math.min(down, 1 - down)) : down;
       for (let column = 0; column < bakeWidth; ++column) {
         const across = (column + 0.5) / bakeWidth;
-        const columnShade = isBand ? readSmoothRise(fadeRatio, System60.Math.min(across, 1 - across)) : 1;
+        const columnShade = isBand ? readSmoothRise(fadeRatio, System62.Math.min(across, 1 - across)) : 1;
         const pixelIndex = (row * bakeWidth + column) * 4;
         pixels[pixelIndex] = red;
         pixels[pixelIndex + 1] = green;
         pixels[pixelIndex + 2] = blue;
-        pixels[pixelIndex + 3] = System60.Math.round(255 * opacity * rowShade * columnShade);
+        pixels[pixelIndex + 3] = System62.Math.round(255 * opacity * rowShade * columnShade);
       }
     }
     canvasRenderingContext.putImageData(imageData, 0, 0);
@@ -24028,8 +25070,8 @@ var SoftShade = class _SoftShade extends Component {
     this.#fadeWidth = fadeWidth;
   }
   setBakeResolution(bakeUnit, bakeMaximumSize) {
-    this.#bakeUnit = System60.Math.max(1, bakeUnit);
-    this.#bakeMaximumSize = System60.Math.max(2, bakeMaximumSize);
+    this.#bakeUnit = System62.Math.max(1, bakeUnit);
+    this.#bakeMaximumSize = System62.Math.max(2, bakeMaximumSize);
   }
   getShape() {
     return this.#shape;
@@ -24053,9 +25095,9 @@ var SoftShade = class _SoftShade extends Component {
     return this.#bakeCanvas;
   }
 };
-var System61 = globalThis;
+var System63 = globalThis;
 var BAKE_PADDING2 = 2;
-var imageIdentifiers = new System61.WeakMap();
+var imageIdentifiers = new System63.WeakMap();
 var nextImageIdentifier = 1;
 var ShadowImage = class extends Component {
   static {
@@ -24105,7 +25147,7 @@ var ShadowImage = class extends Component {
     if (contentWidth <= 0 || contentHeight <= 0) {
       return;
     }
-    const fitScale = System61.Math.min(contentWidth / sourceRect.width, contentHeight / sourceRect.height);
+    const fitScale = System63.Math.min(contentWidth / sourceRect.width, contentHeight / sourceRect.height);
     const imageWidth = sourceRect.width * fitScale;
     const imageHeight = sourceRect.height * fitScale;
     const bakeScale = graphic.calculateTextBakeScale();
@@ -24143,10 +25185,10 @@ var ShadowImage = class extends Component {
       return false;
     }
     const contentSize = node.getContentSize();
-    const blurMargin = System61.Math.max(0, this.#shadowBlur) * 2 + BAKE_PADDING2;
+    const blurMargin = System63.Math.max(0, this.#shadowBlur) * 2 + BAKE_PADDING2;
     const shadowOffset = this.#shadowOffset;
-    const topY = -blurMargin + System61.Math.min(0, shadowOffset);
-    const bottomY = contentSize.y + blurMargin + System61.Math.max(0, shadowOffset);
+    const topY = -blurMargin + System63.Math.min(0, shadowOffset);
+    const bottomY = contentSize.y + blurMargin + System63.Math.max(0, shadowOffset);
     rect.position.set(-blurMargin, topY);
     rect.size.set(contentSize.x + blurMargin * 2, bottomY - topY);
     return true;
@@ -24168,14 +25210,14 @@ var ShadowImage = class extends Component {
     return { left: 0, top: 0, width: imageWidth, height: imageHeight };
   }
   bakeImage(image, sourceRect, imageWidth, imageHeight, bakeScale) {
-    const scaledImageWidth = System61.Math.max(1, System61.Math.round(imageWidth * bakeScale));
-    const scaledImageHeight = System61.Math.max(1, System61.Math.round(imageHeight * bakeScale));
+    const scaledImageWidth = System63.Math.max(1, System63.Math.round(imageWidth * bakeScale));
+    const scaledImageHeight = System63.Math.max(1, System63.Math.round(imageHeight * bakeScale));
     const scaledShadowOffset = this.#shadowOffset * bakeScale;
     const scaledShadowBlur = this.#shadowBlur * bakeScale;
-    const bakePadding = BAKE_PADDING2 + System61.Math.ceil(scaledShadowBlur);
-    const bakeCanvas = System61.document.createElement("canvas");
+    const bakePadding = BAKE_PADDING2 + System63.Math.ceil(scaledShadowBlur);
+    const bakeCanvas = System63.document.createElement("canvas");
     bakeCanvas.width = scaledImageWidth + bakePadding * 2;
-    bakeCanvas.height = scaledImageHeight + bakePadding * 2 + System61.Math.ceil(scaledShadowOffset);
+    bakeCanvas.height = scaledImageHeight + bakePadding * 2 + System63.Math.ceil(scaledShadowOffset);
     const canvasRenderingContext = bakeCanvas.getContext("2d");
     if (canvasRenderingContext === null) {
       this.#bakeCanvas = null;
@@ -24195,7 +25237,7 @@ var ShadowImage = class extends Component {
     this.#bakeMetrics = { scale: bakeScale, imageLeft: bakePadding / bakeScale, imageTop: bakePadding / bakeScale };
   }
   readScaledImage(image, sourceRect, scaledImageWidth, scaledImageHeight) {
-    const scaledCanvas = System61.document.createElement("canvas");
+    const scaledCanvas = System63.document.createElement("canvas");
     scaledCanvas.width = scaledImageWidth;
     scaledCanvas.height = scaledImageHeight;
     const canvasRenderingContext = scaledCanvas.getContext("2d");
@@ -24252,7 +25294,7 @@ var ShadowImage = class extends Component {
     return this.#bakeCanvas;
   }
 };
-var System62 = globalThis;
+var System64 = globalThis;
 var UIScene = class extends Scene {
   static {
     __name(this, "UIScene");
@@ -24322,12 +25364,12 @@ var UIScene = class extends Scene {
   }
   async load(engine) {
     await super.load(engine);
-    this.#loadStartTime = System62.Date.now();
+    this.#loadStartTime = System64.Date.now();
     this.#loadTouchedToSkip = false;
     const skipHandler = __name(() => {
       this.#loadTouchedToSkip = true;
     }, "skipHandler");
-    System62.window.addEventListener("pointerdown", skipHandler, { once: true });
+    System64.window.addEventListener("pointerdown", skipHandler, { once: true });
     const isCaptureTimeStepFixed = engine.isCaptureTimeStepFixed();
     const timeManager = engine.getTimeManager();
     const captureLoadStartTime = timeManager.getRealtimeSinceStartup();
@@ -24339,12 +25381,12 @@ var UIScene = class extends Scene {
           await engine.waitForNextEngineFrame();
         }
       } else {
-        while (System62.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
-          await new Promise((resolve) => System62.setTimeout(resolve, 50));
+        while (System64.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
+          await new Promise((resolve) => System64.setTimeout(resolve, 50));
         }
       }
     } finally {
-      System62.window.removeEventListener("pointerdown", skipHandler);
+      System64.window.removeEventListener("pointerdown", skipHandler);
     }
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
@@ -24387,8 +25429,8 @@ var UIScene = class extends Scene {
       const positionY = (viewSize.y - targetHeight) * 0.5;
       graphic.drawImage(image, Vector2.create(positionX, positionY), Vector2.create(targetWidth, targetHeight));
     }
-    const elapsed = System62.Date.now() - this.#loadStartTime;
-    const progress = System62.Math.min(1, System62.Math.max(0, elapsed / this.#loadMinDurationMs));
+    const elapsed = System64.Date.now() - this.#loadStartTime;
+    const progress = System64.Math.min(1, System64.Math.max(0, elapsed / this.#loadMinDurationMs));
     const barWidth = viewSize.x * 0.6;
     const barHeight = 24;
     const barX = (viewSize.x - barWidth) * 0.5;
@@ -24429,8 +25471,8 @@ var UIScene = class extends Scene {
     const safeAreaRect = this.computeSafeAreaRect();
     const insetTop = safeAreaRect.position.y;
     const insetLeft = safeAreaRect.position.x;
-    const insetRight = System62.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
-    const insetBottom = System62.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
+    const insetRight = System64.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
+    const insetBottom = System64.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
     const previousInsets = this.#safeAreaInsets;
     if (previousInsets.top !== insetTop || previousInsets.left !== insetLeft || previousInsets.right !== insetRight || previousInsets.bottom !== insetBottom) {
       this.setSafeAreaInsets({ top: insetTop, left: insetLeft, right: insetRight, bottom: insetBottom });
@@ -24444,8 +25486,8 @@ var UIScene = class extends Scene {
     const safeAreaInsets = viewManager.getSafeAreaInsets();
     const x = safeAreaInsets.left;
     const y = safeAreaInsets.top;
-    const width = System62.Math.max(viewSize.x - safeAreaInsets.left - safeAreaInsets.right, 0);
-    const height = System62.Math.max(viewSize.y - safeAreaInsets.top - safeAreaInsets.bottom, 0);
+    const width = System64.Math.max(viewSize.x - safeAreaInsets.left - safeAreaInsets.right, 0);
+    const height = System64.Math.max(viewSize.y - safeAreaInsets.top - safeAreaInsets.bottom, 0);
     return Rect.create(x, y, width, height);
   }
   tick(timeDelta) {
@@ -24808,7 +25850,7 @@ var UIProgressView = class _UIProgressView extends UIView {
     return this.#direction;
   }
 };
-var System63 = globalThis;
+var System65 = globalThis;
 var CORNER_STEPS = 10;
 var UIProgressRing = class _UIProgressRing extends Component {
   static {
@@ -24842,7 +25884,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     if (width <= 1 || height <= 1) {
       return;
     }
-    const roundSize = System63.Math.max(0, this.getRoundSize() - inset);
+    const roundSize = System65.Math.max(0, this.getRoundSize() - inset);
     const perimeterKey = `${width},${height},${roundSize},${inset}`;
     if (perimeterKey !== this.#perimeterKey) {
       this.#perimeterPoints = this.readPerimeterPoints(inset, inset, width, height, roundSize);
@@ -24869,16 +25911,16 @@ var UIProgressRing = class _UIProgressRing extends Component {
     return this.draw === _UIProgressRing.prototype.draw;
   }
   readPerimeterPoints(left, top, width, height, roundSize) {
-    const radius = System63.Math.min(roundSize, width * 0.5, height * 0.5);
+    const radius = System65.Math.min(roundSize, width * 0.5, height * 0.5);
     const right = left + width;
     const bottom = top + height;
     const points = [Vector2.create(left + width * 0.5, top)];
-    const corners = [{ x: right - radius, y: top + radius, start: -System63.Math.PI * 0.5 }, { x: right - radius, y: bottom - radius, start: 0 }, { x: left + radius, y: bottom - radius, start: System63.Math.PI * 0.5 }, { x: left + radius, y: top + radius, start: System63.Math.PI }];
+    const corners = [{ x: right - radius, y: top + radius, start: -System65.Math.PI * 0.5 }, { x: right - radius, y: bottom - radius, start: 0 }, { x: left + radius, y: bottom - radius, start: System65.Math.PI * 0.5 }, { x: left + radius, y: top + radius, start: System65.Math.PI }];
     for (const corner of corners) {
       for (let stepIndex = 0; stepIndex <= CORNER_STEPS; ++stepIndex) {
-        const angle = corner.start + System63.Math.PI * 0.5 * stepIndex / CORNER_STEPS;
-        const pointX = corner.x + System63.Math.cos(angle) * radius;
-        const pointY = corner.y + System63.Math.sin(angle) * radius;
+        const angle = corner.start + System65.Math.PI * 0.5 * stepIndex / CORNER_STEPS;
+        const pointX = corner.x + System65.Math.cos(angle) * radius;
+        const pointY = corner.y + System65.Math.sin(angle) * radius;
         points.push(Vector2.create(pointX, pointY));
       }
     }
@@ -24890,7 +25932,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     for (let pointIndex = 1; pointIndex < closedPoints.length; ++pointIndex) {
       const from = closedPoints[pointIndex - 1];
       const to = closedPoints[pointIndex];
-      totalLength += System63.Math.hypot(to.x - from.x, to.y - from.y);
+      totalLength += System65.Math.hypot(to.x - from.x, to.y - from.y);
     }
     const targetLength = totalLength * ratio;
     const partialPoints = [closedPoints[0]];
@@ -24898,7 +25940,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     for (let pointIndex = 1; pointIndex < closedPoints.length; ++pointIndex) {
       const from = closedPoints[pointIndex - 1];
       const to = closedPoints[pointIndex];
-      const segmentLength = System63.Math.hypot(to.x - from.x, to.y - from.y);
+      const segmentLength = System65.Math.hypot(to.x - from.x, to.y - from.y);
       if (walkedLength + segmentLength >= targetLength) {
         const segmentRatio = segmentLength > 0 ? (targetLength - walkedLength) / segmentLength : 0;
         const pointX = from.x + (to.x - from.x) * segmentRatio;
@@ -24912,7 +25954,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     return partialPoints;
   }
   setRatio(ratio) {
-    this.#ratio = System63.Math.max(0, System63.Math.min(1, ratio));
+    this.#ratio = System65.Math.max(0, System65.Math.min(1, ratio));
   }
   getRatio() {
     return this.#ratio;
@@ -24956,7 +25998,7 @@ var UIProgressRing = class _UIProgressRing extends Component {
     return Color.createFromHEX(color);
   }
 };
-var System64 = globalThis;
+var System66 = globalThis;
 var UIHitArea = class _UIHitArea extends Component {
   static {
     __name(this, "UIHitArea");
@@ -24990,8 +26032,8 @@ var UIHitArea = class _UIHitArea extends Component {
     const targetLeft = targetPosition.x - targetPivot.x * targetSize.x;
     const targetTop = targetPosition.y - targetPivot.y * targetSize.y;
     const minimumSize = this.getMinimumSize();
-    const width = System64.Math.max(targetSize.x, minimumSize);
-    const height = System64.Math.max(targetSize.y, minimumSize);
+    const width = System66.Math.max(targetSize.x, minimumSize);
+    const height = System66.Math.max(targetSize.y, minimumSize);
     let left = targetLeft - (width - targetSize.x) * 0.5;
     let top = targetTop - (height - targetSize.y) * 0.5;
     let right = left + width;
@@ -25002,25 +26044,25 @@ var UIHitArea = class _UIHitArea extends Component {
       const clipCorners = clipNode.getWorldCorners();
       const parentCorners = parentNode.getWorldCorners();
       const parentScale = parentNode.getScale();
-      const scaleX = System64.Math.max(1e-4, System64.Math.abs(parentScale.x));
-      const scaleY = System64.Math.max(1e-4, System64.Math.abs(parentScale.y));
-      const clipMinimumX = System64.Math.min(clipCorners[0].x, clipCorners[2].x);
-      const clipMinimumY = System64.Math.min(clipCorners[0].y, clipCorners[2].y);
-      const clipMaximumX = System64.Math.max(clipCorners[0].x, clipCorners[2].x);
-      const clipMaximumY = System64.Math.max(clipCorners[0].y, clipCorners[2].y);
-      const parentLeft = System64.Math.min(parentCorners[0].x, parentCorners[2].x);
-      const parentTop = System64.Math.min(parentCorners[0].y, parentCorners[2].y);
+      const scaleX = System66.Math.max(1e-4, System66.Math.abs(parentScale.x));
+      const scaleY = System66.Math.max(1e-4, System66.Math.abs(parentScale.y));
+      const clipMinimumX = System66.Math.min(clipCorners[0].x, clipCorners[2].x);
+      const clipMinimumY = System66.Math.min(clipCorners[0].y, clipCorners[2].y);
+      const clipMaximumX = System66.Math.max(clipCorners[0].x, clipCorners[2].x);
+      const clipMaximumY = System66.Math.max(clipCorners[0].y, clipCorners[2].y);
+      const parentLeft = System66.Math.min(parentCorners[0].x, parentCorners[2].x);
+      const parentTop = System66.Math.min(parentCorners[0].y, parentCorners[2].y);
       const clipLeft = (clipMinimumX - parentLeft) / scaleX;
       const clipTop = (clipMinimumY - parentTop) / scaleY;
       const clipRight = (clipMaximumX - parentLeft) / scaleX;
       const clipBottom = (clipMaximumY - parentTop) / scaleY;
-      left = System64.Math.max(left, System64.Math.min(clipLeft, targetLeft));
-      top = System64.Math.max(top, System64.Math.min(clipTop, targetTop));
-      right = System64.Math.min(right, System64.Math.max(clipRight, targetLeft + targetSize.x));
-      bottom = System64.Math.min(bottom, System64.Math.max(clipBottom, targetTop + targetSize.y));
+      left = System66.Math.max(left, System66.Math.min(clipLeft, targetLeft));
+      top = System66.Math.max(top, System66.Math.min(clipTop, targetTop));
+      right = System66.Math.min(right, System66.Math.max(clipRight, targetLeft + targetSize.x));
+      bottom = System66.Math.min(bottom, System66.Math.max(clipBottom, targetTop + targetSize.y));
     }
     const hitPosition = Vector2.create(left, top);
-    const hitSize = Vector2.create(System64.Math.max(0, right - left), System64.Math.max(0, bottom - top));
+    const hitSize = Vector2.create(System66.Math.max(0, right - left), System66.Math.max(0, bottom - top));
     node.setLocalPosition(hitPosition);
     node.setContentSize(hitSize);
   }
@@ -25073,9 +26115,9 @@ var UIHitArea = class _UIHitArea extends Component {
     return hitNode;
   }
 };
-var System65 = globalThis;
-var ButtonMotionStyle = System65.Object.freeze({ normal: "normal", inset: "inset" });
-var MOTION_STYLES = System65.Object.freeze({ [ButtonMotionStyle.normal]: { hoverScale: 1.06, hoverSeconds: 0.08, pressScale: 0.92, pressSeconds: 0.05, releaseScale: 1.04, isHoverLit: false }, [ButtonMotionStyle.inset]: { hoverScale: 1, hoverSeconds: 0.08, pressScale: 0.96, pressSeconds: 0.08, releaseScale: 1, isHoverLit: true } });
+var System67 = globalThis;
+var ButtonMotionStyle = System67.Object.freeze({ normal: "normal", inset: "inset" });
+var MOTION_STYLES = System67.Object.freeze({ [ButtonMotionStyle.normal]: { hoverScale: 1.06, hoverSeconds: 0.08, pressScale: 0.92, pressSeconds: 0.05, releaseScale: 1.04, isHoverLit: false }, [ButtonMotionStyle.inset]: { hoverScale: 1, hoverSeconds: 0.08, pressScale: 0.96, pressSeconds: 0.08, releaseScale: 1, isHoverLit: true } });
 var RELEASE_SECONDS = 0.15;
 var LIT_LIGHTEN = 0.1;
 var LIT_RING_WIDTH = 2;
@@ -25084,7 +26126,7 @@ var SHAKE_DISTANCE = 2;
 var SHAKE_SECONDS = 0.25;
 var SHAKE_COUNT = 3;
 var SCALE_EPSILON = 1e-3;
-var areaStyles = new System65.WeakMap();
+var areaStyles = new System67.WeakMap();
 var ButtonMotion = class extends Component {
   static {
     __name(this, "ButtonMotion");
@@ -25179,21 +26221,21 @@ var ButtonMotion = class extends Component {
     }
     const isLit = motion.isHoverLit && !this.#isCoarse && (isHovered || isPressed);
     this.placeLitParts(node, isLit, isPressed);
-    const step = timeDelta > 0 ? System65.Math.min(1, timeDelta / seconds2) : 0;
+    const step = timeDelta > 0 ? System67.Math.min(1, timeDelta / seconds2) : 0;
     this.#scale += (targetScale - this.#scale) * step;
     let scale = this.#scale;
     if (this.#releaseSeconds > 0) {
-      this.#releaseSeconds = System65.Math.max(0, this.#releaseSeconds - timeDelta);
+      this.#releaseSeconds = System67.Math.max(0, this.#releaseSeconds - timeDelta);
       const releaseRatio = 1 - this.#releaseSeconds / RELEASE_SECONDS;
-      scale += (MOTION_STYLES[ButtonMotionStyle.normal].releaseScale - 1) * System65.Math.sin(releaseRatio * System65.Math.PI);
+      scale += (MOTION_STYLES[ButtonMotionStyle.normal].releaseScale - 1) * System67.Math.sin(releaseRatio * System67.Math.PI);
     }
     let shakeOffset = 0;
     if (this.#shakeSeconds > 0) {
-      this.#shakeSeconds = System65.Math.max(0, this.#shakeSeconds - timeDelta);
+      this.#shakeSeconds = System67.Math.max(0, this.#shakeSeconds - timeDelta);
       const shakeRatio = 1 - this.#shakeSeconds / SHAKE_SECONDS;
-      shakeOffset = System65.Math.sin(shakeRatio * System65.Math.PI * 2 * SHAKE_COUNT) * SHAKE_DISTANCE * (1 - shakeRatio);
+      shakeOffset = System67.Math.sin(shakeRatio * System67.Math.PI * 2 * SHAKE_COUNT) * SHAKE_DISTANCE * (1 - shakeRatio);
     }
-    const isResting = System65.Math.abs(scale - 1) < SCALE_EPSILON && this.#releaseSeconds <= 0 && this.#shakeSeconds <= 0 && targetScale === 1;
+    const isResting = System67.Math.abs(scale - 1) < SCALE_EPSILON && this.#releaseSeconds <= 0 && this.#shakeSeconds <= 0 && targetScale === 1;
     if (isResting && !this.#isMoving) {
       return;
     }
@@ -25221,7 +26263,7 @@ var ButtonMotion = class extends Component {
   }
   readScrollPressed(node, buttonState) {
     const scrollView = this.readScrollView(node);
-    const engine = System65.vanillaEngine;
+    const engine = System67.vanillaEngine;
     if (scrollView === null || !engine) {
       return false;
     }
@@ -25241,7 +26283,7 @@ var ButtonMotion = class extends Component {
     if (scrollHold === null) {
       return false;
     }
-    if (System65.Math.abs(scrollOffset.x - scrollHold.x) > 1 || System65.Math.abs(scrollOffset.y - scrollHold.y) > 1) {
+    if (System67.Math.abs(scrollOffset.x - scrollHold.x) > 1 || System67.Math.abs(scrollOffset.y - scrollHold.y) > 1) {
       this.#scrollHold = null;
       return false;
     }
@@ -25294,12 +26336,12 @@ var ButtonMotion = class extends Component {
     litParts.ringNode.setLocalPosition(Vector2.create(0, 0));
     litParts.ringNode.setContentSize(Vector2.create(contentSize.x, contentSize.y));
     litParts.ringPaint.setRoundSize(roundSize);
-    const fillWidth = System65.Math.max(0, contentSize.x - LIT_RING_WIDTH * 2);
-    const fillHeight = System65.Math.max(0, contentSize.y - LIT_RING_WIDTH * 2);
+    const fillWidth = System67.Math.max(0, contentSize.x - LIT_RING_WIDTH * 2);
+    const fillHeight = System67.Math.max(0, contentSize.y - LIT_RING_WIDTH * 2);
     litParts.fillNode.setActive(true);
     litParts.fillNode.setLocalPosition(Vector2.create(LIT_RING_WIDTH, LIT_RING_WIDTH));
     litParts.fillNode.setContentSize(Vector2.create(fillWidth, fillHeight));
-    litParts.fillPaint.setRoundSize(System65.Math.max(0, roundSize - LIT_RING_WIDTH));
+    litParts.fillPaint.setRoundSize(System67.Math.max(0, roundSize - LIT_RING_WIDTH));
     const fillColor = litParts.fillColor;
     fillColor.red = color.red + (1 - color.red) * LIT_LIGHTEN;
     fillColor.green = color.green + (1 - color.green) * LIT_LIGHTEN;
@@ -25330,7 +26372,7 @@ var ButtonMotion = class extends Component {
     return { ringNode, ringPaint, fillNode, fillPaint, fillColor };
   }
   isInputOver(node) {
-    const engine = System65.vanillaEngine;
+    const engine = System67.vanillaEngine;
     if (!engine) {
       return false;
     }
@@ -25377,7 +26419,7 @@ function shakeButton(node) {
   buttonMotion.shake();
 }
 __name(shakeButton, "shakeButton");
-var System66 = globalThis;
+var System68 = globalThis;
 var UIInputFieldMenuAction = { cut: "cut", copy: "copy", paste: "paste", selectAll: "selectAll" };
 var TextEditKind = { insertText: "insertText", deleteBackward: "deleteBackward", deleteForward: "deleteForward", paste: "paste", deleteWordBackward: "deleteWordBackward", deleteWordForward: "deleteWordForward" };
 var MAXIMUM_UNDO_DEPTH = 1e3;
@@ -25594,16 +26636,16 @@ var UIInputField = class extends WorldNode {
     return this.#isMultilineEnabled;
   }
   setLineHeight(lineHeight) {
-    this.#lineHeight = typeof lineHeight === "number" && System66.Number.isFinite(lineHeight) ? lineHeight : null;
+    this.#lineHeight = typeof lineHeight === "number" && System68.Number.isFinite(lineHeight) ? lineHeight : null;
     this.#textAreaLayoutKey = null;
   }
   getLineHeight() {
     if (this.#lineHeight !== null) return this.#lineHeight;
     const normalLineHeight = measureNormalLineHeight(buildFontString(this.#fontFace, this.#fontSize, false, false));
-    return normalLineHeight !== null ? normalLineHeight : System66.Math.round(this.#fontSize * 1.2);
+    return normalLineHeight !== null ? normalLineHeight : System68.Math.round(this.#fontSize * 1.2);
   }
   setTabSize(tabSize) {
-    this.#tabSize = System66.Math.max(0, System66.Number(tabSize) || 0);
+    this.#tabSize = System68.Math.max(0, System68.Number(tabSize) || 0);
     this.#textAreaLayoutKey = null;
     if (this.#domInput) this.#domInput.style.tabSize = String(this.#tabSize);
   }
@@ -25614,7 +26656,7 @@ var UIInputField = class extends WorldNode {
     return this.#scrollTop;
   }
   setScrollTop(scrollTop) {
-    this.#scrollTop = System66.Math.max(0, System66.Number(scrollTop) || 0);
+    this.#scrollTop = System68.Math.max(0, System68.Number(scrollTop) || 0);
   }
   canUndo() {
     return this.#undoList.length > 0;
@@ -25683,8 +26725,8 @@ var UIInputField = class extends WorldNode {
   }
   #syncDOMSelection() {
     if (!this.#domInput) return;
-    const start = System66.Math.min(this.#selectionStart, this.#cursorIndex);
-    const end = System66.Math.max(this.#selectionStart, this.#cursorIndex);
+    const start = System68.Math.min(this.#selectionStart, this.#cursorIndex);
+    const end = System68.Math.max(this.#selectionStart, this.#cursorIndex);
     this.#domInput.setSelectionRange(start, end, this.#cursorIndex < this.#selectionStart ? "backward" : "forward");
   }
   #requestCaretReveal(revealKind) {
@@ -25695,10 +26737,10 @@ var UIInputField = class extends WorldNode {
     return this.#getCompositionStart() + this.#composition.length;
   }
   #getCompositionStart() {
-    return this.#composition.length > 0 ? System66.Math.min(this.#selectionStart, this.#cursorIndex) : this.#cursorIndex;
+    return this.#composition.length > 0 ? System68.Math.min(this.#selectionStart, this.#cursorIndex) : this.#cursorIndex;
   }
   #getCompositionEnd() {
-    return this.#composition.length > 0 ? System66.Math.max(this.#selectionStart, this.#cursorIndex) : this.#cursorIndex;
+    return this.#composition.length > 0 ? System68.Math.max(this.#selectionStart, this.#cursorIndex) : this.#cursorIndex;
   }
   #ensureTextAreaLayout() {
     const contentSize = this.getContentSize();
@@ -25721,7 +26763,7 @@ var UIInputField = class extends WorldNode {
   #buildTextAreaLayoutWithGutter(contentSize, scrollbarGutter) {
     const displayText = this.getDisplayText();
     const fontString = buildFontString(this.#fontFace, this.#fontSize, false, false);
-    const wrapWidth = System66.Math.max(0, contentSize.x - this.#padding * 2 - scrollbarGutter);
+    const wrapWidth = System68.Math.max(0, contentSize.x - this.#padding * 2 - scrollbarGutter);
     const lineHeight = this.getLineHeight();
     const layoutKey = `${fontString}\0${wrapWidth}\0${lineHeight}\0${this.#tabSize}\0${displayText}`;
     if (this.#textAreaLayout && this.#textAreaLayoutKey === layoutKey) {
@@ -25744,7 +26786,7 @@ var UIInputField = class extends WorldNode {
   }
   #getMaximumScrollTop(contentHeight) {
     const layout = this.#ensureTextAreaLayout();
-    return System66.Math.max(0, layout.getContentHeight() + this.#padding * 2 - contentHeight);
+    return System68.Math.max(0, layout.getContentHeight() + this.#padding * 2 - contentHeight);
   }
   #applyCaretReveal() {
     const revealKind = this.#caretRevealRequest;
@@ -25766,7 +26808,7 @@ var UIInputField = class extends WorldNode {
     } else if (caretBottom > this.#scrollTop + contentHeight) {
       this.#scrollTop = caretBottom - contentHeight;
     }
-    this.#scrollTop = System66.Math.max(0, System66.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop));
+    this.#scrollTop = System68.Math.max(0, System68.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop));
   }
   #moveCaretVertically(key, isShift) {
     const layout = this.#ensureTextAreaLayout();
@@ -25779,10 +26821,10 @@ var UIInputField = class extends WorldNode {
       target = layout.moveVertically(cursorIndex, this.#isCaretUpstream, preferredX, key === "ArrowUp" ? -1 : 1);
     } else {
       const pageStep = calculatePageStep(this.getContentSize().y);
-      const lineCount = System66.Math.max(1, System66.Math.floor(pageStep / System66.Math.max(1, layout.lineHeight)));
+      const lineCount = System68.Math.max(1, System68.Math.floor(pageStep / System68.Math.max(1, layout.lineHeight)));
       const lineIndex = layout.findLineIndex(cursorIndex, this.#isCaretUpstream);
-      const lastLineIndex = System66.Math.max(0, layout.lineList.length - 1);
-      const targetLine = key === "PageUp" ? System66.Math.max(0, lineIndex - lineCount) : System66.Math.min(lastLineIndex, lineIndex + lineCount);
+      const lastLineIndex = System68.Math.max(0, layout.lineList.length - 1);
+      const targetLine = key === "PageUp" ? System68.Math.max(0, lineIndex - lineCount) : System68.Math.min(lastLineIndex, lineIndex + lineCount);
       target = layout.findCharacterIndexInLine(targetLine, preferredX);
       revealKind = "always";
     }
@@ -25807,7 +26849,7 @@ var UIInputField = class extends WorldNode {
   scrollTextAreaByWheel(deltaY) {
     if (!this.#isMultilineEnabled) return false;
     const previousScrollTop = this.#scrollTop;
-    this.#scrollTop = System66.Math.max(0, System66.Math.min(this.#getMaximumScrollTop(this.getContentSize().y), this.#scrollTop + deltaY));
+    this.#scrollTop = System68.Math.max(0, System68.Math.min(this.#getMaximumScrollTop(this.getContentSize().y), this.#scrollTop + deltaY));
     return this.#scrollTop !== previousScrollTop;
   }
   getTextAreaScrollContentSize() {
@@ -25823,7 +26865,7 @@ var UIInputField = class extends WorldNode {
     const layout = this.#ensureTextAreaLayout();
     if (!isOverlay) {
       this.#applyCaretReveal();
-      this.#scrollTop = System66.Math.max(0, System66.Math.min(this.#getMaximumScrollTop(contentSize.y), this.#scrollTop));
+      this.#scrollTop = System68.Math.max(0, System68.Math.min(this.#getMaximumScrollTop(contentSize.y), this.#scrollTop));
     }
     const padding = this.#padding;
     const originY = padding - this.#scrollTop;
@@ -25868,8 +26910,8 @@ var UIInputField = class extends WorldNode {
         graphic.setStrokeColor(this.#compositionUnderlineColor.toHEXString());
         for (let lineIndex = 0; lineIndex < layout.lineList.length; ++lineIndex) {
           const line = layout.lineList[lineIndex];
-          const segmentStart = System66.Math.max(compositionStart, line.start);
-          const segmentEnd = System66.Math.min(compositionEnd, line.end);
+          const segmentStart = System68.Math.max(compositionStart, line.start);
+          const segmentEnd = System68.Math.min(compositionEnd, line.end);
           if (segmentStart >= segmentEnd) continue;
           const underlineY = originY + line.top + lineHeight * 0.5 + this.#fontSize * 0.55;
           graphic.drawLine([Vector2.create(padding + layout.getXInLine(lineIndex, segmentStart), underlineY), Vector2.create(padding + layout.getXInLine(lineIndex, segmentEnd), underlineY)], 2);
@@ -25908,11 +26950,11 @@ var UIInputField = class extends WorldNode {
         return null;
       }
       const trackLeft = contentSize.x - this.#textAreaScrollbarGutter;
-      return Rect.create(trackLeft + metrics.thumbCrossOffset, thumbSpan.start + metrics.thumbLengthInset, metrics.thumbThickness, System66.Math.max(0, thumbSpan.length - metrics.thumbLengthInset * 2));
+      return Rect.create(trackLeft + metrics.thumbCrossOffset, thumbSpan.start + metrics.thumbLengthInset, metrics.thumbThickness, System68.Math.max(0, thumbSpan.length - metrics.thumbLengthInset * 2));
     }
-    const thumbLength = System66.Math.min(contentSize.y, System66.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / scrollHeight));
+    const thumbLength = System68.Math.min(contentSize.y, System68.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / scrollHeight));
     const maximumScrollTop = scrollHeight - contentSize.y;
-    const thumbTop = (contentSize.y - thumbLength) * System66.Math.max(0, System66.Math.min(1, this.#scrollTop / maximumScrollTop));
+    const thumbTop = (contentSize.y - thumbLength) * System68.Math.max(0, System68.Math.min(1, this.#scrollTop / maximumScrollTop));
     return Rect.create(contentSize.x - TEXT_AREA_SCROLLBAR_THICKNESS, thumbTop, TEXT_AREA_SCROLLBAR_THICKNESS, thumbLength);
   }
   #dragTextAreaThumb(localY) {
@@ -25922,16 +26964,16 @@ var UIInputField = class extends WorldNode {
     const metrics = this.#textAreaScrollbarGutter > 0 ? readClassicScrollbarMetrics() : null;
     let trackRoom = 1;
     if (metrics) {
-      const thumbRoom = System66.Math.max(1, contentSize.y - metrics.buttonLength * 2);
-      const thumbLength = System66.Math.min(thumbRoom, System66.Math.max(metrics.thumbMinimumLength, System66.Math.round(thumbRoom * contentSize.y / System66.Math.max(1, scrollHeight))));
-      trackRoom = System66.Math.max(1, thumbRoom - thumbLength);
+      const thumbRoom = System68.Math.max(1, contentSize.y - metrics.buttonLength * 2);
+      const thumbLength = System68.Math.min(thumbRoom, System68.Math.max(metrics.thumbMinimumLength, System68.Math.round(thumbRoom * contentSize.y / System68.Math.max(1, scrollHeight))));
+      trackRoom = System68.Math.max(1, thumbRoom - thumbLength);
     } else {
-      const thumbLength = System66.Math.min(contentSize.y, System66.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / System66.Math.max(1, scrollHeight)));
-      trackRoom = System66.Math.max(1, contentSize.y - thumbLength);
+      const thumbLength = System68.Math.min(contentSize.y, System68.Math.max(TEXT_AREA_SCROLLBAR_MINIMUM_THUMB_LENGTH, contentSize.y * contentSize.y / System68.Math.max(1, scrollHeight)));
+      trackRoom = System68.Math.max(1, contentSize.y - thumbLength);
     }
     const maximumScrollTop = this.#getMaximumScrollTop(contentSize.y);
     const dragStart = this.#scrollbarDragStart;
-    this.#scrollTop = System66.Math.max(0, System66.Math.min(maximumScrollTop, dragStart.startScrollTop + (localY - dragStart.startY) / trackRoom * maximumScrollTop));
+    this.#scrollTop = System68.Math.max(0, System68.Math.min(maximumScrollTop, dragStart.startScrollTop + (localY - dragStart.startY) / trackRoom * maximumScrollTop));
   }
   setText(text) {
     this.#value = String(text || "");
@@ -25974,7 +27016,7 @@ var UIInputField = class extends WorldNode {
   setFont(font) {
     if (font === null || font === void 0) {
       this.#fontFace = null;
-    } else if (font instanceof System66.FontFace) {
+    } else if (font instanceof System68.FontFace) {
       this.#fontFace = font;
     } else if (font instanceof FontAsset) {
       this.#fontFace = font.fontFace;
@@ -26118,8 +27160,8 @@ var UIInputField = class extends WorldNode {
         const selEnd = this.#domInput.selectionEnd;
         const selStart = this.#domInput.selectionStart;
         if (typeof selEnd === "number" && typeof selStart === "number") {
-          const ourMin = System66.Math.min(this.#cursorIndex, this.#selectionStart);
-          const ourMax = System66.Math.max(this.#cursorIndex, this.#selectionStart);
+          const ourMin = System68.Math.min(this.#cursorIndex, this.#selectionStart);
+          const ourMax = System68.Math.max(this.#cursorIndex, this.#selectionStart);
           if (selStart !== ourMin || selEnd !== ourMax) {
             const isBackward = this.#domInput.selectionDirection === "backward";
             this.#cursorIndex = isBackward ? selStart : selEnd;
@@ -26186,8 +27228,8 @@ var UIInputField = class extends WorldNode {
       this.#dragGranularity = { granularity: clickCount === 2 ? "word" : "paragraph", start: range.start, end: range.end };
     }
     if (this.#domInput) {
-      const selectionStart = System66.Math.min(this.#selectionStart, this.#cursorIndex);
-      const selectionEnd = System66.Math.max(this.#selectionStart, this.#cursorIndex);
+      const selectionStart = System68.Math.min(this.#selectionStart, this.#cursorIndex);
+      const selectionEnd = System68.Math.max(this.#selectionStart, this.#cursorIndex);
       this.#domInput.setSelectionRange(selectionStart, selectionEnd);
     }
     this.#requestCaretReveal("ifNeeded");
@@ -26219,12 +27261,12 @@ var UIInputField = class extends WorldNode {
         this.#cursorIndex = unitRange.start;
       } else {
         this.#selectionStart = dragGranularity.start;
-        this.#cursorIndex = System66.Math.max(unitRange.end, dragGranularity.end);
+        this.#cursorIndex = System68.Math.max(unitRange.end, dragGranularity.end);
       }
     }
     if (this.#domInput) {
-      const selStart = System66.Math.min(this.#selectionStart, this.#cursorIndex);
-      const selEnd = System66.Math.max(this.#selectionStart, this.#cursorIndex);
+      const selStart = System68.Math.min(this.#selectionStart, this.#cursorIndex);
+      const selEnd = System68.Math.max(this.#selectionStart, this.#cursorIndex);
       this.#domInput.setSelectionRange(selStart, selEnd);
     }
     this.#requestCaretReveal("ifNeeded");
@@ -26288,7 +27330,7 @@ var UIInputField = class extends WorldNode {
   refreshTextPositions() {
     const size = this.getContentSize();
     if (size.x <= 0 || size.y <= 0) return;
-    const inner = Vector2.create(System66.Math.max(0, size.x - this.#padding * 2), size.y);
+    const inner = Vector2.create(System68.Math.max(0, size.x - this.#padding * 2), size.y);
     this.#textTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
     this.#textTextNode.setContentSize(inner);
     this.#placeholderTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
@@ -26298,7 +27340,7 @@ var UIInputField = class extends WorldNode {
   }
   attachDOMInput() {
     if (this.#domInput) return;
-    const doc = System66.document;
+    const doc = System68.document;
     ensureGlobalHiddenInputStyle(doc);
     const input = doc.createElement(this.#isMultilineEnabled ? "textarea" : "input");
     if (!this.#isMultilineEnabled) input.type = "text";
@@ -26396,7 +27438,7 @@ var UIInputField = class extends WorldNode {
       }
       if (!this.#domInput) return;
       if (pointerEvent.type === "mousedown") {
-        this.#pointerClickCount = System66.Math.max(1, pointerEvent.detail || 1);
+        this.#pointerClickCount = System68.Math.max(1, pointerEvent.detail || 1);
       } else if (pointerEvent.type === "touchstart") {
         this.#pointerClickCount = 1;
       }
@@ -26444,8 +27486,8 @@ var UIInputField = class extends WorldNode {
     if (!canvas) return;
     const canvasRect = canvas.getBoundingClientRect();
     const targetScale = viewManager.getTargetResolutionScale() || 1;
-    const scrollX = System66.scrollX || 0;
-    const scrollY = System66.scrollY || 0;
+    const scrollX = System68.scrollX || 0;
+    const scrollY = System68.scrollY || 0;
     const globalPos = this.getPosition();
     const contentSize = this.getContentSize();
     this.#domInput.style.left = `${canvasRect.left + scrollX + globalPos.x * targetScale}px`;
@@ -26498,10 +27540,10 @@ var UIInputField = class extends WorldNode {
     const snapshot = this.#createDOMSnapshot();
     this.#compositionSnapshot = snapshot;
     this.#isComposing = true;
-    const domStart = System66.Math.min(snapshot.selectionStart, snapshot.cursorIndex);
-    const domEnd = System66.Math.max(snapshot.selectionStart, snapshot.cursorIndex);
-    const engineStart = System66.Math.min(this.#selectionStart, this.#cursorIndex);
-    const engineEnd = System66.Math.max(this.#selectionStart, this.#cursorIndex);
+    const domStart = System68.Math.min(snapshot.selectionStart, snapshot.cursorIndex);
+    const domEnd = System68.Math.max(snapshot.selectionStart, snapshot.cursorIndex);
+    const engineStart = System68.Math.min(this.#selectionStart, this.#cursorIndex);
+    const engineEnd = System68.Math.max(this.#selectionStart, this.#cursorIndex);
     if (domStart !== engineStart || domEnd !== engineEnd) {
       this.#selectionStart = snapshot.selectionStart;
       this.#cursorIndex = snapshot.cursorIndex;
@@ -26519,10 +27561,10 @@ var UIInputField = class extends WorldNode {
     }
     if (this.#isComposing || event.isComposing || !this.#domInput) return;
     const snapshot = this.#createDOMSnapshot();
-    const domStart = System66.Math.min(snapshot.selectionStart, snapshot.cursorIndex);
-    const domEnd = System66.Math.max(snapshot.selectionStart, snapshot.cursorIndex);
-    const engineStart = System66.Math.min(this.#selectionStart, this.#cursorIndex);
-    const engineEnd = System66.Math.max(this.#selectionStart, this.#cursorIndex);
+    const domStart = System68.Math.min(snapshot.selectionStart, snapshot.cursorIndex);
+    const domEnd = System68.Math.max(snapshot.selectionStart, snapshot.cursorIndex);
+    const engineStart = System68.Math.min(this.#selectionStart, this.#cursorIndex);
+    const engineEnd = System68.Math.max(this.#selectionStart, this.#cursorIndex);
     if (domStart !== engineStart || domEnd !== engineEnd) this.#openEditKind = null;
     const editKind = DOM_INPUT_EDIT_KIND_TABLE[inputType];
     this.#pendingDOMEdit = { editKind: editKind ? editKind : TextEditKind.paste, snapshot };
@@ -26588,7 +27630,7 @@ var UIInputField = class extends WorldNode {
       if (isMac && !event.altKey) {
         const contentHeight = this.getContentSize().y;
         const direction = key === "PageUp" ? -1 : 1;
-        this.#scrollTop = System66.Math.max(0, System66.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop + calculatePageStep(contentHeight) * direction));
+        this.#scrollTop = System68.Math.max(0, System68.Math.min(this.#getMaximumScrollTop(contentHeight), this.#scrollTop + calculatePageStep(contentHeight) * direction));
         return true;
       }
       if (isMac === event.altKey) {
@@ -26603,7 +27645,7 @@ var UIInputField = class extends WorldNode {
         if (!isShift) {
           const contentHeight = this.getContentSize().y;
           const targetScrollTop = isEnd ? this.#getMaximumScrollTop(contentHeight) : 0;
-          if (System66.Math.abs(targetScrollTop - this.#scrollTop) > 0) {
+          if (System68.Math.abs(targetScrollTop - this.#scrollTop) > 0) {
             this.#scrollTop = targetScrollTop;
             return true;
           }
@@ -26623,11 +27665,11 @@ var UIInputField = class extends WorldNode {
   attachCanvasKeyboard() {
     if (this.#canvasKeydownHandler) return;
     this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
-    System66.document.addEventListener("keydown", this.#canvasKeydownHandler);
+    System68.document.addEventListener("keydown", this.#canvasKeydownHandler);
   }
   detachCanvasKeyboard() {
     if (!this.#canvasKeydownHandler) return;
-    System66.document.removeEventListener("keydown", this.#canvasKeydownHandler);
+    System68.document.removeEventListener("keydown", this.#canvasKeydownHandler);
     this.#canvasKeydownHandler = null;
   }
   handleCanvasKeydown(event) {
@@ -26765,7 +27807,7 @@ var UIInputField = class extends WorldNode {
     }
   }
   moveCursor(newIndex, extendSelection) {
-    let clamped = System66.Math.max(0, System66.Math.min(this.#value.length, newIndex));
+    let clamped = System68.Math.max(0, System68.Math.min(this.#value.length, newIndex));
     if (isInsideSurrogatePair(this.#value, clamped)) {
       clamped += 1;
     }
@@ -26781,8 +27823,8 @@ var UIInputField = class extends WorldNode {
     this.deleteRange(index, endIndex);
   }
   deleteRange(startIndex, endIndex, editKind = TextEditKind.deleteForward) {
-    const start = System66.Math.max(0, startIndex);
-    const end = System66.Math.min(this.#value.length, endIndex);
+    const start = System68.Math.max(0, startIndex);
+    const end = System68.Math.min(this.#value.length, endIndex);
     if (end <= start) {
       return;
     }
@@ -26809,7 +27851,7 @@ var UIInputField = class extends WorldNode {
     this.#cursorVisible = true;
     if (this.#useDirectTouch && this.#domInput) {
       const input = this.#domInput;
-      System66.setTimeout(() => {
+      System68.setTimeout(() => {
         if (this.#domInput !== input) return;
         const length = input.value.length;
         input.setSelectionRange(length, length);
@@ -26825,7 +27867,7 @@ var UIInputField = class extends WorldNode {
   }
   getSelectionRange() {
     if (!this.hasSelection()) return null;
-    return { start: System66.Math.min(this.#cursorIndex, this.#selectionStart), end: System66.Math.max(this.#cursorIndex, this.#selectionStart) };
+    return { start: System68.Math.min(this.#cursorIndex, this.#selectionStart), end: System68.Math.max(this.#cursorIndex, this.#selectionStart) };
   }
   getSelectionText() {
     const range = this.getSelectionRange();
@@ -26842,12 +27884,12 @@ var UIInputField = class extends WorldNode {
     text = sanitizedText;
     let insertedText = text;
     if (this.#maxLength > 0) {
-      const appendableLength = System66.Math.max(0, this.#maxLength - (this.#value.length - (range.end - range.start)));
+      const appendableLength = System68.Math.max(0, this.#maxLength - (this.#value.length - (range.end - range.start)));
       insertedText = limitTextLength(text, appendableLength);
     }
     const next = this.#value.slice(0, range.start) + insertedText + this.#value.slice(range.end);
     this.#value = next;
-    this.#cursorIndex = System66.Math.min(range.start + insertedText.length, next.length);
+    this.#cursorIndex = System68.Math.min(range.start + insertedText.length, next.length);
     this.#selectionStart = this.#cursorIndex;
     this.#pendingDOMEdit = null;
     if (this.#domInput) {
@@ -26903,8 +27945,8 @@ var UIInputField = class extends WorldNode {
   }
   writeClipboard(text) {
     try {
-      if (System66.navigator && System66.navigator.clipboard) {
-        System66.navigator.clipboard.writeText(text).catch(() => {
+      if (System68.navigator && System68.navigator.clipboard) {
+        System68.navigator.clipboard.writeText(text).catch(() => {
         });
       }
     } catch (error) {
@@ -26912,12 +27954,12 @@ var UIInputField = class extends WorldNode {
   }
   readClipboard() {
     try {
-      if (System66.navigator && System66.navigator.clipboard) {
-        return System66.navigator.clipboard.readText();
+      if (System68.navigator && System68.navigator.clipboard) {
+        return System68.navigator.clipboard.readText();
       }
     } catch (error) {
     }
-    return System66.Promise.resolve("");
+    return System68.Promise.resolve("");
   }
   attachContextMenuHandler() {
     if (!this.#resolveEngine() || this.#contextMenuHandler) return;
@@ -27083,7 +28125,7 @@ var UIInputFieldContextMenu = class extends Component {
     if (itemY < 0) {
       return -1;
     }
-    const itemIndex = System66.Math.floor(itemY / CONTEXT_MENU_ITEM_HEIGHT);
+    const itemIndex = System68.Math.floor(itemY / CONTEXT_MENU_ITEM_HEIGHT);
     if (itemIndex >= CONTEXT_MENU_ITEM_LIST.length) {
       return -1;
     }
@@ -27180,10 +28222,10 @@ var TextAreaWheelReceiver = class extends Component {
   }
 };
 function writeInputLayerDrawnRect(field, contentSize, rect) {
-  let minimumX = System66.Math.min(0, contentSize.x);
-  let maximumX = System66.Math.max(0, contentSize.x);
-  let minimumY = System66.Math.min(0, contentSize.y);
-  let maximumY = System66.Math.max(0, contentSize.y);
+  let minimumX = System68.Math.min(0, contentSize.x);
+  let maximumX = System68.Math.max(0, contentSize.x);
+  let minimumY = System68.Math.min(0, contentSize.y);
+  let maximumY = System68.Math.max(0, contentSize.y);
   if (!field.isMultiline()) {
     const state = field.getRenderState();
     const measurementContext = getMeasurementCanvasRenderingContext();
@@ -27194,10 +28236,10 @@ function writeInputLayerDrawnRect(field, contentSize, rect) {
     measurementContext.font = buildFontString(state.fontFace, state.fontSize, false, false);
     const textWidth = measurementContext.measureText(field.getDisplayText()).width;
     measurementContext.restore();
-    minimumX = System66.Math.min(minimumX, state.padding);
-    maximumX = System66.Math.max(maximumX, state.padding + textWidth);
-    minimumY = System66.Math.min(minimumY, contentSize.y * 0.5 - state.fontSize);
-    maximumY = System66.Math.max(maximumY, contentSize.y * 0.5 + state.fontSize);
+    minimumX = System68.Math.min(minimumX, state.padding);
+    maximumX = System68.Math.max(maximumX, state.padding + textWidth);
+    minimumY = System68.Math.min(minimumY, contentSize.y * 0.5 - state.fontSize);
+    maximumY = System68.Math.max(maximumY, contentSize.y * 0.5 + state.fontSize);
   }
   rect.position.set(minimumX - 2, minimumY - 2);
   rect.size.set(maximumX - minimumX + 4, maximumY - minimumY + 4);
@@ -27246,8 +28288,8 @@ var BackgroundLayerRenderer = class extends Component {
     if (state.composition.length === 0 && state.selectionStart !== state.cursorIndex) {
       graphic.pushState();
       graphic.setFontString(buildFontString(state.fontFace, state.fontSize, false, false));
-      const selStart = System66.Math.min(state.selectionStart, state.cursorIndex);
-      const selEnd = System66.Math.max(state.selectionStart, state.cursorIndex);
+      const selStart = System68.Math.min(state.selectionStart, state.cursorIndex);
+      const selEnd = System68.Math.max(state.selectionStart, state.cursorIndex);
       const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
       const endX = state.padding + graphic.measureText(state.value.slice(0, selEnd)).width;
       const halfH = state.fontSize * 0.65;
@@ -27322,7 +28364,7 @@ var OverlayLayerRenderer = class extends Component {
       const y = inset;
       const rectW = contentSize.x - w;
       const rectH = contentSize.y - w;
-      const radius = System66.Math.max(0, state.bgRoundSize - inset);
+      const radius = System68.Math.max(0, state.bgRoundSize - inset);
       graphic.drawStrokeRoundRect(Rect.create(x, y, rectW, rectH), radius, w);
     }
     graphic.popState();
@@ -27331,7 +28373,7 @@ var OverlayLayerRenderer = class extends Component {
 var graphemeSegmenter3 = void 0;
 function getGraphemeSegmenter2() {
   if (graphemeSegmenter3 === void 0) {
-    const intl = System66.Intl;
+    const intl = System68.Intl;
     const segmenterClass = intl ? intl.Segmenter : void 0;
     graphemeSegmenter3 = typeof segmenterClass === "function" ? new segmenterClass(void 0, { granularity: "grapheme" }) : null;
   }
@@ -27399,7 +28441,7 @@ function findBackwardDeletionBoundary(text, index) {
       codePointLength = 2;
     }
     const codePoint = text.codePointAt(position - codePointLength);
-    const character = System66.String.fromCodePoint(codePoint);
+    const character = System68.String.fromCodePoint(codePoint);
     position -= codePointLength;
     const isVariationSelector = VARIATION_SELECTOR_PATTERN.test(character);
     const isExtendedPictographic = EXTENDED_PICTOGRAPHIC_GB11_PATTERN.test(character);
@@ -27575,13 +28617,13 @@ function findBackwardDeletionBoundary(text, index) {
       break;
     }
   }
-  return System66.Math.max(0, index - deleteCount);
+  return System68.Math.max(0, index - deleteCount);
 }
 __name(findBackwardDeletionBoundary, "findBackwardDeletionBoundary");
 var wordSegmenter2 = void 0;
 function collectWordBoundaries(text) {
   if (wordSegmenter2 === void 0) {
-    const intl = System66.Intl;
+    const intl = System68.Intl;
     const segmenterClass = intl ? intl.Segmenter : void 0;
     wordSegmenter2 = typeof segmenterClass === "function" ? new segmenterClass(void 0, { granularity: "word" }) : null;
   }
@@ -27623,7 +28665,7 @@ function findWordRangeAt(text, index) {
 }
 __name(findWordRangeAt, "findWordRangeAt");
 function findParagraphRangeAt(text, index) {
-  const clampedIndex = System66.Math.max(0, System66.Math.min(text.length, index));
+  const clampedIndex = System68.Math.max(0, System68.Math.min(text.length, index));
   let startProbe = clampedIndex;
   if (clampedIndex === text.length && clampedIndex > 0 && text.charCodeAt(clampedIndex - 1) === 10) {
     startProbe = clampedIndex - 1;
@@ -27646,13 +28688,13 @@ function skipTrailingWhitespace(text, index) {
 }
 __name(skipTrailingWhitespace, "skipTrailingWhitespace");
 function isWindowsPlatform() {
-  const navigator = System66.navigator;
+  const navigator = System68.navigator;
   const platform = navigator && typeof navigator.platform === "string" ? navigator.platform : "";
   return platform.startsWith("Win");
 }
 __name(isWindowsPlatform, "isWindowsPlatform");
 function isMacPlatform() {
-  const navigator = System66.navigator;
+  const navigator = System68.navigator;
   const platform = navigator && typeof navigator.platform === "string" ? navigator.platform : "";
   return platform.startsWith("Mac");
 }
@@ -27710,15 +28752,15 @@ function isWordBreakCodeUnit(codeUnit) {
   if (isSurrogateCodeUnit(codeUnit) || isLineBreakCodeUnit(codeUnit) || codeUnit === 95) {
     return true;
   }
-  return !/\p{C}/u.test(System66.String.fromCharCode(codeUnit)) && !isEditingWhitespaceCodeUnit(codeUnit);
+  return !/\p{C}/u.test(System68.String.fromCharCode(codeUnit)) && !isEditingWhitespaceCodeUnit(codeUnit);
 }
 __name(isWordBreakCodeUnit, "isWordBreakCodeUnit");
 function isWordBoundaryCodeUnit(codeUnit) {
-  return isSurrogateCodeUnit(codeUnit) || /[\p{P}\p{S}]/u.test(System66.String.fromCharCode(codeUnit));
+  return isSurrogateCodeUnit(codeUnit) || /[\p{P}\p{S}]/u.test(System68.String.fromCharCode(codeUnit));
 }
 __name(isWordBoundaryCodeUnit, "isWordBoundaryCodeUnit");
 function isAlphanumericCodeUnit(codeUnit) {
-  return !isSurrogateCodeUnit(codeUnit) && /[\p{L}\p{Nd}]/u.test(System66.String.fromCharCode(codeUnit));
+  return !isSurrogateCodeUnit(codeUnit) && /[\p{L}\p{Nd}]/u.test(System68.String.fromCharCode(codeUnit));
 }
 __name(isAlphanumericCodeUnit, "isAlphanumericCodeUnit");
 function readCodeUnit(text, index) {
@@ -27830,7 +28872,7 @@ function collectRunBoundaries(boundaryList, runStart, runEnd) {
 }
 __name(collectRunBoundaries, "collectRunBoundaries");
 function findNextWordPosition(text, index, isSkipSpaces) {
-  const position = System66.Math.max(0, System66.Math.min(text.length, index));
+  const position = System68.Math.max(0, System68.Math.min(text.length, index));
   const boundaryList = collectWordBoundaries(text);
   const runStartList = collectWordSearchRunStarts(text);
   let runIndex = runStartList.length - 1;
@@ -27851,7 +28893,7 @@ function findNextWordPosition(text, index, isSkipSpaces) {
 }
 __name(findNextWordPosition, "findNextWordPosition");
 function findPreviousWordPosition(text, index) {
-  const position = System66.Math.max(0, System66.Math.min(text.length, index));
+  const position = System68.Math.max(0, System68.Math.min(text.length, index));
   const boundaryList = collectWordBoundaries(text);
   const runStartList = collectWordSearchRunStarts(text);
   let runIndex = runStartList.length - 1;
@@ -27872,7 +28914,7 @@ function findPreviousWordPosition(text, index) {
 }
 __name(findPreviousWordPosition, "findPreviousWordPosition");
 function limitTextLength(text, maxLength) {
-  let newLength = System66.Math.min(maxLength, text.length);
+  let newLength = System68.Math.min(maxLength, text.length);
   if (newLength === text.length) {
     return text;
   }
@@ -27886,7 +28928,7 @@ function limitTextLength(text, maxLength) {
 }
 __name(limitTextLength, "limitTextLength");
 function hasStickyUserActivation() {
-  const navigator = System66.navigator;
+  const navigator = System68.navigator;
   const userActivation = navigator ? navigator.userActivation : void 0;
   if (!userActivation) {
     return true;
@@ -27898,7 +28940,7 @@ var offscreenMeasureCanvas = null;
 function getOffscreenMeasureContext() {
   if (!offscreenMeasureCanvas) {
     try {
-      offscreenMeasureCanvas = System66.document.createElement("canvas");
+      offscreenMeasureCanvas = System68.document.createElement("canvas");
     } catch (error) {
       return null;
     }
@@ -27947,7 +28989,7 @@ function findHistoryCommand(event) {
 }
 __name(findHistoryCommand, "findHistoryCommand");
 function measureNormalLineHeight(fontString) {
-  const doc = System66.document;
+  const doc = System68.document;
   if (!doc || !doc.body) return null;
   const fontSet = doc.fonts;
   const fontSetSize = fontSet && typeof fontSet.size === "number" ? fontSet.size : 0;
@@ -27979,7 +29021,7 @@ var classicScrollbarThickness = null;
 function readClassicScrollbarMetrics() {
   if (classicScrollbarThickness === null) {
     classicScrollbarThickness = 0;
-    const doc = System66.document;
+    const doc = System68.document;
     if (doc && doc.body) {
       const probeElement = doc.createElement("div");
       const style = probeElement.style;
@@ -27992,7 +29034,7 @@ function readClassicScrollbarMetrics() {
       style.overflow = "scroll";
       style.scrollbarWidth = "auto";
       doc.body.appendChild(probeElement);
-      classicScrollbarThickness = System66.Math.max(0, probeElement.offsetWidth - probeElement.clientWidth);
+      classicScrollbarThickness = System68.Math.max(0, probeElement.offsetWidth - probeElement.clientWidth);
       probeElement.remove();
     }
   }
@@ -28001,8 +29043,8 @@ function readClassicScrollbarMetrics() {
     return null;
   }
   const proportion = thickness / 15;
-  const thumbThickness = System66.Math.floor(9 * proportion);
-  return { thickness, buttonLength: System66.Math.floor(18 * proportion), thumbThickness, thumbCrossOffset: System66.Math.floor((thickness - thumbThickness) * 0.5), thumbMinimumLength: System66.Math.floor(17 * proportion), thumbLengthInset: 0 };
+  const thumbThickness = System68.Math.floor(9 * proportion);
+  return { thickness, buttonLength: System68.Math.floor(18 * proportion), thumbThickness, thumbCrossOffset: System68.Math.floor((thickness - thumbThickness) * 0.5), thumbMinimumLength: System68.Math.floor(17 * proportion), thumbLengthInset: 0 };
 }
 __name(readClassicScrollbarMetrics, "readClassicScrollbarMetrics");
 function calculateClassicThumbSpan(metrics, trackLength, viewportLength, extentLength, offset) {
@@ -28010,9 +29052,9 @@ function calculateClassicThumbSpan(metrics, trackLength, viewportLength, extentL
   if (extentLength <= viewportLength + 0.5 || thumbRoom < metrics.thumbMinimumLength || viewportLength <= 0) {
     return null;
   }
-  const thumbLength = System66.Math.min(thumbRoom, System66.Math.max(metrics.thumbMinimumLength, System66.Math.round(thumbRoom * viewportLength / extentLength)));
+  const thumbLength = System68.Math.min(thumbRoom, System68.Math.max(metrics.thumbMinimumLength, System68.Math.round(thumbRoom * viewportLength / extentLength)));
   const maximumOffset = extentLength - viewportLength;
-  const thumbStart = metrics.buttonLength + (thumbRoom - thumbLength) * System66.Math.max(0, System66.Math.min(1, offset / maximumOffset));
+  const thumbStart = metrics.buttonLength + (thumbRoom - thumbLength) * System68.Math.max(0, System68.Math.min(1, offset / maximumOffset));
   return { start: thumbStart, length: thumbLength };
 }
 __name(calculateClassicThumbSpan, "calculateClassicThumbSpan");
@@ -28034,7 +29076,7 @@ function advanceToTabStop(x, tabWidth) {
   if (tabWidth <= 0) {
     return x;
   }
-  return (System66.Math.floor(x / tabWidth) + 1) * tabWidth;
+  return (System68.Math.floor(x / tabWidth) + 1) * tabWidth;
 }
 __name(advanceToTabStop, "advanceToTabStop");
 function trimHangingSpaces(text) {
@@ -28065,7 +29107,7 @@ function findLineBreakList(paragraph) {
 }
 __name(findLineBreakList, "findLineBreakList");
 function findLineBreakListFromDocument(paragraph) {
-  const doc = System66.document;
+  const doc = System68.document;
   if (!doc || !doc.body || typeof doc.createRange !== "function") {
     return null;
   }
@@ -28165,7 +29207,7 @@ var TextAreaLayout = class {
     if (!line) {
       return 0;
     }
-    const localIndex = System66.Math.max(line.start, System66.Math.min(line.end, characterIndex)) - line.start;
+    const localIndex = System68.Math.max(line.start, System68.Math.min(line.end, characterIndex)) - line.start;
     const offset = line.offsets[localIndex];
     return typeof offset === "number" ? offset : 0;
   }
@@ -28188,7 +29230,7 @@ var TextAreaLayout = class {
     if (this.lineList.length === 0 || this.lineHeight <= 0) {
       return { index: 0, isUpstream: false };
     }
-    const lineIndex = System66.Math.min(this.lineList.length - 1, System66.Math.max(0, System66.Math.floor(y / this.lineHeight)));
+    const lineIndex = System68.Math.min(this.lineList.length - 1, System68.Math.max(0, System68.Math.floor(y / this.lineHeight)));
     return this.findCharacterIndexInLine(lineIndex, x);
   }
   moveVertically(characterIndex, isUpstream, preferredX, lineDelta) {
@@ -28221,15 +29263,15 @@ var TextAreaLayout = class {
     }
     for (let lineIndex = 0; lineIndex < this.lineList.length; ++lineIndex) {
       const line = this.lineList[lineIndex];
-      const lineSelectionStart = System66.Math.max(startIndex, line.start);
-      const lineSelectionEnd = System66.Math.min(endIndex, line.end);
+      const lineSelectionStart = System68.Math.max(startIndex, line.start);
+      const lineSelectionEnd = System68.Math.min(endIndex, line.end);
       const isLineBreakSelected = line.isHardBreak && startIndex <= line.end && endIndex > line.end;
       if (lineSelectionStart > lineSelectionEnd || lineSelectionStart === lineSelectionEnd && !isLineBreakSelected) {
         continue;
       }
       const startX = this.getXInLine(lineIndex, lineSelectionStart);
       const endX = this.getXInLine(lineIndex, lineSelectionEnd);
-      rectList.push(Rect.create(startX, line.top, System66.Math.max(0, endX - startX), this.lineHeight));
+      rectList.push(Rect.create(startX, line.top, System68.Math.max(0, endX - startX), this.lineHeight));
     }
     return rectList;
   }
@@ -28311,10 +29353,10 @@ function findBoundaryIndexAtOffset(offsets, boundaryList, targetX) {
 __name(findBoundaryIndexAtOffset, "findBoundaryIndexAtOffset");
 function calculatePageStep(visibleHeight) {
   const pageStep = visibleHeight * 0.875;
-  return isMacPlatform() ? System66.Math.max(pageStep, visibleHeight - 40) : pageStep;
+  return isMacPlatform() ? System68.Math.max(pageStep, visibleHeight - 40) : pageStep;
 }
 __name(calculatePageStep, "calculatePageStep");
-var System67 = globalThis;
+var System69 = globalThis;
 var UISlider = class extends UIControl {
   static {
     __name(this, "UISlider");
@@ -28428,15 +29470,15 @@ var UISlider = class extends UIControl {
     if (this.#thumbNode === null && this.#thumbRadius > 0) {
       const thumbRadius = this.#thumbRadius;
       if (this.#direction === ProgressDirection.vertical) {
-        minimumX = System67.Math.min(minimumX, contentSize.x * 0.5 - thumbRadius);
-        maximumX = System67.Math.max(maximumX, contentSize.x * 0.5 + thumbRadius);
-        minimumY = System67.Math.min(minimumY, -thumbRadius);
-        maximumY = System67.Math.max(maximumY, contentSize.y + thumbRadius);
+        minimumX = System69.Math.min(minimumX, contentSize.x * 0.5 - thumbRadius);
+        maximumX = System69.Math.max(maximumX, contentSize.x * 0.5 + thumbRadius);
+        minimumY = System69.Math.min(minimumY, -thumbRadius);
+        maximumY = System69.Math.max(maximumY, contentSize.y + thumbRadius);
       } else {
-        minimumX = System67.Math.min(minimumX, -thumbRadius);
-        maximumX = System67.Math.max(maximumX, contentSize.x + thumbRadius);
-        minimumY = System67.Math.min(minimumY, contentSize.y * 0.5 - thumbRadius);
-        maximumY = System67.Math.max(maximumY, contentSize.y * 0.5 + thumbRadius);
+        minimumX = System69.Math.min(minimumX, -thumbRadius);
+        maximumX = System69.Math.max(maximumX, contentSize.x + thumbRadius);
+        minimumY = System69.Math.min(minimumY, contentSize.y * 0.5 - thumbRadius);
+        maximumY = System69.Math.max(maximumY, contentSize.y * 0.5 + thumbRadius);
       }
     }
     rect.position.set(minimumX - 1, minimumY - 1);
@@ -28590,7 +29632,7 @@ var UISlider = class extends UIControl {
     return this.#isDragging;
   }
 };
-var System68 = globalThis;
+var System70 = globalThis;
 var PARTICLE_FLOATS_PER_VERTEX2 = 8;
 var DEFAULT_CONTENT_SIZE = 300;
 var HeatHazeEffect = class extends Component {
@@ -28642,25 +29684,25 @@ var HeatHazeEffect = class extends Component {
     const matrixF = transformMatrix.f;
     const cornerXList = [matrixE, matrixA * contentSize.x + matrixE, matrixC * contentSize.y + matrixE, matrixA * contentSize.x + matrixC * contentSize.y + matrixE];
     const cornerYList = [matrixF, matrixB * contentSize.x + matrixF, matrixD * contentSize.y + matrixF, matrixB * contentSize.x + matrixD * contentSize.y + matrixF];
-    const minimumX = System68.Math.min(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
-    const maximumX = System68.Math.max(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
-    const minimumY = System68.Math.min(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
-    const maximumY = System68.Math.max(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
+    const minimumX = System70.Math.min(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
+    const maximumX = System70.Math.max(cornerXList[0], cornerXList[1], cornerXList[2], cornerXList[3]);
+    const minimumY = System70.Math.min(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
+    const maximumY = System70.Math.max(cornerYList[0], cornerYList[1], cornerYList[2], cornerYList[3]);
     const boundsHeight = maximumY - minimumY;
     const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
     const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
     const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
-    const regionX = System68.Math.max(0, System68.Math.floor(minimumX));
-    const regionY = System68.Math.max(0, System68.Math.floor(minimumY));
-    const regionRight = System68.Math.min(bufferWidth, System68.Math.ceil(maximumX));
-    const regionBottom = System68.Math.min(bufferHeight, System68.Math.ceil(maximumY));
+    const regionX = System70.Math.max(0, System70.Math.floor(minimumX));
+    const regionY = System70.Math.max(0, System70.Math.floor(minimumY));
+    const regionRight = System70.Math.min(bufferWidth, System70.Math.ceil(maximumX));
+    const regionBottom = System70.Math.min(bufferHeight, System70.Math.ceil(maximumY));
     const regionWidth = regionRight - regionX;
     const regionHeight = regionBottom - regionY;
     if (maximumX - minimumX > 0 && boundsHeight > 0 && regionWidth > 0 && regionHeight > 0) {
       const captureTexture = this.ensureCaptureTexture(graphic, regionWidth, regionHeight);
       graphic.bindTexture(captureTexture);
       webGL2RenderingContext.copyTexSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, 0, 0, regionX, bufferHeight - regionBottom, regionWidth, regionHeight);
-      const rowCount = System68.Math.max(1, System68.Math.ceil(contentSize.y));
+      const rowCount = System70.Math.max(1, System70.Math.ceil(contentSize.y));
       const rowHeight = contentSize.y / rowCount;
       const leftU = (minimumX - regionX) / regionWidth;
       const rightU = (maximumX - regionX) / regionWidth;
@@ -28760,16 +29802,16 @@ var HeatHazeEffect = class extends Component {
       return false;
     }
     const contentSize = node.getContentSize();
-    const amplitude = System68.Math.abs(this.#amplitude) + 1;
+    const amplitude = System70.Math.abs(this.#amplitude) + 1;
     rect.position.set(-amplitude, -1);
     rect.size.set(contentSize.x + amplitude * 2, contentSize.y + 2);
     return true;
   }
   calculateRowOffset(localY) {
-    return System68.Math.sin(this.#timer + localY * this.getFrequency()) * this.getAmplitude();
+    return System70.Math.sin(this.#timer + localY * this.getFrequency()) * this.getAmplitude();
   }
 };
-var System69 = globalThis;
+var System71 = globalThis;
 var SeededRandom = class _SeededRandom extends Object2 {
   static {
     __name(this, "SeededRandom");
@@ -28791,8 +29833,8 @@ var SeededRandom = class _SeededRandom extends Object2 {
   nextValue() {
     this.#state = this.#state + 1831565813 >>> 0;
     let mixed = this.#state;
-    mixed = System69.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
-    mixed ^= mixed + System69.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+    mixed = System71.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+    mixed ^= mixed + System71.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
     const value = ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
     return value;
   }
@@ -28801,7 +29843,7 @@ var SeededRandom = class _SeededRandom extends Object2 {
     return value;
   }
   nextInt(minValue, maxValue) {
-    const value = minValue + System69.Math.floor(this.nextValue() * (maxValue - minValue + 1));
+    const value = minValue + System71.Math.floor(this.nextValue() * (maxValue - minValue + 1));
     return value;
   }
   pick(array) {
@@ -28821,15 +29863,15 @@ var SeededRandom = class _SeededRandom extends Object2 {
     return array;
   }
   static createDailySeed(dateNumber, baseSeed = 2654435761) {
-    const mixed = (baseSeed ^ System69.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
+    const mixed = (baseSeed ^ System71.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
     return mixed || 1;
   }
-  static fromDate(date = new System69.Date(), baseSeed = 2654435761) {
+  static fromDate(date = new System71.Date(), baseSeed = 2654435761) {
     const dateNumber = date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate();
     return new _SeededRandom(_SeededRandom.createDailySeed(dateNumber, baseSeed));
   }
 };
-var System70 = globalThis;
+var System72 = globalThis;
 var ParticleEmitterShape = { point: "point", circle: "circle", cone: "cone", box: "box", edge: "edge" };
 var ParticleRenderShape = { circle: "circle", rect: "rect", streak: "streak", image: "image" };
 function countBurstFires(burstTime, previousTime, currentTime, isStartIncluded, loopDuration) {
@@ -28839,10 +29881,10 @@ function countBurstFires(burstTime, previousTime, currentTime, isStartIncluded, 
   }
   let firstCycle = 0;
   if (!isStartIncluded) {
-    firstCycle = System70.Math.max(0, System70.Math.floor((previousTime - burstTime) / loopDuration) + 1);
+    firstCycle = System72.Math.max(0, System72.Math.floor((previousTime - burstTime) / loopDuration) + 1);
   }
-  const lastCycle = System70.Math.floor((currentTime - burstTime) / loopDuration);
-  return System70.Math.max(0, lastCycle - firstCycle + 1);
+  const lastCycle = System72.Math.floor((currentTime - burstTime) / loopDuration);
+  return System72.Math.max(0, lastCycle - firstCycle + 1);
 }
 __name(countBurstFires, "countBurstFires");
 var ParticleSystem = class extends Component {
@@ -29018,7 +30060,7 @@ var ParticleSystem = class extends Component {
       if (this.#attractorPosition) {
         const toCenterX = this.#attractorPosition.x - particle.x;
         const toCenterY = this.#attractorPosition.y - particle.y;
-        const centerDistance = System70.Math.max(System70.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
+        const centerDistance = System72.Math.max(System72.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
         const directionX = toCenterX / centerDistance;
         const directionY = toCenterY / centerDistance;
         particle.velocityX += directionX * this.#attractorStrength * timeDelta;
@@ -29027,7 +30069,7 @@ var ParticleSystem = class extends Component {
         particle.velocityY += directionX * this.#attractorSwirl * timeDelta;
       }
       if (this.#damping > 0) {
-        const dampingBlend = System70.Math.max(0, 1 - this.#damping * timeDelta);
+        const dampingBlend = System72.Math.max(0, 1 - this.#damping * timeDelta);
         particle.velocityX *= dampingBlend;
         particle.velocityY *= dampingBlend;
       }
@@ -29050,19 +30092,19 @@ var ParticleSystem = class extends Component {
     let directionY = -1;
     const shape = this.#emitterShape;
     if (shape === ParticleEmitterShape.circle) {
-      const angle = this.randomRange(0, System70.Math.PI * 2);
-      const radius = this.#shapeRadius * System70.Math.sqrt(this.randomRange(0, 1));
-      spawnX = System70.Math.cos(angle) * radius;
-      spawnY = System70.Math.sin(angle) * radius;
-      directionX = System70.Math.cos(angle);
-      directionY = System70.Math.sin(angle);
+      const angle = this.randomRange(0, System72.Math.PI * 2);
+      const radius = this.#shapeRadius * System72.Math.sqrt(this.randomRange(0, 1));
+      spawnX = System72.Math.cos(angle) * radius;
+      spawnY = System72.Math.sin(angle) * radius;
+      directionX = System72.Math.cos(angle);
+      directionY = System72.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.cone) {
-      const angle = -System70.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+      const angle = -System72.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
       const radius = this.randomRange(0, this.#shapeRadius);
-      spawnX = System70.Math.cos(angle) * radius;
-      spawnY = System70.Math.sin(angle) * radius;
-      directionX = System70.Math.cos(angle);
-      directionY = System70.Math.sin(angle);
+      spawnX = System72.Math.cos(angle) * radius;
+      spawnY = System72.Math.sin(angle) * radius;
+      directionX = System72.Math.cos(angle);
+      directionY = System72.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.box) {
       spawnX = this.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
       spawnY = this.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
@@ -29070,9 +30112,9 @@ var ParticleSystem = class extends Component {
       spawnX = this.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
       directionY = 1;
     } else {
-      const angle = this.randomRange(0, System70.Math.PI * 2);
-      directionX = System70.Math.cos(angle);
-      directionY = System70.Math.sin(angle);
+      const angle = this.randomRange(0, System72.Math.PI * 2);
+      directionX = System72.Math.cos(angle);
+      directionY = System72.Math.sin(angle);
     }
     if (originOffset) {
       spawnX += originOffset.x;
@@ -29096,7 +30138,7 @@ var ParticleSystem = class extends Component {
     particle.size = this.randomRange(this.#startSizeMin, this.#startSizeMax);
     particle.rotation = this.randomRange(this.#startRotationMin, this.#startRotationMax);
     particle.angularVelocity = this.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-    particle.wobblePhase = this.randomRange(0, System70.Math.PI * 2);
+    particle.wobblePhase = this.randomRange(0, System72.Math.PI * 2);
     particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
     particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
     particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -29120,8 +30162,8 @@ var ParticleSystem = class extends Component {
           break;
         }
       }
-      const keySpan = System70.Math.max(nextKey.time - previousKey.time, 1e-4);
-      const keyBlend = System70.Math.max(0, System70.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
+      const keySpan = System72.Math.max(nextKey.time - previousKey.time, 1e-4);
+      const keyBlend = System72.Math.max(0, System72.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
       red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
       green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
       blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
@@ -29130,7 +30172,7 @@ var ParticleSystem = class extends Component {
     outChannels[0] = red;
     outChannels[1] = green;
     outChannels[2] = blue;
-    outChannels[3] = System70.Math.max(0, System70.Math.min(1, alpha));
+    outChannels[3] = System72.Math.max(0, System72.Math.min(1, alpha));
   }
   draw(graphic) {
     const particleCount = this.#particleList.length;
@@ -29176,20 +30218,20 @@ var ParticleSystem = class extends Component {
       baseOffsetY = -nodePosition.y;
     }
     const isStreak = this.#renderShape === ParticleRenderShape.streak;
-    const wobbleExtent = System70.Math.abs(this.#wobbleAmplitude);
-    let minimumX = System70.Number.POSITIVE_INFINITY;
-    let minimumY = System70.Number.POSITIVE_INFINITY;
-    let maximumX = System70.Number.NEGATIVE_INFINITY;
-    let maximumY = System70.Number.NEGATIVE_INFINITY;
+    const wobbleExtent = System72.Math.abs(this.#wobbleAmplitude);
+    let minimumX = System72.Number.POSITIVE_INFINITY;
+    let minimumY = System72.Number.POSITIVE_INFINITY;
+    let maximumX = System72.Number.NEGATIVE_INFINITY;
+    let maximumY = System72.Number.NEGATIVE_INFINITY;
     for (const particle of particleList) {
       const lifeRatio = particle.age / particle.lifetime;
       const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-      const drawSize = System70.Math.max(0.1, particle.size * sizeScale);
+      const drawSize = System72.Math.max(0.1, particle.size * sizeScale);
       const headX = particle.x + baseOffsetX;
       const headY = particle.y + baseOffsetY;
       let tailX = headX;
       let tailY = headY;
-      let extent = drawSize * 0.5 * System70.Math.SQRT2;
+      let extent = drawSize * 0.5 * System72.Math.SQRT2;
       if (isStreak) {
         tailX = headX - particle.velocityX * this.#streakScale;
         tailY = headY - particle.velocityY * this.#streakScale;
@@ -29197,10 +30239,10 @@ var ParticleSystem = class extends Component {
       }
       const extentX = extent + wobbleExtent + 1;
       const extentY = extent + 1;
-      minimumX = System70.Math.min(minimumX, headX - extentX, tailX - extentX);
-      minimumY = System70.Math.min(minimumY, headY - extentY, tailY - extentY);
-      maximumX = System70.Math.max(maximumX, headX + extentX, tailX + extentX);
-      maximumY = System70.Math.max(maximumY, headY + extentY, tailY + extentY);
+      minimumX = System72.Math.min(minimumX, headX - extentX, tailX - extentX);
+      minimumY = System72.Math.min(minimumY, headY - extentY, tailY - extentY);
+      maximumX = System72.Math.max(maximumX, headX + extentX, tailX + extentX);
+      maximumY = System72.Math.max(maximumY, headY + extentY, tailY + extentY);
     }
     rect.position.set(minimumX, minimumY);
     rect.size.set(maximumX - minimumX, maximumY - minimumY);
@@ -29226,16 +30268,16 @@ var ParticleSystem = class extends Component {
     for (const particle of this.#particleList) {
       const lifeRatio = particle.age / particle.lifetime;
       const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-      const drawSize = System70.Math.max(0.1, particle.size * sizeScale);
+      const drawSize = System72.Math.max(0.1, particle.size * sizeScale);
       this.evaluateColorChannels(particle, lifeRatio, colorChannels);
       let drawX = particle.x + baseOffsetX;
       const drawY = particle.y + baseOffsetY;
       if (this.#wobbleAmplitude > 0) {
-        drawX += System70.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+        drawX += System72.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
       }
       if (isStreak) {
-        const speed = System70.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
-        const safeSpeed = System70.Math.max(speed, 1e-3);
+        const speed = System72.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
+        const safeSpeed = System72.Math.max(speed, 1e-3);
         const directionX = particle.velocityX / safeSpeed;
         const directionY = particle.velocityY / safeSpeed;
         const tailX = drawX - particle.velocityX * this.#streakScale;
@@ -29251,8 +30293,8 @@ var ParticleSystem = class extends Component {
         writeVertex(tailX + sideX, tailY + sideY, 0, 1);
       } else if (isRect && particle.rotation !== 0) {
         const halfSize = drawSize * 0.5;
-        const cosValue = System70.Math.cos(particle.rotation);
-        const sinValue = System70.Math.sin(particle.rotation);
+        const cosValue = System72.Math.cos(particle.rotation);
+        const sinValue = System72.Math.sin(particle.rotation);
         const axisX1 = cosValue * halfSize;
         const axisY1 = sinValue * halfSize;
         const axisX2 = -sinValue * halfSize;
@@ -29280,16 +30322,16 @@ var ParticleSystem = class extends Component {
     for (const particle of this.#particleList) {
       const lifeRatio = particle.age / particle.lifetime;
       const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-      const drawSize = System70.Math.max(0.1, particle.size * sizeScale);
+      const drawSize = System72.Math.max(0.1, particle.size * sizeScale);
       let drawX = particle.x + baseOffsetX;
       const drawY = particle.y + baseOffsetY;
       if (this.#wobbleAmplitude > 0) {
-        drawX += System70.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+        drawX += System72.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
       }
       graphic.pushState();
       graphic.translate(drawX, drawY);
       graphic.rotate(particle.rotation);
-      graphic.multiplyGlobalAlpha(System70.Math.max(0, System70.Math.min(1, particle.alpha * (1 - lifeRatio))));
+      graphic.multiplyGlobalAlpha(System72.Math.max(0, System72.Math.min(1, particle.alpha * (1 - lifeRatio))));
       const image = this.#image;
       graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
       graphic.popState();
@@ -29491,8 +30533,8 @@ var ParticleSystem = class extends Component {
       this.setWorldSpace(description.worldSpace);
     }
     if (description.imageDataUrl !== void 0) {
-      if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System70.Image === "function") {
-        const imageElement = new System70.Image();
+      if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System72.Image === "function") {
+        const imageElement = new System72.Image();
         imageElement.src = description.imageDataUrl;
         this.setImage(imageElement);
       } else {
@@ -29539,11 +30581,11 @@ var ParticleSystem = class extends Component {
     return randomRange(minValue, maxValue);
   }
 };
-var System71 = globalThis;
+var System73 = globalThis;
 var ShaderSpriteEffect = { none: "none", flash: "flash", silhouette: "silhouette", colorize: "colorize", grayscale: "grayscale", sepia: "sepia", invert: "invert", hueShift: "hueShift", colorAdjust: "colorAdjust", posterize: "posterize", threshold: "threshold", gradientMap: "gradientMap", outline: "outline", innerOutline: "innerOutline", glow: "glow", innerGlow: "innerGlow", shadow: "shadow", edgeDetect: "edgeDetect", emboss: "emboss", sharpen: "sharpen", blur: "blur", motionBlur: "motionBlur", radialBlur: "radialBlur", wave: "wave", flag: "flag", ripple: "ripple", heatHaze: "heatHaze", bulge: "bulge", swirl: "swirl", mirror: "mirror", kaleidoscope: "kaleidoscope", jitter: "jitter", pixelate: "pixelate", glitch: "glitch", chromatic: "chromatic", hologram: "hologram", scanlines: "scanlines", oldFilm: "oldFilm", vignette: "vignette", shine: "shine", dissolve: "dissolve", burn: "burn", noiseFade: "noiseFade", pixelDissolve: "pixelDissolve", wipe: "wipe", iris: "iris", diamondWipe: "diamondWipe", clockWipe: "clockWipe", blinds: "blinds", checkerWipe: "checkerWipe" };
-var DEFAULT_PARAMETER_TABLE = { none: [0, 0, 0, 0], flash: [0, 0, 0, 0], silhouette: [0, 0, 0, 0], colorize: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], sepia: [0, 0, 0, 0], invert: [0, 0, 0, 0], hueShift: [0, 0, 0, 0], colorAdjust: [1.4, 1.3, 1.1, 0], posterize: [4, 0, 0, 0], threshold: [0.5, 0, 0, 0], gradientMap: [0.1, 0.05, 0.25, 0], outline: [2, 0, 0, 0], innerOutline: [2, 0, 0, 0], glow: [6, 0, 0, 0], innerGlow: [5, 0, 0, 0], shadow: [6, 6, 0, 0], edgeDetect: [0, 0, 0, 0], emboss: [0, 0, 0, 0], sharpen: [0, 0, 0, 0], blur: [3, 0, 0, 0], motionBlur: [1, 0, 12, 0], radialBlur: [0.12, 0, 0, 0], wave: [12, 4, 0.03, 0], flag: [8, 5, 0.06, 0], ripple: [40, 6, 0.02, 0], heatHaze: [6, 1.5, 0.02, 0], bulge: [0.6, 0, 0, 0], swirl: [1, 0, 0, 0], mirror: [0, 0, 0, 0], kaleidoscope: [6, 0, 0, 0], jitter: [4, 24, 0, 0], pixelate: [24, 0, 0, 0], glitch: [18, 12, 0.15, 0], chromatic: [3, 0, 0, 0], hologram: [120, 6, 0, 0], scanlines: [90, 0, 0, 0], oldFilm: [0, 0, 0, 0], vignette: [0.4, 1, 0, 0], shine: [0.15, 0, 0, 0], dissolve: [8, 0.08, 0, 0], burn: [8, 0.06, 0, 0], noiseFade: [6, 0.2, 0, 0], pixelDissolve: [16, 0, 0, 0], wipe: [1, 0, 0.05, 0], iris: [0.5, 0.5, 0.05, 0], diamondWipe: [0.05, 0, 0, 0], clockWipe: [0.02, 0, 0, 0], blinds: [8, 0.05, 0, 0], checkerWipe: [8, 0, 0, 0] };
-var DEFAULT_COLOR_TABLE = { none: [1, 1, 1, 1], flash: [1, 1, 1, 1], silhouette: [0, 0, 0, 1], colorize: [1, 0.5, 0.5, 1], grayscale: [1, 1, 1, 1], sepia: [1, 1, 1, 1], invert: [1, 1, 1, 1], hueShift: [1, 1, 1, 1], colorAdjust: [1, 1, 1, 1], posterize: [1, 1, 1, 1], threshold: [1, 1, 1, 1], gradientMap: [1, 0.85, 0.5, 1], outline: [1, 1, 1, 1], innerOutline: [1, 1, 1, 1], glow: [1, 0.85, 0.4, 1], innerGlow: [1, 0.85, 0.4, 1], shadow: [0, 0, 0, 0.6], edgeDetect: [1, 1, 1, 1], emboss: [1, 1, 1, 1], sharpen: [1, 1, 1, 1], blur: [1, 1, 1, 1], motionBlur: [1, 1, 1, 1], radialBlur: [1, 1, 1, 1], wave: [1, 1, 1, 1], flag: [1, 1, 1, 1], ripple: [1, 1, 1, 1], heatHaze: [1, 1, 1, 1], bulge: [1, 1, 1, 1], swirl: [1, 1, 1, 1], mirror: [1, 1, 1, 1], kaleidoscope: [1, 1, 1, 1], jitter: [1, 1, 1, 1], pixelate: [1, 1, 1, 1], glitch: [1, 1, 1, 1], chromatic: [1, 1, 1, 1], hologram: [0.4, 0.9, 1, 1], scanlines: [1, 1, 1, 1], oldFilm: [1, 1, 1, 1], vignette: [0, 0, 0, 1], shine: [1, 1, 1, 1], dissolve: [1, 0.6, 0.2, 1], burn: [1, 0.7, 0.25, 1], noiseFade: [1, 1, 1, 1], pixelDissolve: [1, 1, 1, 1], wipe: [1, 1, 1, 1], iris: [1, 1, 1, 1], diamondWipe: [1, 1, 1, 1], clockWipe: [1, 1, 1, 1], blinds: [1, 1, 1, 1], checkerWipe: [1, 1, 1, 1] };
-var EFFECT_BODY_TABLE = { flash: `
+var DEFAULT_PARAMETER_TABLE2 = { none: [0, 0, 0, 0], flash: [0, 0, 0, 0], silhouette: [0, 0, 0, 0], colorize: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], sepia: [0, 0, 0, 0], invert: [0, 0, 0, 0], hueShift: [0, 0, 0, 0], colorAdjust: [1.4, 1.3, 1.1, 0], posterize: [4, 0, 0, 0], threshold: [0.5, 0, 0, 0], gradientMap: [0.1, 0.05, 0.25, 0], outline: [2, 0, 0, 0], innerOutline: [2, 0, 0, 0], glow: [6, 0, 0, 0], innerGlow: [5, 0, 0, 0], shadow: [6, 6, 0, 0], edgeDetect: [0, 0, 0, 0], emboss: [0, 0, 0, 0], sharpen: [0, 0, 0, 0], blur: [3, 0, 0, 0], motionBlur: [1, 0, 12, 0], radialBlur: [0.12, 0, 0, 0], wave: [12, 4, 0.03, 0], flag: [8, 5, 0.06, 0], ripple: [40, 6, 0.02, 0], heatHaze: [6, 1.5, 0.02, 0], bulge: [0.6, 0, 0, 0], swirl: [1, 0, 0, 0], mirror: [0, 0, 0, 0], kaleidoscope: [6, 0, 0, 0], jitter: [4, 24, 0, 0], pixelate: [24, 0, 0, 0], glitch: [18, 12, 0.15, 0], chromatic: [3, 0, 0, 0], hologram: [120, 6, 0, 0], scanlines: [90, 0, 0, 0], oldFilm: [0, 0, 0, 0], vignette: [0.4, 1, 0, 0], shine: [0.15, 0, 0, 0], dissolve: [8, 0.08, 0, 0], burn: [8, 0.06, 0, 0], noiseFade: [6, 0.2, 0, 0], pixelDissolve: [16, 0, 0, 0], wipe: [1, 0, 0.05, 0], iris: [0.5, 0.5, 0.05, 0], diamondWipe: [0.05, 0, 0, 0], clockWipe: [0.02, 0, 0, 0], blinds: [8, 0.05, 0, 0], checkerWipe: [8, 0, 0, 0] };
+var DEFAULT_COLOR_TABLE2 = { none: [1, 1, 1, 1], flash: [1, 1, 1, 1], silhouette: [0, 0, 0, 1], colorize: [1, 0.5, 0.5, 1], grayscale: [1, 1, 1, 1], sepia: [1, 1, 1, 1], invert: [1, 1, 1, 1], hueShift: [1, 1, 1, 1], colorAdjust: [1, 1, 1, 1], posterize: [1, 1, 1, 1], threshold: [1, 1, 1, 1], gradientMap: [1, 0.85, 0.5, 1], outline: [1, 1, 1, 1], innerOutline: [1, 1, 1, 1], glow: [1, 0.85, 0.4, 1], innerGlow: [1, 0.85, 0.4, 1], shadow: [0, 0, 0, 0.6], edgeDetect: [1, 1, 1, 1], emboss: [1, 1, 1, 1], sharpen: [1, 1, 1, 1], blur: [1, 1, 1, 1], motionBlur: [1, 1, 1, 1], radialBlur: [1, 1, 1, 1], wave: [1, 1, 1, 1], flag: [1, 1, 1, 1], ripple: [1, 1, 1, 1], heatHaze: [1, 1, 1, 1], bulge: [1, 1, 1, 1], swirl: [1, 1, 1, 1], mirror: [1, 1, 1, 1], kaleidoscope: [1, 1, 1, 1], jitter: [1, 1, 1, 1], pixelate: [1, 1, 1, 1], glitch: [1, 1, 1, 1], chromatic: [1, 1, 1, 1], hologram: [0.4, 0.9, 1, 1], scanlines: [1, 1, 1, 1], oldFilm: [1, 1, 1, 1], vignette: [0, 0, 0, 1], shine: [1, 1, 1, 1], dissolve: [1, 0.6, 0.2, 1], burn: [1, 0.7, 0.25, 1], noiseFade: [1, 1, 1, 1], pixelDissolve: [1, 1, 1, 1], wipe: [1, 1, 1, 1], iris: [1, 1, 1, 1], diamondWipe: [1, 1, 1, 1], clockWipe: [1, 1, 1, 1], blinds: [1, 1, 1, 1], checkerWipe: [1, 1, 1, 1] };
+var EFFECT_BODY_TABLE2 = { flash: `
 	textureColor.rgb = mix(textureColor.rgb, effectColor.rgb * textureColor.a, effectProgress * effectColor.a);
 	`, silhouette: `
 	textureColor.rgb = mix(textureColor.rgb, effectColor.rgb * textureColor.a, effectProgress);
@@ -29924,7 +30966,7 @@ void main() {
 }
 `;
 function resolveEffectProgram(graphic, effect) {
-  return graphic.resolveShaderProgram("ShaderSprite", effect, () => [VERTEXSHADER_SOURCE2, FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect])]);
+  return graphic.resolveShaderProgram("ShaderSprite", effect, () => [VERTEXSHADER_SOURCE2, FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE2[effect])]);
 }
 __name(resolveEffectProgram, "resolveEffectProgram");
 var ShaderSprite = class _ShaderSprite extends Sprite {
@@ -29943,7 +30985,7 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
     this.#effect = ShaderSpriteEffect.none;
     this.#effectProgress = 0;
     this.#effectTime = 0;
-    this.#effectSeed = System71.Math.random() * 100;
+    this.#effectSeed = System73.Math.random() * 100;
     this.#effectColor = Color.white();
     this.#effectParameters = [0, 0, 0, 0];
   }
@@ -29969,8 +31011,8 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
     if (imageRect === null || imageRect === void 0 || imageRect.isZero()) {
       imageRect = Rect.create(0, 0, image.width, image.height);
     }
-    const imageWidth = System71.Math.max(1, image.width);
-    const imageHeight = System71.Math.max(1, image.height);
+    const imageWidth = System73.Math.max(1, image.width);
+    const imageHeight = System73.Math.max(1, image.height);
     const effectColor = this.getEffectColor();
     const effectParameters = this.getEffectParameters();
     webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("effectTime"), this.getEffectTime());
@@ -29990,18 +31032,18 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
     return true;
   }
   setEffect(effect) {
-    const isKnownEffect = EFFECT_BODY_TABLE[effect] !== void 0 || effect === ShaderSpriteEffect.none;
+    const isKnownEffect = EFFECT_BODY_TABLE2[effect] !== void 0 || effect === ShaderSpriteEffect.none;
     this.#effect = isKnownEffect ? effect : ShaderSpriteEffect.none;
-    const defaultParameters = DEFAULT_PARAMETER_TABLE[this.#effect];
+    const defaultParameters = DEFAULT_PARAMETER_TABLE2[this.#effect];
     this.#effectParameters = [defaultParameters[0], defaultParameters[1], defaultParameters[2], defaultParameters[3]];
-    const defaultColor = DEFAULT_COLOR_TABLE[this.#effect];
+    const defaultColor = DEFAULT_COLOR_TABLE2[this.#effect];
     this.#effectColor = new Color(defaultColor[0], defaultColor[1], defaultColor[2], defaultColor[3]);
   }
   getEffect() {
     return this.#effect;
   }
   setEffectProgress(effectProgress) {
-    this.#effectProgress = System71.Math.max(0, System71.Math.min(1, effectProgress));
+    this.#effectProgress = System73.Math.max(0, System73.Math.min(1, effectProgress));
   }
   getEffectProgress() {
     return this.#effectProgress;
@@ -30035,15 +31077,15 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
     return this.#effectParameters;
   }
   static getDefaultParameters(effect) {
-    const defaultParameters = DEFAULT_PARAMETER_TABLE[effect] ? DEFAULT_PARAMETER_TABLE[effect] : DEFAULT_PARAMETER_TABLE.none;
+    const defaultParameters = DEFAULT_PARAMETER_TABLE2[effect] ? DEFAULT_PARAMETER_TABLE2[effect] : DEFAULT_PARAMETER_TABLE2.none;
     return [defaultParameters[0], defaultParameters[1], defaultParameters[2], defaultParameters[3]];
   }
   static getDefaultColor(effect) {
-    const defaultColor = DEFAULT_COLOR_TABLE[effect] ? DEFAULT_COLOR_TABLE[effect] : DEFAULT_COLOR_TABLE.none;
+    const defaultColor = DEFAULT_COLOR_TABLE2[effect] ? DEFAULT_COLOR_TABLE2[effect] : DEFAULT_COLOR_TABLE2.none;
     return new Color(defaultColor[0], defaultColor[1], defaultColor[2], defaultColor[3]);
   }
 };
-var System72 = globalThis;
+var System74 = globalThis;
 var TrailRenderer = class extends Component {
   static {
     __name(this, "TrailRenderer");
@@ -30111,10 +31153,10 @@ var TrailRenderer = class extends Component {
       const nextPoint = this.#pointList[pointIndex + 1];
       const ageRatio = point.age / this.#pointLifetime;
       const freshRatio = 1 - ageRatio;
-      const segmentWidth = System72.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
-      const red = System72.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
-      const green = System72.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
-      const blue = System72.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
+      const segmentWidth = System74.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
+      const red = System74.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
+      const green = System74.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
+      const blue = System74.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
       const alpha = this.#endColor.alpha + (this.#startColor.alpha - this.#endColor.alpha) * freshRatio;
       graphic.setStrokeColor(`rgba(${red}, ${green}, ${blue}, ${alpha})`);
       graphic.drawLine([Vector2.create(point.x - nodePosition.x, point.y - nodePosition.y), Vector2.create(nextPoint.x - nodePosition.x, nextPoint.y - nodePosition.y)], segmentWidth);
@@ -30138,16 +31180,16 @@ var TrailRenderer = class extends Component {
       return true;
     }
     const nodePosition = node.getLocalPosition();
-    const extent = System72.Math.max(System72.Math.abs(this.#startWidth), System72.Math.abs(this.#endWidth), 0.1) * 0.5 + 1;
-    let minimumX = System72.Number.POSITIVE_INFINITY;
-    let minimumY = System72.Number.POSITIVE_INFINITY;
-    let maximumX = System72.Number.NEGATIVE_INFINITY;
-    let maximumY = System72.Number.NEGATIVE_INFINITY;
+    const extent = System74.Math.max(System74.Math.abs(this.#startWidth), System74.Math.abs(this.#endWidth), 0.1) * 0.5 + 1;
+    let minimumX = System74.Number.POSITIVE_INFINITY;
+    let minimumY = System74.Number.POSITIVE_INFINITY;
+    let maximumX = System74.Number.NEGATIVE_INFINITY;
+    let maximumY = System74.Number.NEGATIVE_INFINITY;
     for (const point of pointList) {
-      minimumX = System72.Math.min(minimumX, point.x);
-      minimumY = System72.Math.min(minimumY, point.y);
-      maximumX = System72.Math.max(maximumX, point.x);
-      maximumY = System72.Math.max(maximumY, point.y);
+      minimumX = System74.Math.min(minimumX, point.x);
+      minimumY = System74.Math.min(minimumY, point.y);
+      maximumX = System74.Math.max(maximumX, point.x);
+      maximumY = System74.Math.max(maximumY, point.y);
     }
     rect.position.set(minimumX - nodePosition.x - extent, minimumY - nodePosition.y - extent);
     rect.size.set(maximumX - minimumX + extent * 2, maximumY - minimumY + extent * 2);
@@ -30271,7 +31313,7 @@ var PlatformerBody = class extends Component {
     this.#landedEvent = landedEvent;
   }
 };
-var System73 = globalThis;
+var System75 = globalThis;
 var SpriteAnimator = class _SpriteAnimator extends Component {
   static {
     __name(this, "SpriteAnimator");
@@ -30283,7 +31325,7 @@ var SpriteAnimator = class _SpriteAnimator extends Component {
   constructor() {
     super();
     this.setComponentType("SpriteAnimator");
-    this.#clipTable = new System73.Map();
+    this.#clipTable = new System75.Map();
     this.#clipName = null;
     this.#animation = new Animation();
     this.#sprite = null;
@@ -30383,7 +31425,7 @@ var SpriteAnimator = class _SpriteAnimator extends Component {
     return isStarted;
   }
 };
-var System74 = globalThis;
+var System76 = globalThis;
 var FloatingText = class extends WorldNode {
   static {
     __name(this, "FloatingText");
@@ -30432,7 +31474,7 @@ var FloatingText = class extends WorldNode {
     for (let index = this.#activeList.length - 1; index >= 0; --index) {
       const item = this.#activeList[index];
       item.elapsedSeconds += timeDelta;
-      const linearRatio = System74.Math.min(1, item.elapsedSeconds / item.duration);
+      const linearRatio = System76.Math.min(1, item.elapsedSeconds / item.duration);
       const easedRatio = 1 - (1 - linearRatio) * (1 - linearRatio);
       item.node.setLocalPosition(Vector2.create(item.startPosition.x, item.startPosition.y - item.rise * easedRatio));
       item.node.setLocalOpacity(1 - linearRatio * linearRatio);
@@ -30454,12 +31496,12 @@ var FloatingText = class extends WorldNode {
     this.#activeList.length = 0;
   }
 };
-var System75 = globalThis;
+var System77 = globalThis;
 var PARTICLE_GRADIENT_CANVAS_SIZE = 64;
 var particleGradientCanvas = null;
 function getParticleGradientCanvas() {
   if (particleGradientCanvas === null) {
-    const canvas = System75.document.createElement("canvas");
+    const canvas = System77.document.createElement("canvas");
     canvas.width = PARTICLE_GRADIENT_CANVAS_SIZE;
     canvas.height = PARTICLE_GRADIENT_CANVAS_SIZE;
     const canvasRenderingContext = canvas.getContext("2d");
@@ -30564,7 +31606,7 @@ var TouchEffect = class extends WorldNode {
     graphic.setGlobalAlpha(originalAlpha);
   }
 };
-var System76 = globalThis;
+var System78 = globalThis;
 var ENTER_DISTANCE = 10;
 var ENTER_SECONDS = 0.18;
 var ENTER_SETTLE_SECONDS = 0.08;
@@ -30578,11 +31620,11 @@ var REPEAT_SECONDS = 0.15;
 var LONG_TEXT_CHARACTERS = 20;
 var LONG_TEXT_EXTRA_SECONDS = 0.5;
 var MAXIMUM_STAY_SECONDS = 4;
-var ToastPhase = System76.Object.freeze({ hidden: "hidden", enter: "enter", stay: "stay", exit: "exit" });
+var ToastPhase = System78.Object.freeze({ hidden: "hidden", enter: "enter", stay: "stay", exit: "exit" });
 function readToastSeconds(text, baseSeconds) {
-  const characterCount = System76.Array.from(text).length;
-  const extraSteps = System76.Math.max(0, System76.Math.ceil((characterCount - LONG_TEXT_CHARACTERS) / LONG_TEXT_CHARACTERS));
-  return System76.Math.min(MAXIMUM_STAY_SECONDS, System76.Math.max(baseSeconds, baseSeconds + extraSteps * LONG_TEXT_EXTRA_SECONDS));
+  const characterCount = System78.Array.from(text).length;
+  const extraSteps = System78.Math.max(0, System78.Math.ceil((characterCount - LONG_TEXT_CHARACTERS) / LONG_TEXT_CHARACTERS));
+  return System78.Math.min(MAXIMUM_STAY_SECONDS, System78.Math.max(baseSeconds, baseSeconds + extraSteps * LONG_TEXT_EXTRA_SECONDS));
 }
 __name(readToastSeconds, "readToastSeconds");
 var ToastMotion = class extends Component {
@@ -30677,14 +31719,14 @@ var ToastMotion = class extends Component {
     let opacity = 1;
     switch (this.#phase) {
       case ToastPhase.enter: {
-        const enterRatio = System76.Math.min(1, this.#phaseSeconds / ENTER_SECONDS);
+        const enterRatio = System78.Math.min(1, this.#phaseSeconds / ENTER_SECONDS);
         const easedRatio = 1 - (1 - enterRatio) * (1 - enterRatio);
         offsetY = this.#enterSide * ENTER_DISTANCE * (1 - easedRatio);
         opacity = easedRatio;
         if (this.#phaseSeconds <= ENTER_SECONDS) {
           scale = ENTER_START_SCALE + (ENTER_PEAK_SCALE - ENTER_START_SCALE) * easedRatio;
         } else {
-          const settleRatio = System76.Math.min(1, (this.#phaseSeconds - ENTER_SECONDS) / ENTER_SETTLE_SECONDS);
+          const settleRatio = System78.Math.min(1, (this.#phaseSeconds - ENTER_SECONDS) / ENTER_SETTLE_SECONDS);
           scale = ENTER_PEAK_SCALE + (1 - ENTER_PEAK_SCALE) * settleRatio;
         }
         if (this.#phaseSeconds >= ENTER_SECONDS + ENTER_SETTLE_SECONDS) {
@@ -30696,8 +31738,8 @@ var ToastMotion = class extends Component {
       case ToastPhase.stay: {
         this.#staySeconds -= timeDelta;
         if (this.#repeatSeconds > 0) {
-          this.#repeatSeconds = System76.Math.max(0, this.#repeatSeconds - timeDelta);
-          scale = 1 + (REPEAT_SCALE - 1) * System76.Math.sin((1 - this.#repeatSeconds / REPEAT_SECONDS) * System76.Math.PI);
+          this.#repeatSeconds = System78.Math.max(0, this.#repeatSeconds - timeDelta);
+          scale = 1 + (REPEAT_SCALE - 1) * System78.Math.sin((1 - this.#repeatSeconds / REPEAT_SECONDS) * System78.Math.PI);
         }
         if (this.#staySeconds <= 0) {
           this.startExit(EXIT_SECONDS);
@@ -30705,7 +31747,7 @@ var ToastMotion = class extends Component {
         break;
       }
       case ToastPhase.exit: {
-        const exitRatio = System76.Math.min(1, this.#phaseSeconds / this.#exitLength);
+        const exitRatio = System78.Math.min(1, this.#phaseSeconds / this.#exitLength);
         offsetY = -EXIT_DISTANCE * exitRatio;
         opacity = 1 - exitRatio;
         if (exitRatio >= 1) {
@@ -30753,12 +31795,12 @@ function attachToastMotion(node, enterSide) {
   return toastMotion;
 }
 __name(attachToastMotion, "attachToastMotion");
-var System77 = globalThis;
+var System79 = globalThis;
 var WAVES_PER_CHANNEL = 2;
 var CHANNEL_COUNT = 6;
-var WAVE_WEIGHTS = System77.Object.freeze([2 / 3, 1 / 3]);
-var WAVE_RATIO_RANGES = System77.Object.freeze([System77.Object.freeze([0.85, 1.15]), System77.Object.freeze([1.7, 2.3])]);
-var DEFAULT_SHAKE = System77.Object.freeze({ amplitude: 0.1, rotationAmplitude: 0, frequency: 10, duration: 0.25, attack: 0, decayExponent: 2 });
+var WAVE_WEIGHTS = System79.Object.freeze([2 / 3, 1 / 3]);
+var WAVE_RATIO_RANGES = System79.Object.freeze([System79.Object.freeze([0.85, 1.15]), System79.Object.freeze([1.7, 2.3])]);
+var DEFAULT_SHAKE = System79.Object.freeze({ amplitude: 0.1, rotationAmplitude: 0, frequency: 10, duration: 0.25, attack: 0, decayExponent: 2 });
 function createOffsetViewMatrix(viewMatrix, position, rotation) {
   const offsetMatrix = Matrix4.createRotationZ(-rotation.z);
   offsetMatrix.rotateX(-rotation.x);
@@ -30782,16 +31824,16 @@ var CameraShake = class {
     const readOption = __name((name) => {
       return options[name] !== void 0 ? options[name] : DEFAULT_SHAKE[name];
     }, "readOption");
-    const seed = options.seed !== void 0 ? options.seed : System77.Math.floor(this.#random.nextValue() * 4294967296);
+    const seed = options.seed !== void 0 ? options.seed : System79.Math.floor(this.#random.nextValue() * 4294967296);
     const waveRandom = new SeededRandom(seed);
     const waves = [];
     for (let channelIndex = 0; channelIndex < CHANNEL_COUNT; ++channelIndex) {
       for (let waveIndex = 0; waveIndex < WAVES_PER_CHANNEL; ++waveIndex) {
         const ratioRange = WAVE_RATIO_RANGES[waveIndex];
-        waves.push({ ratio: waveRandom.nextRange(ratioRange[0], ratioRange[1]), phase: waveRandom.nextRange(0, System77.Math.PI * 2) });
+        waves.push({ ratio: waveRandom.nextRange(ratioRange[0], ratioRange[1]), phase: waveRandom.nextRange(0, System79.Math.PI * 2) });
       }
     }
-    this.#shakes.push({ amplitude: readOption("amplitude"), rotationAmplitude: readOption("rotationAmplitude"), positionAxes: options.positionAxes !== void 0 ? System77.Array.from(options.positionAxes) : [1, 1, 1], rotationAxes: options.rotationAxes !== void 0 ? System77.Array.from(options.rotationAxes) : [1, 1, 1], frequency: readOption("frequency"), duration: readOption("duration"), attack: readOption("attack"), decayExponent: readOption("decayExponent"), age: options.age !== void 0 ? options.age : 0, waves });
+    this.#shakes.push({ amplitude: readOption("amplitude"), rotationAmplitude: readOption("rotationAmplitude"), positionAxes: options.positionAxes !== void 0 ? System79.Array.from(options.positionAxes) : [1, 1, 1], rotationAxes: options.rotationAxes !== void 0 ? System79.Array.from(options.rotationAxes) : [1, 1, 1], frequency: readOption("frequency"), duration: readOption("duration"), attack: readOption("attack"), decayExponent: readOption("decayExponent"), age: options.age !== void 0 ? options.age : 0, waves });
   }
   update(deltaTime) {
     for (let shakeIndex = this.#shakes.length - 1; shakeIndex >= 0; --shakeIndex) {
@@ -30809,11 +31851,11 @@ var CameraShake = class {
       if (age < 0 || age >= shake.duration) {
         continue;
       }
-      let envelope = System77.Math.pow(1 - age / shake.duration, shake.decayExponent);
+      let envelope = System79.Math.pow(1 - age / shake.duration, shake.decayExponent);
       if (shake.attack > 0 && age < shake.attack) {
         envelope *= age / shake.attack;
       }
-      const angularFrequency = System77.Math.PI * 2 * shake.frequency;
+      const angularFrequency = System79.Math.PI * 2 * shake.frequency;
       for (let channelIndex = 0; channelIndex < CHANNEL_COUNT; ++channelIndex) {
         const isPosition = channelIndex < 3;
         const axisIndex = channelIndex % 3;
@@ -30824,7 +31866,7 @@ var CameraShake = class {
         let signal = 0;
         for (let waveIndex = 0; waveIndex < WAVES_PER_CHANNEL; ++waveIndex) {
           const wave = shake.waves[channelIndex * WAVES_PER_CHANNEL + waveIndex];
-          signal += System77.Math.sin(angularFrequency * wave.ratio * age + wave.phase) * WAVE_WEIGHTS[waveIndex];
+          signal += System79.Math.sin(angularFrequency * wave.ratio * age + wave.phase) * WAVE_WEIGHTS[waveIndex];
         }
         offset[channelIndex] += signal * gain * envelope;
       }
@@ -30838,7 +31880,7 @@ var CameraShake = class {
     this.#shakes = [];
   }
 };
-var System78 = globalThis;
+var System80 = globalThis;
 var MINIMUM_FRONT_DEPTH = 1e-4;
 var Camera3D = class {
   static {
@@ -30952,7 +31994,7 @@ var Camera3D = class {
     const eyeZ = -(viewElements[8] * translationX + viewElements[9] * translationY + viewElements[10] * translationZ);
     this.#rawViewMatrix = rawViewMatrix;
     this.#rawProjectionMatrix = rawProjectionMatrix;
-    this.#isOrthographic = System78.Math.abs(projectionElements[11]) < 0.5;
+    this.#isOrthographic = System80.Math.abs(projectionElements[11]) < 0.5;
     this.#eyePosition = Vector3.create(eyeX, eyeY, eyeZ);
     this.#targetPosition = Vector3.create(eyeX - viewElements[2], eyeY - viewElements[6], eyeZ - viewElements[10]);
     this.#upDirection = Vector3.create(viewElements[1], viewElements[5], viewElements[9]);
@@ -31032,7 +32074,7 @@ var Camera3D = class {
     const clip = this.getViewProjectionMatrix().transformPoint(x, y, z);
     const depth = this.readViewDepth(x, y, z);
     result.depth = depth;
-    if (depth < MINIMUM_FRONT_DEPTH || System78.Math.abs(clip.w) < MINIMUM_FRONT_DEPTH) {
+    if (depth < MINIMUM_FRONT_DEPTH || System80.Math.abs(clip.w) < MINIMUM_FRONT_DEPTH) {
       result.x = 0;
       result.y = 0;
       result.isInFront = false;
@@ -31064,7 +32106,7 @@ var Camera3D = class {
     const farY = farPoint.y / farPoint.w;
     const farZ = farPoint.z / farPoint.w;
     const deltaY = farY - nearY;
-    if (System78.Math.abs(deltaY) < 1e-6) {
+    if (System80.Math.abs(deltaY) < 1e-6) {
       return null;
     }
     const ratio = (planeHeight - nearY) / deltaY;
@@ -31074,14 +32116,14 @@ var Camera3D = class {
     return Vector3.create(nearX + (farX - nearX) * ratio, planeHeight, nearZ + (farZ - nearZ) * ratio);
   }
 };
-var System79 = globalThis;
+var System81 = globalThis;
 var VERTEX_FLOAT_COUNT = 15;
 var SKIN_FLOAT_COUNT = 8;
 var DEFAULT_OUTLINE_WIDTH = 0.02;
 var MINIMUM_OUTLINE_MITER_COSINE = 0.85;
 var DEGENERATE_AREA = 1e-12;
 function readColorValues(colorText) {
-  const value = System79.parseInt(colorText.slice(1), 16);
+  const value = System81.parseInt(colorText.slice(1), 16);
   return [(value >> 16 & 255) / 255, (value >> 8 & 255) / 255, (value & 255) / 255];
 }
 __name(readColorValues, "readColorValues");
@@ -31128,7 +32170,7 @@ function createRoundedBoxGeometry(width, height, depth, segments, radius) {
   const geometry = { positions: [], normals: [], indices: [] };
   const halfSizes = [width * 0.5, height * 0.5, depth * 0.5];
   const innerSizes = halfSizes.map((halfSize) => {
-    return System79.Math.max(0, halfSize - radius);
+    return System81.Math.max(0, halfSize - radius);
   });
   const axisSamples = halfSizes.map((halfSize, axisIndex) => {
     const innerSize = innerSizes[axisIndex];
@@ -31155,10 +32197,10 @@ function createRoundedBoxGeometry(width, height, depth, segments, radius) {
           point[firstAxis] = firstValue;
           point[secondAxis] = secondValue;
           const inner = point.map((value, valueIndex) => {
-            return System79.Math.max(-innerSizes[valueIndex], System79.Math.min(innerSizes[valueIndex], value));
+            return System81.Math.max(-innerSizes[valueIndex], System81.Math.min(innerSizes[valueIndex], value));
           });
           const direction = [point[0] - inner[0], point[1] - inner[1], point[2] - inner[2]];
-          const length = System79.Math.sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
+          const length = System81.Math.sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
           const normal = length > 0 ? direction.map((value) => {
             return value / length;
           }) : [0, 0, 0];
@@ -31187,10 +32229,10 @@ function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments)
   const slope = (radiusBottom - radiusTop) / height;
   const sideStart = 0;
   for (let segmentIndex = 0; segmentIndex <= radialSegments; ++segmentIndex) {
-    const angle = segmentIndex / radialSegments * System79.Math.PI * 2;
-    const sine = System79.Math.sin(angle);
-    const cosine = System79.Math.cos(angle);
-    const normalLength = System79.Math.sqrt(1 + slope * slope);
+    const angle = segmentIndex / radialSegments * System81.Math.PI * 2;
+    const sine = System81.Math.sin(angle);
+    const cosine = System81.Math.cos(angle);
+    const normalLength = System81.Math.sqrt(1 + slope * slope);
     geometry.positions.push(radiusTop * sine, halfHeight, radiusTop * cosine);
     geometry.normals.push(sine / normalLength, slope / normalLength, cosine / normalLength);
     geometry.positions.push(radiusBottom * sine, -halfHeight, radiusBottom * cosine);
@@ -31208,8 +32250,8 @@ function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments)
     geometry.positions.push(0, halfHeight * sign, 0);
     geometry.normals.push(0, sign, 0);
     for (let segmentIndex = 0; segmentIndex <= radialSegments; ++segmentIndex) {
-      const angle = segmentIndex / radialSegments * System79.Math.PI * 2;
-      geometry.positions.push(radius * System79.Math.sin(angle), halfHeight * sign, radius * System79.Math.cos(angle));
+      const angle = segmentIndex / radialSegments * System81.Math.PI * 2;
+      geometry.positions.push(radius * System81.Math.sin(angle), halfHeight * sign, radius * System81.Math.cos(angle));
       geometry.normals.push(0, sign, 0);
     }
     for (let segmentIndex = 0; segmentIndex < radialSegments; ++segmentIndex) {
@@ -31219,15 +32261,15 @@ function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments)
   return geometry;
 }
 __name(createCylinderGeometry, "createCylinderGeometry");
-function createSphereGeometry(radius, widthSegments, heightSegments, thetaLength = System79.Math.PI) {
+function createSphereGeometry(radius, widthSegments, heightSegments, thetaLength = System81.Math.PI) {
   const geometry = { positions: [], normals: [], indices: [], uvs: [] };
   for (let heightIndex = 0; heightIndex <= heightSegments; ++heightIndex) {
     const theta = heightIndex / heightSegments * thetaLength;
     for (let widthIndex = 0; widthIndex <= widthSegments; ++widthIndex) {
-      const phi = widthIndex / widthSegments * System79.Math.PI * 2;
-      const normalX = System79.Math.sin(theta) * System79.Math.sin(phi);
-      const normalY = System79.Math.cos(theta);
-      const normalZ = System79.Math.sin(theta) * System79.Math.cos(phi);
+      const phi = widthIndex / widthSegments * System81.Math.PI * 2;
+      const normalX = System81.Math.sin(theta) * System81.Math.sin(phi);
+      const normalY = System81.Math.cos(theta);
+      const normalZ = System81.Math.sin(theta) * System81.Math.cos(phi);
       geometry.positions.push(normalX * radius, normalY * radius, normalZ * radius);
       geometry.normals.push(normalX, normalY, normalZ);
       geometry.uvs.push(widthIndex / widthSegments, heightIndex / heightSegments);
@@ -31246,20 +32288,20 @@ __name(createSphereGeometry, "createSphereGeometry");
 function createLatheGeometry(points, segments) {
   const geometry = { positions: [], normals: [], indices: [] };
   const profileNormals = points.map((point, pointIndex) => {
-    const previous = points[System79.Math.max(0, pointIndex - 1)];
-    const next = points[System79.Math.min(points.length - 1, pointIndex + 1)];
+    const previous = points[System81.Math.max(0, pointIndex - 1)];
+    const next = points[System81.Math.min(points.length - 1, pointIndex + 1)];
     const tangentX = next[0] - previous[0];
     const tangentY = next[1] - previous[1];
-    const length = System79.Math.sqrt(tangentX * tangentX + tangentY * tangentY);
+    const length = System81.Math.sqrt(tangentX * tangentX + tangentY * tangentY);
     if (length <= 0) {
       return [1, 0];
     }
     return [tangentY / length, -tangentX / length];
   });
   for (let segmentIndex = 0; segmentIndex <= segments; ++segmentIndex) {
-    const phi = segmentIndex / segments * System79.Math.PI * 2;
-    const sine = System79.Math.sin(phi);
-    const cosine = System79.Math.cos(phi);
+    const phi = segmentIndex / segments * System81.Math.PI * 2;
+    const sine = System81.Math.sin(phi);
+    const cosine = System81.Math.cos(phi);
     for (let pointIndex = 0; pointIndex < points.length; ++pointIndex) {
       const point = points[pointIndex];
       const profileNormal = profileNormals[pointIndex];
@@ -31281,27 +32323,27 @@ function createCapsuleGeometry(radius, length, capSegments, radialSegments) {
   const points = [];
   const halfLength = length * 0.5;
   for (let segmentIndex = 0; segmentIndex <= capSegments; ++segmentIndex) {
-    const angle = -System79.Math.PI * 0.5 + segmentIndex / capSegments * System79.Math.PI * 0.5;
-    points.push([System79.Math.cos(angle) * radius, -halfLength + System79.Math.sin(angle) * radius]);
+    const angle = -System81.Math.PI * 0.5 + segmentIndex / capSegments * System81.Math.PI * 0.5;
+    points.push([System81.Math.cos(angle) * radius, -halfLength + System81.Math.sin(angle) * radius]);
   }
   for (let segmentIndex = 0; segmentIndex <= capSegments; ++segmentIndex) {
-    const angle = segmentIndex / capSegments * System79.Math.PI * 0.5;
-    points.push([System79.Math.cos(angle) * radius, halfLength + System79.Math.sin(angle) * radius]);
+    const angle = segmentIndex / capSegments * System81.Math.PI * 0.5;
+    points.push([System81.Math.cos(angle) * radius, halfLength + System81.Math.sin(angle) * radius]);
   }
   return createLatheGeometry(points, radialSegments);
 }
 __name(createCapsuleGeometry, "createCapsuleGeometry");
-function createTorusGeometry(radius, tube, radialSegments, tubularSegments, arc = System79.Math.PI * 2) {
+function createTorusGeometry(radius, tube, radialSegments, tubularSegments, arc = System81.Math.PI * 2) {
   const geometry = { positions: [], normals: [], indices: [] };
   for (let radialIndex = 0; radialIndex <= radialSegments; ++radialIndex) {
-    const tubeAngle = radialIndex / radialSegments * System79.Math.PI * 2;
+    const tubeAngle = radialIndex / radialSegments * System81.Math.PI * 2;
     for (let tubularIndex = 0; tubularIndex <= tubularSegments; ++tubularIndex) {
       const ringAngle = tubularIndex / tubularSegments * arc;
-      const centerX = radius * System79.Math.cos(ringAngle);
-      const centerY = radius * System79.Math.sin(ringAngle);
-      const normalX = System79.Math.cos(tubeAngle) * System79.Math.cos(ringAngle);
-      const normalY = System79.Math.cos(tubeAngle) * System79.Math.sin(ringAngle);
-      const normalZ = System79.Math.sin(tubeAngle);
+      const centerX = radius * System81.Math.cos(ringAngle);
+      const centerY = radius * System81.Math.sin(ringAngle);
+      const normalX = System81.Math.cos(tubeAngle) * System81.Math.cos(ringAngle);
+      const normalY = System81.Math.cos(tubeAngle) * System81.Math.sin(ringAngle);
+      const normalZ = System81.Math.sin(tubeAngle);
       geometry.positions.push(centerX + normalX * tube, centerY + normalY * tube, normalZ * tube);
       geometry.normals.push(normalX, normalY, normalZ);
     }
@@ -31322,7 +32364,7 @@ function createOctahedronGeometry(radius) {
     for (const signY of [-1, 1]) {
       for (const signZ of [-1, 1]) {
         const corners = [[radius * signX, 0, 0], [0, radius * signY, 0], [0, 0, radius * signZ]];
-        const normalLength = System79.Math.sqrt(3);
+        const normalLength = System81.Math.sqrt(3);
         const startIndex = geometry.positions.length / 3;
         for (const corner of corners) {
           geometry.positions.push(corner[0], corner[1], corner[2]);
@@ -31337,12 +32379,12 @@ function createOctahedronGeometry(radius) {
 __name(createOctahedronGeometry, "createOctahedronGeometry");
 function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
   const geometry = { positions: [], normals: [], indices: [] };
-  const golden = (1 + System79.Math.sqrt(5)) / 2;
+  const golden = (1 + System81.Math.sqrt(5)) / 2;
   const baseCorners = [[-1, golden, 0], [1, golden, 0], [-1, -golden, 0], [1, -golden, 0], [0, -1, golden], [0, 1, golden], [0, -1, -golden], [0, 1, -golden], [golden, 0, -1], [golden, 0, 1], [-golden, 0, -1], [-golden, 0, 1]];
   const faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
   const scaleCount = vertexScales.length;
   const corners = baseCorners.map((corner, cornerIndex) => {
-    const length = System79.Math.sqrt(corner[0] * corner[0] + corner[1] * corner[1] + corner[2] * corner[2]);
+    const length = System81.Math.sqrt(corner[0] * corner[0] + corner[1] * corner[1] + corner[2] * corner[2]);
     const vertexScale = scaleCount > 0 ? vertexScales[cornerIndex % scaleCount] : 1;
     const scale = radius * vertexScale / length;
     return [corner[0] * scale * axisScale[0], corner[1] * scale * axisScale[1], corner[2] * scale * axisScale[2]];
@@ -31361,7 +32403,7 @@ function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
       third = swapped;
       normal = [-normal[0], -normal[1], -normal[2]];
     }
-    const normalLength = System79.Math.max(1e-6, System79.Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]));
+    const normalLength = System81.Math.max(1e-6, System81.Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]));
     const startIndex = geometry.positions.length / 3;
     for (const corner of [first, second, third]) {
       geometry.positions.push(corner[0], corner[1], corner[2]);
@@ -31425,7 +32467,7 @@ var MeshBuilder = class {
       const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
       const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
       const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-      const normalLength = System79.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+      const normalLength = System81.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
       const unitX = normalLength > 0 ? normalX / normalLength : 0;
       const unitY = normalLength > 0 ? normalY / normalLength : 1;
       const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -31476,12 +32518,12 @@ var MeshBuilder = class {
   }
   addQuadShell(quads, outlineWidth) {
     const readPointKey = __name((corner) => {
-      return System79.Math.round(corner[0] * 1e4) + "," + System79.Math.round(corner[1] * 1e4) + "," + System79.Math.round(corner[2] * 1e4);
+      return System81.Math.round(corner[0] * 1e4) + "," + System81.Math.round(corner[1] * 1e4) + "," + System81.Math.round(corner[2] * 1e4);
     }, "readPointKey");
-    const pointNormals = new System79.Map();
+    const pointNormals = new System81.Map();
     for (const quad of quads) {
       const normal = quad.normal;
-      const normalKey = System79.Math.round(normal[0] * 1e3) + "," + System79.Math.round(normal[1] * 1e3) + "," + System79.Math.round(normal[2] * 1e3);
+      const normalKey = System81.Math.round(normal[0] * 1e3) + "," + System81.Math.round(normal[1] * 1e3) + "," + System81.Math.round(normal[2] * 1e3);
       for (const corner of quad.corners) {
         const pointKey = readPointKey(corner);
         let entry = pointNormals.get(pointKey);
@@ -31504,7 +32546,7 @@ var MeshBuilder = class {
       const startIndex = this.#outlinePositions.length / 3;
       for (const corner of corners) {
         const entry = pointNormals.get(readPointKey(corner));
-        const sumLength = System79.Math.sqrt(entry.sum[0] * entry.sum[0] + entry.sum[1] * entry.sum[1] + entry.sum[2] * entry.sum[2]);
+        const sumLength = System81.Math.sqrt(entry.sum[0] * entry.sum[0] + entry.sum[1] * entry.sum[1] + entry.sum[2] * entry.sum[2]);
         const scale = sumLength > 0 ? outlineWidth / sumLength : 0;
         this.#outlinePositions.push(corner[0] + entry.sum[0] * scale, corner[1] + entry.sum[1] * scale, corner[2] + entry.sum[2] * scale);
         this.#outlineBasePositions.push(corner[0], corner[1], corner[2]);
@@ -31532,7 +32574,7 @@ var MeshBuilder = class {
       const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
       const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
       const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-      const normalLength = System79.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+      const normalLength = System81.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
       const unitX = normalLength > 0 ? normalX / normalLength : 0;
       const unitY = normalLength > 0 ? normalY / normalLength : 1;
       const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -31567,7 +32609,7 @@ var MeshBuilder = class {
       const normalX = normalMatrix[0] * normals[pointIndex] + normalMatrix[1] * normals[pointIndex + 1] + normalMatrix[2] * normals[pointIndex + 2];
       const normalY = normalMatrix[3] * normals[pointIndex] + normalMatrix[4] * normals[pointIndex + 1] + normalMatrix[5] * normals[pointIndex + 2];
       const normalZ = normalMatrix[6] * normals[pointIndex] + normalMatrix[7] * normals[pointIndex + 1] + normalMatrix[8] * normals[pointIndex + 2];
-      const normalLength = System79.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+      const normalLength = System81.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
       const unitX = normalLength > 0 ? normalX / normalLength : 0;
       const unitY = normalLength > 0 ? normalY / normalLength : 1;
       const unitZ = normalLength > 0 ? normalZ / normalLength : 0;
@@ -31619,12 +32661,12 @@ var MeshBuilder = class {
   }
   readArrays() {
     const vertexCount = this.#vertices.length / VERTEX_FLOAT_COUNT;
-    const uvData = new System79.Float32Array(this.#uvValues.length > 0 ? vertexCount * 2 : 0);
+    const uvData = new System81.Float32Array(this.#uvValues.length > 0 ? vertexCount * 2 : 0);
     uvData.set(this.#uvValues.slice(0, uvData.length));
-    const uv1Data = new System79.Float32Array(this.#uv1Values.length > 0 ? vertexCount * 2 : 0);
+    const uv1Data = new System81.Float32Array(this.#uv1Values.length > 0 ? vertexCount * 2 : 0);
     uv1Data.set(this.#uv1Values.slice(0, uv1Data.length));
-    return { vertexData: new System79.Float32Array(this.#vertices), indexData: new System79.Uint32Array(this.#indices), outlineVertexData: new System79.Float32Array(this.#outlinePositions), outlineIndexData: new System79.Uint32Array(this.#outlineIndices), outlineBaseData: new System79.Float32Array(this.#outlineBasePositions), skinData: new System79.Float32Array(this.#skinValues), outlineSkinData: new System79.Float32Array(this.#outlineSkinValues), skeleton: null, uvData, uv1Data, materialRanges: this.#materialRanges.map((materialRange) => {
-      return System79.Object.assign({}, materialRange);
+    return { vertexData: new System81.Float32Array(this.#vertices), indexData: new System81.Uint32Array(this.#indices), outlineVertexData: new System81.Float32Array(this.#outlinePositions), outlineIndexData: new System81.Uint32Array(this.#outlineIndices), outlineBaseData: new System81.Float32Array(this.#outlineBasePositions), skinData: new System81.Float32Array(this.#skinValues), outlineSkinData: new System81.Float32Array(this.#outlineSkinValues), skeleton: null, uvData, uv1Data, materialRanges: this.#materialRanges.map((materialRange) => {
+      return System81.Object.assign({}, materialRange);
     }) };
   }
   readNormalMatrix(elements) {
@@ -31641,7 +32683,7 @@ var MeshBuilder = class {
     const cofactor01 = m12 * m20 - m10 * m22;
     const cofactor02 = m10 * m21 - m11 * m20;
     const determinant = m00 * cofactor00 + m01 * cofactor01 + m02 * cofactor02;
-    if (System79.Math.abs(determinant) < 1e-20) {
+    if (System81.Math.abs(determinant) < 1e-20) {
       return [1, 0, 0, 0, 1, 0, 0, 0, 1];
     }
     const inverseDeterminant = 1 / determinant;
@@ -31720,13 +32762,13 @@ var MeshBuilder = class {
   }
   readOutlineOffsets(worldPositions, worldNormals, outlineWidth) {
     const pointKeys = [];
-    const pointNormals = new System79.Map();
+    const pointNormals = new System81.Map();
     for (let pointIndex = 0; pointIndex < worldPositions.length; pointIndex += 3) {
-      const pointKey = System79.Math.round(worldPositions[pointIndex] * 1e4) + "," + System79.Math.round(worldPositions[pointIndex + 1] * 1e4) + "," + System79.Math.round(worldPositions[pointIndex + 2] * 1e4);
+      const pointKey = System81.Math.round(worldPositions[pointIndex] * 1e4) + "," + System81.Math.round(worldPositions[pointIndex + 1] * 1e4) + "," + System81.Math.round(worldPositions[pointIndex + 2] * 1e4);
       const normalX = worldNormals[pointIndex];
       const normalY = worldNormals[pointIndex + 1];
       const normalZ = worldNormals[pointIndex + 2];
-      const normalKey = System79.Math.round(normalX * 1e3) + "," + System79.Math.round(normalY * 1e3) + "," + System79.Math.round(normalZ * 1e3);
+      const normalKey = System81.Math.round(normalX * 1e3) + "," + System81.Math.round(normalY * 1e3) + "," + System81.Math.round(normalZ * 1e3);
       pointKeys.push(pointKey);
       let entry = pointNormals.get(pointKey);
       if (entry === void 0) {
@@ -31739,7 +32781,7 @@ var MeshBuilder = class {
       entry.normalKeys.push(normalKey);
       entry.normals.push([normalX, normalY, normalZ]);
     }
-    const pointOffsets = new System79.Map();
+    const pointOffsets = new System81.Map();
     for (const [pointKey, entry] of pointNormals) {
       const sum = [0, 0, 0];
       for (const normal of entry.normals) {
@@ -31747,7 +32789,7 @@ var MeshBuilder = class {
         sum[1] += normal[1];
         sum[2] += normal[2];
       }
-      const sumLength = System79.Math.sqrt(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]);
+      const sumLength = System81.Math.sqrt(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]);
       if (sumLength <= 0) {
         pointOffsets.set(pointKey, null);
         continue;
@@ -31756,9 +32798,9 @@ var MeshBuilder = class {
       let minimumCosine = 1;
       for (const normal of entry.normals) {
         const cosine = direction[0] * normal[0] + direction[1] * normal[1] + direction[2] * normal[2];
-        minimumCosine = System79.Math.min(minimumCosine, cosine);
+        minimumCosine = System81.Math.min(minimumCosine, cosine);
       }
-      const distance = outlineWidth / System79.Math.max(minimumCosine, MINIMUM_OUTLINE_MITER_COSINE);
+      const distance = outlineWidth / System81.Math.max(minimumCosine, MINIMUM_OUTLINE_MITER_COSINE);
       pointOffsets.set(pointKey, [direction[0] * distance, direction[1] * distance, direction[2] * distance]);
     }
     const offsets = [];
@@ -31774,27 +32816,27 @@ var MeshBuilder = class {
     return offsets;
   }
   readBoundingRadius(positions) {
-    const minimum = [System79.Infinity, System79.Infinity, System79.Infinity];
-    const maximum = [-System79.Infinity, -System79.Infinity, -System79.Infinity];
+    const minimum = [System81.Infinity, System81.Infinity, System81.Infinity];
+    const maximum = [-System81.Infinity, -System81.Infinity, -System81.Infinity];
     for (let pointIndex = 0; pointIndex < positions.length; pointIndex += 3) {
       for (let axisIndex = 0; axisIndex < 3; ++axisIndex) {
-        minimum[axisIndex] = System79.Math.min(minimum[axisIndex], positions[pointIndex + axisIndex]);
-        maximum[axisIndex] = System79.Math.max(maximum[axisIndex], positions[pointIndex + axisIndex]);
+        minimum[axisIndex] = System81.Math.min(minimum[axisIndex], positions[pointIndex + axisIndex]);
+        maximum[axisIndex] = System81.Math.max(maximum[axisIndex], positions[pointIndex + axisIndex]);
       }
     }
     const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
     let radius = 0;
     for (let pointIndex = 0; pointIndex < positions.length; pointIndex += 3) {
-      const distance = System79.Math.hypot(positions[pointIndex] - center[0], positions[pointIndex + 1] - center[1], positions[pointIndex + 2] - center[2]);
-      radius = System79.Math.max(radius, distance);
+      const distance = System81.Math.hypot(positions[pointIndex] - center[0], positions[pointIndex + 1] - center[1], positions[pointIndex + 2] - center[2]);
+      radius = System81.Math.max(radius, distance);
     }
     return radius;
   }
   readMaximumScale(elements) {
-    const scaleX = System79.Math.sqrt(elements[0] * elements[0] + elements[1] * elements[1] + elements[2] * elements[2]);
-    const scaleY = System79.Math.sqrt(elements[4] * elements[4] + elements[5] * elements[5] + elements[6] * elements[6]);
-    const scaleZ = System79.Math.sqrt(elements[8] * elements[8] + elements[9] * elements[9] + elements[10] * elements[10]);
-    return System79.Math.max(scaleX, scaleY, scaleZ);
+    const scaleX = System81.Math.sqrt(elements[0] * elements[0] + elements[1] * elements[1] + elements[2] * elements[2]);
+    const scaleY = System81.Math.sqrt(elements[4] * elements[4] + elements[5] * elements[5] + elements[6] * elements[6]);
+    const scaleZ = System81.Math.sqrt(elements[8] * elements[8] + elements[9] * elements[9] + elements[10] * elements[10]);
+    return System81.Math.max(scaleX, scaleY, scaleZ);
   }
   static combine(pieces) {
     let vertexFloatCount = 0;
@@ -31808,22 +32850,22 @@ var MeshBuilder = class {
       outlineFloatCount += arrays.outlineVertexData.length;
       outlineIndexCount += arrays.outlineIndexData.length;
     }
-    const vertexData = new System79.Float32Array(vertexFloatCount);
-    const indexData = new System79.Uint32Array(indexCount);
-    const outlineVertexData = new System79.Float32Array(outlineFloatCount);
-    const outlineBaseData = new System79.Float32Array(outlineFloatCount);
-    const outlineIndexData = new System79.Uint32Array(outlineIndexCount);
+    const vertexData = new System81.Float32Array(vertexFloatCount);
+    const indexData = new System81.Uint32Array(indexCount);
+    const outlineVertexData = new System81.Float32Array(outlineFloatCount);
+    const outlineBaseData = new System81.Float32Array(outlineFloatCount);
+    const outlineIndexData = new System81.Uint32Array(outlineIndexCount);
     const innerOutlineRanges = [];
     const innerBodyRanges = [];
     const materialRanges = [];
     const hasUv = pieces.some((piece) => {
       return piece.arrays.uvData !== void 0 && piece.arrays.uvData !== null && piece.arrays.uvData.length > 0;
     });
-    const uvData = new System79.Float32Array(hasUv ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
+    const uvData = new System81.Float32Array(hasUv ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
     const hasUv1 = pieces.some((piece) => {
       return piece.arrays.uv1Data !== void 0 && piece.arrays.uv1Data !== null && piece.arrays.uv1Data.length > 0;
     });
-    const uv1Data = new System79.Float32Array(hasUv1 ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
+    const uv1Data = new System81.Float32Array(hasUv1 ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
     let vertexOffset = 0;
     let indexOffset = 0;
     let outlineOffset = 0;
@@ -31842,14 +32884,14 @@ var MeshBuilder = class {
         indexData[indexOffset + index] = arrays.indexData[index] + startVertex;
       }
       if (hasUv && arrays.uvData !== void 0 && arrays.uvData !== null && arrays.uvData.length > 0) {
-        uvData.set(arrays.uvData.subarray(0, System79.Math.min(arrays.uvData.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
+        uvData.set(arrays.uvData.subarray(0, System81.Math.min(arrays.uvData.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
       }
       if (hasUv1 && arrays.uv1Data !== void 0 && arrays.uv1Data !== null && arrays.uv1Data.length > 0) {
-        uv1Data.set(arrays.uv1Data.subarray(0, System79.Math.min(arrays.uv1Data.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
+        uv1Data.set(arrays.uv1Data.subarray(0, System81.Math.min(arrays.uv1Data.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
       }
       const pieceMaterialRanges = arrays.materialRanges !== void 0 ? arrays.materialRanges : [];
       for (const range of pieceMaterialRanges) {
-        materialRanges.push(System79.Object.assign({}, range, { indexStart: range.indexStart + indexOffset }));
+        materialRanges.push(System81.Object.assign({}, range, { indexStart: range.indexStart + indexOffset }));
       }
       const startOutlineVertex = outlineOffset / 3;
       const pieceOutlineBaseData = arrays.outlineBaseData !== void 0 && arrays.outlineBaseData.length === arrays.outlineVertexData.length ? arrays.outlineBaseData : arrays.outlineVertexData;
@@ -31877,15 +32919,15 @@ var MeshBuilder = class {
       outlineOffset += arrays.outlineVertexData.length;
       outlineIndexOffset += arrays.outlineIndexData.length;
     }
-    return { vertexData, indexData, outlineVertexData, outlineIndexData, outlineBaseData, skinData: new System79.Float32Array(0), outlineSkinData: new System79.Float32Array(0), skeleton: null, innerOutlineRanges, innerBodyRanges, uvData, uv1Data, materialRanges };
+    return { vertexData, indexData, outlineVertexData, outlineIndexData, outlineBaseData, skinData: new System81.Float32Array(0), outlineSkinData: new System81.Float32Array(0), skeleton: null, innerOutlineRanges, innerBodyRanges, uvData, uv1Data, materialRanges };
   }
 };
-var System80 = globalThis;
+var System82 = globalThis;
 var TOON_MAXIMUM_POINT_LIGHTS = 8;
 var TOON_MAXIMUM_BAND_STEPS = 8;
 var nextLightSetId = 1;
 function normalizeDirection(direction) {
-  const length = System80.Math.hypot(direction[0], direction[1], direction[2]);
+  const length = System82.Math.hypot(direction[0], direction[1], direction[2]);
   if (length <= 0) {
     return [0, -1, 0];
   }
@@ -31998,9 +33040,9 @@ var ToonLightSet = class {
   }
   setRimLight(rimColor, rimPower, rimFeather = 1, rimLightMask = 0) {
     this.#rimColor = rimColor.slice();
-    this.#rimPower = System80.Math.max(0, rimPower);
-    this.#rimFeather = System80.Math.max(0, System80.Math.min(1, rimFeather));
-    this.#rimLightMask = System80.Math.max(0, System80.Math.min(1, rimLightMask));
+    this.#rimPower = System82.Math.max(0, rimPower);
+    this.#rimFeather = System82.Math.max(0, System82.Math.min(1, rimFeather));
+    this.#rimLightMask = System82.Math.max(0, System82.Math.min(1, rimLightMask));
     this.markChanged();
   }
   getRimLight() {
@@ -32008,14 +33050,14 @@ var ToonLightSet = class {
   }
   setShadeRimLight(shadeRimColor, shadeRimPower) {
     this.#shadeRimColor = shadeRimColor.slice();
-    this.#shadeRimPower = System80.Math.max(0, shadeRimPower);
+    this.#shadeRimPower = System82.Math.max(0, shadeRimPower);
     this.markChanged();
   }
   getShadeRimLight() {
     return { color: this.#shadeRimColor, power: this.#shadeRimPower };
   }
   setLightColorUsage(lightColorUsage) {
-    for (const key of System80.Object.keys(this.#lightColorUsage)) {
+    for (const key of System82.Object.keys(this.#lightColorUsage)) {
       if (lightColorUsage[key] !== void 0) {
         this.#lightColorUsage[key] = lightColorUsage[key] === true;
       }
@@ -32023,7 +33065,7 @@ var ToonLightSet = class {
     this.markChanged();
   }
   getLightColorUsage() {
-    return System80.Object.assign({}, this.#lightColorUsage);
+    return System82.Object.assign({}, this.#lightColorUsage);
   }
   setLightIntensityLimited(isLimited) {
     this.#isLightIntensityLimited = isLimited === true;
@@ -32033,9 +33075,9 @@ var ToonLightSet = class {
     return this.#isLightIntensityLimited;
   }
   setSpecular(specularStrength, specularExponent = 48, specularFeather = 0, specularColor = [1, 1, 1]) {
-    this.#specularStrength = System80.Math.max(0, specularStrength);
-    this.#specularExponent = System80.Math.max(1, specularExponent);
-    this.#specularFeather = System80.Math.max(0, System80.Math.min(1, specularFeather));
+    this.#specularStrength = System82.Math.max(0, specularStrength);
+    this.#specularExponent = System82.Math.max(1, specularExponent);
+    this.#specularFeather = System82.Math.max(0, System82.Math.min(1, specularFeather));
     this.#specularColor = specularColor.slice();
     this.markChanged();
   }
@@ -32044,7 +33086,7 @@ var ToonLightSet = class {
   }
   setPointLights(pointLights) {
     this.#pointLights = pointLights.slice(0, TOON_MAXIMUM_POINT_LIGHTS).map((pointLight) => {
-      return { position: pointLight.position.slice(), color: pointLight.color !== void 0 ? pointLight.color.slice() : [1, 1, 1], intensity: pointLight.intensity !== void 0 ? pointLight.intensity : 1, range: pointLight.range !== void 0 ? System80.Math.max(0, pointLight.range) : 0, decay: pointLight.decay !== void 0 ? System80.Math.max(0, pointLight.decay) : 2, rangeExponent: pointLight.rangeExponent !== void 0 ? System80.Math.max(1e-4, pointLight.rangeExponent) : 4, wrap: pointLight.wrap !== void 0 ? System80.Math.max(0, pointLight.wrap) : 0, direction: pointLight.direction !== void 0 && pointLight.direction !== null ? normalizeDirection(pointLight.direction) : null, innerConeAngle: pointLight.innerConeAngle !== void 0 ? System80.Math.max(0, pointLight.innerConeAngle) : 0, outerConeAngle: pointLight.outerConeAngle !== void 0 ? System80.Math.max(1e-4, pointLight.outerConeAngle) : System80.Math.PI / 4, castsShadow: pointLight.castsShadow === true, shadowNear: pointLight.shadowNear !== void 0 ? System80.Math.max(1e-3, pointLight.shadowNear) : 0.05 };
+      return { position: pointLight.position.slice(), color: pointLight.color !== void 0 ? pointLight.color.slice() : [1, 1, 1], intensity: pointLight.intensity !== void 0 ? pointLight.intensity : 1, range: pointLight.range !== void 0 ? System82.Math.max(0, pointLight.range) : 0, decay: pointLight.decay !== void 0 ? System82.Math.max(0, pointLight.decay) : 2, rangeExponent: pointLight.rangeExponent !== void 0 ? System82.Math.max(1e-4, pointLight.rangeExponent) : 4, wrap: pointLight.wrap !== void 0 ? System82.Math.max(0, pointLight.wrap) : 0, direction: pointLight.direction !== void 0 && pointLight.direction !== null ? normalizeDirection(pointLight.direction) : null, innerConeAngle: pointLight.innerConeAngle !== void 0 ? System82.Math.max(0, pointLight.innerConeAngle) : 0, outerConeAngle: pointLight.outerConeAngle !== void 0 ? System82.Math.max(1e-4, pointLight.outerConeAngle) : System82.Math.PI / 4, castsShadow: pointLight.castsShadow === true, shadowNear: pointLight.shadowNear !== void 0 ? System82.Math.max(1e-3, pointLight.shadowNear) : 0.05 };
     });
     this.markChanged();
   }
@@ -32052,11 +33094,11 @@ var ToonLightSet = class {
     return this.#pointLights;
   }
   setPointLightLimit(pointLightLimit) {
-    this.#pointLightLimit = System80.Math.max(0, System80.Math.min(TOON_MAXIMUM_POINT_LIGHTS, System80.Math.floor(pointLightLimit)));
+    this.#pointLightLimit = System82.Math.max(0, System82.Math.min(TOON_MAXIMUM_POINT_LIGHTS, System82.Math.floor(pointLightLimit)));
     this.markChanged();
   }
   getPointLightCount() {
-    return System80.Math.min(this.#pointLights.length, this.#pointLightLimit);
+    return System82.Math.min(this.#pointLights.length, this.#pointLightLimit);
   }
   setShade(shade) {
     const step = shade.step !== void 0 ? shade.step : 0.5;
@@ -32073,7 +33115,7 @@ var ToonLightSet = class {
     this.setShadeRamp([0, step], [color, [1, 1, 1]], [0, feather], isHalfLambert);
   }
   setShadeRamp(positions, colors, feathers, isHalfLambert) {
-    const stopCount = System80.Math.min(positions.length, colors.length, TOON_MAXIMUM_BAND_STEPS);
+    const stopCount = System82.Math.min(positions.length, colors.length, TOON_MAXIMUM_BAND_STEPS);
     if (stopCount < 2) {
       this.#shadePositions = [];
       this.#shadeColors = [];
@@ -32085,7 +33127,7 @@ var ToonLightSet = class {
       });
       this.#shadeFeathers = [];
       for (let stopIndex = 0; stopIndex < stopCount; ++stopIndex) {
-        this.#shadeFeathers.push(feathers[stopIndex] !== void 0 ? System80.Math.max(0, feathers[stopIndex]) : 0);
+        this.#shadeFeathers.push(feathers[stopIndex] !== void 0 ? System82.Math.max(0, feathers[stopIndex]) : 0);
       }
     }
     this.#isShadeHalfLambert = isHalfLambert === true;
@@ -32098,7 +33140,7 @@ var ToonLightSet = class {
     return { positions: this.#shadePositions, colors: this.#shadeColors, feathers: this.#shadeFeathers, isHalfLambert: this.#isShadeHalfLambert };
   }
   setBandCount(bandCount) {
-    const count = System80.Math.max(0, System80.Math.min(TOON_MAXIMUM_BAND_STEPS - 1, System80.Math.floor(bandCount)));
+    const count = System82.Math.max(0, System82.Math.min(TOON_MAXIMUM_BAND_STEPS - 1, System82.Math.floor(bandCount)));
     if (count === 0) {
       this.clearShadeRamp();
       return;
@@ -32115,7 +33157,7 @@ var ToonLightSet = class {
     this.setShadeRamp(positions, colors, feathers, false);
   }
   setBandRamp(thresholds, values, isHalfLambert) {
-    const valueCount = System80.Math.min(values.length, TOON_MAXIMUM_BAND_STEPS);
+    const valueCount = System82.Math.min(values.length, TOON_MAXIMUM_BAND_STEPS);
     const positions = [0];
     const colors = [];
     const feathers = [0];
@@ -32144,16 +33186,16 @@ var ToonLightSet = class {
     return { isEnergyNormalized: this.#isEnergyNormalized };
   }
 };
-var System81 = globalThis;
+var System83 = globalThis;
 var TOON_MAXIMUM_INSTANCE_ATTRIBUTES = 3;
 var TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION = 13;
 var TOON_INSTANCE_MATRIX_NAME = "instanceMatrix";
 var TOON_INSTANCE_TINT_NAME = "instanceTint";
 var TOON_INSTANCE_LINE_ID_NAME = "instanceLineId";
 var TOON_INSTANCE_LINE_ID_LOCATION = TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION + TOON_MAXIMUM_INSTANCE_ATTRIBUTES - 1;
-var ToonBlendMode = System81.Object.freeze({ alpha: "alpha", premultiplied: "premultiplied", additive: "additive" });
-var ToonMatcapBlend = System81.Object.freeze({ multiply: "multiply", add: "add" });
-var ToonBufferUsage = System81.Object.freeze({ static: "static", dynamic: "dynamic" });
+var ToonBlendMode = System83.Object.freeze({ alpha: "alpha", premultiplied: "premultiplied", additive: "additive" });
+var ToonMatcapBlend = System83.Object.freeze({ multiply: "multiply", add: "add" });
+var ToonBufferUsage = System83.Object.freeze({ static: "static", dynamic: "dynamic" });
 var nextMaterialId = 1;
 var nextInstanceLayoutId = 1;
 var SHADER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -32213,7 +33255,7 @@ var ToonInstanceLayout = class {
     this.#hasMatrix = false;
     this.#hasTint = false;
     this.#hasLineId = false;
-    const names = new System81.Set();
+    const names = new System83.Set();
     let customCount = 0;
     const hasLineId = attributes.some((attribute) => {
       return attribute.name === TOON_INSTANCE_LINE_ID_NAME;
@@ -32224,31 +33266,31 @@ var ToonInstanceLayout = class {
       const name = attribute.name;
       const size = attribute.size;
       if (typeof name !== "string" || !SHADER_NAME_PATTERN.test(name) || names.has(name)) {
-        throw new System81.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 \uC774\uB984\uC774 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4: ${name}`);
+        throw new System83.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 \uC774\uB984\uC774 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4: ${name}`);
       }
       names.add(name);
       let location = -1;
       if (name === TOON_INSTANCE_MATRIX_NAME) {
         if (size !== 16) {
-          throw new System81.Error("instanceMatrix \uC758 \uD06C\uAE30\uB294 16 \uC785\uB2C8\uB2E4.");
+          throw new System83.Error("instanceMatrix \uC758 \uD06C\uAE30\uB294 16 \uC785\uB2C8\uB2E4.");
         }
         this.#hasMatrix = true;
       } else if (name === TOON_INSTANCE_TINT_NAME) {
         if (size !== 4) {
-          throw new System81.Error("instanceTint \uC758 \uD06C\uAE30\uB294 4 \uC785\uB2C8\uB2E4.");
+          throw new System83.Error("instanceTint \uC758 \uD06C\uAE30\uB294 4 \uC785\uB2C8\uB2E4.");
         }
         this.#hasTint = true;
       } else if (name === TOON_INSTANCE_LINE_ID_NAME) {
         if (size !== 1) {
-          throw new System81.Error("instanceLineId \uC758 \uD06C\uAE30\uB294 1 \uC785\uB2C8\uB2E4.");
+          throw new System83.Error("instanceLineId \uC758 \uD06C\uAE30\uB294 1 \uC785\uB2C8\uB2E4.");
         }
         location = TOON_INSTANCE_LINE_ID_LOCATION;
       } else {
-        if (!System81.Number.isInteger(size) || size < 1 || size > 4) {
-          throw new System81.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 ${name} \uC758 \uD06C\uAE30\uB294 1 ~ 4 \uC785\uB2C8\uB2E4.`);
+        if (!System83.Number.isInteger(size) || size < 1 || size > 4) {
+          throw new System83.Error(`\uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 ${name} \uC758 \uD06C\uAE30\uB294 1 ~ 4 \uC785\uB2C8\uB2E4.`);
         }
         if (customCount >= maximumCustomCount) {
-          throw new System81.Error(`\uC0AC\uC6A9\uC790 \uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 ${maximumCustomCount} \uAC1C\uAE4C\uC9C0\uC785\uB2C8\uB2E4. (instanceLineId \uAC00 \uC788\uC73C\uBA74 \uD558\uB098 \uC801\uB2E4)`);
+          throw new System83.Error(`\uC0AC\uC6A9\uC790 \uC778\uC2A4\uD134\uC2A4 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 ${maximumCustomCount} \uAC1C\uAE4C\uC9C0\uC785\uB2C8\uB2E4. (instanceLineId \uAC00 \uC788\uC73C\uBA74 \uD558\uB098 \uC801\uB2E4)`);
         }
         location = TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION + customCount;
         customCount += 1;
@@ -32288,7 +33330,7 @@ var ToonInstanceLayout = class {
     return source;
   }
 };
-var System82 = globalThis;
+var System84 = globalThis;
 var TOON_MAXIMUM_JOINTS = 96;
 var TOON_INSTANCE_FLOAT_COUNT = 20;
 var SHADOW_FILTER_RADIUS = 1.5;
@@ -32305,8 +33347,8 @@ var ANGEL_RING_TEXTURE_UNIT = 7;
 var FIRST_MATERIAL_TEXTURE_UNIT = 8;
 var AMBIENT_OCCLUSION_TEXTURE_UNIT = 16;
 var TOON_MAXIMUM_MATERIAL_TEXTURES = 8;
-var TOON_ATTRIBUTE_LOCATIONS = System82.Object.freeze({ vertexPosition: 0, vertexNormal: 1, vertexColor: 2, vertexMaterial: 3, vertexDetail: 4, vertexJoints: 5, vertexWeights: 6, instanceMatrix0: 7, instanceMatrix1: 8, instanceMatrix2: 9, instanceMatrix3: 10, instanceTint: 11, vertexUv: 12 });
-var ToonProgramKind = System82.Object.freeze({ solid: "solid", outline: "outline", depth: "depth" });
+var TOON_ATTRIBUTE_LOCATIONS = System84.Object.freeze({ vertexPosition: 0, vertexNormal: 1, vertexColor: 2, vertexMaterial: 3, vertexDetail: 4, vertexJoints: 5, vertexWeights: 6, instanceMatrix0: 7, instanceMatrix1: 8, instanceMatrix2: 9, instanceMatrix3: 10, instanceTint: 11, vertexUv: 12 });
+var ToonProgramKind = System84.Object.freeze({ solid: "solid", outline: "outline", depth: "depth" });
 var FRAME_BLOCK_CHUNK = `layout(std140) uniform ToonFrame {
 	mat4 viewProjectionMatrix;
 	mat4 lightViewProjectionMatrix;
@@ -33127,7 +34169,7 @@ function composeToonProgramSources(material, instanceLayout, isAmbientOcclusion 
   for (const feature of featureList) {
     const defineName = TOON_FEATURE_DEFINE_TABLE[feature];
     if (defineName === void 0) {
-      throw new System82.Error(`unknown toon shader feature: ${feature}`);
+      throw new System84.Error(`unknown toon shader feature: ${feature}`);
     }
     fragmentDefines += `#define ${defineName}
 `;
@@ -33140,7 +34182,7 @@ ${fragmentDefines}`) : SOLID_FRAGMENT_HEAD;
   const lightChunk = material !== null && material.getLightChunk() !== "" ? material.getLightChunk() : DEFAULT_LIGHT_CHUNK;
   const instanceChunk = instanceLayout !== null ? instanceLayout.readDeclarationSource() : "";
   const vertexHead = VERTEX_HEAD_CHUNK + FRAME_BLOCK_CHUNK + VERTEX_COMMON_CHUNK + instanceChunk + VERTEX_STRUCT_CHUNK + vertexChunk;
-  const attributeLocationTable = System82.Object.assign({}, TOON_ATTRIBUTE_LOCATIONS);
+  const attributeLocationTable = System84.Object.assign({}, TOON_ATTRIBUTE_LOCATIONS);
   if (instanceLayout !== null) {
     for (const attribute of instanceLayout.getAttributes()) {
       if (attribute.location >= 0) {
@@ -33181,14 +34223,14 @@ function readDeterminant(first, second, third) {
 }
 __name(readDeterminant, "readDeterminant");
 function readHypot(x, y, z) {
-  const absoluteX = System82.Math.abs(x);
-  const absoluteY = System82.Math.abs(y);
-  const absoluteZ = System82.Math.abs(z);
-  if (absoluteX === System82.Infinity || absoluteY === System82.Infinity || absoluteZ === System82.Infinity) {
-    return System82.Infinity;
+  const absoluteX = System84.Math.abs(x);
+  const absoluteY = System84.Math.abs(y);
+  const absoluteZ = System84.Math.abs(z);
+  if (absoluteX === System84.Infinity || absoluteY === System84.Infinity || absoluteZ === System84.Infinity) {
+    return System84.Infinity;
   }
   if (absoluteX !== absoluteX || absoluteY !== absoluteY || absoluteZ !== absoluteZ) {
-    return System82.NaN;
+    return System84.NaN;
   }
   let maximum = absoluteX;
   if (absoluteY > maximum) {
@@ -33216,7 +34258,7 @@ function readHypot(x, y, z) {
   summand = normalized * normalized - compensation;
   preliminary = sum + summand;
   sum = preliminary;
-  return System82.Math.sqrt(sum) * maximum;
+  return System84.Math.sqrt(sum) * maximum;
 }
 __name(readHypot, "readHypot");
 function readMatrixDeterminant(elements) {
@@ -33241,7 +34283,7 @@ function readFrameCamera(elements) {
     forward = [-forward[0], -forward[1], -forward[2]];
   }
   const determinant = readDeterminant(row0, row1, row3);
-  if (System82.Math.abs(determinant) < 1e-12) {
+  if (System84.Math.abs(determinant) < 1e-12) {
     return { position: [0, 0, 0, 0], forward, isMirrored };
   }
   const constant = [-row0[3], -row1[3], -row3[3]];
@@ -33272,7 +34314,7 @@ function readCameraRoll(viewRotationElements, isMirrored) {
     return 0;
   }
   const cosine = (rightAxis[0] * right[0] + rightAxis[1] * right[1] + rightAxis[2] * right[2]) / (axisLength * rightLength);
-  const roll = System82.Math.acos(System82.Math.max(-1, System82.Math.min(1, cosine)));
+  const roll = System84.Math.acos(System84.Math.max(-1, System84.Math.min(1, cosine)));
   const direction = right[1] < 0 ? -1 : 1;
   return -(direction * roll);
 }
@@ -33281,7 +34323,7 @@ function readShadowBias(lightViewProjectionMatrix, resolution, depthBias, normal
   const elements = lightViewProjectionMatrix.getElements();
   const widthScale = readHypot(elements[0], elements[4], elements[8]);
   const depthScale = readHypot(elements[2], elements[6], elements[10]) * 0.5;
-  const texelWorldSize = 2 / (System82.Math.max(widthScale, 1e-6) * System82.Math.max(1, resolution));
+  const texelWorldSize = 2 / (System84.Math.max(widthScale, 1e-6) * System84.Math.max(1, resolution));
   return [depthBias * SHADOW_FILTER_RADIUS * texelWorldSize * depthScale, normalBias * SHADOW_FILTER_RADIUS * texelWorldSize, SHADOW_SLOPE_BIAS * texelWorldSize * depthScale, SHADOW_MAXIMUM_SLOPE];
 }
 __name(readShadowBias, "readShadowBias");
@@ -33294,7 +34336,7 @@ function readUvData(uvData, uv1Data, vertexCount) {
   if (uv1Data === null) {
     return uvData.length === vertexCount * 2 ? uvData : uvData.subarray(0, vertexCount * 2);
   }
-  const data = new System82.Float32Array(vertexCount * 4);
+  const data = new System84.Float32Array(vertexCount * 4);
   for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
     data[vertexIndex * 4] = uvData[vertexIndex * 2];
     data[vertexIndex * 4 + 1] = uvData[vertexIndex * 2 + 1];
@@ -33305,9 +34347,9 @@ function readUvData(uvData, uv1Data, vertexCount) {
 }
 __name(readUvData, "readUvData");
 function readOutlineVertexData(outlineVertexData, outlineBaseData) {
-  const pointCount = System82.Math.floor(outlineVertexData.length / 3);
+  const pointCount = System84.Math.floor(outlineVertexData.length / 3);
   const hasBase = outlineBaseData !== void 0 && outlineBaseData !== null && outlineBaseData.length === outlineVertexData.length;
-  const data = new System82.Float32Array(pointCount * 6);
+  const data = new System84.Float32Array(pointCount * 6);
   for (let pointIndex = 0; pointIndex < pointCount; ++pointIndex) {
     for (let axis = 0; axis < 3; ++axis) {
       const outlineValue = outlineVertexData[pointIndex * 3 + axis];
@@ -33346,7 +34388,7 @@ function readMaximumScale(elements) {
   const scaleX = readHypot(elements[0], elements[1], elements[2]);
   const scaleY = readHypot(elements[4], elements[5], elements[6]);
   const scaleZ = readHypot(elements[8], elements[9], elements[10]);
-  return System82.Math.max(scaleX, scaleY, scaleZ);
+  return System84.Math.max(scaleX, scaleY, scaleZ);
 }
 __name(readMaximumScale, "readMaximumScale");
 function readInstanceBounds(instanceLayout, data) {
@@ -33354,7 +34396,7 @@ function readInstanceBounds(instanceLayout, data) {
     return null;
   }
   const floatCount = instanceLayout.getFloatCount();
-  const instanceCount = System82.Math.floor(data.length / floatCount);
+  const instanceCount = System84.Math.floor(data.length / floatCount);
   if (instanceCount <= 0) {
     return null;
   }
@@ -33364,23 +34406,23 @@ function readInstanceBounds(instanceLayout, data) {
       matrixOffset = attribute.offset;
     }
   }
-  const minimum = [System82.Infinity, System82.Infinity, System82.Infinity];
-  const maximum = [-System82.Infinity, -System82.Infinity, -System82.Infinity];
+  const minimum = [System84.Infinity, System84.Infinity, System84.Infinity];
+  const maximum = [-System84.Infinity, -System84.Infinity, -System84.Infinity];
   let scale = 0;
   for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
     const offset = instanceIndex * floatCount + matrixOffset;
     for (let axis = 0; axis < 3; ++axis) {
       const value = data[offset + 12 + axis];
-      minimum[axis] = System82.Math.min(minimum[axis], value);
-      maximum[axis] = System82.Math.max(maximum[axis], value);
+      minimum[axis] = System84.Math.min(minimum[axis], value);
+      maximum[axis] = System84.Math.max(maximum[axis], value);
     }
-    scale = System82.Math.max(scale, readMaximumScale(data.subarray(offset, offset + 16)));
+    scale = System84.Math.max(scale, readMaximumScale(data.subarray(offset, offset + 16)));
   }
   const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
   let radius = 0;
   for (let instanceIndex = 0; instanceIndex < instanceCount; ++instanceIndex) {
     const offset = instanceIndex * floatCount + matrixOffset;
-    radius = System82.Math.max(radius, readHypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
+    radius = System84.Math.max(radius, readHypot(data[offset + 12] - center[0], data[offset + 13] - center[1], data[offset + 14] - center[2]));
   }
   return { center, radius, scale };
 }
@@ -33415,12 +34457,12 @@ function isSphereInFrustum(frustumPlanes, sphere) {
 }
 __name(isSphereInFrustum, "isSphereInFrustum");
 function readBoundingSphere(positions, stride) {
-  const minimum = [System82.Infinity, System82.Infinity, System82.Infinity];
-  const maximum = [-System82.Infinity, -System82.Infinity, -System82.Infinity];
+  const minimum = [System84.Infinity, System84.Infinity, System84.Infinity];
+  const maximum = [-System84.Infinity, -System84.Infinity, -System84.Infinity];
   for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
     for (let axis = 0; axis < 3; ++axis) {
-      minimum[axis] = System82.Math.min(minimum[axis], positions[offset + axis]);
-      maximum[axis] = System82.Math.max(maximum[axis], positions[offset + axis]);
+      minimum[axis] = System84.Math.min(minimum[axis], positions[offset + axis]);
+      maximum[axis] = System84.Math.max(maximum[axis], positions[offset + axis]);
     }
   }
   if (minimum[0] > maximum[0]) {
@@ -33429,7 +34471,7 @@ function readBoundingSphere(positions, stride) {
   const center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
   let radius = 0;
   for (let offset = 0; offset + 3 <= positions.length; offset += stride) {
-    radius = System82.Math.max(radius, readHypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
+    radius = System84.Math.max(radius, readHypot(positions[offset] - center[0], positions[offset + 1] - center[1], positions[offset + 2] - center[2]));
   }
   return { center, radius };
 }
@@ -33502,12 +34544,12 @@ var BATCH_SLOT_MESH_LIMIT = 8;
 var DRAW_PART_OUTLINE = 1;
 var DRAW_PART_BODY = 2;
 var DRAW_PART_ALL = 3;
-var WHITE_COLOR = System82.Object.freeze([1, 1, 1, 1]);
-var BLACK_COLOR = System82.Object.freeze([0, 0, 0]);
-var IDENTITY_UV_TRANSFORM = System82.Object.freeze([0, 0, 1, 1]);
+var WHITE_COLOR = System84.Object.freeze([1, 1, 1, 1]);
+var BLACK_COLOR = System84.Object.freeze([0, 0, 0]);
+var IDENTITY_UV_TRANSFORM = System84.Object.freeze([0, 0, 1, 1]);
 var IDENTITY_ELEMENTS = new Matrix4().getElements();
 var INSTANCE_BUFFER_SPHERE = [0, 0, 0, 0];
-var EMPTY_OPTIONS = System82.Object.freeze({});
+var EMPTY_OPTIONS = System84.Object.freeze({});
 function writeMaterialBlockValues(values, options) {
   const tintColor = options.tintColor !== void 0 ? options.tintColor : WHITE_COLOR;
   const emissiveColor = options.emissiveColor !== void 0 ? options.emissiveColor : BLACK_COLOR;
@@ -33542,7 +34584,7 @@ function writeMaterialBlockValues(values, options) {
   values[24] = isTextureGiven(options.baseColorTexture) ? 1 : 0;
   values[25] = isTextureGiven(options.emissiveTexture) ? 1 : 0;
   values[26] = isTextureGiven(options.decalTexture) ? 1 : 0;
-  values[27] = options.tintAmount !== void 0 && options.tintAmount !== null ? System82.Math.max(0, System82.Math.min(1, options.tintAmount)) : -1;
+  values[27] = options.tintAmount !== void 0 && options.tintAmount !== null ? System84.Math.max(0, System84.Math.min(1, options.tintAmount)) : -1;
   values[28] = isTextureGiven(options.matcapTexture) ? 1 : 0;
   values[29] = options.matcapStrength !== void 0 ? options.matcapStrength : 1;
   values[30] = options.matcapBlend === ToonMatcapBlend.add ? 1 : 0;
@@ -33551,8 +34593,8 @@ function writeMaterialBlockValues(values, options) {
   values[33] = angelRingColor[1];
   values[34] = angelRingColor[2];
   values[35] = options.glowScale !== void 0 ? options.glowScale : 1;
-  values[36] = options.specularScale !== void 0 ? System82.Math.max(0, options.specularScale) : 1;
-  values[37] = options.rimScale !== void 0 ? System82.Math.max(0, options.rimScale) : 1;
+  values[36] = options.specularScale !== void 0 ? System84.Math.max(0, options.specularScale) : 1;
+  values[37] = options.rimScale !== void 0 ? System84.Math.max(0, options.rimScale) : 1;
   values[38] = options.colorScale !== void 0 ? options.colorScale : 1;
   values[39] = options.softEdge !== void 0 ? options.softEdge : 0;
   values[40] = options.alphaCutoff !== void 0 ? options.alphaCutoff : 0;
@@ -33568,7 +34610,7 @@ __name(isTextureGiven, "isTextureGiven");
 function readMaterialBlockHash(bits) {
   let hash = 2166136261;
   for (let index = 0; index < bits.length; ++index) {
-    hash = System82.Math.imul(hash ^ bits[index], 16777619);
+    hash = System84.Math.imul(hash ^ bits[index], 16777619);
   }
   return hash >>> 0;
 }
@@ -33583,14 +34625,14 @@ function isSameBits(bits, other) {
 }
 __name(isSameBits, "isSameBits");
 function createBlockCache(binding, floatCount) {
-  const values = new System82.Float32Array(floatCount);
-  return { binding, values, bits: new System82.Uint32Array(values.buffer), table: new System82.Map(), count: 0, boundBlock: null, blocks: [], hand: 0 };
+  const values = new System84.Float32Array(floatCount);
+  return { binding, values, bits: new System84.Uint32Array(values.buffer), table: new System84.Map(), count: 0, boundBlock: null, blocks: [], hand: 0 };
 }
 __name(createBlockCache, "createBlockCache");
 function createFrameRing(alignment) {
-  const values = new System82.Float32Array(FRAME_BLOCK_FLOAT_COUNT);
-  const stride = System82.Math.ceil(FRAME_BLOCK_FLOAT_COUNT * 4 / alignment) * alignment;
-  return { values, bits: new System82.Uint32Array(values.buffer), stride, pages: [], writePage: null, boundBuffer: null, boundOffset: -1 };
+  const values = new System84.Float32Array(FRAME_BLOCK_FLOAT_COUNT);
+  const stride = System84.Math.ceil(FRAME_BLOCK_FLOAT_COUNT * 4 / alignment) * alignment;
+  return { values, bits: new System84.Uint32Array(values.buffer), stride, pages: [], writePage: null, boundBuffer: null, boundOffset: -1 };
 }
 __name(createFrameRing, "createFrameRing");
 function isSameBitsAt(pageBits, start, bits) {
@@ -33688,7 +34730,7 @@ function writeDrawState(state, options) {
   state[DRAW_STATE_ANGEL_RING_TEXTURE] = readTexture(options.angelRingTexture);
   state[DRAW_STATE_TEXTURES] = textures !== void 0 && textures !== null ? textures : null;
   state[DRAW_STATE_OUTLINE_COLOR] = outlineColor !== void 0 && outlineColor !== null ? outlineColor : null;
-  state[DRAW_STATE_OUTLINE_WIDTH_SCALE] = outlineWidthScale !== void 0 ? System82.Math.max(0, outlineWidthScale) : 1;
+  state[DRAW_STATE_OUTLINE_WIDTH_SCALE] = outlineWidthScale !== void 0 ? System84.Math.max(0, outlineWidthScale) : 1;
   state[DRAW_STATE_OUTLINE_OFFSET_Z] = options.outlineOffsetZ !== void 0 ? options.outlineOffsetZ : 0;
   state[DRAW_STATE_PREMULTIPLIED_OUTPUT] = blendMode !== ToonBlendMode.alpha ? 1 : 0;
   state[DRAW_STATE_IS_CULLED] = options.isCulled !== false;
@@ -33700,7 +34742,7 @@ function writeDrawState(state, options) {
 }
 __name(writeDrawState, "writeDrawState");
 function isNumberArray(value) {
-  return value instanceof System82.Array || value instanceof System82.Float32Array || value instanceof System82.Float64Array;
+  return value instanceof System84.Array || value instanceof System84.Float32Array || value instanceof System84.Float64Array;
 }
 __name(isNumberArray, "isNumberArray");
 function writeOptionsSnapshot(entry, options) {
@@ -33825,15 +34867,15 @@ var ToonRenderer = class {
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#colorSpace = options !== null && options.colorSpace !== void 0 ? readColorSpace(options.colorSpace) : readEngineColorSpace();
     this.#stateCache = WebGLStateCache.attach(webGL2RenderingContext);
-    this.#uniformSlotTable = new System82.WeakMap();
+    this.#uniformSlotTable = new System84.WeakMap();
     this.#uniformSerial = 1;
     this.#slotTableProgram = null;
     this.#slotTable = null;
-    this.#drawEntryOfOptions = new System82.WeakMap();
+    this.#drawEntryOfOptions = new System84.WeakMap();
     this.#drawEntryGeneration = 1;
     this.#hintOptions = null;
     this.#hintEntry = null;
-    this.#batchModelElements = new System82.Float32Array(16);
+    this.#batchModelElements = new System84.Float32Array(16);
     this.#trustSerial = 1;
     this.#isTrusting = false;
     this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
@@ -33842,11 +34884,11 @@ var ToonRenderer = class {
     this.#programSets = /* @__PURE__ */ new Map();
     this.#pendingBuilds = /* @__PURE__ */ new Map();
     this.#emptyShadowTexture = this.createEmptyShadowTexture();
-    this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System82.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
+    this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System84.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
     this.#defaultProgramSet = this.createProgramSet(null, null);
     this.#programSets.set("0/0", this.#defaultProgramSet);
     const identityMatrix = Matrix4.createIdentity();
-    this.#viewProjectionElements = new System82.Float32Array(identityMatrix.getElements());
+    this.#viewProjectionElements = new System84.Float32Array(identityMatrix.getElements());
     this.#frustumPlanes = extractFrustumPlanes(identityMatrix);
     this.#cameraPosition = [0, 0, 0, 0];
     this.#cameraForward = [0, 0, -1];
@@ -33859,19 +34901,19 @@ var ToonRenderer = class {
     this.#isShadowPass = false;
     this.#frameSerial = 1;
     this.#savedState = null;
-    this.#instanceData = new System82.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+    this.#instanceData = new System84.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
     this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
     this.#screenRect = null;
     this.#isScissorApplied = false;
-    this.#pointPositionValues = new System82.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
-    this.#pointColorValues = new System82.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
-    this.#pointShapeValues = new System82.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
-    this.#pointSpotValues = new System82.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
-    this.#pointConeValues = new System82.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 2);
-    this.#shadePositionValues = new System82.Float32Array(TOON_MAXIMUM_BAND_STEPS);
-    this.#shadeFeatherValues = new System82.Float32Array(TOON_MAXIMUM_BAND_STEPS);
-    this.#shadeColorValues = new System82.Float32Array(TOON_MAXIMUM_BAND_STEPS * 3);
-    this.#viewRotationElements = new System82.Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    this.#pointPositionValues = new System84.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
+    this.#pointColorValues = new System84.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
+    this.#pointShapeValues = new System84.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 3);
+    this.#pointSpotValues = new System84.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 4);
+    this.#pointConeValues = new System84.Float32Array(TOON_MAXIMUM_POINT_LIGHTS * 2);
+    this.#shadePositionValues = new System84.Float32Array(TOON_MAXIMUM_BAND_STEPS);
+    this.#shadeFeatherValues = new System84.Float32Array(TOON_MAXIMUM_BAND_STEPS);
+    this.#shadeColorValues = new System84.Float32Array(TOON_MAXIMUM_BAND_STEPS * 3);
+    this.#viewRotationElements = new System84.Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
     this.#cameraRoll = 0;
     this.#outlineDistanceScale = [0, 0.5, 4];
     this.#outlineFadeDistance = [0, 0];
@@ -34008,7 +35050,7 @@ var ToonRenderer = class {
       programSet = this.createProgramSet(material, instanceLayout, baseProgramSet, startedProgramList);
     } catch (error) {
       const name = material !== null && material.getName() !== "" ? material.getName() : key;
-      System82.console.error(`ToonRenderer: \uBA38\uD2F0\uB9AC\uC5BC ${name} \uC758 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.`, error);
+      System84.console.error(`ToonRenderer: \uBA38\uD2F0\uB9AC\uC5BC ${name} \uC758 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.`, error);
       if (!reportShaderBuildFailure(this.getWebGL2RenderingContext(), `ToonRenderer.${name}`, error)) {
         return null;
       }
@@ -34094,7 +35136,7 @@ var ToonRenderer = class {
     const programRequests = queue.readProgramRequests(this);
     let isAmbientOcclusion = programRequests.isAmbientOcclusion;
     const requests = programRequests.requests;
-    const keySet = new System82.Set();
+    const keySet = new System84.Set();
     const requestKey = __name((request) => `${request.material !== null ? request.material.getId() : 0}/${request.instanceLayout !== null ? request.instanceLayout.getId() : 0}/${request.featureMask}`, "requestKey");
     for (const request of requests) {
       keySet.add(requestKey(request));
@@ -34125,7 +35167,7 @@ var ToonRenderer = class {
         for (const name of nameList) {
           const bit = TOON_FEATURE_LIGHT_BIT_TABLE[name];
           if (bit === void 0) {
-            throw new System82.Error(`ToonRenderer.prewarmDrawQueue: \uC54C \uC218 \uC5C6\uB294 \uBE5B \uAE30\uB2A5 \uC774\uB984 ${name} (rampTexture, shadeStops, rim, shadeRim, intensityLimit)`);
+            throw new System84.Error(`ToonRenderer.prewarmDrawQueue: \uC54C \uC218 \uC5C6\uB294 \uBE5B \uAE30\uB2A5 \uC774\uB984 ${name} (rampTexture, shadeStops, rim, shadeRim, intensityLimit)`);
           }
           lightMask |= bit;
         }
@@ -34204,12 +35246,12 @@ var ToonRenderer = class {
   deleteMaterial(material) {
     this.#lastProgramKey = null;
     const prefix = `${material.getId()}/`;
-    for (const key of System82.Array.from(this.#pendingBuilds.keys())) {
+    for (const key of System84.Array.from(this.#pendingBuilds.keys())) {
       if (key.startsWith(prefix)) {
         this.deletePendingPrograms(this.takePendingBuild(key));
       }
     }
-    for (const [key, programSet] of System82.Array.from(this.#programSets.entries())) {
+    for (const [key, programSet] of System84.Array.from(this.#programSets.entries())) {
       if (!key.startsWith(prefix)) {
         continue;
       }
@@ -34235,7 +35277,7 @@ var ToonRenderer = class {
     }
     let variants = programSet.variants;
     if (variants === void 0) {
-      variants = new System82.Map();
+      variants = new System84.Map();
       programSet.variants = variants;
     }
     let entry = variants.get(featureMask);
@@ -34262,7 +35304,7 @@ var ToonRenderer = class {
       this.prepareSolidProgram(solidProgram, isAmbientOcclusion);
       entry = { program: solidProgram, kind: ToonProgramKind.solid, lightSet: null, lightVersion: -1 };
     } catch (error) {
-      System82.console.error(`ToonRenderer: \uAE30\uB2A5 \uAC08\uB798 ${featureMask} \uC758 \uBAB8 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD574 \uAE30\uBCF8 \uBAB8 \uC170\uC774\uB354\uB85C \uADF8\uB9BD\uB2C8\uB2E4.`, error);
+      System84.console.error(`ToonRenderer: \uAE30\uB2A5 \uAC08\uB798 ${featureMask} \uC758 \uBAB8 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD574 \uAE30\uBCF8 \uBAB8 \uC170\uC774\uB354\uB85C \uADF8\uB9BD\uB2C8\uB2E4.`, error);
     }
     variants.set(featureMask, entry);
     return entry;
@@ -34290,7 +35332,7 @@ var ToonRenderer = class {
       return;
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    for (const shaderProgram of System82.Array.isArray(pending) ? pending : [pending]) {
+    for (const shaderProgram of System84.Array.isArray(pending) ? pending : [pending]) {
       webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
     }
   }
@@ -34330,7 +35372,7 @@ var ToonRenderer = class {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const glUsage = usage === ToonBufferUsage.dynamic ? webGL2RenderingContext.DYNAMIC_DRAW : webGL2RenderingContext.STATIC_DRAW;
     const buffer = this.createArrayBuffer(data, glUsage);
-    const copy = instanceLayout.hasMatrix() ? new System82.Float32Array(data) : null;
+    const copy = instanceLayout.hasMatrix() ? new System84.Float32Array(data) : null;
     return { layout: instanceLayout, buffer, usage: glUsage, floatCount: data.length, vertexArrays: /* @__PURE__ */ new Map(), generation: 0, bounds: readInstanceBounds(instanceLayout, data), data: copy, renderer: this };
   }
   updateInstanceBuffer(instanceBuffer, data) {
@@ -34338,15 +35380,15 @@ var ToonRenderer = class {
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, instanceBuffer.buffer);
     webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, data, instanceBuffer.usage);
     instanceBuffer.floatCount = data.length;
-    instanceBuffer.data = instanceBuffer.layout.hasMatrix() ? new System82.Float32Array(data) : null;
+    instanceBuffer.data = instanceBuffer.layout.hasMatrix() ? new System84.Float32Array(data) : null;
     instanceBuffer.bounds = readInstanceBounds(instanceBuffer.layout, data);
     instanceBuffer.generation += 1;
   }
   updateInstanceBufferRange(instanceBuffer, firstInstance, data) {
     const layoutFloatCount = instanceBuffer.layout.getFloatCount();
     const floatOffset = firstInstance * layoutFloatCount;
-    if (!System82.Number.isInteger(firstInstance) || firstInstance < 0 || data.length % layoutFloatCount !== 0 || floatOffset + data.length > instanceBuffer.floatCount) {
-      throw new System82.Error(`\uC778\uC2A4\uD134\uC2A4 \uBC84\uD37C\uC758 \uACE0\uCE60 \uC790\uB9AC\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4: ${firstInstance} \uBC88\uBD80\uD130 \uC218 ${data.length} \uAC1C (\uBC84\uD37C\uC758 \uC218 ${instanceBuffer.floatCount} \uAC1C)`);
+    if (!System84.Number.isInteger(firstInstance) || firstInstance < 0 || data.length % layoutFloatCount !== 0 || floatOffset + data.length > instanceBuffer.floatCount) {
+      throw new System84.Error(`\uC778\uC2A4\uD134\uC2A4 \uBC84\uD37C\uC758 \uACE0\uCE60 \uC790\uB9AC\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4: ${firstInstance} \uBC88\uBD80\uD130 \uC218 ${data.length} \uAC1C (\uBC84\uD37C\uC758 \uC218 ${instanceBuffer.floatCount} \uAC1C)`);
     }
     if (data.length === 0) {
       return;
@@ -34392,8 +35434,8 @@ var ToonRenderer = class {
     webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_FLIP_Y_WEBGL, false);
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + BASE_COLOR_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-    if (System82.ArrayBuffer.isView(source.data) && typeof source.width === "number" && typeof source.height === "number") {
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, source.width, source.height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System82.Uint8Array(source.data.buffer, source.data.byteOffset, source.data.byteLength));
+    if (System84.ArrayBuffer.isView(source.data) && typeof source.width === "number" && typeof source.height === "number") {
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, source.width, source.height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System84.Uint8Array(source.data.buffer, source.data.byteOffset, source.data.byteLength));
     } else {
       webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, source);
     }
@@ -34427,12 +35469,12 @@ var ToonRenderer = class {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const buffers = [];
     const isSkinned = arrays.skinData !== void 0 && arrays.skinData !== null && arrays.skinData.length > 0;
-    const vertexCount = System82.Math.floor(arrays.vertexData.length / VERTEX_FLOAT_COUNT);
+    const vertexCount = System84.Math.floor(arrays.vertexData.length / VERTEX_FLOAT_COUNT);
     const hasUv = arrays.uvData !== void 0 && arrays.uvData !== null && vertexCount > 0 && arrays.uvData.length >= vertexCount * 2;
     const hasSecondUv = hasUv && arrays.uv1Data !== void 0 && arrays.uv1Data !== null && arrays.uv1Data.length >= vertexCount * 2;
     const boundingSphere = readBoundingSphere(arrays.vertexData, VERTEX_FLOAT_COUNT);
     const boundingRadius = isSkinned ? boundingSphere.radius * 1.5 : boundingSphere.radius;
-    const defaultInstance = new System82.Float32Array(TOON_INSTANCE_FLOAT_COUNT);
+    const defaultInstance = new System84.Float32Array(TOON_INSTANCE_FLOAT_COUNT);
     defaultInstance.set(Matrix4.createIdentity().getElements(), 0);
     defaultInstance.set([1, 1, 1, 1], 16);
     const instanceBuffer = this.createArrayBuffer(defaultInstance, webGL2RenderingContext.DYNAMIC_DRAW);
@@ -34557,7 +35599,7 @@ var ToonRenderer = class {
     const texture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + SHADOW_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System82.Uint32Array([4294967295]));
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System84.Uint32Array([4294967295]));
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
@@ -34715,7 +35757,7 @@ var ToonRenderer = class {
     return { position: this.#cameraPosition, forward: this.#cameraForward, isMirrored: this.#isFrameMirrored };
   }
   setScreenRect(x, y, width, height) {
-    this.#screenRect = { x, y, width: System82.Math.max(0, width), height: System82.Math.max(0, height) };
+    this.#screenRect = { x, y, width: System84.Math.max(0, width), height: System84.Math.max(0, height) };
   }
   clearScreenRect() {
     this.#screenRect = null;
@@ -34730,8 +35772,8 @@ var ToonRenderer = class {
       return;
     }
     const viewport = savedState.viewport;
-    const viewportWidth = System82.Math.max(1, viewport[2]);
-    const viewportHeight = System82.Math.max(1, viewport[3]);
+    const viewportWidth = System84.Math.max(1, viewport[2]);
+    const viewportHeight = System84.Math.max(1, viewport[3]);
     const scaleX = screenRect.width / viewportWidth;
     const scaleY = screenRect.height / viewportHeight;
     const offsetX = (screenRect.x * 2 + screenRect.width) / viewportWidth - 1;
@@ -34743,10 +35785,10 @@ var ToonRenderer = class {
       elements[columnIndex * 4 + 1] = elements[columnIndex * 4 + 1] * scaleY + clipW * offsetY;
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const scissorLeft = System82.Math.floor(screenRect.x);
-    const scissorBottom = System82.Math.floor(viewportHeight - screenRect.y - screenRect.height);
-    const scissorRight = System82.Math.ceil(screenRect.x + screenRect.width);
-    const scissorTop = System82.Math.ceil(viewportHeight - screenRect.y);
+    const scissorLeft = System84.Math.floor(screenRect.x);
+    const scissorBottom = System84.Math.floor(viewportHeight - screenRect.y - screenRect.height);
+    const scissorRight = System84.Math.ceil(screenRect.x + screenRect.width);
+    const scissorTop = System84.Math.ceil(viewportHeight - screenRect.y);
     webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
     webGL2RenderingContext.scissor(viewport[0] + scissorLeft, viewport[1] + scissorBottom, scissorRight - scissorLeft, scissorTop - scissorBottom);
     this.#isScissorApplied = true;
@@ -34835,7 +35877,7 @@ var ToonRenderer = class {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const isCulled = options.isCulled !== false;
     if (this.#instanceData.length < instances.length * TOON_INSTANCE_FLOAT_COUNT) {
-      this.#instanceData = new System82.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
+      this.#instanceData = new System84.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
     }
     const instanceData = this.#instanceData;
     let instanceCount = 0;
@@ -34872,8 +35914,8 @@ var ToonRenderer = class {
     if (mesh === null || instanceCount <= 0) {
       return;
     }
-    const maximumCount = System82.Math.floor(instanceBuffer.floatCount / System82.Math.max(1, instanceBuffer.layout.getFloatCount()));
-    const count = System82.Math.min(instanceCount, maximumCount);
+    const maximumCount = System84.Math.floor(instanceBuffer.floatCount / System84.Math.max(1, instanceBuffer.layout.getFloatCount()));
+    const count = System84.Math.min(instanceCount, maximumCount);
     if (count <= 0) {
       return;
     }
@@ -34914,7 +35956,7 @@ var ToonRenderer = class {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const floatCount = count * TOON_INSTANCE_FLOAT_COUNT;
     if (this.#instanceData.length < floatCount) {
-      this.#instanceData = new System82.Float32Array(floatCount);
+      this.#instanceData = new System84.Float32Array(floatCount);
     }
     const instanceData = this.#instanceData;
     for (let index = 0; index < count; ++index) {
@@ -34935,7 +35977,7 @@ var ToonRenderer = class {
     const slots = this.#isShadowPass ? this.#shadowBatchSlots : this.#batchSlots;
     let slot = slots[slotIndex];
     if (slot === void 0) {
-      slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System82.Float32Array(0), count: 0, vertexArrays: /* @__PURE__ */ new Map() };
+      slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System84.Float32Array(0), count: 0, vertexArrays: /* @__PURE__ */ new Map() };
       slots[slotIndex] = slot;
     }
     let isSame = slot.count === count;
@@ -34950,7 +35992,7 @@ var ToonRenderer = class {
     }
     if (!isSame) {
       if (slot.values.length < floatCount) {
-        slot.values = new System82.Float32Array(floatCount);
+        slot.values = new System84.Float32Array(floatCount);
       }
       const values = slot.values;
       for (let index = 0; index < floatCount; ++index) {
@@ -35053,7 +36095,7 @@ var ToonRenderer = class {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, buffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.UNIFORM_BUFFER, frameRing.stride * (FRAME_RING_SLOT_COUNT - 1) + FRAME_BLOCK_FLOAT_COUNT * 4, webGL2RenderingContext.STATIC_DRAW);
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.UNIFORM_BUFFER, null);
-        page = { buffer, bits: new System82.Uint32Array(FRAME_RING_SLOT_COUNT * FRAME_BLOCK_FLOAT_COUNT), hashes: new System82.Array(FRAME_RING_SLOT_COUNT).fill(0), count: 0, useFrame: frameNumber, writeFrame: frameNumber };
+        page = { buffer, bits: new System84.Uint32Array(FRAME_RING_SLOT_COUNT * FRAME_BLOCK_FLOAT_COUNT), hashes: new System84.Array(FRAME_RING_SLOT_COUNT).fill(0), count: 0, useFrame: frameNumber, writeFrame: frameNumber };
         pages.push(page);
       }
       page.count = 0;
@@ -35098,13 +36140,13 @@ var ToonRenderer = class {
     values[53] = outlineDistanceScale[1];
     values[54] = outlineDistanceScale[2];
     values[55] = shadowInput !== null ? 1 : 0;
-    values[56] = System82.Math.cos(this.#cameraRoll);
-    values[57] = System82.Math.sin(this.#cameraRoll);
+    values[56] = System84.Math.cos(this.#cameraRoll);
+    values[57] = System84.Math.sin(this.#cameraRoll);
     values[58] = this.#outlineFadeDistance[0];
     values[59] = this.#outlineFadeDistance[1];
     if (shadowInput !== null) {
       values[60] = shadowInput.strength;
-      values[61] = 1 / System82.Math.max(1, shadowInput.resolution);
+      values[61] = 1 / System84.Math.max(1, shadowInput.resolution);
       const shadowBias = shadowInput.bias;
       values[164] = shadowBias[0];
       values[165] = shadowBias[1];
@@ -35215,8 +36257,8 @@ var ToonRenderer = class {
       colorValues.set([pointLight.color[0] * pointLight.intensity, pointLight.color[1] * pointLight.intensity, pointLight.color[2] * pointLight.intensity], lightIndex * 3);
       shapeValues.set([pointLight.decay, pointLight.rangeExponent, pointLight.wrap], lightIndex * 3);
       if (pointLight.direction !== null) {
-        const outerCosine = System82.Math.cos(pointLight.outerConeAngle);
-        const coneScale = 1 / System82.Math.max(1e-3, System82.Math.cos(System82.Math.min(pointLight.innerConeAngle, pointLight.outerConeAngle)) - outerCosine);
+        const outerCosine = System84.Math.cos(pointLight.outerConeAngle);
+        const coneScale = 1 / System84.Math.max(1e-3, System84.Math.cos(System84.Math.min(pointLight.innerConeAngle, pointLight.outerConeAngle)) - outerCosine);
         spotValues.set([pointLight.direction[0], pointLight.direction[1], pointLight.direction[2], 1], lightIndex * 4);
         coneValues.set([coneScale, -outerCosine * coneScale], lightIndex * 2);
       }
@@ -35233,7 +36275,7 @@ var ToonRenderer = class {
     this.writeUniformFloats(shaderProgram, "instanced", 1, instancedMode);
     this.writeUniformFloats(shaderProgram, "skinned", 1, isSkinned ? 1 : 0);
     if (isSkinned) {
-      const jointFloatCount = System82.Math.floor(System82.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
+      const jointFloatCount = System84.Math.floor(System84.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
       const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
       this.writeUniformMatrix4(shaderProgram, "jointMatrices", jointValues);
     }
@@ -35276,7 +36318,7 @@ var ToonRenderer = class {
   readUniformSlot(shaderProgram, uniformName) {
     let slotTable = shaderProgram === this.#slotTableProgram ? this.#slotTable : this.#uniformSlotTable.get(shaderProgram);
     if (slotTable === void 0) {
-      slotTable = new System82.Map();
+      slotTable = new System84.Map();
       this.#uniformSlotTable.set(shaderProgram, slotTable);
     }
     this.#slotTableProgram = shaderProgram;
@@ -35335,7 +36377,7 @@ var ToonRenderer = class {
     return this.readKnownDrawEntry(entry, options);
   }
   createDrawEntry() {
-    return { keys: [], values: [], numbers: [], state: new System82.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0, options: null, generation: this.#drawEntryGeneration };
+    return { keys: [], values: [], numbers: [], state: new System84.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0, options: null, generation: this.#drawEntryGeneration };
   }
   writeHeldDrawEntry(entry, options, isChanged) {
     if (entry === null) {
@@ -35464,7 +36506,7 @@ var ToonRenderer = class {
     blockCache.hand = 0;
     blockCache.count = 0;
     blockCache.boundBlock = null;
-    this.#drawEntryOfOptions = new System82.WeakMap();
+    this.#drawEntryOfOptions = new System84.WeakMap();
     this.#drawEntryGeneration += 1;
   }
   forgetUniformValues(shaderProgram) {
@@ -35487,7 +36529,7 @@ var ToonRenderer = class {
       return;
     }
     if (values === null) {
-      values = new System82.Float64Array(4);
+      values = new System84.Float64Array(4);
       slot.values = values;
     }
     values[0] = x;
@@ -35521,7 +36563,7 @@ var ToonRenderer = class {
       return;
     }
     if (slot.values === null) {
-      slot.values = new System82.Float64Array(1);
+      slot.values = new System84.Float64Array(1);
     }
     slot.values[0] = value;
     slot.serial = this.#uniformSerial;
@@ -35548,7 +36590,7 @@ var ToonRenderer = class {
       }
     }
     if (values === null || values.length < elementCount) {
-      values = new System82.Float32Array(elementCount);
+      values = new System84.Float32Array(elementCount);
       slot.values = values;
     }
     values.set(elements);
@@ -35597,10 +36639,10 @@ var ToonRenderer = class {
       bodyVertexArray = vertexArrays.body;
       outlineVertexArray = vertexArrays.outline;
     }
-    const indexStart = System82.Math.max(0, System82.Math.min(mesh.bodyIndexCount, state[DRAW_STATE_INDEX_START]));
-    const indexCount = state[DRAW_STATE_INDEX_COUNT] > 0 ? System82.Math.min(state[DRAW_STATE_INDEX_COUNT], mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
-    const outlineIndexStart = System82.Math.max(0, System82.Math.min(mesh.outlineIndexCount, state[DRAW_STATE_OUTLINE_INDEX_START]));
-    const outlineIndexCount = state[DRAW_STATE_OUTLINE_INDEX_COUNT] > 0 ? System82.Math.min(state[DRAW_STATE_OUTLINE_INDEX_COUNT], mesh.outlineIndexCount - outlineIndexStart) : mesh.outlineIndexCount - outlineIndexStart;
+    const indexStart = System84.Math.max(0, System84.Math.min(mesh.bodyIndexCount, state[DRAW_STATE_INDEX_START]));
+    const indexCount = state[DRAW_STATE_INDEX_COUNT] > 0 ? System84.Math.min(state[DRAW_STATE_INDEX_COUNT], mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
+    const outlineIndexStart = System84.Math.max(0, System84.Math.min(mesh.outlineIndexCount, state[DRAW_STATE_OUTLINE_INDEX_START]));
+    const outlineIndexCount = state[DRAW_STATE_OUTLINE_INDEX_COUNT] > 0 ? System84.Math.min(state[DRAW_STATE_OUTLINE_INDEX_COUNT], mesh.outlineIndexCount - outlineIndexStart) : mesh.outlineIndexCount - outlineIndexStart;
     const isMirroredDraw = state[DRAW_STATE_IS_MIRRORED] >= 0 ? state[DRAW_STATE_IS_MIRRORED] === 1 : readMatrixDeterminant(modelElements) < 0;
     const isMirrored = isMirroredDraw !== this.#isFrameMirrored;
     this.applyFrontFace(isMirrored ? webGL2RenderingContext.CW : webGL2RenderingContext.CCW);
@@ -35713,7 +36755,7 @@ var ToonRenderer = class {
     }
     if (state[DRAW_STATE_TEXTURES] !== null) {
       let unit = FIRST_MATERIAL_TEXTURE_UNIT;
-      for (const [uniformName, texture] of System82.Object.entries(state[DRAW_STATE_TEXTURES])) {
+      for (const [uniformName, texture] of System84.Object.entries(state[DRAW_STATE_TEXTURES])) {
         if (unit >= FIRST_MATERIAL_TEXTURE_UNIT + TOON_MAXIMUM_MATERIAL_TEXTURES) {
           break;
         }
@@ -35785,11 +36827,11 @@ var ToonRenderer = class {
     this.#frameSerial += 1;
   }
   setOutlineDistanceScale(referenceDistance, minimumScale = 0.5, maximumScale = 4) {
-    this.#outlineDistanceScale = [System82.Math.max(0, referenceDistance), System82.Math.max(0, minimumScale), System82.Math.max(System82.Math.max(0, minimumScale), maximumScale)];
+    this.#outlineDistanceScale = [System84.Math.max(0, referenceDistance), System84.Math.max(0, minimumScale), System84.Math.max(System84.Math.max(0, minimumScale), maximumScale)];
     this.#frameSerial += 1;
   }
   setOutlineFadeDistance(nearDistance, farDistance) {
-    this.#outlineFadeDistance = [System82.Math.max(0, nearDistance), System82.Math.max(0, farDistance)];
+    this.#outlineFadeDistance = [System84.Math.max(0, nearDistance), System84.Math.max(0, farDistance)];
     this.#frameSerial += 1;
   }
   getOutlineFadeDistance() {
@@ -35802,7 +36844,7 @@ var ToonRenderer = class {
       return;
     }
     const resolution = shadowAtlas.getResolution();
-    this.#localShadowInput = { depthTexture: shadowAtlas.getDepthTexture(), lights: shadowAtlas.getLights(), gridSize: shadowAtlas.getGridSize(), tileSize: shadowAtlas.getTileSize() / resolution, texelSize: 1 / resolution, strength: System82.Math.max(0, System82.Math.min(1, strength)) };
+    this.#localShadowInput = { depthTexture: shadowAtlas.getDepthTexture(), lights: shadowAtlas.getLights(), gridSize: shadowAtlas.getGridSize(), tileSize: shadowAtlas.getTileSize() / resolution, texelSize: 1 / resolution, strength: System84.Math.max(0, System84.Math.min(1, strength)) };
   }
   setLightColorUsage(lightColorUsage) {
     this.#lightSet.setLightColorUsage(lightColorUsage);
@@ -35833,7 +36875,7 @@ var ToonRenderer = class {
   setAmbientOcclusionTexture(texture, directLightingStrength = 0) {
     this.#frameSerial += 1;
     this.#lastProgramKey = null;
-    this.#ambientOcclusionInput = texture !== null && texture !== void 0 ? { texture, origin: [0, 0], directLightingStrength: System82.Math.max(0, System82.Math.min(1, directLightingStrength)) } : null;
+    this.#ambientOcclusionInput = texture !== null && texture !== void 0 ? { texture, origin: [0, 0], directLightingStrength: System84.Math.max(0, System84.Math.min(1, directLightingStrength)) } : null;
   }
   getAmbientOcclusionDirectLightingStrength() {
     return this.#ambientOcclusionInput !== null ? this.#ambientOcclusionInput.directLightingStrength : 0;
@@ -35877,7 +36919,7 @@ var ToonProgramPrewarm = class {
     this.#unitList = unitList;
     this.#isReady = false;
     this.#resolve = null;
-    this.#promise = new System82.Promise((resolve) => {
+    this.#promise = new System84.Promise((resolve) => {
       this.#resolve = resolve;
     });
     this.step();
@@ -35891,12 +36933,12 @@ var ToonProgramPrewarm = class {
       this.#resolve();
       return;
     }
-    if (typeof System82.requestAnimationFrame === "function") {
-      System82.requestAnimationFrame(() => {
+    if (typeof System84.requestAnimationFrame === "function") {
+      System84.requestAnimationFrame(() => {
         this.step();
       });
     } else {
-      System82.setTimeout(() => {
+      System84.setTimeout(() => {
         this.step();
       }, 16);
     }
@@ -35908,7 +36950,7 @@ var ToonProgramPrewarm = class {
     return this.#promise;
   }
 };
-var System83 = globalThis;
+var System85 = globalThis;
 var RenderTarget = class extends Object2 {
   static {
     __name(this, "RenderTarget");
@@ -35943,7 +36985,7 @@ var RenderTarget = class extends Object2 {
     this.#colorAttachmentCount = options && options.colorAttachmentCount ? options.colorAttachmentCount : 1;
     this.#useFloatColor = options ? options.useFloatColor === true : false;
     this.#useDepthTexture = options ? options.useDepthTexture === true : false;
-    this.#requestedSampleCount = options && options.sampleCount ? System83.Math.max(0, System83.Math.floor(options.sampleCount)) : 0;
+    this.#requestedSampleCount = options && options.sampleCount ? System85.Math.max(0, System85.Math.floor(options.sampleCount)) : 0;
     this.#sampleCount = 0;
     this.#depthBits = options && options.depthBits === 24 ? 24 : 16;
     this.#multisampleFramebuffer = null;
@@ -36058,7 +37100,7 @@ var RenderTarget = class extends Object2 {
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const maximumSampleCount = webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_SAMPLES);
-    let sampleCount = System83.Math.min(requestedSampleCount, maximumSampleCount);
+    let sampleCount = System85.Math.min(requestedSampleCount, maximumSampleCount);
     for (const internalFormat of internalFormatList) {
       const supportedSampleCountList = webGL2RenderingContext.getInternalformatParameter(webGL2RenderingContext.RENDERBUFFER, internalFormat, webGL2RenderingContext.SAMPLES);
       let bestSampleCount = 0;
@@ -36194,7 +37236,7 @@ var RenderTarget = class extends Object2 {
     return this.#height;
   }
 };
-var System84 = globalThis;
+var System86 = globalThis;
 var ToonView3D = class extends Component {
   static {
     __name(this, "ToonView3D");
@@ -36226,11 +37268,11 @@ var ToonView3D = class extends Component {
     this.#output = { outputFramebuffer: null, outputViewport: [0, 0, 0, 0] };
   }
   setRenderScale(renderScale) {
-    if (typeof renderScale !== "number" || !System84.Number.isFinite(renderScale)) {
+    if (typeof renderScale !== "number" || !System86.Number.isFinite(renderScale)) {
       this.#renderScale = 1;
       return;
     }
-    this.#renderScale = System84.Math.max(0.05, System84.Math.min(4, renderScale));
+    this.#renderScale = System86.Math.max(0.05, System86.Math.min(4, renderScale));
   }
   getRenderScale() {
     return this.#renderScale;
@@ -36272,7 +37314,7 @@ var ToonView3D = class extends Component {
       const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
       this.#renderer = new ToonRenderer(webGL2RenderingContext);
     } catch (error) {
-      System84.console.error("[ToonView3D] \uD230 \uB80C\uB354\uB7EC\uB97C \uC9D3\uC9C0 \uBABB\uD574 \uB300\uCCB4 \uADF8\uB9AC\uAE30\uB85C \uAC11\uB2C8\uB2E4.", error);
+      System86.console.error("[ToonView3D] \uD230 \uB80C\uB354\uB7EC\uB97C \uC9D3\uC9C0 \uBABB\uD574 \uB300\uCCB4 \uADF8\uB9AC\uAE30\uB85C \uAC11\uB2C8\uB2E4.", error);
       this.#renderer = null;
       if (reportShaderBuildFailure(graphic.getWebGL2RenderingContext(), "ToonRenderer", error)) {
         this.#isRendererFailed = true;
@@ -36285,19 +37327,19 @@ var ToonView3D = class extends Component {
     const transformMatrix = graphic.getTransformMatrix();
     const cornerXList = [0, contentSize.x, 0, contentSize.x];
     const cornerYList = [0, 0, contentSize.y, contentSize.y];
-    let minimumX = System84.Infinity;
-    let minimumY = System84.Infinity;
-    let maximumX = -System84.Infinity;
-    let maximumY = -System84.Infinity;
+    let minimumX = System86.Infinity;
+    let minimumY = System86.Infinity;
+    let maximumX = -System86.Infinity;
+    let maximumY = -System86.Infinity;
     for (let cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
       const cornerX = cornerXList[cornerIndex];
       const cornerY = cornerYList[cornerIndex];
       const screenX = transformMatrix.a * cornerX + transformMatrix.c * cornerY + transformMatrix.e;
       const screenY = transformMatrix.b * cornerX + transformMatrix.d * cornerY + transformMatrix.f;
-      minimumX = System84.Math.min(minimumX, screenX);
-      minimumY = System84.Math.min(minimumY, screenY);
-      maximumX = System84.Math.max(maximumX, screenX);
-      maximumY = System84.Math.max(maximumY, screenY);
+      minimumX = System86.Math.min(minimumX, screenX);
+      minimumY = System86.Math.min(minimumY, screenY);
+      maximumX = System86.Math.max(maximumX, screenX);
+      maximumY = System86.Math.max(maximumY, screenY);
     }
     const screenRect = this.#screenRect;
     screenRect.position.x = minimumX;
@@ -36359,11 +37401,11 @@ var ToonView3D = class extends Component {
     const output = this.#output;
     const viewport = graphic.getCurrentViewport();
     output.outputFramebuffer = graphic.getCurrentFramebuffer();
-    const outputWidth = System84.Math.max(1, System84.Math.round(width));
-    const outputHeight = System84.Math.max(1, System84.Math.round(height));
+    const outputWidth = System86.Math.max(1, System86.Math.round(width));
+    const outputHeight = System86.Math.max(1, System86.Math.round(height));
     const outputViewport = output.outputViewport;
-    outputViewport[0] = viewport.position.x + System84.Math.round(x);
-    outputViewport[1] = viewport.position.y + viewport.height - System84.Math.round(y) - outputHeight;
+    outputViewport[0] = viewport.position.x + System86.Math.round(x);
+    outputViewport[1] = viewport.position.y + viewport.height - System86.Math.round(y) - outputHeight;
     outputViewport[2] = outputWidth;
     outputViewport[3] = outputHeight;
   }
@@ -36375,7 +37417,7 @@ var ToonView3D = class extends Component {
         const sampleCount = contextAttributes && contextAttributes.antialias ? 4 : 0;
         target = new RenderTarget(webGL2RenderingContext, width, height, true, { sampleCount, depthBits: 24 });
       } catch (error) {
-        System84.console.error("[ToonView3D] \uB80C\uB354 \uC2A4\uCF00\uC77C \uD310\uC744 \uC9D3\uC9C0 \uBABB\uD574 \uD654\uBA74\uC5D0 \uBC14\uB85C \uADF8\uB9BD\uB2C8\uB2E4.", error);
+        System86.console.error("[ToonView3D] \uB80C\uB354 \uC2A4\uCF00\uC77C \uD310\uC744 \uC9D3\uC9C0 \uBABB\uD574 \uD654\uBA74\uC5D0 \uBC14\uB85C \uADF8\uB9BD\uB2C8\uB2E4.", error);
         this.#renderScale = 1;
         return null;
       }
@@ -36391,8 +37433,8 @@ var ToonView3D = class extends Component {
     const screenRect = this.#screenRect;
     const camera = this.#camera;
     const renderScale = this.#renderScale;
-    const targetWidth = System84.Math.max(1, System84.Math.round(screenRect.size.x * renderScale));
-    const targetHeight = System84.Math.max(1, System84.Math.round(screenRect.size.y * renderScale));
+    const targetWidth = System86.Math.max(1, System86.Math.round(screenRect.size.x * renderScale));
+    const targetHeight = System86.Math.max(1, System86.Math.round(screenRect.size.y * renderScale));
     const drawScreenRect = this.#drawScreenRect;
     const output = this.#output;
     let colorTexture = null;
@@ -36490,7 +37532,7 @@ var Visual = class extends Component {
     return rootNode;
   }
 };
-var System85 = globalThis;
+var System87 = globalThis;
 var UILineChart = class extends Component {
   static {
     __name(this, "UILineChart");
@@ -36549,27 +37591,27 @@ var UILineChart = class extends Component {
     const contentSize = node.getContentSize();
     const width = contentSize.x;
     const height = contentSize.y;
-    let minimumY = System85.Math.min(0, height);
-    let maximumY = System85.Math.max(0, height);
+    let minimumY = System87.Math.min(0, height);
+    let maximumY = System87.Math.max(0, height);
     const valueList = this.#valueList;
     if (valueList.length >= 2 && (this.#minValue !== null || this.#maxValue !== null)) {
       let lowValue = valueList[0];
       let highValue = valueList[0];
       for (const value of valueList) {
-        lowValue = System85.Math.min(lowValue, value);
-        highValue = System85.Math.max(highValue, value);
+        lowValue = System87.Math.min(lowValue, value);
+        highValue = System87.Math.max(highValue, value);
       }
       const rangeLowValue = this.#minValue !== null ? this.#minValue : lowValue;
       const rangeHighValue = this.#maxValue !== null ? this.#maxValue : highValue;
-      const valueRange = System85.Math.max(rangeHighValue - rangeLowValue, 1e-4);
+      const valueRange = System87.Math.max(rangeHighValue - rangeLowValue, 1e-4);
       const lowY = height - (lowValue - rangeLowValue) / valueRange * (height - 4) - 2;
       const highY = height - (highValue - rangeLowValue) / valueRange * (height - 4) - 2;
-      minimumY = System85.Math.min(minimumY, lowY, highY);
-      maximumY = System85.Math.max(maximumY, lowY, highY);
+      minimumY = System87.Math.min(minimumY, lowY, highY);
+      maximumY = System87.Math.max(maximumY, lowY, highY);
     }
-    const margin = System85.Math.max(1, this.#lineWidth) + 1;
-    rect.position.set(System85.Math.min(0, width) - margin, minimumY - margin);
-    rect.size.set(System85.Math.abs(width) + margin * 2, maximumY - minimumY + margin * 2);
+    const margin = System87.Math.max(1, this.#lineWidth) + 1;
+    rect.position.set(System87.Math.min(0, width) - margin, minimumY - margin);
+    rect.size.set(System87.Math.abs(width) + margin * 2, maximumY - minimumY + margin * 2);
     return true;
   }
   calculatePoints(width, height) {
@@ -36583,8 +37625,8 @@ var UILineChart = class extends Component {
       let autoLow = this.#valueList[0];
       let autoHigh = this.#valueList[0];
       for (const value of this.#valueList) {
-        autoLow = System85.Math.min(autoLow, value);
-        autoHigh = System85.Math.max(autoHigh, value);
+        autoLow = System87.Math.min(autoLow, value);
+        autoHigh = System87.Math.max(autoHigh, value);
       }
       if (lowValue === null) {
         lowValue = autoLow;
@@ -36593,7 +37635,7 @@ var UILineChart = class extends Component {
         highValue = autoHigh;
       }
     }
-    const valueRange = System85.Math.max(highValue - lowValue, 1e-4);
+    const valueRange = System87.Math.max(highValue - lowValue, 1e-4);
     const points = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const ratio = sampleIndex / (this.#maxSampleCount - 1);
@@ -36603,7 +37645,7 @@ var UILineChart = class extends Component {
     return points;
   }
   setMaxSampleCount(maxSampleCount) {
-    this.#maxSampleCount = System85.Math.max(2, maxSampleCount);
+    this.#maxSampleCount = System87.Math.max(2, maxSampleCount);
     const excessCount = this.#valueList.length - this.#maxSampleCount;
     if (excessCount > 0) {
       this.#valueList.splice(0, excessCount);
@@ -36683,10 +37725,10 @@ var UIBarChart = class extends Component {
     const width = contentSize.x;
     const height = contentSize.y;
     const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
-    const minimumX = System85.Math.min(0, barWidth, width);
-    const maximumX = System85.Math.max(width, width - barWidth, 0);
-    const minimumY = System85.Math.min(0, height - 1);
-    const maximumY = System85.Math.max(height, 0);
+    const minimumX = System87.Math.min(0, barWidth, width);
+    const maximumX = System87.Math.max(width, width - barWidth, 0);
+    const minimumY = System87.Math.min(0, height - 1);
+    const maximumY = System87.Math.max(height, 0);
     rect.position.set(minimumX - 1, minimumY - 1);
     rect.size.set(maximumX - minimumX + 2, maximumY - minimumY + 2);
     return true;
@@ -36700,14 +37742,14 @@ var UIBarChart = class extends Component {
     if (highValue === null) {
       highValue = 1e-4;
       for (const value of this.#valueList) {
-        highValue = System85.Math.max(highValue, value);
+        highValue = System87.Math.max(highValue, value);
       }
     }
     const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
     const barRects = [];
     for (let barIndex = 0; barIndex < barCount; ++barIndex) {
-      const valueRatio = System85.Math.max(0, System85.Math.min(1, this.#valueList[barIndex] / highValue));
-      const barHeight = System85.Math.max(1, valueRatio * height);
+      const valueRatio = System87.Math.max(0, System87.Math.min(1, this.#valueList[barIndex] / highValue));
+      const barHeight = System87.Math.max(1, valueRatio * height);
       const barX = barIndex * (barWidth + this.#barGap);
       barRects.push(Rect.create(barX, height - barHeight, barWidth, barHeight));
     }
@@ -36739,7 +37781,7 @@ var UIBarChart = class extends Component {
     this.markDrawnRectDirty();
   }
 };
-var System86 = globalThis;
+var System88 = globalThis;
 var UIDraggable = class extends UIControl {
   static {
     __name(this, "UIDraggable");
@@ -36819,7 +37861,7 @@ var UIDraggable = class extends UIControl {
     }
     const node = this.getNode();
     const localPosition = node.getLocalPosition();
-    const blend = System86.Math.min(this.#snapBackSpeed * timeDelta, 1);
+    const blend = System88.Math.min(this.#snapBackSpeed * timeDelta, 1);
     const nextX = localPosition.x + (this.#homePosition.x - localPosition.x) * blend;
     const nextY = localPosition.y + (this.#homePosition.y - localPosition.y) * blend;
     node.setLocalPosition(Vector2.create(nextX, nextY));
@@ -36865,7 +37907,7 @@ var UIDraggable = class extends UIControl {
     return this.#homePosition ? Vector2.create(this.#homePosition.x, this.#homePosition.y) : null;
   }
 };
-var System87 = globalThis;
+var System89 = globalThis;
 var UIListView = class extends Component {
   static {
     __name(this, "UIListView");
@@ -36899,7 +37941,7 @@ var UIListView = class extends Component {
     this.#reachEndEvent = null;
     this.#reachEndThreshold = 120;
     this.#isReachEndArmed = true;
-    this.#activeItemMap = new System87.Map();
+    this.#activeItemMap = new System89.Map();
     this.#freeItemList = [];
   }
   require() {
@@ -36927,7 +37969,7 @@ var UIListView = class extends Component {
   }
   setItemCount(itemCount) {
     const previousItemCount = this.#itemCount;
-    this.#itemCount = System87.Math.max(0, itemCount);
+    this.#itemCount = System89.Math.max(0, itemCount);
     if (this.#itemCount > previousItemCount) {
       this.#isReachEndArmed = true;
     }
@@ -36962,10 +38004,10 @@ var UIListView = class extends Component {
     if (pitch <= 0) {
       return;
     }
-    let firstIndex = System87.Math.floor(scrolled / pitch) - this.#bufferItemCount;
-    let lastIndex = System87.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
-    firstIndex = System87.Math.max(0, firstIndex);
-    lastIndex = System87.Math.min(this.#itemCount - 1, lastIndex);
+    let firstIndex = System89.Math.floor(scrolled / pitch) - this.#bufferItemCount;
+    let lastIndex = System89.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
+    firstIndex = System89.Math.max(0, firstIndex);
+    lastIndex = System89.Math.min(this.#itemCount - 1, lastIndex);
     for (const [itemIndex, itemNode] of [...this.#activeItemMap]) {
       if (itemIndex < firstIndex || itemIndex > lastIndex) {
         itemNode.setActive(false);
@@ -37078,7 +38120,7 @@ var UIListView = class extends Component {
     this.updateScrollContentSize();
   }
   setBufferItemCount(bufferItemCount) {
-    this.#bufferItemCount = System87.Math.max(0, bufferItemCount);
+    this.#bufferItemCount = System89.Math.max(0, bufferItemCount);
   }
   getItemCount() {
     return this.#itemCount;
@@ -37096,7 +38138,7 @@ var UIListView = class extends Component {
     return this.#activeItemMap.size;
   }
 };
-var System88 = globalThis;
+var System90 = globalThis;
 var UISnapScrollView = class extends UIScrollView {
   static {
     __name(this, "UISnapScrollView");
@@ -37185,8 +38227,8 @@ var UISnapScrollView = class extends UIScrollView {
     const snapOffsets = this.computeSnapOffsets();
     const snapCurrentIndex = this.getSnapCurrentIndex();
     const maxIndex = children.length - 1;
-    const prevIndex = System88.Math.max(0, snapCurrentIndex - 1);
-    const nextIndex = System88.Math.min(maxIndex, snapCurrentIndex + 1);
+    const prevIndex = System90.Math.max(0, snapCurrentIndex - 1);
+    const nextIndex = System90.Math.min(maxIndex, snapCurrentIndex + 1);
     const isHorizontal = this.isHorizontal();
     const currentOffset = this.getScrollOffset();
     if (isHorizontal) {
@@ -37247,9 +38289,9 @@ var UISnapScrollView = class extends UIScrollView {
     const currentAxisOffset = isHorizontal ? currentOffset.x : currentOffset.y;
     if (this.getSnapToNearest()) {
       let nearestIndex = 0;
-      let nearestDistance = System88.Math.abs(snapOffsets[0] - currentAxisOffset);
+      let nearestDistance = System90.Math.abs(snapOffsets[0] - currentAxisOffset);
       for (let snapOffsetIndex = 1; snapOffsetIndex < snapOffsets.length; ++snapOffsetIndex) {
-        const distance = System88.Math.abs(snapOffsets[snapOffsetIndex] - currentAxisOffset);
+        const distance = System90.Math.abs(snapOffsets[snapOffsetIndex] - currentAxisOffset);
         if (distance < nearestDistance) {
           nearestDistance = distance;
           nearestIndex = snapOffsetIndex;
@@ -37263,7 +38305,7 @@ var UISnapScrollView = class extends UIScrollView {
     const dragAmount = currentAxisOffset - currentSnapOffset;
     const dragVelocity = this.getDragVelocity();
     const velocityThreshold = this.getVelocityThreshold();
-    const isFling = System88.Math.abs(dragVelocity) >= velocityThreshold && dragVelocity !== 0;
+    const isFling = System90.Math.abs(dragVelocity) >= velocityThreshold && dragVelocity !== 0;
     let direction;
     if (isFling) {
       direction = dragVelocity < 0 ? 1 : -1;
@@ -37277,7 +38319,7 @@ var UISnapScrollView = class extends UIScrollView {
       const candidateChildContentSize = candidateChild.getContentSize();
       const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
       const pageChangeThreshold = this.getPageChangeThreshold();
-      if (isFling || System88.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+      if (isFling || System90.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
         targetIndex = candidateIndex;
       } else {
         targetIndex = snapCurrentIndex;
@@ -37360,7 +38402,7 @@ var UISnapScrollView = class extends UIScrollView {
     return this.#snapCurrentIndex;
   }
 };
-var System89 = globalThis;
+var System91 = globalThis;
 var CONFIRM_PADDING = 24;
 var CONFIRM_ROW_GAP = 16;
 var CONFIRM_TITLE_HEIGHT = 32;
@@ -37528,10 +38570,10 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
     this.#messageLabel.setWordWrapWidth(textWidth);
     const messageText = this.#messageNode.getComponent(Text);
     const wrappedSize = messageText.measureWrappedSize();
-    return System89.Math.ceil(wrappedSize.height);
+    return System91.Math.ceil(wrappedSize.height);
   }
   layoutContent(panelWidth) {
-    const innerWidth = System89.Math.max(1, panelWidth - CONFIRM_PADDING * 2);
+    const innerWidth = System91.Math.max(1, panelWidth - CONFIRM_PADDING * 2);
     let top = CONFIRM_PADDING;
     if (this.#titleNode.isActive()) {
       this.#titleNode.setLocalPosition(Vector2.create(CONFIRM_PADDING, top));
@@ -37541,9 +38583,9 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
     const buttonsHeight = CONFIRM_ROW_GAP + CONFIRM_BUTTON_HEIGHT + CONFIRM_PADDING;
     const viewHeight = this.getViewHeight();
     const margin = this.getMargin();
-    const availableHeight = System89.Math.max(CONFIRM_MINIMUM_MESSAGE_HEIGHT, viewHeight - margin * 2 - top - buttonsHeight);
-    const messageHeight = System89.Math.max(1, this.measureMessageHeight(innerWidth));
-    const scrollHeight = System89.Math.min(messageHeight, availableHeight);
+    const availableHeight = System91.Math.max(CONFIRM_MINIMUM_MESSAGE_HEIGHT, viewHeight - margin * 2 - top - buttonsHeight);
+    const messageHeight = System91.Math.max(1, this.measureMessageHeight(innerWidth));
+    const scrollHeight = System91.Math.min(messageHeight, availableHeight);
     this.#messageNode.setLocalPosition(Vector2.create(0, 0));
     this.#messageNode.setContentSize(Vector2.create(innerWidth, messageHeight));
     this.#messageScrollNode.setLocalPosition(Vector2.create(CONFIRM_PADDING, top));
@@ -37551,7 +38593,7 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
     this.#messageScrollView.setScrollContentSize(Vector2.create(innerWidth, messageHeight));
     this.#messageScrollView.setScrollOffset(Vector2.zero());
     top += scrollHeight + CONFIRM_ROW_GAP;
-    const buttonWidth = System89.Math.max(1, (innerWidth - CONFIRM_BUTTON_GAP) * 0.5);
+    const buttonWidth = System91.Math.max(1, (innerWidth - CONFIRM_BUTTON_GAP) * 0.5);
     const leftButtonLeft = CONFIRM_PADDING;
     const rightButtonLeft = CONFIRM_PADDING + buttonWidth + CONFIRM_BUTTON_GAP;
     const cancelLeft = this.isRightToLeft() ? rightButtonLeft : leftButtonLeft;
@@ -37564,7 +38606,7 @@ var UIConfirmWindow = class _UIConfirmWindow extends UIWindow {
     return top;
   }
 };
-var System90 = globalThis;
+var System92 = globalThis;
 var UIContextMenu = class extends WorldNode {
   static {
     __name(this, "UIContextMenu");
@@ -37657,8 +38699,8 @@ var UIContextMenu = class extends WorldNode {
     }
     this.setContentSize(Vector2.create(areaWidth, areaHeight));
     this.#overlayNode.setContentSize(Vector2.create(areaWidth, areaHeight));
-    const menuX = System90.Math.min(position.x, areaWidth - this.#menuWidth - 4);
-    const menuY = System90.Math.min(position.y, areaHeight - panelHeight - 4);
+    const menuX = System92.Math.min(position.x, areaWidth - this.#menuWidth - 4);
+    const menuY = System92.Math.min(position.y, areaHeight - panelHeight - 4);
     this.#panelNode.setLocalPosition(Vector2.create(menuX, menuY));
     this.setActive(true);
   }
@@ -37862,7 +38904,7 @@ var UIDialog = class extends WorldNode {
     return this.#cancelNode;
   }
 };
-var System91 = globalThis;
+var System93 = globalThis;
 var UIDropdown = class extends WorldNode {
   static {
     __name(this, "UIDropdown");
@@ -37933,7 +38975,7 @@ var UIDropdown = class extends WorldNode {
   }
   setOptionList(optionList) {
     this.#optionList = optionList.slice();
-    this.#selectedIndex = System91.Math.min(this.#selectedIndex, System91.Math.max(0, this.#optionList.length - 1));
+    this.#selectedIndex = System93.Math.min(this.#selectedIndex, System93.Math.max(0, this.#optionList.length - 1));
     const childList = this.#popupNode.getChildren().slice();
     for (const childNode of childList) {
       this.#popupNode.removeChild(childNode);
@@ -38050,7 +39092,7 @@ var UIDropdown = class extends WorldNode {
     this.#changedEvent = changedEvent;
   }
   setSelectedIndex(selectedIndex) {
-    this.#selectedIndex = System91.Math.max(0, System91.Math.min(selectedIndex, this.#optionList.length - 1));
+    this.#selectedIndex = System93.Math.max(0, System93.Math.min(selectedIndex, this.#optionList.length - 1));
     this.refreshHeader();
     this.refreshHighlight();
   }
@@ -38074,7 +39116,7 @@ var UIDropdown = class extends WorldNode {
     return this.#popupNode.getChildren().slice();
   }
 };
-var System92 = globalThis;
+var System94 = globalThis;
 var UISpinner = class extends WorldNode {
   static {
     __name(this, "UISpinner");
@@ -38099,13 +39141,13 @@ var UISpinner = class extends WorldNode {
     this.setContentSize(Vector2.create((radius + dotRadius) * 2, (radius + dotRadius) * 2));
     const center = radius + dotRadius;
     for (let dotIndex = 0; dotIndex < this.#dotCount; ++dotIndex) {
-      const angle = dotIndex / this.#dotCount * System92.Math.PI * 2;
+      const angle = dotIndex / this.#dotCount * System94.Math.PI * 2;
       const dotNode = new WorldNode();
       dotNode.setName("SpinnerDot" + dotIndex);
       dotNode.setPivot(Pivot.middleCenter.clone());
       dotNode.setAnchor(Pivot.topLeft.clone());
       dotNode.setContentSize(Vector2.create(dotRadius * 2, dotRadius * 2));
-      dotNode.setLocalPosition(Vector2.create(center + System92.Math.cos(angle) * radius, center + System92.Math.sin(angle) * radius));
+      dotNode.setLocalPosition(Vector2.create(center + System94.Math.cos(angle) * radius, center + System94.Math.sin(angle) * radius));
       const paint = dotNode.addComponent(Paint);
       paint.setColor(this.#dotColor.clone());
       paint.setRoundSize(dotRadius);
@@ -38155,7 +39197,7 @@ var UISpinner = class extends WorldNode {
     this.#rotationSpeed = rotationSpeed;
   }
 };
-var System93 = globalThis;
+var System95 = globalThis;
 var UIToast = class extends WorldNode {
   static {
     __name(this, "UIToast");
@@ -38219,7 +39261,7 @@ var UIToast = class extends WorldNode {
     }
     this.#phaseSeconds += timeDelta;
     if (this.#phase === "enter") {
-      const ratio = System93.Math.min(1, this.#phaseSeconds / 0.24);
+      const ratio = System95.Math.min(1, this.#phaseSeconds / 0.24);
       const eased = 1 - (1 - ratio) * (1 - ratio);
       this.setLocalOpacity(eased);
       this.updatePosition(eased);
@@ -38233,7 +39275,7 @@ var UIToast = class extends WorldNode {
         this.#phaseSeconds = 0;
       }
     } else if (this.#phase === "exit") {
-      const ratio = System93.Math.min(1, this.#phaseSeconds / 0.2);
+      const ratio = System95.Math.min(1, this.#phaseSeconds / 0.2);
       this.setLocalOpacity(1 - ratio);
       this.updatePosition(1 + ratio * 0.4);
       if (ratio >= 1) {
@@ -38268,18 +39310,18 @@ var UIToast = class extends WorldNode {
     return this.#phase !== "hidden";
   }
 };
-var System94 = globalThis;
+var System96 = globalThis;
 var UIDOCUMENT_VERSION = 1;
 var DEFAULT_NODE_TYPE_TABLE = { WorldNode };
 var NODE_REFERENCE_KEY = "$nodeRef";
-var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System94.Set(["Parent", "Node", "Owner", "Scene", "Content", "Children", "AllComponents", "Component", "Components", "Root", "Graphic", "Camera", "Target", "ImagePath"]);
+var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System96.Set(["Parent", "Node", "Owner", "Scene", "Content", "Children", "AllComponents", "Component", "Components", "Root", "Graphic", "Camera", "Target", "ImagePath"]);
 var DEFAULT_COMPONENT_TYPE_TABLE = { Paint, Sprite, Text, RichText, Mask, Outline, SoftShade, ShadowText, UIProgressRing, UILabel, UIImageView, UIButton, UIToggleButton, UIProgressView, UISlider, UIScrollView, ShadowImage };
 function collectReflectedProperties(targetObject) {
   const propertyList = [];
-  const visitedNameSet = new System94.Set();
-  let prototypeObject = System94.Object.getPrototypeOf(targetObject);
-  while (prototypeObject && prototypeObject !== System94.Object.prototype) {
-    for (const memberName of System94.Object.getOwnPropertyNames(prototypeObject)) {
+  const visitedNameSet = new System96.Set();
+  let prototypeObject = System96.Object.getPrototypeOf(targetObject);
+  while (prototypeObject && prototypeObject !== System96.Object.prototype) {
+    for (const memberName of System96.Object.getOwnPropertyNames(prototypeObject)) {
       let baseName = "";
       if (memberName.indexOf("get") === 0) {
         baseName = memberName.substring(3);
@@ -38301,13 +39343,13 @@ function collectReflectedProperties(targetObject) {
       visitedNameSet.add(baseName);
       propertyList.push({ name: baseName, getterName: memberName, setterName: "set" + baseName });
     }
-    prototypeObject = System94.Object.getPrototypeOf(prototypeObject);
+    prototypeObject = System96.Object.getPrototypeOf(prototypeObject);
   }
   return propertyList;
 }
 __name(collectReflectedProperties, "collectReflectedProperties");
 function findRegisteredTypeName(typeTable, targetType) {
-  for (const typeName of System94.Object.keys(typeTable)) {
+  for (const typeName of System96.Object.keys(typeTable)) {
     if (typeTable[typeName] === targetType) {
       return typeName;
     }
@@ -38316,7 +39358,7 @@ function findRegisteredTypeName(typeTable, targetType) {
 }
 __name(findRegisteredTypeName, "findRegisteredTypeName");
 function collectImagePaths(value, imagePathList) {
-  if (System94.Array.isArray(value)) {
+  if (System96.Array.isArray(value)) {
     for (const childValue of value) {
       collectImagePaths(childValue, imagePathList);
     }
@@ -38325,7 +39367,7 @@ function collectImagePaths(value, imagePathList) {
   if (!value || typeof value !== "object") {
     return;
   }
-  for (const key of System94.Object.keys(value)) {
+  for (const key of System96.Object.keys(value)) {
     const childValue = value[key];
     if (key === "imagePath") {
       if (typeof childValue === "string" && childValue.length > 0 && !imagePathList.includes(childValue)) {
@@ -38398,7 +39440,7 @@ var COMPONENT_PROPERTY_TABLE = { Paint: { save(component) {
     component.setImagePath(data.imagePath);
     loadContext.bindImage(component, data.imagePath);
   }
-  if (System94.Array.isArray(data.nineSlice) && data.nineSlice.length === 4) {
+  if (System96.Array.isArray(data.nineSlice) && data.nineSlice.length === 4) {
     const nineSliceLeft = data.nineSlice[0];
     const nineSliceTop = data.nineSlice[1];
     const nineSliceRight = data.nineSlice[2] - nineSliceLeft;
@@ -38485,7 +39527,7 @@ var COMPONENT_PROPERTY_TABLE = { Paint: { save(component) {
   }
 } }, ShadowImage: { save(component, document2) {
   const componentData = { imagePath: component.getImagePath() };
-  System94.Object.assign(componentData, document2.saveByReflection(component));
+  System96.Object.assign(componentData, document2.saveByReflection(component));
   return componentData;
 }, load(component, data, loadContext) {
   if (data.imagePath) {
@@ -38531,11 +39573,11 @@ var UIDocument = class _UIDocument extends Object2 {
   #loadContext;
   constructor() {
     super();
-    this.#componentTypeTable = System94.Object.assign({}, DEFAULT_COMPONENT_TYPE_TABLE);
-    this.#nodeTypeTable = System94.Object.assign({}, DEFAULT_NODE_TYPE_TABLE);
+    this.#componentTypeTable = System96.Object.assign({}, DEFAULT_COMPONENT_TYPE_TABLE);
+    this.#nodeTypeTable = System96.Object.assign({}, DEFAULT_NODE_TYPE_TABLE);
     this.#imageResolver = null;
-    this.#imageAssetMap = new System94.Map();
-    this.#serializedImageMap = new System94.Map();
+    this.#imageAssetMap = new System96.Map();
+    this.#serializedImageMap = new System96.Map();
     this.#pendingImageList = [];
     this.#pendingNodeReferenceList = [];
     this.#serializeRootNode = null;
@@ -38573,7 +39615,7 @@ var UIDocument = class _UIDocument extends Object2 {
   loadImages(jsonText) {
     let documentData = null;
     try {
-      documentData = System94.JSON.parse(jsonText);
+      documentData = System96.JSON.parse(jsonText);
     } catch (exception) {
       return [];
     }
@@ -38613,7 +39655,7 @@ var UIDocument = class _UIDocument extends Object2 {
       } else if (imageLookup.isWaiting) {
         this.#pendingImageList.push(pendingImage);
       } else {
-        System94.console.warn(`UIDocument: \uADF8\uB9BC\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 (${pendingImage.imagePath})`);
+        System96.console.warn(`UIDocument: \uADF8\uB9BC\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 (${pendingImage.imagePath})`);
       }
     }
     return this.#pendingImageList.length;
@@ -38642,7 +39684,7 @@ var UIDocument = class _UIDocument extends Object2 {
     nodeData.children = [];
     const componentList = node.getAllComponents();
     const generatedTypeSet = this.collectGeneratedComponentTypes(componentList);
-    const widgetContentNodeSet = new System94.Set();
+    const widgetContentNodeSet = new System96.Set();
     for (const component of componentList) {
       const componentTypeName = findRegisteredTypeName(this.#componentTypeTable, component.constructor);
       const propertyHandler = COMPONENT_PROPERTY_TABLE[componentTypeName];
@@ -38687,7 +39729,7 @@ var UIDocument = class _UIDocument extends Object2 {
     }
   }
   collectGeneratedComponentTypes(componentList) {
-    const generatedTypeSet = new System94.Set();
+    const generatedTypeSet = new System96.Set();
     for (const component of componentList) {
       if (!(component instanceof UIView)) {
         continue;
@@ -38725,7 +39767,7 @@ var UIDocument = class _UIDocument extends Object2 {
     let nodeType = this.#nodeTypeTable[nodeData.type];
     if (!nodeType) {
       if (nodeData.type !== void 0) {
-        System94.console.warn(`UIDocument: unregistered node type "${nodeData.type}" is read as WorldNode. (call registerEditorTypes() on the document for documents saved by the editor)`);
+        System96.console.warn(`UIDocument: unregistered node type "${nodeData.type}" is read as WorldNode. (call registerEditorTypes() on the document for documents saved by the editor)`);
       }
       nodeType = WorldNode;
     }
@@ -38768,7 +39810,7 @@ var UIDocument = class _UIDocument extends Object2 {
     const currentComponentList = node.getAllComponents().slice();
     let generatedTypeSet = this.collectGeneratedComponentTypes(currentComponentList);
     const existingComponentList = [];
-    const widgetContentNodeSet = new System94.Set();
+    const widgetContentNodeSet = new System96.Set();
     let widgetComponent = null;
     for (const component of currentComponentList) {
       const componentTypeName = findRegisteredTypeName(this.#componentTypeTable, component.constructor);
@@ -38794,7 +39836,7 @@ var UIDocument = class _UIDocument extends Object2 {
       } else {
         const componentType = this.#componentTypeTable[componentData.type];
         if (!componentType) {
-          System94.console.warn(`UIDocument: unregistered component type "${componentData.type}" is skipped. (call registerEditorTypes() on the document for documents saved by the editor)`);
+          System96.console.warn(`UIDocument: unregistered component type "${componentData.type}" is skipped. (call registerEditorTypes() on the document for documents saved by the editor)`);
           continue;
         }
         const previousComponentCount = node.getAllComponents().length;
@@ -38846,11 +39888,11 @@ var UIDocument = class _UIDocument extends Object2 {
   }
   toJsonText(rootNode, isPretty = true) {
     const documentData = { version: UIDOCUMENT_VERSION, root: this.serializeNode(rootNode) };
-    const jsonText = isPretty ? System94.JSON.stringify(documentData, null, "	") : System94.JSON.stringify(documentData);
+    const jsonText = isPretty ? System96.JSON.stringify(documentData, null, "	") : System96.JSON.stringify(documentData);
     return jsonText;
   }
   fromJsonText(jsonText) {
-    const documentData = System94.JSON.parse(jsonText);
+    const documentData = System96.JSON.parse(jsonText);
     if (!documentData || !documentData.root) {
       throw new Error("UIDocument: invalid document.");
     }
@@ -38858,11 +39900,11 @@ var UIDocument = class _UIDocument extends Object2 {
     return rootNode;
   }
   getComponentTypeNames() {
-    const typeNames = System94.Object.keys(this.#componentTypeTable);
+    const typeNames = System96.Object.keys(this.#componentTypeTable);
     return typeNames;
   }
   createComponent(node, typeName) {
-    if (!System94.Object.hasOwn(this.#componentTypeTable, typeName)) {
+    if (!System96.Object.hasOwn(this.#componentTypeTable, typeName)) {
       return null;
     }
     const componentType = this.#componentTypeTable[typeName];
@@ -38896,12 +39938,12 @@ var UIDocument = class _UIDocument extends Object2 {
     const rootNode = this.#serializeRootNode;
     const referencePath = _UIDocument.findNodePath(rootNode, node);
     if (referencePath !== null && referencePath !== void 0 && _UIDocument.findNodeByPath(rootNode, referencePath) !== node) {
-      System94.console.warn(`UIDocument: \uB178\uB4DC \uCC38\uC870 ${referencePath} \uB294 \uC774\uB984\uC774 \uAC19\uC740 \uC55E \uD615\uC81C\uAC00 \uC788\uC5B4 \uB2E4\uC2DC \uC77D\uC73C\uBA74 \uC55E \uD615\uC81C\uC5D0 \uC774\uC5B4\uC9D1\uB2C8\uB2E4 (\uD615\uC81C \uC774\uB984\uC744 \uB2E4\uB974\uAC8C \uC9C0\uC73C\uC138\uC694)`);
+      System96.console.warn(`UIDocument: \uB178\uB4DC \uCC38\uC870 ${referencePath} \uB294 \uC774\uB984\uC774 \uAC19\uC740 \uC55E \uD615\uC81C\uAC00 \uC788\uC5B4 \uB2E4\uC2DC \uC77D\uC73C\uBA74 \uC55E \uD615\uC81C\uC5D0 \uC774\uC5B4\uC9D1\uB2C8\uB2E4 (\uD615\uC81C \uC774\uB984\uC744 \uB2E4\uB974\uAC8C \uC9C0\uC73C\uC138\uC694)`);
     }
     return referencePath;
   }
   #loadNodeReferences(component, componentData) {
-    for (const propertyName of System94.Object.keys(componentData)) {
+    for (const propertyName of System96.Object.keys(componentData)) {
       const storedValue = componentData[propertyName];
       if (!storedValue || typeof storedValue !== "object" || storedValue[NODE_REFERENCE_KEY] === void 0) {
         continue;
@@ -38962,12 +40004,12 @@ var UIDocument = class _UIDocument extends Object2 {
     const editorComponentTypeList = [["ButtonMotion", ButtonMotion], ["HeatHazeEffect", HeatHazeEffect], ["Mask", Mask], ["Outline", Outline], ["Paint", Paint], ["ParticleSystem", ParticleSystem], ["PlatformerBody", PlatformerBody], ["RichText", RichText], ["ShaderSprite", ShaderSprite], ["ShadowImage", ShadowImage], ["ShadowText", ShadowText], ["SoftShade", SoftShade], ["Sprite", Sprite], ["SpriteAnimator", SpriteAnimator], ["Text", Text], ["ToastMotion", ToastMotion], ["ToonView3D", ToonView3D], ["TrailRenderer", TrailRenderer], ["UIBarChart", UIBarChart], ["UIButton", UIButton], ["UIControl", UIControl], ["UIDraggable", UIDraggable], ["UIHitArea", UIHitArea], ["UIImageView", UIImageView], ["UILabel", UILabel], ["UILineChart", UILineChart], ["UIListView", UIListView], ["UIProgressRing", UIProgressRing], ["UIProgressView", UIProgressView], ["UIScrollView", UIScrollView], ["UISlider", UISlider], ["UISnapScrollView", UISnapScrollView], ["UIToggleButton", UIToggleButton], ["UIView", UIView], ["Visual", Visual]];
     const editorNodeTypeList = [["FloatingText", FloatingText], ["TouchEffect", TouchEffect], ["UIConfirmWindow", UIConfirmWindow], ["UIContextMenu", UIContextMenu], ["UIDialog", UIDialog], ["UIDropdown", UIDropdown], ["UIInputField", UIInputField], ["UIScrollBar", UIScrollBar], ["UISpinner", UISpinner], ["UIToast", UIToast], ["UIWindow", UIWindow], ["UIWindowLayer", UIWindowLayer]];
     for (const [typeName, componentType] of editorComponentTypeList) {
-      if (!System94.Object.hasOwn(this.#componentTypeTable, typeName)) {
+      if (!System96.Object.hasOwn(this.#componentTypeTable, typeName)) {
         this.#componentTypeTable[typeName] = componentType;
       }
     }
     for (const [typeName, nodeType] of editorNodeTypeList) {
-      if (!System94.Object.hasOwn(this.#nodeTypeTable, typeName)) {
+      if (!System96.Object.hasOwn(this.#nodeTypeTable, typeName)) {
         this.#nodeTypeTable[typeName] = nodeType;
       }
     }
@@ -39013,7 +40055,7 @@ var UIDocument = class _UIDocument extends Object2 {
         continue;
       }
       const isCurrentEmpty = currentValue === null || currentValue === void 0;
-      if (System94.Array.isArray(storedValue)) {
+      if (System96.Array.isArray(storedValue)) {
         if ((currentValue instanceof Color || isCurrentEmpty) && storedValue.length === 4) {
           component[property.setterName](arrayToColor(storedValue));
         } else if ((currentValue instanceof Vector2 || isCurrentEmpty) && storedValue.length === 2) {
@@ -39032,7 +40074,7 @@ var UIDocument = class _UIDocument extends Object2 {
     }
   }
 };
-var System95 = globalThis;
+var System97 = globalThis;
 var AnimationClip = class _AnimationClip extends Object2 {
   static {
     __name(this, "AnimationClip");
@@ -39051,7 +40093,7 @@ var AnimationClip = class _AnimationClip extends Object2 {
     const frameRects = [];
     for (const frameId of frameIds) {
       let frameData = null;
-      if (System95.Array.isArray(atlasJson)) {
+      if (System97.Array.isArray(atlasJson)) {
         frameData = atlasJson[frameId];
       } else if (atlasJson && atlasJson.frames) {
         frameData = atlasJson.frames[frameId];
@@ -39094,7 +40136,7 @@ var AnimationClip = class _AnimationClip extends Object2 {
     return this.#duration;
   }
 };
-var System96 = globalThis;
+var System98 = globalThis;
 var BlobAsset = class extends Asset {
   static {
     __name(this, "BlobAsset");
@@ -39111,24 +40153,24 @@ var BlobAsset = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    const response = await System96.fetch(assetPath);
+    const response = await System98.fetch(assetPath);
     if (!response.ok) {
       console.error(`Error loading blob: ${assetPath}`);
-      throw new System96.Error(`HTTP ${response.status}`);
+      throw new System98.Error(`HTTP ${response.status}`);
     }
     this.#blob = await response.blob();
     this.setLoaded(true);
   }
   loadFromBytes(assetPath, bytes) {
     this.setAssetPath(assetPath);
-    this.#blob = bytes instanceof System96.Blob ? bytes : new System96.Blob([bytes]);
+    this.#blob = bytes instanceof System98.Blob ? bytes : new System98.Blob([bytes]);
     this.setLoaded(true);
   }
   getBlob() {
     return this.#blob;
   }
 };
-var System97 = globalThis;
+var System99 = globalThis;
 var TextAsset = class extends Asset {
   static {
     __name(this, "TextAsset");
@@ -39148,13 +40190,13 @@ var TextAsset = class extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System97.Promise.resolve();
+      return System99.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System97.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : void 0);
+      const response = await System99.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : void 0);
       if (!response.ok) {
-        throw new System97.Error(`HTTP ${response.status}`);
+        throw new System99.Error(`HTTP ${response.status}`);
       }
       this.text = await response.text();
       this.setLoaded(true);
@@ -39165,7 +40207,7 @@ var TextAsset = class extends Asset {
   }
   loadFromBytes(assetPath, bytes) {
     this.setAssetPath(assetPath);
-    const textDecoder = new System97.TextDecoder("utf-8");
+    const textDecoder = new System99.TextDecoder("utf-8");
     this.text = textDecoder.decode(bytes);
     this.setLoaded(true);
   }
@@ -39174,7 +40216,7 @@ var TextAsset = class extends Asset {
     this.text = "";
   }
 };
-var System98 = globalThis;
+var System100 = globalThis;
 var JsonAsset = class extends TextAsset {
   static {
     __name(this, "JsonAsset");
@@ -39188,7 +40230,7 @@ var JsonAsset = class extends TextAsset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System98.Promise.resolve();
+      return System100.Promise.resolve();
     }
     try {
       await super.load(assetPath);
@@ -39216,7 +40258,7 @@ var JsonAsset = class extends TextAsset {
     this.data = null;
   }
 };
-var System99 = globalThis;
+var System101 = globalThis;
 var VisualAsset = class _VisualAsset extends Asset {
   static {
     __name(this, "VisualAsset");
@@ -39230,13 +40272,13 @@ var VisualAsset = class _VisualAsset extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System99.Promise.resolve();
+      return System101.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System99.fetch(assetPath);
+      const response = await System101.fetch(assetPath);
       if (!response.ok) {
-        throw new System99.Error(`HTTP ${response.status}`);
+        throw new System101.Error(`HTTP ${response.status}`);
       }
       const documentText = await response.text();
       const visual = _VisualAsset.createVisualFromText(documentText);
@@ -39252,10 +40294,10 @@ var VisualAsset = class _VisualAsset extends Asset {
     return super.unload();
   }
   static createVisualFromText(documentText) {
-    const documentData = System99.JSON.parse(documentText);
-    const isDocumentObject = documentData !== null && typeof documentData === "object" && !System99.Array.isArray(documentData);
-    if (!isDocumentObject || documentData.root === null || typeof documentData.root !== "object" || System99.Array.isArray(documentData.root)) {
-      throw new System99.Error("VisualAsset: invalid document.");
+    const documentData = System101.JSON.parse(documentText);
+    const isDocumentObject = documentData !== null && typeof documentData === "object" && !System101.Array.isArray(documentData);
+    if (!isDocumentObject || documentData.root === null || typeof documentData.root !== "object" || System101.Array.isArray(documentData.root)) {
+      throw new System101.Error("VisualAsset: invalid document.");
     }
     const visual = new Visual();
     visual.setDocumentText(documentText);
@@ -39506,7 +40548,7 @@ var VirtualPad = class extends Object2 {
     return this.#ballColor;
   }
 };
-var System100 = globalThis;
+var System102 = globalThis;
 var NodeLayout = class _NodeLayout extends Object2 {
   static {
     __name(this, "NodeLayout");
@@ -39529,14 +40571,14 @@ var NodeLayout = class _NodeLayout extends Object2 {
       return;
     }
     const angleStepRadian = options.angleStepRadian !== void 0 ? options.angleStepRadian : 0.12;
-    const baseAngleRadian = options.baseAngleRadian !== void 0 ? options.baseAngleRadian : -System100.Math.PI / 2;
+    const baseAngleRadian = options.baseAngleRadian !== void 0 ? options.baseAngleRadian : -System102.Math.PI / 2;
     const rotateNodes = options.rotateNodes !== void 0 ? options.rotateNodes : true;
     const middleIndex = (count - 1) / 2;
     for (let index = 0; index < count; ++index) {
       const node = nodeList[index];
       const angleRadian = baseAngleRadian + (index - middleIndex) * angleStepRadian;
-      const positionX = options.centerX + System100.Math.cos(angleRadian) * options.radius;
-      const positionY = options.centerY + System100.Math.sin(angleRadian) * options.radius;
+      const positionX = options.centerX + System102.Math.cos(angleRadian) * options.radius;
+      const positionY = options.centerY + System102.Math.sin(angleRadian) * options.radius;
       node.setLocalPosition(Vector2.create(positionX, positionY));
       if (rotateNodes) {
         const rotationDegree = radianToDegree(angleRadian - baseAngleRadian);
@@ -39638,7 +40680,7 @@ var NodeLayout = class _NodeLayout extends Object2 {
     return this.#node;
   }
 };
-var System101 = globalThis;
+var System103 = globalThis;
 var Set2 = class _Set extends Object2 {
   static {
     __name(this, "Set");
@@ -39646,7 +40688,7 @@ var Set2 = class _Set extends Object2 {
   #items;
   constructor() {
     super();
-    this.#items = new System101.Set();
+    this.#items = new System103.Set();
   }
   add(item) {
     this.#items.add(item);
@@ -39844,8 +40886,8 @@ var Dictionary = class extends Object2 {
     return Array.from(items.values());
   }
 };
-var System102 = globalThis;
-var AnimationConditionMode = System102.Object.freeze({ if: "if", ifNot: "ifNot", greater: "greater", less: "less", equals: "equals", notEqual: "notEqual" });
+var System104 = globalThis;
+var AnimationConditionMode = System104.Object.freeze({ if: "if", ifNot: "ifNot", greater: "greater", less: "less", equals: "equals", notEqual: "notEqual" });
 var AnimationState = class extends Object2 {
   static {
     __name(this, "AnimationState");
@@ -39914,11 +40956,11 @@ var AnimationState = class extends Object2 {
     const normalizedTime = time / duration;
     let cycleTime = 0;
     if (this.isLoop()) {
-      cycleTime = normalizedTime - System102.Math.floor(normalizedTime);
+      cycleTime = normalizedTime - System104.Math.floor(normalizedTime);
     } else {
-      cycleTime = System102.Math.min(System102.Math.max(normalizedTime, 0), 1);
+      cycleTime = System104.Math.min(System104.Math.max(normalizedTime, 0), 1);
     }
-    return System102.Math.min(System102.Math.floor(cycleTime * frameCount), frameCount - 1);
+    return System104.Math.min(System104.Math.floor(cycleTime * frameCount), frameCount - 1);
   }
 };
 var AnimationTransition = class extends Object2 {
@@ -39993,7 +41035,7 @@ var AnimationTransition = class extends Object2 {
     let crossingTime = exitTime;
     const isLoop = state.isLoop();
     if (isLoop && exitTime < 1) {
-      crossingTime = exitTime + System102.Math.max(0, System102.Math.ceil(previousNormalizedTime - exitTime));
+      crossingTime = exitTime + System104.Math.max(0, System104.Math.ceil(previousNormalizedTime - exitTime));
     }
     return previousNormalizedTime <= crossingTime && crossingTime < currentNormalizedTime;
   }
@@ -40059,7 +41101,7 @@ var Animator = class extends Object2 {
   play(stateIndex) {
     const states = this.getStates();
     const stateCount = states.getCount();
-    if (!System102.Number.isInteger(stateIndex) || stateIndex < 0 || stateIndex >= stateCount) {
+    if (!System104.Number.isInteger(stateIndex) || stateIndex < 0 || stateIndex >= stateCount) {
       return;
     }
     this.#currentStateIndex = stateIndex;
@@ -40119,7 +41161,7 @@ var Animator = class extends Object2 {
   startTransition(transitionIndex) {
     const transitions = this.getTransitions();
     const transitionCount = transitions.getCount();
-    if (!System102.Number.isInteger(transitionIndex) || transitionIndex < 0 || transitionIndex >= transitionCount) {
+    if (!System104.Number.isInteger(transitionIndex) || transitionIndex < 0 || transitionIndex >= transitionCount) {
       return;
     }
     const transition = transitions.getAt(transitionIndex);
@@ -40190,7 +41232,7 @@ var Animator = class extends Object2 {
     return parameter.value;
   }
   setInteger(name, value) {
-    this.#parameters.add(name, { type: "int", value: System102.Math.trunc(value) });
+    this.#parameters.add(name, { type: "int", value: System104.Math.trunc(value) });
   }
   getInteger(name) {
     const parameters = this.getParameters();
@@ -40308,7 +41350,7 @@ var Animator = class extends Object2 {
     if (nextStateIndex === null || this.#transitionDuration <= 0) {
       return 0;
     }
-    return System102.Math.min(System102.Math.max(this.#transitionElapsed / this.#transitionDuration, 0), 1);
+    return System104.Math.min(System104.Math.max(this.#transitionElapsed / this.#transitionDuration, 0), 1);
   }
 };
 var Action = class extends Object2 {
@@ -40577,64 +41619,8 @@ var ShaderWarmer = class {
     return this.#parallelExtension;
   }
 };
-var FULLSCREEN_VERTEXSHADER_SOURCE = `#version 300 es
-out vec2 fragmentCoordinate;
-out vec2 fragmentTextureCoordinate;
-void main() {
-	vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
-	vec2 position = positions[gl_VertexID];
-	fragmentCoordinate = position;
-	fragmentTextureCoordinate = position * 0.5 + 0.5;
-	gl_Position = vec4(position, 0.999, 1.0);
-}
-`;
-var FullscreenPass = class extends Object2 {
-  static {
-    __name(this, "FullscreenPass");
-  }
-  #webGL2RenderingContext;
-  #shaderProgram;
-  #vertexArray;
-  constructor(webGL2RenderingContext, fragmentShaderSource) {
-    super();
-    this.#webGL2RenderingContext = webGL2RenderingContext;
-    this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE.trim(), fragmentShaderSource.trim());
-    this.#vertexArray = webGL2RenderingContext.createVertexArray();
-  }
-  useProgram() {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const shaderProgram = this.getShaderProgram();
-    shaderProgram.useProgram();
-    const vertexArray = this.getVertexArray();
-    webGL2RenderingContext.bindVertexArray(vertexArray);
-  }
-  draw() {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
-  }
-  getUniformLocation(uniformName) {
-    const shaderProgram = this.getShaderProgram();
-    const uniformLocation = shaderProgram.getUniformLocation(uniformName);
-    return uniformLocation;
-  }
-  getWebGL2RenderingContext() {
-    return this.#webGL2RenderingContext;
-  }
-  getShaderProgram() {
-    return this.#shaderProgram;
-  }
-  getVertexArray() {
-    return this.#vertexArray;
-  }
-  destroy() {
-    const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const shaderProgram = this.getShaderProgram();
-    webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
-    webGL2RenderingContext.deleteVertexArray(this.#vertexArray);
-  }
-};
-var System103 = globalThis;
-var ZERO_CLEAR_FLOAT_VALUE = new System103.Float32Array(4);
+var System105 = globalThis;
+var ZERO_CLEAR_FLOAT_VALUE = new System105.Float32Array(4);
 var BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -40689,8 +41675,8 @@ var BloomEffect = class extends Object2 {
     this.#iterationCount = 2;
   }
   resize(sceneWidth, sceneHeight) {
-    const halfWidth = System103.Math.max(1, sceneWidth >> 1);
-    const halfHeight = System103.Math.max(1, sceneHeight >> 1);
+    const halfWidth = System105.Math.max(1, sceneWidth >> 1);
+    const halfHeight = System105.Math.max(1, sceneHeight >> 1);
     this.#pingRenderTarget.resize(halfWidth, halfHeight);
     this.#pongRenderTarget.resize(halfWidth, halfHeight);
   }
@@ -40753,8 +41739,8 @@ var BloomEffect = class extends Object2 {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const pingRenderTarget = this.getPingRenderTarget();
     const pongRenderTarget = this.getPongRenderTarget();
-    const width = System103.Math.max(1, pingRenderTarget.getWidth());
-    const height = System103.Math.max(1, pingRenderTarget.getHeight());
+    const width = System105.Math.max(1, pingRenderTarget.getWidth());
+    const height = System105.Math.max(1, pingRenderTarget.getHeight());
     pingRenderTarget.destroy();
     pongRenderTarget.destroy();
     this.#pingRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, false, { useFloatColor });
@@ -40789,11 +41775,11 @@ var BloomEffect = class extends Object2 {
     return this.#pongRenderTarget;
   }
 };
-var System104 = globalThis;
+var System106 = globalThis;
 var FBX_TIME_UNIT = 46186158e3;
 function readExactInteger(bigValue) {
-  if (bigValue <= System104.BigInt(System104.Number.MAX_SAFE_INTEGER) && bigValue >= System104.BigInt(System104.Number.MIN_SAFE_INTEGER)) {
-    return System104.Number(bigValue);
+  if (bigValue <= System106.BigInt(System106.Number.MAX_SAFE_INTEGER) && bigValue >= System106.BigInt(System106.Number.MIN_SAFE_INTEGER)) {
+    return System106.Number(bigValue);
   }
   return bigValue;
 }
@@ -40830,12 +41816,12 @@ var FbxLoader = class _FbxLoader extends Object2 {
     super();
     this.#dataView = null;
     this.#fileBytes = null;
-    this.#textDecoder = new System104.TextDecoder();
+    this.#textDecoder = new System106.TextDecoder();
     this.#readCursor = 0;
     this.#useWideOffsets = false;
   }
   static async loadFromUrl(url) {
-    const response = await System104.fetch(url);
+    const response = await System106.fetch(url);
     if (!response.ok) {
       throw new Error(`FbxLoader load failed: ${url}`);
     }
@@ -40850,8 +41836,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return sceneData;
   }
   async parseNodeRecords(arrayBuffer) {
-    this.#fileBytes = new System104.Uint8Array(arrayBuffer);
-    this.#dataView = new System104.DataView(arrayBuffer);
+    this.#fileBytes = new System106.Uint8Array(arrayBuffer);
+    this.#dataView = new System106.DataView(arrayBuffer);
     const magicText = this.#textDecoder.decode(this.#fileBytes.subarray(0, 20));
     if (!magicText.startsWith("Kaydara FBX Binary")) {
       throw new Error("FbxLoader: not a binary FBX file.");
@@ -40870,13 +41856,13 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return topNodeList;
   }
   static readVersion(arrayBuffer) {
-    const dataView = new System104.DataView(arrayBuffer);
+    const dataView = new System106.DataView(arrayBuffer);
     return dataView.getUint32(23, true);
   }
   readOffsetValue() {
     const dataView = this.getDataView();
     if (this.#useWideOffsets) {
-      const value2 = System104.Number(dataView.getBigUint64(this.#readCursor, true));
+      const value2 = System106.Number(dataView.getBigUint64(this.#readCursor, true));
       this.#readCursor += 8;
       return value2;
     }
@@ -40931,27 +41917,27 @@ var FbxLoader = class _FbxLoader extends Object2 {
       sourceBytes = fileBytes.subarray(this.#readCursor, this.#readCursor + rawByteLength);
       this.#readCursor += rawByteLength;
     }
-    const elementView = new System104.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
-    const resultArray = new System104.Array(arrayLength);
+    const elementView = new System106.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
+    const resultArray = new System106.Array(arrayLength);
     for (let elementIndex = 0; elementIndex < arrayLength; ++elementIndex) {
       resultArray[elementIndex] = readElement(elementView, elementIndex * elementByteSize);
     }
     return resultArray;
   }
   async inflate(compressedBytes) {
-    const decompressionStream = new System104.DecompressionStream("deflate");
-    const sourceResponse = new System104.Response(compressedBytes);
+    const decompressionStream = new System106.DecompressionStream("deflate");
+    const sourceResponse = new System106.Response(compressedBytes);
     const decompressedStream = sourceResponse.body.pipeThrough(decompressionStream);
-    const decompressedResponse = new System104.Response(decompressedStream);
+    const decompressedResponse = new System106.Response(decompressedStream);
     const decompressedArrayBuffer = await decompressedResponse.arrayBuffer();
-    const decompressedBytes = new System104.Uint8Array(decompressedArrayBuffer);
+    const decompressedBytes = new System106.Uint8Array(decompressedArrayBuffer);
     return decompressedBytes;
   }
   async readProperty() {
     const dataView = this.getDataView();
     const fileBytes = this.getFileBytes();
     const textDecoder = this.getTextDecoder();
-    const typeCode = System104.String.fromCharCode(dataView.getUint8(this.#readCursor));
+    const typeCode = System106.String.fromCharCode(dataView.getUint8(this.#readCursor));
     this.#readCursor += 1;
     switch (typeCode) {
       case "Y": {
@@ -40993,7 +41979,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "l": {
-        const value = await this.readArrayProperty(8, (view, offset) => System104.Number(view.getBigInt64(offset, true)));
+        const value = await this.readArrayProperty(8, (view, offset) => System106.Number(view.getBigInt64(offset, true)));
         return { type: typeCode, value };
       }
       case "i": {
@@ -41048,7 +42034,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         propertyConnectionList.push({ sourceId, destinationId, propertyName });
       }
     }
-    const objectById = new System104.Map();
+    const objectById = new System106.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       objectById.set(objectId, objectNode);
@@ -41064,7 +42050,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return sceneData;
   }
   interpretGeometries(objectsNode) {
-    const geometryById = new System104.Map();
+    const geometryById = new System106.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Geometry") {
         continue;
@@ -41120,11 +42106,11 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const uvReader = this.buildLayerReader(geometryNode, "LayerElementUV", "UV", 2);
     const materialLayer = this.buildMaterialLayer(geometryNode);
     const triangleCount = cornerVertexIndices.length / 3;
-    const outputPositions = new System104.Float32Array(cornerVertexIndices.length * 3);
-    const outputNormals = new System104.Float32Array(cornerVertexIndices.length * 3);
-    const outputTextureCoordinates = new System104.Float32Array(cornerVertexIndices.length * 2);
-    const outputOriginalVertexIndices = new System104.Int32Array(cornerVertexIndices.length);
-    const materialIndexPerTriangle = new System104.Int32Array(triangleCount);
+    const outputPositions = new System106.Float32Array(cornerVertexIndices.length * 3);
+    const outputNormals = new System106.Float32Array(cornerVertexIndices.length * 3);
+    const outputTextureCoordinates = new System106.Float32Array(cornerVertexIndices.length * 2);
+    const outputOriginalVertexIndices = new System106.Int32Array(cornerVertexIndices.length);
+    const materialIndexPerTriangle = new System106.Int32Array(triangleCount);
     for (let cornerIndex = 0; cornerIndex < cornerVertexIndices.length; ++cornerIndex) {
       const originalVertexIndex = cornerVertexIndices[cornerIndex];
       const polygonVertexPosition = cornerPolygonVertexPositions[cornerIndex];
@@ -41150,7 +42136,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const layerNode = geometryNode.children.find((child) => child.name === layerElementName);
     if (!layerNode) {
       return () => {
-        const zeroVector = new System104.Array(componentCount).fill(0);
+        const zeroVector = new System106.Array(componentCount).fill(0);
         return zeroVector;
       };
     }
@@ -41164,7 +42150,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const indexArray = indexNode && indexNode.properties.length > 0 ? indexNode.properties[0].value : null;
     if (dataArray === null) {
       return () => {
-        const zeroVector = new System104.Array(componentCount).fill(0);
+        const zeroVector = new System106.Array(componentCount).fill(0);
         return zeroVector;
       };
     }
@@ -41181,7 +42167,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       if (referenceType === "IndexToDirect" && indexArray) {
         dataIndex = mappedIndex < indexArray.length ? indexArray[mappedIndex] : -1;
       }
-      const componentValues = new System104.Array(componentCount);
+      const componentValues = new System106.Array(componentCount);
       for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
         const value = dataIndex >= 0 ? dataArray[dataIndex * componentCount + componentIndex] : void 0;
         componentValues[componentIndex] = value !== void 0 ? value : 0;
@@ -41209,8 +42195,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
     };
   }
   interpretSkins(objectsNode, objectConnectionList) {
-    const skinDeformerById = new System104.Map();
-    const clusterById = new System104.Map();
+    const skinDeformerById = new System106.Map();
+    const clusterById = new System106.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Deformer") {
         continue;
@@ -41241,7 +42227,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return skinResult;
   }
   interpretVideos(objectsNode) {
-    const videoById = new System104.Map();
+    const videoById = new System106.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Video") {
         continue;
@@ -41252,7 +42238,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       const video = { contentBytes: contentNode && contentNode.properties.length > 0 ? contentNode.properties[0].value : null, filename: filenameNode ? filenameNode.properties[0].value : "" };
       videoById.set(videoId, video);
     }
-    const contentByFileName = new System104.Map();
+    const contentByFileName = new System106.Map();
     for (const video of videoById.values()) {
       if (!video.contentBytes || video.contentBytes.length === 0) {
         continue;
@@ -41281,7 +42267,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return fileName;
   }
   interpretTextures(objectsNode, objectConnectionList) {
-    const textureById = new System104.Map();
+    const textureById = new System106.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Texture") {
         continue;
@@ -41300,7 +42286,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return textureById;
   }
   interpretMaterials(objectsNode, propertyConnectionList, textureById) {
-    const materialById = new System104.Map();
+    const materialById = new System106.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Material") {
         continue;
@@ -41346,7 +42332,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
   }
   interpretModels(objectsNode, objectConnectionList, geometryById, skinDeformerById, materialById) {
     const nodeList = [];
-    const nodeIdToIndex = new System104.Map();
+    const nodeIdToIndex = new System106.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Model") {
         continue;
@@ -41408,10 +42394,10 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return nodeResult;
   }
   interpretAnimations(objectsNode, objectConnectionList, propertyConnectionList, nodeIdToIndex) {
-    const curveById = new System104.Map();
-    const curveNodeById = new System104.Map();
+    const curveById = new System106.Map();
+    const curveNodeById = new System106.Map();
     const layerIds = [];
-    const stackById = new System104.Map();
+    const stackById = new System106.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       if (objectNode.name === "AnimationCurve") {
@@ -41437,7 +42423,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         curveNode.targetProperty = connection.propertyName;
       }
     }
-    const layerIdByCurveNodeId = new System104.Map();
+    const layerIdByCurveNodeId = new System106.Map();
     for (const connection of objectConnectionList) {
       if (layerIds.includes(connection.sourceId) && stackById.has(connection.destinationId)) {
         const stack = stackById.get(connection.destinationId);
@@ -41461,7 +42447,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         const channelResult = this.buildAnimationChannel(curveNode, curveById, nodeIdToIndex);
         if (channelResult) {
           channelList.push(channelResult.channel);
-          duration = System104.Math.max(duration, channelResult.duration);
+          duration = System106.Math.max(duration, channelResult.duration);
         }
       }
       animationList.push({ name: stack.name, duration, channels: channelList });
@@ -41481,7 +42467,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       return null;
     }
     const channelNames = ["X", "Y", "Z"];
-    const timeSet = new System104.Set();
+    const timeSet = new System106.Set();
     for (const channelName of channelNames) {
       const curveId = curveNode.curveByChannel[channelName];
       if (curveId === void 0) {
@@ -41492,13 +42478,13 @@ var FbxLoader = class _FbxLoader extends Object2 {
         timeSet.add(keyTime);
       }
     }
-    const sortedTimes = System104.Array.from(timeSet).sort((left, right) => left - right);
+    const sortedTimes = System106.Array.from(timeSet).sort((left, right) => left - right);
     if (sortedTimes.length === 0) {
       return null;
     }
     const componentCount = path === "rotation" ? 3 : 3;
-    const times = new System104.Float32Array(sortedTimes.length);
-    const values = new System104.Float32Array(sortedTimes.length * componentCount);
+    const times = new System106.Float32Array(sortedTimes.length);
+    const values = new System106.Float32Array(sortedTimes.length * componentCount);
     for (let timeIndex = 0; timeIndex < sortedTimes.length; ++timeIndex) {
       times[timeIndex] = sortedTimes[timeIndex] / FBX_TIME_UNIT;
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -41547,7 +42533,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     return this.#textDecoder;
   }
 };
-var System105 = globalThis;
+var System107 = globalThis;
 var TEXTURE_UNIT_BASECOLOR = 0;
 var TEXTURE_UNIT_NORMAL = 2;
 var TEXTURE_UNIT_METALLICROUGHNESS = 3;
@@ -41558,15 +42544,15 @@ var TEXTURE_UNIT_SPECULAR = 7;
 var TEXTURE_UNIT_OPACITY = 8;
 function computeMipmapByteCount(width, height) {
   let byteCount = 0;
-  let levelWidth = System105.Math.max(1, width);
-  let levelHeight = System105.Math.max(1, height);
+  let levelWidth = System107.Math.max(1, width);
+  let levelHeight = System107.Math.max(1, height);
   while (true) {
     byteCount += levelWidth * levelHeight * 4;
     if (levelWidth === 1 && levelHeight === 1) {
       break;
     }
-    levelWidth = System105.Math.max(1, System105.Math.floor(levelWidth / 2));
-    levelHeight = System105.Math.max(1, System105.Math.floor(levelHeight / 2));
+    levelWidth = System107.Math.max(1, System107.Math.floor(levelWidth / 2));
+    levelHeight = System107.Math.max(1, System107.Math.floor(levelHeight / 2));
   }
   return byteCount;
 }
@@ -41599,7 +42585,7 @@ var Material = class _Material extends Object2 {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#shaderProgram = shaderProgram;
-    this.#extraTextureBindings = new System105.Map();
+    this.#extraTextureBindings = new System107.Map();
     this.#subsurfaceFactor = 1;
     this.#baseColorFactor = [1, 1, 1];
     this.#metallicFactor = 1;
@@ -41661,19 +42647,19 @@ var Material = class _Material extends Object2 {
     if (!hasBytes && !hasSource) {
       const fallbackTexture = webGL2RenderingContext.createTexture();
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, fallbackTexture);
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System105.Uint8Array(fallbackColor));
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System107.Uint8Array(fallbackColor));
       return { glTexture: fallbackTexture, byteCount: 4 };
     }
     let imageSource = imageDescription.source;
     if (!hasSource) {
       const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
-      imageSource = new System105.Blob([imageDescription.bytes], blobOptions);
+      imageSource = new System107.Blob([imageDescription.bytes], blobOptions);
     }
     const bitmapOptions = { premultiplyAlpha: "none", colorSpaceConversion: "none" };
     if (imageDescription.flipY) {
       bitmapOptions.imageOrientation = "flipY";
     }
-    const imageBitmap = await System105.createImageBitmap(imageSource, bitmapOptions);
+    const imageBitmap = await System107.createImageBitmap(imageSource, bitmapOptions);
     const glTexture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
     const internalFormat = imageDescription.isColorData ? webGL2RenderingContext.SRGB8_ALPHA8 : webGL2RenderingContext.RGBA8;
@@ -41687,20 +42673,20 @@ var Material = class _Material extends Object2 {
       const anisotropicExtension = webGL2RenderingContext.getExtension("EXT_texture_filter_anisotropic");
       if (anisotropicExtension) {
         const maximumAnisotropy = webGL2RenderingContext.getParameter(anisotropicExtension.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-        const anisotropy = System105.Math.min(imageDescription.anisotropy, maximumAnisotropy);
+        const anisotropy = System107.Math.min(imageDescription.anisotropy, maximumAnisotropy);
         webGL2RenderingContext.texParameterf(webGL2RenderingContext.TEXTURE_2D, anisotropicExtension.TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
       }
     }
     return { glTexture, byteCount: computeMipmapByteCount(imageBitmap.width, imageBitmap.height) };
   }
   static async loadImageDescription(url, options = null) {
-    const response = await System105.fetch(url);
+    const response = await System107.fetch(url);
     if (!response.ok) {
       throw new Error(`Material image load failed: ${url}`);
     }
     const arrayBuffer = await response.arrayBuffer();
     const contentType = response.headers.get("content-type");
-    const imageDescription = _Material.createImageDescription(new System105.Uint8Array(arrayBuffer), contentType ? contentType : null, options);
+    const imageDescription = _Material.createImageDescription(new System107.Uint8Array(arrayBuffer), contentType ? contentType : null, options);
     return imageDescription;
   }
   static createImageDescription(bytes, mimeType = null, options = null) {
@@ -41781,7 +42767,7 @@ var Material = class _Material extends Object2 {
     material.#emissiveTexture = this.#emissiveTexture;
     material.#specularTexture = this.#specularTexture;
     material.#opacityTexture = this.#opacityTexture;
-    material.#extraTextureBindings = new System105.Map(this.#extraTextureBindings);
+    material.#extraTextureBindings = new System107.Map(this.#extraTextureBindings);
     material.#ownsTextures = false;
     material.#textureByteCount = 0;
     return material;
@@ -41830,8 +42816,8 @@ var Material = class _Material extends Object2 {
     this.#opacityTexture = null;
   }
 };
-var System106 = globalThis;
-var assetCacheTable = new System106.Map();
+var System108 = globalThis;
+var assetCacheTable = new System108.Map();
 var SkinnedModelAsset = class _SkinnedModelAsset extends Object2 {
   static {
     __name(this, "SkinnedModelAsset");
@@ -41912,7 +42898,7 @@ var SkinnedModelAsset = class _SkinnedModelAsset extends Object2 {
     const shaderProgram = asset.getShaderProgram();
     let assetTable = assetCacheTable.get(shaderProgram);
     if (!assetTable) {
-      assetTable = new System106.Map();
+      assetTable = new System108.Map();
       assetCacheTable.set(shaderProgram, assetTable);
     }
     const previousAsset = assetTable.get(normalizedKey);
@@ -42037,32 +43023,32 @@ var SkinnedModelAsset = class _SkinnedModelAsset extends Object2 {
     return this.#animationList;
   }
 };
-var System107 = globalThis;
+var System109 = globalThis;
 var GLB_CHUNKTYPE_JSON = 1313821514;
 var GLB_CHUNKTYPE_BINARY = 5130562;
-var COMPONENT_ARRAY_TABLE = { 5120: System107.Int8Array, 5121: System107.Uint8Array, 5122: System107.Int16Array, 5123: System107.Uint16Array, 5125: System107.Uint32Array, 5126: System107.Float32Array };
+var COMPONENT_ARRAY_TABLE = { 5120: System109.Int8Array, 5121: System109.Uint8Array, 5122: System109.Int16Array, 5123: System109.Uint16Array, 5125: System109.Uint32Array, 5126: System109.Float32Array };
 var TYPE_COMPONENT_COUNT_TABLE = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 var NORMALIZED_DIVISOR_TABLE = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
 var SUPPORTED_EXTENSION_LIST = ["KHR_mesh_quantization", "KHR_texture_transform"];
 var UNSUPPORTED_EXTENSION_MESSAGE_TABLE = { EXT_meshopt_compression: "SkinnedModel: required extension EXT_meshopt_compression (meshopt compression) is not supported yet. (KHR_mesh_quantization without compression is supported)", KHR_draco_mesh_compression: "SkinnedModel: required extension KHR_draco_mesh_compression (Draco compression) is not supported. (KHR_mesh_quantization without compression is supported)" };
 var MORPH_TEXTURE_WIDTH = 2048;
-var ANIMATION_PATH_SET = new System107.Set(["translation", "rotation", "scale", "weights"]);
+var ANIMATION_PATH_SET = new System109.Set(["translation", "rotation", "scale", "weights"]);
 var MORPH_TARGET_MAXIMUM = 96;
-var pendingAssetLoadTable = new System107.Map();
+var pendingAssetLoadTable = new System109.Map();
 function createInstanceNode(templateNode) {
   return { ...templateNode, currentTranslation: templateNode.currentTranslation.slice(), currentScale: templateNode.currentScale.slice(), worldMatrix: templateNode.worldMatrix.clone() };
 }
 __name(createInstanceNode, "createInstanceNode");
 function createInstanceSkin(templateSkin) {
-  return { ...templateSkin, jointMatrixArray: new System107.Float32Array(templateSkin.jointMatrixArray.length) };
+  return { ...templateSkin, jointMatrixArray: new System109.Float32Array(templateSkin.jointMatrixArray.length) };
 }
 __name(createInstanceSkin, "createInstanceSkin");
 function createInstanceDrawable(templateDrawable) {
-  return { ...templateDrawable, wireframeIndexBuffer: null, wireframeIndexCount: 0, wireframeIndexComponentType: 0, morphWeights: new System107.Float32Array(templateDrawable.morphWeights), isMorphTextureShared: templateDrawable.morphTexture !== null, isMorphDirty: false };
+  return { ...templateDrawable, wireframeIndexBuffer: null, wireframeIndexCount: 0, wireframeIndexComponentType: 0, morphWeights: new System109.Float32Array(templateDrawable.morphWeights), isMorphTextureShared: templateDrawable.morphTexture !== null, isMorphDirty: false };
 }
 __name(createInstanceDrawable, "createInstanceDrawable");
 function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
-  const degreeToRadian2 = System107.Math.PI / 180;
+  const degreeToRadian2 = System109.Math.PI / 180;
   const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
   const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian2, 0);
   const rotationZ = Quaternion.createFromEuler(0, 0, zDegree * degreeToRadian2);
@@ -42082,7 +43068,7 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
       const sourceFbxNode = sceneData.nodeList[fbxChannel.nodeIndex];
       const preRotationQuaternion = createQuaternionFromFbxEuler(sourceFbxNode.preRotationDegrees[0], sourceFbxNode.preRotationDegrees[1], sourceFbxNode.preRotationDegrees[2]);
       const keyCount = fbxChannel.times.length;
-      const quaternionValues = new System107.Float32Array(keyCount * 4);
+      const quaternionValues = new System109.Float32Array(keyCount * 4);
       for (let keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
         const eulerQuaternion = createQuaternionFromFbxEuler(fbxChannel.values[keyIndex * 3], fbxChannel.values[keyIndex * 3 + 1], fbxChannel.values[keyIndex * 3 + 2]);
         const rotationQuaternion = preRotationQuaternion.multiply(eulerQuaternion);
@@ -42157,11 +43143,11 @@ function readFloatAccessorArray(json, binaryBuffer, accessorIndex) {
   const sourceArray = readAccessorArray(json, binaryBuffer, accessorIndex);
   const divisor = NORMALIZED_DIVISOR_TABLE[accessor.componentType];
   if (accessor.normalized !== true || divisor === void 0) {
-    return new System107.Float32Array(sourceArray);
+    return new System109.Float32Array(sourceArray);
   }
-  const resultArray = new System107.Float32Array(sourceArray.length);
+  const resultArray = new System109.Float32Array(sourceArray.length);
   for (let valueIndex = 0; valueIndex < sourceArray.length; ++valueIndex) {
-    resultArray[valueIndex] = System107.Math.max(sourceArray[valueIndex] / divisor, -1);
+    resultArray[valueIndex] = System109.Math.max(sourceArray[valueIndex] / divisor, -1);
   }
   return resultArray;
 }
@@ -42179,8 +43165,8 @@ function applyTextureTransform(textureCoordinates, textureInfo, texCoordIndex) {
   const offset = transform.offset || [0, 0];
   const scale = transform.scale || [1, 1];
   const rotation = transform.rotation || 0;
-  const cosine = System107.Math.cos(rotation);
-  const sine = System107.Math.sin(rotation);
+  const cosine = System109.Math.cos(rotation);
+  const sine = System109.Math.sin(rotation);
   for (let valueIndex = 0; valueIndex + 1 < textureCoordinates.length; valueIndex += 2) {
     const scaledU = textureCoordinates[valueIndex] * scale[0];
     const scaledV = textureCoordinates[valueIndex + 1] * scale[1];
@@ -42202,12 +43188,12 @@ function unweldAttributeArray(values, cornerIndices, componentCount) {
 __name(unweldAttributeArray, "unweldAttributeArray");
 function createFlatNormalArrays(primitiveArrays) {
   const vertexCount = primitiveArrays.positions.length / 3;
-  const cornerIndices = primitiveArrays.indices !== null ? primitiveArrays.indices : System107.Array.from({ length: vertexCount }, (value, index) => {
+  const cornerIndices = primitiveArrays.indices !== null ? primitiveArrays.indices : System109.Array.from({ length: vertexCount }, (value, index) => {
     return index;
   });
   const positions = unweldAttributeArray(primitiveArrays.positions, cornerIndices, 3);
-  const normals = new System107.Float32Array(positions.length);
-  const triangleCount = System107.Math.floor(positions.length / 9);
+  const normals = new System109.Float32Array(positions.length);
+  const triangleCount = System109.Math.floor(positions.length / 9);
   for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
     const offset = triangleIndex * 9;
     const firstEdgeX = positions[offset + 3] - positions[offset];
@@ -42219,7 +43205,7 @@ function createFlatNormalArrays(primitiveArrays) {
     const crossX = firstEdgeY * secondEdgeZ - firstEdgeZ * secondEdgeY;
     const crossY = firstEdgeZ * secondEdgeX - firstEdgeX * secondEdgeZ;
     const crossZ = firstEdgeX * secondEdgeY - firstEdgeY * secondEdgeX;
-    const length = System107.Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+    const length = System109.Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
     if (length <= 0) {
       continue;
     }
@@ -42281,7 +43267,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     this.#fadeDuration = 0;
     this.#fadeElapsed = 0;
     this.#timeScale = 1;
-    this.#jointRotationOffsets = new System107.Map();
+    this.#jointRotationOffsets = new System109.Map();
     this.#asset = null;
     this.#instanceMaterialList = [];
   }
@@ -42290,7 +43276,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   }
   static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
     const model = await _SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, async () => {
-      const response = await System107.fetch(url);
+      const response = await System109.fetch(url);
       if (!response.ok) {
         throw new Error(`SkinnedModel load failed: ${url}`);
       }
@@ -42309,7 +43295,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     }
     let pendingTable = pendingAssetLoadTable.get(shaderProgram);
     if (!pendingTable) {
-      pendingTable = new System107.Map();
+      pendingTable = new System109.Map();
       pendingAssetLoadTable.set(shaderProgram, pendingTable);
     }
     const pendingPromise = pendingTable.get(assetKey);
@@ -42386,7 +43372,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     return model;
   }
   static readGlbChunks(arrayBuffer) {
-    const dataView = new System107.DataView(arrayBuffer);
+    const dataView = new System109.DataView(arrayBuffer);
     if (arrayBuffer.byteLength < 12 || dataView.getUint32(0, true) !== 1179937895) {
       throw new Error("SkinnedModel: not a GLB file.");
     }
@@ -42404,9 +43390,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         throw new Error("SkinnedModel: invalid GLB chunks.");
       }
       if (chunkType === GLB_CHUNKTYPE_JSON) {
-        const jsonBytes = new System107.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-        const jsonText = new System107.TextDecoder().decode(jsonBytes);
-        json = System107.JSON.parse(jsonText);
+        const jsonBytes = new System109.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+        const jsonText = new System109.TextDecoder().decode(jsonBytes);
+        json = System109.JSON.parse(jsonText);
       } else if (chunkType === GLB_CHUNKTYPE_BINARY) {
         binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
       }
@@ -42444,7 +43430,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
         inverseBindMatrices.push(matrix);
       }
-      return { jointNodeIndices: skin.joints.slice(), inverseBindMatrices, jointMatrixArray: new System107.Float32Array(skin.joints.length * 16) };
+      return { jointNodeIndices: skin.joints.slice(), inverseBindMatrices, jointMatrixArray: new System109.Float32Array(skin.joints.length * 16) };
     });
     function createImageDescription(textureInfo) {
       if (!textureInfo) {
@@ -42456,7 +43442,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         return null;
       }
       const bufferView = json.bufferViews[image.bufferView];
-      const imageBytes = new System107.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
+      const imageBytes = new System109.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
       return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
     }
     __name(createImageDescription, "createImageDescription");
@@ -42489,7 +43475,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const mesh = json.meshes[node.meshIndex];
       const isStaticMesh = node.skinIndex === void 0;
       if (isStaticMesh) {
-        this.#skinList.push({ jointNodeIndices: [nodeIndex], inverseBindMatrices: [Matrix4.createIdentity()], jointMatrixArray: new System107.Float32Array(16) });
+        this.#skinList.push({ jointNodeIndices: [nodeIndex], inverseBindMatrices: [Matrix4.createIdentity()], jointMatrixArray: new System109.Float32Array(16) });
         node.skinIndex = this.#skinList.length - 1;
       }
       const targetNameList = mesh.extras && mesh.extras.targetNames ? mesh.extras.targetNames : [];
@@ -42509,16 +43495,16 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         let joints = null;
         let weights = null;
         if (isStaticMesh) {
-          joints = new System107.Uint16Array(vertexCount * 4);
-          weights = new System107.Float32Array(vertexCount * 4);
+          joints = new System109.Uint16Array(vertexCount * 4);
+          weights = new System109.Float32Array(vertexCount * 4);
           for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
             weights[vertexIndex * 4] = 1;
           }
         } else {
-          joints = new System107.Uint16Array(readAccessorArray(json, binaryBuffer, primitive.attributes.JOINTS_0));
+          joints = new System109.Uint16Array(readAccessorArray(json, binaryBuffer, primitive.attributes.JOINTS_0));
           const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
           const weightSource = readAccessorArray(json, binaryBuffer, primitive.attributes.WEIGHTS_0);
-          weights = new System107.Float32Array(weightSource.length);
+          weights = new System109.Float32Array(weightSource.length);
           if (weightAccessor.componentType === 5126) {
             weights.set(weightSource);
           } else {
@@ -42531,7 +43517,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         let indices = null;
         if (primitive.indices !== void 0) {
           const indexSource = readAccessorArray(json, binaryBuffer, primitive.indices);
-          indices = indexSource instanceof System107.Uint8Array ? new System107.Uint16Array(indexSource) : indexSource;
+          indices = indexSource instanceof System109.Uint8Array ? new System109.Uint16Array(indexSource) : indexSource;
         }
         const morphTargets = [];
         const primitiveTargets = primitive.targets ? primitive.targets : [];
@@ -42545,7 +43531,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           const targetName = targetNameList[targetIndex] !== void 0 ? targetNameList[targetIndex] : `target${targetIndex}`;
           morphTargets.push({ name: targetName, positionDeltas, normalDeltas });
         }
-        const morphWeights = new System107.Float32Array(morphTargets.length);
+        const morphWeights = new System109.Float32Array(morphTargets.length);
         for (let weightIndex = 0; weightIndex < morphTargets.length; ++weightIndex) {
           morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== void 0 ? baseMorphWeights[weightIndex] : 0;
         }
@@ -42565,7 +43551,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         const times = readFloatAccessorArray(json, binaryBuffer, sampler.input);
         const values = readFloatAccessorArray(json, binaryBuffer, sampler.output);
         if (times.length > 0) {
-          duration = System107.Math.max(duration, times[times.length - 1]);
+          duration = System109.Math.max(duration, times[times.length - 1]);
         }
         const target = channel.target || {};
         if (target.node === void 0 || !ANIMATION_PATH_SET.has(target.path)) {
@@ -42592,7 +43578,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return { name: fbxNode.name, childIndices: fbxNode.childIndices, meshIndex: void 0, skinIndex: void 0, baseTranslation: fbxNode.translation.slice(), baseRotation, baseScale: fbxNode.scale.slice(), currentTranslation: [0, 0, 0], currentRotation: Quaternion.identity(), currentScale: [1, 1, 1], worldMatrix: Matrix4.createIdentity() };
     });
     this.#rootNodeIndices = sceneData.rootNodeIndices.slice();
-    const skinIdList = System107.Array.from(sceneData.skinDeformerById.keys());
+    const skinIdList = System109.Array.from(sceneData.skinDeformerById.keys());
     this.#skinList = skinIdList.map((skinId) => {
       const skinDeformer = sceneData.skinDeformerById.get(skinId);
       const jointNodeIndices = [];
@@ -42613,7 +43599,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
         inverseBindMatrices.push(inverseBindMatrix);
       }
-      return { jointNodeIndices, inverseBindMatrices, jointMatrixArray: new System107.Float32Array(jointNodeIndices.length * 16) };
+      return { jointNodeIndices, inverseBindMatrices, jointMatrixArray: new System109.Float32Array(jointNodeIndices.length * 16) };
     });
     function createFbxImageDescription(textureId) {
       if (textureId === null) {
@@ -42630,7 +43616,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return { bytes: video.contentBytes, mimeType: null, flipY: true };
     }
     __name(createFbxImageDescription, "createFbxImageDescription");
-    const materialIdList = System107.Array.from(sceneData.materialById.keys());
+    const materialIdList = System109.Array.from(sceneData.materialById.keys());
     const materialDescriptionList = materialIdList.map((materialId) => {
       const fbxMaterial = sceneData.materialById.get(materialId);
       const description = Material.createDefaultDescription();
@@ -42658,7 +43644,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       if (!geometry) {
         continue;
       }
-      const influencesPerVertex = new System107.Array(geometry.originalVertexCount);
+      const influencesPerVertex = new System109.Array(geometry.originalVertexCount);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         influencesPerVertex[vertexIndex] = [];
       }
@@ -42675,13 +43661,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           }
         }
       }
-      const vertexJointArray = new System107.Uint16Array(geometry.originalVertexCount * 4);
-      const vertexWeightArray = new System107.Float32Array(geometry.originalVertexCount * 4);
+      const vertexJointArray = new System109.Uint16Array(geometry.originalVertexCount * 4);
+      const vertexWeightArray = new System109.Float32Array(geometry.originalVertexCount * 4);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         const influenceList = influencesPerVertex[vertexIndex];
         influenceList.sort((left, right) => right.weight - left.weight);
         let weightSum = 0;
-        const usedCount = System107.Math.min(4, influenceList.length);
+        const usedCount = System109.Math.min(4, influenceList.length);
         for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
           weightSum += influenceList[slotIndex].weight;
         }
@@ -42694,8 +43680,8 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
       }
       const cornerCount = geometry.cornerCount;
-      const cornerJointArray = new System107.Uint16Array(cornerCount * 4);
-      const cornerWeightArray = new System107.Float32Array(cornerCount * 4);
+      const cornerJointArray = new System109.Uint16Array(cornerCount * 4);
+      const cornerWeightArray = new System109.Float32Array(cornerCount * 4);
       for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
         const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
         if (originalVertexIndex < 0 || originalVertexIndex >= geometry.originalVertexCount) {
@@ -42713,7 +43699,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       for (const subMesh of subMeshList) {
         const materialId = subMesh.localMaterialIndex < ownerMaterialIds.length ? ownerMaterialIds[subMesh.localMaterialIndex] : void 0;
         const materialIndex = materialId !== void 0 ? materialIdList.indexOf(materialId) : -1;
-        meshDescriptionList.push({ positions: subMesh.positions, normals: subMesh.normals, textureCoordinates: subMesh.textureCoordinates, joints: subMesh.joints, weights: subMesh.weights, indices: null, skinIndex: skinListIndex, materialIndex, materialName: materialIndex !== -1 ? sceneData.materialById.get(materialId).name : "", nodeIndex, morphTargets: [], morphWeights: new System107.Float32Array(0) });
+        meshDescriptionList.push({ positions: subMesh.positions, normals: subMesh.normals, textureCoordinates: subMesh.textureCoordinates, joints: subMesh.joints, weights: subMesh.weights, indices: null, skinIndex: skinListIndex, materialIndex, materialName: materialIndex !== -1 ? sceneData.materialById.get(materialId).name : "", nodeIndex, morphTargets: [], morphWeights: new System109.Float32Array(0) });
       }
     }
     this.#animationList = sceneData.animationList.map((fbxAnimation) => {
@@ -42727,12 +43713,12 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   }
   static splitFbxCornersByMaterial(materialIndexPerTriangle, cornerArrays) {
     const triangleCount = materialIndexPerTriangle.length;
-    const triangleCountByMaterial = new System107.Map();
+    const triangleCountByMaterial = new System109.Map();
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const localMaterialIndex = materialIndexPerTriangle[triangleIndex];
       triangleCountByMaterial.set(localMaterialIndex, (triangleCountByMaterial.get(localMaterialIndex) || 0) + 1);
     }
-    const localMaterialIndexList = System107.Array.from(triangleCountByMaterial.keys()).sort((left, right) => left - right);
+    const localMaterialIndexList = System109.Array.from(triangleCountByMaterial.keys()).sort((left, right) => left - right);
     if (localMaterialIndexList.length <= 1) {
       return [{ localMaterialIndex: localMaterialIndexList.length === 1 ? localMaterialIndexList[0] : 0, ...cornerArrays }];
     }
@@ -42740,7 +43726,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     return localMaterialIndexList.map((localMaterialIndex) => {
       const subCornerCount = triangleCountByMaterial.get(localMaterialIndex) * 3;
       const subMesh = { localMaterialIndex };
-      for (const arrayName of System107.Object.keys(componentCountByName)) {
+      for (const arrayName of System109.Object.keys(componentCountByName)) {
         const componentCount = componentCountByName[arrayName];
         const sourceArray = cornerArrays[arrayName];
         const targetArray = new sourceArray.constructor(subCornerCount * componentCount);
@@ -42768,7 +43754,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   }
   addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation = false) {
     const nodeList = this.getNodeList();
-    const nodeIndexByName = new System107.Map();
+    const nodeIndexByName = new System109.Map();
     for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
       nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
     }
@@ -42842,13 +43828,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
         indexCount = meshDescription.indices.length;
-        indexComponentType = meshDescription.indices instanceof System107.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+        indexComponentType = meshDescription.indices instanceof System109.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
         bufferByteCount += meshDescription.indices.byteLength;
       }
       webGL2RenderingContext.bindVertexArray(null);
       const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
       const morphTargetList = meshDescription.morphTargets ? meshDescription.morphTargets.slice() : [];
-      templateDrawableList.push({ vertexArray, vertexBufferList, isIndexed, indexBuffer, indexCount, indexComponentType, indexByteOffset: 0, wireframeIndexBuffer: null, wireframeIndexCount: 0, wireframeIndexComponentType: 0, vertexCount: meshDescription.positions.length / 3, material, materialName: meshDescription.materialName !== void 0 ? meshDescription.materialName : "", skinIndex: meshDescription.skinIndex, nodeIndex: meshDescription.nodeIndex !== void 0 ? meshDescription.nodeIndex : -1, meshDescription, morphTargetList, morphWeights: meshDescription.morphWeights ? new System107.Float32Array(meshDescription.morphWeights) : new System107.Float32Array(0), morphTexture: null, morphRowsPerTarget: 0, morphTextureWidth: 0, isMorphTextureShared: false, isMorphDirty: morphTargetList.length > 0 });
+      templateDrawableList.push({ vertexArray, vertexBufferList, isIndexed, indexBuffer, indexCount, indexComponentType, indexByteOffset: 0, wireframeIndexBuffer: null, wireframeIndexCount: 0, wireframeIndexComponentType: 0, vertexCount: meshDescription.positions.length / 3, material, materialName: meshDescription.materialName !== void 0 ? meshDescription.materialName : "", skinIndex: meshDescription.skinIndex, nodeIndex: meshDescription.nodeIndex !== void 0 ? meshDescription.nodeIndex : -1, meshDescription, morphTargetList, morphWeights: meshDescription.morphWeights ? new System109.Float32Array(meshDescription.morphWeights) : new System109.Float32Array(0), morphTexture: null, morphRowsPerTarget: 0, morphTextureWidth: 0, isMorphTextureShared: false, isMorphDirty: morphTargetList.length > 0 });
     }
     for (const templateDrawable of templateDrawableList) {
       if (templateDrawable.isMorphDirty) {
@@ -42870,7 +43856,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     const vertexCount = drawable.vertexCount;
     const edgeList = _SkinnedModel.buildWireframeEdgeList(drawable.meshDescription.indices, vertexCount);
     const useUnsignedInt = vertexCount > 65535;
-    const wireframeIndices = useUnsignedInt ? new System107.Uint32Array(edgeList) : new System107.Uint16Array(edgeList);
+    const wireframeIndices = useUnsignedInt ? new System109.Uint32Array(edgeList) : new System109.Uint16Array(edgeList);
     const wireframeIndexBuffer = webGL2RenderingContext.createBuffer();
     webGL2RenderingContext.bindVertexArray(null);
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndexBuffer);
@@ -42883,14 +43869,14 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   static buildWireframeEdgeList(triangleIndices, vertexCount) {
     const edgeList = [];
     if (triangleIndices) {
-      const edgeKeySet = new System107.Set();
+      const edgeKeySet = new System109.Set();
       const triangleCount = triangleIndices.length / 3;
       for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
         for (let cornerIndex = 0; cornerIndex < 3; ++cornerIndex) {
           const indexA = triangleIndices[triangleIndex * 3 + cornerIndex];
           const indexB = triangleIndices[triangleIndex * 3 + (cornerIndex + 1) % 3];
-          const minimumIndex = System107.Math.min(indexA, indexB);
-          const maximumIndex = System107.Math.max(indexA, indexB);
+          const minimumIndex = System109.Math.min(indexA, indexB);
+          const maximumIndex = System109.Math.max(indexA, indexB);
           const edgeKey = minimumIndex * vertexCount + maximumIndex;
           if (edgeKeySet.has(edgeKey)) {
             continue;
@@ -42943,10 +43929,10 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   }
   static buildMorphTexelData(morphTargetList, vertexCount) {
     const targetCount = morphTargetList.length;
-    const textureWidth = System107.Math.max(1, System107.Math.min(vertexCount, MORPH_TEXTURE_WIDTH));
-    const rowsPerTarget = System107.Math.ceil(vertexCount / textureWidth);
+    const textureWidth = System109.Math.max(1, System109.Math.min(vertexCount, MORPH_TEXTURE_WIDTH));
+    const rowsPerTarget = System109.Math.ceil(vertexCount / textureWidth);
     const textureHeight = rowsPerTarget * 2 * targetCount;
-    const texelData = new System107.Float32Array(textureWidth * textureHeight * 4);
+    const texelData = new System109.Float32Array(textureWidth * textureHeight * 4);
     for (let targetIndex = 0; targetIndex < targetCount; ++targetIndex) {
       const morphTarget = morphTargetList[targetIndex];
       const positionBlockOffset = targetIndex * 2 * rowsPerTarget * textureWidth;
@@ -42978,7 +43964,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       throw new Error(`SkinnedModel: morph target "${targetName}" delta count mismatch.`);
     }
     drawable.morphTargetList = drawable.morphTargetList.concat([{ name: targetName, positionDeltas, normalDeltas }]);
-    const morphWeights = new System107.Float32Array(drawable.morphTargetList.length);
+    const morphWeights = new System109.Float32Array(drawable.morphTargetList.length);
     morphWeights.set(drawable.morphWeights);
     drawable.morphWeights = morphWeights;
     drawable.isMorphDirty = true;
@@ -43029,7 +44015,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     return drawable.material;
   }
   generateSmoothNormals(positions, indices) {
-    const normals = new System107.Float32Array(positions.length);
+    const normals = new System109.Float32Array(positions.length);
     const triangleCount = indices ? indices.length / 3 : positions.length / 9;
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const indexA = (indices ? indices[triangleIndex * 3] : triangleIndex * 3) * 3;
@@ -43055,7 +44041,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       normals[indexC + 2] += faceNormalZ;
     }
     for (let vertexIndex = 0; vertexIndex < normals.length; vertexIndex += 3) {
-      const normalLength = System107.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
+      const normalLength = System109.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
       if (normalLength > 0) {
         normals[vertexIndex] /= normalLength;
         normals[vertexIndex + 1] /= normalLength;
@@ -43127,9 +44113,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         channel.cursor += 1;
       }
       const frameIndex = channel.cursor;
-      const nextIndex = System107.Math.min(frameIndex + 1, keyCount - 1);
+      const nextIndex = System109.Math.min(frameIndex + 1, keyCount - 1);
       const spanDuration = times[nextIndex] - times[frameIndex];
-      const factor = spanDuration > 0 ? System107.Math.max(0, System107.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
+      const factor = spanDuration > 0 ? System109.Math.max(0, System109.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
       if (channel.path === "rotation") {
         const baseOffset = frameIndex * 4;
         const nextOffset = nextIndex * 4;
@@ -43194,7 +44180,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     if (currentAnimation) {
       if (this.#previousAnimation) {
         this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
-        const blendWeight = System107.Math.min(this.#fadeElapsed / System107.Math.max(this.#fadeDuration, 1e-4), 1);
+        const blendWeight = System109.Math.min(this.#fadeElapsed / System109.Math.max(this.#fadeDuration, 1e-4), 1);
         this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
       } else {
         this.sampleAnimation(currentAnimation, this.#currentTime, 1);
@@ -43311,7 +44297,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     }
   }
 };
-var System108 = globalThis;
+var System110 = globalThis;
 var MORPH_TEXTURE_UNIT = 15;
 var MORPH_GLSL = `
 uniform sampler2D morphTexture;
@@ -43592,7 +44578,7 @@ var SkinnedModelRenderer = class extends Object2 {
     const texture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System108.Uint32Array([4294967295]));
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System110.Uint32Array([4294967295]));
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
@@ -43760,16 +44746,16 @@ var SkinnedModelRenderer = class extends Object2 {
     return this.#emptyShadowTexture;
   }
 };
-var System109 = globalThis;
+var System111 = globalThis;
 var GLB_MAGIC = 1179937895;
 var CHUNK_TYPE_JSON = 1313821514;
 var CHUNK_TYPE_BINARY = 5130562;
-var COMPONENT_ARRAYS = System109.Object.freeze({ 5120: System109.Int8Array, 5121: System109.Uint8Array, 5122: System109.Int16Array, 5123: System109.Uint16Array, 5125: System109.Uint32Array, 5126: System109.Float32Array });
+var COMPONENT_ARRAYS = System111.Object.freeze({ 5120: System111.Int8Array, 5121: System111.Uint8Array, 5122: System111.Int16Array, 5123: System111.Uint16Array, 5125: System111.Uint32Array, 5126: System111.Float32Array });
 var FLOAT_COMPONENT_TYPE = 5126;
-var NORMALIZED_DIVISORS = System109.Object.freeze({ 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 });
-var SUPPORTED_EXTENSIONS = System109.Object.freeze(["KHR_mesh_quantization", "KHR_texture_transform"]);
-var UNSUPPORTED_EXTENSION_MESSAGES = System109.Object.freeze({ EXT_meshopt_compression: "GLB \uC758 \uD544\uC218 \uD655\uC7A5 EXT_meshopt_compression(meshopt \uC555\uCD95)\uC740 \uC544\uC9C1 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4. (\uC555\uCD95 \uC5C6\uC774 \uC591\uC790\uD654\uB9CC \uD55C KHR_mesh_quantization \uC740 \uC77D\uB294\uB2E4)", KHR_draco_mesh_compression: "GLB \uC758 \uD544\uC218 \uD655\uC7A5 KHR_draco_mesh_compression(Draco \uC555\uCD95)\uC740 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4. (\uC555\uCD95 \uC5C6\uC774 \uC591\uC790\uD654\uB9CC \uD55C KHR_mesh_quantization \uC740 \uC77D\uB294\uB2E4)" });
-var TYPE_COMPONENT_COUNTS = System109.Object.freeze({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 });
+var NORMALIZED_DIVISORS = System111.Object.freeze({ 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 });
+var SUPPORTED_EXTENSIONS = System111.Object.freeze(["KHR_mesh_quantization", "KHR_texture_transform"]);
+var UNSUPPORTED_EXTENSION_MESSAGES = System111.Object.freeze({ EXT_meshopt_compression: "GLB \uC758 \uD544\uC218 \uD655\uC7A5 EXT_meshopt_compression(meshopt \uC555\uCD95)\uC740 \uC544\uC9C1 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4. (\uC555\uCD95 \uC5C6\uC774 \uC591\uC790\uD654\uB9CC \uD55C KHR_mesh_quantization \uC740 \uC77D\uB294\uB2E4)", KHR_draco_mesh_compression: "GLB \uC758 \uD544\uC218 \uD655\uC7A5 KHR_draco_mesh_compression(Draco \uC555\uCD95)\uC740 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4. (\uC555\uCD95 \uC5C6\uC774 \uC591\uC790\uD654\uB9CC \uD55C KHR_mesh_quantization \uC740 \uC77D\uB294\uB2E4)" });
+var TYPE_COMPONENT_COUNTS = System111.Object.freeze({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 });
 var TRIANGLES_MODE = 4;
 var OUTLINE_NODE_SUFFIX = ".outline";
 var LOOP_ONCE = "once";
@@ -43782,7 +44768,7 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
   }
   const bufferView = json.bufferViews[accessor.bufferView];
   if ((bufferView.buffer || 0) !== 0) {
-    throw new System109.Error(`GLB \uC758 \uBC14\uAE65 \uBC84\uD37C(buffers[${bufferView.buffer}])\uB294 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4. (\uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC buffers[0] \uB9CC \uC77D\uB294\uB2E4, EXT_meshopt_compression \uC758 fallback \uBC84\uD37C\uB3C4 \uC5EC\uAE30 \uB4E0\uB2E4)`);
+    throw new System111.Error(`GLB \uC758 \uBC14\uAE65 \uBC84\uD37C(buffers[${bufferView.buffer}])\uB294 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4. (\uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC buffers[0] \uB9CC \uC77D\uB294\uB2E4, EXT_meshopt_compression \uC758 fallback \uBC84\uD37C\uB3C4 \uC5EC\uAE30 \uB4E0\uB2E4)`);
   }
   const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
   const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
@@ -43791,7 +44777,7 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
   if (accessor.count > 0) {
     const endOffset = elementOffset + (accessor.count - 1) * stride + tightByteSize;
     if (endOffset > binaryBuffer.byteLength) {
-      throw new System109.Error(`GLB \uC811\uADFC\uC790 ${accessorIndex} \uAC00 \uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC \uBC16\uC744 \uC77D\uC2B5\uB2C8\uB2E4. (\uBC14\uC774\uD2B8 ${elementOffset} ~ ${endOffset}, \uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC ${binaryBuffer.byteLength} \uBC14\uC774\uD2B8)`);
+      throw new System111.Error(`GLB \uC811\uADFC\uC790 ${accessorIndex} \uAC00 \uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC \uBC16\uC744 \uC77D\uC2B5\uB2C8\uB2E4. (\uBC14\uC774\uD2B8 ${elementOffset} ~ ${endOffset}, \uBC14\uC774\uB108\uB9AC \uB369\uC5B4\uB9AC ${binaryBuffer.byteLength} \uBC14\uC774\uD2B8)`);
     }
   }
   if (byteStride === 0 || byteStride === tightByteSize) {
@@ -43814,10 +44800,10 @@ function readFloatAccessor(json, binaryBuffer, accessorIndex, isAlwaysNormalized
   const divisor = NORMALIZED_DIVISORS[accessor.componentType];
   const isNormalized = divisor !== void 0 && (accessor.normalized === true || isAlwaysNormalized);
   if (!isNormalized) {
-    return System109.Float32Array.from(values);
+    return System111.Float32Array.from(values);
   }
-  return System109.Float32Array.from(values, (value) => {
-    return System109.Math.max(value / divisor, -1);
+  return System111.Float32Array.from(values, (value) => {
+    return System111.Math.max(value / divisor, -1);
   });
 }
 __name(readFloatAccessor, "readFloatAccessor");
@@ -43838,12 +44824,12 @@ function applyTextureTransform2(uvs, textureInfo, texCoordIndex) {
   if (transformTexCoord !== texCoordIndex) {
     return uvs;
   }
-  const offset = System109.Array.isArray(transform.offset) ? transform.offset : [0, 0];
-  const scale = System109.Array.isArray(transform.scale) ? transform.scale : [1, 1];
+  const offset = System111.Array.isArray(transform.offset) ? transform.offset : [0, 0];
+  const scale = System111.Array.isArray(transform.scale) ? transform.scale : [1, 1];
   const rotation = typeof transform.rotation === "number" ? transform.rotation : 0;
-  const cosine = System109.Math.cos(rotation);
-  const sine = System109.Math.sin(rotation);
-  const result = new System109.Float32Array(uvs.length);
+  const cosine = System111.Math.cos(rotation);
+  const sine = System111.Math.sin(rotation);
+  const result = new System111.Float32Array(uvs.length);
   for (let valueIndex = 0; valueIndex + 1 < uvs.length; valueIndex += 2) {
     const scaledU = uvs[valueIndex] * scale[0];
     const scaledV = uvs[valueIndex + 1] * scale[1];
@@ -43854,7 +44840,7 @@ function applyTextureTransform2(uvs, textureInfo, texCoordIndex) {
 }
 __name(applyTextureTransform2, "applyTextureTransform");
 function unweldAttribute(values, indices, componentCount) {
-  const result = new System109.Float64Array(indices.length * componentCount);
+  const result = new System111.Float64Array(indices.length * componentCount);
   for (let cornerIndex = 0; cornerIndex < indices.length; ++cornerIndex) {
     for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
       const valueIndex = indices[cornerIndex] * componentCount + componentIndex;
@@ -43866,8 +44852,8 @@ function unweldAttribute(values, indices, componentCount) {
 __name(unweldAttribute, "unweldAttribute");
 function createFlatNormals(positions, indices, joints, weights, uvs, uvs1) {
   const flatPositions = unweldAttribute(positions, indices, 3);
-  const flatNormals = new System109.Float64Array(flatPositions.length);
-  const triangleCount = System109.Math.floor(flatPositions.length / 9);
+  const flatNormals = new System111.Float64Array(flatPositions.length);
+  const triangleCount = System111.Math.floor(flatPositions.length / 9);
   for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
     const offset = triangleIndex * 9;
     const firstEdgeX = flatPositions[offset + 3] - flatPositions[offset];
@@ -43879,7 +44865,7 @@ function createFlatNormals(positions, indices, joints, weights, uvs, uvs1) {
     const crossX = firstEdgeY * secondEdgeZ - firstEdgeZ * secondEdgeY;
     const crossY = firstEdgeZ * secondEdgeX - firstEdgeX * secondEdgeZ;
     const crossZ = firstEdgeX * secondEdgeY - firstEdgeY * secondEdgeX;
-    const length = System109.Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
+    const length = System111.Math.sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ);
     if (length <= 0) {
       continue;
     }
@@ -43889,19 +44875,19 @@ function createFlatNormals(positions, indices, joints, weights, uvs, uvs1) {
       flatNormals[offset + cornerIndex * 3 + 2] = crossZ / length;
     }
   }
-  return { positions: flatPositions, normals: flatNormals, indices: System109.Array.from({ length: indices.length }, (value, index) => {
+  return { positions: flatPositions, normals: flatNormals, indices: System111.Array.from({ length: indices.length }, (value, index) => {
     return index;
   }), joints: joints !== null ? unweldAttribute(joints, indices, 4) : null, weights: weights !== null ? unweldAttribute(weights, indices, 4) : null, uvs: uvs !== null ? unweldAttribute(uvs, indices, 2) : null, uvs1: uvs1 !== null ? unweldAttribute(uvs1, indices, 2) : null };
 }
 __name(createFlatNormals, "createFlatNormals");
 function checkRequiredExtensions2(json) {
-  const requiredExtensions = System109.Array.isArray(json.extensionsRequired) ? json.extensionsRequired : [];
+  const requiredExtensions = System111.Array.isArray(json.extensionsRequired) ? json.extensionsRequired : [];
   for (const extensionName of requiredExtensions) {
     if (SUPPORTED_EXTENSIONS.includes(extensionName)) {
       continue;
     }
     const message = UNSUPPORTED_EXTENSION_MESSAGES[extensionName];
-    throw new System109.Error(message !== void 0 ? message : `GLB \uC758 \uD544\uC218 \uD655\uC7A5 ${extensionName} \uC740 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4.`);
+    throw new System111.Error(message !== void 0 ? message : `GLB \uC758 \uD544\uC218 \uD655\uC7A5 ${extensionName} \uC740 \uC77D\uC9C0 \uBABB\uD569\uB2C8\uB2E4.`);
   }
 }
 __name(checkRequiredExtensions2, "checkRequiredExtensions");
@@ -43914,7 +44900,7 @@ function createTransformMatrix(translation, rotation, scale) {
 }
 __name(createTransformMatrix, "createTransformMatrix");
 function readNodeMatrix(node) {
-  if (System109.Array.isArray(node.matrix)) {
+  if (System111.Array.isArray(node.matrix)) {
     const matrix = Matrix4.createIdentity();
     const elements = matrix.getElements();
     elements.set(node.matrix);
@@ -43931,7 +44917,7 @@ function readSkinBindScale(json, binaryBuffer, skin) {
     return -1;
   });
   json.nodes.forEach((node, nodeIndex) => {
-    if (System109.Array.isArray(node.children)) {
+    if (System111.Array.isArray(node.children)) {
       for (const childIndex of node.children) {
         parentIndices[childIndex] = nodeIndex;
       }
@@ -43953,8 +44939,8 @@ function readSkinBindScale(json, binaryBuffer, skin) {
     }
     const elements = worldMatrix.getElements();
     const determinant = elements[0] * (elements[5] * elements[10] - elements[6] * elements[9]) - elements[4] * (elements[1] * elements[10] - elements[2] * elements[9]) + elements[8] * (elements[1] * elements[6] - elements[2] * elements[5]);
-    const scale = System109.Math.cbrt(System109.Math.abs(determinant));
-    if (scale > 0 && System109.Number.isFinite(scale)) {
+    const scale = System111.Math.cbrt(System111.Math.abs(determinant));
+    if (scale > 0 && System111.Number.isFinite(scale)) {
       scales.push(scale);
     }
   });
@@ -43964,7 +44950,7 @@ function readSkinBindScale(json, binaryBuffer, skin) {
   scales.sort((first, second) => {
     return first - second;
   });
-  return scales[System109.Math.floor(scales.length / 2)];
+  return scales[System111.Math.floor(scales.length / 2)];
 }
 __name(readSkinBindScale, "readSkinBindScale");
 function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt = false, partNode = node, colorSpace = ColorSpace.gamma) {
@@ -43978,7 +44964,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
   if (primitive.indices !== void 0) {
     indices = readAccessor(json, binaryBuffer, primitive.indices);
   } else {
-    indices = System109.Array.from({ length: positions.length / 3 }, (value, index) => {
+    indices = System111.Array.from({ length: positions.length / 3 }, (value, index) => {
       return index;
     });
   }
@@ -44015,21 +45001,21 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
   const baseColor = pbrMetallicRoughness.baseColorFactor !== void 0 ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
   const color = [0, 1, 2].map((channelIndex) => {
     if (colorSpace === ColorSpace.linear) {
-      const linear = System109.Math.min(1, System109.Math.max(0, baseColor[channelIndex]));
-      return linear <= 31308e-7 ? linear * 12.92 : 1.055 * System109.Math.pow(linear, 1 / 2.4) - 0.055;
+      const linear = System111.Math.min(1, System111.Math.max(0, baseColor[channelIndex]));
+      return linear <= 31308e-7 ? linear * 12.92 : 1.055 * System111.Math.pow(linear, 1 / 2.4) - 0.055;
     }
-    return System109.Math.pow(System109.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
+    return System111.Math.pow(System111.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
   });
   let glow = 0;
   const emissiveImage = readTextureImage(json, material.emissiveTexture);
-  if (System109.Array.isArray(material.emissiveFactor) && emissiveImage < 0) {
-    const emissiveMaximum = System109.Math.max(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]);
-    const baseMaximum = System109.Math.max(baseColor[0], baseColor[1], baseColor[2], 1e-3);
+  if (System111.Array.isArray(material.emissiveFactor) && emissiveImage < 0) {
+    const emissiveMaximum = System111.Math.max(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]);
+    const baseMaximum = System111.Math.max(baseColor[0], baseColor[1], baseColor[2], 1e-3);
     glow = emissiveMaximum / baseMaximum;
   }
   const indexStart = builder.getIndexCount();
   builder.addTriangles(positions, normals, indices, partMatrix, color, glow, extras.basic === true, joints, weights, uvs, uvs1);
-  const emissiveFactor = System109.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
+  const emissiveFactor = System111.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
   builder.addMaterialRange({ name: typeof material.name === "string" ? material.name : "", materialIndex: primitive.material !== void 0 ? primitive.material : -1, nodeName: typeof partNode.name === "string" ? partNode.name : "", indexStart, indexCount: builder.getIndexCount() - indexStart, extras, alphaMode: typeof material.alphaMode === "string" ? material.alphaMode : "OPAQUE", alphaCutoff: typeof material.alphaCutoff === "number" ? material.alphaCutoff : 0.5, baseColorFactor: baseColor.slice(0, 4), emissiveFactor, baseColorImage: readTextureImage(json, pbrMetallicRoughness.baseColorTexture), emissiveImage, hasUv: uvs !== null });
 }
 __name(addPrimitive, "addPrimitive");
@@ -44084,7 +45070,7 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
     if (primitive.indices !== void 0) {
       primitiveIndices = readAccessor(json, binaryBuffer, primitive.indices);
     } else {
-      primitiveIndices = System109.Array.from({ length: primitivePositions.length / 3 }, (value, index) => {
+      primitiveIndices = System111.Array.from({ length: primitivePositions.length / 3 }, (value, index) => {
         return index;
       });
     }
@@ -44124,11 +45110,11 @@ function readNodeNames(json) {
   const nodeNames = json.nodes.map((node) => {
     return typeof node.name === "string" ? node.name : "";
   });
-  return new System109.Set(nodeNames);
+  return new System111.Set(nodeNames);
 }
 __name(readNodeNames, "readNodeNames");
 function readSkeleton(json, binaryBuffer) {
-  if (!System109.Array.isArray(json.skins) || json.skins.length === 0) {
+  if (!System111.Array.isArray(json.skins) || json.skins.length === 0) {
     return null;
   }
   const skin = json.skins[0];
@@ -44136,27 +45122,27 @@ function readSkeleton(json, binaryBuffer) {
     return -1;
   });
   json.nodes.forEach((node, nodeIndex) => {
-    if (System109.Array.isArray(node.children)) {
+    if (System111.Array.isArray(node.children)) {
       for (const childIndex of node.children) {
         parentIndices[childIndex] = nodeIndex;
       }
     }
   });
   const nodes = json.nodes.map((node, nodeIndex) => {
-    return { name: typeof node.name === "string" ? node.name : "", parentIndex: parentIndices[nodeIndex], translation: node.translation !== void 0 ? node.translation : [0, 0, 0], rotation: node.rotation !== void 0 ? node.rotation : [0, 0, 0, 1], scale: node.scale !== void 0 ? node.scale : [1, 1, 1], matrix: System109.Array.isArray(node.matrix) ? node.matrix : null };
+    return { name: typeof node.name === "string" ? node.name : "", parentIndex: parentIndices[nodeIndex], translation: node.translation !== void 0 ? node.translation : [0, 0, 0], rotation: node.rotation !== void 0 ? node.rotation : [0, 0, 0, 1], scale: node.scale !== void 0 ? node.scale : [1, 1, 1], matrix: System111.Array.isArray(node.matrix) ? node.matrix : null };
   });
   let inverseBindMatrices = null;
   if (skin.inverseBindMatrices !== void 0) {
-    inverseBindMatrices = System109.Float32Array.from(readFloatAccessor(json, binaryBuffer, skin.inverseBindMatrices));
+    inverseBindMatrices = System111.Float32Array.from(readFloatAccessor(json, binaryBuffer, skin.inverseBindMatrices));
   } else {
-    inverseBindMatrices = new System109.Float32Array(skin.joints.length * 16);
+    inverseBindMatrices = new System111.Float32Array(skin.joints.length * 16);
     for (let jointIndex = 0; jointIndex < skin.joints.length; ++jointIndex) {
       const identityElements = Matrix4.createIdentity().getElements();
       inverseBindMatrices.set(identityElements, jointIndex * 16);
     }
   }
   const animations = {};
-  const sourceAnimations = System109.Array.isArray(json.animations) ? json.animations : [];
+  const sourceAnimations = System111.Array.isArray(json.animations) ? json.animations : [];
   for (const animation of sourceAnimations) {
     const channels = [];
     let duration = 0;
@@ -44164,7 +45150,7 @@ function readSkeleton(json, binaryBuffer) {
       const sampler = animation.samplers[channel.sampler];
       const times = readFloatAccessor(json, binaryBuffer, sampler.input);
       const values = readFloatAccessor(json, binaryBuffer, sampler.output);
-      duration = System109.Math.max(duration, times[times.length - 1]);
+      duration = System111.Math.max(duration, times[times.length - 1]);
       channels.push({ nodeIndex: channel.target.node, path: channel.target.path, times, values, isStep: sampler.interpolation === "STEP" });
     }
     const extras = animation.extras !== void 0 && animation.extras !== null ? animation.extras : {};
@@ -44174,9 +45160,9 @@ function readSkeleton(json, binaryBuffer) {
 }
 __name(readSkeleton, "readSkeleton");
 function readGlbChunks(arrayBuffer) {
-  const dataView = new System109.DataView(arrayBuffer);
+  const dataView = new System111.DataView(arrayBuffer);
   if (dataView.getUint32(0, true) !== GLB_MAGIC) {
-    throw new System109.Error("GLB \uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
+    throw new System111.Error("GLB \uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
   }
   let json = null;
   let binaryBuffer = null;
@@ -44186,16 +45172,16 @@ function readGlbChunks(arrayBuffer) {
     const chunkType = dataView.getUint32(chunkOffset + 4, true);
     const chunkStart = chunkOffset + 8;
     if (chunkType === CHUNK_TYPE_JSON) {
-      const jsonBytes = new System109.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-      const jsonText = new System109.TextDecoder().decode(jsonBytes);
-      json = System109.JSON.parse(jsonText);
+      const jsonBytes = new System111.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+      const jsonText = new System111.TextDecoder().decode(jsonBytes);
+      json = System111.JSON.parse(jsonText);
     } else if (chunkType === CHUNK_TYPE_BINARY) {
       binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
     }
     chunkOffset = chunkStart + chunkLength;
   }
   if (json === null || binaryBuffer === null) {
-    throw new System109.Error("GLB \uC758 \uB369\uC5B4\uB9AC\uAC00 \uBAA8\uC790\uB78D\uB2C8\uB2E4.");
+    throw new System111.Error("GLB \uC758 \uB369\uC5B4\uB9AC\uAC00 \uBAA8\uC790\uB78D\uB2C8\uB2E4.");
   }
   checkRequiredExtensions2(json);
   return { json, binaryBuffer };
@@ -44217,7 +45203,7 @@ function visitMeshNodes(json, visitEvent) {
       const partNode = namedNode !== null ? namedNode : node;
       visitEvent(node, matrix, partNode);
     }
-    if (System109.Array.isArray(node.children)) {
+    if (System111.Array.isArray(node.children)) {
       for (const childIndex of node.children) {
         visit(childIndex, matrix, namedNode);
       }
@@ -44285,22 +45271,22 @@ __name(readGlbArrays, "readGlbArrays");
 function readGlbImages(arrayBuffer) {
   const chunks = readGlbChunks(arrayBuffer);
   const json = chunks.json;
-  const images = System109.Array.isArray(json.images) ? json.images : [];
+  const images = System111.Array.isArray(json.images) ? json.images : [];
   return images.map((image) => {
     const name = typeof image.name === "string" ? image.name : "";
     const mimeType = typeof image.mimeType === "string" ? image.mimeType : "";
     if (typeof image.bufferView !== "number") {
-      return { name, mimeType, data: new System109.Uint8Array(0) };
+      return { name, mimeType, data: new System111.Uint8Array(0) };
     }
     const bufferView = json.bufferViews[image.bufferView];
     const byteOffset = bufferView.byteOffset !== void 0 ? bufferView.byteOffset : 0;
-    return { name, mimeType, data: new System109.Uint8Array(chunks.binaryBuffer.slice(byteOffset, byteOffset + bufferView.byteLength)) };
+    return { name, mimeType, data: new System111.Uint8Array(chunks.binaryBuffer.slice(byteOffset, byteOffset + bufferView.byteLength)) };
   });
 }
 __name(readGlbImages, "readGlbImages");
 function decodeGlbImage(image) {
-  const blob = new System109.Blob([image.data], { type: image.mimeType });
-  return System109.createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  const blob = new System111.Blob([image.data], { type: image.mimeType });
+  return System111.createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
 }
 __name(decodeGlbImage, "decodeGlbImage");
 function readGlbNodeArrays(arrayBuffer, outlineOptions = null, colorSpace = readEngineColorSpace()) {
@@ -44329,7 +45315,7 @@ function readGlbNodeArrays(arrayBuffer, outlineOptions = null, colorSpace = read
         const pbrMetallicRoughness = material.pbrMetallicRoughness !== void 0 ? material.pbrMetallicRoughness : {};
         const baseColor = pbrMetallicRoughness.baseColorFactor !== void 0 ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
         const previousAlpha = partAlphas[partName] !== void 0 ? partAlphas[partName] : 1;
-        partAlphas[partName] = System109.Math.min(previousAlpha, baseColor[3]);
+        partAlphas[partName] = System111.Math.min(previousAlpha, baseColor[3]);
       }
     }
     if (!isOutlineRebuilt) {
@@ -44341,7 +45327,7 @@ function readGlbNodeArrays(arrayBuffer, outlineOptions = null, colorSpace = read
     }
   });
   const partArrays = {};
-  for (const [partName, builder] of System109.Object.entries(builders)) {
+  for (const [partName, builder] of System111.Object.entries(builders)) {
     const arrays = builder.readArrays();
     arrays.extras = partExtras[partName] !== void 0 ? partExtras[partName] : {};
     arrays.alpha = partAlphas[partName] !== void 0 ? partAlphas[partName] : 1;
@@ -44354,14 +45340,14 @@ function readGlbNodeInfos(arrayBuffer) {
   const chunks = readGlbChunks(arrayBuffer);
   const json = chunks.json;
   const binaryBuffer = chunks.binaryBuffer;
-  const partBounds = new System109.Map();
+  const partBounds = new System111.Map();
   visitMeshNodes(json, (node, matrix, partNode) => {
     const nodeName = typeof partNode.name === "string" ? partNode.name : "";
     if (nodeName.endsWith(OUTLINE_NODE_SUFFIX)) {
       return;
     }
     if (!partBounds.has(nodeName)) {
-      partBounds.set(nodeName, { partNode, minimum: [System109.Infinity, System109.Infinity, System109.Infinity], maximum: [-System109.Infinity, -System109.Infinity, -System109.Infinity], jointWeights: new System109.Map() });
+      partBounds.set(nodeName, { partNode, minimum: [System111.Infinity, System111.Infinity, System111.Infinity], maximum: [-System111.Infinity, -System111.Infinity, -System111.Infinity], jointWeights: new System111.Map() });
     }
     const bounds = partBounds.get(nodeName);
     const minimum = bounds.minimum;
@@ -44386,8 +45372,8 @@ function readGlbNodeInfos(arrayBuffer) {
           point = [transformedPoint.x, transformedPoint.y, transformedPoint.z];
         }
         for (let axis = 0; axis < 3; ++axis) {
-          minimum[axis] = System109.Math.min(minimum[axis], point[axis]);
-          maximum[axis] = System109.Math.max(maximum[axis], point[axis]);
+          minimum[axis] = System111.Math.min(minimum[axis], point[axis]);
+          maximum[axis] = System111.Math.max(maximum[axis], point[axis]);
         }
       }
       if (isSkinned) {
@@ -44429,11 +45415,11 @@ function sampleChannel(channel, time) {
   const componentCount = channel.path === "rotation" ? 4 : 3;
   const values = channel.values;
   if (time <= times[0] || times.length === 1) {
-    return System109.Array.from(values.slice(0, componentCount));
+    return System111.Array.from(values.slice(0, componentCount));
   }
   const lastIndex = times.length - 1;
   if (time >= times[lastIndex]) {
-    return System109.Array.from(values.slice(lastIndex * componentCount, lastIndex * componentCount + componentCount));
+    return System111.Array.from(values.slice(lastIndex * componentCount, lastIndex * componentCount + componentCount));
   }
   let keyIndex = 0;
   while (keyIndex < lastIndex - 1 && times[keyIndex + 1] <= time) {
@@ -44442,7 +45428,7 @@ function sampleChannel(channel, time) {
   const startOffset = keyIndex * componentCount;
   const endOffset = startOffset + componentCount;
   if (channel.isStep) {
-    return System109.Array.from(values.slice(startOffset, endOffset));
+    return System111.Array.from(values.slice(startOffset, endOffset));
   }
   const ratio = (time - times[keyIndex]) / (times[keyIndex + 1] - times[keyIndex]);
   const result = [];
@@ -44460,7 +45446,7 @@ function sampleChannel(channel, time) {
     result.push(startValue + (endValue - startValue) * ratio);
   }
   if (componentCount === 4) {
-    const length = System109.Math.hypot(result[0], result[1], result[2], result[3]);
+    const length = System111.Math.hypot(result[0], result[1], result[2], result[3]);
     if (length > 0) {
       return result.map((value) => {
         return value / length;
@@ -44479,7 +45465,7 @@ function readAnimationLocals(skeleton, animationName, time, swingScales = null) 
     const isOnce = animation.extras.loop === LOOP_ONCE;
     let localTime = 0;
     if (animation.duration > 0) {
-      localTime = isOnce ? System109.Math.max(0, System109.Math.min(animation.duration, time)) : time % animation.duration;
+      localTime = isOnce ? System111.Math.max(0, System111.Math.min(animation.duration, time)) : time % animation.duration;
     }
     for (const channel of animation.channels) {
       const local = locals[channel.nodeIndex];
@@ -44513,9 +45499,9 @@ function mixRotation(rotation, otherRotation, ratio) {
   const mixed = rotation.map((value, componentIndex) => {
     return value + (otherRotation[componentIndex] * sign - value) * ratio;
   });
-  const length = System109.Math.hypot(mixed[0], mixed[1], mixed[2], mixed[3]);
+  const length = System111.Math.hypot(mixed[0], mixed[1], mixed[2], mixed[3]);
   if (length <= 0) {
-    return System109.Array.from(rotation);
+    return System111.Array.from(rotation);
   }
   return mixed.map((value) => {
     return value / length;
@@ -44540,8 +45526,8 @@ function readAnimationSwing(skeleton, animationName, nodeIndex) {
       for (let componentIndex = 0; componentIndex < 4; ++componentIndex) {
         dot += values[offset + componentIndex] * restRotation[componentIndex];
       }
-      const angle = 2 * System109.Math.acos(System109.Math.min(1, System109.Math.abs(dot)));
-      largestAngle = System109.Math.max(largestAngle, angle);
+      const angle = 2 * System111.Math.acos(System111.Math.min(1, System111.Math.abs(dot)));
+      largestAngle = System111.Math.max(largestAngle, angle);
     }
   }
   return largestAngle;
@@ -44568,7 +45554,7 @@ function mixLocals(locals, otherLocals, ratio) {
     const rotation = local.rotation.map((value, componentIndex) => {
       return value + (other.rotation[componentIndex] * sign - value) * ratio;
     });
-    const length = System109.Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
+    const length = System111.Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
     if (length > 0) {
       local.rotation = rotation.map((value) => {
         return value / length;
@@ -44577,14 +45563,14 @@ function mixLocals(locals, otherLocals, ratio) {
   }
 }
 __name(mixLocals, "mixLocals");
-var BoneModifyMode = System109.Object.freeze({ add: 0, replace: 1 });
+var BoneModifyMode = System111.Object.freeze({ add: 0, replace: 1 });
 function multiplyRotation(rotation, otherRotation) {
   const [x, y, z, w] = rotation;
   const [otherX, otherY, otherZ, otherW] = otherRotation;
   const result = [w * otherX + x * otherW + y * otherZ - z * otherY, w * otherY - x * otherZ + y * otherW + z * otherX, w * otherZ + x * otherY - y * otherX + z * otherW, w * otherW - x * otherX - y * otherY - z * otherZ];
-  const length = System109.Math.hypot(result[0], result[1], result[2], result[3]);
+  const length = System111.Math.hypot(result[0], result[1], result[2], result[3]);
   if (length <= 0) {
-    return System109.Array.from(rotation);
+    return System111.Array.from(rotation);
   }
   return result.map((value) => {
     return value / length;
@@ -44597,7 +45583,7 @@ function adjustBones(locals, skeleton, modifiers) {
     let nodeIndex = modifier.nodeIndex !== void 0 ? modifier.nodeIndex : -1;
     if (nodeIndex < 0 && modifier.name !== void 0) {
       if (nameIndices === null) {
-        nameIndices = new System109.Map();
+        nameIndices = new System111.Map();
         skeleton.nodes.forEach((node, index) => {
           if (!nameIndices.has(node.name)) {
             nameIndices.set(node.name, index);
@@ -44612,13 +45598,13 @@ function adjustBones(locals, skeleton, modifiers) {
       continue;
     }
     const isReplace = modifier.mode === BoneModifyMode.replace;
-    const weight = modifier.weight !== void 0 ? System109.Math.max(0, System109.Math.min(1, modifier.weight)) : 1;
+    const weight = modifier.weight !== void 0 ? System111.Math.max(0, System111.Math.min(1, modifier.weight)) : 1;
     if (weight <= 0) {
       continue;
     }
     const mixVector = __name((before, after) => {
       if (weight >= 1) {
-        return System109.Array.from(after);
+        return System111.Array.from(after);
       }
       return before.map((value, componentIndex) => {
         return value + (after[componentIndex] - value) * weight;
@@ -44650,14 +45636,14 @@ function writeSkinPose(skeleton, animationName, time, target, blend = null, swin
   const locals = readAnimationLocals(skeleton, animationName, time, swingScales);
   if (blend !== null && blend.weight > 0) {
     const blendLocals = readAnimationLocals(skeleton, blend.animationName, blend.time, swingScales);
-    mixLocals(locals, blendLocals, System109.Math.min(1, blend.weight));
+    mixLocals(locals, blendLocals, System111.Math.min(1, blend.weight));
   }
   if (typeof poseAdjust === "function") {
     for (const local of locals) {
       if (local.matrix === null) {
-        local.translation = System109.Array.from(local.translation);
-        local.rotation = System109.Array.from(local.rotation);
-        local.scale = System109.Array.from(local.scale);
+        local.translation = System111.Array.from(local.translation);
+        local.rotation = System111.Array.from(local.rotation);
+        local.scale = System111.Array.from(local.scale);
       }
     }
     poseAdjust(locals, skeleton);
@@ -44698,8 +45684,8 @@ function writeSkinPose(skeleton, animationName, time, target, blend = null, swin
   }
 }
 __name(writeSkinPose, "writeSkinPose");
-var System110 = globalThis;
-var ZERO_CLEAR_FLOAT_VALUE2 = new System110.Float32Array(4);
+var System112 = globalThis;
+var ZERO_CLEAR_FLOAT_VALUE2 = new System112.Float32Array(4);
 var EXTRACT_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -44771,7 +45757,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     this.#downsamplePass = new FullscreenPass(webGL2RenderingContext, DOWNSAMPLE_FRAGMENTSHADER_SOURCE);
     this.#upsamplePass = new FullscreenPass(webGL2RenderingContext, UPSAMPLE_FRAGMENTSHADER_SOURCE);
     this.#levelRenderTargetList = [];
-    this.#levelCount = System110.Math.max(1, System110.Math.floor(levelCount));
+    this.#levelCount = System112.Math.max(1, System112.Math.floor(levelCount));
     this.#useFloatColor = useFloatColor;
     this.#threshold = 1;
     this.#knee = 0.25;
@@ -44786,8 +45772,8 @@ var MultiLevelBloomEffect = class extends Object2 {
     let levelWidth = this.#sceneWidth;
     let levelHeight = this.#sceneHeight;
     for (let levelIndex = 0; levelIndex < this.#levelCount; ++levelIndex) {
-      levelWidth = System110.Math.max(1, System110.Math.floor(levelWidth / 2));
-      levelHeight = System110.Math.max(1, System110.Math.floor(levelHeight / 2));
+      levelWidth = System112.Math.max(1, System112.Math.floor(levelWidth / 2));
+      levelHeight = System112.Math.max(1, System112.Math.floor(levelHeight / 2));
       levelRenderTargetList.push(new RenderTarget(webGL2RenderingContext, levelWidth, levelHeight, false, { useFloatColor: this.#useFloatColor }));
     }
     this.#levelRenderTargetList = levelRenderTargetList;
@@ -44799,8 +45785,8 @@ var MultiLevelBloomEffect = class extends Object2 {
     this.#levelRenderTargetList = [];
   }
   resize(sceneWidth, sceneHeight) {
-    const safeWidth = System110.Math.max(1, sceneWidth);
-    const safeHeight = System110.Math.max(1, sceneHeight);
+    const safeWidth = System112.Math.max(1, sceneWidth);
+    const safeHeight = System112.Math.max(1, sceneHeight);
     if (safeWidth === this.#sceneWidth && safeHeight === this.#sceneHeight) {
       return;
     }
@@ -44809,7 +45795,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     this.createLevels();
   }
   setLevelCount(levelCount) {
-    const safeLevelCount = System110.Math.max(1, System110.Math.floor(levelCount));
+    const safeLevelCount = System112.Math.max(1, System112.Math.floor(levelCount));
     if (safeLevelCount === this.#levelCount) {
       return;
     }
@@ -44823,8 +45809,8 @@ var MultiLevelBloomEffect = class extends Object2 {
     return this.#useFloatColor;
   }
   setThreshold(threshold, knee) {
-    this.#threshold = System110.Math.max(0, threshold);
-    this.#knee = System110.Math.max(0, knee);
+    this.#threshold = System112.Math.max(0, threshold);
+    this.#knee = System112.Math.max(0, knee);
   }
   render(sceneColorTexture) {
     const levelRenderTargetList = this.#levelRenderTargetList;
@@ -44901,20 +45887,20 @@ var MultiLevelBloomEffect = class extends Object2 {
     return this.#webGL2RenderingContext;
   }
 };
-var System111 = globalThis;
-var ToonOutlineWidthUnit = System111.Object.freeze({ world: "world", pixel: "pixel" });
-var ZERO_CLEAR_VALUE = new System111.Uint32Array(4);
-var ZERO_CLEAR_FLOAT_VALUE3 = new System111.Float32Array(4);
+var System113 = globalThis;
+var ToonOutlineWidthUnit = System113.Object.freeze({ world: "world", pixel: "pixel" });
+var ZERO_CLEAR_VALUE = new System113.Uint32Array(4);
+var ZERO_CLEAR_FLOAT_VALUE3 = new System113.Float32Array(4);
 var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
 var BATCH_SLOT_MESH_LIMIT2 = 8;
-var IDENTITY_ELEMENTS2 = new System111.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+var IDENTITY_ELEMENTS2 = new System113.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 var INSTANCE_BUFFER_SPHERE2 = [0, 0, 0, 0];
 var LINE_TEXTURE_UNIT = 5;
 var DEPTH_TEXTURE_UNIT = 6;
 var LINE_COLOR_TEXTURE_UNIT = 4;
 var COMPOSITE_LINE_TEXTURE_UNIT = 6;
 var COMPOSITE_DEPTH_TEXTURE_UNIT = 7;
-var THIN_LINE_MAXIMUM_WIDTH = 2 * System111.Math.sqrt(4.5) - 1;
+var THIN_LINE_MAXIMUM_WIDTH = 2 * System113.Math.sqrt(4.5) - 1;
 var LINE_COLOR_TABLE_WIDTH = 128;
 var LINE_VERTEX_SHADER = `#version 300 es
 in vec3 vertexPosition;
@@ -45390,7 +46376,7 @@ function addCoveragePassDefine(source) {
 }
 __name(addCoveragePassDefine, "addCoveragePassDefine");
 function readJumpFloodSteps(reach) {
-  const distance = System111.Math.max(1, System111.Math.ceil(reach));
+  const distance = System113.Math.max(1, System113.Math.ceil(reach));
   let step = 1;
   while (step * 2 - 1 < distance) {
     step *= 2;
@@ -45398,13 +46384,13 @@ function readJumpFloodSteps(reach) {
   const steps = [];
   while (step >= 1) {
     steps.push(step);
-    step = System111.Math.floor(step / 2);
+    step = System113.Math.floor(step / 2);
   }
   return steps;
 }
 __name(readJumpFloodSteps, "readJumpFloodSteps");
 function readColorByte(value) {
-  return System111.Math.round(System111.Math.max(0, System111.Math.min(1, value)) * 255);
+  return System113.Math.round(System113.Math.max(0, System113.Math.min(1, value)) * 255);
 }
 __name(readColorByte, "readColorByte");
 var ToonScreenOutline = class {
@@ -45452,7 +46438,7 @@ var ToonScreenOutline = class {
   constructor(webGL2RenderingContext, options = null) {
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#colorSpace = options !== null && options.colorSpace !== void 0 ? readColorSpace(options.colorSpace) : readEngineColorSpace();
-    this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, System111.Object.assign({ instanceLineId: TOON_INSTANCE_LINE_ID_LOCATION }, TOON_ATTRIBUTE_LOCATIONS));
+    this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, System113.Object.assign({ instanceLineId: TOON_INSTANCE_LINE_ID_LOCATION }, TOON_ATTRIBUTE_LOCATIONS));
     this.#seedProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_FRAGMENT_SHADER, {});
     this.#seedGatherProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_GATHER_FRAGMENT_SHADER, {});
     this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
@@ -45469,21 +46455,21 @@ var ToonScreenOutline = class {
     this.#focusDistance = 0;
     this.#depthThreshold = 0.05;
     this.#depthMargin = 2;
-    this.#creaseCosine = System111.Math.cos(System111.Math.PI / 3);
+    this.#creaseCosine = System113.Math.cos(System113.Math.PI / 3);
     this.#creaseWidth = 1;
     this.#creaseOpacity = 1;
     this.#resolutionScale = 1;
     this.#isHdrOutput = false;
     this.#frame = null;
     this.#savedState = null;
-    this.#instanceData = new System111.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+    this.#instanceData = new System113.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
     this.#batchSlots = [];
-    this.#lineUniformValues = new System111.Float32Array([System111.NaN, System111.NaN, System111.NaN, System111.NaN]);
+    this.#lineUniformValues = new System113.Float32Array([System113.NaN, System113.NaN, System113.NaN, System113.NaN]);
     this.#drawnDistanceSum = 0;
     this.#drawnDistanceCount = 0;
     this.#lineWidths = [2, 1];
-    this.#lineColorTable = new System111.Uint8Array((TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1) * 4);
-    this.#lineColorWords = new System111.Uint32Array(this.#lineColorTable.buffer);
+    this.#lineColorTable = new System113.Uint8Array((TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID + 1) * 4);
+    this.#lineColorWords = new System113.Uint32Array(this.#lineColorTable.buffer);
     this.#uploadedLineColorTable = null;
     this.#lineColorCount = 0;
     this.#lineColorTexture = null;
@@ -45496,7 +46482,7 @@ var ToonScreenOutline = class {
     this.#color = [color[0], color[1], color[2], color.length > 3 ? color[3] : 1];
   }
   setLineColor(lineId, color) {
-    if (!System111.Number.isInteger(lineId) || lineId < 1 || lineId > TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID) {
+    if (!System113.Number.isInteger(lineId) || lineId < 1 || lineId > TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID) {
       return;
     }
     const table = this.#lineColorTable;
@@ -45504,7 +46490,7 @@ var ToonScreenOutline = class {
     const red = readColorByte(color[0]);
     const green = readColorByte(color[1]);
     const blue = readColorByte(color[2]);
-    const alpha = System111.Math.max(1, readColorByte(color.length > 3 ? color[3] : 1));
+    const alpha = System113.Math.max(1, readColorByte(color.length > 3 ? color[3] : 1));
     if (table[offset] === red && table[offset + 1] === green && table[offset + 2] === blue && table[offset + 3] === alpha) {
       return;
     }
@@ -45518,7 +46504,7 @@ var ToonScreenOutline = class {
     this.#isLineColorTableDirty = true;
   }
   removeLineColor(lineId) {
-    if (!System111.Number.isInteger(lineId) || lineId < 1 || lineId > TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID) {
+    if (!System113.Number.isInteger(lineId) || lineId < 1 || lineId > TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID) {
       return;
     }
     const table = this.#lineColorTable;
@@ -45542,31 +46528,31 @@ var ToonScreenOutline = class {
     return this.#lineColorCount;
   }
   setWidth(width, unit = ToonOutlineWidthUnit.pixel) {
-    this.#width = System111.Math.max(0, width);
+    this.#width = System113.Math.max(0, width);
     this.#widthUnit = unit;
   }
   setCrease(angleDegrees, width = 1, opacity = 1) {
-    this.#creaseCosine = System111.Math.cos(System111.Math.min(180, System111.Math.max(0, angleDegrees)) * System111.Math.PI / 180);
-    this.#creaseWidth = System111.Math.max(0, width);
-    this.#creaseOpacity = System111.Math.max(0, System111.Math.min(1, opacity));
+    this.#creaseCosine = System113.Math.cos(System113.Math.min(180, System113.Math.max(0, angleDegrees)) * System113.Math.PI / 180);
+    this.#creaseWidth = System113.Math.max(0, width);
+    this.#creaseOpacity = System113.Math.max(0, System113.Math.min(1, opacity));
   }
   setFocusDistance(focusDistance) {
-    this.#focusDistance = System111.Math.max(0, focusDistance);
+    this.#focusDistance = System113.Math.max(0, focusDistance);
   }
   setDepthThreshold(depthThreshold) {
-    this.#depthThreshold = System111.Math.max(0, depthThreshold);
+    this.#depthThreshold = System113.Math.max(0, depthThreshold);
   }
   getDepthThreshold() {
     return this.#depthThreshold;
   }
   setDepthMargin(depthMargin) {
-    this.#depthMargin = System111.Math.max(0, depthMargin);
+    this.#depthMargin = System113.Math.max(0, depthMargin);
   }
   getDepthMargin() {
     return this.#depthMargin;
   }
   setResolutionScale(resolutionScale) {
-    this.#resolutionScale = System111.Math.max(0.25, System111.Math.min(1, resolutionScale));
+    this.#resolutionScale = System113.Math.max(0.25, System113.Math.min(1, resolutionScale));
   }
   setHdrOutput(isHdrOutput) {
     this.#isHdrOutput = isHdrOutput;
@@ -45587,13 +46573,13 @@ var ToonScreenOutline = class {
     const viewport = webGL2RenderingContext.getParameter(webGL2RenderingContext.VIEWPORT);
     const viewProjectionMatrix = projectionMatrix.clone();
     viewProjectionMatrix.multiply(viewMatrix);
-    this.#frame = { viewProjectionElements: new System111.Float32Array(viewProjectionMatrix.getElements()), viewElements: new System111.Float32Array(viewElements), projectionElements: new System111.Float32Array(projectionElements), frustumPlanes: extractFrustumPlanes(viewProjectionMatrix), isPerspective: System111.Math.abs(projectionElements[11]) > 0.5, viewport: [viewport[0], viewport[1], viewport[2], viewport[3]] };
+    this.#frame = { viewProjectionElements: new System113.Float32Array(viewProjectionMatrix.getElements()), viewElements: new System113.Float32Array(viewElements), projectionElements: new System113.Float32Array(projectionElements), frustumPlanes: extractFrustumPlanes(viewProjectionMatrix), isPerspective: System113.Math.abs(projectionElements[11]) > 0.5, viewport: [viewport[0], viewport[1], viewport[2], viewport[3]] };
     this.#drawnDistanceSum = 0;
     this.#drawnDistanceCount = 0;
-    const width = System111.Math.max(1, viewport[2]);
-    const height = System111.Math.max(1, viewport[3]);
-    const lineWidth = System111.Math.max(1, System111.Math.ceil(width * this.#resolutionScale));
-    const lineHeight = System111.Math.max(1, System111.Math.ceil(height * this.#resolutionScale));
+    const width = System113.Math.max(1, viewport[2]);
+    const height = System113.Math.max(1, viewport[3]);
+    const lineWidth = System113.Math.max(1, System113.Math.ceil(width * this.#resolutionScale));
+    const lineHeight = System113.Math.max(1, System113.Math.ceil(height * this.#resolutionScale));
     const lineTarget = this.readLineTarget(lineWidth, lineHeight, lineWidth, lineHeight);
     if (lineTarget === null) {
       return false;
@@ -45614,7 +46600,7 @@ var ToonScreenOutline = class {
     const lineProgram = this.#lineProgram;
     lineProgram.useProgram();
     webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("viewProjectionMatrix"), false, this.#frame.viewProjectionElements);
-    this.#lineUniformValues.fill(System111.NaN);
+    this.#lineUniformValues.fill(System113.NaN);
     return true;
   }
   acceptMesh(mesh, modelElements, isCulled) {
@@ -45634,13 +46620,13 @@ var ToonScreenOutline = class {
     }
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     if (this.#instanceData.length < count * TOON_INSTANCE_FLOAT_COUNT) {
-      this.#instanceData = new System111.Float32Array(count * TOON_INSTANCE_FLOAT_COUNT);
+      this.#instanceData = new System113.Float32Array(count * TOON_INSTANCE_FLOAT_COUNT);
     }
     const instanceData = this.#instanceData;
     for (let index = 0; index < count; ++index) {
       const offset = index * TOON_INSTANCE_FLOAT_COUNT;
       instanceData.set(modelMatrixList[start + index].getElements(), offset);
-      instanceData[offset + 16] = System111.Math.max(0, System111.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineIdList[start + index]));
+      instanceData[offset + 16] = System113.Math.max(0, System113.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineIdList[start + index]));
       instanceData[offset + 17] = 0;
       instanceData[offset + 18] = 0;
       instanceData[offset + 19] = 1;
@@ -45648,7 +46634,7 @@ var ToonScreenOutline = class {
     const floatCount = count * TOON_INSTANCE_FLOAT_COUNT;
     let slot = this.#batchSlots[slotIndex];
     if (slot === void 0) {
-      slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System111.Float32Array(0), count: 0, vertexArrays: new System111.Map() };
+      slot = { buffer: webGL2RenderingContext.createBuffer(), values: new System113.Float32Array(0), count: 0, vertexArrays: new System113.Map() };
       this.#batchSlots[slotIndex] = slot;
     }
     let isSame = slot.count === count;
@@ -45665,7 +46651,7 @@ var ToonScreenOutline = class {
     }
     if (!isSame) {
       if (slot.values.length < floatCount) {
-        slot.values = new System111.Float32Array(floatCount);
+        slot.values = new System113.Float32Array(floatCount);
       }
       slot.values.set(instanceData.subarray(0, floatCount));
       slot.count = count;
@@ -45703,7 +46689,7 @@ var ToonScreenOutline = class {
     }
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     if (this.#instanceData.length < instances.length * TOON_INSTANCE_FLOAT_COUNT) {
-      this.#instanceData = new System111.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
+      this.#instanceData = new System113.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
     }
     const instanceData = this.#instanceData;
     const isCulled = options.isCulled !== false;
@@ -45738,7 +46724,7 @@ var ToonScreenOutline = class {
       return;
     }
     const layoutFloatCount = instanceLayout.getFloatCount();
-    const count = System111.Math.min(instanceCount, System111.Math.floor(instanceBuffer.floatCount / layoutFloatCount));
+    const count = System113.Math.min(instanceCount, System113.Math.floor(instanceBuffer.floatCount / layoutFloatCount));
     if (count <= 0) {
       return;
     }
@@ -45786,18 +46772,18 @@ var ToonScreenOutline = class {
       lineUniformValues[2] = skinnedValue;
       webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), skinnedValue);
     }
-    webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System111.Math.max(0, System111.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
+    webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System113.Math.max(0, System113.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
     if (lineUniformValues[3] !== lineFlags) {
       lineUniformValues[3] = lineFlags;
       webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
     }
     if (isSkinned) {
-      const jointFloatCount = System111.Math.floor(System111.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
+      const jointFloatCount = System113.Math.floor(System113.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
       const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
       webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("jointMatrices"), false, jointValues);
     }
-    const indexStart = options.indexStart !== void 0 ? System111.Math.max(0, options.indexStart) : 0;
-    const indexCount = options.indexCount !== void 0 ? System111.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
+    const indexStart = options.indexStart !== void 0 ? System113.Math.max(0, options.indexStart) : 0;
+    const indexCount = options.indexCount !== void 0 ? System113.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
     if (indexCount <= 0) {
       return;
     }
@@ -45828,10 +46814,10 @@ var ToonScreenOutline = class {
       this.restoreState();
       return;
     }
-    const lineScaleX = lineTarget.width / System111.Math.max(1, this.#frame.viewport[2]);
-    const lineScaleY = lineTarget.height / System111.Math.max(1, this.#frame.viewport[3]);
-    const isScaled = lineTarget.width !== System111.Math.max(1, this.#frame.viewport[2]) || lineTarget.height !== System111.Math.max(1, this.#frame.viewport[3]);
-    const isThinLine = System111.Math.max(lineWidths[0], lineWidths[1]) * System111.Math.min(lineScaleX, lineScaleY) <= THIN_LINE_MAXIMUM_WIDTH;
+    const lineScaleX = lineTarget.width / System113.Math.max(1, this.#frame.viewport[2]);
+    const lineScaleY = lineTarget.height / System113.Math.max(1, this.#frame.viewport[3]);
+    const isScaled = lineTarget.width !== System113.Math.max(1, this.#frame.viewport[2]) || lineTarget.height !== System113.Math.max(1, this.#frame.viewport[3]);
+    const isThinLine = System113.Math.max(lineWidths[0], lineWidths[1]) * System113.Math.min(lineScaleX, lineScaleY) <= THIN_LINE_MAXIMUM_WIDTH;
     if (!isThinLine && !this.readJumpFloodTarget(lineTarget)) {
       this.restoreState();
       return;
@@ -45878,7 +46864,7 @@ var ToonScreenOutline = class {
     jumpFloodProgram.useProgram();
     webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform2f(jumpFloodProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
-    const reach = (System111.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) * System111.Math.min(lineScaleX, lineScaleY) / System111.Math.min(pointScaleX, pointScaleY) + 1.5;
+    const reach = (System113.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) * System113.Math.min(lineScaleX, lineScaleY) / System113.Math.min(pointScaleX, pointScaleY) + 1.5;
     let seedIndex = 0;
     for (const stepSize of readJumpFloodSteps(reach)) {
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[1 - seedIndex]);
@@ -46018,13 +47004,13 @@ var ToonScreenOutline = class {
     } else {
       webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
       webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
-      webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineScale"), lineTarget.width / System111.Math.max(1, viewport[2]), lineTarget.height / System111.Math.max(1, viewport[3]));
+      webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineScale"), lineTarget.width / System113.Math.max(1, viewport[2]), lineTarget.height / System113.Math.max(1, viewport[3]));
     }
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineTexture"), COMPOSITE_LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("depthTexture"), COMPOSITE_DEPTH_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("lineColorTexture"), LINE_COLOR_TEXTURE_UNIT);
     webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("lineColorEnabled"), isLineColorEnabled ? 1 : 0);
-    webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System111.Math.max(1, viewport[2]), System111.Math.max(1, viewport[3]));
+    webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System113.Math.max(1, viewport[2]), System113.Math.max(1, viewport[3]));
     webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
     webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
     webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("outlineColor"), color[0], color[1], color[2], color[3]);
@@ -46054,7 +47040,7 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.coverageTexture);
     webGL2RenderingContext.uniform1i(program.getUniformLocation("coverageTexture"), LINE_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform4f(program.getUniformLocation("viewportRect"), viewport[0], viewport[1], System111.Math.max(1, viewport[2]), System111.Math.max(1, viewport[3]));
+    webGL2RenderingContext.uniform4f(program.getUniformLocation("viewportRect"), viewport[0], viewport[1], System113.Math.max(1, viewport[2]), System113.Math.max(1, viewport[3]));
     webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
     webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
     webGL2RenderingContext.bindVertexArray(null);
@@ -46117,15 +47103,15 @@ var ToonScreenOutline = class {
     const frame = this.#frame;
     let pixelsPerUnit = 1;
     if (this.#widthUnit === ToonOutlineWidthUnit.world) {
-      pixelsPerUnit = frame.viewport[3] * 0.5 * System111.Math.abs(frame.projectionElements[5]);
+      pixelsPerUnit = frame.viewport[3] * 0.5 * System113.Math.abs(frame.projectionElements[5]);
       if (frame.isPerspective) {
         const averageDistance = this.#drawnDistanceCount > 0 ? this.#drawnDistanceSum / this.#drawnDistanceCount : 1;
         const focusDistance = this.#focusDistance > 0 ? this.#focusDistance : averageDistance;
-        pixelsPerUnit /= System111.Math.max(1e-3, focusDistance);
+        pixelsPerUnit /= System113.Math.max(1e-3, focusDistance);
       }
     }
     const toPixels = __name((width) => {
-      return width > 0 ? System111.Math.max(1, width * pixelsPerUnit) : 0;
+      return width > 0 ? System113.Math.max(1, width * pixelsPerUnit) : 0;
     }, "toPixels");
     return [toPixels(this.#width), toPixels(this.#creaseWidth)];
   }
@@ -46149,7 +47135,7 @@ var ToonScreenOutline = class {
     const scaleX = readHypot(modelElements[0], modelElements[1], modelElements[2]);
     const scaleY = readHypot(modelElements[4], modelElements[5], modelElements[6]);
     const scaleZ = readHypot(modelElements[8], modelElements[9], modelElements[10]);
-    const radius = mesh.boundingRadius * System111.Math.max(scaleX, scaleY, scaleZ);
+    const radius = mesh.boundingRadius * System113.Math.max(scaleX, scaleY, scaleZ);
     const frustumPlanes = this.#frame.frustumPlanes;
     for (let planeIndex = 0; planeIndex < frustumPlanes.length; ++planeIndex) {
       const plane = frustumPlanes[planeIndex];
@@ -46324,8 +47310,8 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.deleteProgram(this.#coverageBlitProgram.getProgram());
   }
 };
-var System112 = globalThis;
-var ZERO_CLEAR_FLOAT_VALUE4 = new System112.Float32Array(4);
+var System114 = globalThis;
+var ZERO_CLEAR_FLOAT_VALUE4 = new System114.Float32Array(4);
 var COMPOSITE_FRAGMENT_SHADER2 = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -46610,12 +47596,12 @@ var ToonPostProcess = class _ToonPostProcess {
     this.#requestedSampleCount = options !== null && options.sampleCount ? options.sampleCount : 0;
     this.#depthBits = options !== null && options.depthBits === 24 ? 24 : 16;
     this.#useDepthTexture = options !== null && options.useDepthTexture === true;
-    this.#outputWidth = System112.Math.max(1, width);
-    this.#outputHeight = System112.Math.max(1, height);
+    this.#outputWidth = System114.Math.max(1, width);
+    this.#outputHeight = System114.Math.max(1, height);
     this.#resolutionScale = 1;
     this.#sceneRenderTarget = this.createSceneRenderTarget();
     this.#bloomEffect = new BloomEffect(webGL2RenderingContext);
-    this.#bloomEffect.resize(System112.Math.max(1, width), System112.Math.max(1, height));
+    this.#bloomEffect.resize(System114.Math.max(1, width), System114.Math.max(1, height));
     this.#bloomEffect.setThreshold(0.9, 1.6);
     this.#multiLevelBloomEffect = null;
     this.#compositePass = new FullscreenPass(webGL2RenderingContext, addColorSpaceDefine(COMPOSITE_FRAGMENT_SHADER2, this.#colorSpace));
@@ -46666,14 +47652,14 @@ var ToonPostProcess = class _ToonPostProcess {
     return new RenderTarget(this.#webGL2RenderingContext, sceneWidth, sceneHeight, true, options);
   }
   readSceneWidth() {
-    return System112.Math.max(1, System112.Math.round(this.#outputWidth * this.#resolutionScale));
+    return System114.Math.max(1, System114.Math.round(this.#outputWidth * this.#resolutionScale));
   }
   readSceneHeight() {
-    return System112.Math.max(1, System112.Math.round(this.#outputHeight * this.#resolutionScale));
+    return System114.Math.max(1, System114.Math.round(this.#outputHeight * this.#resolutionScale));
   }
   resize(width, height) {
-    this.#outputWidth = System112.Math.max(1, width);
-    this.#outputHeight = System112.Math.max(1, height);
+    this.#outputWidth = System114.Math.max(1, width);
+    this.#outputHeight = System114.Math.max(1, height);
     const sceneRenderTarget = this.#sceneRenderTarget;
     const sceneWidth = this.readSceneWidth();
     const sceneHeight = this.readSceneHeight();
@@ -46688,14 +47674,14 @@ var ToonPostProcess = class _ToonPostProcess {
     }
   }
   setResolutionScale(resolutionScale) {
-    this.#resolutionScale = System112.Math.max(0.05, System112.Math.min(4, resolutionScale));
+    this.#resolutionScale = System114.Math.max(0.05, System114.Math.min(4, resolutionScale));
     this.resize(this.#outputWidth, this.#outputHeight);
   }
   getResolutionScale() {
     return this.#resolutionScale;
   }
   setSampleCount(sampleCount) {
-    const safeSampleCount = System112.Math.max(0, System112.Math.floor(sampleCount));
+    const safeSampleCount = System114.Math.max(0, System114.Math.floor(sampleCount));
     if (safeSampleCount === this.#requestedSampleCount) {
       return;
     }
@@ -46784,17 +47770,17 @@ var ToonPostProcess = class _ToonPostProcess {
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
   }
   setExposure(exposure) {
-    this.#exposure = System112.Math.max(0, exposure);
+    this.#exposure = System114.Math.max(0, exposure);
   }
   setBloom(isBloomEnabled, bloomStrength, thresholdStart, thresholdEnd) {
     this.#isBloomEnabled = isBloomEnabled;
-    this.#bloomStrength = System112.Math.max(0, bloomStrength);
+    this.#bloomStrength = System114.Math.max(0, bloomStrength);
     this.#bloomEffect.setThreshold(thresholdStart, thresholdEnd);
   }
   setBloomLevels(levelCount, threshold, knee) {
-    this.#bloomThreshold = System112.Math.max(0, threshold);
-    this.#bloomKnee = System112.Math.max(0, knee);
-    const safeLevelCount = System112.Math.max(0, System112.Math.floor(levelCount));
+    this.#bloomThreshold = System114.Math.max(0, threshold);
+    this.#bloomKnee = System114.Math.max(0, knee);
+    const safeLevelCount = System114.Math.max(0, System114.Math.floor(levelCount));
     let multiLevelBloomEffect = this.#multiLevelBloomEffect;
     if (safeLevelCount === 0) {
       if (multiLevelBloomEffect !== null) {
@@ -46819,11 +47805,11 @@ var ToonPostProcess = class _ToonPostProcess {
     this.#bloomEffect.setUseFloatColor(isFloatColor && this.#useFloatColor);
   }
   setBrightness(brightness) {
-    this.#brightness = System112.Math.max(0, brightness);
+    this.#brightness = System114.Math.max(0, brightness);
   }
   setLitArea(center, innerRadius, outerRadius, inverseViewProjectionMatrix) {
-    const safeOuterRadius = System112.Math.max(1e-4, outerRadius);
-    this.#litArea = { center: [center[0], center[1], center[2]], innerRadius: System112.Math.max(0, System112.Math.min(innerRadius, safeOuterRadius)), outerRadius: safeOuterRadius, inverseViewProjectionElements: System112.Float32Array.from(inverseViewProjectionMatrix.getElements()) };
+    const safeOuterRadius = System114.Math.max(1e-4, outerRadius);
+    this.#litArea = { center: [center[0], center[1], center[2]], innerRadius: System114.Math.max(0, System114.Math.min(innerRadius, safeOuterRadius)), outerRadius: safeOuterRadius, inverseViewProjectionElements: System114.Float32Array.from(inverseViewProjectionMatrix.getElements()) };
   }
   clearLitArea() {
     this.#litArea = null;
@@ -46831,18 +47817,18 @@ var ToonPostProcess = class _ToonPostProcess {
   setColorGrade(saturation, contrast, toneColor, toneAmount, hazeColor, hazeAmount) {
     const toneLuminance = toneColor[0] * 0.2126 + toneColor[1] * 0.7152 + toneColor[2] * 0.0722;
     const toneScale = toneLuminance > 0 ? 1 / toneLuminance : 1;
-    this.#saturation = System112.Math.max(0, saturation);
-    this.#contrast = System112.Math.max(0, contrast);
+    this.#saturation = System114.Math.max(0, saturation);
+    this.#contrast = System114.Math.max(0, contrast);
     this.#toneColor = [toneColor[0] * toneScale, toneColor[1] * toneScale, toneColor[2] * toneScale];
-    this.#toneAmount = System112.Math.max(0, System112.Math.min(1, toneAmount));
+    this.#toneAmount = System114.Math.max(0, System114.Math.min(1, toneAmount));
     this.#hazeColor = [hazeColor[0], hazeColor[1], hazeColor[2]];
-    this.#hazeAmount = System112.Math.max(0, System112.Math.min(1, hazeAmount));
+    this.#hazeAmount = System114.Math.max(0, System114.Math.min(1, hazeAmount));
   }
   setVignette(vignetteStrength) {
-    this.#vignetteStrength = System112.Math.max(0, vignetteStrength);
+    this.#vignetteStrength = System114.Math.max(0, vignetteStrength);
   }
   setAmbientOcclusion(isEnabled, intensity = 0.5, radius = 0.5, resolutionScale = 0.5, directLightingStrength = 0) {
-    this.#ambientOcclusion = { isEnabled: isEnabled === true, intensity: System112.Math.max(0, System112.Math.min(1, intensity)), radius: System112.Math.max(1e-4, radius), resolutionScale: System112.Math.max(0.25, System112.Math.min(1, resolutionScale)), directLightingStrength: System112.Math.max(0, System112.Math.min(1, directLightingStrength)) };
+    this.#ambientOcclusion = { isEnabled: isEnabled === true, intensity: System114.Math.max(0, System114.Math.min(1, intensity)), radius: System114.Math.max(1e-4, radius), resolutionScale: System114.Math.max(0.25, System114.Math.min(1, resolutionScale)), directLightingStrength: System114.Math.max(0, System114.Math.min(1, directLightingStrength)) };
   }
   getAmbientOcclusion() {
     const ambientOcclusion = this.#ambientOcclusion;
@@ -46871,7 +47857,7 @@ var ToonPostProcess = class _ToonPostProcess {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     const width = lineTarget.width;
     const height = lineTarget.height;
-    const target = this.readAmbientOcclusionTarget(width, height, System112.Math.max(1, System112.Math.ceil(width * ambientOcclusion.resolutionScale)), System112.Math.max(1, System112.Math.ceil(height * ambientOcclusion.resolutionScale)));
+    const target = this.readAmbientOcclusionTarget(width, height, System114.Math.max(1, System114.Math.ceil(width * ambientOcclusion.resolutionScale)), System114.Math.max(1, System114.Math.ceil(height * ambientOcclusion.resolutionScale)));
     if (target === null) {
       return null;
     }
@@ -46919,9 +47905,9 @@ var ToonPostProcess = class _ToonPostProcess {
     const occlusionPass = passes.occlusionPass;
     bindCommon(occlusionPass, target.blurTexture);
     webGL2RenderingContext.uniform4f(occlusionPass.getUniformLocation("projectionRow"), projectionElements[3], projectionElements[7], projectionElements[11], projectionElements[15]);
-    webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("isPerspective"), System112.Math.abs(projectionElements[11]) > 0.5 ? 1 : 0);
+    webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("isPerspective"), System114.Math.abs(projectionElements[11]) > 0.5 ? 1 : 0);
     webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("radius"), ambientOcclusion.radius);
-    webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("pixelsPerUnit"), 0.5 * System112.Math.abs(projectionElements[0]) * width);
+    webGL2RenderingContext.uniform1f(occlusionPass.getUniformLocation("pixelsPerUnit"), 0.5 * System114.Math.abs(projectionElements[0]) * width);
     occlusionPass.draw();
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.blurFramebuffer);
     webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, ZERO_CLEAR_FLOAT_VALUE4);
@@ -47047,7 +48033,7 @@ var ToonPostProcess = class _ToonPostProcess {
     }
   }
 };
-var System113 = globalThis;
+var System115 = globalThis;
 var SKIN_SHADING_SKIN = 0;
 var SKIN_SHADING_EYE = 1;
 var SKIN_SHADING_HAIR = 2;
@@ -47725,7 +48711,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   constructor(webGL2RenderingContext) {
     super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE, SKIN_VERTEXSHADER_SOURCE);
     this.#cutoutDepthShaderProgram = new ShaderProgram(webGL2RenderingContext, CUTOUT_DEPTH_VERTEXSHADER_SOURCE.trim(), CUTOUT_DEPTH_FRAGMENTSHADER_SOURCE.trim());
-    this.#materialShadingModes = new System113.Map();
+    this.#materialShadingModes = new System115.Map();
     this.#shadowMapTexture = null;
     this.#lightViewProjectionElements = null;
     this.#shadowStrength = 0;
@@ -47734,8 +48720,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#shadowSampleCount = 12;
     this.#hairSway = [0, 0, 1.5];
     this.#useHairFringe = true;
-    this.#lightDirections = new System113.Float32Array(9);
-    this.#lightColors = new System113.Float32Array(9);
+    this.#lightDirections = new System115.Float32Array(9);
+    this.#lightColors = new System115.Float32Array(9);
     this.#ambientSkyColor = [0.34, 0.36, 0.42];
     this.#ambientHorizonColor = [0.16, 0.15, 0.16];
     this.#ambientGroundColor = [0.05, 0.04, 0.045];
@@ -47750,7 +48736,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#microTiling = 0;
     this.#microStrength = 0;
     this.#useWrinkleMaps = false;
-    this.#wrinkleChannelWeights = new System113.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
+    this.#wrinkleChannelWeights = new System115.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
     this.#wrinkleTileMask = 0;
     this.#wrinkleNormalStrength = 1;
     this.#wrinkleColorStrength = 1;
@@ -47968,7 +48954,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#shadowSoftness = shadowSoftness;
   }
   setShadowSampleCount(shadowSampleCount) {
-    this.#shadowSampleCount = System113.Math.max(1, System113.Math.min(SHADOW_SAMPLE_COUNT, System113.Math.floor(shadowSampleCount)));
+    this.#shadowSampleCount = System115.Math.max(1, System115.Math.min(SHADOW_SAMPLE_COUNT, System115.Math.floor(shadowSampleCount)));
   }
   setHairSway(amplitude, time, frequency) {
     this.#hairSway = [amplitude, time, frequency];
@@ -47984,7 +48970,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     return shadingMode !== void 0 ? shadingMode : SKIN_SHADING_SKIN;
   }
   setLight(lightIndex, directionX, directionY, directionZ, red, green, blue, intensity) {
-    const directionLength = System113.Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
+    const directionLength = System115.Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
     const safeLength = directionLength > 0 ? directionLength : 1;
     this.#lightDirections[lightIndex * 3] = directionX / safeLength;
     this.#lightDirections[lightIndex * 3 + 1] = directionY / safeLength;
@@ -48052,7 +49038,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#eyeIrisDepth = irisDepth;
   }
   setEyeClosure(eyeClosure) {
-    this.#eyeClosure = System113.Math.max(0, System113.Math.min(1, eyeClosure));
+    this.#eyeClosure = System115.Math.max(0, System115.Math.min(1, eyeClosure));
   }
   setHairParameters(specularShift, specularPower, specularIntensity, rootShade) {
     this.#hairSpecularShift = [specularShift[0], specularShift[1], 0];
@@ -48064,7 +49050,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     return this.#cutoutDepthShaderProgram;
   }
 };
-var System114 = globalThis;
+var System116 = globalThis;
 var SAMPLE_COUNT = 16;
 var OCCLUSION_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -48189,31 +49175,31 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     this.#intensity = 1;
     this.#bias = 2e-3;
     this.#scale = 0.5;
-    this.#sampleKernel = new System114.Float32Array(SAMPLE_COUNT * 3);
+    this.#sampleKernel = new System116.Float32Array(SAMPLE_COUNT * 3);
     this.computeKernel();
   }
   computeKernel() {
     this.#sampleKernel = _AmbientOcclusionEffect.buildSampleKernel();
   }
   static buildSampleKernel() {
-    const sampleKernel = new System114.Float32Array(SAMPLE_COUNT * 3);
+    const sampleKernel = new System116.Float32Array(SAMPLE_COUNT * 3);
     for (let sampleIndex = 0; sampleIndex < SAMPLE_COUNT; ++sampleIndex) {
       const goldenAngle = 2.39996323;
       const angle = sampleIndex * goldenAngle;
       const height = (sampleIndex + 0.5) / SAMPLE_COUNT;
-      const ring = System114.Math.sqrt(1 - height * height);
+      const ring = System116.Math.sqrt(1 - height * height);
       let scale = (sampleIndex + 1) / SAMPLE_COUNT;
       scale = 0.15 + 0.85 * scale * scale;
-      sampleKernel[sampleIndex * 3] = System114.Math.cos(angle) * ring * scale;
-      sampleKernel[sampleIndex * 3 + 1] = System114.Math.sin(angle) * ring * scale;
+      sampleKernel[sampleIndex * 3] = System116.Math.cos(angle) * ring * scale;
+      sampleKernel[sampleIndex * 3 + 1] = System116.Math.sin(angle) * ring * scale;
       sampleKernel[sampleIndex * 3 + 2] = height * scale;
     }
     return sampleKernel;
   }
   resize(width, height) {
     const scale = this.getScale();
-    const scaledWidth = System114.Math.max(1, System114.Math.floor(width * scale));
-    const scaledHeight = System114.Math.max(1, System114.Math.floor(height * scale));
+    const scaledWidth = System116.Math.max(1, System116.Math.floor(width * scale));
+    const scaledHeight = System116.Math.max(1, System116.Math.floor(height * scale));
     this.#occlusionRenderTarget.resize(scaledWidth, scaledHeight);
     this.#pingRenderTarget.resize(scaledWidth, scaledHeight);
     this.#pongRenderTarget.resize(scaledWidth, scaledHeight);
@@ -48228,12 +49214,12 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     webGL2RenderingContext.uniform1i(depthTextureLocation, 0);
     const normalTextureLocation = occlusionPass.getUniformLocation("normalTexture");
     webGL2RenderingContext.uniform1i(normalTextureLocation, 2);
-    const viewRotation = new System114.Float32Array([viewMatrixElements[0], viewMatrixElements[1], viewMatrixElements[2], viewMatrixElements[4], viewMatrixElements[5], viewMatrixElements[6], viewMatrixElements[8], viewMatrixElements[9], viewMatrixElements[10]]);
+    const viewRotation = new System116.Float32Array([viewMatrixElements[0], viewMatrixElements[1], viewMatrixElements[2], viewMatrixElements[4], viewMatrixElements[5], viewMatrixElements[6], viewMatrixElements[8], viewMatrixElements[9], viewMatrixElements[10]]);
     const viewRotationLocation = occlusionPass.getUniformLocation("viewRotation");
     webGL2RenderingContext.uniformMatrix3fv(viewRotationLocation, false, viewRotation);
     const depthRangeLocation = occlusionPass.getUniformLocation("depthRange");
     webGL2RenderingContext.uniform2f(depthRangeLocation, nearDistance, farDistance);
-    const tangentHalfFieldOfView = System114.Math.tan(fieldOfViewRadian * 0.5);
+    const tangentHalfFieldOfView = System116.Math.tan(fieldOfViewRadian * 0.5);
     const projectionScaleLocation = occlusionPass.getUniformLocation("projectionScale");
     webGL2RenderingContext.uniform2f(projectionScaleLocation, tangentHalfFieldOfView * aspectRatio, tangentHalfFieldOfView);
     const sampleKernelLocation = occlusionPass.getUniformLocation("sampleKernel[0]");
@@ -48327,7 +49313,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     return this.#scale;
   }
 };
-var System115 = globalThis;
+var System117 = globalThis;
 var KERNEL_SAMPLE_COUNT = 17;
 var KERNEL_RANGE = 3;
 var SCATTER_FRAGMENTSHADER_SOURCE = `#version 300 es
@@ -48403,7 +49389,7 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     this.#scatterWidth = 0.2;
     this.#falloffColor = [1, 0.37, 0.3];
     this.#strengthColor = [0.48, 0.41, 0.28];
-    this.#kernel = new System115.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+    this.#kernel = new System117.Float32Array(KERNEL_SAMPLE_COUNT * 4);
     this.computeKernel();
   }
   computeKernel() {
@@ -48413,10 +49399,10 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
   }
   static buildKernel(falloffColor, strengthColor) {
     const sampleCount = KERNEL_SAMPLE_COUNT;
-    const kernel = new System115.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+    const kernel = new System117.Float32Array(KERNEL_SAMPLE_COUNT * 4);
     function evaluateGaussian(variance, distance, channelIndex) {
       const scaledDistance = distance / (1e-3 + falloffColor[channelIndex]);
-      return System115.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System115.Math.PI * variance);
+      return System117.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System117.Math.PI * variance);
     }
     __name(evaluateGaussian, "evaluateGaussian");
     function evaluateProfile(distance, channelIndex) {
@@ -48428,13 +49414,13 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const linearOffset = -KERNEL_RANGE + sampleIndex * step;
       const sign = linearOffset < 0 ? -1 : 1;
-      const normalizedOffset = System115.Math.abs(linearOffset) / KERNEL_RANGE;
+      const normalizedOffset = System117.Math.abs(linearOffset) / KERNEL_RANGE;
       offsets.push(KERNEL_RANGE * sign * normalizedOffset * normalizedOffset);
     }
     const weights = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-      const leftWidth = sampleIndex > 0 ? System115.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
-      const rightWidth = sampleIndex < sampleCount - 1 ? System115.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
+      const leftWidth = sampleIndex > 0 ? System117.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
+      const rightWidth = sampleIndex < sampleCount - 1 ? System117.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
       const area = (leftWidth + rightWidth) * 0.5;
       const weight = [];
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -48487,7 +49473,7 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     const scatterWidthLocation = scatterPass.getUniformLocation("scatterWidth");
     webGL2RenderingContext.uniform1f(scatterWidthLocation, this.getScatterWidth());
     const distanceToProjectionWindowLocation = scatterPass.getUniformLocation("distanceToProjectionWindow");
-    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System115.Math.tan(fieldOfViewRadian * 0.5));
+    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System117.Math.tan(fieldOfViewRadian * 0.5));
     const aspectRatioLocation = scatterPass.getUniformLocation("aspectRatio");
     webGL2RenderingContext.uniform1f(aspectRatioLocation, aspectRatio);
     const depthRangeLocation = scatterPass.getUniformLocation("depthRange");
@@ -48551,13 +49537,13 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     return this.#pongRenderTarget;
   }
 };
-var System116 = globalThis;
+var System118 = globalThis;
 var SHADOW_ATLAS_MAXIMUM_LIGHTS = 4;
 var DEFAULT_SHADOW_DEPTH_BIAS = 1;
 var DEFAULT_SHADOW_NORMAL_BIAS = 1;
 var CUBE_FACE_FORWARDS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 var CUBE_FACE_UPS = [[0, 1, 0], [0, 1, 0], [0, 0, 1], [0, 0, 1], [0, 1, 0], [0, 1, 0]];
-var ShadowUpdateMode = System116.Object.freeze({ everyFrame: "everyFrame", onChange: "onChange", interval: "interval" });
+var ShadowUpdateMode = System118.Object.freeze({ everyFrame: "everyFrame", onChange: "onChange", interval: "interval" });
 function createDepthTarget(webGL2RenderingContext, resolution) {
   const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
   const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
@@ -48675,21 +49661,21 @@ var ShadowMap = class extends Object2 {
   updateLightMatrix(focusPosition, lightDirection, extent, nearDistance, farDistance) {
     const normalizedDirection = lightDirection.normalize();
     const eyeDistance = (nearDistance + farDistance) * 0.5;
-    const upDirection = System116.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
+    const upDirection = System118.Math.abs(normalizedDirection.y) > 0.99 ? Vector3.create(0, 0, 1) : Vector3.up();
     const focusStep = this.#focusStep;
     if (focusStep > 0) {
-      focusPosition = Vector3.create(System116.Math.round(focusPosition.x / focusStep) * focusStep, System116.Math.round(focusPosition.y / focusStep) * focusStep, System116.Math.round(focusPosition.z / focusStep) * focusStep);
+      focusPosition = Vector3.create(System118.Math.round(focusPosition.x / focusStep) * focusStep, System118.Math.round(focusPosition.y / focusStep) * focusStep, System118.Math.round(focusPosition.z / focusStep) * focusStep);
       extent += focusStep;
       farDistance += focusStep;
-      nearDistance = System116.Math.max(nearDistance - focusStep, nearDistance * 0.1);
+      nearDistance = System118.Math.max(nearDistance - focusStep, nearDistance * 0.1);
     }
     const eyeOffset = normalizedDirection.multiply(-eyeDistance);
     const eyePosition = focusPosition.add(eyeOffset);
     const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
     const worldUnitsPerTexel = extent * 2 / this.getResolution();
     const viewElements = viewMatrix.getElements();
-    viewElements[12] = System116.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    viewElements[13] = System116.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[12] = System118.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[13] = System118.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
     const orthographicMatrix = Matrix4.createOrthographic(-extent, extent, -extent, extent, nearDistance, farDistance);
     const lightViewProjectionMatrix = orthographicMatrix.clone();
     lightViewProjectionMatrix.multiply(viewMatrix);
@@ -48701,7 +49687,7 @@ var ShadowMap = class extends Object2 {
   setUpdateMode(updateMode, updateInterval = 1) {
     const shadowCache = this.#shadowCache;
     shadowCache.updateMode = updateMode;
-    shadowCache.updateInterval = System116.Math.max(1, System116.Math.floor(updateInterval));
+    shadowCache.updateInterval = System118.Math.max(1, System118.Math.floor(updateInterval));
     shadowCache.frameCount = 0;
     shadowCache.isUpdateRequested = true;
   }
@@ -48739,8 +49725,8 @@ var ShadowMap = class extends Object2 {
     return this.#lightViewProjectionMatrix;
   }
   setBias(depthBias, normalBias) {
-    this.#depthBias = System116.Math.max(0, depthBias);
-    this.#normalBias = System116.Math.max(0, normalBias);
+    this.#depthBias = System118.Math.max(0, depthBias);
+    this.#normalBias = System118.Math.max(0, normalBias);
   }
   getDepthBias() {
     return this.#depthBias;
@@ -48773,7 +49759,7 @@ var ShadowAtlas = class extends Object2 {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#resolution = resolution;
-    this.#tileResolution = System116.Math.max(1, System116.Math.min(tileResolution, resolution));
+    this.#tileResolution = System118.Math.max(1, System118.Math.min(tileResolution, resolution));
     const depthTarget = createDepthTarget(webGL2RenderingContext, resolution);
     this.#framebuffer = depthTarget.framebuffer;
     this.#depthTexture = depthTarget.depthTexture;
@@ -48791,17 +49777,17 @@ var ShadowAtlas = class extends Object2 {
       if (pointLight.castsShadow !== true || this.#lights.length >= SHADOW_ATLAS_MAXIMUM_LIGHTS) {
         continue;
       }
-      const near = pointLight.shadowNear !== void 0 ? System116.Math.max(1e-3, pointLight.shadowNear) : 0.05;
-      const far = System116.Math.max(near + 0.01, pointLight.range !== void 0 && pointLight.range > 0 ? pointLight.range : 30);
+      const near = pointLight.shadowNear !== void 0 ? System118.Math.max(1e-3, pointLight.shadowNear) : 0.05;
+      const far = System118.Math.max(near + 0.01, pointLight.range !== void 0 && pointLight.range > 0 ? pointLight.range : 30);
       const direction = pointLight.direction !== void 0 && pointLight.direction !== null ? normalizeDirection2(pointLight.direction) : null;
       const light = { lightIndex, position: pointLight.position.slice(), forward: [0, 0, 1], up: [0, 1, 0], tangent: 0, near, far, firstTile: tileCount };
       if (direction !== null) {
-        const outerConeAngle = pointLight.outerConeAngle !== void 0 ? pointLight.outerConeAngle : System116.Math.PI / 4;
-        const helper = System116.Math.abs(direction[1]) < 0.99 ? [0, 1, 0] : [1, 0, 0];
+        const outerConeAngle = pointLight.outerConeAngle !== void 0 ? pointLight.outerConeAngle : System118.Math.PI / 4;
+        const helper = System118.Math.abs(direction[1]) < 0.99 ? [0, 1, 0] : [1, 0, 0];
         const along = helper[0] * direction[0] + helper[1] * direction[1] + helper[2] * direction[2];
         light.forward = direction;
         light.up = normalizeDirection2([helper[0] - direction[0] * along, helper[1] - direction[1] * along, helper[2] - direction[2] * along]);
-        light.tangent = System116.Math.tan(System116.Math.min(System116.Math.max(0.01, outerConeAngle) + 0.05, 1.45));
+        light.tangent = System118.Math.tan(System118.Math.min(System118.Math.max(0.01, outerConeAngle) + 0.05, 1.45));
         tileCount += 1;
       } else {
         tileCount += 6;
@@ -48809,11 +49795,11 @@ var ShadowAtlas = class extends Object2 {
       this.#lights.push(light);
     }
     let tileSize = this.#tileResolution;
-    while (tileSize > 1 && tileCount > System116.Math.floor(this.#resolution / tileSize) * System116.Math.floor(this.#resolution / tileSize)) {
-      tileSize = System116.Math.floor(tileSize / 2);
+    while (tileSize > 1 && tileCount > System118.Math.floor(this.#resolution / tileSize) * System118.Math.floor(this.#resolution / tileSize)) {
+      tileSize = System118.Math.floor(tileSize / 2);
     }
     this.#tileSize = tileSize;
-    this.#gridSize = System116.Math.max(1, System116.Math.floor(this.#resolution / tileSize));
+    this.#gridSize = System118.Math.max(1, System118.Math.floor(this.#resolution / tileSize));
     this.#tiles = [];
     for (const light of this.#lights) {
       if (light.tangent > 0) {
@@ -48827,9 +49813,9 @@ var ShadowAtlas = class extends Object2 {
   }
   createTile(position, forward, up, tangent, near, far) {
     const tileIndex = this.#tiles.length;
-    const viewProjectionMatrix = Matrix4.createPerspective(2 * System116.Math.atan(tangent), 1, near, far);
+    const viewProjectionMatrix = Matrix4.createPerspective(2 * System118.Math.atan(tangent), 1, near, far);
     viewProjectionMatrix.multiply(createBasisViewMatrix(position, forward, up));
-    return { viewProjectionMatrix, x: tileIndex % this.#gridSize * this.#tileSize, y: System116.Math.floor(tileIndex / this.#gridSize) * this.#tileSize, size: this.#tileSize };
+    return { viewProjectionMatrix, x: tileIndex % this.#gridSize * this.#tileSize, y: System118.Math.floor(tileIndex / this.#gridSize) * this.#tileSize, size: this.#tileSize };
   }
   beginRender() {
     bindShadowTarget(this.#webGL2RenderingContext, this.#shadowCache, this.#framebuffer);
@@ -48837,7 +49823,7 @@ var ShadowAtlas = class extends Object2 {
   setUpdateMode(updateMode, updateInterval = 1) {
     const shadowCache = this.#shadowCache;
     shadowCache.updateMode = updateMode;
-    shadowCache.updateInterval = System116.Math.max(1, System116.Math.floor(updateInterval));
+    shadowCache.updateInterval = System118.Math.max(1, System118.Math.floor(updateInterval));
     shadowCache.frameCount = 0;
     shadowCache.isUpdateRequested = true;
   }
@@ -48895,14 +49881,14 @@ var ShadowAtlas = class extends Object2 {
   }
 };
 function normalizeDirection2(direction) {
-  const length = System116.Math.hypot(direction[0], direction[1], direction[2]);
+  const length = System118.Math.hypot(direction[0], direction[1], direction[2]);
   if (length <= 0) {
     return [0, -1, 0];
   }
   return [direction[0] / length, direction[1] / length, direction[2] / length];
 }
 __name(normalizeDirection2, "normalizeDirection");
-var System117 = globalThis;
+var System119 = globalThis;
 var Cooldown = class extends Object2 {
   static {
     __name(this, "Cooldown");
@@ -48911,12 +49897,12 @@ var Cooldown = class extends Object2 {
   #remainSeconds;
   constructor(duration = 1) {
     super();
-    this.#duration = System117.Math.max(0, duration);
+    this.#duration = System119.Math.max(0, duration);
     this.#remainSeconds = 0;
   }
   tick(timeDelta) {
     if (this.#remainSeconds > 0) {
-      this.#remainSeconds = System117.Math.max(0, this.#remainSeconds - timeDelta);
+      this.#remainSeconds = System119.Math.max(0, this.#remainSeconds - timeDelta);
     }
   }
   isReady() {
@@ -48933,7 +49919,7 @@ var Cooldown = class extends Object2 {
     this.#remainSeconds = 0;
   }
   setDuration(duration) {
-    this.#duration = System117.Math.max(0, duration);
+    this.#duration = System119.Math.max(0, duration);
   }
   getDuration() {
     return this.#duration;
@@ -48958,7 +49944,7 @@ var RepeatTimer = class extends Object2 {
   #isRunning;
   constructor(interval = 1, elapsedEvent = null) {
     super();
-    this.#interval = System117.Math.max(1e-6, interval);
+    this.#interval = System119.Math.max(1e-6, interval);
     this.#elapsedSeconds = 0;
     this.#elapsedEvent = elapsedEvent;
     this.#isRunning = true;
@@ -48986,7 +49972,7 @@ var RepeatTimer = class extends Object2 {
     this.#isRunning = false;
   }
   setInterval(interval) {
-    this.#interval = System117.Math.max(1e-6, interval);
+    this.#interval = System119.Math.max(1e-6, interval);
   }
   getInterval() {
     return this.#interval;
@@ -48998,7 +49984,7 @@ var RepeatTimer = class extends Object2 {
     return this.#isRunning;
   }
 };
-var System118 = globalThis;
+var System120 = globalThis;
 var ObjectPool = class extends Object2 {
   static {
     __name(this, "ObjectPool");
@@ -49013,7 +49999,7 @@ var ObjectPool = class extends Object2 {
     this.#createHandler = createHandler;
     this.#resetHandler = resetHandler;
     this.#freeList = [];
-    this.#freeSet = new System118.Set();
+    this.#freeSet = new System120.Set();
     this.#totalCount = 0;
     for (let index = 0; index < preloadCount; ++index) {
       const instance = this.#createHandler();
@@ -49055,7 +50041,7 @@ var ObjectPool = class extends Object2 {
     this.#freeSet.clear();
   }
 };
-var System119 = globalThis;
+var System121 = globalThis;
 var FiniteStateMachine = class extends Object2 {
   static {
     __name(this, "FiniteStateMachine");
@@ -49067,7 +50053,7 @@ var FiniteStateMachine = class extends Object2 {
   #transitionEvent;
   constructor() {
     super();
-    this.#stateTable = new System119.Map();
+    this.#stateTable = new System121.Map();
     this.#stateName = null;
     this.#stateSeconds = 0;
     this.#transitionGuard = null;
@@ -49132,7 +50118,7 @@ var FiniteStateMachine = class extends Object2 {
 };
 var format_exports = {};
 __export(format_exports, { formatCompactNumber: () => formatCompactNumber, formatMinutesSeconds: () => formatMinutesSeconds, formatNumber: () => formatNumber, formatNumberWithUnit: () => formatNumberWithUnit, formatPaddedNumber: () => formatPaddedNumber });
-var System120 = globalThis;
+var System122 = globalThis;
 var COMPACT_UNIT_LIST = [{ divisor: 1e3, suffix: "K" }, { divisor: 1e6, suffix: "M" }, { divisor: 1e9, suffix: "B" }];
 function formatNumber(value, locale = "en-US") {
   return value.toLocaleString(locale);
@@ -49143,7 +50129,7 @@ function formatNumberWithUnit(value, unitSuffix, locale = "ko-KR") {
 }
 __name(formatNumberWithUnit, "formatNumberWithUnit");
 function formatCompactNumber(value, fractionDigits = 1) {
-  const absoluteValue = System120.Math.abs(value);
+  const absoluteValue = System122.Math.abs(value);
   const sign = value < 0 ? "-" : "";
   let unitIndex = -1;
   for (let candidateIndex = COMPACT_UNIT_LIST.length - 1; candidateIndex >= 0; --candidateIndex) {
@@ -49156,7 +50142,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
     return sign + String(absoluteValue);
   }
   let compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
-  if (System120.Number.parseFloat(compactText) >= 1e3 && unitIndex < COMPACT_UNIT_LIST.length - 1) {
+  if (System122.Number.parseFloat(compactText) >= 1e3 && unitIndex < COMPACT_UNIT_LIST.length - 1) {
     ++unitIndex;
     compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
   }
@@ -49164,7 +50150,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
 }
 __name(formatCompactNumber, "formatCompactNumber");
 function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = Infinity) {
-  const clampedValue = System120.Math.min(maxValue, System120.Math.max(minValue, value));
+  const clampedValue = System122.Math.min(maxValue, System122.Math.max(minValue, value));
   if (clampedValue < 0) {
     const digitText = String(-clampedValue).padStart(digitCount - 1, "0");
     return "-" + digitText;
@@ -49173,8 +50159,8 @@ function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = 
 }
 __name(formatPaddedNumber, "formatPaddedNumber");
 function formatMinutesSeconds(totalSeconds) {
-  const flooredSeconds = System120.Math.max(0, System120.Math.floor(totalSeconds));
-  const minutes = System120.Math.floor(flooredSeconds / 60);
+  const flooredSeconds = System122.Math.max(0, System122.Math.floor(totalSeconds));
+  const minutes = System122.Math.floor(flooredSeconds / 60);
   const seconds2 = flooredSeconds % 60;
   return minutes + ":" + String(seconds2).padStart(2, "0");
 }
@@ -49193,7 +50179,7 @@ function trimTrailingZero(numberText) {
   return trimmedText;
 }
 __name(trimTrailingZero, "trimTrailingZero");
-var System121 = globalThis;
+var System123 = globalThis;
 var PersistedStore = class extends Object2 {
   static {
     __name(this, "PersistedStore");
@@ -49212,19 +50198,19 @@ var PersistedStore = class extends Object2 {
     this.#defaultState = defaultState;
     this.#storageBackend = null;
     this.#state = this.readFromStorage();
-    this.#subscriberSet = new System121.Set();
-    this.#subscriberBySubscription = new System121.Map();
+    this.#subscriberSet = new System123.Set();
+    this.#subscriberBySubscription = new System123.Map();
   }
   get() {
     return this.#state;
   }
   set(partialState) {
-    this.#state = System121.Object.assign({}, this.#state, partialState);
+    this.#state = System123.Object.assign({}, this.#state, partialState);
     this.writeToStorage();
     this.notify();
   }
   replace(nextState) {
-    this.#state = System121.Object.assign({}, nextState);
+    this.#state = System123.Object.assign({}, nextState);
     this.writeToStorage();
     this.notify();
   }
@@ -49254,21 +50240,21 @@ var PersistedStore = class extends Object2 {
   readFromStorage() {
     const storedText = this.readStoredText();
     if (storedText.length === 0) {
-      return System121.Object.assign({}, this.#defaultState);
+      return System123.Object.assign({}, this.#defaultState);
     }
     try {
-      const parsed = System121.JSON.parse(storedText);
+      const parsed = System123.JSON.parse(storedText);
       if (!parsed || parsed.version !== this.#version || typeof parsed.state !== "object" || parsed.state === null) {
-        return System121.Object.assign({}, this.#defaultState);
+        return System123.Object.assign({}, this.#defaultState);
       }
-      return System121.Object.assign({}, this.#defaultState, parsed.state);
+      return System123.Object.assign({}, this.#defaultState, parsed.state);
     } catch (parseError) {
-      return System121.Object.assign({}, this.#defaultState);
+      return System123.Object.assign({}, this.#defaultState);
     }
   }
   writeToStorage() {
     const payload = { version: this.#version, state: this.#state };
-    const payloadText = System121.JSON.stringify(payload);
+    const payloadText = System123.JSON.stringify(payload);
     const storageBackend = this.getStorageBackend();
     if (storageBackend === null) {
       LocalStorage.setString(this.#storageKey, payloadText);
@@ -49304,7 +50290,7 @@ var PersistedStore = class extends Object2 {
     return this.#storageKey;
   }
 };
-var System122 = globalThis;
+var System124 = globalThis;
 var DEFAULT_RIGHT_TO_LEFT_LANGUAGES = ["ar", "fa", "he", "ur", "ps", "yi", "dv"];
 var FIRST_STRONG_ISOLATE = "\u2068";
 var POP_DIRECTIONAL_ISOLATE = "\u2069";
@@ -49314,13 +50300,13 @@ var Localization = class _Localization extends Object2 {
   static {
     __name(this, "Localization");
   }
-  static #tableByLanguage = new System122.Map();
+  static #tableByLanguage = new System124.Map();
   static #languageCode = "ko";
   static #fallbackLanguageCode = "ko";
-  static #aliasToLanguage = new System122.Map();
-  static #rightToLeftLanguages = new System122.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
+  static #aliasToLanguage = new System124.Map();
+  static #rightToLeftLanguages = new System124.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
   static detectLanguage(supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const navigatorObject = System122.navigator;
+    const navigatorObject = System124.navigator;
     const candidateList = [];
     if (navigatorObject) {
       if (navigatorObject.languages) {
@@ -49335,7 +50321,7 @@ var Localization = class _Localization extends Object2 {
     return languageCode;
   }
   static selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const supportedSet = new System122.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
+    const supportedSet = new System124.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
     const aliasToLanguage = _Localization.#aliasToLanguage;
     for (const languageTag of candidateList) {
       const loweredTag = languageTag.toLowerCase().split("_").join("-");
@@ -49402,11 +50388,11 @@ var Localization = class _Localization extends Object2 {
     return text.replace(JOINED_PLACEHOLDER_PATTERN, (joinedText) => {
       let isFilled = false;
       const valueText = joinedText.replace(PLACEHOLDER_PATTERN, (matched, name) => {
-        if (!System122.Object.prototype.hasOwnProperty.call(values, name)) {
+        if (!System124.Object.prototype.hasOwnProperty.call(values, name)) {
           return matched;
         }
         isFilled = true;
-        return System122.String(values[name]);
+        return System124.String(values[name]);
       });
       if (!isFilled) {
         return joinedText;
@@ -49419,12 +50405,12 @@ var Localization = class _Localization extends Object2 {
   }
   static setTableFromJson(languageCode, tableJson) {
     const table = {};
-    if (tableJson !== null && typeof tableJson === "object" && !System122.Array.isArray(tableJson)) {
-      for (const key of System122.Object.keys(tableJson)) {
+    if (tableJson !== null && typeof tableJson === "object" && !System124.Array.isArray(tableJson)) {
+      for (const key of System124.Object.keys(tableJson)) {
         const value = tableJson[key];
         if (typeof value === "string") {
           table[key] = value;
-        } else if (System122.Array.isArray(value)) {
+        } else if (System124.Array.isArray(value)) {
           table[key] = value.filter((item) => typeof item === "string");
         }
       }
@@ -49452,7 +50438,7 @@ var Localization = class _Localization extends Object2 {
   }
   static textList(key) {
     const resolvedValue = _Localization.lookup(key);
-    if (System122.Array.isArray(resolvedValue)) {
+    if (System124.Array.isArray(resolvedValue)) {
       return resolvedValue;
     }
     if (typeof resolvedValue === "string") {
@@ -49475,7 +50461,7 @@ var Localization = class _Localization extends Object2 {
     _Localization.#tableByLanguage.clear();
   }
 };
-var System123 = globalThis;
+var System125 = globalThis;
 var PathFinder = class extends Object2 {
   static {
     __name(this, "PathFinder");
@@ -49497,11 +50483,11 @@ var PathFinder = class extends Object2 {
     const toIndex = __name((column, row) => {
       return row * columnCount + column;
     }, "toIndex");
-    const costFromStart = new System123.Float64Array(cellCount).fill(System123.Number.POSITIVE_INFINITY);
-    const cameFrom = new System123.Int32Array(cellCount).fill(-1);
-    const isClosed = new System123.Uint8Array(cellCount);
+    const costFromStart = new System125.Float64Array(cellCount).fill(System125.Number.POSITIVE_INFINITY);
+    const cameFrom = new System125.Int32Array(cellCount).fill(-1);
+    const isClosed = new System125.Uint8Array(cellCount);
     const heuristic = __name((column, row) => {
-      return System123.Math.abs(column - goal.column) + System123.Math.abs(row - goal.row);
+      return System125.Math.abs(column - goal.column) + System125.Math.abs(row - goal.row);
     }, "heuristic");
     const heapScores = [];
     const heapIndices = [];
@@ -49566,7 +50552,7 @@ var PathFinder = class extends Object2 {
         const path = [];
         let traceIndex = goalIndex;
         while (traceIndex !== startIndex) {
-          path.push({ column: traceIndex % columnCount, row: System123.Math.floor(traceIndex / columnCount) });
+          path.push({ column: traceIndex % columnCount, row: System125.Math.floor(traceIndex / columnCount) });
           traceIndex = cameFrom[traceIndex];
         }
         path.reverse();
@@ -49577,7 +50563,7 @@ var PathFinder = class extends Object2 {
       }
       isClosed[currentIndex] = 1;
       const currentColumn = currentIndex % columnCount;
-      const currentRow = System123.Math.floor(currentIndex / columnCount);
+      const currentRow = System125.Math.floor(currentIndex / columnCount);
       for (const offset of neighborOffsets) {
         const nextColumn = currentColumn + offset[0];
         const nextRow = currentRow + offset[1];
@@ -49602,7 +50588,7 @@ var PathFinder = class extends Object2 {
     return null;
   }
 };
-var System124 = globalThis;
+var System126 = globalThis;
 var Grid = class _Grid extends Object2 {
   static {
     __name(this, "Grid");
@@ -49615,7 +50601,7 @@ var Grid = class _Grid extends Object2 {
     if (!isPassableHandler(start.column, start.row)) {
       return visitedList;
     }
-    const isVisited = new System124.Uint8Array(columnCount * rowCount);
+    const isVisited = new System126.Uint8Array(columnCount * rowCount);
     const pendingStack = [start.column, start.row];
     isVisited[start.row * columnCount + start.column] = 1;
     while (pendingStack.length > 0) {
@@ -49648,10 +50634,10 @@ var Grid = class _Grid extends Object2 {
     return visitedList.length === expectedCount;
   }
   static testRectOverlap(worldRect, tileSize, isBlockedHandler) {
-    const startColumn = System124.Math.floor(worldRect.position.x / tileSize);
-    const endColumn = System124.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
-    const startRow = System124.Math.floor(worldRect.position.y / tileSize);
-    const endRow = System124.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
+    const startColumn = System126.Math.floor(worldRect.position.x / tileSize);
+    const endColumn = System126.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
+    const startRow = System126.Math.floor(worldRect.position.y / tileSize);
+    const endRow = System126.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
     for (let row = startRow; row <= endRow; ++row) {
       for (let column = startColumn; column <= endColumn; ++column) {
         if (isBlockedHandler(column, row)) {
@@ -49662,13 +50648,13 @@ var Grid = class _Grid extends Object2 {
     return false;
   }
   static toCell(worldX, worldY, tileSize) {
-    return { column: System124.Math.floor(worldX / tileSize), row: System124.Math.floor(worldY / tileSize) };
+    return { column: System126.Math.floor(worldX / tileSize), row: System126.Math.floor(worldY / tileSize) };
   }
   static toWorldCenter(column, row, tileSize) {
     return { x: (column + 0.5) * tileSize, y: (row + 0.5) * tileSize };
   }
 };
-var System125 = globalThis;
+var System127 = globalThis;
 var Collision2D = class extends Object2 {
   static {
     __name(this, "Collision2D");
@@ -49687,7 +50673,7 @@ var Collision2D = class extends Object2 {
     if (distanceSquared >= radiusSum * radiusSum) {
       return null;
     }
-    const distance = System125.Math.sqrt(distanceSquared);
+    const distance = System127.Math.sqrt(distanceSquared);
     let directionX = 1;
     let directionY = 0;
     if (distance > 1e-6) {
@@ -49738,7 +50724,7 @@ var Collision2D = class extends Object2 {
     return differenceX * differenceX + differenceY * differenceY <= radius * radius;
   }
 };
-var System126 = globalThis;
+var System128 = globalThis;
 var Steering2D = class extends Object2 {
   static {
     __name(this, "Steering2D");
@@ -49746,7 +50732,7 @@ var Steering2D = class extends Object2 {
   static seek(position, targetPosition, speed) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System126.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System128.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.zero();
     }
@@ -49755,7 +50741,7 @@ var Steering2D = class extends Object2 {
   static orbitAtRange(position, targetPosition, preferredRange, speed, elapsedSeconds, strafeRate = 1.7) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System126.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System128.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.create(speed, 0);
     }
@@ -49763,18 +50749,18 @@ var Steering2D = class extends Object2 {
     const forwardY = differenceY / distance;
     const sideX = -forwardY;
     const sideY = forwardX;
-    const rangeError = System126.Math.max(-1, System126.Math.min(1, (distance - preferredRange) / preferredRange));
-    const strafeAmount = System126.Math.sin(elapsedSeconds * strafeRate);
+    const rangeError = System128.Math.max(-1, System128.Math.min(1, (distance - preferredRange) / preferredRange));
+    const strafeAmount = System128.Math.sin(elapsedSeconds * strafeRate);
     const desiredX = forwardX * rangeError + sideX * strafeAmount;
     const desiredY = forwardY * rangeError + sideY * strafeAmount;
-    const desiredLength = System126.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+    const desiredLength = System128.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
     if (desiredLength < 1e-6) {
       return Vector2.zero();
     }
     return Vector2.create(desiredX / desiredLength * speed, desiredY / desiredLength * speed);
   }
 };
-var System127 = globalThis;
+var System129 = globalThis;
 var PointerGesture = class extends Object2 {
   static {
     __name(this, "PointerGesture");
@@ -49873,7 +50859,7 @@ var PointerGesture = class extends Object2 {
     if (!this.#isPressed || this.#isDragging || this.#longPressSeconds <= 0) {
       return 0;
     }
-    return System127.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
+    return System129.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
   }
   isPressed() {
     return this.#isPressed;
@@ -49900,7 +50886,7 @@ var PointerGesture = class extends Object2 {
     this.#longPressSeconds = longPressSeconds;
   }
 };
-var System128 = globalThis;
+var System130 = globalThis;
 var FrameProbe = class {
   static {
     __name(this, "FrameProbe");
@@ -49980,8 +50966,8 @@ var FrameProbe = class {
     return this.#frameCount > 0 ? this.#slowFrameCount / this.#frameCount : 0;
   }
   setSeconds(warmupSeconds, probeSeconds) {
-    this.#warmupSeconds = System128.Math.max(0, warmupSeconds);
-    this.#probeSeconds = System128.Math.max(0, probeSeconds);
+    this.#warmupSeconds = System130.Math.max(0, warmupSeconds);
+    this.#probeSeconds = System130.Math.max(0, probeSeconds);
   }
   getWarmupSeconds() {
     return this.#warmupSeconds;
@@ -50006,7 +50992,7 @@ var FrameProbe = class {
     return this.#unlimitedTargetFramePerSecond;
   }
 };
-var System129 = globalThis;
+var System131 = globalThis;
 var MOUSE_MIDDLE_BUTTON = 1;
 var MOUSE_RIGHT_BUTTON = 2;
 var CameraGestures = class {
@@ -50071,12 +51057,12 @@ var CameraGestures = class {
     this.#isLastWheelCtrl = false;
     this.#isTouchInput = this.isCoarsePointer();
     this.#compatibilityMouseMilliseconds = 800;
-    this.#twistStartRadians = 15 * System129.Math.PI / 180;
-    this.#tiltPerHalfHeightRadians = 35 * System129.Math.PI / 180;
+    this.#twistStartRadians = 15 * System131.Math.PI / 180;
+    this.#tiltPerHalfHeightRadians = 35 * System131.Math.PI / 180;
     this.#rightClickDistance = 8;
     this.#lastTouchTime = -this.#compatibilityMouseMilliseconds;
     this.#listeners = [];
-    const engine = System129.vanillaEngine;
+    const engine = System131.vanillaEngine;
     if (!engine) {
       return;
     }
@@ -50088,10 +51074,10 @@ var CameraGestures = class {
     this.addListener(canvas, "mousedown", (mouseEvent) => {
       this.handleMouseDown(mouseEvent);
     }, false);
-    this.addListener(System129.window, "mousemove", (mouseEvent) => {
+    this.addListener(System131.window, "mousemove", (mouseEvent) => {
       this.handleMouseMove(mouseEvent);
     }, false);
-    this.addListener(System129.window, "mouseup", (mouseEvent) => {
+    this.addListener(System131.window, "mouseup", (mouseEvent) => {
       this.handleMouseUp(mouseEvent);
     }, false);
     this.addListener(canvas, "wheel", (wheelEvent) => {
@@ -50128,10 +51114,10 @@ var CameraGestures = class {
     return this.#isTouchInput;
   }
   isCoarsePointer() {
-    if (typeof System129.matchMedia !== "function") {
+    if (typeof System131.matchMedia !== "function") {
       return false;
     }
-    const mediaQueryList = System129.matchMedia("(pointer: coarse)");
+    const mediaQueryList = System131.matchMedia("(pointer: coarse)");
     return mediaQueryList.matches;
   }
   isLastWheelCtrl() {
@@ -50172,7 +51158,7 @@ var CameraGestures = class {
     return isRotationReleased;
   }
   readUnitsPerCssPixel() {
-    const engine = System129.vanillaEngine;
+    const engine = System131.vanillaEngine;
     if (!engine) {
       return 1;
     }
@@ -50184,7 +51170,7 @@ var CameraGestures = class {
     return 1 / targetResolutionScale;
   }
   readViewPosition(clientX, clientY) {
-    const engine = System129.vanillaEngine;
+    const engine = System131.vanillaEngine;
     const canvas = this.#canvas;
     if (!engine || canvas === null) {
       return null;
@@ -50195,7 +51181,7 @@ var CameraGestures = class {
     return viewManager.canvasPositionToViewPosition(canvasPosition);
   }
   isCompatibilityMouse() {
-    const now = System129.performance.now();
+    const now = System131.performance.now();
     return now - this.#lastTouchTime < this.#compatibilityMouseMilliseconds;
   }
   handleMouseDown(mouseEvent) {
@@ -50233,14 +51219,14 @@ var CameraGestures = class {
     this.#lastMouseX = mouseEvent.clientX;
     this.#lastMouseY = mouseEvent.clientY;
     if (this.#isRightButtonDown) {
-      const pressDistance = System129.Math.hypot(mouseEvent.clientX - this.#rightPressX, mouseEvent.clientY - this.#rightPressY);
+      const pressDistance = System131.Math.hypot(mouseEvent.clientX - this.#rightPressX, mouseEvent.clientY - this.#rightPressY);
       if (pressDistance > this.#rightClickDistance) {
         this.#isRightDragged = true;
       }
       const canvas = this.#canvas;
-      const canvasWidth = canvas !== null ? System129.Math.max(1, canvas.clientWidth) : 1e3;
-      const canvasHeight = canvas !== null ? System129.Math.max(1, canvas.clientHeight) : 1e3;
-      this.#rotation += deltaX / canvasWidth * System129.Math.PI * 2;
+      const canvasWidth = canvas !== null ? System131.Math.max(1, canvas.clientWidth) : 1e3;
+      const canvasHeight = canvas !== null ? System131.Math.max(1, canvas.clientHeight) : 1e3;
+      this.#rotation += deltaX / canvasWidth * System131.Math.PI * 2;
       this.#tilt -= deltaY / (canvasHeight * 0.5) * this.#tiltPerHalfHeightRadians;
     }
     if (this.#isMiddleButtonDown) {
@@ -50265,7 +51251,7 @@ var CameraGestures = class {
   }
   handleTouchChange(touchEvent) {
     this.#isTouchInput = true;
-    this.#lastTouchTime = System129.performance.now();
+    this.#lastTouchTime = System131.performance.now();
     const touches = touchEvent.touches;
     if (touches.length >= 2) {
       if (!this.#isMultiTouch) {
@@ -50286,11 +51272,11 @@ var CameraGestures = class {
     const secondTouch = touches[1];
     this.#lastTouchCenterX = (firstTouch.clientX + secondTouch.clientX) * 0.5;
     this.#lastTouchCenterY = (firstTouch.clientY + secondTouch.clientY) * 0.5;
-    this.#lastTouchAngle = System129.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
-    this.#lastTouchDistance = System129.Math.max(1, System129.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
+    this.#lastTouchAngle = System131.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
+    this.#lastTouchDistance = System131.Math.max(1, System131.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
   }
   handleTouchMove(touchEvent) {
-    this.#lastTouchTime = System129.performance.now();
+    this.#lastTouchTime = System131.performance.now();
     const touches = touchEvent.touches;
     if (!this.#isMultiTouch || touches.length < 2) {
       return;
@@ -50299,25 +51285,25 @@ var CameraGestures = class {
     const secondTouch = touches[1];
     const centerX = (firstTouch.clientX + secondTouch.clientX) * 0.5;
     const centerY = (firstTouch.clientY + secondTouch.clientY) * 0.5;
-    const angle = System129.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
-    const distance = System129.Math.max(1, System129.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
+    const angle = System131.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
+    const distance = System131.Math.max(1, System131.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
     const unitsPerCssPixel = this.readUnitsPerCssPixel();
     this.#panX += (centerX - this.#lastTouchCenterX) * unitsPerCssPixel;
     this.#panY += (centerY - this.#lastTouchCenterY) * unitsPerCssPixel;
     this.#zoom *= distance / this.#lastTouchDistance;
     this.#zoomAnchor = this.readViewPosition(centerX, centerY);
     let angleDelta = angle - this.#lastTouchAngle;
-    while (angleDelta > System129.Math.PI) {
-      angleDelta -= System129.Math.PI * 2;
+    while (angleDelta > System131.Math.PI) {
+      angleDelta -= System131.Math.PI * 2;
     }
-    while (angleDelta < -System129.Math.PI) {
-      angleDelta += System129.Math.PI * 2;
+    while (angleDelta < -System131.Math.PI) {
+      angleDelta += System131.Math.PI * 2;
     }
     if (this.#isTwisting) {
       this.#rotation += angleDelta;
     } else {
       this.#twistSum += angleDelta;
-      if (System129.Math.abs(this.#twistSum) > this.#twistStartRadians) {
+      if (System131.Math.abs(this.#twistSum) > this.#twistStartRadians) {
         this.#isTwisting = true;
       }
     }
@@ -50335,7 +51321,7 @@ var CameraGestures = class {
 };
 var languagepack_exports = {};
 __export(languagepack_exports, { applyLanguageSetting: () => applyLanguageSetting, findLanguage: () => findLanguage, formatText: () => formatText, isRightToLeft: () => isRightToLeft, isolateText: () => isolateText, loadLanguage: () => loadLanguage, loadLanguageList: () => loadLanguageList, matchLanguageTag: () => matchLanguageTag, mirrorLayoutX: () => mirrorLayoutX, readAllTexts: () => readAllTexts, readFallbackLanguageCode: () => readFallbackLanguageCode, readLanguage: () => readLanguage, readLanguageCode: () => readLanguageCode, readLanguages: () => readLanguages, readLayoutTextAlign: () => readLayoutTextAlign, readTextDirection: () => readTextDirection, resolveDeviceLanguageCode: () => resolveDeviceLanguageCode, resolveLanguageCode: () => resolveLanguageCode, setDocumentTitleKey: () => setDocumentTitleKey, setLanguageList: () => setLanguageList, setLanguageLoadedHandler: () => setLanguageLoadedHandler, setLanguagePaths: () => setLanguagePaths, setLanguageTexts: () => setLanguageTexts, setPreferredLanguageTag: () => setPreferredLanguageTag, translate: () => translate });
-var System130 = globalThis;
+var System132 = globalThis;
 var languageListPath = "./assets/localization/languages.json";
 var documentTitleKey = "game.title";
 var preferredLanguageTag = "";
@@ -50375,7 +51361,7 @@ async function loadLanguageList() {
 __name(loadLanguageList, "loadLanguageList");
 function normalizeTextList(values) {
   const textList = [];
-  if (!System130.Array.isArray(values)) {
+  if (!System132.Array.isArray(values)) {
     return textList;
   }
   for (const value of values) {
@@ -50446,7 +51432,7 @@ function resolveDeviceLanguageCode() {
   if (preferredLanguageTag !== "") {
     languageTags.push(preferredLanguageTag);
   }
-  const navigator = System130.navigator;
+  const navigator = System132.navigator;
   if (navigator) {
     if (navigator.languages) {
       for (const languageTag of navigator.languages) {
@@ -50501,7 +51487,7 @@ async function loadLanguage(languageCode) {
     return;
   }
   const fallbackLanguage = findLanguage(fallbackLanguageCode);
-  const isFallbackLoaded = fallbackLanguage !== null && System130.Object.keys(fallbackTexts).length > 0;
+  const isFallbackLoaded = fallbackLanguage !== null && System132.Object.keys(fallbackTexts).length > 0;
   if (fallbackLanguage !== null && !isFallbackLoaded) {
     fallbackTexts = await readLanguageTexts(fallbackLanguage);
   }
@@ -50511,16 +51497,16 @@ async function loadLanguage(languageCode) {
 }
 __name(loadLanguage, "loadLanguage");
 function applyDocumentLanguage(language) {
-  if (typeof System130.document === "undefined") {
+  if (typeof System132.document === "undefined") {
     return;
   }
-  System130.document.documentElement.lang = language.code;
+  System132.document.documentElement.lang = language.code;
   if (documentTitleKey === "") {
     return;
   }
   const documentTitle = translate(documentTitleKey);
   if (documentTitle !== documentTitleKey) {
-    System130.document.title = documentTitle;
+    System132.document.title = documentTitle;
   }
 }
 __name(applyDocumentLanguage, "applyDocumentLanguage");
@@ -50607,11 +51593,11 @@ function formatText(key, values) {
   return text.replace(JOINED_PLACEHOLDER_PATTERN2, (joinedText) => {
     let isFilled = false;
     const valueText = joinedText.replace(PLACEHOLDER_PATTERN2, (matched, name) => {
-      if (!System130.Object.prototype.hasOwnProperty.call(values, name)) {
+      if (!System132.Object.prototype.hasOwnProperty.call(values, name)) {
         return matched;
       }
       isFilled = true;
-      return System130.String(values[name]);
+      return System132.String(values[name]);
     });
     if (!isFilled) {
       return joinedText;
@@ -50621,16 +51607,16 @@ function formatText(key, values) {
 }
 __name(formatText, "formatText");
 function readAllTexts() {
-  const texts = System130.Object.values(currentTexts);
+  const texts = System132.Object.values(currentTexts);
   return texts.join("");
 }
 __name(readAllTexts, "readAllTexts");
 function setLanguageList(data) {
-  if (data === null || typeof data !== "object" || !System130.Array.isArray(data.languages)) {
+  if (data === null || typeof data !== "object" || !System132.Array.isArray(data.languages)) {
     return false;
   }
   const languageEntries = normalizeLanguageEntries(data.languages);
-  languageList = System130.Object.assign({}, data, { languages: languageEntries });
+  languageList = System132.Object.assign({}, data, { languages: languageEntries });
   return true;
 }
 __name(setLanguageList, "setLanguageList");
@@ -50660,7 +51646,7 @@ function setLanguageLoadedHandler(handler) {
 __name(setLanguageLoadedHandler, "setLanguageLoadedHandler");
 var uifont_exports = {};
 __export(uifont_exports, { applyUiFontGroup: () => applyUiFontGroup, buildUiFontString: () => buildUiFontString, configureUiFont: () => configureUiFont, loadUiFont: () => loadUiFont, loadUiFontText: () => loadUiFontText, readUiFontFace: () => readUiFontFace, readUiFontFamily: () => readUiFontFamily, requestUiFontText: () => requestUiFontText });
-var System131 = globalThis;
+var System133 = globalThis;
 var uiFontFamily = "GameUI";
 var fontManifestPath = "./assets/fonts/fonts.json";
 var fontDirectoryPath = "./assets/fonts/";
@@ -50673,7 +51659,7 @@ var fontIndex = null;
 var currentFontGroup = primaryFontGroup;
 var isRemainingGroupsRequested = false;
 var representativeFontFace = null;
-var requestedCharacters = new System131.Set();
+var requestedCharacters = new System133.Set();
 function parseUnicodeRange2(unicodeRange) {
   const ranges = [];
   for (const rangeText of unicodeRange.split(",")) {
@@ -50683,14 +51669,14 @@ function parseUnicodeRange2(unicodeRange) {
     }
     const startText = rangeMatch[1].replace(/\?/g, "0");
     const endText = rangeMatch[2] !== void 0 ? rangeMatch[2] : rangeMatch[1].replace(/\?/g, "F");
-    ranges.push([System131.parseInt(startText, 16), System131.parseInt(endText, 16)]);
+    ranges.push([System133.parseInt(startText, 16), System133.parseInt(endText, 16)]);
   }
   return ranges;
 }
 __name(parseUnicodeRange2, "parseUnicodeRange");
 function readTargetWeights(weightDescriptor) {
   const weightValues = weightDescriptor.trim().split(/\s+/).map((weightText) => {
-    return System131.Number(weightText);
+    return System133.Number(weightText);
   });
   if (weightValues.length >= 2) {
     return uiFontWeights.filter((targetWeight) => {
@@ -50699,7 +51685,7 @@ function readTargetWeights(weightDescriptor) {
   }
   let nearestWeight = uiFontWeights[0];
   for (const targetWeight of uiFontWeights) {
-    if (System131.Math.abs(targetWeight - weightValues[0]) < System131.Math.abs(nearestWeight - weightValues[0])) {
+    if (System133.Math.abs(targetWeight - weightValues[0]) < System133.Math.abs(nearestWeight - weightValues[0])) {
       nearestWeight = targetWeight;
     }
   }
@@ -50724,7 +51710,7 @@ function findDrawingFontFace(codePoint, targetWeight) {
 }
 __name(findDrawingFontFace, "findDrawingFontFace");
 function clearTextCache() {
-  const engine = System131.vanillaEngine;
+  const engine = System133.vanillaEngine;
   if (!engine) {
     return;
   }
@@ -50741,19 +51727,19 @@ async function loadUiFont(fontGroup, text) {
   if (!isIndexLoaded) {
     return;
   }
-  await System131.Promise.all([loadFontGroup(fontGroup), loadFontGroup(primaryFontGroup)]);
+  await System133.Promise.all([loadFontGroup(fontGroup), loadFontGroup(primaryFontGroup)]);
   if (fontGroups.length === 0) {
     return;
   }
   applyUiFontGroup(fontGroup);
   const textLoad = loadUiFontText(text);
-  const waitLimit = new System131.Promise((resolve) => {
-    System131.setTimeout(resolve, uiFontWaitMilliseconds);
+  const waitLimit = new System133.Promise((resolve) => {
+    System133.setTimeout(resolve, uiFontWaitMilliseconds);
   });
-  await System131.Promise.race([textLoad, waitLimit]);
+  await System133.Promise.race([textLoad, waitLimit]);
   if (!isRemainingGroupsRequested) {
     isRemainingGroupsRequested = true;
-    System131.setTimeout(() => {
+    System133.setTimeout(() => {
       loadRemainingFontGroups();
     }, remainingGroupsDelayMilliseconds);
   }
@@ -50771,7 +51757,7 @@ async function loadFontIndex() {
     return false;
   }
   const manifest = jsonAsset.data;
-  if (manifest === null || !System131.Array.isArray(manifest.fonts)) {
+  if (manifest === null || !System133.Array.isArray(manifest.fonts)) {
     console.warn("[uifont] \uAE00\uAF34\uC758 \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
     return false;
   }
@@ -50803,7 +51789,7 @@ async function loadFontGroup(group) {
     return;
   }
   const font = jsonAsset.data;
-  if (font === null || !System131.Array.isArray(font.faces)) {
+  if (font === null || !System133.Array.isArray(font.faces)) {
     console.warn("[uifont] \uAE00\uAF34 \uBB36\uC74C\uC758 \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: " + group);
     return;
   }
@@ -50818,8 +51804,8 @@ async function loadFontGroup(group) {
     const ranges = parseUnicodeRange2(face.unicodeRange);
     const targetWeights = readTargetWeights(face.weight);
     for (const targetWeight of targetWeights) {
-      const descriptors = { weight: System131.String(targetWeight), style: face.style, unicodeRange: face.unicodeRange, display: "swap" };
-      const fontFace = new System131.FontFace(uiFontFamily, "url(" + fontDirectoryPath + face.file + ")", descriptors);
+      const descriptors = { weight: System133.String(targetWeight), style: face.style, unicodeRange: face.unicodeRange, display: "swap" };
+      const fontFace = new System133.FontFace(uiFontFamily, "url(" + fontDirectoryPath + face.file + ")", descriptors);
       faces.push({ fontFace, weight: targetWeight, ranges });
     }
   }
@@ -50834,12 +51820,12 @@ async function loadRemainingFontGroups() {
     return loadFontGroup(indexEntry.group);
   });
   try {
-    await System131.Promise.all(groupLoads);
+    await System133.Promise.all(groupLoads);
   } catch (error) {
     console.warn("[uifont] \uB098\uBA38\uC9C0 \uAE00\uAF34 \uBB36\uC74C\uC744 \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
   }
   applyUiFontGroup(currentFontGroup);
-  const requestedText = System131.Array.from(requestedCharacters).join("");
+  const requestedText = System133.Array.from(requestedCharacters).join("");
   loadUiFontText(requestedText);
 }
 __name(loadRemainingFontGroups, "loadRemainingFontGroups");
@@ -50864,7 +51850,7 @@ function applyUiFontGroup(fontGroup) {
       orderedGroups.push(fontGroupEntry);
     }
   }
-  const fontFaceSet = System131.document.fonts;
+  const fontFaceSet = System133.document.fonts;
   for (const fontGroupEntry of fontGroups) {
     for (const face of fontGroupEntry.faces) {
       fontFaceSet.delete(face.fontFace);
@@ -50885,7 +51871,7 @@ async function loadUiFontText(text) {
   if (fontGroups.length === 0 || typeof text !== "string" || text === "") {
     return;
   }
-  const fontFacesToLoad = new System131.Set();
+  const fontFacesToLoad = new System133.Set();
   for (const character of text) {
     requestedCharacters.add(character);
     const codePoint = character.codePointAt(0);
@@ -50899,11 +51885,11 @@ async function loadUiFontText(text) {
   if (fontFacesToLoad.size === 0) {
     return;
   }
-  const loads = System131.Array.from(fontFacesToLoad).map((fontFace) => {
+  const loads = System133.Array.from(fontFacesToLoad).map((fontFace) => {
     return fontFace.load();
   });
   try {
-    await System131.Promise.all(loads);
+    await System133.Promise.all(loads);
   } catch (error) {
     console.warn("[uifont] \uAE00\uAF34\uC758 \uC870\uAC01\uC744 \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
   }
@@ -50962,7 +51948,7 @@ function readUiFontFamily() {
   return uiFontFamily;
 }
 __name(readUiFontFamily, "readUiFontFamily");
-var System132 = globalThis;
+var System134 = globalThis;
 var FocusNavigator = class extends Object2 {
   static {
     __name(this, "FocusNavigator");
@@ -51013,7 +51999,7 @@ var FocusNavigator = class extends Object2 {
     const currentCenterX = currentItem.rect.position.x + currentItem.rect.size.x * 0.5;
     const currentCenterY = currentItem.rect.position.y + currentItem.rect.size.y * 0.5;
     let bestItem = null;
-    let bestScore = System132.Number.POSITIVE_INFINITY;
+    let bestScore = System134.Number.POSITIVE_INFINITY;
     for (const item of this.#itemList) {
       if (item.id === this.#focusedId) {
         continue;
@@ -51026,7 +52012,7 @@ var FocusNavigator = class extends Object2 {
       if (forwardDistance <= 0) {
         continue;
       }
-      const crossDistance = System132.Math.abs(deltaX * directionY) + System132.Math.abs(deltaY * directionX);
+      const crossDistance = System134.Math.abs(deltaX * directionY) + System134.Math.abs(deltaY * directionX);
       const score = forwardDistance + crossDistance * this.#crossAxisPenalty;
       if (score < bestScore) {
         bestScore = score;
@@ -51040,7 +52026,7 @@ var FocusNavigator = class extends Object2 {
     return this.#focusedId;
   }
 };
-var System133 = globalThis;
+var System135 = globalThis;
 var Shaker = class extends Object2 {
   static {
     __name(this, "Shaker");
@@ -51057,12 +52043,12 @@ var Shaker = class extends Object2 {
     this.#frequency = options.frequency !== void 0 ? options.frequency : 42;
   }
   addShake(strength) {
-    this.#strength = System133.Math.max(this.#strength, strength);
+    this.#strength = System135.Math.max(this.#strength, strength);
   }
   tick(timeDelta) {
     this.#elapsedSeconds += timeDelta;
     if (this.#strength > 0) {
-      this.#strength *= System133.Math.exp(-this.#decayRate * timeDelta);
+      this.#strength *= System135.Math.exp(-this.#decayRate * timeDelta);
       if (this.#strength < 0.05) {
         this.#strength = 0;
       }
@@ -51073,8 +52059,8 @@ var Shaker = class extends Object2 {
       return Vector2.zero();
     }
     const time = this.#elapsedSeconds;
-    const offsetX = System133.Math.sin(time * this.#frequency) * this.#strength;
-    const offsetY = System133.Math.cos(time * this.#frequency * 1.37) * this.#strength;
+    const offsetX = System135.Math.sin(time * this.#frequency) * this.#strength;
+    const offsetY = System135.Math.cos(time * this.#frequency * 1.37) * this.#strength;
     return Vector2.create(offsetX, offsetY);
   }
   isShaking() {
@@ -51090,7 +52076,7 @@ var Shaker = class extends Object2 {
     this.#frequency = frequency;
   }
 };
-var System134 = globalThis;
+var System136 = globalThis;
 var Camera2D = class extends Object2 {
   static {
     __name(this, "Camera2D");
@@ -51121,18 +52107,18 @@ var Camera2D = class extends Object2 {
   tick(timeDelta) {
     if (this.#velocity.x !== 0 || this.#velocity.y !== 0) {
       this.#position = Vector2.create(this.#position.x + this.#velocity.x * timeDelta, this.#position.y + this.#velocity.y * timeDelta);
-      const damping = System134.Math.exp(-this.#inertiaDamping * timeDelta);
+      const damping = System136.Math.exp(-this.#inertiaDamping * timeDelta);
       this.#velocity = Vector2.create(this.#velocity.x * damping, this.#velocity.y * damping);
-      if (System134.Math.abs(this.#velocity.x) < 1 && System134.Math.abs(this.#velocity.y) < 1) {
+      if (System136.Math.abs(this.#velocity.x) < 1 && System136.Math.abs(this.#velocity.y) < 1) {
         this.#velocity = Vector2.zero();
       }
     }
     if (this.#tweenState) {
       const tween = this.#tweenState;
       tween.elapsedSeconds += timeDelta;
-      const linearRatio = System134.Math.min(1, tween.elapsedSeconds / tween.duration);
-      const easedRatio = 1 - System134.Math.pow(1 - linearRatio, 3);
-      this.#zoom = tween.fromZoom * System134.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
+      const linearRatio = System136.Math.min(1, tween.elapsedSeconds / tween.duration);
+      const easedRatio = 1 - System136.Math.pow(1 - linearRatio, 3);
+      this.#zoom = tween.fromZoom * System136.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
       this.#position = Vector2.create(lerp(tween.fromPosition.x, tween.toPosition.x, easedRatio), lerp(tween.fromPosition.y, tween.toPosition.y, easedRatio));
       if (linearRatio >= 1) {
         this.#tweenState = null;
@@ -51165,8 +52151,8 @@ var Camera2D = class extends Object2 {
   }
   convertScreenDeltaToWorld(screenDeltaX, screenDeltaY) {
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System134.Math.cos(radian);
-    const sine = System134.Math.sin(radian);
+    const cosine = System136.Math.cos(radian);
+    const sine = System136.Math.sin(radian);
     const unrotatedX = screenDeltaX * cosine + screenDeltaY * sine;
     const unrotatedY = -screenDeltaX * sine + screenDeltaY * cosine;
     return Vector2.create(unrotatedX / this.#zoom, unrotatedY / this.#zoom);
@@ -51185,7 +52171,7 @@ var Camera2D = class extends Object2 {
   }
   tweenTo(targetPosition, targetZoom, duration = 0.4) {
     this.#velocity = Vector2.zero();
-    this.#tweenState = { fromPosition: Vector2.create(this.#position.x, this.#position.y), toPosition: Vector2.create(targetPosition.x, targetPosition.y), fromZoom: this.#zoom, toZoom: clamp(targetZoom, this.#minZoom, this.#maxZoom), duration: System134.Math.max(1e-4, duration), elapsedSeconds: 0 };
+    this.#tweenState = { fromPosition: Vector2.create(this.#position.x, this.#position.y), toPosition: Vector2.create(targetPosition.x, targetPosition.y), fromZoom: this.#zoom, toZoom: clamp(targetZoom, this.#minZoom, this.#maxZoom), duration: System136.Math.max(1e-4, duration), elapsedSeconds: 0 };
   }
   applyTransform(graphic) {
     graphic.translate(this.#viewSize.x * 0.5, this.#viewSize.y * 0.5);
@@ -51208,8 +52194,8 @@ var Camera2D = class extends Object2 {
   }
   worldToScreen(worldPosition) {
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System134.Math.cos(radian);
-    const sine = System134.Math.sin(radian);
+    const cosine = System136.Math.cos(radian);
+    const sine = System136.Math.sin(radian);
     const scaledX = (worldPosition.x - this.#position.x) * this.#zoom;
     const scaledY = (worldPosition.y - this.#position.y) * this.#zoom;
     return Vector2.create(scaledX * cosine - scaledY * sine + this.#viewSize.x * 0.5, scaledX * sine + scaledY * cosine + this.#viewSize.y * 0.5);
@@ -51218,8 +52204,8 @@ var Camera2D = class extends Object2 {
     const halfViewWidth = this.#viewSize.x * 0.5 / this.#zoom;
     const halfViewHeight = this.#viewSize.y * 0.5 / this.#zoom;
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System134.Math.abs(System134.Math.cos(radian));
-    const sine = System134.Math.abs(System134.Math.sin(radian));
+    const cosine = System136.Math.abs(System136.Math.cos(radian));
+    const sine = System136.Math.abs(System136.Math.sin(radian));
     return Vector2.create(halfViewWidth * cosine + halfViewHeight * sine, halfViewWidth * sine + halfViewHeight * cosine);
   }
   clampToBounds() {
@@ -51293,7 +52279,7 @@ var Camera2D = class extends Object2 {
     this.#velocity = Vector2.zero();
   }
 };
-var System135 = globalThis;
+var System137 = globalThis;
 var Typewriter = class extends Object2 {
   static {
     __name(this, "Typewriter");
@@ -51337,9 +52323,9 @@ var Typewriter = class extends Object2 {
       return;
     }
     const speed = this.#charactersPerSecond * (this.#isFastForward ? this.#fastForwardMultiplier : 1);
-    const previousWholeCount = System135.Math.floor(this.#revealedCount);
-    this.#revealedCount = System135.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
-    const currentWholeCount = System135.Math.floor(this.#revealedCount);
+    const previousWholeCount = System137.Math.floor(this.#revealedCount);
+    this.#revealedCount = System137.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
+    const currentWholeCount = System137.Math.floor(this.#revealedCount);
     if (currentWholeCount !== previousWholeCount) {
       this.#target.setVisibleCharacterCount(currentWholeCount);
       if (this.#characterRevealedEvent) {
@@ -51382,7 +52368,7 @@ var Typewriter = class extends Object2 {
     this.#completeEvent = completeEvent;
   }
 };
-var System136 = globalThis;
+var System138 = globalThis;
 var DialogueRunner = class extends Object2 {
   static {
     __name(this, "DialogueRunner");
@@ -51394,7 +52380,7 @@ var DialogueRunner = class extends Object2 {
   constructor() {
     super();
     this.#entryList = [];
-    this.#labelTable = new System136.Map();
+    this.#labelTable = new System138.Map();
     this.#cursor = 0;
     this.#isFinished = true;
   }
@@ -51547,7 +52533,7 @@ var DialogueScriptParser = class extends Object2 {
     return entryList;
   }
 };
-var System137 = globalThis;
+var System139 = globalThis;
 var BeepPlayer = class extends Object2 {
   static {
     __name(this, "BeepPlayer");
@@ -51572,16 +52558,16 @@ var BeepPlayer = class extends Object2 {
     }
     const startTime = audioContext.currentTime + delaySeconds;
     const endTime = startTime + durationSeconds;
-    const attackSeconds = System137.Math.min(5e-3, durationSeconds * 0.25);
-    const releaseSeconds = System137.Math.min(0.02, durationSeconds * 0.5);
-    const peakVolume = System137.Math.max(1e-4, this.#volume * volumeScale);
+    const attackSeconds = System139.Math.min(5e-3, durationSeconds * 0.25);
+    const releaseSeconds = System139.Math.min(0.02, durationSeconds * 0.5);
+    const peakVolume = System139.Math.max(1e-4, this.#volume * volumeScale);
     const oscillatorNode = audioContext.createOscillator();
     oscillatorNode.type = waveform;
     oscillatorNode.frequency.setValueAtTime(frequency, startTime);
     const gainNode = audioContext.createGain();
     gainNode.gain.setValueAtTime(1e-4, startTime);
     gainNode.gain.linearRampToValueAtTime(peakVolume, startTime + attackSeconds);
-    gainNode.gain.setValueAtTime(peakVolume, System137.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
+    gainNode.gain.setValueAtTime(peakVolume, System139.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
     gainNode.gain.exponentialRampToValueAtTime(1e-4, endTime);
     oscillatorNode.connect(gainNode);
     gainNode.connect(audioContext.destination);
@@ -51636,7 +52622,7 @@ var BeepPlayer = class extends Object2 {
     }
   }
   setVolume(volume) {
-    this.#volume = System137.Math.max(0, System137.Math.min(1, volume));
+    this.#volume = System139.Math.max(0, System139.Math.min(1, volume));
   }
   getVolume() {
     return this.#volume;
@@ -51648,7 +52634,7 @@ var BeepPlayer = class extends Object2 {
     return this.#isMuted;
   }
 };
-var System138 = globalThis;
+var System140 = globalThis;
 var SoundEffectPool = class extends Object2 {
   static {
     __name(this, "SoundEffectPool");
@@ -51703,7 +52689,7 @@ var SoundEffectPool = class extends Object2 {
     }
   }
   setVolume(volume) {
-    this.#volume = System138.Number.isFinite(volume) ? System138.Math.max(0, System138.Math.min(1, volume)) : 1;
+    this.#volume = System140.Number.isFinite(volume) ? System140.Math.max(0, System140.Math.min(1, volume)) : 1;
     for (let index = 0; index < this.#playerList.length; ++index) {
       this.#playerList[index].setVolume(this.#playerVolumeList[index] * this.#volume);
     }
@@ -51718,7 +52704,7 @@ var SoundEffectPool = class extends Object2 {
     return this.#playerList.length;
   }
 };
-var System139 = globalThis;
+var System141 = globalThis;
 var EFFECT_VOICE_COUNT = 12;
 var CONTEXT_RESUME_RETRY_INTERVAL = 0.5;
 var VOLUME_SMOOTHING_SECONDS = 0.05;
@@ -51758,11 +52744,11 @@ var SoundSystem = class {
     this.#externalMuteProvider = null;
     this.#autoplayAllowedProvider = null;
     this.#audioManager = audioManager;
-    this.#soundById = new System139.Map();
-    this.#assetsById = new System139.Map();
+    this.#soundById = new System141.Map();
+    this.#assetsById = new System141.Map();
     this.addSounds(soundTable);
-    this.#lastPlayTimeById = new System139.Map();
-    this.#lastVariantById = new System139.Map();
+    this.#lastPlayTimeById = new System141.Map();
+    this.#lastVariantById = new System141.Map();
     this.#musicBus = null;
     this.#effectBus = null;
     this.#voices = [];
@@ -51770,21 +52756,21 @@ var SoundSystem = class {
     this.#musicFadeSeconds = 0;
     this.#isMusicResumed = false;
     this.#playingMusic = null;
-    this.#musicPositions = new System139.Map();
+    this.#musicPositions = new System141.Map();
     this.#musicVolume = 1;
     this.#musicScale = 1;
     this.#soundEffectVolume = 1;
     this.#isUserMuted = false;
-    this.#isPageHidden = System139.document.visibilityState === "hidden";
+    this.#isPageHidden = System141.document.visibilityState === "hidden";
     this.#isMuted = false;
     this.#isContextPaused = false;
-    const coarsePointerQuery = typeof System139.window.matchMedia === "function" ? System139.window.matchMedia("(pointer: coarse)") : null;
+    const coarsePointerQuery = typeof System141.window.matchMedia === "function" ? System141.window.matchMedia("(pointer: coarse)") : null;
     this.#isBlurMuteEnabled = coarsePointerQuery !== null && coarsePointerQuery.matches;
     this.#isWindowBlurred = false;
     this.#isAutoplayTried = false;
-    this.#lastContextResumeTime = System139.Number.NEGATIVE_INFINITY;
-    System139.document.addEventListener("visibilitychange", () => {
-      this.#isPageHidden = System139.document.visibilityState === "hidden";
+    this.#lastContextResumeTime = System141.Number.NEGATIVE_INFINITY;
+    System141.document.addEventListener("visibilitychange", () => {
+      this.#isPageHidden = System141.document.visibilityState === "hidden";
       const isPageHidden = this.isPageHidden();
       if (!isPageHidden) {
         this.#isWindowBlurred = false;
@@ -51792,7 +52778,7 @@ var SoundSystem = class {
       this.applyMute();
       this.applyContextPause();
     });
-    System139.window.addEventListener("blur", () => {
+    System141.window.addEventListener("blur", () => {
       if (!this.isBlurMuteEnabled()) {
         return;
       }
@@ -51808,8 +52794,8 @@ var SoundSystem = class {
       this.applyMute();
       this.applyContextPause();
     }, "clearWindowBlurred");
-    System139.window.addEventListener("focus", clearWindowBlurred);
-    System139.window.addEventListener("pointerdown", clearWindowBlurred);
+    System141.window.addEventListener("focus", clearWindowBlurred);
+    System141.window.addEventListener("pointerdown", clearWindowBlurred);
   }
   addSounds(soundTable) {
     for (const soundRow of soundTable) {
@@ -51904,7 +52890,7 @@ var SoundSystem = class {
     const effectLoads = effectRows.map((soundRow) => {
       return this.loadSound(soundRow);
     });
-    await System139.Promise.all(effectLoads);
+    await System141.Promise.all(effectLoads);
     for (const musicRow of musicRows) {
       await this.loadSound(musicRow);
     }
@@ -51927,7 +52913,7 @@ var SoundSystem = class {
         console.warn("[sound] \uC18C\uB9AC\uB97C \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. " + path, error);
       }
     });
-    await System139.Promise.all(loads);
+    await System141.Promise.all(loads);
   }
   setMusicVolume(volume) {
     this.#musicVolume = clampVolume(volume);
@@ -51951,7 +52937,7 @@ var SoundSystem = class {
       return;
     }
     this.#musicId = soundId;
-    this.#musicFadeSeconds = System139.Math.max(0, fadeSeconds);
+    this.#musicFadeSeconds = System141.Math.max(0, fadeSeconds);
     this.#isMusicResumed = isResumed;
     this.update();
   }
@@ -51970,8 +52956,8 @@ var SoundSystem = class {
     if (effectVolume <= 1e-3) {
       return;
     }
-    const now = System139.performance.now() / 1e3;
-    const lastPlayTime = this.#lastPlayTimeById.has(soundId) ? this.#lastPlayTimeById.get(soundId) : System139.Number.NEGATIVE_INFINITY;
+    const now = System141.performance.now() / 1e3;
+    const lastPlayTime = this.#lastPlayTimeById.has(soundId) ? this.#lastPlayTimeById.get(soundId) : System141.Number.NEGATIVE_INFINITY;
     const minimumInterval = typeof soundRow.minimumInterval === "number" ? soundRow.minimumInterval : 0;
     if (now - lastPlayTime < minimumInterval) {
       return;
@@ -51993,12 +52979,12 @@ var SoundSystem = class {
     source.buffer = audioBuffer;
     const pitchVariation = typeof soundRow.pitchVariation === "number" ? soundRow.pitchVariation : 0;
     if (pitchVariation > 0) {
-      source.playbackRate.value = 1 + (System139.Math.random() * 2 - 1) * pitchVariation;
+      source.playbackRate.value = 1 + (System141.Math.random() * 2 - 1) * pitchVariation;
     }
     const gainNode = audioContext.createGain();
     gainNode.gain.value = effectVolume;
     source.connect(gainNode);
-    const clampedPan = System139.Math.max(-MAXIMUM_PAN, System139.Math.min(MAXIMUM_PAN, pan));
+    const clampedPan = System141.Math.max(-MAXIMUM_PAN, System141.Math.min(MAXIMUM_PAN, pan));
     if (clampedPan !== 0 && typeof audioContext.createStereoPanner === "function") {
       const pannerNode = audioContext.createStereoPanner();
       pannerNode.pan.value = clampedPan;
@@ -52018,7 +53004,7 @@ var SoundSystem = class {
     source.start(0);
     const playSeconds = typeof soundRow.playSeconds === "number" ? soundRow.playSeconds : 0;
     if (playSeconds > 0) {
-      const fadeOutSeconds = typeof soundRow.fadeOutSeconds === "number" ? System139.Math.max(0, soundRow.fadeOutSeconds) : 0;
+      const fadeOutSeconds = typeof soundRow.fadeOutSeconds === "number" ? System141.Math.max(0, soundRow.fadeOutSeconds) : 0;
       const fadeStartTime = audioContext.currentTime + playSeconds;
       gainNode.gain.setValueAtTime(effectVolume, fadeStartTime);
       gainNode.gain.linearRampToValueAtTime(0, fadeStartTime + fadeOutSeconds);
@@ -52039,7 +53025,7 @@ var SoundSystem = class {
     const candidates = loadedIndices.length > 1 ? loadedIndices.filter((assetIndex) => {
       return assetIndex !== lastIndex;
     }) : loadedIndices;
-    const pickedIndex = candidates[System139.Math.floor(System139.Math.random() * candidates.length)];
+    const pickedIndex = candidates[System141.Math.floor(System141.Math.random() * candidates.length)];
     this.#lastVariantById.set(soundId, pickedIndex);
     return assets[pickedIndex];
   }
@@ -52047,7 +53033,7 @@ var SoundSystem = class {
     const matchingVoices = this.#voices.filter((voice) => {
       return soundId === "" || voice.soundId === soundId;
     });
-    const removeCount = matchingVoices.length - System139.Math.max(0, keepCount);
+    const removeCount = matchingVoices.length - System141.Math.max(0, keepCount);
     for (let voiceIndex = 0; voiceIndex < removeCount; ++voiceIndex) {
       this.stopVoice(matchingVoices[voiceIndex]);
     }
@@ -52071,7 +53057,7 @@ var SoundSystem = class {
       return;
     }
     const audioContext = this.getAudioManager().getAudioContext();
-    const clampedFadeSeconds = System139.Math.max(0, fadeSeconds);
+    const clampedFadeSeconds = System141.Math.max(0, fadeSeconds);
     for (const voice of matchingVoices) {
       if (clampedFadeSeconds <= 0 || audioContext === null || audioContext === void 0) {
         this.stopVoice(voice);
@@ -52118,7 +53104,7 @@ var SoundSystem = class {
     if (audioContext === null || isContextPaused || audioContext.state === "running") {
       return;
     }
-    const now = System139.performance.now() / 1e3;
+    const now = System141.performance.now() / 1e3;
     const lastContextResumeTime = this.getLastContextResumeTime();
     if (now - lastContextResumeTime < CONTEXT_RESUME_RETRY_INTERVAL) {
       return;
@@ -52286,7 +53272,7 @@ var SoundSystem = class {
     if (playingMusic.player !== null) {
       const player = playingMusic.player;
       const gainNode = playingMusic.gain;
-      System139.setTimeout(() => {
+      System141.setTimeout(() => {
         player.stop();
         player.setAudioAsset(null);
         gainNode.disconnect();
@@ -52300,7 +53286,7 @@ var SoundSystem = class {
   }
 };
 function readSoundPaths(soundRow) {
-  if (System139.Array.isArray(soundRow.paths)) {
+  if (System141.Array.isArray(soundRow.paths)) {
     return soundRow.paths;
   }
   if (typeof soundRow.path === "string") {
@@ -52310,17 +53296,17 @@ function readSoundPaths(soundRow) {
 }
 __name(readSoundPaths, "readSoundPaths");
 function readSoundRowLoadType(soundRow) {
-  if (System139.Object.values(AudioLoadType).includes(soundRow.loadType)) {
+  if (System141.Object.values(AudioLoadType).includes(soundRow.loadType)) {
     return soundRow.loadType;
   }
   return soundRow.isMusic ? AudioLoadType.streaming : AudioLoadType.decompressOnLoad;
 }
 __name(readSoundRowLoadType, "readSoundRowLoadType");
 function clampVolume(volume) {
-  if (typeof volume !== "number" || !System139.Number.isFinite(volume)) {
+  if (typeof volume !== "number" || !System141.Number.isFinite(volume)) {
     return 0;
   }
-  return System139.Math.max(0, System139.Math.min(1, volume));
+  return System141.Math.max(0, System141.Math.min(1, volume));
 }
 __name(clampVolume, "clampVolume");
 function readSoundRowVolume(soundRow) {
@@ -52338,861 +53324,7 @@ function readSoundSystem() {
   return currentSoundSystem;
 }
 __name(readSoundSystem, "readSoundSystem");
-var System140 = globalThis;
-var ScreenEffectType = { lensDistortion: "lensDistortion", bulge: "bulge", swirl: "swirl", kaleidoscope: "kaleidoscope", mirror: "mirror", ripple: "ripple", heatHaze: "heatHaze", jitter: "jitter", doubleVision: "doubleVision", pixelate: "pixelate", shockwave: "shockwave", wave: "wave", motionBlur: "motionBlur", zoomBlur: "zoomBlur", blur: "blur", tiltShift: "tiltShift", godRays: "godRays", bloom: "bloom", anamorphic: "anamorphic", glitch: "glitch", vhs: "vhs", chromatic: "chromatic", whiteBalance: "whiteBalance", liftGammaGain: "liftGammaGain", colorGrade: "colorGrade", hueShift: "hueShift", splitToning: "splitToning", tonemap: "tonemap", gradientMap: "gradientMap", sepia: "sepia", grayscale: "grayscale", posterize: "posterize", dither: "dither", halftone: "halftone", sharpen: "sharpen", edgeDetect: "edgeDetect", oldFilm: "oldFilm", nightVision: "nightVision", invert: "invert", scanline: "scanline", grain: "grain", rain: "rain", fog: "fog", vignette: "vignette", spotlight: "spotlight", speedLines: "speedLines", letterbox: "letterbox", pixelDissolve: "pixelDissolve", wipe: "wipe", irisWipe: "irisWipe", diamondWipe: "diamondWipe", clockWipe: "clockWipe", blinds: "blinds", checkerWipe: "checkerWipe", noiseFade: "noiseFade", burn: "burn", tvOff: "tvOff", fade: "fade" };
-var EFFECT_ORDER = ["lensDistortion", "bulge", "swirl", "kaleidoscope", "mirror", "ripple", "heatHaze", "jitter", "doubleVision", "pixelate", "shockwave", "wave", "motionBlur", "zoomBlur", "blur", "tiltShift", "godRays", "bloom", "anamorphic", "glitch", "vhs", "chromatic", "whiteBalance", "liftGammaGain", "colorGrade", "hueShift", "splitToning", "tonemap", "gradientMap", "sepia", "grayscale", "posterize", "dither", "halftone", "sharpen", "edgeDetect", "oldFilm", "nightVision", "invert", "scanline", "grain", "rain", "fog", "vignette", "spotlight", "speedLines", "letterbox", "pixelDissolve", "wipe", "irisWipe", "diamondWipe", "clockWipe", "blinds", "checkerWipe", "noiseFade", "burn", "tvOff", "fade"];
-var DEFAULT_PARAMETER_TABLE2 = { lensDistortion: [0.35, 0, 0, 0], bulge: [0.5, 0.5, 0.5, 0.5], swirl: [0.5, 0.5, 0.6, 0.5], kaleidoscope: [6, 0, 0, 0], mirror: [0, 0, 0, 0], ripple: [0.5, 0.5, 40, 6], heatHaze: [6, 1.5, 0, 0], jitter: [8, 24, 0, 0], doubleVision: [0.02, 3, 0, 0], pixelate: [12, 0, 0, 0], shockwave: [0.5, 0.5, 0, 0.1], wave: [18, 4, 0, 0], motionBlur: [0, 24, 0, 0], zoomBlur: [0.5, 0.5, 0.35, 0], blur: [4, 0, 0, 0], tiltShift: [0.5, 0.18, 6, 0], godRays: [0.5, 0.35, 0.6, 0.94], bloom: [0.65, 1.2, 4, 0], anamorphic: [0.75, 1.5, 24, 0], glitch: [20, 10, 0.08, 0], vhs: [0.01, 0.35, 0, 0], chromatic: [1, 0, 0, 0], whiteBalance: [0.4, 0, 0, 0], liftGammaGain: [0, 1, 1, 0], colorGrade: [1, 1, 1, 0], hueShift: [1, 0, 0, 0], splitToning: [0.1, 0.15, 0.45, 0.5], tonemap: [1, 0, 0, 0], gradientMap: [0.05, 0.03, 0.2, 0], sepia: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], posterize: [5, 0, 0, 0], dither: [4, 2, 0, 0], halftone: [6, 0, 0, 0], sharpen: [0, 0, 0, 0], edgeDetect: [0, 0, 0, 0], oldFilm: [0, 0, 0, 0], nightVision: [0, 0, 0, 0], invert: [0, 0, 0, 0], scanline: [0.15, 0.5, 0, 0], grain: [0, 0, 0, 0], rain: [90, 8, 1.6, 0], fog: [0.35, 1, 0, 0], vignette: [0.45, 1.1, 0, 0], spotlight: [0.5, 0.5, 0.25, 0.2], speedLines: [0.5, 0.5, 14, 6], letterbox: [0.12, 0, 0, 0], pixelDissolve: [24, 0, 0, 0], wipe: [1, 0, 0.05, 0], irisWipe: [0.5, 0.5, 0.05, 0], diamondWipe: [0.05, 0, 0, 0], clockWipe: [0.02, 0, 0, 0], blinds: [10, 0.05, 0, 0], checkerWipe: [10, 0, 0, 0], noiseFade: [5, 0.2, 0, 0], burn: [5, 0.06, 0, 0], tvOff: [0, 0, 0, 0], fade: [0, 0, 0, 0] };
-var SCREEN_EFFECT_PARAMETER_NAMES = { lensDistortion: ["intensity"], bulge: ["centerX", "centerY", "intensity", "radius"], swirl: ["centerX", "centerY", "turns", "radius"], kaleidoscope: ["segments"], mirror: ["axis"], ripple: ["centerX", "centerY", "frequency", "speed"], heatHaze: ["scale", "speed"], jitter: ["amplitude", "rate"], doubleVision: ["offset", "speed"], pixelate: ["blockSize"], shockwave: ["centerX", "centerY", "radius", "width"], wave: ["frequency", "speed"], motionBlur: ["angle", "length"], zoomBlur: ["centerX", "centerY", "length"], blur: ["radius"], tiltShift: ["focusY", "focusWidth", "radius"], godRays: ["centerX", "centerY", "threshold", "decay"], bloom: ["threshold", "intensity", "radius"], anamorphic: ["threshold", "intensity", "width"], glitch: ["rows", "rate", "shift"], vhs: ["wobble", "noise"], chromatic: ["scale"], whiteBalance: ["temperature", "tint"], liftGammaGain: ["lift", "gamma", "gain"], colorGrade: ["contrast", "saturation", "brightness"], hueShift: ["turns"], splitToning: ["shadowRed", "shadowGreen", "shadowBlue", "balance"], tonemap: ["exposure"], gradientMap: ["darkRed", "darkGreen", "darkBlue"], sepia: [], grayscale: [], posterize: ["levels"], dither: ["levels", "pixelSize"], halftone: ["cellSize"], sharpen: [], edgeDetect: [], oldFilm: [], nightVision: [], invert: [], scanline: ["curvature", "density"], grain: [], rain: ["columns", "density", "speed"], fog: ["start", "end"], vignette: ["inner", "outer"], spotlight: ["centerX", "centerY", "radius", "softness"], speedLines: ["centerX", "centerY", "density", "speed"], letterbox: ["vertical", "horizontal"], pixelDissolve: ["blocks"], wipe: ["directionX", "directionY", "softness"], irisWipe: ["centerX", "centerY", "softness"], diamondWipe: ["softness"], clockWipe: ["softness"], blinds: ["count", "softness"], checkerWipe: ["cells"], noiseFade: ["scale", "softness"], burn: ["scale", "width"], tvOff: [], fade: [] };
-var DEFAULT_COLOR_TABLE2 = { shockwave: [1, 1, 1, 0.6], godRays: [1, 0.95, 0.8, 1], anamorphic: [0.5, 0.7, 1, 1], colorGrade: [1, 1, 1, 0], splitToning: [1, 0.85, 0.55, 1], gradientMap: [1, 0.9, 0.6, 1], edgeDetect: [1, 1, 1, 1], nightVision: [0.35, 1, 0.45, 1], rain: [0.8, 0.9, 1, 0.45], fog: [0.75, 0.8, 0.9, 1], vignette: [0, 0, 0, 1], spotlight: [0, 0, 0, 1], speedLines: [1, 1, 1, 0.8], letterbox: [0, 0, 0, 1], pixelDissolve: [0, 0, 0, 1], wipe: [0, 0, 0, 1], irisWipe: [0, 0, 0, 1], diamondWipe: [0, 0, 0, 1], clockWipe: [0, 0, 0, 1], blinds: [0, 0, 0, 1], checkerWipe: [0, 0, 0, 1], noiseFade: [0, 0, 0, 1], burn: [0, 0, 0, 1], tvOff: [0, 0, 0, 1], fade: [0, 0, 0, 1] };
-var FRAGMENTSHADER_HEADER = `#version 300 es
-precision highp float;
-in vec2 fragmentTextureCoordinate;
-uniform sampler2D sourceTexture;
-uniform sampler2D auxiliaryTexture;
-uniform vec2 resolution;
-uniform float time;
-uniform float strength;
-uniform vec4 parameters;
-uniform vec4 effectColor;
-out vec4 outputColor;
-
-// \uC810 \uD574\uC2DC. \uB450 float \uC758 \uBE44\uD2B8\uB97C MurmurHash3 \uC758 fmix32 \uB9C8\uBB34\uB9AC(Austin Appleby, \uACF5\uAC1C \uB3C4\uBA54\uC778)\uB85C \uC11E\uC5B4 [0, 1) \uB85C \uB0B8\uB2E4.
-highp uint hashMix32(highp uint value) {
-	value ^= value >> 16u;
-	value *= 0x85ebca6bu;
-	value ^= value >> 13u;
-	value *= 0xc2b2ae35u;
-	value ^= value >> 16u;
-	return value;
-}
-
-float hash21(vec2 point) {
-	highp uvec2 bits = floatBitsToUint(point);
-	highp uint value = hashMix32(bits.x ^ hashMix32(bits.y + 0x9e3779b9u));
-	return float(value >> 8u) * (1.0 / 16777216.0);
-}
-
-float valueNoise(vec2 point) {
-	vec2 cell = floor(point);
-	vec2 fraction = fract(point);
-	vec2 blend = fraction * fraction * (3.0 - 2.0 * fraction);
-	float bottom = mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), blend.x);
-	float top = mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0, 1.0)), blend.x);
-	return mix(bottom, top, blend.y);
-}
-
-vec4 sampleScreen(vec2 screenUv) {
-	vec2 clamped = clamp(screenUv, 0.0, 1.0);
-	return texture(sourceTexture, vec2(clamped.x, 1.0 - clamped.y));
-}
-
-float luminanceAt(vec2 uv) {
-	return dot(texture(sourceTexture, uv).rgb, vec3(0.299, 0.587, 0.114));
-}
-
-void main() {
-	vec2 uv = fragmentTextureCoordinate;
-	vec2 screenUv = vec2(uv.x, 1.0 - uv.y);
-	vec4 color = texture(sourceTexture, uv);
-`;
-var FRAGMENTSHADER_FOOTER = `
-	outputColor = vec4(color.rgb, 1.0);
-}
-`;
-var EFFECT_BODY_TABLE2 = { copy: ``, lensDistortion: `
-	vec2 centered = uv - 0.5;
-	float radiusSquared = dot(centered, centered);
-	float distortion = parameters.x * strength;
-	vec2 warped = uv + centered * radiusSquared * distortion;
-	warped = 0.5 + (warped - 0.5) / (1.0 + 0.25 * max(distortion, 0.0));
-	vec2 insideMask = step(vec2(0.0), warped) * step(warped, vec2(1.0));
-	color = texture(sourceTexture, warped) * insideMask.x * insideMask.y;
-	`, bulge: `
-	float aspect = resolution.x / resolution.y;
-	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
-	float bulgeDistance = length(fromCenter) / max(parameters.w, 0.001);
-	float bulgeFactor = 1.0 - parameters.z * strength * (1.0 - clamp(bulgeDistance, 0.0, 1.0));
-	vec2 warpedScreen = parameters.xy + fromCenter * bulgeFactor / vec2(aspect, 1.0);
-	color = sampleScreen(warpedScreen);
-	`, swirl: `
-	float aspect = resolution.x / resolution.y;
-	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
-	float swirlDistance = length(fromCenter) / max(parameters.w, 0.001);
-	float swirlAngle = parameters.z * strength * 6.28318530718 * pow(1.0 - clamp(swirlDistance, 0.0, 1.0), 2.0);
-	float cosine = cos(swirlAngle);
-	float sine = sin(swirlAngle);
-	vec2 rotated = vec2(fromCenter.x * cosine - fromCenter.y * sine, fromCenter.x * sine + fromCenter.y * cosine);
-	color = sampleScreen(parameters.xy + rotated / vec2(aspect, 1.0));
-	`, kaleidoscope: `
-	float aspect = resolution.x / resolution.y;
-	vec2 fromCenter = (screenUv - 0.5) * vec2(aspect, 1.0);
-	float kaleidoRadius = length(fromCenter);
-	float segmentAngle = 6.28318530718 / max(parameters.x, 1.0);
-	float kaleidoAngle = atan(fromCenter.y, fromCenter.x);
-	kaleidoAngle = abs(mod(kaleidoAngle, segmentAngle) - segmentAngle * 0.5);
-	vec2 mirroredScreen = 0.5 + vec2(cos(kaleidoAngle), sin(kaleidoAngle)) * kaleidoRadius / vec2(aspect, 1.0);
-	color = mix(color, sampleScreen(mirroredScreen), strength);
-	`, mirror: `
-	vec2 mirroredScreen = screenUv;
-	if (parameters.x < 0.5) {
-		mirroredScreen.x = screenUv.x < 0.5 ? screenUv.x : 1.0 - screenUv.x;
-	}
-	else {
-		mirroredScreen.y = screenUv.y < 0.5 ? screenUv.y : 1.0 - screenUv.y;
-	}
-	color = mix(color, sampleScreen(mirroredScreen), step(0.5, strength));
-	`, ripple: `
-	float aspect = resolution.x / resolution.y;
-	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
-	float rippleDistance = length(fromCenter);
-	float rippleWave = sin(rippleDistance * parameters.z - time * parameters.w) * strength * 0.012 / (1.0 + rippleDistance * 4.0);
-	vec2 rippleDirection = rippleDistance > 0.0001 ? fromCenter / rippleDistance : vec2(0.0);
-	color = sampleScreen(screenUv + rippleDirection * rippleWave / vec2(aspect, 1.0));
-	`, heatHaze: `
-	vec2 hazeOffset = vec2(valueNoise(uv * parameters.x + vec2(0.0, time * parameters.y)), valueNoise(uv * parameters.x + vec2(time * parameters.y, 7.3))) - 0.5;
-	color = texture(sourceTexture, uv + hazeOffset * strength * 0.03);
-	`, jitter: `
-	float jitterSeed = floor(time * parameters.y);
-	vec2 jitterOffset = (vec2(hash21(vec2(jitterSeed, 1.0)), hash21(vec2(jitterSeed, 2.0))) - 0.5) * parameters.x * strength / resolution;
-	color = texture(sourceTexture, clamp(uv + jitterOffset, 0.0, 1.0));
-	`, doubleVision: `
-	vec2 visionOffset = vec2(sin(time * parameters.y) * parameters.x, cos(time * parameters.y * 0.7) * parameters.x * 0.5) * strength;
-	color = (texture(sourceTexture, uv + visionOffset) + texture(sourceTexture, uv - visionOffset)) * 0.5;
-	`, pixelate: `
-	float block = max(1.0, parameters.x * strength);
-	vec2 pixelUv = (floor(uv * resolution / block) + 0.5) * block / resolution;
-	color = texture(sourceTexture, pixelUv);
-	`, shockwave: `
-	float aspect = resolution.x / resolution.y;
-	vec2 delta = (screenUv - parameters.xy) * vec2(aspect, 1.0);
-	float ringDistance = length(delta);
-	float ringWidth = max(parameters.w, 0.001);
-	float ring = 1.0 - smoothstep(0.0, ringWidth, abs(ringDistance - parameters.z));
-	float wave = sin((ringDistance - parameters.z) / ringWidth * 3.14159265) * ring;
-	vec2 direction = ringDistance > 0.0001 ? delta / ringDistance : vec2(0.0);
-	vec2 uvDirection = vec2(direction.x, -direction.y);
-	vec2 displaced = uv - uvDirection / vec2(aspect, 1.0) * wave * strength * 0.06;
-	color = texture(sourceTexture, displaced);
-	color.rgb += effectColor.rgb * ring * ring * strength * effectColor.a;
-	`, wave: `
-	vec2 displaced = uv + vec2(sin(uv.y * parameters.x + time * parameters.y), cos(uv.x * parameters.x * 0.7 + time * parameters.y * 0.8)) * strength * 0.012;
-	color = texture(sourceTexture, displaced);
-	`, motionBlur: `
-	vec2 blurDirection = vec2(cos(parameters.x), -sin(parameters.x)) * parameters.y * strength / resolution;
-	vec4 sum = vec4(0.0);
-	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
-		float offset = (float(sampleIndex) - 5.5) / 5.5;
-		sum += texture(sourceTexture, uv + blurDirection * offset);
-	}
-	color = sum / 12.0;
-	`, zoomBlur: `
-	vec2 toCenter = (parameters.xy - screenUv) * strength * parameters.z;
-	toCenter.y = -toCenter.y;
-	vec4 sum = vec4(0.0);
-	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
-		sum += texture(sourceTexture, uv + toCenter * (float(sampleIndex) / 12.0));
-	}
-	color = sum / 12.0;
-	`, blur: `
-	vec2 blurStep = parameters.zw / resolution * parameters.x * strength;
-	vec4 sum = color * 0.227027;
-	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
-	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
-	color = sum;
-	`, tiltShift: `
-	float focusDistance = smoothstep(parameters.y * 0.5, parameters.y * 1.5, abs(screenUv.y - parameters.x));
-	vec2 blurStep = parameters.zw / resolution * focusDistance * strength;
-	vec4 sum = color * 0.227027;
-	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
-	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
-	color = sum;
-	`, godRays: `
-	vec2 rayCenter = vec2(parameters.x, 1.0 - parameters.y);
-	vec2 rayStep = (rayCenter - uv) / 16.0;
-	vec3 rays = vec3(0.0);
-	float weight = 1.0;
-	vec2 sampleUv = uv;
-	for (int sampleIndex = 0; sampleIndex < 16; ++sampleIndex) {
-		sampleUv += rayStep;
-		vec3 sampled = texture(sourceTexture, sampleUv).rgb;
-		float luminance = dot(sampled, vec3(0.299, 0.587, 0.114));
-		rays += sampled * smoothstep(parameters.z - 0.1, parameters.z + 0.1, luminance) * weight;
-		weight *= parameters.w;
-	}
-	color.rgb += rays / 16.0 * effectColor.rgb * strength * 2.0;
-	`, bloomBright: `
-	float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	float knee = smoothstep(parameters.x - 0.1, parameters.x + 0.1, luminance);
-	color.rgb *= knee;
-	`, bloomComposite: `
-	vec3 bloom = texture(auxiliaryTexture, uv).rgb;
-	color.rgb += bloom * strength * parameters.y;
-	`, anamorphicComposite: `
-	vec3 flare = texture(auxiliaryTexture, uv).rgb;
-	color.rgb += flare * effectColor.rgb * strength * parameters.y;
-	`, glitch: `
-	float seed = floor(time * parameters.y);
-	float row = floor(uv.y * parameters.x);
-	float rowRandom = hash21(vec2(row, seed));
-	float shift = step(0.8, rowRandom) * (hash21(vec2(seed, row)) - 0.5) * parameters.z * strength;
-	vec2 shifted = uv + vec2(shift, 0.0);
-	color = texture(sourceTexture, shifted);
-	float split = strength * 0.012 * step(0.5, rowRandom);
-	color.r = texture(sourceTexture, shifted + vec2(split, 0.0)).r;
-	color.b = texture(sourceTexture, shifted - vec2(split, 0.0)).b;
-	float blockNoise = step(0.93, hash21(floor(uv * vec2(8.0, 6.0)) + seed)) * strength;
-	color.rgb = mix(color.rgb, 1.0 - color.rgb, blockNoise * 0.6);
-	`, vhs: `
-	float band = fract(time * 0.35);
-	float bandMask = smoothstep(0.0, 0.05, abs(screenUv.y - band)) ;
-	float wobble = (sin(time * 9.0 + uv.y * 40.0) * 0.5 + (1.0 - bandMask) * 3.0) * parameters.x * strength;
-	vec2 shifted = uv + vec2(wobble, 0.0);
-	color = texture(sourceTexture, shifted);
-	color.r = texture(sourceTexture, shifted + vec2(0.006 * strength, 0.0)).r;
-	color.b = texture(sourceTexture, shifted - vec2(0.006 * strength, 0.0)).b;
-	float lineNoise = hash21(vec2(floor(uv.y * resolution.y * 0.5), floor(time * 30.0)));
-	float noiseLine = step(1.0 - parameters.y * 0.08, lineNoise) * strength;
-	color.rgb = mix(color.rgb, vec3(0.9), noiseLine * 0.6);
-	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	color.rgb = mix(color.rgb, vec3(gray), 0.2 * strength);
-	color.rgb += (hash21(uv * resolution + fract(time * 5.0) * 100.0) - 0.5) * parameters.y * 0.3 * strength;
-	`, chromatic: `
-	vec2 offset = (uv - 0.5) * strength * 0.03 * parameters.x;
-	color.r = texture(sourceTexture, uv + offset).r;
-	color.b = texture(sourceTexture, uv - offset).b;
-	`, whiteBalance: `
-	vec3 balanced = color.rgb * vec3(1.0 + parameters.x * 0.25, 1.0 + parameters.y * 0.15, 1.0 - parameters.x * 0.25);
-	color.rgb = mix(color.rgb, clamp(balanced, 0.0, 1.0), strength);
-	`, liftGammaGain: `
-	vec3 graded = color.rgb * parameters.z + parameters.x * (1.0 - color.rgb);
-	graded = pow(max(graded, vec3(0.0)), vec3(1.0 / max(parameters.y, 0.01)));
-	color.rgb = mix(color.rgb, clamp(graded, 0.0, 1.0), strength);
-	`, colorGrade: `
-	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	vec3 graded = mix(vec3(gray), color.rgb, parameters.y);
-	graded = (graded - 0.5) * parameters.x + 0.5;
-	graded *= parameters.z;
-	graded *= mix(vec3(1.0), effectColor.rgb, effectColor.a);
-	color.rgb = mix(color.rgb, clamp(graded, 0.0, 1.0), strength);
-	`, hueShift: `
-	float hueAngle = strength * parameters.x * 6.28318530718;
-	vec3 yiq = mat3(0.299, 0.596, 0.211, 0.587, -0.274, -0.523, 0.114, -0.322, 0.312) * color.rgb;
-	float chroma = length(yiq.yz);
-	float hue = atan(yiq.z, yiq.y) + hueAngle;
-	yiq.yz = vec2(cos(hue), sin(hue)) * chroma;
-	color.rgb = clamp(mat3(1.0, 1.0, 1.0, 0.956, -0.272, -1.106, 0.621, -0.647, 1.703) * yiq, 0.0, 1.0);
-	`, splitToning: `
-	float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	float highlightWeight = smoothstep(parameters.w - 0.3, parameters.w + 0.3, luminance);
-	vec3 toned = color.rgb * mix(parameters.xyz * 2.0, effectColor.rgb * 2.0, highlightWeight);
-	color.rgb = mix(color.rgb, clamp(mix(color.rgb, toned, 0.5), 0.0, 1.0), strength);
-	`, tonemap: `
-	vec3 exposed = color.rgb * parameters.x;
-	// ACES \uADFC\uC0AC. (Krzysztof Narkowicz 2016, CC0)
-	vec3 mapped = (exposed * (2.51 * exposed + 0.03)) / (exposed * (2.43 * exposed + 0.59) + 0.14);
-	color.rgb = mix(color.rgb, clamp(mapped, 0.0, 1.0), strength);
-	`, gradientMap: `
-	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	color.rgb = mix(color.rgb, mix(parameters.xyz, effectColor.rgb, gray), strength);
-	`, sepia: `
-	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	color.rgb = mix(color.rgb, gray * vec3(1.2, 1.0, 0.78), strength);
-	`, grayscale: `
-	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	color.rgb = mix(color.rgb, vec3(gray), strength);
-	`, posterize: `
-	float levels = max(parameters.x, 1.0);
-	color.rgb = mix(color.rgb, floor(color.rgb * levels + 0.5) / levels, strength);
-	`, dither: `
-	float pixelSize = max(parameters.y, 1.0);
-	vec2 pixelCell = floor(uv * resolution / pixelSize);
-	vec3 sampled = texture(sourceTexture, (pixelCell + 0.5) * pixelSize / resolution).rgb;
-	int bayerX = int(mod(pixelCell.x, 4.0));
-	int bayerY = int(mod(pixelCell.y, 4.0));
-	int bayerIndex = bayerX + bayerY * 4;
-	float bayerValues[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
-	float bayerThreshold = (bayerValues[bayerIndex] + 0.5) / 16.0 - 0.5;
-	float levels = max(parameters.x, 2.0) - 1.0;
-	vec3 dithered = floor(sampled * levels + bayerThreshold + 0.5) / levels;
-	color.rgb = mix(color.rgb, clamp(dithered, 0.0, 1.0), strength);
-	`, halftone: `
-	float cellSize = max(parameters.x, 2.0);
-	vec2 cell = floor(uv * resolution / cellSize);
-	vec2 cellCenter = (cell + 0.5) * cellSize / resolution;
-	vec3 sampled = texture(sourceTexture, cellCenter).rgb;
-	float luminance = dot(sampled, vec3(0.299, 0.587, 0.114));
-	float dotRadius = (1.0 - luminance) * 0.7;
-	float cellDistance = length((uv * resolution / cellSize) - (cell + 0.5));
-	float dotMask = 1.0 - smoothstep(dotRadius - 0.1, dotRadius + 0.1, cellDistance);
-	vec3 halftoned = mix(vec3(1.0), vec3(0.05), dotMask);
-	color.rgb = mix(color.rgb, halftoned * mix(vec3(1.0), sampled + 0.3, 0.4), strength);
-	`, sharpen: `
-	vec2 texel = 1.0 / resolution;
-	vec3 neighbors = texture(sourceTexture, uv + vec2(texel.x, 0.0)).rgb + texture(sourceTexture, uv - vec2(texel.x, 0.0)).rgb + texture(sourceTexture, uv + vec2(0.0, texel.y)).rgb + texture(sourceTexture, uv - vec2(0.0, texel.y)).rgb;
-	vec3 sharpened = clamp(color.rgb * 5.0 - neighbors, 0.0, 1.0);
-	color.rgb = mix(color.rgb, sharpened, strength);
-	`, edgeDetect: `
-	vec2 texel = 1.0 / resolution;
-	float gradientX = 0.0;
-	float gradientY = 0.0;
-	gradientX += luminanceAt(uv + vec2(-texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, -texel.y));
-	gradientX += luminanceAt(uv + vec2(-texel.x, 0.0)) * -2.0 + luminanceAt(uv + vec2(texel.x, 0.0)) * 2.0;
-	gradientX += luminanceAt(uv + vec2(-texel.x, texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, texel.y));
-	gradientY += luminanceAt(uv + vec2(-texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(-texel.x, texel.y));
-	gradientY += luminanceAt(uv + vec2(0.0, -texel.y)) * -2.0 + luminanceAt(uv + vec2(0.0, texel.y)) * 2.0;
-	gradientY += luminanceAt(uv + vec2(texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, texel.y));
-	float edge = clamp(length(vec2(gradientX, gradientY)) * 2.0, 0.0, 1.0);
-	color.rgb = mix(color.rgb, effectColor.rgb * edge, strength);
-	`, oldFilm: `
-	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	vec3 filmColor = gray * vec3(1.15, 1.0, 0.8);
-	float grain = (hash21(uv * resolution + fract(time * 9.1) * 100.0) - 0.5) * 0.25;
-	float scratchSeed = floor(time * 8.0);
-	float scratchX = hash21(vec2(scratchSeed, 1.0));
-	float scratch = (1.0 - smoothstep(0.0, 0.003, abs(uv.x - scratchX))) * step(0.6, hash21(vec2(scratchSeed, 3.0)));
-	float flicker = 0.9 + 0.1 * hash21(vec2(floor(time * 12.0), 5.0));
-	float vignette = 1.0 - smoothstep(0.5, 1.0, distance(uv, vec2(0.5)) * 1.4142) * 0.6;
-	vec3 aged = (filmColor + grain + scratch * 0.8) * flicker * vignette;
-	color.rgb = mix(color.rgb, clamp(aged, 0.0, 1.0), strength);
-	`, nightVision: `
-	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-	float amplified = clamp(gray * 1.8 + 0.08, 0.0, 1.0);
-	float noise = (hash21(uv * resolution + fract(time * 7.0) * 100.0) - 0.5) * 0.25;
-	float lines = 0.9 + 0.1 * sin(uv.y * resolution.y * 1.5);
-	float vignette = 1.0 - smoothstep(0.55, 1.0, distance(uv, vec2(0.5)) * 1.4142);
-	vec3 visionColor = effectColor.rgb * (amplified + noise) * lines * vignette;
-	color.rgb = mix(color.rgb, clamp(visionColor, 0.0, 1.0), strength);
-	`, invert: `
-	color.rgb = mix(color.rgb, vec3(1.0) - color.rgb, strength);
-	`, scanline: `
-	vec2 centered = uv - 0.5;
-	float radiusSquared = dot(centered, centered);
-	vec2 warped = uv + centered * radiusSquared * parameters.x * strength;
-	vec2 insideMask = step(vec2(0.0), warped) * step(warped, vec2(1.0));
-	color = texture(sourceTexture, warped) * insideMask.x * insideMask.y;
-	float lines = 0.5 + 0.5 * sin(warped.y * resolution.y * 3.14159265 * parameters.y);
-	color.rgb *= 1.0 - strength * 0.35 * lines;
-	float maskPhase = warped.x * resolution.x * 2.0943951;
-	color.rgb *= 1.0 + strength * 0.08 * vec3(sin(maskPhase), sin(maskPhase + 2.0943951), sin(maskPhase + 4.1887902));
-	`, grain: `
-	float grainValue = hash21(uv * resolution + fract(time * 7.13) * 100.0) - 0.5;
-	color.rgb += grainValue * strength * 0.25;
-	`, rain: `
-	float column = floor(screenUv.x * parameters.x);
-	float columnRandom = hash21(vec2(column, 1.0));
-	float streakY = fract(screenUv.y * parameters.y * (0.6 + columnRandom * 0.8) - time * parameters.z * (0.8 + columnRandom * 0.6) + columnRandom * 7.0);
-	float columnX = fract(screenUv.x * parameters.x);
-	float streak = smoothstep(0.7, 1.0, streakY) * (1.0 - smoothstep(0.0, 0.25, abs(columnX - 0.5))) * step(0.35, columnRandom);
-	color.rgb = mix(color.rgb, effectColor.rgb, streak * strength * effectColor.a);
-	`, fog: `
-	float fogMask = smoothstep(parameters.x, parameters.y, screenUv.y) * strength;
-	color.rgb = mix(color.rgb, effectColor.rgb, fogMask * effectColor.a);
-	`, vignette: `
-	float vignetteDistance = distance(uv, vec2(0.5)) * 1.4142;
-	float vignetteMask = smoothstep(parameters.x, parameters.y, vignetteDistance) * strength;
-	color.rgb = mix(color.rgb, effectColor.rgb, vignetteMask * effectColor.a);
-	`, spotlight: `
-	float aspect = resolution.x / resolution.y;
-	float spotDistance = length((screenUv - parameters.xy) * vec2(aspect, 1.0));
-	float spotMask = smoothstep(parameters.z, parameters.z + max(parameters.w, 0.001), spotDistance) * strength;
-	color.rgb = mix(color.rgb, effectColor.rgb, spotMask * effectColor.a);
-	`, speedLines: `
-	float aspect = resolution.x / resolution.y;
-	vec2 delta = (screenUv - parameters.xy) * vec2(aspect, 1.0);
-	float lineDistance = length(delta);
-	float angle = atan(delta.y, delta.x);
-	float streak = valueNoise(vec2(cos(angle), sin(angle)) * parameters.z + vec2(time * parameters.w, 0.0));
-	float lineMask = smoothstep(0.55, 0.75, streak) * smoothstep(0.15, 0.6, lineDistance);
-	color.rgb = mix(color.rgb, effectColor.rgb, lineMask * strength * effectColor.a);
-	`, letterbox: `
-	float bar = parameters.x * strength;
-	float pillar = parameters.y * strength;
-	float inside = step(bar, uv.y) * step(uv.y, 1.0 - bar) * step(pillar, uv.x) * step(uv.x, 1.0 - pillar);
-	color.rgb = mix(effectColor.rgb, color.rgb, inside);
-	`, pixelDissolve: `
-	vec2 blockCell = floor(screenUv * vec2(parameters.x, parameters.x * resolution.y / resolution.x));
-	float blockRandom = hash21(blockCell + 3.7);
-	color.rgb = mix(color.rgb, effectColor.rgb, step(blockRandom, strength) * effectColor.a);
-	`, wipe: `
-	vec2 wipeDirection = normalize(parameters.xy + vec2(0.0001, 0.0));
-	float wipeDistance = dot(screenUv - 0.5, wipeDirection) + 0.5;
-	float softness = max(parameters.z, 0.0001);
-	float cover = 1.0 - smoothstep(strength * (1.0 + softness) - softness, strength * (1.0 + softness), wipeDistance);
-	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
-	`, irisWipe: `
-	float aspect = resolution.x / resolution.y;
-	float irisDistance = length((screenUv - parameters.xy) * vec2(aspect, 1.0));
-	float softness = max(parameters.z, 0.0001);
-	float visibleRadius = (1.0 - strength) * 0.9 * max(aspect, 1.0);
-	float cover = smoothstep(visibleRadius, visibleRadius + softness, irisDistance);
-	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
-	`, diamondWipe: `
-	float diamondDistance = abs(screenUv.x - 0.5) + abs(screenUv.y - 0.5);
-	float softness = max(parameters.x, 0.0001);
-	float cover = 1.0 - smoothstep(strength * (1.0 + softness), strength * (1.0 + softness) + softness, diamondDistance);
-	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
-	`, clockWipe: `
-	vec2 fromCenter = screenUv - 0.5;
-	float clockAngle = (atan(fromCenter.x, -fromCenter.y) + 3.14159265) / 6.28318530718;
-	float softness = max(parameters.x, 0.0001);
-	float cover = 1.0 - smoothstep(strength, strength + softness, clockAngle);
-	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
-	`, blinds: `
-	float stripe = fract(screenUv.y * parameters.x);
-	float softness = max(parameters.y, 0.0001);
-	float cover = 1.0 - smoothstep(strength, strength + softness, stripe);
-	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
-	`, checkerWipe: `
-	vec2 checkerCell = floor(screenUv * vec2(parameters.x, parameters.x * resolution.y / resolution.x));
-	float parity = mod(checkerCell.x + checkerCell.y, 2.0);
-	float cellThreshold = parity * 0.5 + hash21(checkerCell + 1.3) * 0.5;
-	color.rgb = mix(color.rgb, effectColor.rgb, step(cellThreshold, strength * 1.0001) * effectColor.a);
-	`, noiseFade: `
-	float fadeNoise = valueNoise(screenUv * vec2(parameters.x * resolution.x / resolution.y, parameters.x) + 2.1);
-	float softness = max(parameters.y, 0.001);
-	float cover = 1.0 - smoothstep(strength * (1.0 + softness) - softness, strength * (1.0 + softness), fadeNoise);
-	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
-	`, burn: `
-	float burnNoise = valueNoise(screenUv * vec2(parameters.x * resolution.x / resolution.y, parameters.x) + 5.3);
-	float threshold = strength * (1.0 + parameters.y * 4.0) - parameters.y * 2.0;
-	float burned = 1.0 - step(threshold, burnNoise);
-	float innerBand = smoothstep(threshold, threshold + parameters.y, burnNoise);
-	float outerBand = smoothstep(threshold + parameters.y, threshold + parameters.y * 2.0, burnNoise);
-	vec3 emberColor = vec3(1.0, 0.55, 0.15);
-	vec3 sootColor = vec3(0.05, 0.02, 0.01);
-	vec3 burning = mix(emberColor, mix(sootColor, color.rgb, outerBand), innerBand);
-	color.rgb = mix(burning, effectColor.rgb, burned * effectColor.a);
-	`, tvOff: `
-	float collapse = max(1.0 - strength, 0.0);
-	float squeeze = max(collapse * collapse, 0.002);
-	float centeredY = (screenUv.y - 0.5) / squeeze + 0.5;
-	float widthSqueeze = smoothstep(0.0, 0.15, collapse);
-	float centeredX = (screenUv.x - 0.5) / max(widthSqueeze, 0.002) + 0.5;
-	float inside = step(0.0, centeredY) * step(centeredY, 1.0) * step(0.0, centeredX) * step(centeredX, 1.0);
-	vec3 collapsed = sampleScreen(vec2(centeredX, centeredY)).rgb * (1.0 + (1.0 - collapse) * 2.0);
-	float glowLine = (1.0 - smoothstep(0.0, 0.01 + squeeze * 0.5, abs(screenUv.y - 0.5))) * (1.0 - collapse) * step(0.02, widthSqueeze);
-	color.rgb = mix(effectColor.rgb, collapsed, inside) + vec3(glowLine);
-	color.rgb = mix(color.rgb, effectColor.rgb, step(0.999, strength));
-	`, fade: `
-	color.rgb = mix(color.rgb, effectColor.rgb, strength * effectColor.a);
-	`, regionComposite: `
-	vec4 original = texture(auxiliaryTexture, uv);
-	vec2 pixel = uv * resolution;
-	vec2 halfSize = resolution * 0.5;
-	float cornerRadius = min(parameters.x, min(halfSize.x, halfSize.y));
-	vec2 cornerOffset = abs(pixel - halfSize) - (halfSize - cornerRadius);
-	float cornerDistance = length(max(cornerOffset, 0.0)) + min(max(cornerOffset.x, cornerOffset.y), 0.0) - cornerRadius;
-	float inside = 1.0 - smoothstep(-0.75, 0.75, cornerDistance);
-	color = mix(original, color, inside);
-	` };
-function createColorTexture(webGL2RenderingContext, width, height, isOpaque = false) {
-  const texture = webGL2RenderingContext.createTexture();
-  webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-  if (isOpaque) {
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGB8, width, height, 0, webGL2RenderingContext.RGB, webGL2RenderingContext.UNSIGNED_BYTE, null);
-  } else {
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
-  }
-  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
-  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
-  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
-  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-  return texture;
-}
-__name(createColorTexture, "createColorTexture");
-function createRenderTarget(webGL2RenderingContext, width, height, useStencil, isOpaque = false) {
-  const texture = createColorTexture(webGL2RenderingContext, width, height, isOpaque);
-  const framebuffer = webGL2RenderingContext.createFramebuffer();
-  webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
-  webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
-  let stencilRenderbuffer = null;
-  if (useStencil) {
-    stencilRenderbuffer = webGL2RenderingContext.createRenderbuffer();
-    webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
-    webGL2RenderingContext.renderbufferStorage(webGL2RenderingContext.RENDERBUFFER, webGL2RenderingContext.DEPTH24_STENCIL8, width, height);
-    webGL2RenderingContext.framebufferRenderbuffer(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT, webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
-  }
-  webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
-  return { framebuffer, texture, stencilRenderbuffer, width, height };
-}
-__name(createRenderTarget, "createRenderTarget");
-function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
-  if (!renderTarget) {
-    return;
-  }
-  webGL2RenderingContext.deleteFramebuffer(renderTarget.framebuffer);
-  webGL2RenderingContext.deleteTexture(renderTarget.texture);
-  if (renderTarget.stencilRenderbuffer) {
-    webGL2RenderingContext.deleteRenderbuffer(renderTarget.stencilRenderbuffer);
-  }
-}
-__name(destroyRenderTarget, "destroyRenderTarget");
-var ScreenEffect = class extends Object2 {
-  static {
-    __name(this, "ScreenEffect");
-  }
-  #webGL2RenderingContext;
-  #passTable;
-  #effectTable;
-  #sceneTarget;
-  #pingTarget;
-  #pongTarget;
-  #halfTargetA;
-  #halfTargetB;
-  #time;
-  #isBound;
-  #region;
-  constructor() {
-    super();
-    this.#webGL2RenderingContext = null;
-    this.#passTable = new System140.Map();
-    this.#effectTable = new System140.Map();
-    this.#sceneTarget = null;
-    this.#pingTarget = null;
-    this.#pongTarget = null;
-    this.#halfTargetA = null;
-    this.#halfTargetB = null;
-    this.#time = 0;
-    this.#isBound = false;
-    this.#region = null;
-    this.resetAll();
-  }
-  resetAll() {
-    for (const effectType of EFFECT_ORDER) {
-      const defaultParameters = DEFAULT_PARAMETER_TABLE2[effectType];
-      const defaultColor = DEFAULT_COLOR_TABLE2[effectType] ? DEFAULT_COLOR_TABLE2[effectType] : [1, 1, 1, 1];
-      this.#effectTable.set(effectType, { isEnabled: false, strength: 1, parameters: [defaultParameters[0], defaultParameters[1], defaultParameters[2], defaultParameters[3]], color: new Color(defaultColor[0], defaultColor[1], defaultColor[2], defaultColor[3]) });
-    }
-  }
-  setRegion(x, y, width, height, cornerRadius = 0) {
-    this.#region = { x, y, width, height, cornerRadius: System140.Math.max(0, cornerRadius) };
-  }
-  clearRegion() {
-    this.#region = null;
-  }
-  getRegion() {
-    return this.#region;
-  }
-  tick(timeDelta) {
-    this.#time += timeDelta;
-  }
-  begin(graphic) {
-    this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
-    this.#isBound = this.hasActiveEffect();
-  }
-  end(graphic) {
-    if (!this.#isBound) {
-      return;
-    }
-    this.#isBound = false;
-    this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
-    graphic.flushBatch();
-    const webGL2RenderingContext = this.#webGL2RenderingContext;
-    const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
-    const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
-    if (bufferWidth <= 0 || bufferHeight <= 0) {
-      return;
-    }
-    let regionX = 0;
-    let regionY = 0;
-    let regionWidth = bufferWidth;
-    let regionHeight = bufferHeight;
-    let cornerRadius = 0;
-    if (this.#region) {
-      regionX = System140.Math.max(0, System140.Math.round(this.#region.x));
-      regionY = System140.Math.max(0, System140.Math.round(this.#region.y));
-      regionWidth = System140.Math.min(bufferWidth - regionX, System140.Math.round(this.#region.width));
-      regionHeight = System140.Math.min(bufferHeight - regionY, System140.Math.round(this.#region.height));
-      cornerRadius = this.#region.cornerRadius;
-    }
-    if (regionWidth <= 0 || regionHeight <= 0) {
-      return;
-    }
-    const width = regionWidth;
-    const height = regionHeight;
-    this.ensureTargets(width, height);
-    const glRegionY = bufferHeight - (regionY + regionHeight);
-    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
-    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#sceneTarget.texture);
-    webGL2RenderingContext.copyTexSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, 0, 0, regionX, glRegionY, width, height);
-    webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
-    webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
-    const stepList = [];
-    for (const effectType of EFFECT_ORDER) {
-      const effectState = this.#effectTable.get(effectType);
-      if (!effectState.isEnabled || effectState.strength <= 0) {
-        continue;
-      }
-      if (effectType === "blur") {
-        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 1, 0], target: "pingpong" });
-        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 0, 1], target: "pingpong" });
-        continue;
-      }
-      if (effectType === "bloom") {
-        stepList.push({ passName: "bloomBright", state: effectState, parameters: effectState.parameters, target: "halfA" });
-        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 1, 0], target: "halfB", source: "halfA" });
-        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 0, 1], target: "halfA", source: "halfB" });
-        stepList.push({ passName: "bloomComposite", state: effectState, parameters: effectState.parameters, target: "pingpong", auxiliary: "halfA", source: "previous" });
-        continue;
-      }
-      if (effectType === "anamorphic") {
-        stepList.push({ passName: "bloomBright", state: effectState, parameters: effectState.parameters, target: "halfA" });
-        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 1, 0], target: "halfB", source: "halfA" });
-        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2] * 0.5, 0, 1, 0], target: "halfA", source: "halfB" });
-        stepList.push({ passName: "anamorphicComposite", state: effectState, parameters: effectState.parameters, target: "pingpong", auxiliary: "halfA", source: "previous" });
-        continue;
-      }
-      if (effectType === "tiltShift") {
-        stepList.push({ passName: "tiltShift", state: effectState, parameters: [effectState.parameters[0], effectState.parameters[1], effectState.parameters[2], 0], target: "pingpong" });
-        stepList.push({ passName: "tiltShift", state: effectState, parameters: [effectState.parameters[0], effectState.parameters[1], 0, effectState.parameters[2]], target: "pingpong" });
-        continue;
-      }
-      stepList.push({ passName: effectType, state: effectState, parameters: effectState.parameters, target: "pingpong" });
-    }
-    if (stepList.length === 0) {
-      stepList.push({ passName: "copy", state: null, parameters: [0, 0, 0, 0], target: "pingpong" });
-    }
-    if (cornerRadius > 0) {
-      stepList.push({ passName: "regionComposite", state: null, parameters: [cornerRadius, 0, 0, 0], target: "pingpong", auxiliary: "scene" });
-    }
-    let lastScreenIndex = -1;
-    for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
-      if (stepList[stepIndex].target === "pingpong") {
-        lastScreenIndex = stepIndex;
-      }
-    }
-    let previousTexture = this.#sceneTarget.texture;
-    let pingPongTurn = 0;
-    for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
-      const step = stepList[stepIndex];
-      const pass = this.resolvePass(step.passName);
-      if (pass === null) {
-        continue;
-      }
-      let targetTexture = null;
-      if (stepIndex === lastScreenIndex) {
-        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
-        webGL2RenderingContext.viewport(regionX, glRegionY, width, height);
-        webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
-        webGL2RenderingContext.scissor(regionX, glRegionY, width, height);
-      } else if (step.target === "halfA" || step.target === "halfB") {
-        const halfTarget = step.target === "halfA" ? this.#halfTargetA : this.#halfTargetB;
-        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, halfTarget.framebuffer);
-        webGL2RenderingContext.viewport(0, 0, halfTarget.width, halfTarget.height);
-        targetTexture = halfTarget.texture;
-      } else {
-        const pingPongTarget = pingPongTurn % 2 === 0 ? this.#pingTarget : this.#pongTarget;
-        pingPongTurn += 1;
-        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, pingPongTarget.framebuffer);
-        webGL2RenderingContext.viewport(0, 0, width, height);
-        targetTexture = pingPongTarget.texture;
-      }
-      let sourceTexture = previousTexture;
-      if (step.source === "halfA") {
-        sourceTexture = this.#halfTargetA.texture;
-      } else if (step.source === "halfB") {
-        sourceTexture = this.#halfTargetB.texture;
-      }
-      const isHalfTarget = step.target === "halfA" || step.target === "halfB";
-      const passWidth = isHalfTarget ? this.#halfTargetA.width : width;
-      const passHeight = isHalfTarget ? this.#halfTargetA.height : height;
-      pass.useProgram();
-      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
-      webGL2RenderingContext.uniform1i(pass.getUniformLocation("sourceTexture"), 0);
-      if (step.auxiliary) {
-        let auxiliaryTexture = this.#halfTargetB.texture;
-        if (step.auxiliary === "halfA") {
-          auxiliaryTexture = this.#halfTargetA.texture;
-        } else if (step.auxiliary === "scene") {
-          auxiliaryTexture = this.#sceneTarget.texture;
-        }
-        webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
-        webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, auxiliaryTexture);
-        webGL2RenderingContext.uniform1i(pass.getUniformLocation("auxiliaryTexture"), 1);
-        webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-      }
-      webGL2RenderingContext.uniform2f(pass.getUniformLocation("resolution"), passWidth, passHeight);
-      webGL2RenderingContext.uniform1f(pass.getUniformLocation("time"), this.#time);
-      const strength = step.state ? step.state.strength : 1;
-      webGL2RenderingContext.uniform1f(pass.getUniformLocation("strength"), strength);
-      webGL2RenderingContext.uniform4f(pass.getUniformLocation("parameters"), step.parameters[0], step.parameters[1], step.parameters[2], step.parameters[3]);
-      const color = step.state ? step.state.color : Color.white();
-      webGL2RenderingContext.uniform4f(pass.getUniformLocation("effectColor"), color.red, color.green, color.blue, color.alpha);
-      pass.draw();
-      if (!isHalfTarget) {
-        previousTexture = targetTexture;
-      }
-    }
-    webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
-    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
-    webGL2RenderingContext.bindVertexArray(null);
-    graphic.restoreRenderState();
-  }
-  hasActiveEffect() {
-    for (const effectState of this.#effectTable.values()) {
-      if (effectState.isEnabled && effectState.strength > 0) {
-        return true;
-      }
-    }
-    return false;
-  }
-  ensureTargets(width, height) {
-    if (this.#sceneTarget && this.#sceneTarget.width === width && this.#sceneTarget.height === height) {
-      return;
-    }
-    const webGL2RenderingContext = this.#webGL2RenderingContext;
-    destroyRenderTarget(webGL2RenderingContext, this.#sceneTarget);
-    destroyRenderTarget(webGL2RenderingContext, this.#pingTarget);
-    destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
-    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
-    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
-    const halfWidth = System140.Math.max(1, System140.Math.round(width / 2));
-    const halfHeight = System140.Math.max(1, System140.Math.round(height / 2));
-    this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, false, true);
-    this.#pingTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
-    this.#pongTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
-    this.#halfTargetA = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
-    this.#halfTargetB = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
-  }
-  resolvePass(passName) {
-    if (this.#passTable.has(passName)) {
-      return this.#passTable.get(passName);
-    }
-    const effectBody = EFFECT_BODY_TABLE2[passName] !== void 0 ? EFFECT_BODY_TABLE2[passName] : "";
-    const fragmentShaderSource = FRAGMENTSHADER_HEADER + effectBody + FRAGMENTSHADER_FOOTER;
-    let pass = null;
-    try {
-      pass = new FullscreenPass(this.#webGL2RenderingContext, fragmentShaderSource);
-    } catch (error) {
-      console.error(`ScreenEffect: pass "${passName}" failed: ${error && error.message !== void 0 ? error.message : error}`);
-      if (!reportShaderBuildFailure(this.#webGL2RenderingContext, `ScreenEffect.${passName}`, error)) {
-        return null;
-      }
-      pass = null;
-    }
-    this.#passTable.set(passName, pass);
-    return pass;
-  }
-  setEnabled(effectType, isEnabled) {
-    const effectState = this.#effectTable.get(effectType);
-    if (effectState) {
-      effectState.isEnabled = isEnabled;
-    }
-  }
-  isEnabled(effectType) {
-    const effectState = this.#effectTable.get(effectType);
-    return effectState ? effectState.isEnabled : false;
-  }
-  setStrength(effectType, strength) {
-    const effectState = this.#effectTable.get(effectType);
-    if (effectState) {
-      effectState.strength = strength;
-    }
-  }
-  getStrength(effectType) {
-    const effectState = this.#effectTable.get(effectType);
-    return effectState ? effectState.strength : 0;
-  }
-  setParameters(effectType, x, y = 0, z = 0, w = 0) {
-    const effectState = this.#effectTable.get(effectType);
-    if (effectState) {
-      effectState.parameters = [x, y, z, w];
-    }
-  }
-  setParameter(effectType, parameterName, value) {
-    const effectState = this.#effectTable.get(effectType);
-    const parameterNames = SCREEN_EFFECT_PARAMETER_NAMES[effectType];
-    if (!effectState || !parameterNames) {
-      return;
-    }
-    const parameterIndex = parameterNames.indexOf(parameterName);
-    if (parameterIndex >= 0) {
-      effectState.parameters[parameterIndex] = value;
-    }
-  }
-  getParameters(effectType) {
-    const effectState = this.#effectTable.get(effectType);
-    return effectState ? effectState.parameters : [0, 0, 0, 0];
-  }
-  setColor(effectType, color) {
-    color = Color.from(color);
-    const effectState = this.#effectTable.get(effectType);
-    if (effectState && color) {
-      effectState.color = color.clone();
-    }
-  }
-  getColor(effectType) {
-    const effectState = this.#effectTable.get(effectType);
-    return effectState ? effectState.color : Color.white();
-  }
-  disableAll() {
-    for (const effectState of this.#effectTable.values()) {
-      effectState.isEnabled = false;
-    }
-  }
-  setTimelineProperty(propertyName, value) {
-    const separatorIndex = propertyName.indexOf(".");
-    const effectType = separatorIndex >= 0 ? propertyName.substring(0, separatorIndex) : propertyName;
-    const memberName = separatorIndex >= 0 ? propertyName.substring(separatorIndex + 1) : "";
-    const effectState = this.#effectTable.get(effectType);
-    if (!effectState) {
-      return;
-    }
-    if (memberName === "") {
-      const strength = System140.Number(value);
-      effectState.strength = strength;
-      effectState.isEnabled = strength > 0;
-      return;
-    }
-    if (memberName === "color") {
-      effectState.color = typeof value === "string" ? Color.createFromHEX(value) : effectState.color;
-      return;
-    }
-    if (memberName === "enabled") {
-      effectState.isEnabled = value === true || value === "true";
-      return;
-    }
-    this.setParameter(effectType, memberName, System140.Number(value));
-  }
-  getTime() {
-    return this.#time;
-  }
-  getSceneTexture() {
-    return this.#sceneTarget ? this.#sceneTarget.texture : null;
-  }
-  static getEffectOrder() {
-    return EFFECT_ORDER.slice();
-  }
-  destroy() {
-    const webGL2RenderingContext = this.#webGL2RenderingContext;
-    if (webGL2RenderingContext === null) {
-      super.destroy();
-      return;
-    }
-    for (const pass of this.#passTable.values()) {
-      if (pass === null) {
-        continue;
-      }
-      webGL2RenderingContext.deleteProgram(pass.getShaderProgram().getProgram());
-      webGL2RenderingContext.deleteVertexArray(pass.getVertexArray());
-    }
-    this.#passTable.clear();
-    destroyRenderTarget(webGL2RenderingContext, this.#sceneTarget);
-    destroyRenderTarget(webGL2RenderingContext, this.#pingTarget);
-    destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
-    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
-    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
-    this.#sceneTarget = null;
-    this.#pingTarget = null;
-    this.#pongTarget = null;
-    this.#halfTargetA = null;
-    this.#halfTargetB = null;
-    super.destroy();
-  }
-};
-var System141 = globalThis;
+var System142 = globalThis;
 var TIMELINE_EASING_DIRECTION_FUNCTION_NAMES = { in: "easeIn", out: "easeOut", inOut: "easeInOut" };
 var TIMELINE_EASING_NAMES = (() => {
   const nameList = ["linear", "step", "bezier"];
@@ -53204,8 +53336,8 @@ var TIMELINE_EASING_NAMES = (() => {
   return nameList;
 })();
 function createBezierEasing(x1, y1, x2, y2) {
-  const clampedX1 = System141.Math.max(0, System141.Math.min(1, x1));
-  const clampedX2 = System141.Math.max(0, System141.Math.min(1, x2));
+  const clampedX1 = System142.Math.max(0, System142.Math.min(1, x1));
+  const clampedX2 = System142.Math.max(0, System142.Math.min(1, x2));
   const sampleCurve = __name((t, p1, p2) => {
     const oneMinus = 1 - t;
     return 3 * oneMinus * oneMinus * t * p1 + 3 * oneMinus * t * t * p2 + t * t * t;
@@ -53224,15 +53356,15 @@ function createBezierEasing(x1, y1, x2, y2) {
     let t = progress;
     for (let iteration = 0; iteration < 8; ++iteration) {
       const error = sampleCurve(t, clampedX1, clampedX2) - progress;
-      if (System141.Math.abs(error) < 1e-5) {
+      if (System142.Math.abs(error) < 1e-5) {
         break;
       }
       const derivative = sampleDerivative(t, clampedX1, clampedX2);
-      if (System141.Math.abs(derivative) < 1e-6) {
+      if (System142.Math.abs(derivative) < 1e-6) {
         break;
       }
       t -= error / derivative;
-      t = System141.Math.max(0, System141.Math.min(1, t));
+      t = System142.Math.max(0, System142.Math.min(1, t));
     }
     return sampleCurve(t, y1, y2);
   };
@@ -53246,7 +53378,7 @@ function resolveTimelineEasing(easingName, curve = null) {
     return (progress) => 0;
   }
   if (easingName === "bezier") {
-    const controlPoints = System141.Array.isArray(curve) && curve.length >= 4 ? curve : [0.42, 0, 0.58, 1];
+    const controlPoints = System142.Array.isArray(curve) && curve.length >= 4 ? curve : [0.42, 0, 0.58, 1];
     return createBezierEasing(controlPoints[0], controlPoints[1], controlPoints[2], controlPoints[3]);
   }
   const separatorIndex = easingName.indexOf(".");
@@ -53265,15 +53397,15 @@ function resolveTimelineEasing(easingName, curve = null) {
 __name(resolveTimelineEasing, "resolveTimelineEasing");
 function parseTimelineColor(hexText) {
   const text = typeof hexText === "string" && hexText.startsWith("#") ? hexText.substring(1) : "ffffff";
-  const red = System141.parseInt(text.substring(0, 2), 16) / 255;
-  const green = System141.parseInt(text.substring(2, 4), 16) / 255;
-  const blue = System141.parseInt(text.substring(4, 6), 16) / 255;
-  const alpha = text.length >= 8 ? System141.parseInt(text.substring(6, 8), 16) / 255 : 1;
-  return [System141.Number.isFinite(red) ? red : 1, System141.Number.isFinite(green) ? green : 1, System141.Number.isFinite(blue) ? blue : 1, System141.Number.isFinite(alpha) ? alpha : 1];
+  const red = System142.parseInt(text.substring(0, 2), 16) / 255;
+  const green = System142.parseInt(text.substring(2, 4), 16) / 255;
+  const blue = System142.parseInt(text.substring(4, 6), 16) / 255;
+  const alpha = text.length >= 8 ? System142.parseInt(text.substring(6, 8), 16) / 255 : 1;
+  return [System142.Number.isFinite(red) ? red : 1, System142.Number.isFinite(green) ? green : 1, System142.Number.isFinite(blue) ? blue : 1, System142.Number.isFinite(alpha) ? alpha : 1];
 }
 __name(parseTimelineColor, "parseTimelineColor");
 function composeTimelineColor(channels) {
-  const toByte = __name((value) => System141.Math.round(System141.Math.max(0, System141.Math.min(1, value)) * 255).toString(16).padStart(2, "0"), "toByte");
+  const toByte = __name((value) => System142.Math.round(System142.Math.max(0, System142.Math.min(1, value)) * 255).toString(16).padStart(2, "0"), "toByte");
   return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]) + toByte(channels[3] === void 0 ? 1 : channels[3]);
 }
 __name(composeTimelineColor, "composeTimelineColor");
@@ -53315,7 +53447,7 @@ var TIMELINE_PROPERTY_DEFINITIONS = { x: { kind: "number", label: "X", apply: __
 }, "apply") }, rotation: { kind: "number", label: "Rotation", apply: __name((node, value) => {
   node.setLocalRotation(value);
 }, "apply") }, opacity: { kind: "number", label: "Opacity", apply: __name((node, value) => {
-  node.setLocalOpacity(System141.Math.max(0, System141.Math.min(1, value)));
+  node.setLocalOpacity(System142.Math.max(0, System142.Math.min(1, value)));
 }, "apply") }, visible: { kind: "boolean", label: "Visible", apply: __name((node, value) => {
   node.setActive(value === true || value === "true");
 }, "apply") }, color: { kind: "color", label: "Color", apply: __name((node, value) => {
@@ -53328,22 +53460,22 @@ var TIMELINE_PROPERTY_DEFINITIONS = { x: { kind: "number", label: "X", apply: __
 }, "apply") }, number: { kind: "number", label: "Number", apply: __name((node, value) => {
   const textComponent = node.getComponent(Text);
   if (textComponent) {
-    textComponent.setText(String(System141.Math.round(value)));
+    textComponent.setText(String(System142.Math.round(value)));
   }
 }, "apply") }, fontSize: { kind: "number", label: "Font Size", apply: __name((node, value) => {
   const textComponent = node.getComponent(Text);
   if (textComponent) {
-    textComponent.setFontSize(System141.Math.round(value));
+    textComponent.setFontSize(System142.Math.round(value));
   }
 }, "apply") }, visibleCharacters: { kind: "number", label: "Visible Characters", apply: __name((node, value) => {
   const textComponent = node.getComponent(Text);
   if (textComponent) {
-    textComponent.setVisibleCharacterCount(System141.Math.round(value));
+    textComponent.setVisibleCharacterCount(System142.Math.round(value));
   }
 }, "apply") }, frame: { kind: "number", label: "Frame", apply: __name((node, value) => {
   const sprite = node.getComponent(ShaderSprite);
   if (sprite) {
-    applySpriteFrame(sprite, System141.Math.round(value));
+    applySpriteFrame(sprite, System142.Math.round(value));
   }
 }, "apply") }, effect: { kind: "number", label: "Effect Progress", apply: __name((node, value) => {
   const sprite = node.getComponent(ShaderSprite);
@@ -53351,8 +53483,8 @@ var TIMELINE_PROPERTY_DEFINITIONS = { x: { kind: "number", label: "X", apply: __
     sprite.setEffectProgress(value);
   }
 }, "apply") }, event: { kind: "string", label: "Event", apply: null } };
-var spriteFrameGridTable = new System141.WeakMap();
-var soundPlayerTable = new System141.WeakMap();
+var spriteFrameGridTable = new System142.WeakMap();
+var soundPlayerTable = new System142.WeakMap();
 var timelineAudioManager = null;
 function applySpriteFrame(sprite, frameIndex) {
   const image = sprite.getImage();
@@ -53367,7 +53499,7 @@ function applySpriteFrame(sprite, frameIndex) {
   const frameWidth = image.width / gridColumns;
   const frameHeight = image.height / gridRows;
   const column = wrappedIndex % gridColumns;
-  const row = System141.Math.floor(wrappedIndex / gridColumns);
+  const row = System142.Math.floor(wrappedIndex / gridColumns);
   sprite.setImageRect(Rect.create(column * frameWidth, row * frameHeight, frameWidth, frameHeight));
 }
 __name(applySpriteFrame, "applySpriteFrame");
@@ -53413,7 +53545,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#description = null;
     this.#compiledTracks = [];
     this.#compiledMarkers = [];
-    this.#targetTable = new System141.Map();
+    this.#targetTable = new System142.Map();
     this.#targetResolver = null;
     this.#eventHandler = null;
     this.#markerHandler = null;
@@ -53423,22 +53555,22 @@ var Timeline = class _Timeline extends Object2 {
     this.#isPlaying = false;
     this.#isDirty = true;
     this.#particleSystems = [];
-    this.#particleFreeRunSet = new System141.Set();
+    this.#particleFreeRunSet = new System142.Set();
     this.setDescription(description ? description : _Timeline.createEmptyDescription());
   }
   static createEmptyDescription() {
     return { name: "Timeline", duration: 3, frameRate: 30, loop: true, stage: { width: 960, height: 540, backgroundColor: "#101114ff", nodes: [] }, tracks: [], markers: [] };
   }
   static async loadFromUrl(url) {
-    const response = await System141.fetch(url);
+    const response = await System142.fetch(url);
     if (!response.ok) {
-      throw new System141.Error(`Timeline: HTTP ${response.status}: ${url}`);
+      throw new System142.Error(`Timeline: HTTP ${response.status}: ${url}`);
     }
     const description = await response.json();
     return new _Timeline(description);
   }
   static loadFromText(text) {
-    const description = System141.JSON.parse(text);
+    const description = System142.JSON.parse(text);
     return new _Timeline(description);
   }
   static createFromJsonAsset(jsonAsset) {
@@ -53446,7 +53578,7 @@ var Timeline = class _Timeline extends Object2 {
     if (!isLoaded || !jsonAsset.data) {
       return null;
     }
-    const description = System141.structuredClone(jsonAsset.data);
+    const description = System142.structuredClone(jsonAsset.data);
     return new _Timeline(description);
   }
   setDescription(description) {
@@ -53454,13 +53586,13 @@ var Timeline = class _Timeline extends Object2 {
     if (!this.#description.stage) {
       this.#description.stage = { width: 960, height: 540, backgroundColor: "#101114ff", nodes: [] };
     }
-    if (!System141.Array.isArray(this.#description.stage.nodes)) {
+    if (!System142.Array.isArray(this.#description.stage.nodes)) {
       this.#description.stage.nodes = [];
     }
-    if (!System141.Array.isArray(this.#description.tracks)) {
+    if (!System142.Array.isArray(this.#description.tracks)) {
       this.#description.tracks = [];
     }
-    if (!System141.Array.isArray(this.#description.markers)) {
+    if (!System142.Array.isArray(this.#description.markers)) {
       this.#description.markers = [];
     }
     this.invalidate();
@@ -53475,7 +53607,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#compiledTracks = [];
     for (const track of this.#description.tracks) {
       const definition = TIMELINE_PROPERTY_DEFINITIONS[track.property];
-      const keys = System141.Array.isArray(track.keys) ? track.keys.slice() : [];
+      const keys = System142.Array.isArray(track.keys) ? track.keys.slice() : [];
       keys.sort((left, right) => left.time - right.time);
       const target = this.resolveTarget(track.target);
       const kind = definition ? definition.kind : typeof (keys.length > 0 ? keys[0].value : 0) === "number" ? "number" : "string";
@@ -53488,8 +53620,8 @@ var Timeline = class _Timeline extends Object2 {
   }
   collectParticleSystems() {
     this.#particleSystems = [];
-    this.#particleFreeRunSet = new System141.Set();
-    const eventTargetSet = new System141.Set();
+    this.#particleFreeRunSet = new System142.Set();
+    const eventTargetSet = new System142.Set();
     for (const compiledTrack of this.#compiledTracks) {
       if (compiledTrack.track.property === "event" && compiledTrack.target) {
         eventTargetSet.add(compiledTrack.target);
@@ -53550,11 +53682,11 @@ var Timeline = class _Timeline extends Object2 {
       }
     }
     eventList.sort((left, right) => left.time - right.time);
-    const stepSeconds = System141.Math.max(1 / 60, time / 600);
+    const stepSeconds = System142.Math.max(1 / 60, time / 600);
     let currentTime = 0;
     const advanceTo = __name((targetTime) => {
       while (currentTime < targetTime - 1e-6) {
-        const stepDelta = System141.Math.min(stepSeconds, targetTime - currentTime);
+        const stepDelta = System142.Math.min(stepSeconds, targetTime - currentTime);
         this.simulateParticles(stepDelta);
         currentTime += stepDelta;
       }
@@ -53601,7 +53733,7 @@ var Timeline = class _Timeline extends Object2 {
     this.invalidate();
   }
   buildStage(parentNode, imageResolver = null) {
-    const nodeTable = new System141.Map();
+    const nodeTable = new System142.Map();
     const nodeDescriptions = this.#description.stage.nodes;
     const createdList = [];
     for (const nodeDescription of nodeDescriptions) {
@@ -53634,14 +53766,14 @@ var Timeline = class _Timeline extends Object2 {
     return false;
   }
   static createStageNode(nodeDescription, imageResolver = null) {
-    const description = System141.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    const description = System142.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
     const node = new WorldNode();
     node.setName(description.name);
     _Timeline.applyStageNodeDescription(node, description, imageResolver);
     return node;
   }
   static applyStageNodeDescription(node, nodeDescription, imageResolver = null) {
-    const description = System141.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    const description = System142.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
     node.setPivot(Vector2.create(description.pivotX, description.pivotY));
     node.setAnchor(Pivot.topLeft.clone());
     node.setContentSize(Vector2.create(description.width, description.height));
@@ -53656,13 +53788,13 @@ var Timeline = class _Timeline extends Object2 {
       paintComponent.setRoundSize(description.roundSize);
     } else if (description.type === "sprite") {
       const sprite = node.getOrAddComponent(ShaderSprite);
-      spriteFrameGridTable.set(sprite, { columns: System141.Math.max(1, description.frameColumns), rows: System141.Math.max(1, description.frameRows) });
+      spriteFrameGridTable.set(sprite, { columns: System142.Math.max(1, description.frameColumns), rows: System142.Math.max(1, description.frameRows) });
       let image = null;
       if (description.image && imageResolver) {
         image = imageResolver(description.image);
       }
       if (!image && description.image && description.image.startsWith("data:")) {
-        image = new System141.Image();
+        image = new System142.Image();
         image.onload = () => {
           applySpriteFrame(sprite, description.frame);
         };
@@ -53749,7 +53881,7 @@ var Timeline = class _Timeline extends Object2 {
     this.seek(0);
   }
   seek(time) {
-    this.#time = System141.Math.max(0, System141.Math.min(this.getDuration(), time));
+    this.#time = System142.Math.max(0, System142.Math.min(this.getDuration(), time));
     this.evaluate(this.#time);
     this.resimulateParticles(this.#time);
   }
@@ -53846,8 +53978,8 @@ var Timeline = class _Timeline extends Object2 {
           particleSystem.stop(true);
         } else if (eventName.startsWith("emit")) {
           const separatorIndex = eventName.indexOf(":");
-          const emitCount = separatorIndex >= 0 ? System141.Number(eventName.substring(separatorIndex + 1)) : 30;
-          particleSystem.emit(System141.Number.isFinite(emitCount) ? emitCount : 30);
+          const emitCount = separatorIndex >= 0 ? System142.Number(eventName.substring(separatorIndex + 1)) : 30;
+          particleSystem.emit(System142.Number.isFinite(emitCount) ? emitCount : 30);
         }
       }
     }
@@ -53901,7 +54033,7 @@ var Timeline = class _Timeline extends Object2 {
     }
     const easingFunction = resolveTimelineEasing(fromKey.easing, fromKey.curve);
     const progress = (time - fromKey.time) / segmentDuration;
-    const easedProgress = easingFunction(System141.Math.max(0, System141.Math.min(1, progress)));
+    const easedProgress = easingFunction(System142.Math.max(0, System142.Math.min(1, progress)));
     return interpolateValue(kind, fromKey.value, toKey.value, easedProgress);
   }
   static sampleTrack(track, time) {
@@ -53929,12 +54061,12 @@ var Timeline = class _Timeline extends Object2 {
     return this.#description.loop === true;
   }
   getDuration() {
-    const duration = System141.Number(this.#description.duration);
-    return System141.Number.isFinite(duration) && duration > 0 ? duration : 0;
+    const duration = System142.Number(this.#description.duration);
+    return System142.Number.isFinite(duration) && duration > 0 ? duration : 0;
   }
   getFrameRate() {
-    const frameRate = System141.Number(this.#description.frameRate);
-    return System141.Number.isFinite(frameRate) && frameRate > 0 ? frameRate : 30;
+    const frameRate = System142.Number(this.#description.frameRate);
+    return System142.Number.isFinite(frameRate) && frameRate > 0 ? frameRate : 30;
   }
   setEventHandler(eventHandler) {
     this.#eventHandler = eventHandler;
@@ -53946,8 +54078,8 @@ var Timeline = class _Timeline extends Object2 {
     this.#completeHandler = completeHandler;
   }
 };
-var System142 = globalThis;
-var sortIdTable = new System142.WeakMap();
+var System143 = globalThis;
+var sortIdTable = new System143.WeakMap();
 var nextSortId = 1;
 function readSortId(value) {
   if (value === void 0 || value === null || typeof value !== "object") {
@@ -53981,7 +54113,7 @@ function writeCasterRecord(record, item) {
   record.instanceBuffer = instanceBuffer;
   record.generation = generation;
   if (record.values.length !== valueCount) {
-    record.values = new System142.Float32Array(valueCount);
+    record.values = new System143.Float32Array(valueCount);
     isChanged = true;
   }
   const values = record.values;
@@ -54012,7 +54144,7 @@ function writeCasterRecord(record, item) {
 }
 __name(writeCasterRecord, "writeCasterRecord");
 function writeRecordValue(values, index, value) {
-  const rounded = System142.Math.fround(value);
+  const rounded = System143.Math.fround(value);
   if (values[index] !== rounded) {
     values[index] = rounded;
     return true;
@@ -54023,7 +54155,7 @@ __name(writeRecordValue, "writeRecordValue");
 function writeRecordValues(values, offset, source, count) {
   let isChanged = false;
   for (let index = 0; index < count; ++index) {
-    const rounded = System142.Math.fround(source[index]);
+    const rounded = System143.Math.fround(source[index]);
     if (values[offset + index] !== rounded) {
       values[offset + index] = rounded;
       isChanged = true;
@@ -54058,7 +54190,7 @@ function isSameValues(values, other) {
   return true;
 }
 __name(isSameValues, "isSameValues");
-var ToonDrawStage = System142.Object.freeze({ beforeOpaque: "beforeOpaque", afterOpaque: "afterOpaque", afterOutline: "afterOutline", afterTransparent: "afterTransparent" });
+var ToonDrawStage = System143.Object.freeze({ beforeOpaque: "beforeOpaque", afterOpaque: "afterOpaque", afterOutline: "afterOutline", afterTransparent: "afterTransparent" });
 var ToonDrawItem = class {
   static {
     __name(this, "ToonDrawItem");
@@ -54186,8 +54318,8 @@ var ToonDrawQueue = class {
     this.#screenOutline = null;
     this.#postProcess = null;
     this.#opaqueItemList = null;
-    this.#sortKeys = new System142.Int32Array(0);
-    this.#sortOrder = new System142.Int32Array(0);
+    this.#sortKeys = new System143.Int32Array(0);
+    this.#sortOrder = new System143.Int32Array(0);
     this.#sortCount = -1;
     this.#opaqueScratch = [];
     this.#isResolved = false;
@@ -54200,13 +54332,13 @@ var ToonDrawQueue = class {
     this.#casterList = [];
     this.#staticCasterList = [];
     this.#dynamicCasterList = [];
-    this.#lightKey = new System142.Float32Array(17);
-    this.#localLightKey = new System142.Float32Array(0);
+    this.#lightKey = new System143.Float32Array(17);
+    this.#localLightKey = new System143.Float32Array(0);
     this.#lineGroupPool = [];
     this.#lineGroupCount = 0;
     this.#lineGroupSerial = 0;
     this.#lineBatchSlotCount = 0;
-    this.#lineGroupOfMesh = new System142.WeakMap();
+    this.#lineGroupOfMesh = new System143.WeakMap();
     this.#transparentPool = [];
     this.#transparentList = [];
   }
@@ -54280,7 +54412,7 @@ var ToonDrawQueue = class {
     try {
       this.resolveItems(renderer);
       const requests = [];
-      const keySet = new System142.Set();
+      const keySet = new System143.Set();
       const itemList = this.#itemList;
       for (let index = 0; index < this.#itemCount; ++index) {
         const item = itemList[index];
@@ -54432,7 +54564,7 @@ var ToonDrawQueue = class {
   drawLocalShadows(renderer, shadowAtlas) {
     const tileCount = shadowAtlas.getTileCount();
     if (this.#localLightKey.length !== 1 + tileCount * 19) {
-      this.#localLightKey = new System142.Float32Array(1 + tileCount * 19);
+      this.#localLightKey = new System143.Float32Array(1 + tileCount * 19);
     }
     const lightKey = this.#localLightKey;
     lightKey[0] = shadowAtlas.getResolution();
@@ -54505,7 +54637,7 @@ var ToonDrawQueue = class {
         continue;
       }
       if (casterIndex >= recordList.length) {
-        recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System142.Float32Array(0), stableFrameCount: 0, isStatic: false, drawItem: null, changeSerial: -1 });
+        recordList.push({ mesh: null, material: void 0, instanceBuffer: null, generation: -1, values: new System143.Float32Array(0), stableFrameCount: 0, isStatic: false, drawItem: null, changeSerial: -1 });
       }
       const record = recordList[casterIndex];
       casterIndex += 1;
@@ -54633,9 +54765,9 @@ var ToonDrawQueue = class {
     const screenRect = renderer.getScreenRect();
     const viewport = webGL2RenderingContext.getParameter(webGL2RenderingContext.VIEWPORT);
     if (screenRect !== null) {
-      const left = System142.Math.floor(screenRect.x);
-      const bottom = System142.Math.floor(viewport[3] - screenRect.y - screenRect.height);
-      webGL2RenderingContext.viewport(viewport[0] + left, viewport[1] + bottom, System142.Math.max(1, System142.Math.round(screenRect.width)), System142.Math.max(1, System142.Math.round(screenRect.height)));
+      const left = System143.Math.floor(screenRect.x);
+      const bottom = System143.Math.floor(viewport[3] - screenRect.y - screenRect.height);
+      webGL2RenderingContext.viewport(viewport[0] + left, viewport[1] + bottom, System143.Math.max(1, System143.Math.round(screenRect.width)), System143.Math.max(1, System143.Math.round(screenRect.height)));
     }
     if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
       const lineMatrices = this.#lineMatrices;
@@ -54918,9 +55050,9 @@ var ToonDrawQueue = class {
     let keys = this.#sortKeys;
     let isSame = count === this.#sortCount;
     if (keys.length < count * 4) {
-      keys = new System142.Int32Array(count * 4);
+      keys = new System143.Int32Array(count * 4);
       this.#sortKeys = keys;
-      this.#sortOrder = new System142.Int32Array(count);
+      this.#sortOrder = new System143.Int32Array(count);
       isSame = false;
     }
     for (let index = 0; index < count; ++index) {
@@ -55016,8 +55148,8 @@ var ToonDrawQueue = class {
     }
   }
 };
-var System143 = globalThis;
-var GraphicsQuality = System143.Object.freeze({ auto: "auto", high: "high", low: "low" });
+var System144 = globalThis;
+var GraphicsQuality = System144.Object.freeze({ auto: "auto", high: "high", low: "low" });
 var GraphicsQualityGovernor = class {
   static {
     __name(this, "GraphicsQualityGovernor");
@@ -55052,7 +55184,7 @@ var GraphicsQualityGovernor = class {
     return this.#liteOverride;
   }
   applySearchText(searchText, liteKey = "light") {
-    const searchParameters = new System143.URLSearchParams(searchText);
+    const searchParameters = new System144.URLSearchParams(searchText);
     if (!searchParameters.has(liteKey)) {
       return;
     }
@@ -55060,7 +55192,7 @@ var GraphicsQualityGovernor = class {
     this.#liteOverride = value !== "0" && value !== "false";
   }
   applyPageQuery(liteKey = "light") {
-    const location = System143.location;
+    const location = System144.location;
     if (!location || typeof location.search !== "string") {
       return;
     }
@@ -55102,8 +55234,8 @@ var GraphicsQualityGovernor = class {
     return isChanged;
   }
   setRenderPixelRatioLimits(normalMaxRenderPixelRatio, liteMaxRenderPixelRatio) {
-    this.#normalMaxRenderPixelRatio = System143.Math.max(0, normalMaxRenderPixelRatio);
-    this.#liteMaxRenderPixelRatio = System143.Math.max(0, liteMaxRenderPixelRatio);
+    this.#normalMaxRenderPixelRatio = System144.Math.max(0, normalMaxRenderPixelRatio);
+    this.#liteMaxRenderPixelRatio = System144.Math.max(0, liteMaxRenderPixelRatio);
   }
   readMaxRenderPixelRatio() {
     return this.isLite() ? this.#liteMaxRenderPixelRatio : this.#normalMaxRenderPixelRatio;
@@ -55118,7 +55250,7 @@ var GraphicsQualityGovernor = class {
     return true;
   }
 };
-var System144 = globalThis;
+var System145 = globalThis;
 var FixedStepper = class extends Object2 {
   static {
     __name(this, "FixedStepper");
@@ -55137,7 +55269,7 @@ var FixedStepper = class extends Object2 {
     this.setMaximumStepsPerFrame(maximumStepsPerFrame);
   }
   setStepSeconds(stepSeconds) {
-    if (typeof stepSeconds !== "number" || !System144.Number.isFinite(stepSeconds) || stepSeconds <= 0) {
+    if (typeof stepSeconds !== "number" || !System145.Number.isFinite(stepSeconds) || stepSeconds <= 0) {
       return;
     }
     this.#stepSeconds = stepSeconds;
@@ -55146,10 +55278,10 @@ var FixedStepper = class extends Object2 {
     return this.#stepSeconds;
   }
   setMaximumStepsPerFrame(maximumStepsPerFrame) {
-    if (typeof maximumStepsPerFrame !== "number" || !System144.Number.isFinite(maximumStepsPerFrame)) {
+    if (typeof maximumStepsPerFrame !== "number" || !System145.Number.isFinite(maximumStepsPerFrame)) {
       return;
     }
-    this.#maximumStepsPerFrame = System144.Math.max(1, System144.Math.floor(maximumStepsPerFrame));
+    this.#maximumStepsPerFrame = System145.Math.max(1, System145.Math.floor(maximumStepsPerFrame));
   }
   getMaximumStepsPerFrame() {
     return this.#maximumStepsPerFrame;
@@ -55157,7 +55289,7 @@ var FixedStepper = class extends Object2 {
   advance(timeDelta, stepFunction) {
     const stepSeconds = this.getStepSeconds();
     const maximumStepsPerFrame = this.getMaximumStepsPerFrame();
-    const isValidTimeDelta = typeof timeDelta === "number" && System144.Number.isFinite(timeDelta) && timeDelta > 0;
+    const isValidTimeDelta = typeof timeDelta === "number" && System145.Number.isFinite(timeDelta) && timeDelta > 0;
     if (isValidTimeDelta) {
       this.#accumulatedSeconds += timeDelta;
     }
@@ -55181,7 +55313,7 @@ var FixedStepper = class extends Object2 {
   getAlpha() {
     const stepSeconds = this.getStepSeconds();
     const alpha = this.#accumulatedSeconds / stepSeconds;
-    return System144.Math.max(0, System144.Math.min(1, alpha));
+    return System145.Math.max(0, System145.Math.min(1, alpha));
   }
   getLastStepCount() {
     return this.#lastStepCount;
@@ -55191,7 +55323,7 @@ var FixedStepper = class extends Object2 {
     this.#lastStepCount = 0;
   }
 };
-var System145 = globalThis;
+var System146 = globalThis;
 var DEFAULT_CONCURRENCY = 6;
 var AssetLoader = class extends Object2 {
   static {
@@ -55223,10 +55355,10 @@ var AssetLoader = class extends Object2 {
     this.#completeHandler = null;
   }
   setConcurrency(concurrency) {
-    if (typeof concurrency !== "number" || !System145.Number.isFinite(concurrency)) {
+    if (typeof concurrency !== "number" || !System146.Number.isFinite(concurrency)) {
       return;
     }
-    this.#concurrency = System145.Math.max(1, System145.Math.floor(concurrency));
+    this.#concurrency = System146.Math.max(1, System146.Math.floor(concurrency));
   }
   getConcurrency() {
     return this.#concurrency;
@@ -55293,7 +55425,7 @@ var AssetLoader = class extends Object2 {
     while (this.#workerPromiseList.length > 0) {
       const workerPromiseList = this.#workerPromiseList;
       this.#workerPromiseList = [];
-      await System145.Promise.all(workerPromiseList);
+      await System146.Promise.all(workerPromiseList);
     }
     this.#loadPromise = null;
     this.notifyProgress();
@@ -55311,7 +55443,7 @@ var AssetLoader = class extends Object2 {
   startWorkers() {
     const concurrency = this.getConcurrency();
     const unclaimedCount = this.#entryList.length - this.#nextEntryIndex;
-    const workerCount = System145.Math.min(concurrency - this.#activeWorkerCount, unclaimedCount);
+    const workerCount = System146.Math.min(concurrency - this.#activeWorkerCount, unclaimedCount);
     for (let workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
       this.#activeWorkerCount += 1;
       const workerPromise = this.runWorker();
@@ -55327,10 +55459,10 @@ var AssetLoader = class extends Object2 {
       try {
         await entry.loadFunction();
         if (entry.asset !== null && typeof entry.asset.isLoaded === "function" && !entry.asset.isLoaded()) {
-          loadError = new System145.Error(`Not loaded: ${entry.path}`);
+          loadError = new System146.Error(`Not loaded: ${entry.path}`);
         }
       } catch (error) {
-        loadError = error === void 0 || error === null ? new System145.Error(`Load fail: ${entry.path}`) : error;
+        loadError = error === void 0 || error === null ? new System146.Error(`Load fail: ${entry.path}`) : error;
       }
       entry.isFinished = true;
       this.#finishedCount += 1;
@@ -55401,7 +55533,7 @@ var AssetLoader = class extends Object2 {
     return finishedCount >= totalCount;
   }
 };
-var System146 = globalThis;
+var System147 = globalThis;
 var DEFAULT_META_NAME = "build-version";
 var DEFAULT_VERSION_JSON_PATH = "./version.json";
 var BuildInfo = class _BuildInfo extends Object2 {
@@ -55441,7 +55573,7 @@ var BuildInfo = class _BuildInfo extends Object2 {
     const versionJsonPath = this.#versionJsonPath;
     if (versionJsonPath !== "") {
       try {
-        const response = await System146.fetch(versionJsonPath, { cache: "no-cache" });
+        const response = await System147.fetch(versionJsonPath, { cache: "no-cache" });
         if (response.ok) {
           const versionData = await response.json();
           if (versionData !== null && typeof versionData === "object") {
@@ -55458,7 +55590,7 @@ var BuildInfo = class _BuildInfo extends Object2 {
     return this.readText();
   }
   readMetaText() {
-    const document2 = System146.document;
+    const document2 = System147.document;
     if (document2 === null || document2 === void 0) {
       return "";
     }
@@ -55503,16 +55635,16 @@ var BuildInfo = class _BuildInfo extends Object2 {
     return parts.join(" ");
   }
 };
-var System147 = globalThis;
+var System148 = globalThis;
 var ATLAS_WIDTH = 1024;
 var ATLAS_HEIGHT = 512;
 var ATLAS_SLOT_SIZE = 128;
 var SMOKE_FRAME_COUNT = 16;
-var ToonVfxSlot = System147.Object.freeze({ soft: 0, streak: 1, star: 2, shockBand: 3, beamGrain: 4, scorch: 5, ramps: 8, dent: 9, glow: 10 });
+var ToonVfxSlot = System148.Object.freeze({ soft: 0, streak: 1, star: 2, shockBand: 3, beamGrain: 4, scorch: 5, ramps: 8, dent: 9, glow: 10 });
 var TOON_VFX_MAXIMUM_RAMPS = 8;
-var ToonVfxLook = System147.Object.freeze({ soft: 0, streak: 1, smoke: 2, star: 3, ember: 4, glow: 5, grit: 6 });
-var ToonVfxShape = System147.Object.freeze({ point: "point", sphere: "sphere", ring: "ring", disc: "disc", cone: "cone", line: "line" });
-var ToonVfxDecalMode = System147.Object.freeze({ scorch: 0, glow: 1, ring: 2, stain: 3, sheen: 4, shade: 5 });
+var ToonVfxLook = System148.Object.freeze({ soft: 0, streak: 1, smoke: 2, star: 3, ember: 4, glow: 5, grit: 6 });
+var ToonVfxShape = System148.Object.freeze({ point: "point", sphere: "sphere", ring: "ring", disc: "disc", cone: "cone", line: "line" });
+var ToonVfxDecalMode = System148.Object.freeze({ scorch: 0, glow: 1, ring: 2, stain: 3, sheen: 4, shade: 5 });
 var TOON_VFX_DEFAULT_PARTICLE_CAPACITY = 3e3;
 var PARTICLE_FLOAT_COUNT = 28;
 var NO_FLOOR = -1e5;
@@ -55525,17 +55657,17 @@ var LIGHTNING_POINT_COUNT = 22;
 var DEFAULT_GLINT_CAPACITY = 96;
 var LOOK_COUNT = 7;
 var DEFAULT_BLOB_SHADOW_ALPHA = 0.45;
-var DEFAULT_RIM_COLOR = System147.Object.freeze([0.05, 0.05, 0.08]);
+var DEFAULT_RIM_COLOR = System148.Object.freeze([0.05, 0.05, 0.08]);
 var SHAKE_UNIT_SCALE = 100;
 var LIGHTNING_FADE_SECONDS = 0.1;
 var DECAL_LIFT = 0.014;
 var GROUND_GLOW_LIFT = 0.02;
 var VFX_TEXTURE_UNIT = 4;
-var PARTICLE_ATTRIBUTE_LOCATIONS = System147.Object.freeze({ vertexCorner: 0, particleStart: 1, particleVelocity: 2, particleMotion: 3, particleColor: 4, particleLook: 5, particleExtra: 6, particleShape: 7 });
-var SPHERE_ATTRIBUTE_LOCATIONS = System147.Object.freeze({ vertexPosition: 0 });
-var GRID_ATTRIBUTE_LOCATIONS = System147.Object.freeze({ vertexGrid: 0 });
-var CORNER_ATTRIBUTE_LOCATIONS = System147.Object.freeze({ vertexCorner: 0 });
-var RIBBON_ATTRIBUTE_LOCATIONS = System147.Object.freeze({ vertexPosition: 0, vertexRibbon: 1 });
+var PARTICLE_ATTRIBUTE_LOCATIONS = System148.Object.freeze({ vertexCorner: 0, particleStart: 1, particleVelocity: 2, particleMotion: 3, particleColor: 4, particleLook: 5, particleExtra: 6, particleShape: 7 });
+var SPHERE_ATTRIBUTE_LOCATIONS = System148.Object.freeze({ vertexPosition: 0 });
+var GRID_ATTRIBUTE_LOCATIONS = System148.Object.freeze({ vertexGrid: 0 });
+var CORNER_ATTRIBUTE_LOCATIONS = System148.Object.freeze({ vertexCorner: 0 });
+var RIBBON_ATTRIBUTE_LOCATIONS = System148.Object.freeze({ vertexPosition: 0, vertexRibbon: 1 });
 var NOISE_SHADER_CHUNK = `
 // \uC810 \uD574\uC2DC. \uC138 float \uC758 \uBE44\uD2B8\uB97C MurmurHash3 \uC758 fmix32 \uB9C8\uBB34\uB9AC(Austin Appleby, \uACF5\uAC1C \uB3C4\uBA54\uC778)\uB85C \uC11E\uC5B4 [0, 1) \uB85C \uB0B8\uB2E4.
 highp uint hashMix32(highp uint value) {
@@ -56120,7 +56252,7 @@ void main() {
 var DEFAULT_RAMPS = [["#ffffff", "#d8d8d8", "#a0a0a0", "#686868", "#343434", "#101010"]];
 function createNoiseGrid(seed) {
   const seededRandom = new SeededRandom(seed);
-  const grid = new System147.Float32Array(256 * 256);
+  const grid = new System148.Float32Array(256 * 256);
   for (let valueIndex = 0; valueIndex < grid.length; ++valueIndex) {
     grid[valueIndex] = seededRandom.nextValue();
   }
@@ -56128,8 +56260,8 @@ function createNoiseGrid(seed) {
 }
 __name(createNoiseGrid, "createNoiseGrid");
 function readGridNoise(grid, x, y, periodX, periodY) {
-  const column = System147.Math.floor(x);
-  const row = System147.Math.floor(y);
+  const column = System148.Math.floor(x);
+  const row = System148.Math.floor(y);
   const offsetX = x - column;
   const offsetY = y - row;
   const weightX = offsetX * offsetX * (3 - 2 * offsetX);
@@ -56162,7 +56294,7 @@ function readGridFbm(grid, x, y, periodX, periodY, octaveCount) {
 }
 __name(readGridFbm, "readGridFbm");
 function clampUnit(value) {
-  return System147.Math.min(1, System147.Math.max(0, value));
+  return System148.Math.min(1, System148.Math.max(0, value));
 }
 __name(clampUnit, "clampUnit");
 function smoothStep(edgeStart, edgeEnd, value) {
@@ -56174,7 +56306,7 @@ function readRampColor(color) {
   if (typeof color !== "string") {
     return [color[0], color[1], color[2]];
   }
-  const value = System147.parseInt(color.slice(1), 16);
+  const value = System148.parseInt(color.slice(1), 16);
   return [(value >> 16 & 255) / 255, (value >> 8 & 255) / 255, (value & 255) / 255];
 }
 __name(readRampColor, "readRampColor");
@@ -56190,16 +56322,16 @@ function paintCell(pixels, originX, originY, painter) {
       texel[3] = 0;
       painter(u, v, texel);
       const offset = ((originY + pixelY) * ATLAS_WIDTH + originX + pixelX) * 4;
-      pixels[offset] = System147.Math.round(clampUnit(texel[0]) * 255);
-      pixels[offset + 1] = System147.Math.round(clampUnit(texel[1]) * 255);
-      pixels[offset + 2] = System147.Math.round(clampUnit(texel[2]) * 255);
-      pixels[offset + 3] = System147.Math.round(clampUnit(texel[3]) * 255);
+      pixels[offset] = System148.Math.round(clampUnit(texel[0]) * 255);
+      pixels[offset + 1] = System148.Math.round(clampUnit(texel[1]) * 255);
+      pixels[offset + 2] = System148.Math.round(clampUnit(texel[2]) * 255);
+      pixels[offset + 3] = System148.Math.round(clampUnit(texel[3]) * 255);
     }
   }
 }
 __name(paintCell, "paintCell");
 function paintSlot(pixels, slot, painter) {
-  paintCell(pixels, ATLAS_WIDTH / 2 + slot % 4 * ATLAS_SLOT_SIZE, System147.Math.floor(slot / 4) * ATLAS_SLOT_SIZE, painter);
+  paintCell(pixels, ATLAS_WIDTH / 2 + slot % 4 * ATLAS_SLOT_SIZE, System148.Math.floor(slot / 4) * ATLAS_SLOT_SIZE, painter);
 }
 __name(paintSlot, "paintSlot");
 function paintRamps(pixels, ramps) {
@@ -56207,7 +56339,7 @@ function paintRamps(pixels, ramps) {
     return stops.map(readRampColor);
   });
   paintSlot(pixels, ToonVfxSlot.ramps, (u, v, color) => {
-    const rowIndex = System147.Math.min(rampColors.length - 1, System147.Math.floor(v * TOON_VFX_MAXIMUM_RAMPS));
+    const rowIndex = System148.Math.min(rampColors.length - 1, System148.Math.floor(v * TOON_VFX_MAXIMUM_RAMPS));
     const stops = rampColors[rowIndex];
     if (stops.length === 1) {
       color[0] = stops[0][0];
@@ -56217,7 +56349,7 @@ function paintRamps(pixels, ramps) {
       return;
     }
     const position = u * (stops.length - 1);
-    const stopIndex = System147.Math.min(stops.length - 2, System147.Math.floor(position));
+    const stopIndex = System148.Math.min(stops.length - 2, System148.Math.floor(position));
     const blend = position - stopIndex;
     for (let channel = 0; channel < 3; ++channel) {
       color[channel] = stops[stopIndex][channel] + (stops[stopIndex + 1][channel] - stops[stopIndex][channel]) * blend;
@@ -56227,21 +56359,21 @@ function paintRamps(pixels, ramps) {
 }
 __name(paintRamps, "paintRamps");
 function createAtlasPixels() {
-  const pixels = new System147.Uint8Array(ATLAS_WIDTH * ATLAS_HEIGHT * 4);
+  const pixels = new System148.Uint8Array(ATLAS_WIDTH * ATLAS_HEIGHT * 4);
   const grid = createNoiseGrid(4164);
   for (let frame = 0; frame < SMOKE_FRAME_COUNT; ++frame) {
     const progress = frame / (SMOKE_FRAME_COUNT - 1);
     const swirl = progress * 1.1;
-    const swirlCosine = System147.Math.cos(swirl);
-    const swirlSine = System147.Math.sin(swirl);
-    paintCell(pixels, frame % 4 * ATLAS_SLOT_SIZE, System147.Math.floor(frame / 4) * ATLAS_SLOT_SIZE, (u, v, color) => {
+    const swirlCosine = System148.Math.cos(swirl);
+    const swirlSine = System148.Math.sin(swirl);
+    paintCell(pixels, frame % 4 * ATLAS_SLOT_SIZE, System148.Math.floor(frame / 4) * ATLAS_SLOT_SIZE, (u, v, color) => {
       const centerX = u * 2 - 1;
       const centerY = v * 2 - 1;
       const turnedX = centerX * swirlCosine - centerY * swirlSine;
       const turnedY = centerX * swirlSine + centerY * swirlCosine;
       const warp = readGridFbm(grid, turnedX * 1.7 + 40, turnedY * 1.7 + 40, 256, 256, 3);
       const density = readGridFbm(grid, turnedX * 2.2 + warp * 1.4 + 90, turnedY * 2.2 - progress * 1.3 + 90, 256, 256, 4);
-      const distance = System147.Math.hypot(centerX, centerY);
+      const distance = System148.Math.hypot(centerX, centerY);
       const radius = 0.55 + 0.33 * progress;
       const shape = 1 - smoothStep(radius * 0.45, radius, distance + (density - 0.5) * 0.55);
       const shade = 0.55 + 0.4 * v + (density - 0.5) * 0.35;
@@ -56252,29 +56384,29 @@ function createAtlasPixels() {
     });
   }
   paintSlot(pixels, ToonVfxSlot.soft, (u, v, color) => {
-    const distance = System147.Math.hypot(u * 2 - 1, v * 2 - 1);
-    color[3] = System147.Math.pow(System147.Math.max(0, 1 - distance), 2.2) + System147.Math.exp(-distance * distance * 30) * 0.4;
+    const distance = System148.Math.hypot(u * 2 - 1, v * 2 - 1);
+    color[3] = System148.Math.pow(System148.Math.max(0, 1 - distance), 2.2) + System148.Math.exp(-distance * distance * 30) * 0.4;
   });
   paintSlot(pixels, ToonVfxSlot.streak, (u, v, color) => {
     const across = u * 2 - 1;
     const width = 0.16 * (0.3 + 0.7 * v);
-    const body = System147.Math.exp(-(across / width) * (across / width)) * System147.Math.pow(v, 1.6) * (1 - smoothStep(0.92, 1, v));
-    const head = System147.Math.exp(-(across * across * 40 + (v - 0.84) * (v - 0.84) * 60));
+    const body = System148.Math.exp(-(across / width) * (across / width)) * System148.Math.pow(v, 1.6) * (1 - smoothStep(0.92, 1, v));
+    const head = System148.Math.exp(-(across * across * 40 + (v - 0.84) * (v - 0.84) * 60));
     color[3] = body + head * 0.8;
   });
   paintSlot(pixels, ToonVfxSlot.star, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System147.Math.hypot(centerX, centerY);
-    const angle = System147.Math.atan2(centerY, centerX);
-    const longRays = System147.Math.pow(System147.Math.abs(System147.Math.cos(angle * 2)), 60) * System147.Math.pow(System147.Math.max(0, 1 - distance), 1.4);
-    const shortRays = System147.Math.pow(System147.Math.abs(System147.Math.sin(angle * 2)), 90) * System147.Math.pow(System147.Math.max(0, 1 - distance * 1.5), 1.4) * 0.6;
-    const glow = System147.Math.exp(-distance * distance * 16) * 0.7 + System147.Math.exp(-distance * distance * 140) * 0.6;
+    const distance = System148.Math.hypot(centerX, centerY);
+    const angle = System148.Math.atan2(centerY, centerX);
+    const longRays = System148.Math.pow(System148.Math.abs(System148.Math.cos(angle * 2)), 60) * System148.Math.pow(System148.Math.max(0, 1 - distance), 1.4);
+    const shortRays = System148.Math.pow(System148.Math.abs(System148.Math.sin(angle * 2)), 90) * System148.Math.pow(System148.Math.max(0, 1 - distance * 1.5), 1.4) * 0.6;
+    const glow = System148.Math.exp(-distance * distance * 16) * 0.7 + System148.Math.exp(-distance * distance * 140) * 0.6;
     color[3] = longRays + shortRays + glow;
   });
   paintSlot(pixels, ToonVfxSlot.shockBand, (u, v, color) => {
     const torn = readGridFbm(grid, u * 12, v * 3 + 7, 12, 256, 4);
-    const lead = System147.Math.exp(-((v - 0.8) / 0.07) * ((v - 0.8) / 0.07));
+    const lead = System148.Math.exp(-((v - 0.8) / 0.07) * ((v - 0.8) / 0.07));
     const trail = v < 0.8 ? v / 0.8 * (v / 0.8) * 0.5 : 0;
     const outerCut = 1 - smoothStep(0.84 + (torn - 0.5) * 0.12, 0.96, v);
     color[3] = (lead + trail) * (0.45 + 0.75 * torn) * outerCut * smoothStep(0, 0.15, v);
@@ -56291,14 +56423,14 @@ function createAtlasPixels() {
   paintSlot(pixels, ToonVfxSlot.scorch, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System147.Math.hypot(centerX, centerY);
+    const distance = System148.Math.hypot(centerX, centerY);
     const edgeNoise = readGridFbm(grid, centerX * 3 + 20, centerY * 3 + 20, 256, 256, 4);
     const threshold = 0.78 + (edgeNoise - 0.5) * 0.45;
     const grain = readGridFbm(grid, centerX * 9 + 50, centerY * 9 + 50, 256, 256, 3);
     const darkness = (1 - smoothStep(threshold - 0.32, threshold, distance)) * (0.7 + 0.3 * grain);
-    const ridge = 1 - System147.Math.abs(2 * readGridFbm(grid, centerX * 4.5 + 11, centerY * 4.5 + 3, 256, 256, 4) - 1);
+    const ridge = 1 - System148.Math.abs(2 * readGridFbm(grid, centerX * 4.5 + 11, centerY * 4.5 + 3, 256, 256, 4) - 1);
     const crack = smoothStep(0.82, 0.95, ridge) * (1 - smoothStep(0.2, threshold, distance));
-    color[0] = crack + System147.Math.exp(-distance * distance * 7) * 0.8;
+    color[0] = crack + System148.Math.exp(-distance * distance * 7) * 0.8;
     color[1] = 0;
     color[2] = 0;
     color[3] = darkness * 0.9;
@@ -56306,17 +56438,17 @@ function createAtlasPixels() {
   paintSlot(pixels, ToonVfxSlot.dent, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System147.Math.hypot(centerX, centerY) + (readGridFbm(grid, centerX * 4 + 70, centerY * 4 + 70, 256, 256, 3) - 0.5) * 0.12;
-    const rim = System147.Math.exp(-((distance - 0.72) / 0.07) * ((distance - 0.72) / 0.07));
+    const distance = System148.Math.hypot(centerX, centerY) + (readGridFbm(grid, centerX * 4 + 70, centerY * 4 + 70, 256, 256, 3) - 0.5) * 0.12;
+    const rim = System148.Math.exp(-((distance - 0.72) / 0.07) * ((distance - 0.72) / 0.07));
     const inner = (1 - smoothStep(0.3, 0.76, distance)) * 0.55;
-    color[0] = rim * 0.8 + System147.Math.exp(-distance * distance * 10) * 0.5;
+    color[0] = rim * 0.8 + System148.Math.exp(-distance * distance * 10) * 0.5;
     color[1] = 0;
     color[2] = 0;
     color[3] = inner + rim * 0.3;
   });
   paintSlot(pixels, ToonVfxSlot.glow, (u, v, color) => {
-    const distance = System147.Math.hypot(u * 2 - 1, v * 2 - 1);
-    color[3] = System147.Math.exp(-distance * distance * 4.5) * (1 - smoothStep(0.85, 1, distance));
+    const distance = System148.Math.hypot(u * 2 - 1, v * 2 - 1);
+    color[3] = System148.Math.exp(-distance * distance * 4.5) * (1 - smoothStep(0.85, 1, distance));
   });
   return pixels;
 }
@@ -56327,10 +56459,10 @@ function createSphereArrays() {
   const positions = [];
   const indices = [];
   for (let downIndex = 0; downIndex <= downCount; ++downIndex) {
-    const polar = downIndex / downCount * System147.Math.PI;
+    const polar = downIndex / downCount * System148.Math.PI;
     for (let aroundIndex = 0; aroundIndex <= aroundCount; ++aroundIndex) {
-      const azimuth = aroundIndex / aroundCount * System147.Math.PI * 2;
-      positions.push(System147.Math.sin(polar) * System147.Math.cos(azimuth), System147.Math.cos(polar), System147.Math.sin(polar) * System147.Math.sin(azimuth));
+      const azimuth = aroundIndex / aroundCount * System148.Math.PI * 2;
+      positions.push(System148.Math.sin(polar) * System148.Math.cos(azimuth), System148.Math.cos(polar), System148.Math.sin(polar) * System148.Math.sin(azimuth));
     }
   }
   for (let downIndex = 0; downIndex < downCount; ++downIndex) {
@@ -56340,7 +56472,7 @@ function createSphereArrays() {
       indices.push(first, second, first + 1, second, second + 1, first + 1);
     }
   }
-  return { positions: new System147.Float32Array(positions), indices: new System147.Uint16Array(indices) };
+  return { positions: new System148.Float32Array(positions), indices: new System148.Uint16Array(indices) };
 }
 __name(createSphereArrays, "createSphereArrays");
 function createGridArrays(segments) {
@@ -56360,7 +56492,7 @@ function createGridArrays(segments) {
       indices.push(first, second, first + 1, second, second + 1, first + 1);
     }
   }
-  return { positions: new System147.Float32Array(positions), indices: new System147.Uint16Array(indices) };
+  return { positions: new System148.Float32Array(positions), indices: new System148.Uint16Array(indices) };
 }
 __name(createGridArrays, "createGridArrays");
 function readRangeValue(range, seededRandom) {
@@ -56371,18 +56503,18 @@ function readRangeValue(range, seededRandom) {
 }
 __name(readRangeValue, "readRangeValue");
 function readAxisSides(axis) {
-  const axisLength = System147.Math.hypot(axis[0], axis[1], axis[2]);
+  const axisLength = System148.Math.hypot(axis[0], axis[1], axis[2]);
   if (axisLength < 1e-6) {
     return [[1, 0, 0], [0, 0, 1]];
   }
   const axisX = axis[0] / axisLength;
   const axisY = axis[1] / axisLength;
   const axisZ = axis[2] / axisLength;
-  const helper = System147.Math.abs(axisY) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const helper = System148.Math.abs(axisY) < 0.9 ? [0, 1, 0] : [1, 0, 0];
   let sideX = axisY * helper[2] - axisZ * helper[1];
   let sideY = axisZ * helper[0] - axisX * helper[2];
   let sideZ = axisX * helper[1] - axisY * helper[0];
-  const sideLength = System147.Math.hypot(sideX, sideY, sideZ);
+  const sideLength = System148.Math.hypot(sideX, sideY, sideZ);
   sideX /= sideLength;
   sideY /= sideLength;
   sideZ /= sideLength;
@@ -56461,9 +56593,9 @@ var ToonVfx = class {
     this.#rimColor = [DEFAULT_RIM_COLOR[0], DEFAULT_RIM_COLOR[1], DEFAULT_RIM_COLOR[2]];
     this.#buffers = [];
     this.#countRatio = 1;
-    const cornerData = new System147.Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-    this.#particleCapacity = System147.Math.max(1, System147.Math.floor(particleCapacity));
-    this.#particleData = new System147.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
+    const cornerData = new System148.Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    this.#particleCapacity = System148.Math.max(1, System148.Math.floor(particleCapacity));
+    this.#particleData = new System148.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
     this.#particleWriteIndex = 0;
     this.#particleUsedCount = 0;
     this.#isParticleDirty = false;
@@ -56471,12 +56603,12 @@ var ToonVfx = class {
     this.#particleBuffer = this.createBuffer();
     this.#particleVertexArray = this.createParticleVertexArray(cornerData, this.#particleBuffer);
     this.#glintCapacity = DEFAULT_GLINT_CAPACITY;
-    this.#glintData = new System147.Float32Array(DEFAULT_GLINT_CAPACITY * PARTICLE_FLOAT_COUNT);
-    this.#lookGains = new System147.Float32Array(LOOK_COUNT).fill(1);
-    this.#usedEventKeys = new System147.Set();
+    this.#glintData = new System148.Float32Array(DEFAULT_GLINT_CAPACITY * PARTICLE_FLOAT_COUNT);
+    this.#lookGains = new System148.Float32Array(LOOK_COUNT).fill(1);
+    this.#usedEventKeys = new System148.Set();
     this.#glintBuffer = this.createBuffer();
     this.#glintVertexArray = this.createParticleVertexArray(cornerData, this.#glintBuffer);
-    this.#ribbonData = new System147.Float32Array(RIBBON_FLOAT_COUNT * 256);
+    this.#ribbonData = new System148.Float32Array(RIBBON_FLOAT_COUNT * 256);
     this.#ribbonVertexArray = webGL2RenderingContext.createVertexArray();
     webGL2RenderingContext.bindVertexArray(this.#ribbonVertexArray);
     this.#ribbonBuffer = this.createBuffer();
@@ -56595,8 +56727,8 @@ var ToonVfx = class {
     this.readAtlasTexture();
   }
   setParticleCapacity(particleCapacity) {
-    this.#particleCapacity = System147.Math.max(1, System147.Math.floor(particleCapacity));
-    this.#particleData = new System147.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
+    this.#particleCapacity = System148.Math.max(1, System148.Math.floor(particleCapacity));
+    this.#particleData = new System148.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
     this.#particleWriteIndex = 0;
     this.#particleUsedCount = 0;
     this.#particleLiveUntil = this.#time;
@@ -56606,14 +56738,14 @@ var ToonVfx = class {
     return this.#particleCapacity;
   }
   setCountRatio(countRatio) {
-    this.#countRatio = System147.Math.max(0, System147.Math.min(1, countRatio));
+    this.#countRatio = System148.Math.max(0, System148.Math.min(1, countRatio));
   }
   getCountRatio() {
     return this.#countRatio;
   }
   setGlintCapacity(glintCapacity) {
-    this.#glintCapacity = System147.Math.max(1, System147.Math.floor(glintCapacity));
-    this.#glintData = new System147.Float32Array(this.#glintCapacity * PARTICLE_FLOAT_COUNT);
+    this.#glintCapacity = System148.Math.max(1, System148.Math.floor(glintCapacity));
+    this.#glintData = new System148.Float32Array(this.#glintCapacity * PARTICLE_FLOAT_COUNT);
     this.#queuedGlintCount = 0;
   }
   getGlintCapacity() {
@@ -56623,7 +56755,7 @@ var ToonVfx = class {
     if (look < 0 || look >= LOOK_COUNT) {
       return;
     }
-    this.#lookGains[look] = System147.Math.max(0, gain);
+    this.#lookGains[look] = System148.Math.max(0, gain);
   }
   getLookGain(look) {
     if (look < 0 || look >= LOOK_COUNT) {
@@ -56702,7 +56834,7 @@ var ToonVfx = class {
     if (this.#countRatio >= 1) {
       return count;
     }
-    return System147.Math.max(1, System147.Math.round(count * this.#countRatio));
+    return System148.Math.max(1, System148.Math.round(count * this.#countRatio));
   }
   emitParticles(options) {
     if (!this.registerEventKey(options.key)) {
@@ -56725,8 +56857,8 @@ var ToonVfx = class {
       floor2 = this.readFloorHeight(position[0], position[2]);
     }
     const direction = options.direction !== void 0 ? options.direction : [0, 1, 0];
-    const spread = options.spread !== void 0 ? options.spread : System147.Math.PI;
-    const directionLength = System147.Math.max(1e-4, System147.Math.hypot(direction[0], direction[1], direction[2]));
+    const spread = options.spread !== void 0 ? options.spread : System148.Math.PI;
+    const directionLength = System148.Math.max(1e-4, System148.Math.hypot(direction[0], direction[1], direction[2]));
     const axisX = direction[0] / directionLength;
     const axisY = direction[1] / directionLength;
     const axisZ = direction[2] / directionLength;
@@ -56740,35 +56872,35 @@ var ToonVfx = class {
       let headingZ = 0;
       switch (shape) {
         case ToonVfxShape.ring: {
-          const angle = (particleIndex + random2() * 0.8) / count * System147.Math.PI * 2;
-          offsetX = System147.Math.cos(angle) * radius;
-          offsetZ = System147.Math.sin(angle) * radius;
-          headingX = System147.Math.cos(angle);
+          const angle = (particleIndex + random2() * 0.8) / count * System148.Math.PI * 2;
+          offsetX = System148.Math.cos(angle) * radius;
+          offsetZ = System148.Math.sin(angle) * radius;
+          headingX = System148.Math.cos(angle);
           headingY = 0;
-          headingZ = System147.Math.sin(angle);
+          headingZ = System148.Math.sin(angle);
           break;
         }
         case ToonVfxShape.disc: {
-          const angle = random2() * System147.Math.PI * 2;
-          const reach = System147.Math.sqrt(random2()) * radius;
-          offsetX = System147.Math.cos(angle) * reach;
-          offsetZ = System147.Math.sin(angle) * reach;
-          headingX = System147.Math.cos(angle);
+          const angle = random2() * System148.Math.PI * 2;
+          const reach = System148.Math.sqrt(random2()) * radius;
+          offsetX = System148.Math.cos(angle) * reach;
+          offsetZ = System148.Math.sin(angle) * reach;
+          headingX = System148.Math.cos(angle);
           headingY = 0;
-          headingZ = System147.Math.sin(angle);
+          headingZ = System148.Math.sin(angle);
           break;
         }
         case ToonVfxShape.cone: {
           const tilt = random2() * spread;
-          const turn = random2() * System147.Math.PI * 2;
-          const tiltSine = System147.Math.sin(tilt);
-          const tiltCosine = System147.Math.cos(tilt);
-          const turnCosine = System147.Math.cos(turn);
-          const turnSine = System147.Math.sin(turn);
+          const turn = random2() * System148.Math.PI * 2;
+          const tiltSine = System148.Math.sin(tilt);
+          const tiltCosine = System148.Math.cos(tilt);
+          const turnCosine = System148.Math.cos(turn);
+          const turnSine = System148.Math.sin(turn);
           headingX = axisX * tiltCosine + (sides[0][0] * turnCosine + sides[1][0] * turnSine) * tiltSine;
           headingY = axisY * tiltCosine + (sides[0][1] * turnCosine + sides[1][1] * turnSine) * tiltSine;
           headingZ = axisZ * tiltCosine + (sides[0][2] * turnCosine + sides[1][2] * turnSine) * tiltSine;
-          const reach = System147.Math.sqrt(random2()) * radius;
+          const reach = System148.Math.sqrt(random2()) * radius;
           offsetX = (sides[0][0] * turnCosine + sides[1][0] * turnSine) * reach;
           offsetY = (sides[0][1] * turnCosine + sides[1][1] * turnSine) * reach;
           offsetZ = (sides[0][2] * turnCosine + sides[1][2] * turnSine) * reach;
@@ -56776,24 +56908,24 @@ var ToonVfx = class {
         }
         case ToonVfxShape.line: {
           const along = random2() * (options.length !== void 0 ? options.length : 1);
-          const turn = random2() * System147.Math.PI * 2;
-          const reach = System147.Math.sqrt(random2()) * radius;
+          const turn = random2() * System148.Math.PI * 2;
+          const reach = System148.Math.sqrt(random2()) * radius;
           headingX = axisX;
           headingY = axisY;
           headingZ = axisZ;
-          offsetX = axisX * along + (sides[0][0] * System147.Math.cos(turn) + sides[1][0] * System147.Math.sin(turn)) * reach;
-          offsetY = axisY * along + (sides[0][1] * System147.Math.cos(turn) + sides[1][1] * System147.Math.sin(turn)) * reach;
-          offsetZ = axisZ * along + (sides[0][2] * System147.Math.cos(turn) + sides[1][2] * System147.Math.sin(turn)) * reach;
+          offsetX = axisX * along + (sides[0][0] * System148.Math.cos(turn) + sides[1][0] * System148.Math.sin(turn)) * reach;
+          offsetY = axisY * along + (sides[0][1] * System148.Math.cos(turn) + sides[1][1] * System148.Math.sin(turn)) * reach;
+          offsetZ = axisZ * along + (sides[0][2] * System148.Math.cos(turn) + sides[1][2] * System148.Math.sin(turn)) * reach;
           break;
         }
         default: {
           const heightRatio = random2() * 2 - 1;
-          const angle = random2() * System147.Math.PI * 2;
-          const ringRatio = System147.Math.sqrt(1 - heightRatio * heightRatio);
-          headingX = System147.Math.cos(angle) * ringRatio;
+          const angle = random2() * System148.Math.PI * 2;
+          const ringRatio = System148.Math.sqrt(1 - heightRatio * heightRatio);
+          headingX = System148.Math.cos(angle) * ringRatio;
           headingY = heightRatio;
-          headingZ = System147.Math.sin(angle) * ringRatio;
-          const reach = System147.Math.cbrt(random2()) * radius;
+          headingZ = System148.Math.sin(angle) * ringRatio;
+          const reach = System148.Math.cbrt(random2()) * radius;
           offsetX = headingX * reach;
           offsetY = headingY * reach;
           offsetZ = headingZ * reach;
@@ -56802,13 +56934,13 @@ var ToonVfx = class {
       }
       if (options.isUpward === true && headingY < 0) {
         headingY = -headingY;
-        offsetY = System147.Math.abs(offsetY);
+        offsetY = System148.Math.abs(offsetY);
       }
       const speed = readRangeValue(options.speed !== void 0 ? options.speed : 1, seededRandom);
       const rise = readRangeValue(options.rise !== void 0 ? options.rise : 0, seededRandom);
       const size = readRangeValue(options.size !== void 0 ? options.size : 0.2, seededRandom);
       const sizeEnd = size * readRangeValue(options.sizeEnd !== void 0 ? options.sizeEnd : 1, seededRandom);
-      const life = System147.Math.max(1e-3, readRangeValue(options.life !== void 0 ? options.life : 1, seededRandom));
+      const life = System148.Math.max(1e-3, readRangeValue(options.life !== void 0 ? options.life : 1, seededRandom));
       const delay = readRangeValue(options.delay !== void 0 ? options.delay : 0, seededRandom);
       const spin = readRangeValue(options.spin !== void 0 ? options.spin : 0, seededRandom);
       let velocityX = headingX * speed;
@@ -56833,8 +56965,8 @@ var ToonVfx = class {
       offset += 4;
     }
     this.#particleWriteIndex = (this.#particleWriteIndex + 1) % this.#particleCapacity;
-    this.#particleUsedCount = System147.Math.min(this.#particleCapacity, this.#particleUsedCount + 1);
-    this.#particleLiveUntil = System147.Math.max(this.#particleLiveUntil, start[3] + velocity[3]);
+    this.#particleUsedCount = System148.Math.min(this.#particleCapacity, this.#particleUsedCount + 1);
+    this.#particleLiveUntil = System148.Math.max(this.#particleLiveUntil, start[3] + velocity[3]);
     this.#isParticleDirty = true;
   }
   addFireball(options) {
@@ -56843,7 +56975,7 @@ var ToonVfx = class {
       return;
     }
     const position = options.position !== void 0 ? options.position : [0, 0, 0];
-    this.#fireballs.push({ x: position[0], y: position[1], z: position[2], radius: options.radius, life: options.life, ramp: options.ramp !== void 0 ? options.ramp : 0, smokeColor: options.smokeColor !== void 0 ? options.smokeColor : [0.16, 0.14, 0.13], rise: options.rise !== void 0 ? options.rise : 0.6, growSeconds: System147.Math.max(1e-3, options.growSeconds !== void 0 ? options.growSeconds : 0.3), boil: options.boil !== void 0 ? options.boil : 0.32, rim: options.rim !== void 0 ? options.rim : 0, seed: this.#seededRandom.nextValue() * 40, age });
+    this.#fireballs.push({ x: position[0], y: position[1], z: position[2], radius: options.radius, life: options.life, ramp: options.ramp !== void 0 ? options.ramp : 0, smokeColor: options.smokeColor !== void 0 ? options.smokeColor : [0.16, 0.14, 0.13], rise: options.rise !== void 0 ? options.rise : 0.6, growSeconds: System148.Math.max(1e-3, options.growSeconds !== void 0 ? options.growSeconds : 0.3), boil: options.boil !== void 0 ? options.boil : 0.32, rim: options.rim !== void 0 ? options.rim : 0, seed: this.#seededRandom.nextValue() * 40, age });
   }
   addShockwave(options) {
     const delay = options.delay !== void 0 ? options.delay : 0;
@@ -56860,7 +56992,7 @@ var ToonVfx = class {
       return;
     }
     const seededRandom = this.#seededRandom;
-    const decal = this.createDecal(options, seededRandom.nextValue() * System147.Math.PI * 2, seededRandom.nextValue() * 40);
+    const decal = this.createDecal(options, seededRandom.nextValue() * System148.Math.PI * 2, seededRandom.nextValue() * 40);
     decal.age = age;
     this.#decals.push(decal);
   }
@@ -56883,14 +57015,14 @@ var ToonVfx = class {
     this.#plumes.push({ x: options.x, z: options.z, floorHeight: this.readFloorHeight(options.x, options.z), height: options.height, capRadius: options.capRadius !== void 0 ? options.capRadius : options.height * 0.4, stemRadius: options.stemRadius !== void 0 ? options.stemRadius : options.height * 0.1, life: options.life, ramp: options.ramp !== void 0 ? options.ramp : 0, smokeColor: options.smokeColor !== void 0 ? options.smokeColor : [0.34, 0.31, 0.29], seed: this.#seededRandom.nextValue() * 40, age });
   }
   queueBeam(options) {
-    const beam = options.alpha !== void 0 ? options : System147.Object.assign({}, options, { alpha: 1 });
+    const beam = options.alpha !== void 0 ? options : System148.Object.assign({}, options, { alpha: 1 });
     if (!(beam.radius > 0) || !(beam.alpha > 0)) {
       return;
     }
     this.#queuedBeams.push(beam);
   }
   queueRibbon(options) {
-    const ribbon = options.alpha !== void 0 ? options : System147.Object.assign({}, options, { alpha: 1 });
+    const ribbon = options.alpha !== void 0 ? options : System148.Object.assign({}, options, { alpha: 1 });
     if (ribbon.points.length < 2 || !(ribbon.width > 0) || !(ribbon.alpha > 0)) {
       return;
     }
@@ -56904,22 +57036,22 @@ var ToonVfx = class {
     const turns = options.turns !== void 0 ? options.turns : 1;
     const axis = [options.end[0] - start[0], options.end[1] - start[1], options.end[2] - start[2]];
     const sides = readAxisSides(axis);
-    const kinkStep = System147.Math.floor(time / LIGHTNING_KINK_SECONDS);
+    const kinkStep = System148.Math.floor(time / LIGHTNING_KINK_SECONDS);
     const seededRandom = new SeededRandom(1);
     for (let boltIndex = 0; boltIndex < count; ++boltIndex) {
-      seededRandom.setSeed(System147.Math.floor(seed * 7919) + kinkStep * 131 + boltIndex * 977 >>> 0);
+      seededRandom.setSeed(System148.Math.floor(seed * 7919) + kinkStep * 131 + boltIndex * 977 >>> 0);
       const random2 = __name(() => {
         return seededRandom.nextValue();
       }, "random");
-      const phase = boltIndex / count * System147.Math.PI * 2 + random2() * 0.8;
+      const phase = boltIndex / count * System148.Math.PI * 2 + random2() * 0.8;
       const boltTurns = turns * (0.8 + random2() * 0.4) * (random2() < 0.5 ? -1 : 1);
       const points = [];
       for (let pointIndex = 0; pointIndex < LIGHTNING_POINT_COUNT; ++pointIndex) {
         const along = pointIndex / (LIGHTNING_POINT_COUNT - 1);
-        const angle = phase + along * boltTurns * System147.Math.PI * 2 + (random2() - 0.5) * 0.5;
+        const angle = phase + along * boltTurns * System148.Math.PI * 2 + (random2() - 0.5) * 0.5;
         const reach = options.radius * (0.75 + random2() * 0.5);
-        const cosine = System147.Math.cos(angle) * reach;
-        const sine = System147.Math.sin(angle) * reach;
+        const cosine = System148.Math.cos(angle) * reach;
+        const sine = System148.Math.sin(angle) * reach;
         points.push([start[0] + axis[0] * along + sides[0][0] * cosine + sides[1][0] * sine, start[1] + axis[1] * along + sides[0][1] * cosine + sides[1][1] * sine, start[2] + axis[2] * along + sides[0][2] * cosine + sides[1][2] * sine]);
       }
       this.queueRibbon({ points, width: options.width * (0.7 + random2() * 0.6), taper: 0.6, color: options.color, ramp: options.ramp, alpha: options.alpha, brightness: options.brightness, grainRepeat: 1.5, flow: time * 6 + boltIndex, glow: options.glow, rim: options.rim });
@@ -56933,7 +57065,7 @@ var ToonVfx = class {
     const size = options.size !== void 0 ? options.size : 0.2;
     const color = options.color !== void 0 ? options.color : [1, 1, 1];
     const angle = options.angle !== void 0 ? options.angle : 0;
-    const values = [[position[0], position[1], position[2], this.#time], [0, 0, 0, 1e6], [0, 0, size, size], [color[0], color[1], color[2], options.ramp !== void 0 ? options.ramp : -1], [options.look !== void 0 ? options.look : ToonVfxLook.soft, 0, 0, NO_FLOOR], [options.brightness !== void 0 ? options.brightness : 1, options.alpha !== void 0 ? options.alpha : 1, angle / (System147.Math.PI * 2), 0], [1, options.rim !== void 0 ? options.rim : 0, 0, 0]];
+    const values = [[position[0], position[1], position[2], this.#time], [0, 0, 0, 1e6], [0, 0, size, size], [color[0], color[1], color[2], options.ramp !== void 0 ? options.ramp : -1], [options.look !== void 0 ? options.look : ToonVfxLook.soft, 0, 0, NO_FLOOR], [options.brightness !== void 0 ? options.brightness : 1, options.alpha !== void 0 ? options.alpha : 1, angle / (System148.Math.PI * 2), 0], [1, options.rim !== void 0 ? options.rim : 0, 0, 0]];
     const glintData = this.#glintData;
     let offset = this.#queuedGlintCount * PARTICLE_FLOAT_COUNT;
     for (const value of values) {
@@ -56949,7 +57081,7 @@ var ToonVfx = class {
     if (!this.registerEventKey(options.key)) {
       return;
     }
-    const lightning = System147.Object.assign({ radius: 0.05, count: 1, width: 0.05, turns: 1, color: [1, 1, 1], ramp: -1, alpha: 1, brightness: 1, glow: null, rim: 0 }, options);
+    const lightning = System148.Object.assign({ radius: 0.05, count: 1, width: 0.05, turns: 1, color: [1, 1, 1], ramp: -1, alpha: 1, brightness: 1, glow: null, rim: 0 }, options);
     lightning.life = options.life !== void 0 ? options.life : 0.5;
     lightning.age = options.age !== void 0 ? options.age : 0;
     lightning.seed = options.seed !== void 0 ? options.seed : this.#seededRandom.nextValue() * 1e3;
@@ -56977,7 +57109,7 @@ var ToonVfx = class {
       if (lightning.age < 0) {
         continue;
       }
-      const fade = System147.Math.min(1, (lightning.life - lightning.age) / LIGHTNING_FADE_SECONDS);
+      const fade = System148.Math.min(1, (lightning.life - lightning.age) / LIGHTNING_FADE_SECONDS);
       this.queueLightning({ start: lightning.start, end: lightning.end, radius: lightning.radius, count: lightning.count, width: lightning.width, turns: lightning.turns, color: lightning.color, ramp: lightning.ramp, alpha: lightning.alpha * fade, brightness: lightning.brightness, time: this.#time, seed: lightning.seed, glow: lightning.glow, rim: lightning.rim });
     }
     const isQueued = this.#queuedDecals.length > 0 || this.#queuedBeams.length > 0 || this.#queuedRibbons.length > 0 || this.#queuedGlintCount > 0;
@@ -57029,7 +57161,7 @@ var ToonVfx = class {
     const viewProjectionMatrix = projectionMatrix.clone();
     viewProjectionMatrix.multiply(viewMatrix);
     const viewDirection = [viewElements[2], viewElements[6], viewElements[10]];
-    const isPerspective = System147.Math.abs(projectionElements[11]) > 0.5;
+    const isPerspective = System148.Math.abs(projectionElements[11]) > 0.5;
     let cameraPoint = [viewDirection[0], viewDirection[1], viewDirection[2], 0];
     if (isPerspective) {
       const translationX = viewElements[12];
@@ -57060,9 +57192,9 @@ var ToonVfx = class {
       if (decal.age < 0) {
         continue;
       }
-      const heat = decal.heatSeconds > 0 ? System147.Math.max(0, 1 - decal.age / decal.heatSeconds) : 0;
-      let fade = System147.Math.min(1, decal.life - decal.age) * decal.alpha;
-      if (decal.flicker > 0 && System147.Math.floor(decal.age / decal.flicker) % 2 === 1) {
+      const heat = decal.heatSeconds > 0 ? System148.Math.max(0, 1 - decal.age / decal.heatSeconds) : 0;
+      let fade = System148.Math.min(1, decal.life - decal.age) * decal.alpha;
+      if (decal.flicker > 0 && System148.Math.floor(decal.age / decal.flicker) % 2 === 1) {
         fade *= 0.3;
       }
       this.drawDecal(decal, fade, heat * heat);
@@ -57074,7 +57206,7 @@ var ToonVfx = class {
   drawDecal(decal, alpha, heat) {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     const decalProgram = this.#decalProgram;
-    const grow = decal.growSeconds > 0 ? 1 - System147.Math.pow(1 - System147.Math.min(1, System147.Math.max(0, decal.age) / decal.growSeconds), 2) : 1;
+    const grow = decal.growSeconds > 0 ? 1 - System148.Math.pow(1 - System148.Math.min(1, System148.Math.max(0, decal.age) / decal.growSeconds), 2) : 1;
     const radius = decal.startRadius + (decal.radius - decal.startRadius) * grow;
     webGL2RenderingContext.uniform4f(decalProgram.getUniformLocation("decalShape"), decal.x, decal.z, radius, decal.angle);
     webGL2RenderingContext.uniform1f(decalProgram.getUniformLocation("decalHeight"), decal.floorHeight + DECAL_LIFT);
@@ -57103,20 +57235,20 @@ var ToonVfx = class {
       if (activeAge < 0) {
         continue;
       }
-      const progress = System147.Math.min(1, activeAge / System147.Math.max(1e-3, band.life - band.delay));
-      const spread = 1 - System147.Math.pow(1 - progress, 3);
+      const progress = System148.Math.min(1, activeAge / System148.Math.max(1e-3, band.life - band.delay));
+      const spread = 1 - System148.Math.pow(1 - progress, 3);
       const radius = band.startRadius + (band.endRadius - band.startRadius) * spread;
-      const width = System147.Math.min(radius, band.width * (1 - 0.45 * progress));
-      const alpha = System147.Math.pow(1 - progress, 1.3);
+      const width = System148.Math.min(radius, band.width * (1 - 0.45 * progress));
+      const alpha = System148.Math.pow(1 - progress, 1.3);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandProgress"), progress);
-      webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRepeat"), System147.Math.max(6, System147.Math.round(band.endRadius * 4)));
+      webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRepeat"), System148.Math.max(6, System148.Math.round(band.endRadius * 4)));
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRamp"), band.ramp);
       webGL2RenderingContext.uniform3f(bandProgram.getUniformLocation("bandColor"), band.color[0], band.color[1], band.color[2]);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandSeed"), band.seed);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandAlpha"), alpha);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRim"), band.rim);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandFlat"), 1);
-      webGL2RenderingContext.uniform4f(bandProgram.getUniformLocation("bandShape"), band.x, band.z, radius, System147.Math.min(radius, width * 2.6));
+      webGL2RenderingContext.uniform4f(bandProgram.getUniformLocation("bandShape"), band.x, band.z, radius, System148.Math.min(radius, width * 2.6));
       webGL2RenderingContext.uniform2f(bandProgram.getUniformLocation("bandLift"), 0, band.floorHeight + GROUND_GLOW_LIFT);
       webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, this.#bandMesh.indexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandFlat"), 0);
@@ -57139,9 +57271,9 @@ var ToonVfx = class {
       if (plume.age < 0) {
         continue;
       }
-      const progress = System147.Math.min(1, plume.age / plume.life);
+      const progress = System148.Math.min(1, plume.age / plume.life);
       const alpha = smoothStep(0, 0.08, progress) * (1 - smoothStep(0.6, 1, progress));
-      const heat = System147.Math.max(0, 1 - progress * 1.4);
+      const heat = System148.Math.max(0, 1 - progress * 1.4);
       webGL2RenderingContext.uniform4f(plumeProgram.getUniformLocation("plumeShape"), plume.x, plume.z, plume.height, plume.capRadius);
       webGL2RenderingContext.uniform4f(plumeProgram.getUniformLocation("plumeMotion"), progress, plume.age, plume.seed, plume.stemRadius);
       webGL2RenderingContext.uniform1f(plumeProgram.getUniformLocation("plumeBase"), plume.floorHeight);
@@ -57166,10 +57298,10 @@ var ToonVfx = class {
       if (fireball.age < 0) {
         continue;
       }
-      const progress = System147.Math.min(1, fireball.age / fireball.life);
-      const grow = 1 - System147.Math.pow(1 - System147.Math.min(1, fireball.age / fireball.growSeconds), 3);
+      const progress = System148.Math.min(1, fireball.age / fireball.life);
+      const grow = 1 - System148.Math.pow(1 - System148.Math.min(1, fireball.age / fireball.growSeconds), 3);
       const radius = fireball.radius * (0.25 + 0.75 * grow) * (1 + 0.25 * progress);
-      const heat = System147.Math.max(0, 1 - System147.Math.pow(progress, 1.4) * 1.25);
+      const heat = System148.Math.max(0, 1 - System148.Math.pow(progress, 1.4) * 1.25);
       const alpha = 1 - smoothStep(0.55, 1, progress);
       webGL2RenderingContext.uniform4f(fireballProgram.getUniformLocation("ballCenter"), fireball.x, fireball.y + fireball.rise * progress, fireball.z, radius);
       webGL2RenderingContext.uniform1f(fireballProgram.getUniformLocation("ballTime"), fireball.age);
@@ -57196,7 +57328,7 @@ var ToonVfx = class {
     for (const beam of this.#queuedBeams) {
       const start = beam.start;
       const axis = [beam.end[0] - start[0], beam.end[1] - start[1], beam.end[2] - start[2]];
-      const beamLength = System147.Math.hypot(axis[0], axis[1], axis[2]);
+      const beamLength = System148.Math.hypot(axis[0], axis[1], axis[2]);
       const sides = readAxisSides(axis);
       webGL2RenderingContext.uniform3f(beamProgram.getUniformLocation("beamStart"), start[0], start[1], start[2]);
       webGL2RenderingContext.uniform3f(beamProgram.getUniformLocation("beamAxis"), axis[0], axis[1], axis[2]);
@@ -57220,7 +57352,7 @@ var ToonVfx = class {
       vertexCount += ribbon.points.length * 2;
     }
     if (this.#ribbonData.length < vertexCount * RIBBON_FLOAT_COUNT) {
-      this.#ribbonData = new System147.Float32Array(vertexCount * RIBBON_FLOAT_COUNT * 2);
+      this.#ribbonData = new System148.Float32Array(vertexCount * RIBBON_FLOAT_COUNT * 2);
     }
     const ribbonData = this.#ribbonData;
     const ribbonLengths = [];
@@ -57232,10 +57364,10 @@ var ToonVfx = class {
       let ribbonLength = 0;
       for (let pointIndex = 0; pointIndex <= lastIndex; ++pointIndex) {
         const point = points[pointIndex];
-        const previous = points[System147.Math.max(0, pointIndex - 1)];
-        const next = points[System147.Math.min(lastIndex, pointIndex + 1)];
+        const previous = points[System148.Math.max(0, pointIndex - 1)];
+        const next = points[System148.Math.min(lastIndex, pointIndex + 1)];
         if (pointIndex > 0) {
-          ribbonLength += System147.Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]);
+          ribbonLength += System148.Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]);
         }
         const tangent = [next[0] - previous[0], next[1] - previous[1], next[2] - previous[2]];
         let towardX = cameraPoint[0];
@@ -57249,7 +57381,7 @@ var ToonVfx = class {
         let sideX = tangent[1] * towardZ - tangent[2] * towardY;
         let sideY = tangent[2] * towardX - tangent[0] * towardZ;
         let sideZ = tangent[0] * towardY - tangent[1] * towardX;
-        const sideLength = System147.Math.max(1e-6, System147.Math.hypot(sideX, sideY, sideZ));
+        const sideLength = System148.Math.max(1e-6, System148.Math.hypot(sideX, sideY, sideZ));
         const along = pointIndex / lastIndex;
         const edge = 2 * along - 1;
         const halfWidth = ribbon.width * 0.5 * (1 - taper * edge * edge);
@@ -57359,7 +57491,7 @@ var ToonVfx = class {
     }
   }
 };
-var System148 = globalThis;
+var System149 = globalThis;
 var searchAtlasList = [];
 function removeExtension(fileName) {
   const dotIndex = fileName.lastIndexOf(".");
@@ -57380,7 +57512,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
   constructor() {
     super();
     this.#pageImages = [];
-    this.#frames = new System148.Map();
+    this.#frames = new System149.Map();
     this.#isLoaded = false;
   }
   async load(jsonPath) {
@@ -57398,14 +57530,14 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
     const frameValues = [];
     if (atlasData !== null && typeof atlasData === "object" && atlasData.images !== void 0) {
       const meta = atlasData.meta !== void 0 ? atlasData.meta : {};
-      if (System148.Array.isArray(meta.pages)) {
+      if (System149.Array.isArray(meta.pages)) {
         for (const page of meta.pages) {
           pagePaths.push(page.imageFileName);
         }
       } else if (typeof meta.imageFileName === "string") {
         pagePaths.push(meta.imageFileName);
       }
-      for (const fileName of System148.Object.keys(atlasData.images)) {
+      for (const fileName of System149.Object.keys(atlasData.images)) {
         const imageData = atlasData.images[fileName];
         const pageIndex = typeof imageData.page === "number" ? imageData.page : 0;
         frameValues.push([fileName, pageIndex, imageData.x, imageData.y, imageData.width, imageData.height]);
@@ -57414,7 +57546,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
       for (const pagePath of atlasData.pagePaths) {
         pagePaths.push(pagePath);
       }
-      for (const frameName of System148.Object.keys(atlasData.frames)) {
+      for (const frameName of System149.Object.keys(atlasData.frames)) {
         const values = atlasData.frames[frameName];
         frameValues.push([frameName, values[0], values[1], values[2], values[3], values[4]]);
       }
@@ -57433,7 +57565,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
       });
       loadPromises.push(loadPromise);
     }
-    await System148.Promise.all(loadPromises);
+    await System149.Promise.all(loadPromises);
     this.#pageImages = pageImages;
     this.#frames.clear();
     for (const values of frameValues) {
@@ -57474,7 +57606,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
     return pageImages.length;
   }
   getFrameNames() {
-    return System148.Array.from(this.#frames.keys());
+    return System149.Array.from(this.#frames.keys());
   }
   isLoaded() {
     return this.#isLoaded;
@@ -57523,7 +57655,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
     return frame !== null;
   }
 };
-var System149 = globalThis;
+var System150 = globalThis;
 var Indicator = class extends Object2 {
   static {
     __name(this, "Indicator");
@@ -57575,9 +57707,9 @@ var Indicator = class extends Object2 {
     const outerRadius = this.#radius;
     const teethSegments = [];
     for (let i = 0; i < teethCount; i++) {
-      const angle = i / teethCount * System149.Math.PI * 2;
-      const cosA = System149.Math.cos(angle);
-      const sinA = System149.Math.sin(angle);
+      const angle = i / teethCount * System150.Math.PI * 2;
+      const cosA = System150.Math.cos(angle);
+      const sinA = System150.Math.sin(angle);
       const startPosition = Vector2.create(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
       const endPosition = Vector2.create(cosA * outerRadius, sinA * outerRadius);
       teethSegments.push([startPosition, endPosition]);
@@ -57613,7 +57745,7 @@ var Indicator = class extends Object2 {
     return this.#isVisible;
   }
 };
-var System150 = globalThis;
+var System151 = globalThis;
 var ATLAS_MAX_WIDTH = 1024;
 var ATLAS_PADDING = 2;
 var GlyphInfo = class extends Object2 {
@@ -57693,7 +57825,7 @@ var DynamicFont = class extends Object2 {
     this.rebuildAtlas();
   }
   rebuildAtlas() {
-    const document2 = System150.document;
+    const document2 = System151.document;
     const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : DEFAULT_FONT_FAMILY_STRING;
     const fontSize = this.getFontSize();
     const fontString = `${fontSize}px ${fontFamily}`;
@@ -57789,7 +57921,7 @@ var DynamicFont = class extends Object2 {
     this.#atlasCanvas = null;
   }
 };
-var System151 = globalThis;
+var System152 = globalThis;
 var PaneTheme = { color: { background: "#1e1e1e", panel: "#252526", toolbar: "#2d2d30", border: "#444", text: "#ccc", textDim: "#aaaaaa", accent: "#0e639c", accentHover: "#1177bb", warning: "#d97706", warningHover: "#f59e0b", error: "#f44336", success: "#4CAF50", inputBg: "#3c3c3c", resizer: "#333", resizerHover: "#007acc" }, size: { resizer: 5 }, font: { family: "sans-serif", mono: '"Consolas", monospace', size: "13px", sizeSmall: "12px" } };
 var PaneStyle = class {
   static {
@@ -57800,7 +57932,7 @@ var PaneStyle = class {
     Object.assign(el.style, styles);
   }
   static create(tagName, preset = "", options = {}) {
-    const el = System151.document.createElement(tagName);
+    const el = System152.document.createElement(tagName);
     if (options.id) el.id = options.id;
     if (options.text) el.innerText = options.text;
     if (options.type) el.type = options.type;
@@ -57880,7 +58012,7 @@ var Pane = class _Pane {
     this.#createContainer();
   }
   #createContainer() {
-    this.#container = System151.document.createElement("div");
+    this.#container = System152.document.createElement("div");
     this.#container.style.position = "absolute";
     this.#container.style.overflow = "hidden";
     this.#container.style.boxSizing = "border-box";
@@ -57899,7 +58031,7 @@ var Pane = class _Pane {
     this.#container.appendChild(pane.getContainer());
   }
   #createResizer(prev, next) {
-    const resizer = System151.document.createElement("div");
+    const resizer = System152.document.createElement("div");
     resizer.style.position = "absolute";
     resizer.style.backgroundColor = PaneTheme.color.resizer;
     resizer.style.zIndex = "1000";
@@ -57930,10 +58062,10 @@ var Pane = class _Pane {
         const grabRect = resizer.getBoundingClientRect();
         this.#resizeGrabOffset = this.#direction === "horizontal" ? e.clientX - grabRect.left : e.clientY - grabRect.top;
         resizer.style.backgroundColor = PaneTheme.color.resizerHover;
-        System151.document.body.style.cursor = resizer.style.cursor;
-        System151.document.body.style.userSelect = "none";
-        System151.document.addEventListener("mousemove", this.#onMouseMoveBind);
-        System151.document.addEventListener("mouseup", this.#onMouseUpBind);
+        System152.document.body.style.cursor = resizer.style.cursor;
+        System152.document.body.style.userSelect = "none";
+        System152.document.addEventListener("mousemove", this.#onMouseMoveBind);
+        System152.document.addEventListener("mouseup", this.#onMouseUpBind);
       });
     }
     resizer.dataset.thickness = thickness;
@@ -57959,10 +58091,10 @@ var Pane = class _Pane {
   }
   #onMouseUp() {
     this.#isResizing = false;
-    System151.document.body.style.cursor = "default";
-    System151.document.body.style.userSelect = "auto";
-    System151.document.removeEventListener("mousemove", this.#onMouseMoveBind);
-    System151.document.removeEventListener("mouseup", this.#onMouseUpBind);
+    System152.document.body.style.cursor = "default";
+    System152.document.body.style.userSelect = "auto";
+    System152.document.removeEventListener("mousemove", this.#onMouseMoveBind);
+    System152.document.removeEventListener("mouseup", this.#onMouseUpBind);
     for (const r of this.#resizers) r.style.backgroundColor = PaneTheme.color.resizer;
   }
   updateLayout(x, y, w, h) {
@@ -58040,14 +58172,14 @@ var Pane = class _Pane {
   refresh() {
     const p = this.#container.parentElement;
     if (!p) return;
-    this.updateLayout(0, 0, p.clientWidth || System151.window.innerWidth, p.clientHeight || System151.window.innerHeight);
+    this.updateLayout(0, 0, p.clientWidth || System152.window.innerWidth, p.clientHeight || System152.window.innerHeight);
   }
   attachTo(p) {
     p.appendChild(this.#container);
     const run = __name(() => this.refresh(), "run");
-    System151.window.addEventListener("resize", run);
+    System152.window.addEventListener("resize", run);
     run();
-    System151.requestAnimationFrame(run);
+    System152.requestAnimationFrame(run);
   }
   setVisible(isVisible) {
     this.#isVisible = isVisible;
@@ -58090,7 +58222,7 @@ var Pane = class _Pane {
     return this.#resizableEdges;
   }
 };
-var System152 = globalThis;
+var System153 = globalThis;
 var RECEIVED_MESSAGE_LIMIT = 1024;
 var WebSocketClient = class extends Object2 {
   static {
@@ -58111,7 +58243,7 @@ var WebSocketClient = class extends Object2 {
     if (this.#isConnected) {
       return;
     }
-    this.#webSocket = new System152.WebSocket(url);
+    this.#webSocket = new System153.WebSocket(url);
     const webSocket = this.getWebSocket();
     webSocket.binaryType = "arraybuffer";
     webSocket.onopen = () => {
@@ -58128,11 +58260,11 @@ var WebSocketClient = class extends Object2 {
       try {
         const data = messageEvent.data;
         let text = data;
-        if (data instanceof System152.ArrayBuffer) {
-          const textDecoder = new System152.TextDecoder("utf-8", { fatal: true });
+        if (data instanceof System153.ArrayBuffer) {
+          const textDecoder = new System153.TextDecoder("utf-8", { fatal: true });
           text = textDecoder.decode(data);
         }
-        const obj = System152.JSON.parse(text);
+        const obj = System153.JSON.parse(text);
         this.receiveMessage(obj);
       } catch (error) {
         console.error(error);
@@ -58171,7 +58303,7 @@ var WebSocketClient = class extends Object2 {
       return;
     }
     try {
-      const json = System152.JSON.stringify(obj);
+      const json = System153.JSON.stringify(obj);
       const webSocket = this.getWebSocket();
       webSocket.send(json);
     } catch (error) {
@@ -58191,7 +58323,7 @@ var WebSocketClient = class extends Object2 {
     return this.#receiveEvent;
   }
 };
-var System153 = globalThis;
+var System154 = globalThis;
 export {
   AUTOMATIC_STREAMING_BYTE_THRESHOLD,
   Action,
@@ -58377,7 +58509,7 @@ export {
   SpriteDrawMode,
   Steering2D,
   SubsurfaceScatteringEffect,
-  System153 as System,
+  System154 as System,
   TIMELINE_EASING_NAMES,
   TIMELINE_NODE_DEFAULTS,
   TIMELINE_PROPERTY_DEFINITIONS,

@@ -9,6 +9,7 @@ import { Vector2 } from "../base/vector2.js";
 import { Component } from "../core/component.js";
 import { Engine } from "../core/engine.js";
 import { Graphic } from "../core/graphic.js";
+import { ScreenEffect } from "../effect/screeneffect.js";
 import { WorldNode } from "../core/node/worldnode.js";
 
 const geometryKeyContentSize = Vector2.zero(); // writeGeometryKey 가 노드의 내용 크기를 복제본 없이 받는 곳.
@@ -72,6 +73,8 @@ export class UIView extends Component {
 	/** @private @type { Engine } */ #engine;
 	/** @private @type { WorldNode | null } */ #content; // 컨텐트 노드.
 	/** @private @type { Color } */ #backgroundColor;
+	/** @private @type { number } */ #backdropBlurRadius; // 뒤 화면 흐림 반지름. (픽셀, 0 이면 끔)
+	/** @private @type { ScreenEffect | null } */ #backdropScreenEffect; // 뒤 화면을 흐릴 화면 효과. (처음 흐릴 때 만든다)
 
 	//==============================================================================
 	// 생성.
@@ -85,6 +88,8 @@ export class UIView extends Component {
 		this.#engine = null;
 		this.#content = null;
 		this.#backgroundColor = new Color(1, 1, 1, 0);
+		this.#backdropBlurRadius = 0;
+		this.#backdropScreenEffect = null;
 	}
 
 	//==============================================================================
@@ -160,7 +165,7 @@ export class UIView extends Component {
 	 * @returns { boolean } 입력을 적었으면 참.
 	 */
 	writeGeometryKey(geometryKey) {
-		if (this.draw !== UIView.prototype.draw) {
+		if (this.draw !== UIView.prototype.draw || this.#backdropBlurRadius > 0) {
 			return false;
 		}
 		const node = this.getNode();
@@ -198,6 +203,11 @@ export class UIView extends Component {
 			return;
 		}
 
+		// 뒤 화면 흐림. (바탕색보다 먼저, 이미 그려진 뒤 화면을 이 뷰 자리만 흐린다)
+		if (this.#backdropBlurRadius > 0) {
+			this.drawBackdropBlur(graphic, node);
+		}
+
 		//  컨텐트 영역 출력.
 		// 투명한 바탕은 그리지 않는다. (보이지 않는 드로우가 묶어 그리기를 끊지 않게)
 		const backgroundColor = this.getBackgroundColor();
@@ -208,6 +218,92 @@ export class UIView extends Component {
 		const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
 		graphic.setFillColor(backgroundColor);
 		graphic.drawRect(backgroundRect);
+	}
+
+	//==============================================================================
+	// 뒤 화면 흐리기. (draw 가 부른다)
+	// - 먼저 그린 것을 화면에 내보내고, 이 뷰의 내용 영역이 화면에서 차지한 사각형(변환한 네 귀퉁이의 경계 상자, 기기 픽셀)만 ScreenEffect 의 흐림(blur)으로 흐려 같은 자리에 되돌린다.
+	// - 화면(기본 프레임버퍼)을 그릴 때만 한다. 렌더 타겟에 그리는 중이면 흐리지 않는다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { Graphic } graphic 그래픽.
+	 * @param { WorldNode } node 이 뷰의 노드.
+	 */
+	drawBackdropBlur(graphic, node) {
+		const contentSize = node.getContentSize();
+		if (!(contentSize.x > 0 && contentSize.y > 0)) {
+			return;
+		}
+		const transformMatrix = graphic.getTransformMatrix();
+		const cornerList = [
+			transformMatrix.transformPoint(0, 0),
+			transformMatrix.transformPoint(contentSize.x, 0),
+			transformMatrix.transformPoint(contentSize.x, contentSize.y),
+			transformMatrix.transformPoint(0, contentSize.y),
+		];
+		let leftX = System.Infinity;
+		let topY = System.Infinity;
+		let rightX = -System.Infinity;
+		let bottomY = -System.Infinity;
+		for (const corner of cornerList) {
+			leftX = System.Math.min(leftX, corner.x);
+			topY = System.Math.min(topY, corner.y);
+			rightX = System.Math.max(rightX, corner.x);
+			bottomY = System.Math.max(bottomY, corner.y);
+		}
+		const regionX = System.Math.round(leftX);
+		const regionY = System.Math.round(topY);
+		const regionWidth = System.Math.round(rightX) - regionX;
+		const regionHeight = System.Math.round(bottomY) - regionY;
+		if (regionWidth <= 0 || regionHeight <= 0) {
+			return;
+		}
+		graphic.runExternalPass((webGL2RenderingContext) => {
+			if (webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING) !== null) {
+				return;
+			}
+			let screenEffect = this.#backdropScreenEffect;
+			if (screenEffect === null) {
+				screenEffect = new ScreenEffect();
+				screenEffect.setEnabled("blur", true);
+				this.#backdropScreenEffect = screenEffect;
+			}
+			screenEffect.setParameters("blur", this.#backdropBlurRadius);
+			screenEffect.setRegion(regionX, regionY, regionWidth, regionHeight);
+			screenEffect.begin(graphic);
+			screenEffect.end(graphic);
+		}, { clearDepth: false });
+	}
+
+	//==============================================================================
+	// 뒤 화면 흐림 설정. (CSS backdrop-filter: blur(), 언리얼 UMG BackgroundBlur 와 같은 뜻)
+	// - 켜면 이 뷰가 그려질 때, 그보다 먼저 그려진 화면을 이 뷰의 내용 영역만 흐리고 그 위에 배경색(반투명)을 얹는다.
+	// - 흐림은 ScreenEffect 의 blur 와 같은 가우스 근사다. 반지름은 그 blur 의 반지름(기기 픽셀)이다.
+	// - 화면에 그릴 때만 된다. (렌더 타겟에 그리는 중이면 흐리지 않는다) 켜진 동안은 기하 캐시를 쓰지 않는다. (매 그리기마다 화면을 읽는다)
+	//==============================================================================
+	/**
+	 * @param { number } blurRadius 흐림 반지름. (기기 픽셀, 0 이하면 끈다, 처음은 0)
+	 * @example <caption>반투명 패널 뒤를 흐리기</caption>
+	 * import { UIView, Color } from "./build/vanilla.js";
+	 *
+	 * const view = new UIView();
+	 * view.setBackgroundColor(new Color(1, 1, 1, 0.25));
+	 * view.setBackdropBlur(6);
+	 * console.log(view.getBackdropBlur());
+	 */
+	setBackdropBlur(blurRadius) {
+		this.#backdropBlurRadius = System.Math.max(0, blurRadius);
+	}
+
+	//==============================================================================
+	// 뒤 화면 흐림 반지름 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 흐림 반지름. (기기 픽셀, 0 이면 꺼짐)
+	 */
+	getBackdropBlur() {
+		return this.#backdropBlurRadius;
 	}
 
 	//==============================================================================
