@@ -130,6 +130,23 @@ try {
 		const lostUsage = tracker.readUsage();
 		out.lostTotal = lostUsage.totalBytes;
 		out.lostCanvas = lostUsage.canvasBytes;
+		// 엔진은 기본으로 셈을 걸지 않는다. (GL 짓기 호출이 브라우저 본디 함수 그대로, 켜면 그때부터 가로챈다)
+		const { Engine, EngineConfiguration } = await import("/import.js");
+		const engineConfiguration = new EngineConfiguration();
+		engineConfiguration.canvasId = "gameCanvas";
+		const engine = new Engine(engineConfiguration);
+		const engineGl = document.getElementById("gameCanvas").getContext("webgl2");
+		out.offEnabled = engine.isGpuMemoryTrackingEnabled();
+		out.offHooked = engineGl.createTexture.name === "vanillaGpuMemoryTrackerHook" || engineGl.texImage2D.name === "vanillaGpuMemoryTrackerHook";
+		engine.enableGpuMemoryTracking();
+		out.onEnabled = engine.isGpuMemoryTrackingEnabled();
+		out.onHooked = engineGl.createTexture.name === "vanillaGpuMemoryTrackerHook";
+		const afterTexture = engineGl.createTexture();
+		engineGl.bindTexture(engineGl.TEXTURE_2D, afterTexture);
+		engineGl.texStorage2D(engineGl.TEXTURE_2D, 1, engineGl.RGBA8, 8, 8);
+		const engineUsage = engine.readGpuMemoryUsage();
+		out.engineTexture = engineUsage.kindTable.texture.bytes;
+		out.engineOwner = engineUsage.ownerList.length > 0 ? engineUsage.ownerList[0].owner : "";
 		return out;
 	});
 }
@@ -153,4 +170,7 @@ check(result.afterBufferDelete === 200, "deleteBuffer 가 뺌 " + result.afterBu
 check(result.canvasBytes === 64 * 64 * 8, "캔버스 몫(antialias 끔) " + result.canvasBytes);
 check(result.owner.includes("buildTexture") || result.owner.includes("evaluate"), "주인 이름에 지은 자리가 듦 " + result.owner);
 check(result.lostTotal === 0 && result.lostCanvas === 0, "컨텍스트를 잃으면 비움 " + result.lostTotal);
+check(result.offEnabled === false && result.offHooked === false, "엔진은 기본으로 셈을 걸지 않음 " + result.offEnabled + " " + result.offHooked);
+check(result.onEnabled === true && result.onHooked === true, "enableGpuMemoryTracking 이 켬 " + result.onEnabled + " " + result.onHooked);
+check(result.engineTexture === 8 * 8 * 4, "켠 뒤에 지은 텍스처부터 셈 " + result.engineTexture + " (256 이어야)");
 console.log("GPU 메모리 셈 크롬 시험 통과 (" + checkCount + " 검사)");

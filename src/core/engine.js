@@ -139,6 +139,10 @@ export class EngineConfiguration extends Object {
 	// 3D 색 공간. (ColorSpace.gamma 가 기본, 지금까지와 같은 화면. ColorSpace.linear 면 sRGB 텍스처와 sRGB 표준 곡선으로 선형 공간에서 빛을 셈한다)
 	// 생성 때 정한다. 툰 렌더러, 후처리, 화면 바깥선, GLB 읽기가 따로 받지 않으면 이 값을 따른다. 2D 는 어느 값이든 감마 공간에서 합성한다. (유니티 Player Settings 의 Color Space)
 	/** @type { string } */ colorSpace;
+	// GPU 메모리 셈(개발용)을 처음부터 켤지. 생성 때 정한다. 끄면(기본) GL 짓기 호출을 가로채지 않아 프레임 CPU 에 드는 값이 없다.
+	// 켜면 엔진이 처음 짓는 자원까지 센다. 나중에 켜려면 Engine.enableGpuMemoryTracking() 이고 그 뒤에 지은 것부터 센다.
+	// 예: engineConfiguration.trackGpuMemory = true; (프로파일링 때)
+	/** @type { boolean } */ trackGpuMemory;
 
 	//==============================================================================
 	// 생성.
@@ -154,6 +158,7 @@ export class EngineConfiguration extends Object {
 		this.title = "";
 		this.preserveDrawingBuffer = false;
 		this.antialias = true;
+		this.trackGpuMemory = false;
 		this.maximumFramePerSecond = 0;
 		this.defaultFontUrl = "";
 		this.ignoreVirtualKeyboardResize = false;
@@ -245,7 +250,7 @@ export class Engine extends Object {
 		const canvas = this.#platform.getOrAddCanvas(canvasId);
 		
 
-		this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true, engineConfiguration.antialias !== false, readColorSpace(engineConfiguration.colorSpace));
+		this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true, engineConfiguration.antialias !== false, readColorSpace(engineConfiguration.colorSpace), engineConfiguration.trackGpuMemory === true);
 		this.#sceneManager = new SceneManager(this);
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this);
@@ -2052,15 +2057,51 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
+	// GPU 메모리 셈 켜기. (개발용, Graphic.enableGpuMemoryTracking 과 같다)
+	//==============================================================================
+	/**
+	 * GPU 메모리 셈을 켠다. 켠 뒤에 지은 것부터 센다. (처음부터 세려면 EngineConfiguration.trackGpuMemory)
+	 * @example <caption>GPU 메모리 셈 켜기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * engine.enableGpuMemoryTracking();
+	 * console.log(engine.isGpuMemoryTrackingEnabled());
+	 */
+	enableGpuMemoryTracking() {
+		this.getGraphic().enableGpuMemoryTracking();
+	}
+
+	//==============================================================================
+	// GPU 메모리 셈이 켜져 있는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 켜져 있으면 true.
+	 * @example <caption>GPU 메모리 셈이 켜져 있는지 읽기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * console.log(engine.isGpuMemoryTrackingEnabled());
+	 */
+	isGpuMemoryTrackingEnabled() {
+		return this.getGraphic().isGpuMemoryTrackingEnabled();
+	}
+
+	//==============================================================================
 	// GPU 메모리 읽기. (개발용, Graphic.readGpuMemoryUsage 와 같다)
 	//==============================================================================
 	/**
+	 * 셈이 꺼져 있으면 이 호출이 켜고 그 뒤에 지은 것부터 센다. 처음부터 다 세려면 EngineConfiguration.trackGpuMemory 를 true 로 둔다.
 	 * @returns { { totalBytes: number, canvasBytes: number, kindTable: object, ownerList: Array<{ owner: string, kind: string, count: number, bytes: number }> } }
 	 * 합(캔버스 몫 포함), 캔버스 몫, 종류별 { count, bytes }, 주인별 몫(큰 것부터).
 	 * @example <caption>종류별 GPU 메모리 읽기</caption>
 	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
 	 *
-	 * const engine = new Engine(new EngineConfiguration());
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.trackGpuMemory = true;
+	 * const engine = new Engine(engineConfiguration);
 	 * engine.run(new Scene());
 	 * const usage = engine.readGpuMemoryUsage();
 	 * console.log(usage.kindTable.texture.bytes, usage.kindTable.renderbuffer.bytes, usage.kindTable.buffer.bytes);

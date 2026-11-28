@@ -5,7 +5,7 @@
 // - 바이트는 형식과 크기로 셈한 이름값이다. (드라이버가 맞추는 줄 정렬, 타일 메모리, 멀티샘플 압축은 모른다. 멀티샘플 렌더버퍼는 샘플 수를 곱한다)
 // - 주인은 객체를 지은 호출 스택의 위쪽 세 칸이다. (엔진 안 지은 자리를 가려내는 개발용 이름, 스택은 지을 때 한 번만 읽는다)
 // - 지우지 않고 버려진 객체는 가비지 컬렉션이 올 때 FinalizationRegistry 로 뺀다. (브라우저가 그때 GL 객체를 풀어 준다)
-// - 같은 컨텍스트에는 하나만 건다. (Graphic 이 짓는 자리에서 걸고, 엔진 밖에서 만든 컨텍스트는 GpuMemoryTracker.attach 로 건다)
+// - 같은 컨텍스트에는 하나만 건다. (기본은 꺼 둔다. 켜는 길은 EngineConfiguration.trackGpuMemory, Graphic.enableGpuMemoryTracking, 엔진 밖에서 만든 컨텍스트는 GpuMemoryTracker.attach 이고, 걸기 전에는 GL 짓기 호출을 가로채지 않는다)
 //==============================================================================
 const System = globalThis;
 import { Object } from "../../base/object.js";
