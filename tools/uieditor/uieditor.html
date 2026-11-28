@@ -56010,7 +56010,13 @@ float readShadeLevel(vec3 rampColor, float cosine) {
 	}
 	else {
 		bottom = readLuminance(shadeStopColors[0]);
-		top = readLuminance(shadeStopColors[shadeStopCount - 1]);
+		// \uB9C8\uC9C0\uB9C9 \uCE78\uC740 \uACE0\uB9AC\uB85C \uCC3E\uB294\uB2E4. (\uC0C9 \uCE78\uC774 0 \uAC1C\uC77C \uB54C \uB3D9\uC801 \uCCA8\uC790 shadeStopColors[shadeStopCount - 1] \uC77D\uAE30\uAC00 \uC544\uC774\uD3F0 SE2 (A13) \uC758 GPU \uD504\uB85C\uC138\uC2A4\uB97C \uC8FD\uC600\uB2E4)
+		top = readLuminance(shadeStopColors[0]);
+		for (int index = 1; index < 8; ++index) {
+			if (index < shadeStopCount) {
+				top = readLuminance(shadeStopColors[index]);
+			}
+		}
 	}
 	return clamp((readLuminance(rampColor) - bottom) / max(top - bottom, 0.0001), 0.0, 1.0);
 }
