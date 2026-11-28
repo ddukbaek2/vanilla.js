@@ -2674,6 +2674,10 @@ export class ToonRenderer {
 				// 위와 같다.
 			}
 		}
+		if (unitList.length > 0) {
+			// 맡긴 컴파일과 링크 명령을 GPU 프로세스로 보낸다. (그리지 않는 프레임에는 명령이 저절로 흘러가지 않아 병렬 짓기가 시작되지 않을 수 있다)
+			webGL2RenderingContext.flush();
+		}
 		return new ToonProgramPrewarm(this, unitList);
 	}
 
@@ -2813,6 +2817,9 @@ export class ToonRenderer {
 			else {
 				index += 1;
 			}
+		}
+		if (unitList.length > 0) {
+			this.getWebGL2RenderingContext().flush(); // 그리지 않는 프레임에도 맡긴 짓기가 나아가게 명령을 보낸다.
 		}
 		return unitList.length === 0;
 	}
