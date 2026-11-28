@@ -6695,6 +6695,30 @@
 			"vanilla-engine": {
 				"module": "core/component/richtext",
 				"class": "RichText",
+				"name": "set_letter_spacing"
+			},
+			"vanilla.js": {
+				"module": "core/component/text",
+				"class": "Text",
+				"name": "setLetterSpacing"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/richtext",
+				"class": "RichText",
+				"name": "get_letter_spacing"
+			},
+			"vanilla.js": {
+				"module": "core/component/text",
+				"class": "Text",
+				"name": "getLetterSpacing"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/richtext",
+				"class": "RichText",
 				"name": "set_text_direction"
 			},
 			"vanilla.js": {
@@ -7783,6 +7807,30 @@
 			"vanilla-engine": {
 				"module": "core/component/text",
 				"class": "Text",
+				"name": "set_letter_spacing"
+			},
+			"vanilla.js": {
+				"module": "core/component/text",
+				"class": "Text",
+				"name": "setLetterSpacing"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/text",
+				"class": "Text",
+				"name": "get_letter_spacing"
+			},
+			"vanilla.js": {
+				"module": "core/component/text",
+				"class": "Text",
+				"name": "getLetterSpacing"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/text",
+				"class": "Text",
 				"name": "set_visible_character_count"
 			},
 			"vanilla.js": {
@@ -8605,6 +8653,18 @@
 				"module": "core/engine",
 				"class": "Engine",
 				"name": "exitApplication"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "open_url"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "openUrl"
 			}
 		},
 		{
@@ -36383,6 +36443,30 @@
 			"vanilla-engine": {
 				"module": "ui/uilabel",
 				"class": "UILabel",
+				"name": "set_letter_spacing"
+			},
+			"vanilla.js": {
+				"module": "ui/uilabel",
+				"class": "UILabel",
+				"name": "setLetterSpacing"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uilabel",
+				"class": "UILabel",
+				"name": "get_letter_spacing"
+			},
+			"vanilla.js": {
+				"module": "ui/uilabel",
+				"class": "UILabel",
+				"name": "getLetterSpacing"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uilabel",
+				"class": "UILabel",
 				"name": "set_visible_character_count"
 			},
 			"vanilla.js": {
@@ -38881,6 +38965,30 @@
 				"module": "ui/uiview",
 				"class": "UIView",
 				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiview",
+				"class": "UIView",
+				"name": "set_backdrop_blur"
+			},
+			"vanilla.js": {
+				"module": "ui/uiview",
+				"class": "UIView",
+				"name": "setBackdropBlur"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiview",
+				"class": "UIView",
+				"name": "get_backdrop_blur"
+			},
+			"vanilla.js": {
+				"module": "ui/uiview",
+				"class": "UIView",
+				"name": "getBackdropBlur"
 			}
 		},
 		{

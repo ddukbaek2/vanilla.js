@@ -10787,6 +10787,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "open_url"
+							},
 							"examples": [
 								{
 									"title": {
@@ -36738,7 +36744,13 @@
 								"en": "Sets the letter spacing. (same meaning as CSS letter-spacing and Unreal UMG letter spacing)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/text.js"
+							"source": "src/core/component/text.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/richtext",
+								"class": "RichText",
+								"name": "set_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
@@ -36757,7 +36769,13 @@
 								"en": "Returns the letter spacing."
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/text.js"
+							"source": "src/core/component/text.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/richtext",
+								"class": "RichText",
+								"name": "get_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
@@ -39365,6 +39383,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uiview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiview",
+								"class": "UIView",
+								"name": "set_backdrop_blur"
+							},
 							"examples": [
 								{
 									"title": {
@@ -39393,7 +39417,13 @@
 								"en": "Returns the backdrop blur radius."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiview.js"
+							"source": "src/ui/uiview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiview",
+								"class": "UIView",
+								"name": "get_backdrop_blur"
+							}
 						},
 						{
 							"kind": "method",
@@ -40748,7 +40778,13 @@
 								"en": "Sets the letter spacing. (delegated to Text)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uilabel.js"
+							"source": "src/ui/uilabel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uilabel",
+								"class": "UILabel",
+								"name": "set_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
@@ -40767,7 +40803,13 @@
 								"en": "Returns the letter spacing."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uilabel.js"
+							"source": "src/ui/uilabel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uilabel",
+								"class": "UILabel",
+								"name": "get_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
