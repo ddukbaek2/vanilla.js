@@ -8615,9 +8615,519 @@
     }
   };
 
-  // src/core/graphic/colorspace.js
+  // src/core/graphic/gpumemorytracker.js
   var System14 = globalThis;
-  var ColorSpace = System14.Object.freeze({
+  var TEXTURE_2D = 3553;
+  var TEXTURE_3D = 32879;
+  var TEXTURE_2D_ARRAY = 35866;
+  var TEXTURE_CUBE_MAP = 34067;
+  var TEXTURE_BINDING_2D = 32873;
+  var TEXTURE_BINDING_3D = 32874;
+  var TEXTURE_BINDING_2D_ARRAY = 35869;
+  var TEXTURE_BINDING_CUBE_MAP = 34068;
+  var RENDERBUFFER_BINDING = 36007;
+  var ARRAY_BUFFER2 = 34962;
+  var ELEMENT_ARRAY_BUFFER2 = 34963;
+  var PIXEL_PACK_BUFFER = 35051;
+  var PIXEL_UNPACK_BUFFER = 35052;
+  var UNIFORM_BUFFER = 35345;
+  var COPY_READ_BUFFER = 36662;
+  var COPY_WRITE_BUFFER = 36663;
+  var TRANSFORM_FEEDBACK_BUFFER = 35982;
+  var ARRAY_BUFFER_BINDING = 34964;
+  var ELEMENT_ARRAY_BUFFER_BINDING = 34965;
+  var PIXEL_PACK_BUFFER_BINDING = 35053;
+  var PIXEL_UNPACK_BUFFER_BINDING = 35055;
+  var UNIFORM_BUFFER_BINDING = 35368;
+  var COPY_READ_BUFFER_BINDING = 36662;
+  var COPY_WRITE_BUFFER_BINDING = 36663;
+  var TRANSFORM_FEEDBACK_BUFFER_BINDING = 35983;
+  var TEXTURE_BINDING_TABLE = new System14.Map([[TEXTURE_2D, TEXTURE_BINDING_2D], [TEXTURE_3D, TEXTURE_BINDING_3D], [TEXTURE_2D_ARRAY, TEXTURE_BINDING_2D_ARRAY], [TEXTURE_CUBE_MAP, TEXTURE_BINDING_CUBE_MAP]]);
+  var BUFFER_BINDING_TABLE = new System14.Map([
+    [ARRAY_BUFFER2, ARRAY_BUFFER_BINDING],
+    [ELEMENT_ARRAY_BUFFER2, ELEMENT_ARRAY_BUFFER_BINDING],
+    [PIXEL_PACK_BUFFER, PIXEL_PACK_BUFFER_BINDING],
+    [PIXEL_UNPACK_BUFFER, PIXEL_UNPACK_BUFFER_BINDING],
+    [UNIFORM_BUFFER, UNIFORM_BUFFER_BINDING],
+    [COPY_READ_BUFFER, COPY_READ_BUFFER_BINDING],
+    [COPY_WRITE_BUFFER, COPY_WRITE_BUFFER_BINDING],
+    [TRANSFORM_FEEDBACK_BUFFER, TRANSFORM_FEEDBACK_BUFFER_BINDING]
+  ]);
+  var FORMAT_BYTE_TABLE = new System14.Map([
+    [33321, 1],
+    [36756, 1],
+    [33329, 1],
+    [33330, 1],
+    [36168, 1],
+    // R8, R8_SNORM, R8I, R8UI, STENCIL_INDEX8
+    [33323, 2],
+    [36757, 2],
+    [33336, 2],
+    [33325, 2],
+    [33332, 2],
+    [33189, 2],
+    [36194, 2],
+    [32854, 2],
+    [32855, 2],
+    // RG8, RG8_SNORM, RG8UI, R16F, R16UI, DEPTH16, RGB565, RGBA4, RGB5_A1
+    [32849, 3],
+    [35905, 3],
+    [36758, 3],
+    // RGB8, SRGB8, RGB8_SNORM
+    [32856, 4],
+    [35907, 4],
+    [36759, 4],
+    [36220, 4],
+    [36238, 4],
+    [32857, 4],
+    [35898, 4],
+    [35901, 4],
+    // RGBA8, SRGB8_ALPHA8, RGBA8_SNORM, RGBA8UI, RGBA8I, RGB10_A2, R11F_G11F_B10F, RGB9_E5
+    [33327, 4],
+    [33326, 4],
+    [33334, 4],
+    [33338, 4],
+    [33190, 4],
+    [36012, 4],
+    [35056, 4],
+    // RG16F, R32F, R32UI, RG16UI, DEPTH24, DEPTH32F, DEPTH24_STENCIL8
+    [34843, 6],
+    // RGB16F
+    [34842, 8],
+    [33328, 8],
+    [33340, 8],
+    [36214, 8],
+    [36232, 8],
+    [36013, 8],
+    // RGBA16F, RG32F, RG32UI, RGBA16UI, RGBA16I, DEPTH32F_STENCIL8
+    [34837, 12],
+    // RGB32F
+    [34836, 16],
+    [36208, 16],
+    [36226, 16]
+    // RGBA32F, RGBA32UI, RGBA32I
+  ]);
+  var UNSIZED_FORMAT_BYTE_TABLE = new System14.Map([[6408, 4], [6407, 3], [6410, 2], [6409, 1], [6406, 1], [34041, 4]]);
+  var DEPTH_COMPONENT = 6402;
+  var UNSIGNED_SHORT = 5123;
+  var GpuMemoryKind = System14.Object.freeze({
+    texture: "texture",
+    // 텍스처.
+    renderbuffer: "renderbuffer",
+    // 렌더버퍼. (멀티샘플 렌더 타겟의 색, 깊이)
+    buffer: "buffer"
+    // 버퍼. (정점, 인덱스, 인스턴스, 유니폼)
+  });
+  var HOOK_NAME = "vanillaGpuMemoryTrackerHook";
+  var STACK_DEPTH = 3;
+  var STACK_LIMIT = 12;
+  var trackerTable = new System14.WeakMap();
+  function readFormatByteCount(internalFormat, type) {
+    const sized = FORMAT_BYTE_TABLE.get(internalFormat);
+    if (sized !== void 0) {
+      return sized;
+    }
+    if (internalFormat === DEPTH_COMPONENT) {
+      return type === UNSIGNED_SHORT ? 2 : 4;
+    }
+    const unsized = UNSIZED_FORMAT_BYTE_TABLE.get(internalFormat);
+    if (unsized !== void 0) {
+      return unsized;
+    }
+    return 4;
+  }
+  __name(readFormatByteCount, "readFormatByteCount");
+  function readSourceSize(source) {
+    if (source === null || source === void 0) {
+      return { width: 0, height: 0 };
+    }
+    const width = source.naturalWidth ?? source.videoWidth ?? source.displayWidth ?? source.width ?? 0;
+    const height = source.naturalHeight ?? source.videoHeight ?? source.displayHeight ?? source.height ?? 0;
+    return { width, height };
+  }
+  __name(readSourceSize, "readSourceSize");
+  function readOwnerName() {
+    const previousLimit = System14.Error.stackTraceLimit;
+    System14.Error.stackTraceLimit = STACK_LIMIT;
+    const stack = new System14.Error().stack;
+    System14.Error.stackTraceLimit = previousLimit;
+    if (typeof stack !== "string") {
+      return "unknown";
+    }
+    const frameList = [];
+    for (const line of stack.split("\n")) {
+      let name = null;
+      let location = null;
+      const chromeMatch = /^\s*at (?:async )?(.*?) \((.*)\)\s*$/.exec(line);
+      if (chromeMatch !== null) {
+        name = chromeMatch[1];
+        location = chromeMatch[2];
+      } else {
+        const chromeAnonymousMatch = /^\s*at (.*)$/.exec(line);
+        const safariMatch = /^(.*?)@(.*)$/.exec(line);
+        if (chromeAnonymousMatch !== null) {
+          name = "";
+          location = chromeAnonymousMatch[1];
+        } else if (safariMatch !== null) {
+          name = safariMatch[1];
+          location = safariMatch[2];
+        }
+      }
+      if (location !== null) {
+        frameList.push({ name, location });
+      }
+    }
+    let firstIndex = 0;
+    for (let index = 0; index < frameList.length; ++index) {
+      if (frameList[index].name.includes(HOOK_NAME)) {
+        firstIndex = index + 1;
+      }
+    }
+    const frameNameList = [];
+    for (let index = firstIndex; index < frameList.length && frameNameList.length < STACK_DEPTH; ++index) {
+      const frame = frameList[index];
+      if (frame.location.includes("webglstatecache")) {
+        continue;
+      }
+      const fileMatch = /([^/\\]+?)(?:\.js|\.mjs|\.html)?(?::\d+)*\)?$/.exec(frame.location);
+      const fileName = fileMatch !== null ? fileMatch[1] : "";
+      const frameName = frame.name !== "" ? frame.name : "(" + fileName + ")";
+      frameNameList.push(frameName.length > 60 ? frameName.slice(0, 60) + "..." : frameName);
+    }
+    return frameNameList.length > 0 ? frameNameList.join(" < ") : "unknown";
+  }
+  __name(readOwnerName, "readOwnerName");
+  var GpuMemoryTracker = class _GpuMemoryTracker extends Object2 {
+    static {
+      __name(this, "GpuMemoryTracker");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { WebGL2RenderingContext } */
+    #webGL2RenderingContext;
+    /** @private @type { WeakMap<object, object> } */
+    #entryTable;
+    // GL 객체 -> 적은 것. ({ kind, owner, bytes, levelTable, width, height, internalFormat, isMipmapGenerated })
+    /** @private @type { Set<object> } */
+    #entrySet;
+    // 살아 있는 적은 것 모두. (합을 낼 때 돈다)
+    /** @private @type { FinalizationRegistry | null } */
+    #finalizationRegistry;
+    //==============================================================================
+    // 생성. (attach 로 건다)
+    //==============================================================================
+    /**
+     * @constructor
+     * @param { WebGL2RenderingContext } webGL2RenderingContext 셈할 컨텍스트.
+     */
+    constructor(webGL2RenderingContext) {
+      super();
+      this.#webGL2RenderingContext = webGL2RenderingContext;
+      this.#entryTable = new System14.WeakMap();
+      this.#entrySet = new System14.Set();
+      this.#finalizationRegistry = typeof System14.FinalizationRegistry === "function" ? new System14.FinalizationRegistry((entry) => {
+        this.#entrySet.delete(entry);
+      }) : null;
+      this.installTrackers();
+      const canvas = webGL2RenderingContext.canvas;
+      if (canvas && typeof canvas.addEventListener === "function") {
+        canvas.addEventListener("webglcontextlost", () => {
+          this.#entrySet.clear();
+          this.#entryTable = new System14.WeakMap();
+        });
+      }
+    }
+    //==============================================================================
+    // 컨텍스트에 셈 걸기. (없으면 만들어 건다, 같은 컨텍스트에는 하나만)
+    //==============================================================================
+    /**
+     * @param { WebGL2RenderingContext } webGL2RenderingContext 컨텍스트.
+     * @returns { GpuMemoryTracker } 그 컨텍스트의 GPU 메모리 셈.
+     * @example <caption>엔진 밖에서 만든 컨텍스트의 GPU 메모리 읽기</caption>
+     * import { GpuMemoryTracker } from "./vanilla.js";
+     * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+     * const gpuMemoryTracker = GpuMemoryTracker.attach(webGL2RenderingContext);
+     * const texture = webGL2RenderingContext.createTexture();
+     * webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+     * webGL2RenderingContext.texStorage2D(webGL2RenderingContext.TEXTURE_2D, 1, webGL2RenderingContext.RGBA8, 64, 64);
+     * const usage = gpuMemoryTracker.readUsage();
+     * console.log(usage.totalBytes);
+     */
+    static attach(webGL2RenderingContext) {
+      let tracker = trackerTable.get(webGL2RenderingContext);
+      if (tracker === void 0) {
+        tracker = new _GpuMemoryTracker(webGL2RenderingContext);
+        trackerTable.set(webGL2RenderingContext, tracker);
+      }
+      return tracker;
+    }
+    //==============================================================================
+    // 객체 적기.
+    //==============================================================================
+    /**
+     * @private
+     * @param { object | null } glObject 지은 GL 객체.
+     * @param { string } kind GpuMemoryKind 의 값.
+     */
+    register(glObject, kind) {
+      if (glObject === null || glObject === void 0) {
+        return;
+      }
+      const entry = { kind, owner: readOwnerName(), bytes: 0, levelTable: kind === GpuMemoryKind.texture ? new System14.Map() : null, width: 0, height: 0, internalFormat: 0 };
+      this.#entryTable.set(glObject, entry);
+      this.#entrySet.add(entry);
+      if (this.#finalizationRegistry !== null) {
+        this.#finalizationRegistry.register(glObject, entry);
+      }
+    }
+    //==============================================================================
+    // 객체 빼기.
+    //==============================================================================
+    /**
+     * @private
+     * @param { object | null } glObject 지운 GL 객체.
+     */
+    unregister(glObject) {
+      if (glObject === null || glObject === void 0) {
+        return;
+      }
+      const entry = this.#entryTable.get(glObject);
+      if (entry === void 0) {
+        return;
+      }
+      this.#entryTable.delete(glObject);
+      this.#entrySet.delete(entry);
+      if (this.#finalizationRegistry !== null) {
+        this.#finalizationRegistry.unregister(glObject);
+      }
+    }
+    //==============================================================================
+    // 객체의 바이트 정하기. (텍스처는 대상과 단계마다 따로 적고 합한다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { object | null | undefined } glObject GL 객체.
+     * @param { string | null } levelKey 텍스처의 대상과 단계. (null 이면 객체 하나의 바이트)
+     * @param { number } bytes 바이트.
+     */
+    setBytes(glObject, levelKey, bytes) {
+      if (glObject === null || glObject === void 0) {
+        return;
+      }
+      const entry = this.#entryTable.get(glObject);
+      if (entry === void 0) {
+        return;
+      }
+      if (levelKey === null || entry.levelTable === null) {
+        entry.bytes = bytes;
+        return;
+      }
+      entry.levelTable.set(levelKey, bytes);
+      let sum = 0;
+      for (const levelBytes of entry.levelTable.values()) {
+        sum += levelBytes;
+      }
+      entry.bytes = sum;
+    }
+    //==============================================================================
+    // 지금 묶인 객체. (상태 캐시가 기억한 값, 모르면 한 번 GL 에 묻는다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { number } bindingName 묶음 열거.
+     * @returns { object | null }
+     */
+    readBound(bindingName) {
+      return this.#webGL2RenderingContext.getParameter(bindingName);
+    }
+    //==============================================================================
+    // 텍스처의 바이트 정하기. (texImage2D, texStorage2D 같은 것이 부른다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { number } target 대상.
+     * @param { number } level 단계.
+     * @param { number } internalFormat 내부 형식.
+     * @param { number } width 너비.
+     * @param { number } height 높이.
+     * @param { number } depth 깊이. (2D 는 1)
+     * @param { number } type 올리는 값 형식.
+     */
+    setTextureLevel(target, level, internalFormat, width, height, depth, type) {
+      const bindingName = TEXTURE_BINDING_TABLE.get(target) ?? TEXTURE_BINDING_CUBE_MAP;
+      const texture = this.readBound(bindingName);
+      if (texture === null || texture === void 0) {
+        return;
+      }
+      const entry = this.#entryTable.get(texture);
+      if (entry !== void 0 && level === 0) {
+        entry.width = width;
+        entry.height = height;
+        entry.internalFormat = internalFormat;
+      }
+      this.setBytes(texture, target + ":" + level, width * height * depth * readFormatByteCount(internalFormat, type));
+    }
+    //==============================================================================
+    // 가로채기 걸기.
+    //==============================================================================
+    /**
+     * @private
+     */
+    installTrackers() {
+      const gl = this.#webGL2RenderingContext;
+      const tracker = this;
+      const wrap = /* @__PURE__ */ __name((functionName, beforeCallback, afterCallback) => {
+        const originalFunction = gl[functionName];
+        if (typeof originalFunction !== "function") {
+          return;
+        }
+        gl[functionName] = /* @__PURE__ */ __name(function vanillaGpuMemoryTrackerHook(...argumentList) {
+          if (beforeCallback !== null) {
+            beforeCallback(...argumentList);
+          }
+          const result = originalFunction.apply(gl, argumentList);
+          if (afterCallback !== null) {
+            afterCallback(result, ...argumentList);
+          }
+          return result;
+        }, "vanillaGpuMemoryTrackerHook");
+      }, "wrap");
+      wrap("createTexture", null, (texture) => tracker.register(texture, GpuMemoryKind.texture));
+      wrap("createRenderbuffer", null, (renderbuffer) => tracker.register(renderbuffer, GpuMemoryKind.renderbuffer));
+      wrap("createBuffer", null, (buffer) => tracker.register(buffer, GpuMemoryKind.buffer));
+      wrap("deleteTexture", (texture) => tracker.unregister(texture), null);
+      wrap("deleteRenderbuffer", (renderbuffer) => tracker.unregister(renderbuffer), null);
+      wrap("deleteBuffer", (buffer) => tracker.unregister(buffer), null);
+      wrap("texImage2D", null, (result, target, level, internalFormat, ...rest) => {
+        if (rest.length >= 6) {
+          tracker.setTextureLevel(target, level, internalFormat, rest[0], rest[1], 1, rest[4]);
+        } else {
+          const size = readSourceSize(rest[2]);
+          tracker.setTextureLevel(target, level, internalFormat, size.width, size.height, 1, rest[1]);
+        }
+      });
+      wrap("texImage3D", null, (result, target, level, internalFormat, width, height, depth, border, format, type) => {
+        tracker.setTextureLevel(target, level, internalFormat, width, height, depth, type);
+      });
+      wrap("texStorage2D", null, (result, target, levelCount, internalFormat, width, height) => {
+        let levelWidth = width;
+        let levelHeight = height;
+        for (let level = 0; level < levelCount; ++level) {
+          tracker.setTextureLevel(target, level, internalFormat, levelWidth, levelHeight, 1, 0);
+          levelWidth = System14.Math.max(1, levelWidth >> 1);
+          levelHeight = System14.Math.max(1, levelHeight >> 1);
+        }
+      });
+      wrap("texStorage3D", null, (result, target, levelCount, internalFormat, width, height, depth) => {
+        let levelWidth = width;
+        let levelHeight = height;
+        let levelDepth = depth;
+        for (let level = 0; level < levelCount; ++level) {
+          tracker.setTextureLevel(target, level, internalFormat, levelWidth, levelHeight, levelDepth, 0);
+          levelWidth = System14.Math.max(1, levelWidth >> 1);
+          levelHeight = System14.Math.max(1, levelHeight >> 1);
+          if (target === TEXTURE_3D) {
+            levelDepth = System14.Math.max(1, levelDepth >> 1);
+          }
+        }
+      });
+      wrap("generateMipmap", null, (result, target) => {
+        const bindingName = TEXTURE_BINDING_TABLE.get(target);
+        if (bindingName === void 0) {
+          return;
+        }
+        const texture = tracker.readBound(bindingName);
+        const entry = texture === null || texture === void 0 ? void 0 : tracker.#entryTable.get(texture);
+        if (entry === void 0 || entry.width <= 0) {
+          return;
+        }
+        let levelWidth = entry.width;
+        let levelHeight = entry.height;
+        let level = 0;
+        while (levelWidth > 1 || levelHeight > 1) {
+          levelWidth = System14.Math.max(1, levelWidth >> 1);
+          levelHeight = System14.Math.max(1, levelHeight >> 1);
+          ++level;
+          tracker.setBytes(texture, target + ":" + level, levelWidth * levelHeight * readFormatByteCount(entry.internalFormat, 0));
+        }
+      });
+      wrap("renderbufferStorage", null, (result, target, internalFormat, width, height) => {
+        tracker.setBytes(tracker.readBound(RENDERBUFFER_BINDING), null, width * height * readFormatByteCount(internalFormat, 0));
+      });
+      wrap("renderbufferStorageMultisample", null, (result, target, sampleCount, internalFormat, width, height) => {
+        tracker.setBytes(tracker.readBound(RENDERBUFFER_BINDING), null, width * height * readFormatByteCount(internalFormat, 0) * System14.Math.max(1, sampleCount));
+      });
+      wrap("bufferData", null, (result, target, sizeOrData, usage, srcOffset, length) => {
+        const bindingName = BUFFER_BINDING_TABLE.get(target);
+        if (bindingName === void 0) {
+          return;
+        }
+        let bytes = 0;
+        if (typeof sizeOrData === "number") {
+          bytes = sizeOrData;
+        } else if (sizeOrData !== null && sizeOrData !== void 0) {
+          if (System14.ArrayBuffer.isView(sizeOrData) && srcOffset !== void 0) {
+            const elementBytes = sizeOrData.BYTES_PER_ELEMENT ?? 1;
+            const elementCount = sizeOrData.byteLength / elementBytes;
+            bytes = (length === void 0 || length === 0 ? elementCount - srcOffset : length) * elementBytes;
+          } else {
+            bytes = sizeOrData.byteLength ?? 0;
+          }
+        }
+        tracker.setBytes(tracker.readBound(bindingName), null, bytes);
+      });
+    }
+    //==============================================================================
+    // 지금 쓰는 GPU 메모리 읽기.
+    //==============================================================================
+    /**
+     * @returns { { totalBytes: number, canvasBytes: number, kindTable: object, ownerList: Array<{ owner: string, kind: string, count: number, bytes: number }> } }
+     * 합(캔버스 몫 포함), 캔버스 기본 프레임 버퍼 몫, 종류별 { count, bytes }, 주인별 몫(큰 것부터).
+     * @example <caption>종류별과 주인별 GPU 메모리 읽기</caption>
+     * import { GpuMemoryTracker } from "./vanilla.js";
+     * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+     * const gpuMemoryTracker = GpuMemoryTracker.attach(webGL2RenderingContext);
+     * const usage = gpuMemoryTracker.readUsage();
+     * console.log(usage.kindTable.texture.bytes, usage.ownerList.length);
+     */
+    readUsage() {
+      const kindTable = {};
+      for (const kind of System14.Object.values(GpuMemoryKind)) {
+        kindTable[kind] = { count: 0, bytes: 0 };
+      }
+      const ownerTable = new System14.Map();
+      let totalBytes = 0;
+      for (const entry of this.#entrySet) {
+        const kindUsage = kindTable[entry.kind];
+        kindUsage.count += 1;
+        kindUsage.bytes += entry.bytes;
+        totalBytes += entry.bytes;
+        const ownerKey = entry.kind + "|" + entry.owner;
+        let ownerUsage = ownerTable.get(ownerKey);
+        if (ownerUsage === void 0) {
+          ownerUsage = { owner: entry.owner, kind: entry.kind, count: 0, bytes: 0 };
+          ownerTable.set(ownerKey, ownerUsage);
+        }
+        ownerUsage.count += 1;
+        ownerUsage.bytes += entry.bytes;
+      }
+      const ownerList = Array.from(ownerTable.values()).sort((left, right) => right.bytes - left.bytes);
+      const gl = this.#webGL2RenderingContext;
+      let canvasBytes = 0;
+      if (!gl.isContextLost()) {
+        const attributes = gl.getContextAttributes();
+        const pixelCount = gl.drawingBufferWidth * gl.drawingBufferHeight;
+        const sampleCount = attributes !== null && attributes.antialias ? 4 : 1;
+        canvasBytes = pixelCount * 8 * sampleCount + (sampleCount > 1 ? pixelCount * 4 : 0);
+      }
+      return { totalBytes: totalBytes + canvasBytes, canvasBytes, kindTable, ownerList };
+    }
+  };
+
+  // src/core/graphic/colorspace.js
+  var System15 = globalThis;
+  var ColorSpace = System15.Object.freeze({
     gamma: "gamma",
     // 감마 공간. (기본, 지금까지의 화면, pow 2.2 근사)
     linear: "linear"
@@ -8629,7 +9139,7 @@
   __name(readColorSpace, "readColorSpace");
 
   // src/core/graphic.js
-  var System15 = globalThis;
+  var System16 = globalThis;
   var VERTEXSHADER_SOURCE = `#version 300 es
 in vec2 vertexPosition;
 in vec2 vertexTextureCoordinate;
@@ -8698,8 +9208,8 @@ void main() {
   var NODE_VISIBILITY_OUTSIDE = 1;
   var NODE_VISIBILITY_INSIDE = 2;
   function isClipEdgeOnPixelCenter(edge) {
-    const fraction = edge - System15.Math.floor(edge);
-    return System15.Math.abs(fraction - 0.5) < CLIP_EDGE_EPSILON;
+    const fraction = edge - System16.Math.floor(edge);
+    return System16.Math.abs(fraction - 0.5) < CLIP_EDGE_EPSILON;
   }
   __name(isClipEdgeOnPixelCenter, "isClipEdgeOnPixelCenter");
   var BATCH_VERTEXSHADER_SOURCE = `#version 300 es
@@ -8980,8 +9490,8 @@ void main() {
   var VERTEX_CAPACITY = 4096;
   var CORNER_SEGMENT_COUNT = 8;
   var ROUND_RECT_POSITION_COUNT = 4 * (CORNER_SEGMENT_COUNT + 1);
-  var ROUND_RECT_COSINE_TABLE = new System15.Float64Array(ROUND_RECT_POSITION_COUNT);
-  var ROUND_RECT_SINE_TABLE = new System15.Float64Array(ROUND_RECT_POSITION_COUNT);
+  var ROUND_RECT_COSINE_TABLE = new System16.Float64Array(ROUND_RECT_POSITION_COUNT);
+  var ROUND_RECT_SINE_TABLE = new System16.Float64Array(ROUND_RECT_POSITION_COUNT);
   var ROUND_RECT_CORNER_START_RADIAN_LIST = [-PI / 2, 0, PI / 2, PI];
   for (let cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
     const startRadian = ROUND_RECT_CORNER_START_RADIAN_LIST[cornerIndex];
@@ -8992,7 +9502,7 @@ void main() {
       ROUND_RECT_SINE_TABLE[positionIndex] = sin(radian);
     }
   }
-  var ROUND_RECT_POSITION_DATA = new System15.Float64Array(ROUND_RECT_POSITION_COUNT * 2);
+  var ROUND_RECT_POSITION_DATA = new System16.Float64Array(ROUND_RECT_POSITION_COUNT * 2);
   var MAXIMUM_TEXT_BAKE_SCALE = 8;
   var DEFAULT_TEXT_BAKE_SCALE_STEP = 0.25;
   var RIGHT_TO_LEFT_CHARACTER_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
@@ -9180,10 +9690,19 @@ void main() {
     #imageMipmapBias;
     /** @private @type { string } */
     #imageSmoothingQuality;
+    /** @private @type { boolean } */
+    #isContextLost;
+    // WebGL 컨텍스트를 잃은 동안 참. (webglcontextlost 로 세우고 되살려 다시 지은 뒤 내린다, 엔진이 이 동안 그리지 않는다)
+    /** @private @type { ((event: string) => void) | null } */
+    #contextEventCallback;
+    // 잃음과 되살림을 알리는 함수. (엔진이 건다, "lost" 와 "restored")
+    /** @private @type { GpuMemoryTracker } */
+    #gpuMemoryTracker;
+    // GPU 메모리 셈. (텍스처, 렌더버퍼, 버퍼)
     /** @private @type { ShaderProgram } */
     #shaderProgram;
     /** @private @type { Map<string, ShaderProgram | null> } */
-    #resolvedShaderProgramTable = new System15.Map();
+    #resolvedShaderProgramTable = new System16.Map();
     // resolveShaderProgram 이 담아 둔 프로그램. ("묶음\u0000이름" → 프로그램, 실패는 null)
     /** @private @type { ShaderProgram | null } */
     #shaderProgramOverride;
@@ -9547,7 +10066,10 @@ void main() {
       this.#canvas = canvas;
       this.#webGL2RenderingContext = webGL2RenderingContext;
       this.#webGLStateCache = WebGLStateCache.attach(webGL2RenderingContext);
-      const contextChangeCallback = /* @__PURE__ */ __name(() => {
+      this.#gpuMemoryTracker = GpuMemoryTracker.attach(webGL2RenderingContext);
+      this.#isContextLost = false;
+      this.#contextEventCallback = null;
+      const forgetGeometry = /* @__PURE__ */ __name(() => {
         this.#geometryCacheGeneration += 1;
         for (const retainedFlush of this.#batchRetainedFlushList) {
           retainedFlush.vertexArray = null;
@@ -9555,37 +10077,35 @@ void main() {
           retainedFlush.bufferVertexCount = 0;
           retainedFlush.isValid = false;
         }
-      }, "contextChangeCallback");
-      canvas.addEventListener("webglcontextlost", contextChangeCallback);
-      canvas.addEventListener("webglcontextrestored", contextChangeCallback);
+      }, "forgetGeometry");
+      canvas.addEventListener("webglcontextlost", (event) => {
+        event.preventDefault();
+        this.#isContextLost = true;
+        this.#batchVertexCount = 0;
+        this.#batchTextureCount = 0;
+        this.#isBatchSegmentDeferring = false;
+        forgetGeometry();
+        this.notifyContextEvent("lost");
+      });
+      canvas.addEventListener("webglcontextrestored", () => {
+        forgetGeometry();
+        try {
+          this.restoreContextResources(webGL2RenderingContext);
+        } catch (error) {
+          console.error(error);
+          console.error("Graphic: WebGL2 context restored, but the engine failed to rebuild its resources. Drawing stays stopped.");
+          return;
+        }
+        this.#isContextLost = false;
+        this.notifyContextEvent("restored");
+      });
       this.#isForceGizmosVisible = false;
       this.#isImageSmoothingEnabled = true;
       this.#isImageMipmapEnabled = false;
       this.#imageMipmapBias = 0;
       this.#imageSmoothingQuality = "high";
-      this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, FRAGMENTSHADER_SOURCE);
-      this.#shaderProgramOverride = null;
-      this.#vertexData = new Float32Array(VERTEX_CAPACITY * FLOATS_PER_VERTEX);
-      this.#vertexArray = webGL2RenderingContext.createVertexArray();
-      this.#vertexBuffer = webGL2RenderingContext.createBuffer();
-      webGL2RenderingContext.bindVertexArray(this.#vertexArray);
-      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
-      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+      this.createCoreResources(webGL2RenderingContext);
       const shaderProgram = this.getShaderProgram();
-      const vertexPositionLocation = shaderProgram.getAttributeLocation("vertexPosition");
-      const vertexTextureCoordinateLocation = shaderProgram.getAttributeLocation("vertexTextureCoordinate");
-      const strideBytes = FLOATS_PER_VERTEX * 4;
-      webGL2RenderingContext.enableVertexAttribArray(vertexPositionLocation);
-      webGL2RenderingContext.vertexAttribPointer(vertexPositionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
-      webGL2RenderingContext.enableVertexAttribArray(vertexTextureCoordinateLocation);
-      webGL2RenderingContext.vertexAttribPointer(vertexTextureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
-      webGL2RenderingContext.bindVertexArray(null);
-      this.#whiteTexture = webGL2RenderingContext.createTexture();
-      this.bindTexture(this.#whiteTexture);
-      const whitePixel = new Uint8Array([255, 255, 255, 255]);
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, whitePixel);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
-      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
       this.#particleShaderProgram = null;
       this.#particleVertexArray = null;
       this.#particleVertexBuffer = null;
@@ -9682,7 +10202,7 @@ void main() {
       this.#isSubtreeCullingEnabled = true;
       this.#culledSubtreeCount = 0;
       this.#lastFrameCulledSubtreeCount = 0;
-      this.#localVisibleKeyList = new System15.Float64Array(10).fill(System15.Number.NaN);
+      this.#localVisibleKeyList = new System16.Float64Array(10).fill(System16.Number.NaN);
       this.#isLocalVisibleBoundsKnown = false;
       this.#localVisibleMinimumX = 0;
       this.#localVisibleMinimumY = 0;
@@ -10478,28 +10998,28 @@ void main() {
       const matrixD = transformMatrix.d;
       const matrixE = transformMatrix.e;
       const matrixF = transformMatrix.f;
-      let minimumX = System15.Infinity;
-      let minimumY = System15.Infinity;
-      let maximumX = -System15.Infinity;
-      let maximumY = -System15.Infinity;
+      let minimumX = System16.Infinity;
+      let minimumY = System16.Infinity;
+      let maximumX = -System16.Infinity;
+      let maximumY = -System16.Infinity;
       let offset = firstVertexIndex * floatsPerVertex;
       for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
         const positionX = vertexData[offset];
         const positionY = vertexData[offset + 1];
         const deviceX = matrixA * positionX + matrixC * positionY + matrixE;
         const deviceY = matrixB * positionX + matrixD * positionY + matrixF;
-        minimumX = System15.Math.min(minimumX, deviceX);
-        minimumY = System15.Math.min(minimumY, deviceY);
-        maximumX = System15.Math.max(maximumX, deviceX);
-        maximumY = System15.Math.max(maximumY, deviceY);
+        minimumX = System16.Math.min(minimumX, deviceX);
+        minimumY = System16.Math.min(minimumY, deviceY);
+        maximumX = System16.Math.max(maximumX, deviceX);
+        maximumY = System16.Math.max(maximumY, deviceY);
         offset += floatsPerVertex;
       }
       const viewportWidth = this.#appliedViewportWidth;
       const viewportHeight = this.#appliedViewportHeight;
-      const leftX = System15.Math.max(0, System15.Math.floor(minimumX));
-      const topY = System15.Math.max(0, System15.Math.floor(minimumY));
-      const rightX = System15.Math.min(viewportWidth, System15.Math.ceil(maximumX));
-      const bottomY = System15.Math.min(viewportHeight, System15.Math.ceil(maximumY));
+      const leftX = System16.Math.max(0, System16.Math.floor(minimumX));
+      const topY = System16.Math.max(0, System16.Math.floor(minimumY));
+      const rightX = System16.Math.min(viewportWidth, System16.Math.ceil(maximumX));
+      const bottomY = System16.Math.min(viewportHeight, System16.Math.ceil(maximumY));
       if (!(rightX > leftX && bottomY > topY)) {
         return false;
       }
@@ -10772,6 +11292,156 @@ void main() {
       }
     }
     //==============================================================================
+    // 기본 GL 자원 짓기. (기본 셰이더 프로그램, 버텍스 어레이와 버퍼, 흰 텍스처)
+    // - 생성자와 컨텍스트를 되살린 뒤에 같이 쓴다.
+    //==============================================================================
+    /**
+     * @private
+     * @param { WebGL2RenderingContext } webGL2RenderingContext
+     */
+    createCoreResources(webGL2RenderingContext) {
+      this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, FRAGMENTSHADER_SOURCE);
+      this.#shaderProgramOverride = null;
+      this.#vertexData = new Float32Array(VERTEX_CAPACITY * FLOATS_PER_VERTEX);
+      this.#vertexArray = webGL2RenderingContext.createVertexArray();
+      this.#vertexBuffer = webGL2RenderingContext.createBuffer();
+      webGL2RenderingContext.bindVertexArray(this.#vertexArray);
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+      webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+      const shaderProgram = this.getShaderProgram();
+      const vertexPositionLocation = shaderProgram.getAttributeLocation("vertexPosition");
+      const vertexTextureCoordinateLocation = shaderProgram.getAttributeLocation("vertexTextureCoordinate");
+      const strideBytes = FLOATS_PER_VERTEX * 4;
+      webGL2RenderingContext.enableVertexAttribArray(vertexPositionLocation);
+      webGL2RenderingContext.vertexAttribPointer(vertexPositionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
+      webGL2RenderingContext.enableVertexAttribArray(vertexTextureCoordinateLocation);
+      webGL2RenderingContext.vertexAttribPointer(vertexTextureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
+      webGL2RenderingContext.bindVertexArray(null);
+      this.#whiteTexture = webGL2RenderingContext.createTexture();
+      this.bindTexture(this.#whiteTexture);
+      const whitePixel = new Uint8Array([255, 255, 255, 255]);
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, whitePixel);
+      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+      webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+    }
+    //==============================================================================
+    // 컨텍스트를 되살린 뒤 엔진 자원 다시 짓기. (잃은 컨텍스트의 객체는 모두 죽었다)
+    // - 기본 자원은 다시 짓고, 지연 생성 자원은 비워 다음에 쓸 때 짓게 하고, 그림 텍스처와 글자 아틀라스는 새 캐시로 바꿔 다시 올린다.
+    //==============================================================================
+    /**
+     * @private
+     * @param { WebGL2RenderingContext } webGL2RenderingContext
+     */
+    restoreContextResources(webGL2RenderingContext) {
+      this.#resolvedShaderProgramTable.clear();
+      this.createCoreResources(webGL2RenderingContext);
+      this.#particleShaderProgram = null;
+      this.#particleVertexArray = null;
+      this.#particleVertexBuffer = null;
+      this.#particleVertexData = null;
+      this.#softDiscTexture = null;
+      this.#batchShaderProgram = null;
+      this.#batchVertexArray = null;
+      this.#batchVertexBuffer = null;
+      this.#batchVertexData = null;
+      this.#batchVertexCount = 0;
+      this.#blendShaderProgram = null;
+      this.#particleBlendShaderProgram = null;
+      this.#backdropTargetTable.clear();
+      this.#framebufferFormatTable.clear();
+      this.#layerTarget = null;
+      this.#opacityLayerStack = [];
+      this.#opacityLayerTargetPool = [];
+      this.#uniformLocationProgram = null;
+      this.#isUploadedUniformKnown = false;
+      this.#appliedViewportWidth = 0;
+      this.#appliedViewportHeight = 0;
+      const textureBinder = /* @__PURE__ */ __name((texture) => {
+        this.bindTexture(texture);
+      }, "textureBinder");
+      this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
+      const beforeTextureOverwrite = /* @__PURE__ */ __name(() => {
+        this.flushBatch();
+      }, "beforeTextureOverwrite");
+      this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder, beforeTextureOverwrite);
+      webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+      webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+      webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+      webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+      const shaderProgram = this.#shaderProgram;
+      this.useShaderProgram(shaderProgram);
+      webGL2RenderingContext.uniform1i(shaderProgram.getUniformLocation("mainTexture"), 0);
+      this.applyImageMipmapBias(shaderProgram);
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+      if (this.#isBatchingEnabled) {
+        this.ensureSpriteBatchResources();
+      }
+    }
+    //==============================================================================
+    // 컨텍스트 잃음, 되살림 알리기. (엔진이 건 함수에, 그 함수의 예외는 알리고 넘어간다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { string } event "lost" 나 "restored".
+     */
+    notifyContextEvent(event) {
+      if (this.#contextEventCallback === null) {
+        return;
+      }
+      try {
+        this.#contextEventCallback(event);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    //==============================================================================
+    // 컨텍스트 잃음, 되살림을 알릴 함수 걸기. (엔진이 건다)
+    //==============================================================================
+    /**
+     * @private
+     * @param { ((event: string) => void) | null } contextEventCallback "lost" 와 "restored" 를 받는 함수. (null 이면 끈다)
+     */
+    setContextEventCallback(contextEventCallback) {
+      this.#contextEventCallback = contextEventCallback;
+    }
+    //==============================================================================
+    // WebGL 컨텍스트를 잃은 상태인지.
+    //==============================================================================
+    /**
+     * 컨텍스트를 잃은 동안 엔진은 그리지 않는다. 되살아나 엔진이 기본 자원을 다시 지으면 false 로 돌아간다.
+     * (webglcontextlost 이벤트로 세운 깃발이라 GL 에 묻지 않는다)
+     * @returns { boolean } 잃었으면 true.
+     * @example <caption>잃은 동안 게임이 하던 그리기를 건너뛰기</caption>
+     * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * engine.run(new Scene());
+     * if (!engine.getGraphic().isContextLost()) {
+     * 	console.log("draw");
+     * }
+     */
+    isContextLost() {
+      return this.#isContextLost;
+    }
+    //==============================================================================
+    // GPU 메모리 읽기. (개발용)
+    //==============================================================================
+    /**
+     * 텍스처, 렌더버퍼, 버퍼가 쓰는 GPU 메모리를 종류별과 주인별로 읽는다. (형식과 크기로 셈한 이름값, 멀티샘플 렌더버퍼는 샘플 수를 곱한다)
+     * @returns { { totalBytes: number, canvasBytes: number, kindTable: object, ownerList: Array<{ owner: string, kind: string, count: number, bytes: number }> } }
+     * 합(캔버스 기본 프레임 버퍼 몫 포함), 캔버스 몫, 종류별 { count, bytes }, 주인별 몫(큰 것부터, 주인은 지은 호출 스택의 위쪽 세 칸).
+     * @example <caption>GPU 메모리 합과 가장 큰 주인 읽기</caption>
+     * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * engine.run(new Scene());
+     * const usage = engine.getGraphic().readGpuMemoryUsage();
+     * console.log(usage.totalBytes, usage.ownerList.length > 0 ? usage.ownerList[0].owner : "none");
+     */
+    readGpuMemoryUsage() {
+      return this.#gpuMemoryTracker.readUsage();
+    }
+    //==============================================================================
     // 프레임 그리기 통계 시작.
     // - 엔진이 매 프레임 씬을 그리기 전에 부른다. 지난 프레임의 드로우 콜 / 정점 수를 넘겨 두고 이번 프레임 값을 비운다.
     // - 2D 경로(drawVertices, drawColoredQuads)만 센다. 3D 렌더러와 화면 효과 패스는 세지 않는다.
@@ -10820,7 +11490,7 @@ void main() {
      */
     getLastFrameTriangleCount() {
       const lastFrameVertexCount = this.getLastFrameVertexCount();
-      return System15.Math.floor(lastFrameVertexCount / 3);
+      return System16.Math.floor(lastFrameVertexCount / 3);
     }
     //==============================================================================
     // 화면 밖 거르기 설정. (기본 true)
@@ -11078,10 +11748,10 @@ void main() {
       const clipStack = this.#clipStack;
       if (clipStack.length > 0) {
         const clipEntry = clipStack[clipStack.length - 1];
-        visibleMinimumX = System15.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
-        visibleMinimumY = System15.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
-        visibleMaximumX = System15.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
-        visibleMaximumY = System15.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
+        visibleMinimumX = System16.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
+        visibleMinimumY = System16.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
+        visibleMaximumX = System16.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
+        visibleMaximumY = System16.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
       }
       const transformMatrix = this.#transformMatrix;
       const matrixA = transformMatrix.a;
@@ -11106,7 +11776,7 @@ void main() {
       keyList[9] = visibleMaximumY;
       const determinant = matrixA * matrixD - matrixB * matrixC;
       this.#isLocalInnerBoundsKnown = false;
-      if (determinant === 0 || !System15.Number.isFinite(determinant)) {
+      if (determinant === 0 || !System16.Number.isFinite(determinant)) {
         this.#isLocalVisibleBoundsKnown = false;
         return false;
       }
@@ -11123,11 +11793,11 @@ void main() {
       const leftBottomY = (matrixA * bottomY - matrixB * leftX) * inverseDeterminant;
       const rightBottomX = (matrixD * rightX - matrixC * bottomY) * inverseDeterminant;
       const rightBottomY = (matrixA * bottomY - matrixB * rightX) * inverseDeterminant;
-      const minimumX = System15.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
-      const minimumY = System15.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
-      const maximumX = System15.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
-      const maximumY = System15.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
-      const isFinite = System15.Number.isFinite(minimumX) && System15.Number.isFinite(minimumY) && System15.Number.isFinite(maximumX) && System15.Number.isFinite(maximumY);
+      const minimumX = System16.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const minimumY = System16.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const maximumX = System16.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const maximumY = System16.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const isFinite = System16.Number.isFinite(minimumX) && System16.Number.isFinite(minimumY) && System16.Number.isFinite(maximumX) && System16.Number.isFinite(maximumY);
       this.#localVisibleMinimumX = minimumX;
       this.#localVisibleMinimumY = minimumY;
       this.#localVisibleMaximumX = maximumX;
@@ -11138,11 +11808,11 @@ void main() {
         const innerRightX = (visibleMaximumX - 1 - matrixE) / matrixA;
         const innerTopY = (visibleMinimumY + 1 - matrixF) / matrixD;
         const innerBottomY = (visibleMaximumY - 1 - matrixF) / matrixD;
-        this.#localInnerMinimumX = System15.Math.min(innerLeftX, innerRightX);
-        this.#localInnerMinimumY = System15.Math.min(innerTopY, innerBottomY);
-        this.#localInnerMaximumX = System15.Math.max(innerLeftX, innerRightX);
-        this.#localInnerMaximumY = System15.Math.max(innerTopY, innerBottomY);
-        this.#isLocalInnerBoundsKnown = System15.Number.isFinite(this.#localInnerMinimumX) && System15.Number.isFinite(this.#localInnerMinimumY) && System15.Number.isFinite(this.#localInnerMaximumX) && System15.Number.isFinite(this.#localInnerMaximumY);
+        this.#localInnerMinimumX = System16.Math.min(innerLeftX, innerRightX);
+        this.#localInnerMinimumY = System16.Math.min(innerTopY, innerBottomY);
+        this.#localInnerMaximumX = System16.Math.max(innerLeftX, innerRightX);
+        this.#localInnerMaximumY = System16.Math.max(innerTopY, innerBottomY);
+        this.#isLocalInnerBoundsKnown = System16.Number.isFinite(this.#localInnerMinimumX) && System16.Number.isFinite(this.#localInnerMinimumY) && System16.Number.isFinite(this.#localInnerMaximumX) && System16.Number.isFinite(this.#localInnerMaximumY);
       }
       return isFinite;
     }
@@ -11193,10 +11863,10 @@ void main() {
       const leftBottomY = matrixB * leftX + matrixD * bottomY + matrixF;
       const rightBottomX = matrixA * rightX + matrixC * bottomY + matrixE;
       const rightBottomY = matrixB * rightX + matrixD * bottomY + matrixF;
-      const minimumX = System15.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
-      const maximumX = System15.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
-      const minimumY = System15.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
-      const maximumY = System15.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const minimumX = System16.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const maximumX = System16.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const minimumY = System16.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const maximumY = System16.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
       let visibleMinimumX = 0;
       let visibleMinimumY = 0;
       let visibleMaximumX = viewportWidth;
@@ -11204,10 +11874,10 @@ void main() {
       const clipStack = this.#clipStack;
       if (clipStack.length > 0) {
         const clipEntry = clipStack[clipStack.length - 1];
-        visibleMinimumX = System15.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
-        visibleMinimumY = System15.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
-        visibleMaximumX = System15.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
-        visibleMaximumY = System15.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
+        visibleMinimumX = System16.Math.max(visibleMinimumX, clipEntry.cullMinimumX);
+        visibleMinimumY = System16.Math.max(visibleMinimumY, clipEntry.cullMinimumY);
+        visibleMaximumX = System16.Math.min(visibleMaximumX, clipEntry.cullMaximumX);
+        visibleMaximumY = System16.Math.min(visibleMaximumY, clipEntry.cullMaximumY);
       }
       if (!(maximumX >= visibleMinimumX && maximumY >= visibleMinimumY && minimumX <= visibleMaximumX && minimumY <= visibleMaximumY)) {
         return NODE_VISIBILITY_OUTSIDE;
@@ -11276,7 +11946,7 @@ void main() {
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const maximumTextureUnitCount = webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_TEXTURE_IMAGE_UNITS);
-      const textureSlotCount = System15.Math.max(1, System15.Math.min(maximumTextureUnitCount, BATCH_TEXTURE_SLOT_LIMIT));
+      const textureSlotCount = System16.Math.max(1, System16.Math.min(maximumTextureUnitCount, BATCH_TEXTURE_SLOT_LIMIT));
       this.#batchTextureSlotCount = textureSlotCount;
       this.#batchTextureList = new Array(textureSlotCount).fill(null);
       this.#batchTextureCount = 0;
@@ -11464,7 +12134,7 @@ void main() {
       this.ensureSpriteBatchResources();
       if (!this.#isBatchFlushScheduled) {
         this.#isBatchFlushScheduled = true;
-        System15.queueMicrotask(this.#scheduledBatchFlush);
+        System16.queueMicrotask(this.#scheduledBatchFlush);
       }
       let textureSlot = this.findSpriteBatchTextureSlot(texture);
       const isTextureSlotMissing = textureSlot < 0 && this.#batchTextureCount >= this.#batchTextureSlotCount;
@@ -11693,7 +12363,7 @@ void main() {
       while (vertexCapacity < vertexCount) {
         vertexCapacity *= 2;
       }
-      vertexCapacity = System15.Math.min(vertexCapacity, BATCH_VERTEX_CAPACITY);
+      vertexCapacity = System16.Math.min(vertexCapacity, BATCH_VERTEX_CAPACITY);
       const grownVertexData = new Float32Array(vertexCapacity * BATCH_FLOATS_PER_VERTEX);
       grownVertexData.set(batchVertexData.subarray(0, this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX));
       this.#batchVertexData = grownVertexData;
@@ -12664,7 +13334,7 @@ void main() {
       const quadRect = this.#backdropRect;
       const groupRectList = this.#particleGroupRectList;
       const groupRect = { x: 0, y: 0, width: 0, height: 0 };
-      const quadCount = System15.Math.floor(vertexCount / 6);
+      const quadCount = System16.Math.floor(vertexCount / 6);
       let groupStartQuadIndex = 0;
       let groupRectCount = 0;
       const drawGroup = /* @__PURE__ */ __name((endQuadIndex) => {
@@ -12703,10 +13373,10 @@ void main() {
           groupRect.width = quadRect.width;
           groupRect.height = quadRect.height;
         } else {
-          const leftX = System15.Math.min(groupRect.x, quadRect.x);
-          const bottomY = System15.Math.min(groupRect.y, quadRect.y);
-          const rightX = System15.Math.max(groupRect.x + groupRect.width, quadRect.x + quadRect.width);
-          const topY = System15.Math.max(groupRect.y + groupRect.height, quadRect.y + quadRect.height);
+          const leftX = System16.Math.min(groupRect.x, quadRect.x);
+          const bottomY = System16.Math.min(groupRect.y, quadRect.y);
+          const rightX = System16.Math.max(groupRect.x + groupRect.width, quadRect.x + quadRect.width);
+          const topY = System16.Math.max(groupRect.y + groupRect.height, quadRect.y + quadRect.height);
           groupRect.x = leftX;
           groupRect.y = bottomY;
           groupRect.width = rightX - leftX;
@@ -12728,7 +13398,7 @@ void main() {
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const textureSize = 64;
-      const pixels = new System15.Uint8Array(textureSize * textureSize * 4);
+      const pixels = new System16.Uint8Array(textureSize * textureSize * 4);
       const halfSize = textureSize * 0.5;
       for (let pixelY = 0; pixelY < textureSize; ++pixelY) {
         for (let pixelX = 0; pixelX < textureSize; ++pixelX) {
@@ -13149,7 +13819,7 @@ void main() {
     drawArc(center, radius, startRadian, endRadian, lineWidth = 1) {
       const halfWidth = lineWidth * 0.5;
       const strokeColor = this.getStrokeColor();
-      this.drawRingWithColor(center.x, center.y, System15.Math.max(0, radius - halfWidth), radius + halfWidth, startRadian, endRadian, strokeColor);
+      this.drawRingWithColor(center.x, center.y, System16.Math.max(0, radius - halfWidth), radius + halfWidth, startRadian, endRadian, strokeColor);
     }
     //==============================================================================
     // 고리 출력의 셈. (drawRing, drawArc 가 부른다)
@@ -13172,19 +13842,19 @@ void main() {
       const clampedSpanRadian = clamp(spanRadian, -fullRadian, fullRadian);
       const maximumScale = this.#transformMatrix.getMaximumScale();
       const fullSegmentCount = clamp(ceil(outerRadius * maximumScale * 0.5), 16, 64);
-      const segmentCount = System15.Math.max(1, ceil(fullSegmentCount * System15.Math.abs(clampedSpanRadian) / fullRadian));
+      const segmentCount = System16.Math.max(1, ceil(fullSegmentCount * System16.Math.abs(clampedSpanRadian) / fullRadian));
       const vertexData = this.getVertexData();
       let offset = 0;
       let vertexCount = 0;
-      let previousCosine = System15.Math.cos(startRadian);
-      let previousSine = System15.Math.sin(startRadian);
+      let previousCosine = System16.Math.cos(startRadian);
+      let previousSine = System16.Math.sin(startRadian);
       for (let segmentIndex = 1; segmentIndex <= segmentCount; ++segmentIndex) {
         if ((vertexCount + 6) * FLOATS_PER_VERTEX > vertexData.length) {
           break;
         }
         const radian = startRadian + clampedSpanRadian * (segmentIndex / segmentCount);
-        const cosine = System15.Math.cos(radian);
-        const sine = System15.Math.sin(radian);
+        const cosine = System16.Math.cos(radian);
+        const sine = System16.Math.sin(radian);
         const previousInnerX = centerX + previousCosine * innerRadius;
         const previousInnerY = centerY + previousSine * innerRadius;
         const previousOuterX = centerX + previousCosine * outerRadius;
@@ -13266,7 +13936,7 @@ void main() {
       const vertexData = this.getVertexData();
       let offset = 0;
       let vertexCount = 0;
-      const segmentCount = System15.Math.floor(positionValues.length / 4);
+      const segmentCount = System16.Math.floor(positionValues.length / 4);
       for (let segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex) {
         const valueIndex = segmentIndex * 4;
         const startX = positionValues[valueIndex];
@@ -13389,9 +14059,9 @@ void main() {
      * const engine = new Engine(engineConfiguration);
      * engine.run(new MainScene());
      */
-    prepareLoadedImages(timeLimitMilliseconds = System15.Infinity) {
+    prepareLoadedImages(timeLimitMilliseconds = System16.Infinity) {
       const pendingImageList = DecodedImageStore.getPendingImageList(this.getWebGL2RenderingContext());
-      const startTime = System15.performance.now();
+      const startTime = System16.performance.now();
       let imageIndex = 0;
       while (imageIndex < pendingImageList.length) {
         const image = pendingImageList[imageIndex];
@@ -13400,7 +14070,7 @@ void main() {
         if (!isPrepared) {
           DecodedImageStore.release(image);
         }
-        if (System15.performance.now() - startTime >= timeLimitMilliseconds) {
+        if (System16.performance.now() - startTime >= timeLimitMilliseconds) {
           break;
         }
       }
@@ -14194,15 +14864,15 @@ void main() {
       const leftBottomY = matrixB * leftX + matrixD * bottomY + transformMatrix.f;
       const rightBottomX = matrixA * rightX + matrixC * bottomY + transformMatrix.e;
       const rightBottomY = matrixB * rightX + matrixD * bottomY + transformMatrix.f;
-      const minimumX = System15.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
-      const maximumX = System15.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
-      const minimumY = System15.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
-      const maximumY = System15.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const minimumX = System16.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const maximumX = System16.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const minimumY = System16.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const maximumY = System16.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
       const parentEntry = previousClipDepth > 0 ? this.#clipStack[previousClipDepth - 1] : null;
-      clipEntry.cullMinimumX = parentEntry ? System15.Math.max(parentEntry.cullMinimumX, minimumX) : minimumX;
-      clipEntry.cullMinimumY = parentEntry ? System15.Math.max(parentEntry.cullMinimumY, minimumY) : minimumY;
-      clipEntry.cullMaximumX = parentEntry ? System15.Math.min(parentEntry.cullMaximumX, maximumX) : maximumX;
-      clipEntry.cullMaximumY = parentEntry ? System15.Math.min(parentEntry.cullMaximumY, maximumY) : maximumY;
+      clipEntry.cullMinimumX = parentEntry ? System16.Math.max(parentEntry.cullMinimumX, minimumX) : minimumX;
+      clipEntry.cullMinimumY = parentEntry ? System16.Math.max(parentEntry.cullMinimumY, minimumY) : minimumY;
+      clipEntry.cullMaximumX = parentEntry ? System16.Math.min(parentEntry.cullMaximumX, maximumX) : maximumX;
+      clipEntry.cullMaximumY = parentEntry ? System16.Math.min(parentEntry.cullMaximumY, maximumY) : maximumY;
       const isAxisAligned = matrixB === 0 && matrixC === 0 || matrixA === 0 && matrixD === 0;
       let isShaderClip = false;
       let shaderMinimumX = minimumX;
@@ -14211,11 +14881,11 @@ void main() {
       let shaderMaximumY = maximumY;
       if (roundSize <= 0 && isAxisAligned) {
         if (this.isFramebufferMultisampled()) {
-          shaderMinimumX = System15.Math.round(minimumX);
-          shaderMinimumY = System15.Math.round(minimumY);
-          shaderMaximumX = System15.Math.round(maximumX);
-          shaderMaximumY = System15.Math.round(maximumY);
-          isShaderClip = System15.Math.abs(shaderMinimumX - minimumX) < CLIP_EDGE_EPSILON && System15.Math.abs(shaderMinimumY - minimumY) < CLIP_EDGE_EPSILON && System15.Math.abs(shaderMaximumX - maximumX) < CLIP_EDGE_EPSILON && System15.Math.abs(shaderMaximumY - maximumY) < CLIP_EDGE_EPSILON;
+          shaderMinimumX = System16.Math.round(minimumX);
+          shaderMinimumY = System16.Math.round(minimumY);
+          shaderMaximumX = System16.Math.round(maximumX);
+          shaderMaximumY = System16.Math.round(maximumY);
+          isShaderClip = System16.Math.abs(shaderMinimumX - minimumX) < CLIP_EDGE_EPSILON && System16.Math.abs(shaderMinimumY - minimumY) < CLIP_EDGE_EPSILON && System16.Math.abs(shaderMaximumX - maximumX) < CLIP_EDGE_EPSILON && System16.Math.abs(shaderMaximumY - maximumY) < CLIP_EDGE_EPSILON;
         } else {
           isShaderClip = !isClipEdgeOnPixelCenter(minimumX) && !isClipEdgeOnPixelCenter(minimumY) && !isClipEdgeOnPixelCenter(maximumX) && !isClipEdgeOnPixelCenter(maximumY);
         }
@@ -14228,10 +14898,10 @@ void main() {
         clipEntry.shaderClipSlot = parentEntry.shaderClipSlot;
         clipEntry.shaderClipSlotGeneration = parentEntry.shaderClipSlotGeneration;
         if (isShaderClip) {
-          shaderClipRect[0] = System15.Math.max(shaderClipRect[0], shaderMinimumX);
-          shaderClipRect[1] = System15.Math.max(shaderClipRect[1], shaderMinimumY);
-          shaderClipRect[2] = System15.Math.min(shaderClipRect[2], shaderMaximumX);
-          shaderClipRect[3] = System15.Math.min(shaderClipRect[3], shaderMaximumY);
+          shaderClipRect[0] = System16.Math.max(shaderClipRect[0], shaderMinimumX);
+          shaderClipRect[1] = System16.Math.max(shaderClipRect[1], shaderMinimumY);
+          shaderClipRect[2] = System16.Math.min(shaderClipRect[2], shaderMaximumX);
+          shaderClipRect[3] = System16.Math.min(shaderClipRect[3], shaderMaximumY);
           clipEntry.shaderClipSlotGeneration = -1;
         }
       } else {
@@ -14318,10 +14988,10 @@ void main() {
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const shaderClipRect = this.#shaderClipRect;
-      const leftX = System15.Math.ceil(shaderClipRect[0] - 0.5);
-      const topY = System15.Math.ceil(shaderClipRect[1] - 0.5);
-      const rightX = System15.Math.max(leftX, System15.Math.ceil(shaderClipRect[2] - 0.5));
-      const bottomY = System15.Math.max(topY, System15.Math.ceil(shaderClipRect[3] - 0.5));
+      const leftX = System16.Math.ceil(shaderClipRect[0] - 0.5);
+      const topY = System16.Math.ceil(shaderClipRect[1] - 0.5);
+      const rightX = System16.Math.max(leftX, System16.Math.ceil(shaderClipRect[2] - 0.5));
+      const bottomY = System16.Math.max(topY, System16.Math.ceil(shaderClipRect[3] - 0.5));
       webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
       webGL2RenderingContext.scissor(leftX, this.#appliedViewportHeight - bottomY, rightX - leftX, bottomY - topY);
       this.#isClipScissorEnabled = true;
@@ -14705,13 +15375,13 @@ void main() {
      */
     readFramebufferPixels() {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const width = System15.Math.max(0, this.#appliedViewportWidth);
-      const height = System15.Math.max(0, this.#appliedViewportHeight);
+      const width = System16.Math.max(0, this.#appliedViewportWidth);
+      const height = System16.Math.max(0, this.#appliedViewportHeight);
       const rowByteCount = width * 4;
-      const bottomUpPixels = new System15.Uint8Array(rowByteCount * height);
+      const bottomUpPixels = new System16.Uint8Array(rowByteCount * height);
       webGL2RenderingContext.pixelStorei(webGL2RenderingContext.PACK_ALIGNMENT, 1);
       webGL2RenderingContext.readPixels(0, 0, width, height, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bottomUpPixels);
-      const topDownPixels = new System15.Uint8Array(rowByteCount * height);
+      const topDownPixels = new System16.Uint8Array(rowByteCount * height);
       for (let rowIndex = 0; rowIndex < height; rowIndex++) {
         const sourceStart = (height - 1 - rowIndex) * rowByteCount;
         topDownPixels.set(bottomUpPixels.subarray(sourceStart, sourceStart + rowByteCount), rowIndex * rowByteCount);
@@ -15089,7 +15759,7 @@ void main() {
   };
 
   // src/core/viewmanager.js
-  var System16 = globalThis;
+  var System17 = globalThis;
   var ViewScaleMode = {
     // 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
     none: "none",
@@ -15196,8 +15866,8 @@ void main() {
         return;
       }
       this.#isViewRectPending = false;
-      const devicePixelRatio = this.limitRenderPixelRatio(System16.window.devicePixelRatio || 1);
-      const clientNativeSize = Vector2.create(System16.window.innerWidth, System16.window.innerHeight);
+      const devicePixelRatio = this.limitRenderPixelRatio(System17.window.devicePixelRatio || 1);
+      const clientNativeSize = Vector2.create(System17.window.innerWidth, System17.window.innerHeight);
       const canvasNativeRect = canvas.getBoundingClientRect();
       const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
       const canvasPixelSize = Vector2.create(Math.round(canvasNativeSize.x * devicePixelRatio), Math.round(canvasNativeSize.y * devicePixelRatio));
@@ -15629,8 +16299,8 @@ void main() {
     applyAspectViewScaleMode() {
       const referenceResolutionSize = this.getReferenceResolutionSize();
       const canvas = this.getCanvas();
-      let screenWidth = System16.window.innerWidth;
-      let screenHeight = System16.window.innerHeight;
+      let screenWidth = System17.window.innerWidth;
+      let screenHeight = System17.window.innerHeight;
       if (canvas) {
         const canvasNativeRect = canvas.getBoundingClientRect();
         if (canvasNativeRect.width > 0 && canvasNativeRect.height > 0) {
@@ -15727,12 +16397,12 @@ void main() {
      */
     readSafeAreaFromUrl() {
       try {
-        const parameters = new System16.URLSearchParams(System16.window.location.search);
+        const parameters = new System17.URLSearchParams(System17.window.location.search);
         const safeAreaText = parameters.get("safeArea");
         if (!safeAreaText) {
           return null;
         }
-        const parts = safeAreaText.split(",").map((part) => System16.parseFloat(part) || 0);
+        const parts = safeAreaText.split(",").map((part) => System17.parseFloat(part) || 0);
         return { top: parts[0] || 0, right: parts[1] || 0, bottom: parts[2] || 0, left: parts[3] || 0 };
       } catch (parseError) {
         return null;
@@ -15746,7 +16416,7 @@ void main() {
      * @returns { object }
      */
     readSafeAreaFromEnvironment() {
-      const documentObject = System16.document;
+      const documentObject = System17.document;
       if (!documentObject || !documentObject.body) {
         return { top: 0, right: 0, bottom: 0, left: 0 };
       }
@@ -15756,18 +16426,18 @@ void main() {
         documentObject.body.appendChild(probeElement);
         this.#safeAreaProbeElement = probeElement;
       }
-      const computedStyle = System16.getComputedStyle(this.#safeAreaProbeElement);
+      const computedStyle = System17.getComputedStyle(this.#safeAreaProbeElement);
       return {
-        top: System16.parseFloat(computedStyle.paddingTop) || 0,
-        right: System16.parseFloat(computedStyle.paddingRight) || 0,
-        bottom: System16.parseFloat(computedStyle.paddingBottom) || 0,
-        left: System16.parseFloat(computedStyle.paddingLeft) || 0
+        top: System17.parseFloat(computedStyle.paddingTop) || 0,
+        right: System17.parseFloat(computedStyle.paddingRight) || 0,
+        bottom: System17.parseFloat(computedStyle.paddingBottom) || 0,
+        left: System17.parseFloat(computedStyle.paddingLeft) || 0
       };
     }
   };
 
   // src/core/gamepadmanager.js
-  var System17 = globalThis;
+  var System18 = globalThis;
   var GamepadAnalogStickCode = {
     LEFT_X: 0,
     // 왼쪽 스틱 가로축.
@@ -15816,7 +16486,7 @@ void main() {
     TOUCHPAD: 17
     // 터치패드 누름.
   };
-  var GamepadKind = System17.Object.freeze({
+  var GamepadKind = System18.Object.freeze({
     xbox: "xbox",
     // 엑스박스 패드.
     playstation: "playstation",
@@ -15965,7 +16635,7 @@ void main() {
     // 모든 게임패드 갱신.
     //==============================================================================
     updateAllGamepads() {
-      const gamepads = System17.navigator.getGamepads();
+      const gamepads = System18.navigator.getGamepads();
       this.#activeGamepadId = "";
       const isInputLogEnabled = this.isInputLogEnabled();
       for (let index = 0; index < gamepads.length; ++index) {
@@ -16035,8 +16705,8 @@ void main() {
           const lastAxisValue = state.axes.get(i);
           if (Math.abs(lastAxisValue - currentAxisValue) > 0.01) {
             state.axes.set(i, currentAxisValue);
-            const isLastAxisBeyond = System17.Math.abs(lastAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
-            const isCurrentAxisBeyond = System17.Math.abs(currentAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
+            const isLastAxisBeyond = System18.Math.abs(lastAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
+            const isCurrentAxisBeyond = System18.Math.abs(currentAxisValue) >= GAMEPAD_ACTIVE_AXIS_THRESHOLD;
             if (isCurrentAxisBeyond && !isLastAxisBeyond) {
               this.#activeGamepadId = gamepad.id;
             }
@@ -16136,7 +16806,7 @@ void main() {
      * @returns { Gamepad[] } 연결된 게임패드 목록. (브라우저의 지금 Gamepad)
      */
     getAllConnectedGamepads() {
-      const gamepads = System17.navigator.getGamepads();
+      const gamepads = System18.navigator.getGamepads();
       const connected = [];
       for (const hardwareIndex of this.#connectedGamepadIndices) {
         const gamepad = gamepads[hardwareIndex];
@@ -16167,7 +16837,7 @@ void main() {
         return void 0;
       }
       const hardwareIndex = this.#connectedGamepadIndices.at(gamepadIndex);
-      const gamepads = System17.navigator.getGamepads();
+      const gamepads = System18.navigator.getGamepads();
       return gamepads[hardwareIndex];
     }
     //==============================================================================
@@ -16218,13 +16888,13 @@ void main() {
      * console.log(connectedGamepadCount);
      */
     vibrate(strongMagnitude, weakMagnitude, seconds) {
-      if (typeof System17.navigator.getGamepads !== "function") {
+      if (typeof System18.navigator.getGamepads !== "function") {
         return;
       }
-      const durationMilliseconds = System17.Math.max(0, System17.Math.round(seconds * 1e3));
-      const clampedStrongMagnitude = System17.Math.min(1, System17.Math.max(0, strongMagnitude));
-      const clampedWeakMagnitude = System17.Math.min(1, System17.Math.max(0, weakMagnitude));
-      const gamepads = System17.navigator.getGamepads();
+      const durationMilliseconds = System18.Math.max(0, System18.Math.round(seconds * 1e3));
+      const clampedStrongMagnitude = System18.Math.min(1, System18.Math.max(0, strongMagnitude));
+      const clampedWeakMagnitude = System18.Math.min(1, System18.Math.max(0, weakMagnitude));
+      const gamepads = System18.navigator.getGamepads();
       for (const hardwareIndex of this.#connectedGamepadIndices) {
         const gamepad = gamepads[hardwareIndex];
         if (gamepad === null || gamepad === void 0) {
@@ -16243,7 +16913,7 @@ void main() {
   };
 
   // src/core/inputactions.js
-  var System18 = globalThis;
+  var System19 = globalThis;
   var DEFAULT_DEAD_ZONE = 0.2;
   var DEFAULT_AXIS_PRESS_THRESHOLD = 0.5;
   var SOURCE_PRESS_THRESHOLD = 0.5;
@@ -16299,11 +16969,11 @@ void main() {
     //==============================================================================
     constructor() {
       super();
-      this.#keyBindings = new System18.Map();
-      this.#gamepadButtonBindings = new System18.Map();
-      this.#axisBindings = new System18.Map();
-      this.#repeats = new System18.Map();
-      this.#states = new System18.Map();
+      this.#keyBindings = new System19.Map();
+      this.#gamepadButtonBindings = new System19.Map();
+      this.#axisBindings = new System19.Map();
+      this.#repeats = new System19.Map();
+      this.#states = new System19.Map();
       this.#sources = [];
       this.#deadZone = DEFAULT_DEAD_ZONE;
       this.#axisPressThreshold = DEFAULT_AXIS_PRESS_THRESHOLD;
@@ -16415,7 +17085,7 @@ void main() {
         this.#repeats.delete(action);
         return;
       }
-      this.#repeats.set(action, { delaySeconds: System18.Math.max(0, delaySeconds), intervalSeconds });
+      this.#repeats.set(action, { delaySeconds: System19.Math.max(0, delaySeconds), intervalSeconds });
     }
     //==============================================================================
     // 죽은 구역 설정. (0 ~ 1 미만, 처음은 0.2)
@@ -16424,7 +17094,7 @@ void main() {
      * @param { number } deadZone 죽은 구역. (0 ~ 0.99 로 자른다)
      */
     setDeadZone(deadZone) {
-      this.#deadZone = System18.Math.min(0.99, System18.Math.max(0, deadZone));
+      this.#deadZone = System19.Math.min(0.99, System19.Math.max(0, deadZone));
     }
     //==============================================================================
     // 죽은 구역 반환.
@@ -16442,7 +17112,7 @@ void main() {
      * @param { number } axisPressThreshold 눌린 것으로 보는 기울기. (0 ~ 1 로 자른다)
      */
     setAxisPressThreshold(axisPressThreshold) {
-      this.#axisPressThreshold = System18.Math.min(1, System18.Math.max(0, axisPressThreshold));
+      this.#axisPressThreshold = System19.Math.min(1, System19.Math.max(0, axisPressThreshold));
     }
     //==============================================================================
     // 축에 묶은 동작을 눌린 것으로 보는 기울기 반환.
@@ -16563,7 +17233,7 @@ void main() {
             }
             isPressed = true;
             const buttonValue = gamepadManager.getButtonValue(gamepadIndex, buttonCode);
-            value = System18.Math.max(value, buttonValue > 0 ? buttonValue : 1);
+            value = System19.Math.max(value, buttonValue > 0 ? buttonValue : 1);
           }
           for (const axisBinding of axisBindingList) {
             const axisValue = gamepadManager.getAxisValue(gamepadIndex, axisBinding.axisIndex);
@@ -16572,7 +17242,7 @@ void main() {
               isPressed = true;
             }
             const scaledValue = this.applyDeadZone(directedValue);
-            value = System18.Math.max(value, scaledValue);
+            value = System19.Math.max(value, scaledValue);
           }
         }
         for (const source of this.#sources) {
@@ -16580,11 +17250,11 @@ void main() {
             continue;
           }
           const sourceValue = source.readActionValue(action);
-          const numberValue = sourceValue === true ? 1 : typeof sourceValue === "number" && System18.Number.isFinite(sourceValue) ? System18.Math.min(1, System18.Math.max(0, sourceValue)) : 0;
+          const numberValue = sourceValue === true ? 1 : typeof sourceValue === "number" && System19.Number.isFinite(sourceValue) ? System19.Math.min(1, System19.Math.max(0, sourceValue)) : 0;
           if (numberValue <= 0) {
             continue;
           }
-          value = System18.Math.max(value, numberValue);
+          value = System19.Math.max(value, numberValue);
           if (numberValue >= SOURCE_PRESS_THRESHOLD) {
             isPressed = true;
             if (typeof source.readGamepadKind === "function") {
@@ -16620,8 +17290,8 @@ void main() {
           continue;
         }
         const clampedMoveAxis = this.clampLength(moveAxis.x, moveAxis.y);
-        const clampedLength = System18.Math.hypot(clampedMoveAxis.x, clampedMoveAxis.y);
-        const currentLength = System18.Math.hypot(sourceMoveAxis.x, sourceMoveAxis.y);
+        const clampedLength = System19.Math.hypot(clampedMoveAxis.x, clampedMoveAxis.y);
+        const currentLength = System19.Math.hypot(sourceMoveAxis.x, sourceMoveAxis.y);
         if (clampedLength > currentLength) {
           sourceMoveAxis = clampedMoveAxis;
         }
@@ -16642,7 +17312,7 @@ void main() {
         }, "isAnyKeyPressed");
         const directionX = (isAnyKeyPressed(MOVE_RIGHT_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_LEFT_KEYS) ? 1 : 0);
         const directionY = (isAnyKeyPressed(MOVE_DOWN_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_UP_KEYS) ? 1 : 0);
-        const keyLength = System18.Math.hypot(directionX, directionY);
+        const keyLength = System19.Math.hypot(directionX, directionY);
         if (keyLength > 0) {
           keyMoveAxis = Vector2.create(directionX / keyLength, directionY / keyLength);
         }
@@ -16750,9 +17420,9 @@ void main() {
       for (const axisValueList of this.#gamepadAxisList) {
         const axisX = axisValueList[xAxisIndex] ?? 0;
         const axisY = axisValueList[yAxisIndex] ?? 0;
-        const length = System18.Math.hypot(axisX, axisY);
+        const length = System19.Math.hypot(axisX, axisY);
         const scaledLength = this.applyDeadZone(length);
-        const currentLength = System18.Math.hypot(stickVector.x, stickVector.y);
+        const currentLength = System19.Math.hypot(stickVector.x, stickVector.y);
         if (scaledLength > currentLength) {
           stickVector = Vector2.create(axisX / length * scaledLength, axisY / length * scaledLength);
         }
@@ -16771,8 +17441,8 @@ void main() {
       const stickVector = this.readGamepadStick(GamepadAnalogStickCode.LEFT_X, GamepadAnalogStickCode.LEFT_Y);
       const candidateVectors = [stickVector, this.#sourceMoveAxis];
       for (const candidateVector of candidateVectors) {
-        const candidateLength = System18.Math.hypot(candidateVector.x, candidateVector.y);
-        const currentLength = System18.Math.hypot(moveVector.x, moveVector.y);
+        const candidateLength = System19.Math.hypot(candidateVector.x, candidateVector.y);
+        const currentLength = System19.Math.hypot(moveVector.x, moveVector.y);
         if (candidateLength > currentLength) {
           moveVector = Vector2.create(candidateVector.x, candidateVector.y);
         }
@@ -16787,10 +17457,10 @@ void main() {
      * @returns { number } 죽은 구역을 뺀 값. (0 ~ 1)
      */
     applyDeadZone(value) {
-      if (!System18.Number.isFinite(value) || value <= this.#deadZone) {
+      if (!System19.Number.isFinite(value) || value <= this.#deadZone) {
         return 0;
       }
-      const clampedValue = System18.Math.min(1, value);
+      const clampedValue = System19.Math.min(1, value);
       return (clampedValue - this.#deadZone) / (1 - this.#deadZone);
     }
     //==============================================================================
@@ -16802,9 +17472,9 @@ void main() {
      * @returns { Vector2 } 길이가 1 이하인 새 벡터.
      */
     clampLength(x, y) {
-      const vectorX = System18.Number.isFinite(x) ? x : 0;
-      const vectorY = System18.Number.isFinite(y) ? y : 0;
-      const length = System18.Math.hypot(vectorX, vectorY);
+      const vectorX = System19.Number.isFinite(x) ? x : 0;
+      const vectorY = System19.Number.isFinite(y) ? y : 0;
+      const length = System19.Math.hypot(vectorX, vectorY);
       if (length <= 1) {
         return Vector2.create(vectorX, vectorY);
       }
@@ -16813,8 +17483,8 @@ void main() {
   };
 
   // src/core/inputmanager.js
-  var System19 = globalThis;
-  var MouseButton = System19.Object.freeze({
+  var System20 = globalThis;
+  var MouseButton = System20.Object.freeze({
     left: 0,
     // 왼쪽 단추.
     middle: 1,
@@ -16823,7 +17493,7 @@ void main() {
     // 오른쪽 단추.
   });
   var MOUSE_BUTTON_COUNT = 3;
-  var TouchPhase = System19.Object.freeze({
+  var TouchPhase = System20.Object.freeze({
     began: "began",
     // 이번 프레임에 닿음.
     moved: "moved",
@@ -16835,7 +17505,7 @@ void main() {
     cancelled: "cancelled"
     // 취소됨. (브라우저가 터치를 거둠)
   });
-  var InputDevice = System19.Object.freeze({
+  var InputDevice = System20.Object.freeze({
     keyboard: "keyboard",
     // 키보드.
     mouse: "mouse",
@@ -16987,14 +17657,14 @@ void main() {
       this.#wheelDeltaX = 0;
       this.#wheelDeltaY = 0;
       this.#engine = engine;
-      this.#mouseButtonsDown = new System19.Array(MOUSE_BUTTON_COUNT).fill(false);
-      this.#mouseButtonsJustPressed = new System19.Array(MOUSE_BUTTON_COUNT).fill(false);
-      this.#mouseButtonsJustReleased = new System19.Array(MOUSE_BUTTON_COUNT).fill(false);
+      this.#mouseButtonsDown = new System20.Array(MOUSE_BUTTON_COUNT).fill(false);
+      this.#mouseButtonsJustPressed = new System20.Array(MOUSE_BUTTON_COUNT).fill(false);
+      this.#mouseButtonsJustReleased = new System20.Array(MOUSE_BUTTON_COUNT).fill(false);
       this.#touchPoints = [];
       this.#endedTouchPoints = [];
       this.#lastInputDevice = InputDevice.keyboard;
-      if (typeof System19.matchMedia === "function") {
-        const mediaQueryList = System19.matchMedia("(pointer: coarse)");
+      if (typeof System20.matchMedia === "function") {
+        const mediaQueryList = System20.matchMedia("(pointer: coarse)");
         if (mediaQueryList.matches) {
           this.#lastInputDevice = InputDevice.touch;
         }
@@ -17592,7 +18262,7 @@ void main() {
      * @returns { string[] } 막는 키 코드 목록의 사본.
      */
     getPreventedKeys() {
-      return System19.Array.from(this.#preventedKeys);
+      return System20.Array.from(this.#preventedKeys);
     }
     //==============================================================================
     // 그 키의 기본 동작을 막는지.
@@ -17615,7 +18285,7 @@ void main() {
       if (engine && engine.isTextInputFocused()) {
         return true;
       }
-      const document2 = System19.document;
+      const document2 = System20.document;
       if (!document2 || !document2.activeElement) {
         return false;
       }
@@ -17655,7 +18325,7 @@ void main() {
   };
 
   // src/base/obb.js
-  var System20 = globalThis;
+  var System21 = globalThis;
   var OBB = class _OBB extends Object2 {
     static {
       __name(this, "OBB");
@@ -17758,13 +18428,13 @@ void main() {
      */
     setEdges(edges) {
       if (!_OBB.isValidate(edges)) {
-        throw new System20.Error(`edges is null.`);
+        throw new System21.Error(`edges is null.`);
       }
-      if (!System20.Array.isArray(edges)) {
-        throw new System20.Error(`edges is not Array.`);
+      if (!System21.Array.isArray(edges)) {
+        throw new System21.Error(`edges is not Array.`);
       }
       if (this.#edges.length !== edges.length) {
-        throw new System20.Error(`edges.length !== this.#edges.length.`);
+        throw new System21.Error(`edges.length !== this.#edges.length.`);
       }
       for (let i = 0; i < this.#edges.length; ++i) {
         this.#edges[i] = edges[i];
@@ -17869,7 +18539,7 @@ void main() {
   };
 
   // src/core/node/worldnode.js
-  var System21 = globalThis;
+  var System22 = globalThis;
   var cullContentSize = Vector2.zero();
   var cullRect = new Rect();
   var cullDrawnRect = new Rect();
@@ -18032,10 +18702,10 @@ void main() {
           maximumY = drawnBottomY;
           isDrawnRectFound = true;
         } else {
-          minimumX = System21.Math.min(minimumX, drawnRect.position.x);
-          minimumY = System21.Math.min(minimumY, drawnRect.position.y);
-          maximumX = System21.Math.max(maximumX, drawnRightX);
-          maximumY = System21.Math.max(maximumY, drawnBottomY);
+          minimumX = System22.Math.min(minimumX, drawnRect.position.x);
+          minimumY = System22.Math.min(minimumY, drawnRect.position.y);
+          maximumX = System22.Math.max(maximumX, drawnRightX);
+          maximumY = System22.Math.max(maximumY, drawnBottomY);
         }
       }
       if (enabledComponentCount === 0) {
@@ -18054,10 +18724,10 @@ void main() {
           maximumY = contentSize.y + 1;
           isDrawnRectFound = true;
         } else {
-          minimumX = System21.Math.min(minimumX, -1);
-          minimumY = System21.Math.min(minimumY, -1);
-          maximumX = System21.Math.max(maximumX, contentSize.x + 1);
-          maximumY = System21.Math.max(maximumY, contentSize.y + 1);
+          minimumX = System22.Math.min(minimumX, -1);
+          minimumY = System22.Math.min(minimumY, -1);
+          maximumX = System22.Math.max(maximumX, contentSize.x + 1);
+          maximumY = System22.Math.max(maximumY, contentSize.y + 1);
         }
       }
       if (!isDrawnRectFound) {
@@ -18776,7 +19446,7 @@ void main() {
     convertViewPositionToNodePosition(viewPosition) {
       const affine = this.calculateWorldAffine();
       const determinant = affine.a * affine.d - affine.b * affine.c;
-      if (determinant === 0 || !System21.Number.isFinite(determinant)) {
+      if (determinant === 0 || !System22.Number.isFinite(determinant)) {
         return null;
       }
       const offsetX = viewPosition.x - affine.e;
@@ -19845,7 +20515,7 @@ void main() {
   };
 
   // src/core/scenemanager.js
-  var System22 = globalThis;
+  var System23 = globalThis;
   var IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS = 2;
   var SCENE_LOAD_EXTRA_WAIT_SECONDS = 0.3;
   var SceneManager = class extends Object2 {
@@ -19906,7 +20576,7 @@ void main() {
           }
           const timeManager = engine.getTimeManager();
           const waitStartTime = timeManager.getRealtimeSinceStartup();
-          await new System22.Promise((resolve) => {
+          await new System23.Promise((resolve) => {
             engine.addEngineFrameCallback(() => {
               if (timeManager.getRealtimeSinceStartup() - waitStartTime < SCENE_LOAD_EXTRA_WAIT_SECONDS) {
                 return false;
@@ -19918,16 +20588,16 @@ void main() {
             });
           });
         } else {
-          const minimumWaitPromise = new System22.Promise((resolve) => {
-            System22.setTimeout(resolve, SCENE_LOAD_EXTRA_WAIT_SECONDS * 1e3);
+          const minimumWaitPromise = new System23.Promise((resolve) => {
+            System23.setTimeout(resolve, SCENE_LOAD_EXTRA_WAIT_SECONDS * 1e3);
           });
           if (graphic) {
             while (graphic.prepareLoadedImages(IMAGE_UPLOAD_TIME_SLICE_MILLISECONDS) > 0) {
-              await new System22.Promise((resolve) => {
-                const timeoutIdentifier = System22.setTimeout(resolve, 50);
-                if (typeof System22.requestAnimationFrame === "function") {
-                  System22.requestAnimationFrame(() => {
-                    System22.clearTimeout(timeoutIdentifier);
+              await new System23.Promise((resolve) => {
+                const timeoutIdentifier = System23.setTimeout(resolve, 50);
+                if (typeof System23.requestAnimationFrame === "function") {
+                  System23.requestAnimationFrame(() => {
+                    System23.clearTimeout(timeoutIdentifier);
                     resolve();
                   });
                 }
@@ -19988,9 +20658,9 @@ void main() {
   };
 
   // src/resource/audioasset.js
-  var System23 = globalThis;
+  var System24 = globalThis;
   var AUTOMATIC_STREAMING_BYTE_THRESHOLD = 1024 * 1024;
-  var AudioLoadType = System23.Object.freeze({
+  var AudioLoadType = System24.Object.freeze({
     automatic: "automatic",
     // 크기를 보고 고른다. (AUTOMATIC_STREAMING_BYTE_THRESHOLD 보다 큰 파일은 스트리밍, 아니면 통째로 풀기, 고른 애셋만)
     decompressOnLoad: "decompressOnLoad",
@@ -19999,7 +20669,7 @@ void main() {
     // 풀지 않고 미디어 요소(HTMLAudioElement)가 조금씩 풀어 흘린다. (배경음처럼 긴 소리, 메모리는 압축된 파일 크기 이하)
   });
   function createStreamMediaElement() {
-    const mediaElement = System23.document.createElement("audio");
+    const mediaElement = System24.document.createElement("audio");
     mediaElement.preservesPitch = false;
     mediaElement.webkitPreservesPitch = false;
     return mediaElement;
@@ -20019,7 +20689,7 @@ void main() {
   __name(releaseMediaElement, "releaseMediaElement");
 
   // src/core/audioplayer.js
-  var System24 = globalThis;
+  var System25 = globalThis;
   function readPlaybackPosition(startTime, elapsedSeconds, duration, isLoop) {
     const position = startTime + elapsedSeconds;
     if (!(duration > 0)) {
@@ -20028,7 +20698,7 @@ void main() {
     if (isLoop) {
       return position % duration;
     }
-    return System24.Math.min(position, duration);
+    return System25.Math.min(position, duration);
   }
   __name(readPlaybackPosition, "readPlaybackPosition");
   var AudioPlayer = class {
@@ -20339,7 +21009,7 @@ void main() {
      * @param { number } playbackRate 재생 빠르기. (1 이면 그대로)
      */
     setPlaybackRate(playbackRate) {
-      const isValid = typeof playbackRate === "number" && System24.Number.isFinite(playbackRate) && playbackRate > 0;
+      const isValid = typeof playbackRate === "number" && System25.Number.isFinite(playbackRate) && playbackRate > 0;
       this.#playbackRate = isValid ? playbackRate : 1;
     }
     //==============================================================================
@@ -20375,7 +21045,7 @@ void main() {
      * @param { number } volume 음량. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
      */
     setVolume(volume) {
-      const clampedVolume = System24.Number.isFinite(volume) ? System24.Math.max(0, System24.Math.min(1, volume)) : 1;
+      const clampedVolume = System25.Number.isFinite(volume) ? System25.Math.max(0, System25.Math.min(1, volume)) : 1;
       this.#volume = clampedVolume;
       if (this.#gainNode && !this.#isMuted) {
         this.#gainNode.gain.value = clampedVolume;
@@ -20460,7 +21130,7 @@ void main() {
       if (this.#isMediaPlaying) {
         return this.#mediaElement.currentTime;
       }
-      const elapsedSeconds = System24.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
+      const elapsedSeconds = System25.Math.max(0, audioContext.currentTime - this.#startContextTime) * this.#startPlaybackRate;
       return readPlaybackPosition(this.#time, elapsedSeconds, this.#startDuration, this.#isLoop);
     }
     //==============================================================================
@@ -20488,7 +21158,7 @@ void main() {
   };
 
   // src/core/audiobus.js
-  var System25 = globalThis;
+  var System26 = globalThis;
   var AudioBus = class {
     static {
       __name(this, "AudioBus");
@@ -20557,7 +21227,7 @@ void main() {
      * @param { number } volume 크기. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
      */
     setVolume(volume) {
-      const clampedVolume = System25.Number.isFinite(volume) ? System25.Math.max(0, System25.Math.min(1, volume)) : 1;
+      const clampedVolume = System26.Number.isFinite(volume) ? System26.Math.max(0, System26.Math.min(1, volume)) : 1;
       this.#volume = clampedVolume;
       if (this.#gainNode && !this.#isMuted) {
         this.#gainNode.gain.value = clampedVolume;
@@ -20603,7 +21273,7 @@ void main() {
   };
 
   // src/core/audiomanager.js
-  var System26 = globalThis;
+  var System27 = globalThis;
   var CONTEXT_CLOCK_CHECK_INTERVAL = 0.5;
   var CONTEXT_CLOCK_MINIMUM_RATIO = 0.25;
   var AudioManager = class extends Object2 {
@@ -20637,7 +21307,7 @@ void main() {
       const platform = engine.getPlatform();
       const platformInfo = platform.getPlatformInfo();
       const platformName = platformInfo.platformName;
-      const isDesktopModeIPad = platformName === PlatformType.macOS && System26.navigator.maxTouchPoints > 1;
+      const isDesktopModeIPad = platformName === PlatformType.macOS && System27.navigator.maxTouchPoints > 1;
       this.#isIOS = platformName === PlatformType.iOS || platformName === PlatformType.iPadOS || isDesktopModeIPad;
       this.#isVerifyingContextClock = false;
     }
@@ -20667,7 +21337,7 @@ void main() {
       if (this.#audioContext) {
         return this.#audioContext;
       }
-      const audioContextType = System26.window.AudioContext || System26.window.webkitAudioContext;
+      const audioContextType = System27.window.AudioContext || System27.window.webkitAudioContext;
       if (audioContextType) {
         this.#audioContext = new audioContextType();
       }
@@ -20724,14 +21394,14 @@ void main() {
         return;
       }
       this.#isVerifyingContextClock = true;
-      const startTime = System26.performance.now() / 1e3;
+      const startTime = System27.performance.now() / 1e3;
       const startContextTime = audioContext.currentTime;
-      System26.setTimeout(() => {
+      System27.setTimeout(() => {
         this.#isVerifyingContextClock = false;
-        if (audioContext !== this.#audioContext || audioContext.state !== "running" || System26.document.visibilityState !== "visible") {
+        if (audioContext !== this.#audioContext || audioContext.state !== "running" || System27.document.visibilityState !== "visible") {
           return;
         }
-        const elapsedTime = System26.performance.now() / 1e3 - startTime;
+        const elapsedTime = System27.performance.now() / 1e3 - startTime;
         const contextElapsedTime = audioContext.currentTime - startContextTime;
         if (contextElapsedTime >= elapsedTime * CONTEXT_CLOCK_MINIMUM_RATIO) {
           return;
@@ -20744,7 +21414,7 @@ void main() {
             this.verifyContextClock(audioContext);
           }
         }).catch(() => {
-          System26.setTimeout(() => {
+          System27.setTimeout(() => {
             this.resumeContext();
           }, CONTEXT_CLOCK_CHECK_INTERVAL * 1e3);
         });
@@ -20835,7 +21505,7 @@ void main() {
   };
 
   // src/core/pointercursor.js
-  var System27 = globalThis;
+  var System28 = globalThis;
   var SHOWN_CURSOR_NAMES = ["pointer", "crosshair", "not-allowed", "grab", "grabbing", "text", "move", "help", "wait", "progress", "none"];
   var PointerCursor = class _PointerCursor extends Singleton {
     static {
@@ -20874,7 +21544,7 @@ void main() {
     constructor() {
       super();
       this.#isEnabled = false;
-      this.#imageCursorValues = new System27.Map();
+      this.#imageCursorValues = new System28.Map();
       this.#buttonCursorName = "pointer";
       this.#defaultCursorName = "default";
       this.#screenCursorName = "default";
@@ -20973,11 +21643,11 @@ void main() {
      * @param { string } fallbackCursorName - 그림을 못 쓸 때의 CSS cursor 이름.
      */
     registerImageCursor(name, url, url2x, hotspotX, hotspotY, fallbackCursorName) {
-      const roundedHotspotX = System27.Math.round(hotspotX);
-      const roundedHotspotY = System27.Math.round(hotspotY);
+      const roundedHotspotX = System28.Math.round(hotspotX);
+      const roundedHotspotY = System28.Math.round(hotspotY);
       const hotspotText = ` ${roundedHotspotX} ${roundedHotspotY}, ${fallbackCursorName}`;
       let cursorValue = `url("${url}")${hotspotText}`;
-      const css = System27.CSS;
+      const css = System28.CSS;
       if (url2x !== "" && css !== void 0 && typeof css.supports === "function") {
         const imageSetValue = `-webkit-image-set(url("${url}") 1x, url("${url2x}") 2x)${hotspotText}`;
         if (css.supports("cursor", imageSetValue)) {
@@ -20986,9 +21656,9 @@ void main() {
       }
       this.#imageCursorValues.set(name, cursorValue);
       if (!_PointerCursor.isCoarsePointer()) {
-        const devicePixelRatio = System27.devicePixelRatio || 1;
+        const devicePixelRatio = System28.devicePixelRatio || 1;
         const preloadUrl = url2x !== "" && devicePixelRatio > 1 ? url2x : url;
-        const image = new System27.Image();
+        const image = new System28.Image();
         image.src = preloadUrl;
       }
     }
@@ -21039,10 +21709,10 @@ void main() {
      * @returns { boolean } 주된 손이 손가락이면 참.
      */
     static isCoarsePointer() {
-      if (typeof System27.matchMedia !== "function") {
+      if (typeof System28.matchMedia !== "function") {
         return false;
       }
-      const mediaQueryList = System27.matchMedia("(pointer: coarse)");
+      const mediaQueryList = System28.matchMedia("(pointer: coarse)");
       return mediaQueryList.matches;
     }
     //==============================================================================
@@ -21053,7 +21723,7 @@ void main() {
      * @returns { HTMLCanvasElement | null } 엔진의 캔버스. (엔진이 없으면 null)
      */
     static readEngineCanvas() {
-      const engine = System27.vanillaEngine;
+      const engine = System28.vanillaEngine;
       if (!engine) {
         return null;
       }
@@ -21063,7 +21733,7 @@ void main() {
   };
 
   // src/core/engine.js
-  var System28 = globalThis;
+  var System29 = globalThis;
   var FRAME_LIMIT_TOLERANCE_MILLISECONDS = 4;
   var FRAME_LIMIT_RESYNC_MILLISECONDS = 1;
   var COMPATIBILITY_MOUSE_MILLISECONDS = 800;
@@ -21072,7 +21742,7 @@ void main() {
   var CAPTURE_FRAME_MILLISECONDS = 1e3 / 60;
   var GPU_THROUGHPUT_WARMUP_FRAME_COUNT = 10;
   var GPU_THROUGHPUT_CHUNK_FRAME_COUNT = 30;
-  var PageEvent = System28.Object.freeze({
+  var PageEvent = System29.Object.freeze({
     hidden: "hidden",
     // 페이지가 가려짐. (다른 탭, 앱 전환)
     visible: "visible",
@@ -21083,6 +21753,12 @@ void main() {
     // 창이 포커스를 얻음. (focus)
     pointerDown: "pointerDown"
     // 창을 누름. (pointerdown, 포커스를 알리지 않아도 누르면 창은 포커스를 가진 것이다)
+  });
+  var GraphicContextEvent = System29.Object.freeze({
+    lost: "lost",
+    // WebGL 컨텍스트를 잃음. (GPU 메모리 부족, 드라이버 재설정, 백그라운드 회수. 잃은 동안 엔진은 그리지 않고 씬 갱신만 한다)
+    restored: "restored"
+    // 컨텍스트가 되살아나 엔진이 기본 자원을 다시 지음. (게임이 지은 GL 객체와 3D 렌더러, 렌더 타겟은 죽었으니 이때 다시 짓는다)
   });
   var EngineConfiguration = class extends Object2 {
     static {
@@ -21249,6 +21925,9 @@ void main() {
     #isPageHidden;
     // 페이지가 가려져 있는지.
     /** @private @type { Array<Function> } */
+    #graphicContextEventListeners;
+    // 그래픽 컨텍스트 이벤트 리스너. ((graphicContextEvent) => void)
+    /** @private @type { Array<Function> } */
     #pageEventListeners;
     // 페이지 이벤트 리스너. ((pageEvent) => void)
     /** @private @type { object | null } */
@@ -21264,13 +21943,13 @@ void main() {
     constructor(engineConfiguration) {
       super();
       if (engineConfiguration === null || engineConfiguration === void 0 || engineConfiguration instanceof EngineConfiguration === false) {
-        throw new System28.Error(`engineConfiguration is invalid.`);
+        throw new System29.Error(`engineConfiguration is invalid.`);
       }
       this.#engineConfiguration = engineConfiguration;
       this.#platform = new Platform();
       this.#modalDialogList = [];
       if (engineConfiguration.title !== "") {
-        System28.document.title = engineConfiguration.title;
+        System29.document.title = engineConfiguration.title;
       }
       const canvasId = this.#engineConfiguration.canvasId;
       const canvas = this.#platform.getOrAddCanvas(canvasId);
@@ -21292,14 +21971,23 @@ void main() {
       this.#frameLimitFramePerSecond = 0;
       this.#statisticsTextRect = Rect.zero();
       this.#version = Version.create(0, 3, 2);
-      this.#frameCaptureRequests = new System28.Map();
+      this.#frameCaptureRequests = new System29.Map();
       this.#isCaptureTimeStepFixed = false;
       this.#engineFrameCallbacks = [];
       this.#isExitRequested = false;
-      this.#isPageHidden = System28.document.visibilityState === "hidden";
+      this.#isPageHidden = System29.document.visibilityState === "hidden";
       this.#pageEventListeners = [];
+      this.#graphicContextEventListeners = [];
+      this.#graphic.setContextEventCallback((graphicContextEvent) => {
+        if (graphicContextEvent === GraphicContextEvent.lost) {
+          console.error("Engine: WebGL2 context lost. Drawing is paused until the context is restored.");
+        } else {
+          console.warn("Engine: WebGL2 context restored. Engine resources were rebuilt, rebuild game-owned GL objects now.");
+        }
+        this.dispatchGraphicContextEvent(graphicContextEvent);
+      });
       this.#gpuThroughputMeasurement = null;
-      System28.vanillaEngine = this;
+      System29.vanillaEngine = this;
       this.setupAllDocumentEvents();
       this.resize();
       this.requestFrameCapturesFromUrl();
@@ -21312,25 +22000,25 @@ void main() {
      */
     run(scene) {
       if (scene === null || scene === void 0 || scene instanceof Scene === false) {
-        throw new System28.Error(`scene is invalid.`);
+        throw new System29.Error(`scene is invalid.`);
       }
       const startEngine = /* @__PURE__ */ __name(() => {
         const sceneManager = this.getSceneManager();
         sceneManager.loadScene(scene).catch((error) => {
           console.error(error);
         });
-        System28.window.addEventListener("resize", this.#resizeCallback);
-        if (System28.window.visualViewport) {
-          System28.window.visualViewport.addEventListener("resize", this.#resizeCallback);
-          System28.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+        System29.window.addEventListener("resize", this.#resizeCallback);
+        if (System29.window.visualViewport) {
+          System29.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+          System29.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
         }
         ++this.#frameNumber;
-        System28.window.requestAnimationFrame(this.#updateEngineCallback);
+        System29.window.requestAnimationFrame(this.#updateEngineCallback);
       }, "startEngine");
       startEngine();
       const engineConfiguration = this.getEngineConfiguration();
-      if (engineConfiguration.rebakeTextOnFontLoad && System28.document.fonts) {
-        System28.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
+      if (engineConfiguration.rebakeTextOnFontLoad && System29.document.fonts) {
+        System29.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
           const graphic = this.getGraphic();
           const textStringTextureCache = graphic.getTextStringTextureCache();
           textStringTextureCache.invalidateFontFaces(fontFaceSetLoadEvent.fontfaces);
@@ -21372,13 +22060,13 @@ void main() {
       const engineConfiguration = this.getEngineConfiguration();
       const viewManager = this.getViewManager();
       if (engineConfiguration.autoResizeOnWindowResize) {
-        const visualViewport = System28.window.visualViewport;
-        const clientWidth = visualViewport ? visualViewport.width : System28.window.innerWidth;
-        let clientHeight = visualViewport ? visualViewport.height : System28.window.innerHeight;
+        const visualViewport = System29.window.visualViewport;
+        const clientWidth = visualViewport ? visualViewport.width : System29.window.innerWidth;
+        let clientHeight = visualViewport ? visualViewport.height : System29.window.innerHeight;
         const appliedClientNativeSize = this.#appliedClientNativeSize;
         const isTextInputFocused = this.isTextInputFocused();
         if (engineConfiguration.ignoreVirtualKeyboardResize && isTextInputFocused && appliedClientNativeSize !== null) {
-          const isSameWidth = System28.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
+          const isSameWidth = System29.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
           if (isSameWidth && clientHeight < appliedClientNativeSize.y) {
             clientHeight = appliedClientNativeSize.y;
           }
@@ -21388,10 +22076,10 @@ void main() {
         const canvas = viewManager.getCanvas();
         const maxCanvasAspectRatio = engineConfiguration.maxCanvasAspectRatio;
         if (maxCanvasAspectRatio > 0) {
-          const canvasWidth = System28.Math.floor(System28.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
-          const canvasHeight = System28.Math.floor(System28.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
-          const canvasLeft = System28.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
-          const canvasTop = System28.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
+          const canvasWidth = System29.Math.floor(System29.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
+          const canvasHeight = System29.Math.floor(System29.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
+          const canvasLeft = System29.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
+          const canvasTop = System29.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
           canvas.style.width = `${canvasWidth}px`;
           canvas.style.height = `${canvasHeight}px`;
           canvas.style.marginLeft = `${canvasLeft}px`;
@@ -21425,7 +22113,7 @@ void main() {
      * @returns { boolean } 글자 입력칸이 포커스되어 있으면 참.
      */
     isTextInputFocused() {
-      const activeElement = System28.document.activeElement;
+      const activeElement = System29.document.activeElement;
       if (!activeElement) {
         return false;
       }
@@ -21460,7 +22148,7 @@ void main() {
           inputManager2.clear();
         }
       }, "recoverEngineState");
-      System28.document.addEventListener("resume", () => {
+      System29.document.addEventListener("resume", () => {
         console.log(`[Engine] resume: persisted`);
         recoverEngineState();
         const sceneManager = this.getSceneManager();
@@ -21469,7 +22157,7 @@ void main() {
           loadedScene.onPageProcessRestored();
         }
       });
-      System28.window.addEventListener("pageshow", (pageTransitionEvent) => {
+      System29.window.addEventListener("pageshow", (pageTransitionEvent) => {
         if (pageTransitionEvent.persisted) {
           console.log(`[Engine] pageshow: persisted`);
           recoverEngineState();
@@ -21480,8 +22168,8 @@ void main() {
           }
         }
       });
-      System28.document.addEventListener("visibilitychange", () => {
-        if (System28.document.visibilityState === "visible") {
+      System29.document.addEventListener("visibilitychange", () => {
+        if (System29.document.visibilityState === "visible") {
           console.log(`[Engine] visibilitychange: visible`);
           recoverEngineState();
           const sceneManager = this.getSceneManager();
@@ -21493,12 +22181,12 @@ void main() {
       });
       let lastTouchTimestamp = -COMPATIBILITY_MOUSE_MILLISECONDS;
       const noteMouseDevice = /* @__PURE__ */ __name(() => {
-        if (System28.performance.now() - lastTouchTimestamp < COMPATIBILITY_MOUSE_MILLISECONDS) {
+        if (System29.performance.now() - lastTouchTimestamp < COMPATIBILITY_MOUSE_MILLISECONDS) {
           return;
         }
         inputManager.setLastInputDevice(InputDevice.mouse);
       }, "noteMouseDevice");
-      System28.document.addEventListener("keydown", (keyboardEvent) => {
+      System29.document.addEventListener("keydown", (keyboardEvent) => {
         const key = keyboardEvent.code;
         inputManager.pushKey(key);
         inputManager.setLastInputDevice(InputDevice.keyboard);
@@ -21507,7 +22195,7 @@ void main() {
           keyboardEvent.preventDefault();
         }
       });
-      System28.document.addEventListener("keyup", (keyboardEvent) => {
+      System29.document.addEventListener("keyup", (keyboardEvent) => {
         const key = keyboardEvent.code;
         inputManager.popKey(key);
       });
@@ -21530,7 +22218,7 @@ void main() {
         this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
       });
       canvas.addEventListener("mousemove", (touchEvent) => {
-        const movement = System28.Math.abs(touchEvent.movementX) + System28.Math.abs(touchEvent.movementY);
+        const movement = System29.Math.abs(touchEvent.movementX) + System29.Math.abs(touchEvent.movementY);
         if (movement >= MOUSE_DEVICE_MOVE_THRESHOLD) {
           noteMouseDevice();
         }
@@ -21555,7 +22243,7 @@ void main() {
         this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
         wheelEvent.preventDefault();
       }, { passive: false });
-      System28.window.addEventListener("mouseup", (touchEvent) => {
+      System29.window.addEventListener("mouseup", (touchEvent) => {
         const inputManager2 = this.getInputManager();
         inputManager2.setMouseButtonDown(touchEvent.button, false);
         if (!inputManager2.isTouchMoved()) {
@@ -21571,7 +22259,7 @@ void main() {
         this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
       });
       canvas.addEventListener("touchstart", (touchEvent) => {
-        lastTouchTimestamp = System28.performance.now();
+        lastTouchTimestamp = System29.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (!touch) {
@@ -21585,7 +22273,7 @@ void main() {
         touchEvent.preventDefault();
       }, { passive: false });
       canvas.addEventListener("touchmove", (touchEvent) => {
-        lastTouchTimestamp = System28.performance.now();
+        lastTouchTimestamp = System29.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (!touch) {
@@ -21595,7 +22283,7 @@ void main() {
         touchEvent.preventDefault();
       }, { passive: false });
       canvas.addEventListener("touchend", (touchEvent) => {
-        lastTouchTimestamp = System28.performance.now();
+        lastTouchTimestamp = System29.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (touch) {
@@ -21607,7 +22295,7 @@ void main() {
         inputManager2.setTouchReleased(true);
         touchEvent.preventDefault();
       }, { passive: false });
-      System28.window.addEventListener("touchmove", (touchEvent) => {
+      System29.window.addEventListener("touchmove", (touchEvent) => {
         const touch = touchEvent.changedTouches[0];
         if (!touch) {
           return;
@@ -21621,7 +22309,7 @@ void main() {
         }
       });
       canvas.addEventListener("touchcancel", (touchEvent) => {
-        lastTouchTimestamp = System28.performance.now();
+        lastTouchTimestamp = System29.performance.now();
         this.updateTouchPoints(touchEvent);
         const touch = touchEvent.changedTouches[0];
         if (touch) {
@@ -21632,52 +22320,52 @@ void main() {
         inputManager2.setTouchDown(false);
         inputManager2.setTouchCancelled(true);
       });
-      System28.window.addEventListener("blur", (focusEvent) => {
+      System29.window.addEventListener("blur", (focusEvent) => {
         const inputManager2 = this.getInputManager();
         inputManager2.clear();
         inputManager2.setTouchReleased(true);
         focusEvent.preventDefault();
       }, { passive: false });
       const userGestureHandler = this.resumeOnUserGesture.bind(this);
-      System28.window.addEventListener("click", userGestureHandler);
-      System28.window.addEventListener("touchstart", userGestureHandler);
-      System28.window.addEventListener("keydown", userGestureHandler);
+      System29.window.addEventListener("click", userGestureHandler);
+      System29.window.addEventListener("touchstart", userGestureHandler);
+      System29.window.addEventListener("keydown", userGestureHandler);
       if (this.#engineConfiguration.resumeAudioOnTouchEnd) {
-        System28.window.addEventListener("touchend", userGestureHandler);
-        System28.window.addEventListener("pointerup", userGestureHandler);
+        System29.window.addEventListener("touchend", userGestureHandler);
+        System29.window.addEventListener("pointerup", userGestureHandler);
       }
-      System28.window.addEventListener("focus", this.#resumeCallback);
-      System28.document.addEventListener("visibilitychange", () => {
-        if (System28.document.visibilityState === "visible") {
+      System29.window.addEventListener("focus", this.#resumeCallback);
+      System29.document.addEventListener("visibilitychange", () => {
+        if (System29.document.visibilityState === "visible") {
           this.resume();
         }
       });
-      System28.document.addEventListener("pointerlockchange", () => {
+      System29.document.addEventListener("pointerlockchange", () => {
         if (document.pointerLockElement === canvas) {
         } else {
         }
       });
-      System28.document.addEventListener("visibilitychange", () => {
-        const isHidden = System28.document.visibilityState === "hidden";
+      System29.document.addEventListener("visibilitychange", () => {
+        const isHidden = System29.document.visibilityState === "hidden";
         const pageEvent = isHidden ? PageEvent.hidden : PageEvent.visible;
         this.dispatchPageEvent(pageEvent);
       });
-      System28.window.addEventListener("blur", () => {
+      System29.window.addEventListener("blur", () => {
         this.dispatchPageEvent(PageEvent.blurred);
       });
-      System28.window.addEventListener("focus", () => {
+      System29.window.addEventListener("focus", () => {
         this.dispatchPageEvent(PageEvent.focused);
       });
-      System28.window.addEventListener("pointerdown", () => {
+      System29.window.addEventListener("pointerdown", () => {
         this.dispatchPageEvent(PageEvent.pointerDown);
       });
-      System28.window.addEventListener("gamepadconnected", (gamepadEvent) => {
+      System29.window.addEventListener("gamepadconnected", (gamepadEvent) => {
         const gamepad = gamepadEvent.gamepad;
         const inputManager2 = this.getInputManager();
         inputManager2.connectGamepad(gamepad);
         console.log(`gamepadconnected: ${gamepad.id}`);
       });
-      System28.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
+      System29.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
         const gamepad = gamepadEvent.gamepad;
         const inputManager2 = this.getInputManager();
         inputManager2.disconnectGamepad(gamepad);
@@ -21721,7 +22409,7 @@ void main() {
           }
         }
       }
-      const touchingIdentifiers = new System28.Set();
+      const touchingIdentifiers = new System29.Set();
       const touches = touchEvent.touches;
       for (let touchIndex = 0; touchIndex < touches.length; ++touchIndex) {
         touchingIdentifiers.add(touches[touchIndex].identifier);
@@ -21839,7 +22527,7 @@ void main() {
     updateEngine(timestamp) {
       if (this.#gpuThroughputMeasurement !== null) {
         this.#runGpuThroughputChunk();
-        System28.window.requestAnimationFrame(this.#updateEngineCallback);
+        System29.window.requestAnimationFrame(this.#updateEngineCallback);
         return;
       }
       const engineConfiguration = this.getEngineConfiguration();
@@ -21854,7 +22542,7 @@ void main() {
         const dueTimestamp = this.#frameLimitStartTimestamp + this.#frameLimitFrameCount * frameInterval;
         const earlyMilliseconds = dueTimestamp - timestamp;
         if (earlyMilliseconds > FRAME_LIMIT_TOLERANCE_MILLISECONDS) {
-          System28.window.requestAnimationFrame(this.#updateEngineCallback);
+          System29.window.requestAnimationFrame(this.#updateEngineCallback);
           return;
         }
         if (earlyMilliseconds < -frameInterval || earlyMilliseconds > 0 && earlyMilliseconds <= FRAME_LIMIT_RESYNC_MILLISECONDS) {
@@ -21867,7 +22555,9 @@ void main() {
         this.resize();
       }
       const graphic = this.getGraphic();
-      graphic.applySettings(this);
+      if (!graphic.isContextLost()) {
+        graphic.applySettings(this);
+      }
       if (this.#isCaptureTimeStepFixed) {
         timestamp = this.#frameNumber * CAPTURE_FRAME_MILLISECONDS;
       }
@@ -21909,7 +22599,7 @@ void main() {
       if (!isCaptureFrameHeld) {
         ++this.#frameNumber;
       }
-      System28.window.requestAnimationFrame(this.#updateEngineCallback);
+      System29.window.requestAnimationFrame(this.#updateEngineCallback);
     }
     //==============================================================================
     // 씬 갱신과 그리기. (엔진 프레임과 GPU 처리량 재기가 같은 길로 그린다)
@@ -21921,6 +22611,7 @@ void main() {
      * @param { boolean } isTickEnabled 거짓이면 씬을 갱신하지 않고 그리기만 한다.
      */
     #tickAndDrawScenes(graphic, timeDelta, isTickEnabled) {
+      const isContextLost = graphic.isContextLost();
       graphic.beginFrameStatistics();
       const sceneManager = this.getSceneManager();
       const viewManager = this.getViewManager();
@@ -21928,12 +22619,17 @@ void main() {
       for (const loadedScene of loadedScenes) {
         try {
           if (!loadedScene.isLoaded()) {
-            viewManager.applyViewRect(graphic);
-            loadedScene.drawOnLoad(graphic);
+            if (!isContextLost) {
+              viewManager.applyViewRect(graphic);
+              loadedScene.drawOnLoad(graphic);
+            }
             continue;
           }
           if (isTickEnabled) {
             loadedScene.tick(timeDelta);
+          }
+          if (isContextLost) {
+            continue;
           }
           viewManager.applyViewRect(graphic);
           loadedScene.preDraw(graphic);
@@ -21944,8 +22640,14 @@ void main() {
             loadedScene.drawGizmos(graphic);
           }
         } catch (error) {
+          if (!isContextLost && graphic.getWebGL2RenderingContext().isContextLost()) {
+            continue;
+          }
           console.error(error);
         }
+      }
+      if (isContextLost) {
+        return;
       }
       const engineConfiguration = this.getEngineConfiguration();
       if (engineConfiguration.useStatistics) {
@@ -21993,27 +22695,27 @@ void main() {
      * console.log(result.frameCount, result.chunkMillisecondsPerFrame.length, result.millisecondsPerFrame > 0, timeBefore === timeAfter);
      */
     measureGpuThroughput(frameCount = 120) {
-      if (!System28.Number.isInteger(frameCount) || frameCount < 1) {
-        return System28.Promise.reject(new System28.Error(`frameCount is invalid: ${frameCount}`));
+      if (!System29.Number.isInteger(frameCount) || frameCount < 1) {
+        return System29.Promise.reject(new System29.Error(`frameCount is invalid: ${frameCount}`));
       }
       if (this.#gpuThroughputMeasurement !== null) {
-        return System28.Promise.reject(new System28.Error("measureGpuThroughput is already running."));
+        return System29.Promise.reject(new System29.Error("measureGpuThroughput is already running."));
       }
       if (this.#frameNumber === 0) {
-        return System28.Promise.reject(new System28.Error("measureGpuThroughput needs a running engine loop. (call run first)"));
+        return System29.Promise.reject(new System29.Error("measureGpuThroughput needs a running engine loop. (call run first)"));
       }
       const webGL2RenderingContext = this.getGraphic().getWebGL2RenderingContext();
       if (webGL2RenderingContext === null || webGL2RenderingContext === void 0 || webGL2RenderingContext.isContextLost()) {
-        return System28.Promise.reject(new System28.Error("measureGpuThroughput needs a WebGL2 context."));
+        return System29.Promise.reject(new System29.Error("measureGpuThroughput needs a WebGL2 context."));
       }
-      return new System28.Promise((resolve, reject) => {
+      return new System29.Promise((resolve, reject) => {
         this.#gpuThroughputMeasurement = {
           frameCount,
           warmupFrameCount: GPU_THROUGHPUT_WARMUP_FRAME_COUNT,
           measuredFrameCount: 0,
           totalMilliseconds: 0,
           chunkMillisecondsPerFrame: [],
-          pixel: new System28.Uint8Array(4),
+          pixel: new System29.Uint8Array(4),
           resolve,
           reject
         };
@@ -22032,18 +22734,18 @@ void main() {
         const graphic = this.getGraphic();
         const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
         if (webGL2RenderingContext.isContextLost()) {
-          throw new System28.Error("WebGL2 context lost while measureGpuThroughput.");
+          throw new System29.Error("WebGL2 context lost while measureGpuThroughput.");
         }
         graphic.applySettings(this);
         const timeDelta = this.getTimeManager().getTimeDelta();
         const isWarmup = measurement.warmupFrameCount > 0;
-        const chunkFrameCount = isWarmup ? measurement.warmupFrameCount : System28.Math.min(GPU_THROUGHPUT_CHUNK_FRAME_COUNT, measurement.frameCount - measurement.measuredFrameCount);
-        const startMilliseconds = System28.performance.now();
+        const chunkFrameCount = isWarmup ? measurement.warmupFrameCount : System29.Math.min(GPU_THROUGHPUT_CHUNK_FRAME_COUNT, measurement.frameCount - measurement.measuredFrameCount);
+        const startMilliseconds = System29.performance.now();
         for (let index = 0; index < chunkFrameCount; ++index) {
           this.#tickAndDrawScenes(graphic, timeDelta, false);
         }
         this.#waitGpuForGpuThroughput(webGL2RenderingContext, measurement.pixel);
-        const chunkMilliseconds = System28.performance.now() - startMilliseconds;
+        const chunkMilliseconds = System29.performance.now() - startMilliseconds;
         if (isWarmup) {
           measurement.warmupFrameCount = 0;
           return;
@@ -22213,7 +22915,7 @@ void main() {
      */
     setMaximumFramePerSecond(maximumFramePerSecond) {
       const engineConfiguration = this.getEngineConfiguration();
-      if (typeof maximumFramePerSecond !== "number" || !System28.Number.isFinite(maximumFramePerSecond) || maximumFramePerSecond < 0) {
+      if (typeof maximumFramePerSecond !== "number" || !System29.Number.isFinite(maximumFramePerSecond) || maximumFramePerSecond < 0) {
         engineConfiguration.maximumFramePerSecond = 0;
         return;
       }
@@ -22246,7 +22948,7 @@ void main() {
     exitApplication() {
       this.#isExitRequested = true;
       try {
-        const capacitor = System28.Capacitor;
+        const capacitor = System29.Capacitor;
         if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
           capacitor.Plugins.App.exitApp();
           return;
@@ -22254,7 +22956,7 @@ void main() {
       } catch (nativeError) {
       }
       try {
-        System28.window.close();
+        System29.window.close();
       } catch (closeError) {
       }
     }
@@ -22289,7 +22991,7 @@ void main() {
      * @returns { Promise<void> } 다음 엔진 프레임에 풀리는 약속.
      */
     waitForNextEngineFrame() {
-      return new System28.Promise((resolve) => {
+      return new System29.Promise((resolve) => {
         this.addEngineFrameCallback(() => {
           resolve();
           return true;
@@ -22321,7 +23023,7 @@ void main() {
      * @param { string } title 창 제목.
      */
     setTitle(title) {
-      System28.document.title = title;
+      System29.document.title = title;
     }
     //==============================================================================
     // 알림 창. (window.alert 자리, 엔진이 그린 창, 러스트 판 Engine::alert 와 같다)
@@ -22363,7 +23065,7 @@ void main() {
      * @returns { Promise<void> } 닫히면 풀린다.
      */
     alertAsync(message) {
-      return new System28.Promise((resolve) => {
+      return new System29.Promise((resolve) => {
         this.alert(message).setCallback(() => {
           resolve();
         });
@@ -22377,7 +23079,7 @@ void main() {
      * @returns { Promise<boolean> } 확인하면 참.
      */
     confirmAsync(message) {
-      return new System28.Promise((resolve) => {
+      return new System29.Promise((resolve) => {
         this.confirm(message).setCallback((result) => {
           resolve(result.isConfirmed());
         });
@@ -22392,7 +23094,7 @@ void main() {
      * @returns { Promise<string | null> } 입력한 글. (취소하면 null)
      */
     promptAsync(message, defaultValue = "") {
-      return new System28.Promise((resolve) => {
+      return new System29.Promise((resolve) => {
         this.prompt(message, defaultValue).setCallback((result) => {
           resolve(result.isConfirmed() ? result.getText() : null);
         });
@@ -22419,11 +23121,11 @@ void main() {
     #showModalDialog(kind, message, defaultValue) {
       const handle = new ModalDialogHandle();
       const viewManager = this.getViewManager();
-      if (!System28.document || !viewManager || !viewManager.getCanvas()) {
+      if (!System29.document || !viewManager || !viewManager.getCanvas()) {
         handle.finish(kind === ModalDialogKind.alert ? ModalDialogResult.confirmed("") : ModalDialogResult.cancelled());
         return handle;
       }
-      this.#modalDialogList.push(new ModalDialog(kind, System28.String(message), System28.String(defaultValue), handle, this.getPlatform().platformName));
+      this.#modalDialogList.push(new ModalDialog(kind, System29.String(message), System29.String(defaultValue), handle, this.getPlatform().platformName));
       return handle;
     }
     //==============================================================================
@@ -22458,7 +23160,7 @@ void main() {
      * @param { string } text 클립보드에 쓸 글.
      */
     writeClipboardText(text) {
-      const clipboard = System28.navigator ? System28.navigator.clipboard : void 0;
+      const clipboard = System29.navigator ? System29.navigator.clipboard : void 0;
       if (!clipboard || typeof clipboard.writeText !== "function") {
         return;
       }
@@ -22489,7 +23191,7 @@ void main() {
      * });
      */
     async readClipboardText() {
-      const clipboard = System28.navigator ? System28.navigator.clipboard : void 0;
+      const clipboard = System29.navigator ? System29.navigator.clipboard : void 0;
       if (!clipboard || typeof clipboard.readText !== "function") {
         return null;
       }
@@ -22634,6 +23336,87 @@ void main() {
       this.#pageEventListeners.splice(listenerIndex, 1);
     }
     //==============================================================================
+    // 그래픽 컨텍스트 이벤트 리스너 더하기. ((graphicContextEvent) => void, GraphicContextEvent 의 값을 받는다)
+    //==============================================================================
+    /**
+     * WebGL 컨텍스트를 잃으면 lost, 되살아나 엔진이 기본 자원을 다시 지으면 restored 를 넘긴다. 잃은 동안 엔진은 그리지 않고 씬 갱신만 한다.
+     * @param { Function } graphicContextEventListener (graphicContextEvent) => void. 같은 함수는 한 번만 더한다.
+     * @example <caption>컨텍스트를 되살리면 게임의 GL 객체 다시 짓기</caption>
+     * import { Engine, EngineConfiguration, Scene, GraphicContextEvent } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * engine.run(new Scene());
+     * let isRebuildNeeded = false;
+     * engine.addGraphicContextEventListener((graphicContextEvent) => {
+     * 	if (graphicContextEvent === GraphicContextEvent.restored) {
+     * 		isRebuildNeeded = true;
+     * 	}
+     * });
+     * console.log(isRebuildNeeded);
+     */
+    addGraphicContextEventListener(graphicContextEventListener) {
+      if (this.#graphicContextEventListeners.includes(graphicContextEventListener)) {
+        return;
+      }
+      this.#graphicContextEventListeners.push(graphicContextEventListener);
+    }
+    //==============================================================================
+    // 그래픽 컨텍스트 이벤트 리스너 빼기.
+    //==============================================================================
+    /**
+     * @param { Function } graphicContextEventListener 더했던 리스너. (없으면 아무것도 하지 않는다)
+     * @example <caption>더한 리스너 빼기</caption>
+     * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * engine.run(new Scene());
+     * const graphicContextEventListener = (graphicContextEvent) => {
+     * 	console.log(graphicContextEvent);
+     * };
+     * engine.addGraphicContextEventListener(graphicContextEventListener);
+     * engine.removeGraphicContextEventListener(graphicContextEventListener);
+     */
+    removeGraphicContextEventListener(graphicContextEventListener) {
+      const listenerIndex = this.#graphicContextEventListeners.indexOf(graphicContextEventListener);
+      if (listenerIndex < 0) {
+        return;
+      }
+      this.#graphicContextEventListeners.splice(listenerIndex, 1);
+    }
+    //==============================================================================
+    // 그래픽 컨텍스트 이벤트 알리기. (리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)
+    //==============================================================================
+    /**
+     * @param { string } graphicContextEvent GraphicContextEvent 의 값.
+     */
+    dispatchGraphicContextEvent(graphicContextEvent) {
+      const graphicContextEventListeners = this.#graphicContextEventListeners.slice();
+      for (const graphicContextEventListener of graphicContextEventListeners) {
+        try {
+          graphicContextEventListener(graphicContextEvent);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    }
+    //==============================================================================
+    // GPU 메모리 읽기. (개발용, Graphic.readGpuMemoryUsage 와 같다)
+    //==============================================================================
+    /**
+     * @returns { { totalBytes: number, canvasBytes: number, kindTable: object, ownerList: Array<{ owner: string, kind: string, count: number, bytes: number }> } }
+     * 합(캔버스 몫 포함), 캔버스 몫, 종류별 { count, bytes }, 주인별 몫(큰 것부터).
+     * @example <caption>종류별 GPU 메모리 읽기</caption>
+     * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+     *
+     * const engine = new Engine(new EngineConfiguration());
+     * engine.run(new Scene());
+     * const usage = engine.readGpuMemoryUsage();
+     * console.log(usage.kindTable.texture.bytes, usage.kindTable.renderbuffer.bytes, usage.kindTable.buffer.bytes);
+     */
+    readGpuMemoryUsage() {
+      return this.getGraphic().readGpuMemoryUsage();
+    }
+    //==============================================================================
     // 페이지 이벤트 알리기. (가려짐을 적고 리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)
     //==============================================================================
     /**
@@ -22676,8 +23459,8 @@ void main() {
      */
     requestFrameCapture(frameNumber) {
       const currentFrameNumber = this.getFrameNumber();
-      const targetFrameNumber = System28.Math.max(System28.Math.floor(frameNumber), currentFrameNumber);
-      const promise = new System28.Promise((resolve) => {
+      const targetFrameNumber = System29.Math.max(System29.Math.floor(frameNumber), currentFrameNumber);
+      const promise = new System29.Promise((resolve) => {
         let captureHandlers = this.#frameCaptureRequests.get(targetFrameNumber);
         if (captureHandlers === void 0) {
           captureHandlers = [];
@@ -22711,18 +23494,18 @@ void main() {
     // 주소 쿼리의 화면 저장 요청 걸기. (capture, captureName, captureExit)
     //==============================================================================
     requestFrameCapturesFromUrl() {
-      if (!System28.location || typeof System28.URLSearchParams !== "function") {
+      if (!System29.location || typeof System29.URLSearchParams !== "function") {
         return;
       }
-      const searchParameters = new System28.URLSearchParams(System28.location.search);
+      const searchParameters = new System29.URLSearchParams(System29.location.search);
       const captureText = searchParameters.get("capture");
       if (captureText === null) {
         return;
       }
       const frameNumbers = [];
       for (const frameText of captureText.split(",")) {
-        const frameNumber = System28.Number.parseInt(frameText.trim(), 10);
-        if (System28.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
+        const frameNumber = System29.Number.parseInt(frameText.trim(), 10);
+        if (System29.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
           frameNumbers.push(frameNumber);
         }
       }
@@ -22737,11 +23520,11 @@ void main() {
       for (const frameNumber of frameNumbers) {
         const capturePromise = this.requestFrameCapture(frameNumber);
         capturePromise.then((dataUrl) => {
-          const fileName = captureFileName.split("{frame}").join(System28.String(frameNumber));
-          const anchorElement = System28.document.createElement("a");
+          const fileName = captureFileName.split("{frame}").join(System29.String(frameNumber));
+          const anchorElement = System29.document.createElement("a");
           anchorElement.href = dataUrl;
           anchorElement.download = fileName;
-          System28.document.body.appendChild(anchorElement);
+          System29.document.body.appendChild(anchorElement);
           anchorElement.click();
           anchorElement.remove();
           const canvas = this.getCanvas();
@@ -22760,12 +23543,12 @@ void main() {
      * @returns { Engine } 마지막으로 만든 엔진. (만든 적이 없으면 undefined)
      */
     static getEngine() {
-      return System28.vanillaEngine;
+      return System29.vanillaEngine;
     }
   };
 
   // src/base/seededrandom.js
-  var System29 = globalThis;
+  var System30 = globalThis;
   var SeededRandom = class _SeededRandom extends Object2 {
     static {
       __name(this, "SeededRandom");
@@ -22831,8 +23614,8 @@ void main() {
     nextValue() {
       this.#state = this.#state + 1831565813 >>> 0;
       let mixed = this.#state;
-      mixed = System29.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
-      mixed ^= mixed + System29.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+      mixed = System30.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+      mixed ^= mixed + System30.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
       const value = ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
       return value;
     }
@@ -22857,7 +23640,7 @@ void main() {
      * @returns { number } minValue 이상 maxValue 이하의 정수.
      */
     nextInt(minValue, maxValue) {
-      const value = minValue + System29.Math.floor(this.nextValue() * (maxValue - minValue + 1));
+      const value = minValue + System30.Math.floor(this.nextValue() * (maxValue - minValue + 1));
       return value;
     }
     //==============================================================================
@@ -22903,7 +23686,7 @@ void main() {
      * @returns { number } 시드. (32 비트 부호 없는 정수, 0 이면 1)
      */
     static createDailySeed(dateNumber, baseSeed = 2654435761) {
-      const mixed = (baseSeed ^ System29.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
+      const mixed = (baseSeed ^ System30.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
       return mixed || 1;
     }
     //==============================================================================
@@ -22923,14 +23706,14 @@ void main() {
       * const sameDayValue = sameDayRandom.nextInt(1, 100);
       * console.log(boardValue === sameDayValue);
      */
-    static fromDate(date = new System29.Date(), baseSeed = 2654435761) {
+    static fromDate(date = new System30.Date(), baseSeed = 2654435761) {
       const dateNumber = date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate();
       return new _SeededRandom(_SeededRandom.createDailySeed(dateNumber, baseSeed));
     }
   };
 
   // src/effect/particlesystem.js
-  var System30 = globalThis;
+  var System31 = globalThis;
   var ParticleEmitterShape = {
     point: "point",
     // 노드 원점 한 점에서 무작위 방향.
@@ -22960,10 +23743,10 @@ void main() {
     }
     let firstCycle = 0;
     if (!isStartIncluded) {
-      firstCycle = System30.Math.max(0, System30.Math.floor((previousTime - burstTime) / loopDuration) + 1);
+      firstCycle = System31.Math.max(0, System31.Math.floor((previousTime - burstTime) / loopDuration) + 1);
     }
-    const lastCycle = System30.Math.floor((currentTime - burstTime) / loopDuration);
-    return System30.Math.max(0, lastCycle - firstCycle + 1);
+    const lastCycle = System31.Math.floor((currentTime - burstTime) / loopDuration);
+    return System31.Math.max(0, lastCycle - firstCycle + 1);
   }
   __name(countBurstFires, "countBurstFires");
   var ParticleSystem = class extends Component {
@@ -23251,7 +24034,7 @@ void main() {
         if (this.#attractorPosition) {
           const toCenterX = this.#attractorPosition.x - particle.x;
           const toCenterY = this.#attractorPosition.y - particle.y;
-          const centerDistance = System30.Math.max(System30.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
+          const centerDistance = System31.Math.max(System31.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
           const directionX = toCenterX / centerDistance;
           const directionY = toCenterY / centerDistance;
           particle.velocityX += directionX * this.#attractorStrength * timeDelta;
@@ -23260,7 +24043,7 @@ void main() {
           particle.velocityY += directionX * this.#attractorSwirl * timeDelta;
         }
         if (this.#damping > 0) {
-          const dampingBlend = System30.Math.max(0, 1 - this.#damping * timeDelta);
+          const dampingBlend = System31.Math.max(0, 1 - this.#damping * timeDelta);
           particle.velocityX *= dampingBlend;
           particle.velocityY *= dampingBlend;
         }
@@ -23290,19 +24073,19 @@ void main() {
       let directionY = -1;
       const shape = this.#emitterShape;
       if (shape === ParticleEmitterShape.circle) {
-        const angle = this.randomRange(0, System30.Math.PI * 2);
-        const radius = this.#shapeRadius * System30.Math.sqrt(this.randomRange(0, 1));
-        spawnX = System30.Math.cos(angle) * radius;
-        spawnY = System30.Math.sin(angle) * radius;
-        directionX = System30.Math.cos(angle);
-        directionY = System30.Math.sin(angle);
+        const angle = this.randomRange(0, System31.Math.PI * 2);
+        const radius = this.#shapeRadius * System31.Math.sqrt(this.randomRange(0, 1));
+        spawnX = System31.Math.cos(angle) * radius;
+        spawnY = System31.Math.sin(angle) * radius;
+        directionX = System31.Math.cos(angle);
+        directionY = System31.Math.sin(angle);
       } else if (shape === ParticleEmitterShape.cone) {
-        const angle = -System30.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+        const angle = -System31.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
         const radius = this.randomRange(0, this.#shapeRadius);
-        spawnX = System30.Math.cos(angle) * radius;
-        spawnY = System30.Math.sin(angle) * radius;
-        directionX = System30.Math.cos(angle);
-        directionY = System30.Math.sin(angle);
+        spawnX = System31.Math.cos(angle) * radius;
+        spawnY = System31.Math.sin(angle) * radius;
+        directionX = System31.Math.cos(angle);
+        directionY = System31.Math.sin(angle);
       } else if (shape === ParticleEmitterShape.box) {
         spawnX = this.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
         spawnY = this.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
@@ -23310,9 +24093,9 @@ void main() {
         spawnX = this.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
         directionY = 1;
       } else {
-        const angle = this.randomRange(0, System30.Math.PI * 2);
-        directionX = System30.Math.cos(angle);
-        directionY = System30.Math.sin(angle);
+        const angle = this.randomRange(0, System31.Math.PI * 2);
+        directionX = System31.Math.cos(angle);
+        directionY = System31.Math.sin(angle);
       }
       if (originOffset) {
         spawnX += originOffset.x;
@@ -23336,7 +24119,7 @@ void main() {
       particle.size = this.randomRange(this.#startSizeMin, this.#startSizeMax);
       particle.rotation = this.randomRange(this.#startRotationMin, this.#startRotationMax);
       particle.angularVelocity = this.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-      particle.wobblePhase = this.randomRange(0, System30.Math.PI * 2);
+      particle.wobblePhase = this.randomRange(0, System31.Math.PI * 2);
       particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
       particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
       particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -23369,8 +24152,8 @@ void main() {
             break;
           }
         }
-        const keySpan = System30.Math.max(nextKey.time - previousKey.time, 1e-4);
-        const keyBlend = System30.Math.max(0, System30.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
+        const keySpan = System31.Math.max(nextKey.time - previousKey.time, 1e-4);
+        const keyBlend = System31.Math.max(0, System31.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
         red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
         green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
         blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
@@ -23379,7 +24162,7 @@ void main() {
       outChannels[0] = red;
       outChannels[1] = green;
       outChannels[2] = blue;
-      outChannels[3] = System30.Math.max(0, System30.Math.min(1, alpha));
+      outChannels[3] = System31.Math.max(0, System31.Math.min(1, alpha));
     }
     //==============================================================================
     // 출력. (정점 색 배치, 파티클 수와 무관하게 시스템당 드로우 한 번)
@@ -23456,20 +24239,20 @@ void main() {
         baseOffsetY = -nodePosition.y;
       }
       const isStreak = this.#renderShape === ParticleRenderShape.streak;
-      const wobbleExtent = System30.Math.abs(this.#wobbleAmplitude);
-      let minimumX = System30.Number.POSITIVE_INFINITY;
-      let minimumY = System30.Number.POSITIVE_INFINITY;
-      let maximumX = System30.Number.NEGATIVE_INFINITY;
-      let maximumY = System30.Number.NEGATIVE_INFINITY;
+      const wobbleExtent = System31.Math.abs(this.#wobbleAmplitude);
+      let minimumX = System31.Number.POSITIVE_INFINITY;
+      let minimumY = System31.Number.POSITIVE_INFINITY;
+      let maximumX = System31.Number.NEGATIVE_INFINITY;
+      let maximumY = System31.Number.NEGATIVE_INFINITY;
       for (const particle of particleList) {
         const lifeRatio = particle.age / particle.lifetime;
         const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-        const drawSize = System30.Math.max(0.1, particle.size * sizeScale);
+        const drawSize = System31.Math.max(0.1, particle.size * sizeScale);
         const headX = particle.x + baseOffsetX;
         const headY = particle.y + baseOffsetY;
         let tailX = headX;
         let tailY = headY;
-        let extent = drawSize * 0.5 * System30.Math.SQRT2;
+        let extent = drawSize * 0.5 * System31.Math.SQRT2;
         if (isStreak) {
           tailX = headX - particle.velocityX * this.#streakScale;
           tailY = headY - particle.velocityY * this.#streakScale;
@@ -23477,10 +24260,10 @@ void main() {
         }
         const extentX = extent + wobbleExtent + 1;
         const extentY = extent + 1;
-        minimumX = System30.Math.min(minimumX, headX - extentX, tailX - extentX);
-        minimumY = System30.Math.min(minimumY, headY - extentY, tailY - extentY);
-        maximumX = System30.Math.max(maximumX, headX + extentX, tailX + extentX);
-        maximumY = System30.Math.max(maximumY, headY + extentY, tailY + extentY);
+        minimumX = System31.Math.min(minimumX, headX - extentX, tailX - extentX);
+        minimumY = System31.Math.min(minimumY, headY - extentY, tailY - extentY);
+        maximumX = System31.Math.max(maximumX, headX + extentX, tailX + extentX);
+        maximumY = System31.Math.max(maximumY, headY + extentY, tailY + extentY);
       }
       rect.position.set(minimumX, minimumY);
       rect.size.set(maximumX - minimumX, maximumY - minimumY);
@@ -23515,16 +24298,16 @@ void main() {
       for (const particle of this.#particleList) {
         const lifeRatio = particle.age / particle.lifetime;
         const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-        const drawSize = System30.Math.max(0.1, particle.size * sizeScale);
+        const drawSize = System31.Math.max(0.1, particle.size * sizeScale);
         this.evaluateColorChannels(particle, lifeRatio, colorChannels);
         let drawX = particle.x + baseOffsetX;
         const drawY = particle.y + baseOffsetY;
         if (this.#wobbleAmplitude > 0) {
-          drawX += System30.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+          drawX += System31.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
         }
         if (isStreak) {
-          const speed = System30.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
-          const safeSpeed = System30.Math.max(speed, 1e-3);
+          const speed = System31.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
+          const safeSpeed = System31.Math.max(speed, 1e-3);
           const directionX = particle.velocityX / safeSpeed;
           const directionY = particle.velocityY / safeSpeed;
           const tailX = drawX - particle.velocityX * this.#streakScale;
@@ -23540,8 +24323,8 @@ void main() {
           writeVertex(tailX + sideX, tailY + sideY, 0, 1);
         } else if (isRect && particle.rotation !== 0) {
           const halfSize = drawSize * 0.5;
-          const cosValue = System30.Math.cos(particle.rotation);
-          const sinValue = System30.Math.sin(particle.rotation);
+          const cosValue = System31.Math.cos(particle.rotation);
+          const sinValue = System31.Math.sin(particle.rotation);
           const axisX1 = cosValue * halfSize;
           const axisY1 = sinValue * halfSize;
           const axisX2 = -sinValue * halfSize;
@@ -23578,16 +24361,16 @@ void main() {
       for (const particle of this.#particleList) {
         const lifeRatio = particle.age / particle.lifetime;
         const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-        const drawSize = System30.Math.max(0.1, particle.size * sizeScale);
+        const drawSize = System31.Math.max(0.1, particle.size * sizeScale);
         let drawX = particle.x + baseOffsetX;
         const drawY = particle.y + baseOffsetY;
         if (this.#wobbleAmplitude > 0) {
-          drawX += System30.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+          drawX += System31.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
         }
         graphic.pushState();
         graphic.translate(drawX, drawY);
         graphic.rotate(particle.rotation);
-        graphic.multiplyGlobalAlpha(System30.Math.max(0, System30.Math.min(1, particle.alpha * (1 - lifeRatio))));
+        graphic.multiplyGlobalAlpha(System31.Math.max(0, System31.Math.min(1, particle.alpha * (1 - lifeRatio))));
         const image = this.#image;
         graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
         graphic.popState();
@@ -24033,8 +24816,8 @@ void main() {
         this.setWorldSpace(description.worldSpace);
       }
       if (description.imageDataUrl !== void 0) {
-        if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System30.Image === "function") {
-          const imageElement = new System30.Image();
+        if (typeof description.imageDataUrl === "string" && description.imageDataUrl !== "" && typeof System31.Image === "function") {
+          const imageElement = new System31.Image();
           imageElement.src = description.imageDataUrl;
           this.setImage(imageElement);
         } else {
@@ -24157,7 +24940,7 @@ void main() {
   };
 
   // src/web/pane.js
-  var System31 = globalThis;
+  var System32 = globalThis;
   var PaneTheme = {
     color: {
       background: "#1e1e1e",
@@ -24211,7 +24994,7 @@ void main() {
      * @returns { HTMLElement } 만든 엘리먼트.
      */
     static create(tagName, preset = "", options = {}) {
-      const el = System31.document.createElement(tagName);
+      const el = System32.document.createElement(tagName);
       if (options.id) el.id = options.id;
       if (options.text) el.innerText = options.text;
       if (options.type) el.type = options.type;
@@ -24378,7 +25161,7 @@ void main() {
     //==============================================================================
     /** @private */
     #createContainer() {
-      this.#container = System31.document.createElement("div");
+      this.#container = System32.document.createElement("div");
       this.#container.style.position = "absolute";
       this.#container.style.overflow = "hidden";
       this.#container.style.boxSizing = "border-box";
@@ -24407,7 +25190,7 @@ void main() {
     //==============================================================================
     /** @private */
     #createResizer(prev, next) {
-      const resizer = System31.document.createElement("div");
+      const resizer = System32.document.createElement("div");
       resizer.style.position = "absolute";
       resizer.style.backgroundColor = PaneTheme.color.resizer;
       resizer.style.zIndex = "1000";
@@ -24438,10 +25221,10 @@ void main() {
           const grabRect = resizer.getBoundingClientRect();
           this.#resizeGrabOffset = this.#direction === "horizontal" ? e.clientX - grabRect.left : e.clientY - grabRect.top;
           resizer.style.backgroundColor = PaneTheme.color.resizerHover;
-          System31.document.body.style.cursor = resizer.style.cursor;
-          System31.document.body.style.userSelect = "none";
-          System31.document.addEventListener("mousemove", this.#onMouseMoveBind);
-          System31.document.addEventListener("mouseup", this.#onMouseUpBind);
+          System32.document.body.style.cursor = resizer.style.cursor;
+          System32.document.body.style.userSelect = "none";
+          System32.document.addEventListener("mousemove", this.#onMouseMoveBind);
+          System32.document.addEventListener("mouseup", this.#onMouseUpBind);
         });
       }
       resizer.dataset.thickness = thickness;
@@ -24475,10 +25258,10 @@ void main() {
     /** @private */
     #onMouseUp() {
       this.#isResizing = false;
-      System31.document.body.style.cursor = "default";
-      System31.document.body.style.userSelect = "auto";
-      System31.document.removeEventListener("mousemove", this.#onMouseMoveBind);
-      System31.document.removeEventListener("mouseup", this.#onMouseUpBind);
+      System32.document.body.style.cursor = "default";
+      System32.document.body.style.userSelect = "auto";
+      System32.document.removeEventListener("mousemove", this.#onMouseMoveBind);
+      System32.document.removeEventListener("mouseup", this.#onMouseUpBind);
       for (const r of this.#resizers) r.style.backgroundColor = PaneTheme.color.resizer;
     }
     //==============================================================================
@@ -24571,7 +25354,7 @@ void main() {
     refresh() {
       const p = this.#container.parentElement;
       if (!p) return;
-      this.updateLayout(0, 0, p.clientWidth || System31.window.innerWidth, p.clientHeight || System31.window.innerHeight);
+      this.updateLayout(0, 0, p.clientWidth || System32.window.innerWidth, p.clientHeight || System32.window.innerHeight);
     }
     //==============================================================================
     // 부모 요소에 붙이기. (창 크기가 바뀔 때마다 다시 배치한다)
@@ -24582,9 +25365,9 @@ void main() {
     attachTo(p) {
       p.appendChild(this.#container);
       const run = /* @__PURE__ */ __name(() => this.refresh(), "run");
-      System31.window.addEventListener("resize", run);
+      System32.window.addEventListener("resize", run);
       run();
-      System31.requestAnimationFrame(run);
+      System32.requestAnimationFrame(run);
     }
     //==============================================================================
     // 보이기 / 숨기기. (숨긴 패널은 자리를 차지하지 않고, 맞닿은 리사이저도 숨는다)
@@ -24701,7 +25484,7 @@ void main() {
   };
 
   // tools/common/editorkit.js
-  var System32 = globalThis;
+  var System33 = globalThis;
   var EditorTheme = {
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", Roboto, sans-serif',
     accentColor: "#d4b06a",
@@ -24747,15 +25530,15 @@ void main() {
   }
   __name(setEditorCommandHandler, "setEditorCommandHandler");
   function applyEditorTheme() {
-    for (const colorName of System32.Object.keys(EDITOR_PANE_COLORS)) {
+    for (const colorName of System33.Object.keys(EDITOR_PANE_COLORS)) {
       PaneTheme.color[colorName] = EDITOR_PANE_COLORS[colorName];
     }
     PaneTheme.size.resizer = 3;
     PaneTheme.font.family = EditorTheme.fontFamily;
     PaneTheme.font.size = "13px";
-    const editorStyleElement = System32.document.createElement("style");
+    const editorStyleElement = System33.document.createElement("style");
     editorStyleElement.innerText = "* { scrollbar-width: thin; scrollbar-color: rgba(121, 121, 121, 0.4) transparent; }::-webkit-scrollbar { width: 10px; height: 10px; }::-webkit-scrollbar-track { background: transparent; }::-webkit-scrollbar-thumb { background: rgba(121, 121, 121, 0.4); }::-webkit-scrollbar-thumb:hover { background: rgba(121, 121, 121, 0.7); }::-webkit-scrollbar-corner { background: transparent; }input[type=checkbox] { accent-color: " + EditorTheme.accentColor + "; }body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }";
-    System32.document.head.appendChild(editorStyleElement);
+    System33.document.head.appendChild(editorStyleElement);
   }
   __name(applyEditorTheme, "applyEditorTheme");
   function wrapEditorIconMarkup(shapeMarkup) {
@@ -24803,7 +25586,7 @@ void main() {
   }
   __name(setEditorHeaderIconActive, "setEditorHeaderIconActive");
   function createEditorMenuPanelElement(menuItems) {
-    const panelElement = System32.document.createElement("div");
+    const panelElement = System33.document.createElement("div");
     panelElement.id = "editorMenuPanel";
     panelElement.style.cssText = "position:fixed;z-index:9999;min-width:196px;padding:4px 0;background:" + PaneTheme.color.toolbar + ";border:1px solid " + PaneTheme.color.border + ";border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,0.5);font-size:13px;color:" + PaneTheme.color.text + ";font-family:" + PaneTheme.font.family + ";";
     panelElement.addEventListener("mousedown", (mouseEvent) => {
@@ -24811,24 +25594,24 @@ void main() {
     });
     for (const menuItem of menuItems) {
       if (menuItem.separator) {
-        const separatorElement = System32.document.createElement("div");
+        const separatorElement = System33.document.createElement("div");
         separatorElement.style.cssText = "height:1px;margin:4px 8px;background:" + PaneTheme.color.border + ";";
         panelElement.appendChild(separatorElement);
         continue;
       }
-      const itemElement = System32.document.createElement("div");
+      const itemElement = System33.document.createElement("div");
       itemElement.style.cssText = "display:flex;align-items:center;padding:5px 12px 5px 8px;cursor:pointer;white-space:nowrap;";
-      const checkElement = System32.document.createElement("span");
+      const checkElement = System33.document.createElement("span");
       checkElement.style.cssText = "width:16px;flex:0 0 16px;color:" + EditorTheme.accentColor + ";";
       const isChecked = editorIsCommandChecked ? editorIsCommandChecked(menuItem.id) : false;
       checkElement.innerText = isChecked ? "\u2713" : "";
       itemElement.appendChild(checkElement);
-      const labelElement = System32.document.createElement("span");
+      const labelElement = System33.document.createElement("span");
       labelElement.style.cssText = "flex:1;";
       labelElement.innerText = menuItem.label;
       itemElement.appendChild(labelElement);
       if (menuItem.shortcut) {
-        const shortcutElement = System32.document.createElement("span");
+        const shortcutElement = System33.document.createElement("span");
         shortcutElement.style.cssText = "margin-left:24px;color:" + PaneTheme.color.textDim + ";font-size:12px;";
         shortcutElement.innerText = menuItem.shortcut;
         itemElement.appendChild(shortcutElement);
@@ -24857,22 +25640,22 @@ void main() {
   function openEditorMenuPanelAt(clientX, clientY, menuItems) {
     closeEditorMenuPanel();
     const panelElement = createEditorMenuPanelElement(menuItems);
-    panelElement.style.left = System32.Math.round(clientX) + "px";
-    panelElement.style.top = System32.Math.round(clientY) + "px";
-    System32.document.body.appendChild(panelElement);
+    panelElement.style.left = System33.Math.round(clientX) + "px";
+    panelElement.style.top = System33.Math.round(clientY) + "px";
+    System33.document.body.appendChild(panelElement);
     const panelRect = panelElement.getBoundingClientRect();
-    const viewportWidth = System32.document.documentElement.clientWidth;
-    const viewportHeight = System32.document.documentElement.clientHeight;
+    const viewportWidth = System33.document.documentElement.clientWidth;
+    const viewportHeight = System33.document.documentElement.clientHeight;
     if (panelRect.right > viewportWidth) {
-      panelElement.style.left = System32.Math.max(0, System32.Math.floor(viewportWidth - panelRect.width)) + "px";
+      panelElement.style.left = System33.Math.max(0, System33.Math.floor(viewportWidth - panelRect.width)) + "px";
     }
     if (panelRect.bottom > viewportHeight) {
-      panelElement.style.top = System32.Math.max(0, System32.Math.floor(viewportHeight - panelRect.height)) + "px";
+      panelElement.style.top = System33.Math.max(0, System33.Math.floor(viewportHeight - panelRect.height)) + "px";
     }
   }
   __name(openEditorMenuPanelAt, "openEditorMenuPanelAt");
   function closeEditorMenuPanel() {
-    const existingPanel = System32.document.getElementById("editorMenuPanel");
+    const existingPanel = System33.document.getElementById("editorMenuPanel");
     if (existingPanel) {
       existingPanel.remove();
     }
@@ -24882,8 +25665,8 @@ void main() {
   }
   __name(closeEditorMenuPanel, "closeEditorMenuPanel");
   var openMenuCloseHandler = null;
-  System32.window.addEventListener("mousedown", () => {
-    const openedPanel = System32.document.getElementById("editorMenuPanel");
+  System33.window.addEventListener("mousedown", () => {
+    const openedPanel = System33.document.getElementById("editorMenuPanel");
     if (openedPanel || openMenuCloseHandler) {
       closeEditorMenuPanel();
     }
@@ -24912,9 +25695,9 @@ void main() {
       const titleElement = menuTitleElementList[menuIndex];
       const titleRect = titleElement.getBoundingClientRect();
       const panelElement = createEditorMenuPanelElement(menuDefinitions[menuIndex].items);
-      panelElement.style.left = System32.Math.round(titleRect.left) + "px";
-      panelElement.style.top = System32.Math.round(titleRect.bottom) + "px";
-      System32.document.body.appendChild(panelElement);
+      panelElement.style.left = System33.Math.round(titleRect.left) + "px";
+      panelElement.style.top = System33.Math.round(titleRect.bottom) + "px";
+      System33.document.body.appendChild(panelElement);
       titleElement.style.backgroundColor = EditorTheme.menuHoverColor;
       openMenuIndex = menuIndex;
       openMenuCloseHandler = closeDropdown;
@@ -25167,7 +25950,7 @@ void main() {
   }
   __name(decorateEditorInputElement, "decorateEditorInputElement");
   function createEditorButtonElement(labelText, isPrimary) {
-    const buttonElement = System32.document.createElement("div");
+    const buttonElement = System33.document.createElement("div");
     buttonElement.innerText = labelText;
     buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;border:1px solid " + PaneTheme.color.border + ";" + (isPrimary ? "background:" + EditorTheme.accentColor + ";color:" + EditorTheme.onAccentTextColor + ";border-color:" + EditorTheme.accentColor + ";" : "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";");
     buttonElement.addEventListener("mouseenter", () => {
@@ -25295,8 +26078,8 @@ void main() {
   }
   __name(createEditorPropertyRowElement, "createEditorPropertyRowElement");
   function composeEditorNumberText(value) {
-    const isInteger = System32.Math.abs(value - System32.Math.round(value)) < 1e-4;
-    return isInteger ? String(System32.Math.round(value)) : value.toFixed(2);
+    const isInteger = System33.Math.abs(value - System33.Math.round(value)) < 1e-4;
+    return isInteger ? String(System33.Math.round(value)) : value.toFixed(2);
   }
   __name(composeEditorNumberText, "composeEditorNumberText");
   function appendEditorNumberRow(parentElement, labelText, currentValue, stepAmount, applyCallback, beginEditCallback) {
@@ -25306,8 +26089,8 @@ void main() {
     inputElement.style.width = "100%";
     inputElement.value = composeEditorNumberText(currentValue);
     const commitValue = /* @__PURE__ */ __name(() => {
-      const parsedValue = System32.Number(inputElement.value);
-      if (System32.Number.isFinite(parsedValue)) {
+      const parsedValue = System33.Number(inputElement.value);
+      if (System33.Number.isFinite(parsedValue)) {
         if (beginEditCallback) {
           beginEditCallback();
         }
@@ -25328,24 +26111,24 @@ void main() {
     labelElement.addEventListener("mousedown", (mouseEvent) => {
       mouseEvent.preventDefault();
       const startX = mouseEvent.clientX;
-      const startValue = System32.Number(inputElement.value) || 0;
+      const startValue = System33.Number(inputElement.value) || 0;
       if (beginEditCallback) {
         beginEditCallback();
       }
       const onMouseMove = /* @__PURE__ */ __name((moveEvent) => {
         let nextValue = startValue + (moveEvent.clientX - startX) * stepAmount;
         if (stepAmount >= 1) {
-          nextValue = System32.Math.round(nextValue);
+          nextValue = System33.Math.round(nextValue);
         }
         inputElement.value = composeEditorNumberText(nextValue);
         applyCallback(nextValue);
       }, "onMouseMove");
       const onMouseUp = /* @__PURE__ */ __name(() => {
-        System32.window.removeEventListener("mousemove", onMouseMove);
-        System32.window.removeEventListener("mouseup", onMouseUp);
+        System33.window.removeEventListener("mousemove", onMouseMove);
+        System33.window.removeEventListener("mouseup", onMouseUp);
       }, "onMouseUp");
-      System32.window.addEventListener("mousemove", onMouseMove);
-      System32.window.addEventListener("mouseup", onMouseUp);
+      System33.window.addEventListener("mousemove", onMouseMove);
+      System33.window.addEventListener("mouseup", onMouseUp);
     });
     rowElement.appendChild(inputElement);
     return rowElement;
@@ -25383,8 +26166,8 @@ void main() {
     alphaInputElement.style.width = "100%";
     alphaInputElement.value = alphaValue.toFixed(2);
     const commitColor = /* @__PURE__ */ __name(() => {
-      const parsedAlpha = System32.Number(alphaInputElement.value);
-      const clampedAlpha = System32.Number.isFinite(parsedAlpha) ? System32.Math.max(0, System32.Math.min(1, parsedAlpha)) : alphaValue;
+      const parsedAlpha = System33.Number(alphaInputElement.value);
+      const clampedAlpha = System33.Number.isFinite(parsedAlpha) ? System33.Math.max(0, System33.Math.min(1, parsedAlpha)) : alphaValue;
       if (beginEditCallback) {
         beginEditCallback();
       }
@@ -25402,7 +26185,7 @@ void main() {
   __name(appendEditorColorRow, "appendEditorColorRow");
   function appendEditorBooleanRow(parentElement, labelText, currentValue, changeHandler, beginEditCallback) {
     const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const checkElement = System32.document.createElement("input");
+    const checkElement = System33.document.createElement("input");
     checkElement.type = "checkbox";
     checkElement.checked = currentValue;
     checkElement.style.cssText = "width:14px;height:14px;accent-color:" + EditorTheme.accentColor + ";cursor:pointer;";
@@ -25418,10 +26201,10 @@ void main() {
   __name(appendEditorBooleanRow, "appendEditorBooleanRow");
   function appendEditorSelectRow(parentElement, labelText, optionList, currentValue, changeHandler) {
     const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const selectElement = System32.document.createElement("select");
+    const selectElement = System33.document.createElement("select");
     selectElement.style.cssText = "flex:1;min-width:0;height:24px;box-sizing:border-box;padding:0 4px;font-family:" + EditorTheme.fontFamily + ";font-size:13px;border-radius:3px;outline:none;background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";border:1px solid " + EditorTheme.borderColor + ";cursor:pointer;";
     for (const optionValue of optionList) {
-      const optionElement = System32.document.createElement("option");
+      const optionElement = System33.document.createElement("option");
       optionElement.value = optionValue;
       optionElement.textContent = optionValue;
       selectElement.appendChild(optionElement);
@@ -25435,29 +26218,29 @@ void main() {
   }
   __name(appendEditorSelectRow, "appendEditorSelectRow");
   function openEditorInputDialog(titleText, labelText, currentText, acceptHandler, acceptLabelText = "Save") {
-    const existingDialog = System32.document.getElementById("editorDialog");
+    const existingDialog = System33.document.getElementById("editorDialog");
     if (existingDialog) {
       existingDialog.remove();
     }
-    const backdropElement = System32.document.createElement("div");
+    const backdropElement = System33.document.createElement("div");
     backdropElement.id = "editorDialog";
     backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-family:" + PaneTheme.font.family + ";";
-    const panelElement = System32.document.createElement("div");
+    const panelElement = System33.document.createElement("div");
     panelElement.style.cssText = "min-width:340px;padding:16px 18px 14px 18px;border-radius:6px;background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
-    const titleElement = System32.document.createElement("div");
+    const titleElement = System33.document.createElement("div");
     titleElement.innerText = titleText;
     titleElement.style.cssText = "font-size:14px;font-weight:bold;color:" + EditorTheme.accentColor + ";margin-bottom:12px;";
     panelElement.appendChild(titleElement);
-    const fieldLabelElement = System32.document.createElement("div");
+    const fieldLabelElement = System33.document.createElement("div");
     fieldLabelElement.innerText = labelText;
     fieldLabelElement.style.cssText = "font-size:12px;color:" + PaneTheme.color.textDim + ";margin-bottom:4px;";
     panelElement.appendChild(fieldLabelElement);
-    const inputElement = System32.document.createElement("input");
+    const inputElement = System33.document.createElement("input");
     inputElement.type = "text";
     inputElement.value = currentText;
     inputElement.style.cssText = "width:100%;box-sizing:border-box;padding:6px 8px;font-size:14px;border-radius:3px;background:" + PaneTheme.color.inputBg + ";border:1px solid " + PaneTheme.color.border + ";color:" + PaneTheme.color.text + ";outline:none;";
     panelElement.appendChild(inputElement);
-    const buttonRowElement = System32.document.createElement("div");
+    const buttonRowElement = System33.document.createElement("div");
     buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
     const cancelElement = createEditorButtonElement("Cancel", false);
     const acceptElement = createEditorButtonElement(acceptLabelText, true);
@@ -25465,7 +26248,7 @@ void main() {
     buttonRowElement.appendChild(acceptElement);
     panelElement.appendChild(buttonRowElement);
     backdropElement.appendChild(panelElement);
-    System32.document.body.appendChild(backdropElement);
+    System33.document.body.appendChild(backdropElement);
     inputElement.focus();
     inputElement.select();
     const closeDialog = /* @__PURE__ */ __name(() => {
@@ -25510,7 +26293,7 @@ void main() {
   __name(buildEditorWindowLayout, "buildEditorWindowLayout");
 
   // tools/particleeditor/particleeditor.js
-  var System33 = globalThis;
+  var System34 = globalThis;
   var ICON_SHAPES = {
     preset: "<circle cx='7' cy='7' r='2.2' fill='currentColor'/><circle cx='3' cy='3.6' r='1.2' fill='currentColor' opacity='0.7'/><circle cx='11.2' cy='4.4' r='1' fill='currentColor' opacity='0.55'/><circle cx='10.4' cy='10.8' r='1.3' fill='currentColor' opacity='0.7'/><circle cx='3.4' cy='10.4' r='0.9' fill='currentColor' opacity='0.5'/>",
     system: "<path d='M7 1.8l5.2 5.2-5.2 5.2-5.2-5.2z' fill='none' stroke='currentColor' stroke-width='1.5'/><circle cx='7' cy='7' r='1.6' fill='currentColor'/>"
@@ -25753,15 +26536,15 @@ void main() {
     }
   ];
   function composeHexText(channels) {
-    const toByte = /* @__PURE__ */ __name((value) => System33.Math.round(value * 255).toString(16).padStart(2, "0"), "toByte");
+    const toByte = /* @__PURE__ */ __name((value) => System34.Math.round(value * 255).toString(16).padStart(2, "0"), "toByte");
     return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]);
   }
   __name(composeHexText, "composeHexText");
   function parseHexChannels(hexText, alphaValue) {
     return [
-      System33.parseInt(hexText.substring(1, 3), 16) / 255,
-      System33.parseInt(hexText.substring(3, 5), 16) / 255,
-      System33.parseInt(hexText.substring(5, 7), 16) / 255,
+      System34.parseInt(hexText.substring(1, 3), 16) / 255,
+      System34.parseInt(hexText.substring(3, 5), 16) / 255,
+      System34.parseInt(hexText.substring(5, 7), 16) / 255,
       alphaValue
     ];
   }
@@ -25898,7 +26681,7 @@ void main() {
       const presetPane = new Pane({ size: 320, minSize: 120 });
       const presetElement = createEditorSectionElement("PRESETS", () => {
         const menuItems = [];
-        for (const presetName of System33.Object.keys(PRESET_TABLE)) {
+        for (const presetName of System34.Object.keys(PRESET_TABLE)) {
           menuItems.push({
             id: "addPreset." + presetName,
             label: "Add " + presetName,
@@ -25911,7 +26694,7 @@ void main() {
       });
       const presetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
       const presetIconMarkup = wrapEditorIconMarkup(ICON_SHAPES.preset);
-      for (const presetName of System33.Object.keys(PRESET_TABLE)) {
+      for (const presetName of System34.Object.keys(PRESET_TABLE)) {
         const rowElement = createEditorListRowElement(presetIconMarkup, presetName);
         rowElement.addEventListener("click", () => {
           this.addSystemFromPreset(presetName);
@@ -26012,8 +26795,8 @@ void main() {
       const windowLayout = buildEditorWindowLayout(MENU_DEFINITIONS, mainPane);
       const rootPane = windowLayout.rootPane;
       this.#statusTextElement = windowLayout.statusTextElement;
-      rootPane.attachTo(System33.document.body);
-      this.#fileInputElement = System33.document.createElement("input");
+      rootPane.attachTo(System34.document.body);
+      this.#fileInputElement = System34.document.createElement("input");
       this.#fileInputElement.type = "file";
       this.#fileInputElement.accept = ".json";
       this.#fileInputElement.style.display = "none";
@@ -26026,8 +26809,8 @@ void main() {
         this.loadAssetText(jsonText, selectedFile.name);
         this.#fileInputElement.value = "";
       });
-      System33.document.body.appendChild(this.#fileInputElement);
-      this.#imageInputElement = System33.document.createElement("input");
+      System34.document.body.appendChild(this.#fileInputElement);
+      this.#imageInputElement = System34.document.createElement("input");
       this.#imageInputElement.type = "file";
       this.#imageInputElement.accept = "image/*";
       this.#imageInputElement.multiple = true;
@@ -26039,8 +26822,8 @@ void main() {
         this.#imageInputElement.value = "";
         this.rebuildAssetList();
       });
-      System33.document.body.appendChild(this.#imageInputElement);
-      System33.window.addEventListener("keydown", (keyboardEvent) => {
+      System34.document.body.appendChild(this.#imageInputElement);
+      System34.window.addEventListener("keydown", (keyboardEvent) => {
         const targetTag = keyboardEvent.target.tagName;
         const isTypingTarget = targetTag === "INPUT" || targetTag === "TEXTAREA" || targetTag === "SELECT";
         if (keyboardEvent.ctrlKey && keyboardEvent.altKey && keyboardEvent.key.toLowerCase() === "n") {
@@ -26147,8 +26930,8 @@ void main() {
     composeAsset() {
       const systemList = [];
       for (const systemEntry of this.#systems) {
-        const clonedDescription = System33.JSON.parse(System33.JSON.stringify(systemEntry.description));
-        systemList.push(System33.Object.assign({ name: systemEntry.name }, clonedDescription));
+        const clonedDescription = System34.JSON.parse(System34.JSON.stringify(systemEntry.description));
+        systemList.push(System34.Object.assign({ name: systemEntry.name }, clonedDescription));
       }
       return { systems: systemList };
     }
@@ -26160,13 +26943,13 @@ void main() {
      */
     saveAsset(fileName) {
       const asset = this.composeAsset();
-      const jsonText = System33.JSON.stringify(asset, null, "	");
-      const blob = new System33.Blob([jsonText], { type: "application/json" });
-      const anchorElement = System33.document.createElement("a");
-      anchorElement.href = System33.URL.createObjectURL(blob);
+      const jsonText = System34.JSON.stringify(asset, null, "	");
+      const blob = new System34.Blob([jsonText], { type: "application/json" });
+      const anchorElement = System34.document.createElement("a");
+      anchorElement.href = System34.URL.createObjectURL(blob);
       anchorElement.download = fileName;
       anchorElement.click();
-      System33.URL.revokeObjectURL(anchorElement.href);
+      System34.URL.revokeObjectURL(anchorElement.href);
       this.refreshStatus();
     }
     //==============================================================================
@@ -26177,10 +26960,10 @@ void main() {
      * @param { string } fileName
      */
     loadAssetText(jsonText, fileName) {
-      const parsedAsset = System33.JSON.parse(jsonText);
+      const parsedAsset = System34.JSON.parse(jsonText);
       this.clearSystems();
       this.#assetFileName = fileName;
-      if (System33.Array.isArray(parsedAsset.systems)) {
+      if (System34.Array.isArray(parsedAsset.systems)) {
         for (const systemDescription of parsedAsset.systems) {
           const systemName = systemDescription.name ? systemDescription.name : this.composeSystemName("System");
           this.addSystem(systemName, systemDescription);
@@ -26216,11 +26999,11 @@ void main() {
      * @param { object } overrideDescription
      */
     addSystem(systemName, overrideDescription) {
-      const description = System33.JSON.parse(System33.JSON.stringify(DEFAULT_DESCRIPTION));
+      const description = System34.JSON.parse(System34.JSON.stringify(DEFAULT_DESCRIPTION));
       if (overrideDescription) {
-        const clonedOverride = System33.JSON.parse(System33.JSON.stringify(overrideDescription));
+        const clonedOverride = System34.JSON.parse(System34.JSON.stringify(overrideDescription));
         delete clonedOverride.name;
-        System33.Object.assign(description, clonedOverride);
+        System34.Object.assign(description, clonedOverride);
       }
       const systemEntry = { name: systemName, description, node: null, particleSystem: null };
       this.#systems.push(systemEntry);
@@ -26318,7 +27101,7 @@ void main() {
         this.#emitterNode.removeChild(selectedEntry.node);
       }
       this.#systems.splice(this.#selectedIndex, 1);
-      const nextIndex = System33.Math.min(this.#selectedIndex, this.#systems.length - 1);
+      const nextIndex = System34.Math.min(this.#selectedIndex, this.#systems.length - 1);
       this.rebuildHierarchy();
       this.selectSystem(nextIndex);
     }
@@ -26377,10 +27160,10 @@ void main() {
      * @param { File } imageFile
      */
     importImageAsset(imageFile) {
-      return new System33.Promise((resolve) => {
-        const fileReader = new System33.FileReader();
+      return new System34.Promise((resolve) => {
+        const fileReader = new System34.FileReader();
         fileReader.onload = () => {
-          const imageElement = new System33.Image();
+          const imageElement = new System34.Image();
           imageElement.onload = () => {
             this.#assets.push({ name: imageFile.name, dataUrl: fileReader.result, imageElement });
             resolve();
@@ -26463,7 +27246,7 @@ void main() {
       if (!systemEntry.description.imageDataUrl || !systemEntry.particleSystem) {
         return;
       }
-      const imageElement = new System33.Image();
+      const imageElement = new System34.Image();
       imageElement.onload = () => {
         systemEntry.particleSystem.setImage(imageElement);
       };
@@ -26741,16 +27524,16 @@ void main() {
               borderBottom: "1px solid " + EditorTheme.borderSoftColor
             }
           });
-          const timeInputElement = System33.document.createElement("input");
+          const timeInputElement = System34.document.createElement("input");
           timeInputElement.type = "text";
           timeInputElement.value = String(gradientKey.time);
           decorateEditorInputElement(timeInputElement);
           timeInputElement.style.flex = "0 0 52px";
-          const colorInputElement = System33.document.createElement("input");
+          const colorInputElement = System34.document.createElement("input");
           colorInputElement.type = "color";
           colorInputElement.value = composeHexText(gradientKey.color);
           colorInputElement.style.cssText = "position:relative;width:34px;height:22px;padding:0;border:1px solid " + PaneTheme.color.border + ";background:transparent;cursor:pointer;flex-shrink:0;";
-          const alphaInputElement = System33.document.createElement("input");
+          const alphaInputElement = System34.document.createElement("input");
           alphaInputElement.type = "text";
           alphaInputElement.value = String(gradientKey.color[3]);
           decorateEditorInputElement(alphaInputElement);
@@ -26759,10 +27542,10 @@ void main() {
           removeButtonElement.style.padding = "2px 10px";
           removeButtonElement.style.fontSize = "12px";
           const commitKey = /* @__PURE__ */ __name(() => {
-            const timeValue = System33.Number.parseFloat(timeInputElement.value);
-            const alphaValue = System33.Number.parseFloat(alphaInputElement.value);
-            gradientKey.time = System33.Number.isFinite(timeValue) ? timeValue : gradientKey.time;
-            const safeAlpha = System33.Number.isFinite(alphaValue) ? alphaValue : 1;
+            const timeValue = System34.Number.parseFloat(timeInputElement.value);
+            const alphaValue = System34.Number.parseFloat(alphaInputElement.value);
+            gradientKey.time = System34.Number.isFinite(timeValue) ? timeValue : gradientKey.time;
+            const safeAlpha = System34.Number.isFinite(alphaValue) ? alphaValue : 1;
             gradientKey.color = parseHexChannels(colorInputElement.value, safeAlpha);
             description.colorOverLifetime.sort((left, right) => left.time - right.time);
             applyChange();
@@ -26904,8 +27687,8 @@ void main() {
   }, (commandId) => {
     return false;
   });
-  System33.particleEditor = particleEditor;
-  System33.document.title = "vanilla.js - Particle Editor";
+  System34.particleEditor = particleEditor;
+  System34.document.title = "vanilla.js - Particle Editor";
   particleEditor.run();
 })();
 

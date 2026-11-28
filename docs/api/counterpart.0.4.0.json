@@ -20283,6 +20283,30 @@
 			"vanilla-engine": {
 				"module": "graphics3d/shadowmap",
 				"class": "ShadowMap",
+				"name": "set_focus_step"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "setFocusStep"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "get_focus_step"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
+				"name": "getFocusStep"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/shadowmap",
+				"class": "ShadowMap",
 				"name": "destroy"
 			},
 			"vanilla.js": {
