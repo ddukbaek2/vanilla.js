@@ -345,6 +345,7 @@ const TOON_FEATURE_SHADE_RIM = 256;
 const TOON_FEATURE_SHADOW = 512;
 const TOON_FEATURE_INTENSITY_LIMIT = 1024;
 const TOON_FEATURE_ALL = 2047;
+const PREWARM_FINISH_PER_STEP = 3; // 미리 짓기가 한 걸음에 끝내는 프로그램 수. (끝내기의 유니폼 칸 읽기를 프레임에 나눈다)
 const TOON_FEATURE_DRAW_BITS = TOON_FEATURE_BASE_TEXTURE | TOON_FEATURE_EMISSIVE_TEXTURE | TOON_FEATURE_DECAL_TEXTURE | TOON_FEATURE_MATCAP | TOON_FEATURE_ANGEL_RING | TOON_FEATURE_SHADOW;
 
 // 몸을 그리는 조각 셰이더의 머리. (유니폼, 표면과 빛 구조, 공용 함수)
@@ -1859,8 +1860,8 @@ export const DRAW_STATE_IS_TRANSPARENT = 8; // alpha 나 틴트 알파가 1 보�
 const DRAW_STATE_ALPHA = 9;
 const DRAW_STATE_BLEND_MODE = 10;
 export const DRAW_STATE_HAS_OUTLINE = 11; // hasOutline 이 false 가 아님.
-const DRAW_STATE_IS_BODY_DRAWN = 12; // isBodyDrawn 이 false 가 아님.
-const DRAW_STATE_LIGHT_SET = 13; // ToonLightSet 이나 null.
+export const DRAW_STATE_IS_BODY_DRAWN = 12; // isBodyDrawn 이 false 가 아님.
+export const DRAW_STATE_LIGHT_SET = 13; // ToonLightSet 이나 null.
 export const DRAW_STATE_BASE_COLOR_TEXTURE = 14; // 텍스처 다섯. (없으면 null)
 const DRAW_STATE_EMISSIVE_TEXTURE = 15;
 const DRAW_STATE_DECAL_TEXTURE = 16;
@@ -2137,6 +2138,7 @@ export class ToonRenderer {
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { Map<string, object | null> } */ #programSets; // "머티리얼 번호/인스턴스 꼴 번호" → { solid, outline, depth } (짓지 못했으면 null)
 	/** @private @type { object } */ #defaultProgramSet;
+	/** @private @type { Map<string, Array<ShaderProgram> | ShaderProgram> } */ #pendingBuilds; // 미리 짓기가 컴파일을 맡긴 채 아직 끝내지 않은 프로그램. (프로그램 칸의 열쇠 → 몸, 바깥선, 깊이 순서, 기능 갈래 몸의 열쇠 → 몸 하나)
 	/** @private @type { WebGLTexture } */ #emptyShadowTexture; // 그림자를 받지 않을 때 그림자 유닛에 묶는 1x1 비교 깊이 텍스처. (깊이 1 이라 늘 빛을 받음)
 	/** @private @type { WebGLTexture } */ #whiteTexture; // 텍스처를 주지 않은 바탕색, 빛남, 데칼 유닛에 묶는 1x1 흰 텍스처.
 	/** @private @type { Float32Array } */ #viewProjectionElements; // 이번 프레임의 보기와 투영.
@@ -2223,6 +2225,7 @@ export class ToonRenderer {
 		this.#outlineBlocks = createBlockCache(OUTLINE_BLOCK_BINDING, OUTLINE_BLOCK_FLOAT_COUNT);
 		this.#lastProgramKey = null;
 		this.#programSets = new Map();
+		this.#pendingBuilds = new Map();
 		this.#emptyShadowTexture = this.createEmptyShadowTexture();
 		this.#whiteTexture = this.createTexture({ width: 1, height: 1, data: new System.Uint8Array([255, 255, 255, 255]) }, { isMipmapped: false });
 		this.#defaultProgramSet = this.createProgramSet(null, null);
@@ -2331,24 +2334,70 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 세 프로그램의 컴파일 시작. (몸, 바깥선, 깊이 순서, 모서리 어둠 몸이면 몸 하나, isDeferred 면 결과를 확인하지 않고 맡기기만 한다, 아니면 짓고 확인한다)
+	//==============================================================================
+	/**
+	 * @param { ToonMaterial | null } material - 머티리얼. (null 이면 빈 조각)
+	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴. (null 이면 없음)
+	 * @param { boolean } isAmbientOcclusion - 모서리 어둠 몸 프로그램만 지을 때 true.
+	 * @param { boolean } isDeferred - 컴파일만 맡길 때 true. (ShaderProgram.finishBuild 로 끝낸다)
+	 * @returns { Array<ShaderProgram> } 지은 프로그램. (짓지 못하면 던진다)
+	 * @private
+	 */
+	startProgramList(material, instanceLayout, isAmbientOcclusion, isDeferred) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace);
+		const programList = [];
+		try {
+			programList.push(new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable, isDeferred));
+			if (!isAmbientOcclusion) {
+				programList.push(new ShaderProgram(webGL2RenderingContext, sources.outlineVertexShader, sources.outlineFragmentShader, sources.attributeLocationTable, isDeferred));
+				programList.push(new ShaderProgram(webGL2RenderingContext, sources.depthVertexShader, sources.depthFragmentShader, sources.attributeLocationTable, isDeferred));
+			}
+		}
+		catch (error) {
+			for (const shaderProgram of programList) {
+				webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
+			}
+			throw error;
+		}
+		return programList;
+	}
+
+	//==============================================================================
+	// 프로그램 칸과 기능 갈래 몸의 열쇠.
+	//==============================================================================
+	/**
+	 * @param { ToonMaterial | null } material - 머티리얼.
+	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴.
+	 * @param { boolean } isAmbientOcclusion - 모서리 어둠 몸 프로그램인지.
+	 * @param { number } [featureMask] - 기능 갈래 몸이면 기능 비트. (-1 이면 프로그램 칸의 열쇠)
+	 * @returns { string } 열쇠. (readProgramSetVariant 의 열쇠와 같은 꼴)
+	 * @private
+	 */
+	readProgramKey(material, instanceLayout, isAmbientOcclusion, featureMask = -1) {
+		const baseKey = `${material !== null ? material.getId() : 0}/${instanceLayout !== null ? instanceLayout.getId() : 0}`;
+		const key = isAmbientOcclusion ? `${baseKey}/ao` : baseKey;
+		return featureMask >= 0 ? `${key}/v${featureMask}` : key;
+	}
+
+	//==============================================================================
 	// 세 프로그램 짓기. (짓지 못하면 던진다)
 	//==============================================================================
 	/**
 	 * @param { ToonMaterial | null } material - 머티리얼. (null 이면 빈 조각)
 	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴. (null 이면 없음)
 	 * @param { object | null } [baseProgramSet] - 모서리 어둠 몸 프로그램만 짓고 바깥선과 그림자 깊이는 이 칸의 것을 같이 쓸 때. (기본 null)
+	 * @param { Array<ShaderProgram> | null } [startedProgramList] - 미리 짓기가 컴파일을 맡겨 둔 프로그램. (있으면 새로 컴파일하지 않고 그 결과를 끝내 쓴다, 기본 null)
 	 * @returns { object } 세 프로그램 칸. ({ solid, outline, depth } 마다 { program, kind, frameSerial, lightSet, lightVersion }, 같이 쓰면 isAmbientOcclusion true)
 	 * @private
 	 */
-	createProgramSet(material, instanceLayout, baseProgramSet = null) {
+	createProgramSet(material, instanceLayout, baseProgramSet = null, startedProgramList = null) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const sources = composeToonProgramSources(material, instanceLayout, baseProgramSet !== null, this.#colorSpace);
-		const programList = [];
+		const programList = startedProgramList !== null ? startedProgramList : this.startProgramList(material, instanceLayout, baseProgramSet !== null, false);
 		try {
-			programList.push(new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable));
-			if (baseProgramSet === null) {
-				programList.push(new ShaderProgram(webGL2RenderingContext, sources.outlineVertexShader, sources.outlineFragmentShader, sources.attributeLocationTable));
-				programList.push(new ShaderProgram(webGL2RenderingContext, sources.depthVertexShader, sources.depthFragmentShader, sources.attributeLocationTable));
+			for (const shaderProgram of programList) {
+				shaderProgram.finishBuild();
 			}
 		}
 		catch (error) {
@@ -2420,11 +2469,14 @@ export class ToonRenderer {
 			this.#lastProgramKey = { material: material, instanceLayout: instanceLayout, isAmbientOcclusion: isAmbientOcclusion, programSet: programSet };
 			return programSet;
 		}
+		// 미리 짓기가 컴파일을 맡겨 둔 것이 있으면 그것을 끝내 쓴다. (아직 안 끝났으면 여기서 기다린다, 동작은 그 자리에서 짓는 것과 같다)
+		const startedProgramList = this.takePendingBuild(key);
 		// 모서리 어둠 몸 프로그램은 바깥선과 그림자 깊이를 기본 칸과 같이 쓴다. 짓지 못하면 (머티리얼 텍스처가 조각 셰이더 유닛을 다 쓴 기기 같은) 모서리 어둠 없이 기본 칸으로 그린다.
 		let baseProgramSet = null;
 		if (isAmbientOcclusion) {
 			baseProgramSet = this.readProgramSetVariant(material, instanceLayout, false);
 			if (baseProgramSet === null) {
+				this.deletePendingPrograms(startedProgramList);
 				// 컨텍스트를 잃은 탓이면 기억하지 않는다. (되살린 뒤 다시 짓는다)
 				if (!this.getWebGL2RenderingContext().isContextLost()) {
 					this.#programSets.set(key, null);
@@ -2434,7 +2486,7 @@ export class ToonRenderer {
 		}
 		let programSet = null;
 		try {
-			programSet = this.createProgramSet(material, instanceLayout, baseProgramSet);
+			programSet = this.createProgramSet(material, instanceLayout, baseProgramSet, startedProgramList);
 		}
 		catch (error) {
 			const name = material !== null && material.getName() !== "" ? material.getName() : key;
@@ -2487,6 +2539,144 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 그리기 줄에 담긴 것이 쓸 프로그램 변형을 그리지 않고 미리 짓기. (유니티 ShaderVariantCollection.WarmUp, 언리얼 PSO 캐시 꼴)
+	// - 머티리얼, 인스턴스 꼴, 몸 기능 비트(빛 묶음과 그리기 꼴이 정함), 모서리 어둠 몸, 바깥선, 그림자 깊이를 그리기 줄이 그릴 때와 같은 열쇠로 짓는다.
+	// - 첫 그리기에서 처음 보는 조합의 프로그램을 짓느라 한 프레임이 끊기는 것을 불러오는 동안으로 옮긴다. 장면을 담은 뒤 첫 프레임 앞에서 한 번 부른다.
+	// - KHR_parallel_shader_compile 이 있으면 컴파일만 맡기고 프레임마다 끝났는지 물어 주 스레드를 막지 않는다. 없으면 이 호출 안에서 짓는다.
+	// - 미리 짓기가 끝나기 전에 그려도 된다. 아직 안 지어진 변형은 그 자리에서 지어 쓴다. (동작은 같다)
+	//==============================================================================
+	/**
+	 * @param { ToonDrawQueue } queue - 변형을 읽을 그리기 줄. (담은 것만 읽고 그리지 않는다)
+	 * @returns { ToonProgramPrewarm } 미리 짓기의 진행. (isReady, wait)
+	 * @example <caption>장면을 담은 뒤 첫 프레임 앞에 변형을 미리 짓기</caption>
+	 * import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createSphereGeometry(0.5, 16, 10), Matrix4.createIdentity(), "#f0e8e0");
+	 * const mesh = renderer.createMesh(builder.readArrays());
+	 * const queue = new ToonDrawQueue();
+	 * queue.addMesh(mesh, Matrix4.createIdentity(), { castsShadow: false });
+	 * const prewarm = renderer.prewarmDrawQueue(queue);
+	 * prewarm.wait().then(() => {
+	 * 	if (!prewarm.isReady()) {
+	 * 		throw new Error("prewarm is not ready");
+	 * 	}
+	 * });
+	 */
+	prewarmDrawQueue(queue) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const programRequests = queue.readProgramRequests(this);
+		const isAmbientOcclusion = programRequests.isAmbientOcclusion || this.#ambientOcclusionInput !== null;
+		const unitList = [];
+		if (!ShaderProgram.isParallelCompileSupported(webGL2RenderingContext)) {
+			for (const request of programRequests.requests) {
+				const programSet = this.readProgramSetVariant(request.material, request.instanceLayout, isAmbientOcclusion);
+				if (programSet !== null && request.featureMask >= 0) {
+					this.readSolidVariant(programSet, request.material, request.instanceLayout, request.featureMask);
+				}
+			}
+			return new ToonProgramPrewarm(this, unitList);
+		}
+		const startSet = (material, instanceLayout, isAmbientOcclusionSet) => {
+			if (material === null && instanceLayout === null && !isAmbientOcclusionSet) {
+				return;
+			}
+			const key = this.readProgramKey(material, instanceLayout, isAmbientOcclusionSet);
+			if (this.#programSets.has(key) || this.#pendingBuilds.has(key)) {
+				return;
+			}
+			try {
+				this.#pendingBuilds.set(key, this.startProgramList(material, instanceLayout, isAmbientOcclusionSet, true));
+				unitList.push({ isVariant: false, material: material, instanceLayout: instanceLayout, isAmbientOcclusion: isAmbientOcclusionSet, featureMask: -1 });
+			}
+			catch (error) {
+				// 컨텍스트를 잃은 탓 같은 것은 그릴 때 다시 짓고 알린다.
+			}
+		};
+		for (const request of programRequests.requests) {
+			startSet(request.material, request.instanceLayout, false);
+			if (isAmbientOcclusion) {
+				startSet(request.material, request.instanceLayout, true);
+			}
+		}
+		for (const request of programRequests.requests) {
+			const featureMask = request.featureMask;
+			if (featureMask < 0 || featureMask === TOON_FEATURE_ALL) {
+				continue;
+			}
+			const setKey = this.readProgramKey(request.material, request.instanceLayout, isAmbientOcclusion);
+			const builtSet = this.#programSets.get(setKey);
+			if (builtSet === null || (builtSet !== undefined && (builtSet.isShared === true || (builtSet.variants !== undefined && builtSet.variants.has(featureMask))))) {
+				continue;
+			}
+			const key = this.readProgramKey(request.material, request.instanceLayout, isAmbientOcclusion, featureMask);
+			if (this.#pendingBuilds.has(key)) {
+				continue;
+			}
+			try {
+				this.#pendingBuilds.set(key, this.startSolidVariant(request.material, request.instanceLayout, isAmbientOcclusion, featureMask, true));
+				unitList.push({ isVariant: true, material: request.material, instanceLayout: request.instanceLayout, isAmbientOcclusion: isAmbientOcclusion, featureMask: featureMask });
+			}
+			catch (error) {
+				// 위와 같다.
+			}
+		}
+		return new ToonProgramPrewarm(this, unitList);
+	}
+
+	//==============================================================================
+	// 미리 짓기 한 걸음. (컴파일이 끝난 것을 끝내 프로그램 칸에 넣는다, 프레임마다 부른다)
+	//==============================================================================
+	/**
+	 * @param { Array<object> } unitList - prewarmDrawQueue 가 맡긴 칸. (끝낸 것은 이 배열에서 뺀다)
+	 * @returns { boolean } 모두 끝났으면 true.
+	 * @private
+	 */
+	advancePrewarm(unitList) {
+		let finishBudget = PREWARM_FINISH_PER_STEP;
+		for (let index = 0; index < unitList.length;) {
+			const unit = unitList[index];
+			const key = this.readProgramKey(unit.material, unit.instanceLayout, unit.isAmbientOcclusion, unit.featureMask);
+			const pending = this.#pendingBuilds.get(key);
+			let isDone = false;
+			if (pending === undefined) {
+				isDone = true; // 그릴 때 이미 끝냈거나 머티리얼을 지웠다.
+			}
+			else if (!unit.isVariant) {
+				const baseKey = this.readProgramKey(unit.material, unit.instanceLayout, false);
+				const isBaseWaiting = unit.isAmbientOcclusion && this.#pendingBuilds.has(baseKey);
+				if (!isBaseWaiting && finishBudget > 0 && pending.every((shaderProgram) => shaderProgram.isBuildComplete())) {
+					this.readProgramSetVariant(unit.material, unit.instanceLayout, unit.isAmbientOcclusion);
+					finishBudget -= 1;
+					isDone = true;
+				}
+			}
+			else {
+				const setKey = this.readProgramKey(unit.material, unit.instanceLayout, unit.isAmbientOcclusion);
+				if (!this.#pendingBuilds.has(setKey)) {
+					const programSet = this.#programSets.get(setKey);
+					if (programSet === undefined || programSet === null || programSet.isShared === true) {
+						this.deletePendingPrograms(this.takePendingBuild(key)); // 쓰일 몸이 없다.
+						isDone = true;
+					}
+					else if (finishBudget > 0 && pending.isBuildComplete()) {
+						this.readSolidVariant(programSet, unit.material, unit.instanceLayout, unit.featureMask);
+						finishBudget -= 1;
+						isDone = true;
+					}
+				}
+			}
+			if (isDone) {
+				unitList.splice(index, 1);
+			}
+			else {
+				index += 1;
+			}
+		}
+		return unitList.length === 0;
+	}
+
+	//==============================================================================
 	// 머티리얼의 프로그램 지우기. (모든 인스턴스 꼴의 것, 다시 그리면 새로 짓는다)
 	//==============================================================================
 	/**
@@ -2495,6 +2685,11 @@ export class ToonRenderer {
 	deleteMaterial(material) {
 		this.#lastProgramKey = null;
 		const prefix = `${material.getId()}/`;
+		for (const key of System.Array.from(this.#pendingBuilds.keys())) {
+			if (key.startsWith(prefix)) {
+				this.deletePendingPrograms(this.takePendingBuild(key));
+			}
+		}
 		for (const [key, programSet] of System.Array.from(this.#programSets.entries())) {
 			if (!key.startsWith(prefix)) {
 				continue;
@@ -2554,16 +2749,14 @@ export class ToonRenderer {
 		}
 		entry = programSet.solid;
 		try {
-			const disabledFeatures = [];
-			for (let index = 0; index < TOON_FEATURE_DEFINE_LIST.length; ++index) {
-				if ((featureMask & (1 << index)) === 0) {
-					disabledFeatures.push(TOON_FEATURE_DEFINE_LIST[index]);
-				}
-			}
 			const isAmbientOcclusion = programSet.isAmbientOcclusion === true;
-			const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace, disabledFeatures);
-			const webGL2RenderingContext = this.getWebGL2RenderingContext();
-			const solidProgram = new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable);
+			// 미리 짓기가 컴파일을 맡겨 둔 것이 있으면 그것을 끝내 쓴다.
+			const pendingKey = this.readProgramKey(material, instanceLayout, isAmbientOcclusion, featureMask);
+			let solidProgram = this.takePendingBuild(pendingKey);
+			if (solidProgram === null) {
+				solidProgram = this.startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, false);
+			}
+			solidProgram.finishBuild();
 			this.prepareSolidProgram(solidProgram, isAmbientOcclusion);
 			entry = { program: solidProgram, kind: ToonProgramKind.solid, lightSet: null, lightVersion: -1 };
 		}
@@ -2572,6 +2765,63 @@ export class ToonRenderer {
 		}
 		variants.set(featureMask, entry);
 		return entry;
+	}
+
+	//==============================================================================
+	// 기능 갈래 몸 프로그램의 컴파일 시작. (isDeferred 면 결과를 확인하지 않고 맡기기만 한다)
+	//==============================================================================
+	/**
+	 * @param { ToonMaterial | null } material - 머티리얼.
+	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴.
+	 * @param { boolean } isAmbientOcclusion - 모서리 어둠 몸 프로그램인지.
+	 * @param { number } featureMask - 기능 비트.
+	 * @param { boolean } isDeferred - 컴파일만 맡길 때 true.
+	 * @returns { ShaderProgram } 지은 몸 프로그램.
+	 * @private
+	 */
+	startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, isDeferred) {
+		const disabledFeatures = [];
+		for (let index = 0; index < TOON_FEATURE_DEFINE_LIST.length; ++index) {
+			if ((featureMask & (1 << index)) === 0) {
+				disabledFeatures.push(TOON_FEATURE_DEFINE_LIST[index]);
+			}
+		}
+		const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace, disabledFeatures);
+		return new ShaderProgram(this.getWebGL2RenderingContext(), sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable, isDeferred);
+	}
+
+	//==============================================================================
+	// 미리 짓기가 맡겨 둔 프로그램 꺼내기. (꺼내면 맡긴 칸에서 빠진다, 없으면 null)
+	//==============================================================================
+	/**
+	 * @param { string } key - readProgramKey 의 열쇠.
+	 * @returns { any } 맡겨 둔 프로그램. (프로그램 칸의 열쇠면 배열, 기능 갈래 몸이면 하나, 없으면 null)
+	 * @private
+	 */
+	takePendingBuild(key) {
+		const pending = this.#pendingBuilds.get(key);
+		if (pending === undefined) {
+			return null;
+		}
+		this.#pendingBuilds.delete(key);
+		return pending;
+	}
+
+	//==============================================================================
+	// 맡겨 둔 프로그램 지우기. (쓰지 않게 된 것, null 이면 하지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Array<ShaderProgram> | ShaderProgram | null } pending - 맡겨 둔 프로그램.
+	 * @private
+	 */
+	deletePendingPrograms(pending) {
+		if (pending === null) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		for (const shaderProgram of System.Array.isArray(pending) ? pending : [pending]) {
+			webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
+		}
 	}
 
 	//==============================================================================
@@ -3133,6 +3383,10 @@ export class ToonRenderer {
 			this.deleteProgramSet(programSet);
 		}
 		this.#programSets.clear();
+		for (const pending of this.#pendingBuilds.values()) {
+			this.deletePendingPrograms(pending);
+		}
+		this.#pendingBuilds.clear();
 		this.#lastProgramKey = null;
 		this.clearBlockCache(this.#materialBlocks);
 		this.clearBlockCache(this.#outlineBlocks);
@@ -5527,5 +5781,101 @@ export class ToonRenderer {
 	getDepthProgram(material = null) {
 		const programSet = this.readProgramSet(material, null);
 		return programSet !== null ? programSet.depth.program : null;
+	}
+}
+
+
+//==============================================================================
+// 프로그램 변형 미리 짓기의 진행. (ToonRenderer.prewarmDrawQueue 의 결과)
+// - 컴파일이 끝난 것을 프레임마다 나눠 끝낸다. (requestAnimationFrame, 병렬 컴파일 확장이 없으면 만들 때 이미 끝나 있다)
+//==============================================================================
+/**
+ * @example <caption>불러오는 동안 미리 짓고 끝나면 시작하기</caption>
+ * import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from "./vanilla.js";
+ * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+ * const builder = new MeshBuilder();
+ * builder.addPart(createSphereGeometry(0.5, 16, 10), Matrix4.createIdentity(), "#c0d0ff");
+ * const mesh = renderer.createMesh(builder.readArrays());
+ * const queue = new ToonDrawQueue();
+ * queue.addMesh(mesh, Matrix4.createIdentity(), { castsShadow: false });
+ * const prewarm = renderer.prewarmDrawQueue(queue);
+ * await prewarm.wait();
+ * console.log(prewarm.isReady());
+ */
+export class ToonProgramPrewarm {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @private @type { ToonRenderer } */ #renderer;
+	/** @private @type { Array<object> } */ #unitList;
+	/** @private @type { boolean } */ #isReady;
+	/** @private @type { Promise<void> } */ #promise;
+	/** @private @type { Function } */ #resolve;
+
+	//==============================================================================
+	// 생성. (ToonRenderer.prewarmDrawQueue 가 부른다)
+	//==============================================================================
+	/**
+	 * @constructor
+	 * @param { ToonRenderer } renderer - 렌더러.
+	 * @param { Array<object> } unitList - 맡긴 칸.
+	 * @private
+	 */
+	constructor(renderer, unitList) {
+		this.#renderer = renderer;
+		this.#unitList = unitList;
+		this.#isReady = false;
+		this.#resolve = null;
+		this.#promise = new System.Promise((resolve) => {
+			this.#resolve = resolve;
+		});
+		this.step();
+	}
+
+	//==============================================================================
+	// 한 걸음. (끝난 컴파일을 끝내고, 남았으면 다음 프레임에 다시)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	step() {
+		if (this.#isReady) {
+			return;
+		}
+		if (this.#renderer.advancePrewarm(this.#unitList)) {
+			this.#isReady = true;
+			this.#resolve();
+			return;
+		}
+		if (typeof System.requestAnimationFrame === "function") {
+			System.requestAnimationFrame(() => {
+				this.step();
+			});
+		}
+		else {
+			System.setTimeout(() => {
+				this.step();
+			}, 16);
+		}
+	}
+
+	//==============================================================================
+	// 다 지었는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 모두 지었으면 true. (그려도 되지만 안 지은 것은 그 자리에서 짓는다)
+	 */
+	isReady() {
+		return this.#isReady;
+	}
+
+	//==============================================================================
+	// 다 지을 때까지 기다리기.
+	//==============================================================================
+	/**
+	 * @returns { Promise<void> } 다 지으면 풀리는 약속.
+	 */
+	wait() {
+		return this.#promise;
 	}
 }
