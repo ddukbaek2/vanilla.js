@@ -74,6 +74,7 @@ export class UIView extends Component {
 	/** @private @type { WorldNode | null } */ #content; // 컨텐트 노드.
 	/** @private @type { Color } */ #backgroundColor;
 	/** @private @type { number } */ #backdropBlurRadius; // 뒤 화면 흐림 반지름. (픽셀, 0 이면 끔)
+	/** @private @type { number } */ #backdropCornerRadius; // 뒤 화면 흐림과 바탕색의 둥근 모서리 반지름. (노드 좌표 단위, 0 이면 사각형)
 	/** @private @type { ScreenEffect | null } */ #backdropScreenEffect; // 뒤 화면을 흐릴 화면 효과. (처음 흐릴 때 만든다)
 
 	//==============================================================================
@@ -89,6 +90,7 @@ export class UIView extends Component {
 		this.#content = null;
 		this.#backgroundColor = new Color(1, 1, 1, 0);
 		this.#backdropBlurRadius = 0;
+		this.#backdropCornerRadius = 0;
 		this.#backdropScreenEffect = null;
 	}
 
@@ -217,6 +219,10 @@ export class UIView extends Component {
 		const contentSize = node.getContentSize();
 		const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
 		graphic.setFillColor(backgroundColor);
+		if (this.#backdropCornerRadius > 0 && this.#backdropBlurRadius > 0) {
+			graphic.drawRoundRect(backgroundRect, this.#backdropCornerRadius);
+			return;
+		}
 		graphic.drawRect(backgroundRect);
 	}
 
@@ -252,6 +258,9 @@ export class UIView extends Component {
 			rightX = System.Math.max(rightX, corner.x);
 			bottomY = System.Math.max(bottomY, corner.y);
 		}
+		const unitOrigin = transformMatrix.transformPoint(0, 0);
+		const unitX = transformMatrix.transformPoint(1, 0);
+		const devicePixelPerUnit = System.Math.hypot(unitX.x - unitOrigin.x, unitX.y - unitOrigin.y);
 		const regionX = System.Math.round(leftX);
 		const regionY = System.Math.round(topY);
 		const regionWidth = System.Math.round(rightX) - regionX;
@@ -266,11 +275,11 @@ export class UIView extends Component {
 			let screenEffect = this.#backdropScreenEffect;
 			if (screenEffect === null) {
 				screenEffect = new ScreenEffect();
-				screenEffect.setEnabled("blur", true);
+				screenEffect.setEnabled("gaussianBlur", true);
 				this.#backdropScreenEffect = screenEffect;
 			}
-			screenEffect.setParameters("blur", this.#backdropBlurRadius);
-			screenEffect.setRegion(regionX, regionY, regionWidth, regionHeight);
+			screenEffect.setParameters("gaussianBlur", this.#backdropBlurRadius * devicePixelPerUnit);
+			screenEffect.setRegion(regionX, regionY, regionWidth, regionHeight, this.#backdropCornerRadius * devicePixelPerUnit);
 			screenEffect.begin(graphic);
 			screenEffect.end(graphic);
 		}, { clearDepth: false });
@@ -279,11 +288,12 @@ export class UIView extends Component {
 	//==============================================================================
 	// 뒤 화면 흐림 설정. (CSS backdrop-filter: blur(), 언리얼 UMG BackgroundBlur 와 같은 뜻)
 	// - 켜면 이 뷰가 그려질 때, 그보다 먼저 그려진 화면을 이 뷰의 내용 영역만 흐리고 그 위에 배경색(반투명)을 얹는다.
-	// - 흐림은 ScreenEffect 의 blur 와 같은 가우스 근사다. 반지름은 그 blur 의 반지름(기기 픽셀)이다.
+	// - 인자는 CSS backdrop-filter: blur(Npx) 의 N 과 같은 표준편차다. (노드 좌표 단위, 화면에서는 변환 배율을 곱한 기기 픽셀)
+	// - 흐림은 ScreenEffect 의 gaussianBlur(분리형 가우스, 선형 샘플링, 3 시그마까지, 모서리는 거울 접기)다. 크롬의 backdrop-filter 와 같다.
 	// - 화면에 그릴 때만 된다. (렌더 타겟에 그리는 중이면 흐리지 않는다) 켜진 동안은 기하 캐시를 쓰지 않는다. (매 그리기마다 화면을 읽는다)
 	//==============================================================================
 	/**
-	 * @param { number } blurRadius 흐림 반지름. (기기 픽셀, 0 이하면 끈다, 처음은 0)
+	 * @param { number } blurRadius 흐림 표준편차. (CSS blur(Npx) 의 N, 노드 좌표 단위, 0 이하면 끈다, 처음은 0)
 	 * @example <caption>반투명 패널 뒤를 흐리기</caption>
 	 * import { UIView, Color } from "./build/vanilla.js";
 	 *
@@ -297,10 +307,39 @@ export class UIView extends Component {
 	}
 
 	//==============================================================================
+	// 뒤 화면 흐림과 바탕색의 둥근 모서리 설정. (CSS border-radius 와 같은 뜻)
+	// - 흐림이 켜져 있을 때 흐림 영역과 바탕색이 이 반지름의 둥근 사각형 안에만 깔린다. (모서리 바깥은 뒤 화면 그대로)
+	//==============================================================================
+	/**
+	 * @param { number } cornerRadius 모서리 반지름. (노드 좌표 단위, 0 이하면 사각형, 처음은 0)
+	 * @example <caption>둥근 단추 모양으로 뒤 흐리기</caption>
+	 * import { UIView, Color } from "./build/vanilla.js";
+	 *
+	 * const view = new UIView();
+	 * view.setBackgroundColor(new Color(1, 1, 1, 0.25));
+	 * view.setBackdropBlur(6);
+	 * view.setBackdropCornerRadius(12);
+	 * console.log(view.getBackdropCornerRadius());
+	 */
+	setBackdropCornerRadius(cornerRadius) {
+		this.#backdropCornerRadius = System.Math.max(0, cornerRadius);
+	}
+
+	//==============================================================================
+	// 뒤 화면 흐림의 둥근 모서리 반지름 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 모서리 반지름. (노드 좌표 단위, 0 이면 사각형)
+	 */
+	getBackdropCornerRadius() {
+		return this.#backdropCornerRadius;
+	}
+
+	//==============================================================================
 	// 뒤 화면 흐림 반지름 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 흐림 반지름. (기기 픽셀, 0 이면 꺼짐)
+	 * @returns { number } 흐림 표준편차. (CSS blur(Npx) 의 N, 0 이면 꺼짐)
 	 */
 	getBackdropBlur() {
 		return this.#backdropBlurRadius;

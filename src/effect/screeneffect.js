@@ -30,6 +30,7 @@ export const ScreenEffectType = {
 	motionBlur: "motionBlur",         // 방향 블러. (parameters = [각도 라디안, 길이 픽셀])
 	zoomBlur: "zoomBlur",             // 중심으로 뻗는 방사 블러. (parameters = [중심 x, 중심 y, 길이])
 	blur: "blur",                     // 가우시안 블러. (parameters = [반지름 픽셀])
+	gaussianBlur: "gaussianBlur",     // 표준편차 가우시안 블러. (parameters = [표준편차 픽셀], CSS filter: blur() 와 같은 뜻, 분리형 선형 샘플링, 3 시그마까지)
 	tiltShift: "tiltShift",           // 틸트 시프트. (parameters = [초점 y, 초점 폭, 반지름 픽셀])
 	godRays: "godRays",               // 빛줄기. (parameters = [중심 x, 중심 y, 문턱, 감쇠], color = 빛 색)
 	bloom: "bloom",                   // 밝은 곳 번짐. (parameters = [문턱, 세기 배율, 반지름 픽셀])
@@ -82,7 +83,7 @@ export const ScreenEffectType = {
 // 적용 차례. (형태 왜곡 → 흐림 → 글리치 → 색 → 무늬 → 전환)
 const EFFECT_ORDER = [
 	"lensDistortion", "bulge", "swirl", "kaleidoscope", "mirror", "ripple", "heatHaze", "jitter", "doubleVision", "pixelate", "shockwave", "wave",
-	"motionBlur", "zoomBlur", "blur", "tiltShift", "godRays", "bloom", "anamorphic",
+	"motionBlur", "zoomBlur", "blur", "gaussianBlur", "tiltShift", "godRays", "bloom", "anamorphic",
 	"glitch", "vhs", "chromatic",
 	"whiteBalance", "liftGammaGain", "colorGrade", "hueShift", "splitToning", "tonemap", "gradientMap", "sepia", "grayscale", "posterize", "dither", "halftone", "sharpen", "edgeDetect", "oldFilm", "nightVision", "invert",
 	"scanline", "grain", "rain", "fog", "vignette", "spotlight", "speedLines", "letterbox",
@@ -106,6 +107,7 @@ const DEFAULT_PARAMETER_TABLE = {
 	motionBlur: [0, 24, 0, 0],
 	zoomBlur: [0.5, 0.5, 0.35, 0],
 	blur: [4, 0, 0, 0],
+	gaussianBlur: [4, 0, 0, 0],
 	tiltShift: [0.5, 0.18, 6, 0],
 	godRays: [0.5, 0.35, 0.6, 0.94],
 	bloom: [0.65, 1.2, 4, 0],
@@ -168,6 +170,7 @@ export const SCREEN_EFFECT_PARAMETER_NAMES = {
 	motionBlur: ["angle", "length"],
 	zoomBlur: ["centerX", "centerY", "length"],
 	blur: ["radius"],
+	gaussianBlur: ["sigma"],
 	tiltShift: ["focusY", "focusWidth", "radius"],
 	godRays: ["centerX", "centerY", "threshold", "decay"],
 	bloom: ["threshold", "intensity", "radius"],
@@ -283,6 +286,10 @@ float valueNoise(vec2 point) {
 vec4 sampleScreen(vec2 screenUv) {
 	vec2 clamped = clamp(screenUv, 0.0, 1.0);
 	return texture(sourceTexture, vec2(clamped.x, 1.0 - clamped.y));
+}
+
+vec2 mirrorUv(vec2 point) {
+	return 1.0 - abs(1.0 - mod(point, 2.0));
 }
 
 float luminanceAt(vec2 uv) {
@@ -418,6 +425,30 @@ const EFFECT_BODY_TABLE = {
 	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
 	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
 	color = sum;
+	`,
+	gaussianBlur: `
+	float sigma = parameters.x * strength;
+	if (sigma >= 0.05) {
+		vec2 texelStep = parameters.zw / resolution;
+		float tapRadius = ceil(sigma * 3.0);
+		float inverseTwoVariance = -0.5 / (sigma * sigma);
+		vec4 sum = color;
+		float total = 1.0;
+		for (int pairIndex = 0; pairIndex < 128; ++pairIndex) {
+			float firstOffset = float(pairIndex * 2 + 1);
+			if (firstOffset > tapRadius) {
+				break;
+			}
+			float secondOffset = firstOffset + 1.0;
+			float firstWeight = exp(firstOffset * firstOffset * inverseTwoVariance);
+			float secondWeight = secondOffset <= tapRadius ? exp(secondOffset * secondOffset * inverseTwoVariance) : 0.0;
+			float pairWeight = firstWeight + secondWeight;
+			vec2 sampleStep = texelStep * ((firstOffset * firstWeight + secondOffset * secondWeight) / pairWeight);
+			sum += (texture(sourceTexture, mirrorUv(uv + sampleStep)) + texture(sourceTexture, mirrorUv(uv - sampleStep))) * pairWeight;
+			total += 2.0 * pairWeight;
+		}
+		color = sum / total;
+	}
 	`,
 	tiltShift: `
 	float focusDistance = smoothstep(parameters.y * 0.5, parameters.y * 1.5, abs(screenUv.y - parameters.x));
@@ -1042,6 +1073,11 @@ export class ScreenEffect extends Object {
 			if (effectType === "blur") {
 				stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 1, 0], target: "pingpong" });
 				stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 0, 1], target: "pingpong" });
+				continue;
+			}
+			if (effectType === "gaussianBlur") {
+				stepList.push({ passName: "gaussianBlur", state: effectState, parameters: [effectState.parameters[0], 0, 1, 0], target: "pingpong" });
+				stepList.push({ passName: "gaussianBlur", state: effectState, parameters: [effectState.parameters[0], 0, 0, 1], target: "pingpong" });
 				continue;
 			}
 			if (effectType === "bloom") {
