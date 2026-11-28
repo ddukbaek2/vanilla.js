@@ -270,11 +270,88 @@ void main() {
 }
 `;
 
+// 몸 조각 셰이더의 기능 갈래. (유니폼으로 켜고 끄던 갈래를 컴파일 때 지울 수 있다. 정의가 없으면 예전과 같은 유니폼 갈래이고, TOON_NO_* 를 정의하면 그 갈래의 글이 프로그램에서 빠진다)
+//   쓰지 않는 갈래의 글은 건너뛰어도 프로그램 크기와 레지스터 몫을 차지해 화소마다 비용이 든다. (아이폰 SE2 에서 안 쓰는 갈래를 지우면 같은 화면이 빨랐다, HANDOFF 의 값)
+const SOLID_FEATURE_CHUNK = `#ifdef TOON_NO_BASE_TEXTURE
+#define TOON_USES_BASE_TEXTURE false
+#else
+#define TOON_USES_BASE_TEXTURE (textureEnabled.x > 0.5)
+#endif
+#ifdef TOON_NO_EMISSIVE_TEXTURE
+#define TOON_USES_EMISSIVE_TEXTURE false
+#else
+#define TOON_USES_EMISSIVE_TEXTURE (textureEnabled.y > 0.5)
+#endif
+#ifdef TOON_NO_DECAL_TEXTURE
+#define TOON_USES_DECAL_TEXTURE false
+#else
+#define TOON_USES_DECAL_TEXTURE (textureEnabled.z > 0.5)
+#endif
+#ifdef TOON_NO_MATCAP
+#define TOON_USES_MATCAP false
+#else
+#define TOON_USES_MATCAP (matcapSettings.x > 0.5)
+#endif
+#ifdef TOON_NO_ANGEL_RING
+#define TOON_USES_ANGEL_RING false
+#else
+#define TOON_USES_ANGEL_RING (angelRingSettings.x > 0.5)
+#endif
+#ifdef TOON_NO_RAMP_TEXTURE
+#define TOON_USES_RAMP_TEXTURE false
+#else
+#define TOON_USES_RAMP_TEXTURE (rampTextureEnabled > 0.5)
+#endif
+#ifdef TOON_NO_SHADE_STOPS
+#define TOON_USES_SHADE_STOPS false
+#else
+#define TOON_USES_SHADE_STOPS (shadeStopCount >= 2)
+#endif
+#ifdef TOON_NO_SHADOW
+#define TOON_USES_SHADOW false
+#else
+#define TOON_USES_SHADOW (receivesShadow > 0.5)
+#endif
+#ifdef TOON_NO_INTENSITY_LIMIT
+#define TOON_USES_INTENSITY_LIMIT false
+#else
+#define TOON_USES_INTENSITY_LIMIT (lightIntensityLimit > 0.5)
+#endif
+#ifdef TOON_NO_RIM
+#define TOON_USES_RIM false
+#else
+#define TOON_USES_RIM (rimLight.a > 0.0)
+#endif
+#ifdef TOON_NO_SHADE_RIM
+#define TOON_USES_SHADE_RIM false
+#else
+#define TOON_USES_SHADE_RIM (shadeRimLight.a > 0.0)
+#endif
+`;
+
+// 몸 조각 셰이더의 기능 갈래. (순서가 기능 비트 자리다. 비트 i 가 켜져 있으면 그 갈래를 쓰는 그리기, 꺼져 있으면 TOON_NO_* 를 정의해 글을 뺀다)
+//   렌더러가 그리기의 텍스처, 빛 묶음, 그림자 입력을 보고 스스로 비트를 정한다. (유니티 셰이더 키워드 변형과 같은 꼴, 게임이 이름을 적지 않는다)
+const TOON_FEATURE_DEFINE_LIST = ["baseTexture", "emissiveTexture", "decalTexture", "matcap", "angelRing", "rampTexture", "shadeStops", "rim", "shadeRim", "shadow", "intensityLimit"];
+const TOON_FEATURE_DEFINE_TABLE = { baseTexture: "TOON_NO_BASE_TEXTURE", emissiveTexture: "TOON_NO_EMISSIVE_TEXTURE", decalTexture: "TOON_NO_DECAL_TEXTURE", matcap: "TOON_NO_MATCAP", angelRing: "TOON_NO_ANGEL_RING", rampTexture: "TOON_NO_RAMP_TEXTURE", shadeStops: "TOON_NO_SHADE_STOPS", rim: "TOON_NO_RIM", shadeRim: "TOON_NO_SHADE_RIM", shadow: "TOON_NO_SHADOW", intensityLimit: "TOON_NO_INTENSITY_LIMIT" };
+const TOON_FEATURE_BASE_TEXTURE = 1;
+const TOON_FEATURE_EMISSIVE_TEXTURE = 2;
+const TOON_FEATURE_DECAL_TEXTURE = 4;
+const TOON_FEATURE_MATCAP = 8;
+const TOON_FEATURE_ANGEL_RING = 16;
+const TOON_FEATURE_RAMP_TEXTURE = 32;
+const TOON_FEATURE_SHADE_STOPS = 64;
+const TOON_FEATURE_RIM = 128;
+const TOON_FEATURE_SHADE_RIM = 256;
+const TOON_FEATURE_SHADOW = 512;
+const TOON_FEATURE_INTENSITY_LIMIT = 1024;
+const TOON_FEATURE_ALL = 2047;
+const TOON_FEATURE_DRAW_BITS = TOON_FEATURE_BASE_TEXTURE | TOON_FEATURE_EMISSIVE_TEXTURE | TOON_FEATURE_DECAL_TEXTURE | TOON_FEATURE_MATCAP | TOON_FEATURE_ANGEL_RING | TOON_FEATURE_SHADOW;
+
 // 몸을 그리는 조각 셰이더의 머리. (유니폼, 표면과 빛 구조, 공용 함수)
 const SOLID_FRAGMENT_HEAD = `#version 300 es
 precision highp float;
 precision highp sampler2DShadow;
-${FRAME_BLOCK_CHUNK}in vec3 worldPosition;
+${SOLID_FEATURE_CHUNK}${FRAME_BLOCK_CHUNK}in vec3 worldPosition;
 in vec3 localPosition;
 in vec3 worldNormal;
 in vec3 surfaceColor;
@@ -407,11 +484,11 @@ float readLightIntensity(vec3 color) {
 }
 vec3 readLimitedDirectionalColor(vec3 color) {
 	float energyScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
-	return lightIntensityLimit > 0.5 ? clamp(color * energyScale, 0.0, 1.0) / energyScale : color;
+	return TOON_USES_INTENSITY_LIMIT ? clamp(color * energyScale, 0.0, 1.0) / energyScale : color;
 }
 vec3 readLimitedLocalColor(vec3 color) {
 	float energyScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
-	return lightIntensityLimit > 0.5 ? color * min(1.0, 1.0 / max(0.001, readLightIntensity(color * energyScale))) : color;
+	return TOON_USES_INTENSITY_LIMIT ? color * min(1.0, 1.0 / max(0.001, readLightIntensity(color * energyScale))) : color;
 }
 float readShadow() {
 	if (shadowEnabled < 0.5) {
@@ -494,14 +571,14 @@ float readToonCoordinate(float cosine, float offset) {
 	return (shadeHalfLambert > 0.5 ? cosine * 0.5 + 0.5 : max(cosine, 0.0)) + offset;
 }
 vec3 readShadeRamp(float coordinate) {
-	if (rampTextureEnabled > 0.5) {
+	if (TOON_USES_RAMP_TEXTURE) {
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		return textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb;
 #else
 		return toLinear(textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb);
 #endif
 	}
-	if (shadeStopCount < 2) {
+	if (!TOON_USES_SHADE_STOPS) {
 		return vec3(clamp(coordinate, 0.0, 1.0));
 	}
 	float edgeWidth = max(fwidth(coordinate), 0.0001);
@@ -516,14 +593,14 @@ vec3 readShadeRamp(float coordinate) {
 	return color;
 }
 vec3 readShadeRampWithWidth(float coordinate, float edgeWidth) {
-	if (rampTextureEnabled > 0.5) {
+	if (TOON_USES_RAMP_TEXTURE) {
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		return textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb;
 #else
 		return toLinear(textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb);
 #endif
 	}
-	if (shadeStopCount < 2) {
+	if (!TOON_USES_SHADE_STOPS) {
 		return vec3(clamp(coordinate, 0.0, 1.0));
 	}
 	vec3 color = shadeStopColors[0];
@@ -539,7 +616,7 @@ vec3 readShadeRampWithWidth(float coordinate, float edgeWidth) {
 float readShadeLevel(vec3 rampColor, float cosine) {
 	float bottom;
 	float top;
-	if (rampTextureEnabled > 0.5) {
+	if (TOON_USES_RAMP_TEXTURE) {
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		bottom = readLuminance(textureLod(rampTexture, vec2(0.0, 0.5), 0.0).rgb);
 		top = readLuminance(textureLod(rampTexture, vec2(1.0, 0.5), 0.0).rgb);
@@ -548,7 +625,7 @@ float readShadeLevel(vec3 rampColor, float cosine) {
 		top = readLuminance(toLinear(textureLod(rampTexture, vec2(1.0, 0.5), 0.0).rgb));
 #endif
 	}
-	else if (shadeStopCount < 2) {
+	else if (!TOON_USES_SHADE_STOPS) {
 		return clamp(cosine, 0.0, 1.0);
 	}
 	else {
@@ -602,27 +679,27 @@ const SOLID_FRAGMENT_BODY = `ToonSurface readSurface() {
 #endif
 	float opacity = alpha * tintColor.a * surfaceTint.a;
 	vec2 uv = surfaceUv * uvTransform.zw + uvTransform.xy;
-	if (textureEnabled.x > 0.5) {
+	if (TOON_USES_BASE_TEXTURE) {
 		vec4 texel = texture(baseColorTexture, uv);
 		color *= texel.rgb;
 		opacity *= texel.a;
 	}
 	vec3 emission = toLinear(emissiveColor.rgb) * emissiveColor.a;
 #ifdef VANILLA_COLOR_SPACE_LINEAR
-	if (textureEnabled.y > 0.5) {
+	if (TOON_USES_EMISSIVE_TEXTURE) {
 		emission *= texture(emissiveTexture, uv).rgb;
 	}
-	if (textureEnabled.z > 0.5) {
+	if (TOON_USES_DECAL_TEXTURE) {
 		vec4 decal = texture(decalTexture, surfaceUv * decalUvTransform.zw + decalUvTransform.xy);
 		vec3 decalTint = decal.rgb * toLinear(decalColor.rgb);
 		color = mix(color, decalTint, decal.a);
 		emission += decalTint * decal.a * decalColor.a;
 	}
 #else
-	if (textureEnabled.y > 0.5) {
+	if (TOON_USES_EMISSIVE_TEXTURE) {
 		emission *= toLinear(texture(emissiveTexture, uv).rgb);
 	}
-	if (textureEnabled.z > 0.5) {
+	if (TOON_USES_DECAL_TEXTURE) {
 		vec4 decal = texture(decalTexture, surfaceUv * decalUvTransform.zw + decalUvTransform.xy);
 		vec3 decalTint = decal.rgb * decalColor.rgb;
 		color = mix(color, decalTint, decal.a);
@@ -650,7 +727,7 @@ ToonLighting readLighting(ToonSurface surface) {
 	ToonLighting lighting;
 	vec3 normal = surface.normal;
 	vec3 viewDirection = surface.viewDirection;
-	float shadow = receivesShadow > 0.5 ? readShadow() : 1.0;
+	float shadow = TOON_USES_SHADOW ? readShadow() : 1.0;
 	float specularNormalization = energyNormalized > 0.5 ? (specularLight.y + 8.0) * RECIPROCAL_PI / 8.0 : 1.0;
 	bool hasSpecular = specularLight.x > 0.0;
 	vec3 specularSum = vec3(0.0);
@@ -689,7 +766,7 @@ ToonLighting readLighting(ToonSurface surface) {
 		vec3 shape = pointLightShapes[index];
 		float lightShadow = 1.0;
 		int shadowSlot = int(pointLightShadowSlots[index] + 0.5) - 1;
-		if (shadowSlot >= 0 && receivesShadow > 0.5) {
+		if (shadowSlot >= 0 && TOON_USES_SHADOW) {
 			lightShadow = readLocalShadow(shadowSlot, surface.worldPosition, normal);
 		}
 		float cosine = (dot(normal, lightDirection) + shape.z) / (1.0 + shape.z);
@@ -728,13 +805,13 @@ ToonLighting readLighting(ToonSurface surface) {
 	lighting.irradiance = irradiance;
 	lighting.specular = hasSpecular ? specularSum * specularColor * specularLight.x * specularNormalization : vec3(0.0);
 	lighting.rim = vec3(0.0);
-	if (rimLight.a > 0.0) {
+	if (TOON_USES_RIM) {
 		float rimTerm = pow(1.0 - clamp(dot(normal, viewDirection), 0.0, 1.0), rimLight.a);
 		float edgeWidth = max(fwidth(rimTerm), 0.0001);
 		float rim = mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, rimTerm), rimTerm, rimShape.x);
 		lighting.rim = rimLight.rgb * mix(vec3(1.0), sunLightColor, lightColorUsage.w) * rim * mix(1.0, sunLevel, rimShape.y);
 	}
-	if (shadeRimLight.a > 0.0) {
+	if (TOON_USES_SHADE_RIM) {
 		float shadeRimTerm = pow(1.0 - clamp(dot(normal, viewDirection), 0.0, 1.0), shadeRimLight.a);
 		float edgeWidth = max(fwidth(shadeRimTerm), 0.0001);
 		float shadeRim = mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, shadeRimTerm), shadeRimTerm, rimShape.x);
@@ -768,9 +845,10 @@ void main() {
 		float diffuseScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
 		color = albedo * lighting.irradiance * diffuseScale + lighting.specular * surface.specularMask + lighting.rim * surface.rimMask + emission;
 	}
-	vec3 viewNormal = normalize(viewRotation * surface.normal);
-	vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
-	if (matcapSettings.x > 0.5) {
+	// 보기 노멀과 해 빛색은 매캡과 천사 고리가 켜진 때만 쓰니 그 갈래 안에서 셈한다. (끄면 모든 화소가 셈하던 노멀 정규화와 빛 제한을 건너뜀, 값은 같다)
+	if (TOON_USES_MATCAP) {
+		vec3 viewNormal = normalize(viewRotation * surface.normal);
+		vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		vec3 matcap = texture(matcapTexture, vec2(viewNormal.x * 0.5 + 0.5, 0.5 - viewNormal.y * 0.5)).rgb * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.y);
 #else
@@ -778,7 +856,9 @@ void main() {
 #endif
 		color = matcapSettings.z > 0.5 ? color + matcap * matcapSettings.y : color * mix(vec3(1.0), matcap, matcapSettings.y);
 	}
-	if (angelRingSettings.x > 0.5) {
+	if (TOON_USES_ANGEL_RING) {
+		vec3 viewNormal = normalize(viewRotation * surface.normal);
+		vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
 		vec2 ringOffset = mix(viewNormal, vec3(0.0, 0.0, 1.0), angelRingSettings.y).xy * 0.5;
 		vec2 ringNormal = vec2(ringOffset.x * cameraRoll.x + ringOffset.y * cameraRoll.y, ringOffset.y * cameraRoll.x - ringOffset.x * cameraRoll.y) + 0.5;
 		vec2 ringUv = vec2(ringNormal.x, 1.0 - mix(1.0 - surface.uv1.y, ringNormal.y, angelRingSettings.z));
@@ -885,6 +965,7 @@ void main() {
  * @param { ToonInstanceLayout | null } instanceLayout - 사용자 어트리뷰트를 선언할 인스턴스 꼴. (null 이면 없음)
  * @param { boolean } [isAmbientOcclusion] - 몸 조각 셰이더에 TOON_AMBIENT_OCCLUSION 을 정의해 모서리 어둠 텍스처를 바탕빛에 곱할지. (기본 false)
  * @param { string } [colorSpace] - 색 공간. (ColorSpace, 기본은 엔진의 색 공간, linear 면 소스마다 #define VANILLA_COLOR_SPACE_LINEAR 1 이 들어간다)
+ * @param { Array<string> } [disabledFeatures] - 몸 조각 셰이더에서 컴파일 때 지울 기능 갈래. (baseTexture, emissiveTexture, decalTexture, matcap, angelRing, rampTexture, shadeStops, rim, shadeRim, shadow, intensityLimit 가운데, 기본은 없음, 지운 갈래를 그리기 때 켜면 그 갈래는 그려지지 않는다. 렌더러는 그리기가 쓰지 않는 갈래를 스스로 알아 넘긴다)
  * @returns { object } 세 프로그램의 소스와 어트리뷰트 자리. ({ solidVertexShader, solidFragmentShader, outlineVertexShader, outlineFragmentShader, depthVertexShader, depthFragmentShader, attributeLocationTable })
  * @example <caption>머티리얼과 인스턴스 꼴로 지은 몸 프로그램을 직접 컴파일해 보기</caption>
  * import { composeToonProgramSources, ToonMaterial, ToonInstanceLayout } from "./vanilla.js";
@@ -900,7 +981,17 @@ void main() {
  * }
  * context.deleteShader(shader);
  */
-export function composeToonProgramSources(material, instanceLayout, isAmbientOcclusion = false, colorSpace = readEngineColorSpace()) {
+export function composeToonProgramSources(material, instanceLayout, isAmbientOcclusion = false, colorSpace = readEngineColorSpace(), disabledFeatures = []) {
+	const featureList = disabledFeatures;
+	let fragmentDefines = isAmbientOcclusion ? "#define TOON_AMBIENT_OCCLUSION\n" : "";
+	for (const feature of featureList) {
+		const defineName = TOON_FEATURE_DEFINE_TABLE[feature];
+		if (defineName === undefined) {
+			throw new System.Error(`unknown toon shader feature: ${feature}`);
+		}
+		fragmentDefines += `#define ${defineName}\n`;
+	}
+	const fragmentHead = fragmentDefines !== "" ? SOLID_FRAGMENT_HEAD.replace("#version 300 es\n", `#version 300 es\n${fragmentDefines}`) : SOLID_FRAGMENT_HEAD;
 	const vertexChunk = material !== null && material.getVertexChunk() !== "" ? material.getVertexChunk() : DEFAULT_VERTEX_CHUNK;
 	const uniformChunk = material !== null ? material.getUniformChunk() : "";
 	const surfaceChunk = material !== null && material.getSurfaceChunk() !== "" ? material.getSurfaceChunk() : DEFAULT_SURFACE_CHUNK;
@@ -917,7 +1008,7 @@ export function composeToonProgramSources(material, instanceLayout, isAmbientOcc
 	}
 	return {
 		solidVertexShader: addColorSpaceDefine(vertexHead + SOLID_VERTEX_BODY, colorSpace),
-		solidFragmentShader: addColorSpaceDefine((isAmbientOcclusion ? SOLID_FRAGMENT_HEAD.replace("#version 300 es\n", "#version 300 es\n#define TOON_AMBIENT_OCCLUSION\n") : SOLID_FRAGMENT_HEAD) + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY, colorSpace),
+		solidFragmentShader: addColorSpaceDefine(fragmentHead + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY, colorSpace),
 		outlineVertexShader: addColorSpaceDefine(vertexHead + OUTLINE_VERTEX_BODY, colorSpace),
 		outlineFragmentShader: addColorSpaceDefine(OUTLINE_FRAGMENT_SHADER, colorSpace),
 		depthVertexShader: addColorSpaceDefine(vertexHead + DEPTH_VERTEX_BODY, colorSpace),
@@ -1785,7 +1876,8 @@ export const DRAW_STATE_CASTS_SHADOW = 25; // castsShadow 가 false 가 아님.
 export const DRAW_STATE_LINE_ID = 26; // 수면 그 번호, 아니면 null.
 export const DRAW_STATE_GROUP = 27; // group 이나 null.
 export const DRAW_STATE_IS_DEPTH_PREPASSED = 28;
-const DRAW_STATE_COUNT = 29;
+const DRAW_STATE_FEATURE_BITS = 29; // 그리기 꼴이 정하는 몸 기능 갈래 비트. (텍스처 다섯, 그림자 받기)
+const DRAW_STATE_COUNT = 30;
 
 //==============================================================================
 // 자동 인스턴싱으로 묶을 수 있는 푼 칸인지. (그리기 줄이 같은 모형, 같은 재질 블록의 이어진 것을 drawMeshBatch 한 번으로 그린다)
@@ -1867,6 +1959,7 @@ function writeDrawState(state, options) {
 	state[DRAW_STATE_LINE_ID] = typeof lineId === "number" ? lineId : null;
 	state[DRAW_STATE_GROUP] = group !== undefined && group !== null ? group : null;
 	state[DRAW_STATE_IS_DEPTH_PREPASSED] = options.isDepthPrepassed === true;
+	state[DRAW_STATE_FEATURE_BITS] = (state[DRAW_STATE_BASE_COLOR_TEXTURE] !== null ? TOON_FEATURE_BASE_TEXTURE : 0) | (state[DRAW_STATE_EMISSIVE_TEXTURE] !== null ? TOON_FEATURE_EMISSIVE_TEXTURE : 0) | (state[DRAW_STATE_DECAL_TEXTURE] !== null ? TOON_FEATURE_DECAL_TEXTURE : 0) | (state[DRAW_STATE_MATCAP_TEXTURE] !== null ? TOON_FEATURE_MATCAP : 0) | (state[DRAW_STATE_ANGEL_RING_TEXTURE] !== null ? TOON_FEATURE_ANGEL_RING : 0) | (options.receivesShadow !== false ? TOON_FEATURE_SHADOW : 0);
 }
 
 //==============================================================================
@@ -2054,6 +2147,9 @@ export class ToonRenderer {
 	/** @private @type { ToonLightSet } */ #lightSet; // 기본 빛 묶음.
 	/** @private @type { Array<number> } */ #outlineColor; // 바깥선 색. (sRGB, 알파)
 	/** @private @type { boolean } */ #isHdrOutput; // 선형 색을 낼지.
+	/** @private @type { ToonLightSet | null } */ #featureLightSet = null; // 기능 비트를 셈한 빛 묶음과 판 번호와 비트. (readFeatureMask)
+	/** @private @type { number } */ #featureLightVersion = -1;
+	/** @private @type { number } */ #featureLightMask = 0;
 	/** @private @type { object | null } */ #shadowInput; // 받을 그림자. ({ depthTexture, lightViewProjectionMatrix, resolution, strength })
 	/** @private @type { object | null } */ #ambientOcclusionInput; // 모서리 어둠. ({ texture, origin [x, y] 이번 프레임 뷰포트의 왼쪽 아래, directLightingStrength 직접 빛에 미치는 몫 }, null 이면 기본 몸 프로그램)
 	/** @private @type { boolean } */ #isShadowPass; // 그림자 깊이 패스 중인지.
@@ -2201,6 +2297,40 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 몸 프로그램의 샘플러 유닛과 재질 블록 자리 정하기. (몸 프로그램을 지을 때마다)
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } solidProgram - 몸 프로그램.
+	 * @param { boolean } isAmbientOcclusion - 모서리 어둠 몸 프로그램인지.
+	 * @private
+	 */
+	prepareSolidProgram(solidProgram, isAmbientOcclusion) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const previousProgram = webGL2RenderingContext.getParameter(webGL2RenderingContext.CURRENT_PROGRAM);
+		solidProgram.useProgram();
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("shadowTexture"), SHADOW_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("baseColorTexture"), BASE_COLOR_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("emissiveTexture"), EMISSIVE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("decalTexture"), DECAL_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("rampTexture"), RAMP_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("matcapTexture"), MATCAP_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("localShadowTexture"), LOCAL_SHADOW_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("angelRingTexture"), ANGEL_RING_TEXTURE_UNIT);
+		if (isAmbientOcclusion) {
+			webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("ambientOcclusionTexture"), AMBIENT_OCCLUSION_TEXTURE_UNIT);
+		}
+		const blockIndex = webGL2RenderingContext.getUniformBlockIndex(solidProgram.getProgram(), MATERIAL_BLOCK_NAME);
+		if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
+			webGL2RenderingContext.uniformBlockBinding(solidProgram.getProgram(), blockIndex, MATERIAL_BLOCK_BINDING);
+		}
+		const frameBlockIndex = webGL2RenderingContext.getUniformBlockIndex(solidProgram.getProgram(), FRAME_BLOCK_NAME);
+		if (frameBlockIndex !== webGL2RenderingContext.INVALID_INDEX) {
+			webGL2RenderingContext.uniformBlockBinding(solidProgram.getProgram(), frameBlockIndex, FRAME_BLOCK_BINDING);
+		}
+		webGL2RenderingContext.useProgram(previousProgram);
+	}
+
+	//==============================================================================
 	// 세 프로그램 짓기. (짓지 못하면 던진다)
 	//==============================================================================
 	/**
@@ -2229,25 +2359,13 @@ export class ToonRenderer {
 		}
 		const solidProgram = programList[0];
 		const previousProgram = webGL2RenderingContext.getParameter(webGL2RenderingContext.CURRENT_PROGRAM);
-		solidProgram.useProgram();
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("shadowTexture"), SHADOW_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("baseColorTexture"), BASE_COLOR_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("emissiveTexture"), EMISSIVE_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("decalTexture"), DECAL_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("rampTexture"), RAMP_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("matcapTexture"), MATCAP_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("localShadowTexture"), LOCAL_SHADOW_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("angelRingTexture"), ANGEL_RING_TEXTURE_UNIT);
-		if (baseProgramSet !== null) {
-			webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("ambientOcclusionTexture"), AMBIENT_OCCLUSION_TEXTURE_UNIT);
-		}
+		this.prepareSolidProgram(solidProgram, baseProgramSet !== null);
 		const bindBlock = (shaderProgram, blockName, binding) => {
 			const blockIndex = webGL2RenderingContext.getUniformBlockIndex(shaderProgram.getProgram(), blockName);
 			if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
 				webGL2RenderingContext.uniformBlockBinding(shaderProgram.getProgram(), blockIndex, binding);
 			}
 		};
-		bindBlock(solidProgram, MATERIAL_BLOCK_NAME, MATERIAL_BLOCK_BINDING);
 		for (const shaderProgram of programList) {
 			bindBlock(shaderProgram, FRAME_BLOCK_NAME, FRAME_BLOCK_BINDING);
 		}
@@ -2387,6 +2505,76 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 그리기가 쓰는 몸 기능 갈래 비트. (그리기 꼴의 비트에 빛 묶음과 그림자 입력을 더한다)
+	//==============================================================================
+	/**
+	 * @param { Array<any> } state - readDrawEntry 의 푼 칸.
+	 * @param { ToonLightSet } lightSet - 이 그리기의 빛 묶음.
+	 * @returns { number } 기능 비트. (TOON_FEATURE_ALL 이면 전부 쓰는 기본 프로그램)
+	 * @private
+	 */
+	readFeatureMask(state, lightSet) {
+		let lightMask = 0;
+		if (this.#featureLightSet === lightSet && this.#featureLightVersion === lightSet.getVersion()) {
+			lightMask = this.#featureLightMask;
+		}
+		else {
+			lightMask = (lightSet.getRampTexture() !== null ? TOON_FEATURE_RAMP_TEXTURE : 0) | (lightSet.getShadeRamp().positions.length >= 2 ? TOON_FEATURE_SHADE_STOPS : 0) | (lightSet.getRimLight().power > 0 ? TOON_FEATURE_RIM : 0) | (lightSet.getShadeRimLight().power > 0 ? TOON_FEATURE_SHADE_RIM : 0) | (lightSet.isLightIntensityLimited() ? TOON_FEATURE_INTENSITY_LIMIT : 0);
+			this.#featureLightSet = lightSet;
+			this.#featureLightVersion = lightSet.getVersion();
+			this.#featureLightMask = lightMask;
+		}
+		// 그림자 입력이 없을 때 그림자 갈래를 빼면 맥 크롬에서 툰 예제 하나(toonview)가 8 화소 1 단계 달라져(컴파일러가 식을 다르게 접음) 비트에 넣지 않는다. 그리기 꼴의 receivesShadow false 만 뺀다.
+		return state[DRAW_STATE_FEATURE_BITS] | lightMask;
+	}
+
+	//==============================================================================
+	// 쓰는 기능 갈래만 남긴 몸 프로그램 칸 반환. (없으면 짓는다, 짓지 못하면 기본 몸 칸)
+	//==============================================================================
+	/**
+	 * @param { object } programSet - readProgramSet 의 칸.
+	 * @param { ToonMaterial | null } material - 머티리얼.
+	 * @param { ToonInstanceLayout | null } instanceLayout - 인스턴스 꼴.
+	 * @param { number } featureMask - 기능 비트.
+	 * @returns { object } 몸 프로그램 칸.
+	 * @private
+	 */
+	readSolidVariant(programSet, material, instanceLayout, featureMask) {
+		if (featureMask === TOON_FEATURE_ALL || programSet.isShared === true) {
+			return programSet.solid;
+		}
+		let variants = programSet.variants;
+		if (variants === undefined) {
+			variants = new System.Map();
+			programSet.variants = variants;
+		}
+		let entry = variants.get(featureMask);
+		if (entry !== undefined) {
+			return entry;
+		}
+		entry = programSet.solid;
+		try {
+			const disabledFeatures = [];
+			for (let index = 0; index < TOON_FEATURE_DEFINE_LIST.length; ++index) {
+				if ((featureMask & (1 << index)) === 0) {
+					disabledFeatures.push(TOON_FEATURE_DEFINE_LIST[index]);
+				}
+			}
+			const isAmbientOcclusion = programSet.isAmbientOcclusion === true;
+			const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace, disabledFeatures);
+			const webGL2RenderingContext = this.getWebGL2RenderingContext();
+			const solidProgram = new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable);
+			this.prepareSolidProgram(solidProgram, isAmbientOcclusion);
+			entry = { program: solidProgram, kind: ToonProgramKind.solid, lightSet: null, lightVersion: -1 };
+		}
+		catch (error) {
+			System.console.error(`ToonRenderer: 기능 갈래 ${featureMask} 의 몸 셰이더를 짓지 못해 기본 몸 셰이더로 그립니다.`, error);
+		}
+		variants.set(featureMask, entry);
+		return entry;
+	}
+
+	//==============================================================================
 	// 세 프로그램 지우기.
 	//==============================================================================
 	/**
@@ -2398,6 +2586,14 @@ export class ToonRenderer {
 			return;
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		if (programSet.variants !== undefined) {
+			for (const entry of programSet.variants.values()) {
+				if (entry !== programSet.solid) {
+					webGL2RenderingContext.deleteProgram(entry.program.getProgram());
+				}
+			}
+			programSet.variants.clear();
+		}
 		// 모서리 어둠 칸은 몸만 제 것이다. (바깥선과 그림자 깊이는 기본 칸이 지운다, 짓지 못해 기본 칸을 빌린 것은 몸도 빌린 것)
 		if (programSet.isAmbientOcclusion === true) {
 			if (programSet.isShared !== true) {
@@ -4763,11 +4959,11 @@ export class ToonRenderer {
 		}
 
 		// 몸.
-		const solidEntry = programSet.solid;
+		const lightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
+		const solidEntry = this.readSolidVariant(programSet, material, instanceLayout, this.readFeatureMask(state, lightSet));
 		const solidProgram = solidEntry.program;
 		solidProgram.useProgram();
 		this.uploadFrameUniforms(solidEntry);
-		const lightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
 		this.uploadLightUniforms(solidEntry, lightSet);
 		this.uploadDrawUniforms(solidProgram, modelElements, isSkinned, instancedMode, jointMatrices);
 		// 재질 값은 블록 하나로. (값이 같은 블록은 하나, 그리기마다 bindBufferBase 하나)
