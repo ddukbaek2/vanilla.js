@@ -133,16 +133,28 @@ function readSourceSize(source) {
 }
 
 //==============================================================================
+// 지은 자리의 스택 잡기. (지을 때는 호출 칸만 잡고 글로 푸는 것은 주인 이름을 읽을 때까지 미룬다, 스택 글 만들기가 비싸다)
+//==============================================================================
+/**
+ * @returns { Error }
+ */
+function captureOwnerTrace() {
+	const previousLimit = System.Error.stackTraceLimit;
+	System.Error.stackTraceLimit = STACK_LIMIT;
+	const trace = new System.Error();
+	System.Error.stackTraceLimit = previousLimit;
+	return trace;
+}
+
+//==============================================================================
 // 지은 자리의 주인 이름. (이 파일과 상태 캐시를 건너뛴 위쪽 세 칸, 크롬과 사파리 스택 꼴 둘 다)
 //==============================================================================
 /**
+ * @param { Error } trace - captureOwnerTrace 의 결과.
  * @returns { string }
  */
-function readOwnerName() {
-	const previousLimit = System.Error.stackTraceLimit;
-	System.Error.stackTraceLimit = STACK_LIMIT;
-	const stack = new System.Error().stack;
-	System.Error.stackTraceLimit = previousLimit;
+function readOwnerName(trace) {
+	const stack = trace.stack;
 	if (typeof stack !== "string") {
 		return "unknown";
 	}
@@ -213,7 +225,7 @@ export class GpuMemoryTracker extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
-	/** @private @type { WeakMap<object, object> } */ #entryTable; // GL 객체 -> 적은 것. ({ kind, owner, bytes, levelTable, width, height, internalFormat, isMipmapGenerated })
+	/** @private @type { WeakMap<object, object> } */ #entryTable; // GL 객체 -> 적은 것. ({ kind, owner (처음엔 null, 읽을 때 trace 로 풂), trace, bytes, levelTable, width, height, internalFormat, isMipmapGenerated })
 	/** @private @type { Set<object> } */ #entrySet; // 살아 있는 적은 것 모두. (합을 낼 때 돈다)
 	/** @private @type { FinalizationRegistry | null } */ #finalizationRegistry;
 
@@ -280,7 +292,7 @@ export class GpuMemoryTracker extends Object {
 		if (glObject === null || glObject === undefined) {
 			return;
 		}
-		const entry = { kind: kind, owner: readOwnerName(), bytes: 0, levelTable: kind === GpuMemoryKind.texture ? new System.Map() : null, width: 0, height: 0, internalFormat: 0 };
+		const entry = { kind: kind, owner: null, trace: captureOwnerTrace(), bytes: 0, levelTable: kind === GpuMemoryKind.texture ? new System.Map() : null, width: 0, height: 0, internalFormat: 0 };
 		this.#entryTable.set(glObject, entry);
 		this.#entrySet.add(entry);
 		if (this.#finalizationRegistry !== null) {
@@ -527,6 +539,10 @@ export class GpuMemoryTracker extends Object {
 			kindUsage.count += 1;
 			kindUsage.bytes += entry.bytes;
 			totalBytes += entry.bytes;
+			if (entry.owner === null) { // 지을 때 미룬 스택 풀기. (한 번만)
+				entry.owner = readOwnerName(entry.trace);
+				entry.trace = null;
+			}
 			const ownerKey = entry.kind + "|" + entry.owner;
 			let ownerUsage = ownerTable.get(ownerKey);
 			if (ownerUsage === undefined) {
