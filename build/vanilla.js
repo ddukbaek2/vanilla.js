@@ -15382,10 +15382,10 @@ var FullscreenPass = class extends Object2 {
   }
 };
 var System36 = globalThis;
-var ScreenEffectType = { lensDistortion: "lensDistortion", bulge: "bulge", swirl: "swirl", kaleidoscope: "kaleidoscope", mirror: "mirror", ripple: "ripple", heatHaze: "heatHaze", jitter: "jitter", doubleVision: "doubleVision", pixelate: "pixelate", shockwave: "shockwave", wave: "wave", motionBlur: "motionBlur", zoomBlur: "zoomBlur", blur: "blur", tiltShift: "tiltShift", godRays: "godRays", bloom: "bloom", anamorphic: "anamorphic", glitch: "glitch", vhs: "vhs", chromatic: "chromatic", whiteBalance: "whiteBalance", liftGammaGain: "liftGammaGain", colorGrade: "colorGrade", hueShift: "hueShift", splitToning: "splitToning", tonemap: "tonemap", gradientMap: "gradientMap", sepia: "sepia", grayscale: "grayscale", posterize: "posterize", dither: "dither", halftone: "halftone", sharpen: "sharpen", edgeDetect: "edgeDetect", oldFilm: "oldFilm", nightVision: "nightVision", invert: "invert", scanline: "scanline", grain: "grain", rain: "rain", fog: "fog", vignette: "vignette", spotlight: "spotlight", speedLines: "speedLines", letterbox: "letterbox", pixelDissolve: "pixelDissolve", wipe: "wipe", irisWipe: "irisWipe", diamondWipe: "diamondWipe", clockWipe: "clockWipe", blinds: "blinds", checkerWipe: "checkerWipe", noiseFade: "noiseFade", burn: "burn", tvOff: "tvOff", fade: "fade" };
-var EFFECT_ORDER = ["lensDistortion", "bulge", "swirl", "kaleidoscope", "mirror", "ripple", "heatHaze", "jitter", "doubleVision", "pixelate", "shockwave", "wave", "motionBlur", "zoomBlur", "blur", "tiltShift", "godRays", "bloom", "anamorphic", "glitch", "vhs", "chromatic", "whiteBalance", "liftGammaGain", "colorGrade", "hueShift", "splitToning", "tonemap", "gradientMap", "sepia", "grayscale", "posterize", "dither", "halftone", "sharpen", "edgeDetect", "oldFilm", "nightVision", "invert", "scanline", "grain", "rain", "fog", "vignette", "spotlight", "speedLines", "letterbox", "pixelDissolve", "wipe", "irisWipe", "diamondWipe", "clockWipe", "blinds", "checkerWipe", "noiseFade", "burn", "tvOff", "fade"];
-var DEFAULT_PARAMETER_TABLE = { lensDistortion: [0.35, 0, 0, 0], bulge: [0.5, 0.5, 0.5, 0.5], swirl: [0.5, 0.5, 0.6, 0.5], kaleidoscope: [6, 0, 0, 0], mirror: [0, 0, 0, 0], ripple: [0.5, 0.5, 40, 6], heatHaze: [6, 1.5, 0, 0], jitter: [8, 24, 0, 0], doubleVision: [0.02, 3, 0, 0], pixelate: [12, 0, 0, 0], shockwave: [0.5, 0.5, 0, 0.1], wave: [18, 4, 0, 0], motionBlur: [0, 24, 0, 0], zoomBlur: [0.5, 0.5, 0.35, 0], blur: [4, 0, 0, 0], tiltShift: [0.5, 0.18, 6, 0], godRays: [0.5, 0.35, 0.6, 0.94], bloom: [0.65, 1.2, 4, 0], anamorphic: [0.75, 1.5, 24, 0], glitch: [20, 10, 0.08, 0], vhs: [0.01, 0.35, 0, 0], chromatic: [1, 0, 0, 0], whiteBalance: [0.4, 0, 0, 0], liftGammaGain: [0, 1, 1, 0], colorGrade: [1, 1, 1, 0], hueShift: [1, 0, 0, 0], splitToning: [0.1, 0.15, 0.45, 0.5], tonemap: [1, 0, 0, 0], gradientMap: [0.05, 0.03, 0.2, 0], sepia: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], posterize: [5, 0, 0, 0], dither: [4, 2, 0, 0], halftone: [6, 0, 0, 0], sharpen: [0, 0, 0, 0], edgeDetect: [0, 0, 0, 0], oldFilm: [0, 0, 0, 0], nightVision: [0, 0, 0, 0], invert: [0, 0, 0, 0], scanline: [0.15, 0.5, 0, 0], grain: [0, 0, 0, 0], rain: [90, 8, 1.6, 0], fog: [0.35, 1, 0, 0], vignette: [0.45, 1.1, 0, 0], spotlight: [0.5, 0.5, 0.25, 0.2], speedLines: [0.5, 0.5, 14, 6], letterbox: [0.12, 0, 0, 0], pixelDissolve: [24, 0, 0, 0], wipe: [1, 0, 0.05, 0], irisWipe: [0.5, 0.5, 0.05, 0], diamondWipe: [0.05, 0, 0, 0], clockWipe: [0.02, 0, 0, 0], blinds: [10, 0.05, 0, 0], checkerWipe: [10, 0, 0, 0], noiseFade: [5, 0.2, 0, 0], burn: [5, 0.06, 0, 0], tvOff: [0, 0, 0, 0], fade: [0, 0, 0, 0] };
-var SCREEN_EFFECT_PARAMETER_NAMES = { lensDistortion: ["intensity"], bulge: ["centerX", "centerY", "intensity", "radius"], swirl: ["centerX", "centerY", "turns", "radius"], kaleidoscope: ["segments"], mirror: ["axis"], ripple: ["centerX", "centerY", "frequency", "speed"], heatHaze: ["scale", "speed"], jitter: ["amplitude", "rate"], doubleVision: ["offset", "speed"], pixelate: ["blockSize"], shockwave: ["centerX", "centerY", "radius", "width"], wave: ["frequency", "speed"], motionBlur: ["angle", "length"], zoomBlur: ["centerX", "centerY", "length"], blur: ["radius"], tiltShift: ["focusY", "focusWidth", "radius"], godRays: ["centerX", "centerY", "threshold", "decay"], bloom: ["threshold", "intensity", "radius"], anamorphic: ["threshold", "intensity", "width"], glitch: ["rows", "rate", "shift"], vhs: ["wobble", "noise"], chromatic: ["scale"], whiteBalance: ["temperature", "tint"], liftGammaGain: ["lift", "gamma", "gain"], colorGrade: ["contrast", "saturation", "brightness"], hueShift: ["turns"], splitToning: ["shadowRed", "shadowGreen", "shadowBlue", "balance"], tonemap: ["exposure"], gradientMap: ["darkRed", "darkGreen", "darkBlue"], sepia: [], grayscale: [], posterize: ["levels"], dither: ["levels", "pixelSize"], halftone: ["cellSize"], sharpen: [], edgeDetect: [], oldFilm: [], nightVision: [], invert: [], scanline: ["curvature", "density"], grain: [], rain: ["columns", "density", "speed"], fog: ["start", "end"], vignette: ["inner", "outer"], spotlight: ["centerX", "centerY", "radius", "softness"], speedLines: ["centerX", "centerY", "density", "speed"], letterbox: ["vertical", "horizontal"], pixelDissolve: ["blocks"], wipe: ["directionX", "directionY", "softness"], irisWipe: ["centerX", "centerY", "softness"], diamondWipe: ["softness"], clockWipe: ["softness"], blinds: ["count", "softness"], checkerWipe: ["cells"], noiseFade: ["scale", "softness"], burn: ["scale", "width"], tvOff: [], fade: [] };
+var ScreenEffectType = { lensDistortion: "lensDistortion", bulge: "bulge", swirl: "swirl", kaleidoscope: "kaleidoscope", mirror: "mirror", ripple: "ripple", heatHaze: "heatHaze", jitter: "jitter", doubleVision: "doubleVision", pixelate: "pixelate", shockwave: "shockwave", wave: "wave", motionBlur: "motionBlur", zoomBlur: "zoomBlur", blur: "blur", gaussianBlur: "gaussianBlur", tiltShift: "tiltShift", godRays: "godRays", bloom: "bloom", anamorphic: "anamorphic", glitch: "glitch", vhs: "vhs", chromatic: "chromatic", whiteBalance: "whiteBalance", liftGammaGain: "liftGammaGain", colorGrade: "colorGrade", hueShift: "hueShift", splitToning: "splitToning", tonemap: "tonemap", gradientMap: "gradientMap", sepia: "sepia", grayscale: "grayscale", posterize: "posterize", dither: "dither", halftone: "halftone", sharpen: "sharpen", edgeDetect: "edgeDetect", oldFilm: "oldFilm", nightVision: "nightVision", invert: "invert", scanline: "scanline", grain: "grain", rain: "rain", fog: "fog", vignette: "vignette", spotlight: "spotlight", speedLines: "speedLines", letterbox: "letterbox", pixelDissolve: "pixelDissolve", wipe: "wipe", irisWipe: "irisWipe", diamondWipe: "diamondWipe", clockWipe: "clockWipe", blinds: "blinds", checkerWipe: "checkerWipe", noiseFade: "noiseFade", burn: "burn", tvOff: "tvOff", fade: "fade" };
+var EFFECT_ORDER = ["lensDistortion", "bulge", "swirl", "kaleidoscope", "mirror", "ripple", "heatHaze", "jitter", "doubleVision", "pixelate", "shockwave", "wave", "motionBlur", "zoomBlur", "blur", "gaussianBlur", "tiltShift", "godRays", "bloom", "anamorphic", "glitch", "vhs", "chromatic", "whiteBalance", "liftGammaGain", "colorGrade", "hueShift", "splitToning", "tonemap", "gradientMap", "sepia", "grayscale", "posterize", "dither", "halftone", "sharpen", "edgeDetect", "oldFilm", "nightVision", "invert", "scanline", "grain", "rain", "fog", "vignette", "spotlight", "speedLines", "letterbox", "pixelDissolve", "wipe", "irisWipe", "diamondWipe", "clockWipe", "blinds", "checkerWipe", "noiseFade", "burn", "tvOff", "fade"];
+var DEFAULT_PARAMETER_TABLE = { lensDistortion: [0.35, 0, 0, 0], bulge: [0.5, 0.5, 0.5, 0.5], swirl: [0.5, 0.5, 0.6, 0.5], kaleidoscope: [6, 0, 0, 0], mirror: [0, 0, 0, 0], ripple: [0.5, 0.5, 40, 6], heatHaze: [6, 1.5, 0, 0], jitter: [8, 24, 0, 0], doubleVision: [0.02, 3, 0, 0], pixelate: [12, 0, 0, 0], shockwave: [0.5, 0.5, 0, 0.1], wave: [18, 4, 0, 0], motionBlur: [0, 24, 0, 0], zoomBlur: [0.5, 0.5, 0.35, 0], blur: [4, 0, 0, 0], gaussianBlur: [4, 0, 0, 0], tiltShift: [0.5, 0.18, 6, 0], godRays: [0.5, 0.35, 0.6, 0.94], bloom: [0.65, 1.2, 4, 0], anamorphic: [0.75, 1.5, 24, 0], glitch: [20, 10, 0.08, 0], vhs: [0.01, 0.35, 0, 0], chromatic: [1, 0, 0, 0], whiteBalance: [0.4, 0, 0, 0], liftGammaGain: [0, 1, 1, 0], colorGrade: [1, 1, 1, 0], hueShift: [1, 0, 0, 0], splitToning: [0.1, 0.15, 0.45, 0.5], tonemap: [1, 0, 0, 0], gradientMap: [0.05, 0.03, 0.2, 0], sepia: [0, 0, 0, 0], grayscale: [0, 0, 0, 0], posterize: [5, 0, 0, 0], dither: [4, 2, 0, 0], halftone: [6, 0, 0, 0], sharpen: [0, 0, 0, 0], edgeDetect: [0, 0, 0, 0], oldFilm: [0, 0, 0, 0], nightVision: [0, 0, 0, 0], invert: [0, 0, 0, 0], scanline: [0.15, 0.5, 0, 0], grain: [0, 0, 0, 0], rain: [90, 8, 1.6, 0], fog: [0.35, 1, 0, 0], vignette: [0.45, 1.1, 0, 0], spotlight: [0.5, 0.5, 0.25, 0.2], speedLines: [0.5, 0.5, 14, 6], letterbox: [0.12, 0, 0, 0], pixelDissolve: [24, 0, 0, 0], wipe: [1, 0, 0.05, 0], irisWipe: [0.5, 0.5, 0.05, 0], diamondWipe: [0.05, 0, 0, 0], clockWipe: [0.02, 0, 0, 0], blinds: [10, 0.05, 0, 0], checkerWipe: [10, 0, 0, 0], noiseFade: [5, 0.2, 0, 0], burn: [5, 0.06, 0, 0], tvOff: [0, 0, 0, 0], fade: [0, 0, 0, 0] };
+var SCREEN_EFFECT_PARAMETER_NAMES = { lensDistortion: ["intensity"], bulge: ["centerX", "centerY", "intensity", "radius"], swirl: ["centerX", "centerY", "turns", "radius"], kaleidoscope: ["segments"], mirror: ["axis"], ripple: ["centerX", "centerY", "frequency", "speed"], heatHaze: ["scale", "speed"], jitter: ["amplitude", "rate"], doubleVision: ["offset", "speed"], pixelate: ["blockSize"], shockwave: ["centerX", "centerY", "radius", "width"], wave: ["frequency", "speed"], motionBlur: ["angle", "length"], zoomBlur: ["centerX", "centerY", "length"], blur: ["radius"], gaussianBlur: ["sigma"], tiltShift: ["focusY", "focusWidth", "radius"], godRays: ["centerX", "centerY", "threshold", "decay"], bloom: ["threshold", "intensity", "radius"], anamorphic: ["threshold", "intensity", "width"], glitch: ["rows", "rate", "shift"], vhs: ["wobble", "noise"], chromatic: ["scale"], whiteBalance: ["temperature", "tint"], liftGammaGain: ["lift", "gamma", "gain"], colorGrade: ["contrast", "saturation", "brightness"], hueShift: ["turns"], splitToning: ["shadowRed", "shadowGreen", "shadowBlue", "balance"], tonemap: ["exposure"], gradientMap: ["darkRed", "darkGreen", "darkBlue"], sepia: [], grayscale: [], posterize: ["levels"], dither: ["levels", "pixelSize"], halftone: ["cellSize"], sharpen: [], edgeDetect: [], oldFilm: [], nightVision: [], invert: [], scanline: ["curvature", "density"], grain: [], rain: ["columns", "density", "speed"], fog: ["start", "end"], vignette: ["inner", "outer"], spotlight: ["centerX", "centerY", "radius", "softness"], speedLines: ["centerX", "centerY", "density", "speed"], letterbox: ["vertical", "horizontal"], pixelDissolve: ["blocks"], wipe: ["directionX", "directionY", "softness"], irisWipe: ["centerX", "centerY", "softness"], diamondWipe: ["softness"], clockWipe: ["softness"], blinds: ["count", "softness"], checkerWipe: ["cells"], noiseFade: ["scale", "softness"], burn: ["scale", "width"], tvOff: [], fade: [] };
 var DEFAULT_COLOR_TABLE = { shockwave: [1, 1, 1, 0.6], godRays: [1, 0.95, 0.8, 1], anamorphic: [0.5, 0.7, 1, 1], colorGrade: [1, 1, 1, 0], splitToning: [1, 0.85, 0.55, 1], gradientMap: [1, 0.9, 0.6, 1], edgeDetect: [1, 1, 1, 1], nightVision: [0.35, 1, 0.45, 1], rain: [0.8, 0.9, 1, 0.45], fog: [0.75, 0.8, 0.9, 1], vignette: [0, 0, 0, 1], spotlight: [0, 0, 0, 1], speedLines: [1, 1, 1, 0.8], letterbox: [0, 0, 0, 1], pixelDissolve: [0, 0, 0, 1], wipe: [0, 0, 0, 1], irisWipe: [0, 0, 0, 1], diamondWipe: [0, 0, 0, 1], clockWipe: [0, 0, 0, 1], blinds: [0, 0, 0, 1], checkerWipe: [0, 0, 0, 1], noiseFade: [0, 0, 0, 1], burn: [0, 0, 0, 1], tvOff: [0, 0, 0, 1], fade: [0, 0, 0, 1] };
 var FRAGMENTSHADER_HEADER = `#version 300 es
 precision highp float;
@@ -15427,6 +15427,10 @@ float valueNoise(vec2 point) {
 vec4 sampleScreen(vec2 screenUv) {
 	vec2 clamped = clamp(screenUv, 0.0, 1.0);
 	return texture(sourceTexture, vec2(clamped.x, 1.0 - clamped.y));
+}
+
+vec2 mirrorUv(vec2 point) {
+	return 1.0 - abs(1.0 - mod(point, 2.0));
 }
 
 float luminanceAt(vec2 uv) {
@@ -15542,6 +15546,29 @@ var EFFECT_BODY_TABLE = { copy: ``, lensDistortion: `
 	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
 	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
 	color = sum;
+	`, gaussianBlur: `
+	float sigma = parameters.x * strength;
+	if (sigma >= 0.05) {
+		vec2 texelStep = parameters.zw / resolution;
+		float tapRadius = ceil(sigma * 3.0);
+		float inverseTwoVariance = -0.5 / (sigma * sigma);
+		vec4 sum = color;
+		float total = 1.0;
+		for (int pairIndex = 0; pairIndex < 128; ++pairIndex) {
+			float firstOffset = float(pairIndex * 2 + 1);
+			if (firstOffset > tapRadius) {
+				break;
+			}
+			float secondOffset = firstOffset + 1.0;
+			float firstWeight = exp(firstOffset * firstOffset * inverseTwoVariance);
+			float secondWeight = secondOffset <= tapRadius ? exp(secondOffset * secondOffset * inverseTwoVariance) : 0.0;
+			float pairWeight = firstWeight + secondWeight;
+			vec2 sampleStep = texelStep * ((firstOffset * firstWeight + secondOffset * secondWeight) / pairWeight);
+			sum += (texture(sourceTexture, mirrorUv(uv + sampleStep)) + texture(sourceTexture, mirrorUv(uv - sampleStep))) * pairWeight;
+			total += 2.0 * pairWeight;
+		}
+		color = sum / total;
+	}
 	`, tiltShift: `
 	float focusDistance = smoothstep(parameters.y * 0.5, parameters.y * 1.5, abs(screenUv.y - parameters.x));
 	vec2 blurStep = parameters.zw / resolution * focusDistance * strength;
@@ -15972,6 +15999,11 @@ var ScreenEffect = class extends Object2 {
         stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 0, 1], target: "pingpong" });
         continue;
       }
+      if (effectType === "gaussianBlur") {
+        stepList.push({ passName: "gaussianBlur", state: effectState, parameters: [effectState.parameters[0], 0, 1, 0], target: "pingpong" });
+        stepList.push({ passName: "gaussianBlur", state: effectState, parameters: [effectState.parameters[0], 0, 0, 1], target: "pingpong" });
+        continue;
+      }
       if (effectType === "bloom") {
         stepList.push({ passName: "bloomBright", state: effectState, parameters: effectState.parameters, target: "halfA" });
         stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 1, 0], target: "halfB", source: "halfA" });
@@ -16245,6 +16277,7 @@ var UIView = class _UIView extends Component {
   #content;
   #backgroundColor;
   #backdropBlurRadius;
+  #backdropCornerRadius;
   #backdropScreenEffect;
   constructor() {
     super();
@@ -16253,6 +16286,7 @@ var UIView = class _UIView extends Component {
     this.#content = null;
     this.#backgroundColor = new Color(1, 1, 1, 0);
     this.#backdropBlurRadius = 0;
+    this.#backdropCornerRadius = 0;
     this.#backdropScreenEffect = null;
   }
   setEngine(engine) {
@@ -16316,6 +16350,10 @@ var UIView = class _UIView extends Component {
     const contentSize = node.getContentSize();
     const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
     graphic.setFillColor(backgroundColor);
+    if (this.#backdropCornerRadius > 0 && this.#backdropBlurRadius > 0) {
+      graphic.drawRoundRect(backgroundRect, this.#backdropCornerRadius);
+      return;
+    }
     graphic.drawRect(backgroundRect);
   }
   drawBackdropBlur(graphic, node) {
@@ -16335,6 +16373,9 @@ var UIView = class _UIView extends Component {
       rightX = System37.Math.max(rightX, corner.x);
       bottomY = System37.Math.max(bottomY, corner.y);
     }
+    const unitOrigin = transformMatrix.transformPoint(0, 0);
+    const unitX = transformMatrix.transformPoint(1, 0);
+    const devicePixelPerUnit = System37.Math.hypot(unitX.x - unitOrigin.x, unitX.y - unitOrigin.y);
     const regionX = System37.Math.round(leftX);
     const regionY = System37.Math.round(topY);
     const regionWidth = System37.Math.round(rightX) - regionX;
@@ -16349,17 +16390,23 @@ var UIView = class _UIView extends Component {
       let screenEffect = this.#backdropScreenEffect;
       if (screenEffect === null) {
         screenEffect = new ScreenEffect();
-        screenEffect.setEnabled("blur", true);
+        screenEffect.setEnabled("gaussianBlur", true);
         this.#backdropScreenEffect = screenEffect;
       }
-      screenEffect.setParameters("blur", this.#backdropBlurRadius);
-      screenEffect.setRegion(regionX, regionY, regionWidth, regionHeight);
+      screenEffect.setParameters("gaussianBlur", this.#backdropBlurRadius * devicePixelPerUnit);
+      screenEffect.setRegion(regionX, regionY, regionWidth, regionHeight, this.#backdropCornerRadius * devicePixelPerUnit);
       screenEffect.begin(graphic);
       screenEffect.end(graphic);
     }, { clearDepth: false });
   }
   setBackdropBlur(blurRadius) {
     this.#backdropBlurRadius = System37.Math.max(0, blurRadius);
+  }
+  setBackdropCornerRadius(cornerRadius) {
+    this.#backdropCornerRadius = System37.Math.max(0, cornerRadius);
+  }
+  getBackdropCornerRadius() {
+    return this.#backdropCornerRadius;
   }
   getBackdropBlur() {
     return this.#backdropBlurRadius;

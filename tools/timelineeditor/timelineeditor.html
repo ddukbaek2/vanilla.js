@@ -24231,6 +24231,35 @@ void main() {
       }
     }
     //==============================================================================
+    // 현지 시각 읽기. (지금에서 분 오프셋만큼 더한 때를 이 기계의 시간대로 본 달력 시각, 러스트 판 Engine::read_local_time 과 같다)
+    // - 웹은 Date 로 읽는다. 더한 때의 일광 절약 시간까지 반영한다. (new Date(Date.now() + 오프셋) 과 같다)
+    //==============================================================================
+    /**
+     * @param { number } [minuteOffset=0] 지금에 더할 분. (음수는 과거, 0 이면 지금)
+     * @returns { { year: number, month: number, day: number, hour: number, minute: number, second: number, weekday: number } } 현지 시각. (해, 달 1 에서 12, 날, 시, 분, 초, 요일 0 이 일요일)
+     * @example <caption>지금 시각과 두 시간 앞뒤</caption>
+     * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+     *
+     * class MainScene extends Scene {
+     * 	async load(engine) {
+     * 		await super.load(engine);
+     * 		const now = engine.readLocalTime();
+     * 		const later = engine.readLocalTime(120);
+     * 		const earlier = engine.readLocalTime(-120);
+     * 		console.log(now.hour < 24 && now.month >= 1 && now.month <= 12, later.hour !== earlier.hour);
+     * 	}
+     * }
+     *
+     * const engineConfiguration = new EngineConfiguration();
+     * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+     * const engine = new Engine(engineConfiguration);
+     * engine.run(new MainScene());
+     */
+    readLocalTime(minuteOffset = 0) {
+      const date = new System32.Date(System32.Date.now() + minuteOffset * 6e4);
+      return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: date.getHours(), minute: date.getMinutes(), second: date.getSeconds(), weekday: date.getDay() };
+    }
+    //==============================================================================
     // 찍기 모드 여부 반환. (주소 쿼리 capture 로 시간을 프레임마다 1/60 초씩 보내는지)
     //==============================================================================
     /**

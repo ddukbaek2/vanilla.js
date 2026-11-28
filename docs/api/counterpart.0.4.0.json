@@ -8671,18 +8671,6 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "Engine",
-				"name": "read_local_time"
-			},
-			"vanilla.js": {
-				"module": "core/engine",
-				"class": "Engine",
-				"name": "readLocalTime"
-			}
-		},
-		{
-			"vanilla-engine": {
-				"module": "core/engine",
-				"class": "Engine",
 				"name": "is_exit_requested"
 			},
 			"vanilla.js": {
