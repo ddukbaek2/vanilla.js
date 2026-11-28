@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
 	툰 재기 장면을 requestAnimationFrame 으로 돌리는 페이지. (tools/perftrace.mjs 로 프레임 전체 시간을 잰다, 시험이 아니다)
-	- 주소 값: scene (lobby, lobbymove, room, roomitem, roommove, miner, 기본 lobbymove), engine (import.js 가 든 폴더, 기본 이 저장소 뿌리)
+	- 주소 값: scene (lobby, lobbymove, room, roomitem, roommove, miner, translucent, 기본 lobbymove), engine (import.js 가 든 폴더, 기본 이 저장소 뿌리), point (translucent 의 점광 수 0 이나 1, 기본 1), layers (translucent 의 겹 수, 기본 12), measure (있으면 프레임마다 화소 하나를 읽어 GPU 를 기다리며 60 프레임의 ms 가운데 값을 window.__result 에 낸다)
 	- 예: NODE_PATH=$(npm root -g) node tools/perftrace.mjs "tests/graphics3d/toonscenepage.html?scene=lobbymove" --seconds 10 --keep-trace trace.json
 -->
 <html>
@@ -29,11 +29,31 @@ else if (sceneName === "room" || sceneName === "roomitem" || sceneName === "room
 	const { createRoomScene } = await import("./toonroomscene.mjs");
 	scene = createRoomScene(vanilla, gl, canvas.width, canvas.height, sceneName === "roomitem" ? "item" : "fresh", sceneName === "roommove");
 }
+else if (sceneName === "translucent") {
+	const { createTranslucentScene } = await import("./tooltranslucentscene.mjs");
+	scene = createTranslucentScene(vanilla, gl, canvas.width, canvas.height, { hasPointLight: parameters.get("point") !== "0", layerCount: Number(parameters.get("layers") ?? 12) });
+}
 else {
 	const { createMinerScene } = await import("./toonminerscene.mjs");
 	const minerScene = createMinerScene(vanilla, gl, canvas.width, canvas.height, "buffer", 6);
 	scene = { drawFrame: () => minerScene.drawFrame() };
 }
+if (parameters.has("measure")) {
+	const pixel = new Uint8Array(4);
+	const timeList = [];
+	for (let measureFrame = 0; measureFrame < 80; ++measureFrame) {
+		const start = performance.now();
+		scene.drawFrame(measureFrame);
+		gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+		if (measureFrame >= 20) {
+			timeList.push(performance.now() - start);
+		}
+	}
+	timeList.sort((first, second) => first - second);
+	window.__result = { median: timeList[timeList.length >> 1], min: timeList[0], pixel: Array.from(pixel).join(",") };
+	document.title = JSON.stringify(window.__result);
+}
+else {
 let frame = 0;
 function step() {
 	scene.drawFrame(frame);
@@ -41,6 +61,7 @@ function step() {
 	requestAnimationFrame(step);
 }
 requestAnimationFrame(step);
+}
 </script>
 </body>
 </html>
