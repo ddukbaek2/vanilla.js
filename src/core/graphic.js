@@ -722,7 +722,7 @@ export class Graphic extends Object {
 	/** @private @type { string } */ #imageSmoothingQuality;
 	/** @private @type { boolean } */ #isContextLost; // WebGL 컨텍스트를 잃은 동안 참. (webglcontextlost 로 세우고 되살려 다시 지은 뒤 내린다, 엔진이 이 동안 그리지 않는다)
 	/** @private @type { ((event: string) => void) | null } */ #contextEventCallback; // 잃음과 되살림을 알리는 함수. (엔진이 건다, "lost" 와 "restored")
-	/** @private @type { GpuMemoryTracker } */ #gpuMemoryTracker; // GPU 메모리 셈. (텍스처, 렌더버퍼, 버퍼)
+	/** @private @type { GpuMemoryTracker | null } */ #gpuMemoryTracker; // GPU 메모리 셈. (텍스처, 렌더버퍼, 버퍼, 켜기 전에는 null 이라 GL 짓기 호출을 가로채지 않는다)
 	/** @private @type { ShaderProgram } */ #shaderProgram;
 	/** @private @type { Map<string, ShaderProgram | null> } */ #resolvedShaderProgramTable = new System.Map(); // resolveShaderProgram 이 담아 둔 프로그램. ("묶음\u0000이름" → 프로그램, 실패는 null)
 	/** @private @type { ShaderProgram | null } */ #shaderProgramOverride; // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
@@ -861,8 +861,9 @@ export class Graphic extends Object {
 	 * @param { boolean } preserveDrawingBuffer 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. (true 일 때만 남긴다)
 	 * @param { boolean } [antialias] 캔버스의 멀티샘플 안티에일리어싱을 켤지. (기본 true, false 일 때만 끈다)
 	 * @param { string } [colorSpace] 3D 색 공간. (ColorSpace, 기본 ColorSpace.gamma, 엔진은 EngineConfiguration.colorSpace 를 넘긴다)
+	 * @param { boolean } [trackGpuMemory] GPU 메모리 셈을 처음부터 켤지. (기본 false, 엔진은 EngineConfiguration.trackGpuMemory 를 넘긴다)
 	 */
-	constructor(canvas, preserveDrawingBuffer, antialias = true, colorSpace = ColorSpace.gamma) {
+	constructor(canvas, preserveDrawingBuffer, antialias = true, colorSpace = ColorSpace.gamma, trackGpuMemory = false) {
 		super();
 		this.#colorSpace = readColorSpace(colorSpace);
 
@@ -884,8 +885,8 @@ export class Graphic extends Object {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		// 그리는 중에 GL 상태를 읽지 않게 컨텍스트의 상태 함수를 가로채 기억한다. (다른 GL 호출보다 먼저 건다)
 		this.#webGLStateCache = WebGLStateCache.attach(webGL2RenderingContext);
-		// GPU 메모리 셈. (텍스처, 렌더버퍼, 버퍼를 짓고 크기를 정하는 함수를 가로챈다, 엔진 자원을 짓기 전에 건다)
-		this.#gpuMemoryTracker = GpuMemoryTracker.attach(webGL2RenderingContext);
+		// GPU 메모리 셈. (개발용이라 기본은 꺼 둔다, 켜면 텍스처, 렌더버퍼, 버퍼를 짓고 크기를 정하는 함수를 가로챈다, 엔진 자원을 짓기 전에 걸어야 엔진 자원도 센다)
+		this.#gpuMemoryTracker = trackGpuMemory === true ? GpuMemoryTracker.attach(webGL2RenderingContext) : null;
 		this.#isContextLost = false;
 		this.#contextEventCallback = null;
 
@@ -2383,21 +2384,62 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// GPU 메모리 셈 켜기. (개발용)
+	//==============================================================================
+	/**
+	 * GPU 메모리 셈을 켠다. 켠 뒤에 지은 텍스처, 렌더버퍼, 버퍼부터 센다. (이미 켰으면 아무것도 하지 않는다)
+	 * 켜기 전에는 GL 짓기 호출을 가로채지 않아 프레임 CPU 에 드는 값이 없다.
+	 * 엔진이 처음 짓는 자원까지 세려면 EngineConfiguration.trackGpuMemory 를 true 로 둔다.
+	 * @example <caption>GPU 메모리 셈 켜기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * engine.getGraphic().enableGpuMemoryTracking();
+	 * console.log(engine.getGraphic().isGpuMemoryTrackingEnabled());
+	 */
+	enableGpuMemoryTracking() {
+		if (this.#gpuMemoryTracker === null) {
+			this.#gpuMemoryTracker = GpuMemoryTracker.attach(this.#webGL2RenderingContext);
+		}
+	}
+
+	//==============================================================================
+	// GPU 메모리 셈이 켜져 있는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 켜져 있으면 true.
+	 * @example <caption>GPU 메모리 셈이 켜져 있는지 읽기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * console.log(engine.getGraphic().isGpuMemoryTrackingEnabled());
+	 */
+	isGpuMemoryTrackingEnabled() {
+		return this.#gpuMemoryTracker !== null;
+	}
+
+	//==============================================================================
 	// GPU 메모리 읽기. (개발용)
 	//==============================================================================
 	/**
 	 * 텍스처, 렌더버퍼, 버퍼가 쓰는 GPU 메모리를 종류별과 주인별로 읽는다. (형식과 크기로 셈한 이름값, 멀티샘플 렌더버퍼는 샘플 수를 곱한다)
+	 * 셈이 꺼져 있으면 이 호출이 켜고, 그 뒤에 지은 것부터 센다. 처음부터 다 세려면 EngineConfiguration.trackGpuMemory 를 true 로 둔다.
 	 * @returns { { totalBytes: number, canvasBytes: number, kindTable: object, ownerList: Array<{ owner: string, kind: string, count: number, bytes: number }> } }
 	 * 합(캔버스 기본 프레임 버퍼 몫 포함), 캔버스 몫, 종류별 { count, bytes }, 주인별 몫(큰 것부터, 주인은 지은 호출 스택의 위쪽 세 칸).
 	 * @example <caption>GPU 메모리 합과 가장 큰 주인 읽기</caption>
 	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
 	 *
-	 * const engine = new Engine(new EngineConfiguration());
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.trackGpuMemory = true;
+	 * const engine = new Engine(engineConfiguration);
 	 * engine.run(new Scene());
 	 * const usage = engine.getGraphic().readGpuMemoryUsage();
 	 * console.log(usage.totalBytes, usage.ownerList.length > 0 ? usage.ownerList[0].owner : "none");
 	 */
 	readGpuMemoryUsage() {
+		this.enableGpuMemoryTracking();
 		return this.#gpuMemoryTracker.readUsage();
 	}
 

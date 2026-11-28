@@ -5,7 +5,7 @@
 // - 바이트는 형식과 크기로 셈한 이름값이다. (드라이버가 맞추는 줄 정렬, 타일 메모리, 멀티샘플 압축은 모른다. 멀티샘플 렌더버퍼는 샘플 수를 곱한다)
 // - 주인은 객체를 지은 호출 스택의 위쪽 세 칸이다. (엔진 안 지은 자리를 가려내는 개발용 이름, 스택은 지을 때 한 번만 읽는다)
 // - 지우지 않고 버려진 객체는 가비지 컬렉션이 올 때 FinalizationRegistry 로 뺀다. (브라우저가 그때 GL 객체를 풀어 준다)
-// - 같은 컨텍스트에는 하나만 건다. (Graphic 이 짓는 자리에서 걸고, 엔진 밖에서 만든 컨텍스트는 GpuMemoryTracker.attach 로 건다)
+// - 같은 컨텍스트에는 하나만 건다. (기본은 꺼 둔다. 켜는 길은 EngineConfiguration.trackGpuMemory, Graphic.enableGpuMemoryTracking, 엔진 밖에서 만든 컨텍스트는 GpuMemoryTracker.attach 이고, 걸기 전에는 GL 짓기 호출을 가로채지 않는다)
 //==============================================================================
 const System = globalThis;
 import { Object } from "../../base/object.js";
@@ -133,16 +133,28 @@ function readSourceSize(source) {
 }
 
 //==============================================================================
+// 지은 자리의 스택 잡기. (지을 때는 호출 칸만 잡고 글로 푸는 것은 주인 이름을 읽을 때까지 미룬다, 스택 글 만들기가 비싸다)
+//==============================================================================
+/**
+ * @returns { Error }
+ */
+function captureOwnerTrace() {
+	const previousLimit = System.Error.stackTraceLimit;
+	System.Error.stackTraceLimit = STACK_LIMIT;
+	const trace = new System.Error();
+	System.Error.stackTraceLimit = previousLimit;
+	return trace;
+}
+
+//==============================================================================
 // 지은 자리의 주인 이름. (이 파일과 상태 캐시를 건너뛴 위쪽 세 칸, 크롬과 사파리 스택 꼴 둘 다)
 //==============================================================================
 /**
+ * @param { Error } trace - captureOwnerTrace 의 결과.
  * @returns { string }
  */
-function readOwnerName() {
-	const previousLimit = System.Error.stackTraceLimit;
-	System.Error.stackTraceLimit = STACK_LIMIT;
-	const stack = new System.Error().stack;
-	System.Error.stackTraceLimit = previousLimit;
+function readOwnerName(trace) {
+	const stack = trace.stack;
 	if (typeof stack !== "string") {
 		return "unknown";
 	}
@@ -213,7 +225,7 @@ export class GpuMemoryTracker extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
-	/** @private @type { WeakMap<object, object> } */ #entryTable; // GL 객체 -> 적은 것. ({ kind, owner, bytes, levelTable, width, height, internalFormat, isMipmapGenerated })
+	/** @private @type { WeakMap<object, object> } */ #entryTable; // GL 객체 -> 적은 것. ({ kind, owner (처음엔 null, 읽을 때 trace 로 풂), trace, bytes, levelTable, width, height, internalFormat, isMipmapGenerated })
 	/** @private @type { Set<object> } */ #entrySet; // 살아 있는 적은 것 모두. (합을 낼 때 돈다)
 	/** @private @type { FinalizationRegistry | null } */ #finalizationRegistry;
 
@@ -280,7 +292,7 @@ export class GpuMemoryTracker extends Object {
 		if (glObject === null || glObject === undefined) {
 			return;
 		}
-		const entry = { kind: kind, owner: readOwnerName(), bytes: 0, levelTable: kind === GpuMemoryKind.texture ? new System.Map() : null, width: 0, height: 0, internalFormat: 0 };
+		const entry = { kind: kind, owner: null, trace: captureOwnerTrace(), bytes: 0, levelTable: kind === GpuMemoryKind.texture ? new System.Map() : null, width: 0, height: 0, internalFormat: 0 };
 		this.#entryTable.set(glObject, entry);
 		this.#entrySet.add(entry);
 		if (this.#finalizationRegistry !== null) {
@@ -527,6 +539,10 @@ export class GpuMemoryTracker extends Object {
 			kindUsage.count += 1;
 			kindUsage.bytes += entry.bytes;
 			totalBytes += entry.bytes;
+			if (entry.owner === null) { // 지을 때 미룬 스택 풀기. (한 번만)
+				entry.owner = readOwnerName(entry.trace);
+				entry.trace = null;
+			}
 			const ownerKey = entry.kind + "|" + entry.owner;
 			let ownerUsage = ownerTable.get(ownerKey);
 			if (ownerUsage === undefined) {

@@ -4173,14 +4173,41 @@ export class ToonRenderer {
 		if (entry === undefined) {
 			entry = this.createDrawEntry();
 			this.#drawEntryOfOptions.set(options, entry);
+			return this.writeKnownDrawEntry(entry, options);
 		}
-		else if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
+		return this.readKnownDrawEntry(entry, options);
+	}
+
+	//==============================================================================
+	// 꼴 객체마다 기억한 칸을 맞추기. (readDrawEntry 의 기억이 있는 갈래, findDrawEntry 가 기억 칸을 이미 찾았을 때 바로 부른다)
+	//==============================================================================
+	/**
+	 * @param { object } entry - 꼴 객체마다 기억한 칸.
+	 * @param { object } options - 그리기 꼴.
+	 * @returns { object } entry.
+	 * @private
+	 */
+	readKnownDrawEntry(entry, options) {
+		if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
 			return entry;
 		}
-		else if (isSameOptionsSnapshot(entry, options)) {
+		if (isSameOptionsSnapshot(entry, options)) {
 			entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
 			return entry;
 		}
+		return this.writeKnownDrawEntry(entry, options);
+	}
+
+	//==============================================================================
+	// 꼴 객체마다 기억한 칸을 새로 풀기. (값이 달라졌거나 처음 지은 칸, 재질 블록은 다시 고른다)
+	//==============================================================================
+	/**
+	 * @param { object } entry - 꼴 객체마다 기억한 칸.
+	 * @param { object } options - 그리기 꼴.
+	 * @returns { object } entry.
+	 * @private
+	 */
+	writeKnownDrawEntry(entry, options) {
 		writeOptionsSnapshot(entry, options);
 		writeDrawState(entry.state, options);
 		entry.materialBlock = null;
@@ -4199,10 +4226,14 @@ export class ToonRenderer {
 	 * @private
 	 */
 	findDrawEntry(options) {
-		if (!this.#drawEntryOfOptions.has(options)) {
+		const entry = this.#drawEntryOfOptions.get(options);
+		if (entry === undefined) {
 			return null;
 		}
-		return this.readDrawEntry(options);
+		if (options === this.#hintOptions) {
+			return this.readHeldDrawEntry(this.#hintEntry);
+		}
+		return this.readKnownDrawEntry(entry, options);
 	}
 
 	//==============================================================================
