@@ -345,6 +345,7 @@ const TOON_FEATURE_SHADE_RIM = 256;
 const TOON_FEATURE_SHADOW = 512;
 const TOON_FEATURE_INTENSITY_LIMIT = 1024;
 const TOON_FEATURE_ALL = 2047;
+const TOON_FEATURE_LIGHT_BIT_TABLE = { rampTexture: TOON_FEATURE_RAMP_TEXTURE, shadeStops: TOON_FEATURE_SHADE_STOPS, rim: TOON_FEATURE_RIM, shadeRim: TOON_FEATURE_SHADE_RIM, intensityLimit: TOON_FEATURE_INTENSITY_LIMIT }; // prewarmDrawQueue 의 lightFeatureList 이름 → 비트.
 const PREWARM_FINISH_PER_STEP = 3; // 미리 짓기가 한 걸음에 끝내는 프로그램 수. (끝내기의 유니폼 칸 읽기를 프레임에 나눈다)
 const TOON_FEATURE_DRAW_BITS = TOON_FEATURE_BASE_TEXTURE | TOON_FEATURE_EMISSIVE_TEXTURE | TOON_FEATURE_DECAL_TEXTURE | TOON_FEATURE_MATCAP | TOON_FEATURE_ANGEL_RING | TOON_FEATURE_SHADOW;
 
@@ -2138,6 +2139,7 @@ export class ToonRenderer {
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { Map<string, object | null> } */ #programSets; // "머티리얼 번호/인스턴스 꼴 번호" → { solid, outline, depth } (짓지 못했으면 null)
 	/** @private @type { object } */ #defaultProgramSet;
+	/** @private @type { boolean } */ #isAsyncProgramBuild = true; // 처음 보는 몸 변형을 병렬 컴파일에 맡기고 그동안 기본 몸으로 그린다. (KHR_parallel_shader_compile 이 있을 때만)
 	/** @private @type { Map<string, Array<ShaderProgram> | ShaderProgram> } */ #pendingBuilds; // 미리 짓기가 컴파일을 맡긴 채 아직 끝내지 않은 프로그램. (프로그램 칸의 열쇠 → 몸, 바깥선, 깊이 순서, 기능 갈래 몸의 열쇠 → 몸 하나)
 	/** @private @type { WebGLTexture } */ #emptyShadowTexture; // 그림자를 받지 않을 때 그림자 유닛에 묶는 1x1 비교 깊이 텍스처. (깊이 1 이라 늘 빛을 받음)
 	/** @private @type { WebGLTexture } */ #whiteTexture; // 텍스처를 주지 않은 바탕색, 빛남, 데칼 유닛에 묶는 1x1 흰 텍스처.
@@ -2539,6 +2541,39 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 처음 보는 몸 변형을 맡기고 기본 몸으로 그릴지. (기본 true, KHR_parallel_shader_compile 이 없으면 이 값과 상관없이 그 자리에서 짓는다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isAsync - true 면 장면 중간에 처음 보는 몸 변형을 그 자리에서 짓지 않고, 다 지어질 때까지 전부 켠 기본 몸(같은 화면)으로 그린다. false 면 그 자리에서 짓고 기다린다.
+	 * @example
+	 * import { ToonRenderer } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * renderer.setAsyncProgramBuild(false);
+	 * if (renderer.isAsyncProgramBuild() !== false) {
+	 * 	throw new Error("async program build must be off");
+	 * }
+	 */
+	setAsyncProgramBuild(isAsync) {
+		this.#isAsyncProgramBuild = isAsync === true;
+	}
+
+	//==============================================================================
+	// 처음 보는 몸 변형을 맡기고 기본 몸으로 그리는지 읽기.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 처음 보는 몸 변형을 맡기고 기본 몸으로 그리면 true.
+	 * @example
+	 * import { ToonRenderer } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * if (typeof renderer.isAsyncProgramBuild() !== "boolean") {
+	 * 	throw new Error("not boolean");
+	 * }
+	 */
+	isAsyncProgramBuild() {
+		return this.#isAsyncProgramBuild;
+	}
+
+	//==============================================================================
 	// 그리기 줄에 담긴 것이 쓸 프로그램 변형을 그리지 않고 미리 짓기. (유니티 ShaderVariantCollection.WarmUp, 언리얼 PSO 캐시 꼴)
 	// - 머티리얼, 인스턴스 꼴, 몸 기능 비트(빛 묶음과 그리기 꼴이 정함), 모서리 어둠 몸, 바깥선, 그림자 깊이를 그리기 줄이 그릴 때와 같은 열쇠로 짓는다.
 	// - 첫 그리기에서 처음 보는 조합의 프로그램을 짓느라 한 프레임이 끊기는 것을 불러오는 동안으로 옮긴다. 장면을 담은 뒤 첫 프레임 앞에서 한 번 부른다.
@@ -2547,6 +2582,10 @@ export class ToonRenderer {
 	//==============================================================================
 	/**
 	 * @param { ToonDrawQueue } queue - 변형을 읽을 그리기 줄. (담은 것만 읽고 그리지 않는다)
+	 * @param { object } [options] - 게임이 장면 중간에 쓸 조합 목록. (유니티 ShaderVariantCollection 처럼, 기본은 빈 객체)
+	 * @param { Array<ToonDrawQueue> } [options.queueList] - 더 읽을 그리기 줄. (나중에 나올 재질이나 인스턴스 꼴을 담은 줄)
+	 * @param { Array<ToonLightSet> } [options.lightSetList] - 그리기 줄의 모든 그리기에 더 맞춰 볼 빛 묶음. (지금 값의 기능 비트를 쓴다)
+	 * @param { Array<Array<string>> } [options.lightFeatureList] - 더 맞춰 볼 빛 묶음 쪽 기능 조합. (조합마다 "rampTexture", "shadeStops", "rim", "shadeRim", "intensityLimit" 중 그 빛 묶음에 더 켜질 것의 이름, 이미 켜진 것에 더해 맞춰 본다)
 	 * @returns { ToonProgramPrewarm } 미리 짓기의 진행. (isReady, wait)
 	 * @example <caption>장면을 담은 뒤 첫 프레임 앞에 변형을 미리 짓기</caption>
 	 * import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from "./vanilla.js";
@@ -2562,10 +2601,24 @@ export class ToonRenderer {
 	 * 		throw new Error("prewarm is not ready");
 	 * 	}
 	 * });
+	 * @example <caption>장면 중간에 켜질 림 라이트 조합까지 미리 짓기</caption>
+	 * import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * const builder = new MeshBuilder();
+	 * builder.addPart(createSphereGeometry(0.5, 16, 10), Matrix4.createIdentity(), "#f0e8e0");
+	 * const mesh = renderer.createMesh(builder.readArrays());
+	 * const queue = new ToonDrawQueue();
+	 * queue.addMesh(mesh, Matrix4.createIdentity(), { castsShadow: false });
+	 * const prewarm = renderer.prewarmDrawQueue(queue, { lightFeatureList: [["rim"], ["rim", "shadeRim"]] });
+	 * prewarm.wait().then(() => {
+	 * 	if (!prewarm.isReady()) {
+	 * 		throw new Error("prewarm is not ready");
+	 * 	}
+	 * });
 	 */
-	prewarmDrawQueue(queue) {
+	prewarmDrawQueue(queue, options = {}) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const programRequests = queue.readProgramRequests(this);
+		const programRequests = this.expandPrewarmRequests(queue, options);
 		const isAmbientOcclusion = programRequests.isAmbientOcclusion || this.#ambientOcclusionInput !== null;
 		const unitList = [];
 		if (!ShaderProgram.isParallelCompileSupported(webGL2RenderingContext)) {
@@ -2622,6 +2675,94 @@ export class ToonRenderer {
 			}
 		}
 		return new ToonProgramPrewarm(this, unitList);
+	}
+
+	//==============================================================================
+	// 미리 지을 변형 목록 만들기. (그리기 줄들이 읽은 것에 게임이 준 빛 묶음 쪽 기능 조합을 곱한다)
+	//==============================================================================
+	/**
+	 * @param { ToonDrawQueue } queue - 변형을 읽을 그리기 줄.
+	 * @param { object } options - prewarmDrawQueue 의 options.
+	 * @returns { object } { isAmbientOcclusion, requests } (ToonDrawQueue.readProgramRequests 와 같은 꼴)
+	 * @private
+	 */
+	expandPrewarmRequests(queue, options) {
+		const programRequests = queue.readProgramRequests(this);
+		let isAmbientOcclusion = programRequests.isAmbientOcclusion;
+		const requests = programRequests.requests;
+		const keySet = new System.Set();
+		const requestKey = (request) => `${request.material !== null ? request.material.getId() : 0}/${request.instanceLayout !== null ? request.instanceLayout.getId() : 0}/${request.featureMask}`;
+		for (const request of requests) {
+			keySet.add(requestKey(request));
+		}
+		if (options.queueList !== undefined) {
+			for (const otherQueue of options.queueList) {
+				const otherRequests = otherQueue.readProgramRequests(this);
+				isAmbientOcclusion = isAmbientOcclusion || otherRequests.isAmbientOcclusion;
+				for (const request of otherRequests.requests) {
+					const key = requestKey(request);
+					if (!keySet.has(key)) {
+						keySet.add(key);
+						requests.push(request);
+					}
+				}
+			}
+		}
+		const lightMaskList = []; // 빛 묶음 쪽 비트를 이 값으로 바꿔 맞춰 볼 것. (lightSetList)
+		const addedMaskList = []; // 요청이 이미 가진 빛 묶음 쪽 비트에 더해 맞춰 볼 것. (lightFeatureList)
+		if (options.lightSetList !== undefined) {
+			for (const lightSet of options.lightSetList) {
+				lightMaskList.push(this.readLightFeatureMask(lightSet));
+			}
+		}
+		if (options.lightFeatureList !== undefined) {
+			for (const nameList of options.lightFeatureList) {
+				let lightMask = 0;
+				for (const name of nameList) {
+					const bit = TOON_FEATURE_LIGHT_BIT_TABLE[name];
+					if (bit === undefined) {
+						throw new System.Error(`ToonRenderer.prewarmDrawQueue: 알 수 없는 빛 기능 이름 ${name} (rampTexture, shadeStops, rim, shadeRim, intensityLimit)`);
+					}
+					lightMask |= bit;
+				}
+				addedMaskList.push(lightMask);
+			}
+		}
+		const baseCount = requests.length;
+		for (let index = 0; index < baseCount; ++index) {
+			const request = requests[index];
+			if (request.featureMask < 0) {
+				continue;
+			}
+			const featureMaskList = [];
+			for (const lightMask of lightMaskList) {
+				featureMaskList.push((request.featureMask & TOON_FEATURE_DRAW_BITS) | lightMask);
+			}
+			for (const addedMask of addedMaskList) {
+				featureMaskList.push(request.featureMask | addedMask);
+			}
+			for (const featureMask of featureMaskList) {
+				const expanded = { material: request.material, instanceLayout: request.instanceLayout, featureMask: featureMask, isBodyDrawn: request.isBodyDrawn };
+				const key = requestKey(expanded);
+				if (!keySet.has(key)) {
+					keySet.add(key);
+					requests.push(expanded);
+				}
+			}
+		}
+		return { isAmbientOcclusion: isAmbientOcclusion, requests: requests };
+	}
+
+	//==============================================================================
+	// 빛 묶음 쪽 몸 기능 비트. (readFeatureMask 의 빛 묶음 몫, 열쇠 칸은 건드리지 않는다)
+	//==============================================================================
+	/**
+	 * @param { ToonLightSet } lightSet - 빛 묶음.
+	 * @returns { number } 빛 묶음 쪽 기능 비트.
+	 * @private
+	 */
+	readLightFeatureMask(lightSet) {
+		return (lightSet.getRampTexture() !== null ? TOON_FEATURE_RAMP_TEXTURE : 0) | (lightSet.getShadeRamp().positions.length >= 2 ? TOON_FEATURE_SHADE_STOPS : 0) | (lightSet.getRimLight().power > 0 ? TOON_FEATURE_RIM : 0) | (lightSet.getShadeRimLight().power > 0 ? TOON_FEATURE_SHADE_RIM : 0) | (lightSet.isLightIntensityLimited() ? TOON_FEATURE_INTENSITY_LIMIT : 0);
 	}
 
 	//==============================================================================
@@ -2752,6 +2893,15 @@ export class ToonRenderer {
 			const isAmbientOcclusion = programSet.isAmbientOcclusion === true;
 			// 미리 짓기가 컴파일을 맡겨 둔 것이 있으면 그것을 끝내 쓴다.
 			const pendingKey = this.readProgramKey(material, instanceLayout, isAmbientOcclusion, featureMask);
+			const pendingProgram = this.#pendingBuilds.get(pendingKey);
+			if (pendingProgram !== undefined && this.#isAsyncProgramBuild && !pendingProgram.isBuildComplete()) {
+				return programSet.solid; // 아직 짓는 중이면 전부 켠 기본 몸(같은 화면)으로 그리고 칸에 넣지 않는다. 다음 그리기에 다시 묻는다.
+			}
+			if (pendingProgram === undefined && this.#isAsyncProgramBuild && ShaderProgram.isParallelCompileSupported(this.getWebGL2RenderingContext())) {
+				// 처음 보는 변형은 컴파일만 맡기고 이번 프레임은 기본 몸으로 그려 프레임을 막지 않는다.
+				this.#pendingBuilds.set(pendingKey, this.startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, true));
+				return programSet.solid;
+			}
 			let solidProgram = this.takePendingBuild(pendingKey);
 			if (solidProgram === null) {
 				solidProgram = this.startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, false);
