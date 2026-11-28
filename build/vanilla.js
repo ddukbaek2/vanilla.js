@@ -15032,6 +15032,10 @@ var Engine = class extends Object2 {
       return false;
     }
   }
+  readLocalTime(minuteOffset = 0) {
+    const date = new System35.Date(System35.Date.now() + minuteOffset * 6e4);
+    return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: date.getHours(), minute: date.getMinutes(), second: date.getSeconds(), weekday: date.getDay() };
+  }
   isCaptureTimeStepFixed() {
     return this.#isCaptureTimeStepFixed;
   }
