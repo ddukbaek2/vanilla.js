@@ -2,6 +2,7 @@
 // UIView 뒤 화면 흐림(setBackdropBlur) 크롬 시험. (NODE_PATH=$(npm root -g) node tests/ui/uibackdropblurchrome.test.mjs)
 // - 흰 줄과 검은 줄이 번갈아 깔린 화면 위에 흐림 반지름 0 과 6 의 투명 뷰를 얹어 찍는다.
 //   0 은 줄이 그대로, 6 은 뷰 자리 안만 줄이 흐려져 회색이 섞이고 뷰 밖은 그대로인지 본다.
+// - UIBACKDROPBLUR_DUMP=경로 를 주면 흐림 6 의 y 180 줄 화소(빨강, 뷰 안과 밖)를 JSON 으로 적는다. 러스트 예제 uibackdropblur 와 견줄 때 쓴다.
 // - 크롬 경로는 CHROME_PATH 로 바꿀 수 있다. puppeteer-core 나 크롬이 없으면 실패한다. (말없이 건너뛰지 않는다)
 //==============================================================================
 import fs from "node:fs";
@@ -133,6 +134,9 @@ try {
 	};
 	const sharpResult = await readRow(0);
 	const blurResult = await readRow(6);
+	if (process.env.UIBACKDROPBLUR_DUMP) {
+		fs.writeFileSync(process.env.UIBACKDROPBLUR_DUMP, JSON.stringify({ inside: blurResult.inside, outside: blurResult.outside }));
+	}
 	checkEqual(sharpResult.errorList.join("\n"), "", "흐림 0 오류");
 	checkEqual(blurResult.errorList.join("\n"), "", "흐림 6 오류");
 	const countMiddle = (valueList) => valueList.filter((value) => value > 40 && value < 215).length;
