@@ -10071,7 +10071,13 @@
 								"en": "Whether to turn on GPU memory tracking (for development) from the start. Set at creation. When off (the default), GL create calls are not intercepted, so there is no per-frame CPU cost.\nWhen on, the resources the engine creates first are counted too. To turn it on later use Engine.enableGpuMemoryTracking(), which counts what is created after that.\nExample: engineConfiguration.trackGpuMemory = true; (when profiling)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/engine.js"
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "EngineConfiguration",
+								"name": "track_gpu_memory"
+							}
 						},
 						{
 							"kind": "constructor",
@@ -11603,6 +11609,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "enable_gpu_memory_tracking"
+							},
 							"examples": [
 								{
 									"title": {
@@ -11632,6 +11644,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "is_gpu_memory_tracking_enabled"
+							},
 							"examples": [
 								{
 									"title": {
@@ -11661,6 +11679,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "read_gpu_memory_usage"
+							},
 							"examples": [
 								{
 									"title": {
@@ -19645,6 +19669,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "enable_gpu_memory_tracking"
+							},
 							"examples": [
 								{
 									"title": {
@@ -19674,6 +19704,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "is_gpu_memory_tracking_enabled"
+							},
 							"examples": [
 								{
 									"title": {
@@ -19703,6 +19739,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "read_gpu_memory_usage"
+							},
 							"examples": [
 								{
 									"title": {
@@ -59220,7 +59262,13 @@
 								"en": "Whether the parallel shader compile extension exists. (KHR_parallel_shader_compile; if present, compiling and linking can be handed off and completion polled without blocking the main thread)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic/shaderprogram.js"
+							"source": "src/core/graphic/shaderprogram.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/shaderprogram",
+								"class": "ShaderProgram",
+								"name": "is_parallel_compile_supported"
+							}
 						},
 						{
 							"kind": "method",
@@ -59239,7 +59287,13 @@
 								"en": "Whether the handed-off build is done. (True if nothing was handed off or it is already finished, or if the extension is missing; it only asks and never blocks the main thread)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic/shaderprogram.js"
+							"source": "src/core/graphic/shaderprogram.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/shaderprogram",
+								"class": "ShaderProgram",
+								"name": "is_build_complete"
+							}
 						},
 						{
 							"kind": "method",
@@ -59251,7 +59305,13 @@
 								"en": "Finishes the handed-off build. (Checks the compile and link results and waits until done if not; does nothing if nothing was handed off or it is already finished)\n- On failure, deletes the shaders and program and throws. (Same message as the constructor)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/graphic/shaderprogram.js"
+							"source": "src/core/graphic/shaderprogram.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/shaderprogram",
+								"class": "ShaderProgram",
+								"name": "finish_build"
+							}
 						},
 						{
 							"kind": "method",
@@ -66558,6 +66618,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonrenderer",
+								"class": "ToonRenderer",
+								"name": "set_async_program_build"
+							},
 							"examples": [
 								{
 									"title": {
@@ -66587,6 +66653,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonrenderer",
+								"class": "ToonRenderer",
+								"name": "is_async_program_build"
+							},
 							"examples": [
 								{
 									"title": {
@@ -66633,6 +66705,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonrenderer",
+								"class": "ToonRenderer",
+								"name": "prewarm_draw_queue"
+							},
 							"examples": [
 								{
 									"title": {
@@ -69218,6 +69296,11 @@
 							"language": "javascript"
 						}
 					],
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/toon/toonrenderer",
+						"class": "ToonProgramPrewarm"
+					},
 					"members": [
 						{
 							"kind": "method",
@@ -69236,7 +69319,13 @@
 								"en": "Whether everything is built."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
+							"source": "src/graphics3d/toon/toonrenderer.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonrenderer",
+								"class": "ToonProgramPrewarm",
+								"name": "is_ready"
+							}
 						},
 						{
 							"kind": "method",
@@ -69255,7 +69344,13 @@
 								"en": "Waiting until everything is built."
 							},
 							"since": "0.4.0",
-							"source": "src/graphics3d/toon/toonrenderer.js"
+							"source": "src/graphics3d/toon/toonrenderer.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonrenderer",
+								"class": "ToonProgramPrewarm",
+								"name": "wait"
+							}
 						}
 					]
 				}
@@ -111129,6 +111224,11 @@
 					"summary": {
 						"ko": "종류 이름.",
 						"en": "Type name."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/gpumemorytracker",
+						"class": "GpuMemoryKind"
 					},
 					"values": [
 						{

@@ -8229,6 +8229,9 @@
     // 짓기를 맡긴 채 아직 끝내지 않은 셰이더. (맡기지 않았거나 끝냈으면 null)
     /** @private @type { WebGLShader | null } */
     #pendingFragmentShader;
+    /** @private @type { boolean } */
+    #isBuildCompleted;
+    // 맡긴 짓기가 끝났다고 한 번 확인했는지. (끝남은 되돌지 않으니 다시 묻지 않는다)
     //==============================================================================
     // 생성.
     // - 컴파일이나 링크에 실패하면 그때까지 지은 셰이더와 프로그램을 지우고 오류를 던진다.
@@ -8248,6 +8251,7 @@
       this.#uniformLocations = /* @__PURE__ */ new Map();
       this.#pendingVertexShader = null;
       this.#pendingFragmentShader = null;
+      this.#isBuildCompleted = false;
       if (isDeferred) {
         const vertexShader2 = webGL2RenderingContext.createShader(webGL2RenderingContext.VERTEX_SHADER);
         webGL2RenderingContext.shaderSource(vertexShader2, vertexShaderSource);
@@ -8322,7 +8326,11 @@
       if (extension === null) {
         return true;
       }
-      return webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+      if (this.#isBuildCompleted) {
+        return true;
+      }
+      this.#isBuildCompleted = webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+      return this.#isBuildCompleted;
     }
     //==============================================================================
     // 맡긴 짓기 끝내기. (컴파일과 링크 결과를 확인한다, 안 끝났으면 끝날 때까지 기다린다, 맡기지 않았거나 이미 끝냈으면 아무것도 하지 않는다)
@@ -48876,6 +48884,9 @@ ${fragmentDefines}`) : SOLID_FRAGMENT_HEAD;
         } catch (error) {
         }
       }
+      if (unitList.length > 0) {
+        webGL2RenderingContext.flush();
+      }
       return new ToonProgramPrewarm(this, unitList);
     }
     //==============================================================================
@@ -49008,6 +49019,9 @@ ${fragmentDefines}`) : SOLID_FRAGMENT_HEAD;
         } else {
           index += 1;
         }
+      }
+      if (unitList.length > 0) {
+        this.getWebGL2RenderingContext().flush();
       }
       return unitList.length === 0;
     }

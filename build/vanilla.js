@@ -4766,6 +4766,7 @@ var ShaderProgram = class extends Object2 {
   #uniformLocations;
   #pendingVertexShader;
   #pendingFragmentShader;
+  #isBuildCompleted;
   constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null, isDeferred = false) {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
@@ -4773,6 +4774,7 @@ var ShaderProgram = class extends Object2 {
     this.#uniformLocations = /* @__PURE__ */ new Map();
     this.#pendingVertexShader = null;
     this.#pendingFragmentShader = null;
+    this.#isBuildCompleted = false;
     if (isDeferred) {
       const vertexShader2 = webGL2RenderingContext.createShader(webGL2RenderingContext.VERTEX_SHADER);
       webGL2RenderingContext.shaderSource(vertexShader2, vertexShaderSource);
@@ -4834,7 +4836,11 @@ var ShaderProgram = class extends Object2 {
     if (extension === null) {
       return true;
     }
-    return webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+    if (this.#isBuildCompleted) {
+      return true;
+    }
+    this.#isBuildCompleted = webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+    return this.#isBuildCompleted;
   }
   finishBuild() {
     const vertexShader = this.#pendingVertexShader;
@@ -34079,6 +34085,9 @@ var ToonRenderer = class {
       } catch (error) {
       }
     }
+    if (unitList.length > 0) {
+      webGL2RenderingContext.flush();
+    }
     return new ToonProgramPrewarm(this, unitList);
   }
   expandPrewarmRequests(queue, options) {
@@ -34186,6 +34195,9 @@ var ToonRenderer = class {
       } else {
         index += 1;
       }
+    }
+    if (unitList.length > 0) {
+      this.getWebGL2RenderingContext().flush();
     }
     return unitList.length === 0;
   }

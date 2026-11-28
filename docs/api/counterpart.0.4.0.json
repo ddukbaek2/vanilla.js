@@ -8289,6 +8289,18 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "EngineConfiguration",
+				"name": "track_gpu_memory"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
+				"name": "trackGpuMemory"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "EngineConfiguration",
 				"name": "ignore_virtual_keyboard_resize"
 			},
 			"vanilla.js": {
@@ -8641,6 +8653,42 @@
 				"module": "core/engine",
 				"class": "Engine",
 				"name": "getCanvas"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "enable_gpu_memory_tracking"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "enableGpuMemoryTracking"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "is_gpu_memory_tracking_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "isGpuMemoryTrackingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "read_gpu_memory_usage"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "readGpuMemoryUsage"
 			}
 		},
 		{
@@ -11471,6 +11519,42 @@
 			"vanilla-engine": {
 				"module": "core/graphic",
 				"class": "Graphic",
+				"name": "enable_gpu_memory_tracking"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "enableGpuMemoryTracking"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "is_gpu_memory_tracking_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "isGpuMemoryTrackingEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "read_gpu_memory_usage"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "readGpuMemoryUsage"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
 				"name": "get_vertex_array"
 			},
 			"vanilla.js": {
@@ -11579,6 +11663,16 @@
 			"vanilla.js": {
 				"module": "core/graphic",
 				"name": "detectTextDirection"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gpumemorytracker",
+				"class": "GpuMemoryKind"
+			},
+			"vanilla.js": {
+				"module": "core/graphic/gpumemorytracker",
+				"class": "GpuMemoryKind"
 			}
 		},
 		{
@@ -15471,6 +15565,42 @@
 				"module": "core/graphic/shaderprogram",
 				"class": "ShaderProgram",
 				"name": "constructor"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "is_parallel_compile_supported"
+			},
+			"vanilla.js": {
+				"module": "core/graphic/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "isParallelCompileSupported"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "is_build_complete"
+			},
+			"vanilla.js": {
+				"module": "core/graphic/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "isBuildComplete"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "finish_build"
+			},
+			"vanilla.js": {
+				"module": "core/graphic/shaderprogram",
+				"class": "ShaderProgram",
+				"name": "finishBuild"
 			}
 		},
 		{
@@ -22706,6 +22836,40 @@
 		{
 			"vanilla-engine": {
 				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonProgramPrewarm"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonProgramPrewarm"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonProgramPrewarm",
+				"name": "is_ready"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonProgramPrewarm",
+				"name": "isReady"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonProgramPrewarm",
+				"name": "wait"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonProgramPrewarm",
+				"name": "wait"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
 				"class": "ToonRenderer"
 			},
 			"vanilla.js": {
@@ -22753,12 +22917,48 @@
 			"vanilla-engine": {
 				"module": "graphics3d/toon/toonrenderer",
 				"class": "ToonRenderer",
+				"name": "set_async_program_build"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "setAsyncProgramBuild"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "is_async_program_build"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "isAsyncProgramBuild"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
 				"name": "prepare_material"
 			},
 			"vanilla.js": {
 				"module": "graphics3d/toon/toonrenderer",
 				"class": "ToonRenderer",
 				"name": "prepareMaterial"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "prewarm_draw_queue"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "prewarmDrawQueue"
 			}
 		},
 		{

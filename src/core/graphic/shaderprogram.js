@@ -102,6 +102,7 @@ export class ShaderProgram extends Object {
 	/** @private @type { Map<string, WebGLUniformLocation> } */ #uniformLocations;
 	/** @private @type { WebGLShader | null } */ #pendingVertexShader; // 짓기를 맡긴 채 아직 끝내지 않은 셰이더. (맡기지 않았거나 끝냈으면 null)
 	/** @private @type { WebGLShader | null } */ #pendingFragmentShader;
+	/** @private @type { boolean } */ #isBuildCompleted; // 맡긴 짓기가 끝났다고 한 번 확인했는지. (끝남은 되돌지 않으니 다시 묻지 않는다)
 
 	//==============================================================================
 	// 생성.
@@ -123,6 +124,7 @@ export class ShaderProgram extends Object {
 		this.#uniformLocations = new Map();
 		this.#pendingVertexShader = null;
 		this.#pendingFragmentShader = null;
+		this.#isBuildCompleted = false;
 
 		if (isDeferred) {
 			const vertexShader = webGL2RenderingContext.createShader(webGL2RenderingContext.VERTEX_SHADER);
@@ -206,7 +208,12 @@ export class ShaderProgram extends Object {
 		if (extension === null) {
 			return true;
 		}
-		return webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+		if (this.#isBuildCompleted) {
+			return true;
+		}
+		// 끝남을 묻는 일은 GPU 프로세스와 오가는 일이라 끝난 것은 다시 묻지 않는다.
+		this.#isBuildCompleted = webGL2RenderingContext.getProgramParameter(this.#program, extension.COMPLETION_STATUS_KHR) === true;
+		return this.#isBuildCompleted;
 	}
 
 	//==============================================================================
