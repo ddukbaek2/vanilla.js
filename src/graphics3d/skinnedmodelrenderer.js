@@ -5,6 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { ShaderProgram } from "../core/graphic/shaderprogram.js";
 import { MORPH_TARGET_MAXIMUM } from "./skinnedmodel.js";
+import { JOINT_BLOCK_GLSL, JointBlockBuffer, MORPH_WEIGHT_VECTOR_COUNT } from "./jointblock.js";
 
 
 //==============================================================================
@@ -20,7 +21,7 @@ uniform sampler2D morphTexture;
 uniform int morphTargetCount;
 uniform int morphRowsPerTarget;
 uniform int morphTextureWidth;
-uniform float morphWeights[${MORPH_TARGET_MAXIMUM}];
+uniform vec4 morphWeights[${MORPH_WEIGHT_VECTOR_COUNT}];
 
 vec3 fetchMorphDelta(int blockRow, int vertexIndex) {
 	int texelX = vertexIndex % morphTextureWidth;
@@ -30,7 +31,7 @@ vec3 fetchMorphDelta(int blockRow, int vertexIndex) {
 
 void applyMorphTargets(inout vec3 position, inout vec3 normal) {
 	for (int targetIndex = 0; targetIndex < morphTargetCount; ++targetIndex) {
-		float weight = morphWeights[targetIndex];
+		float weight = morphWeights[targetIndex >> 2][targetIndex & 3];
 		if (abs(weight) < 0.0001) {
 			continue;
 		}
@@ -51,7 +52,7 @@ layout(location = 4) in vec4 vertexWeights;
 uniform mat4 modelMatrix;
 uniform mat4 viewProjectionMatrix;
 uniform mat4 lightViewProjectionMatrix;
-uniform mat4 jointMatrices[96];
+${JOINT_BLOCK_GLSL}
 out vec3 worldPosition;
 out vec3 worldNormal;
 out vec2 fragmentTextureCoordinate;
@@ -219,7 +220,7 @@ layout(location = 3) in uvec4 vertexJoints;
 layout(location = 4) in vec4 vertexWeights;
 uniform mat4 modelMatrix;
 uniform mat4 lightViewProjectionMatrix;
-uniform mat4 jointMatrices[96];
+${JOINT_BLOCK_GLSL}
 ${MORPH_GLSL}
 void main() {
 	vec3 morphedPosition = vertexPosition;
@@ -247,7 +248,7 @@ layout(location = 3) in uvec4 vertexJoints;
 layout(location = 4) in vec4 vertexWeights;
 uniform mat4 modelMatrix;
 uniform mat4 viewProjectionMatrix;
-uniform mat4 jointMatrices[96];
+${JOINT_BLOCK_GLSL}
 ${MORPH_GLSL}
 void main() {
 	vec3 morphedPosition = vertexPosition;
@@ -326,6 +327,8 @@ export class SkinnedModelRenderer extends Object {
 	/** @private @type { ShaderProgram } */ #depthShaderProgram;
 	/** @private @type { ShaderProgram } */ #wireframeShaderProgram;
 	/** @private @type { WebGLTexture | null } */ #shadowMapTexture;
+	/** @private @type { JointBlockBuffer } */ #jointBlockBuffer; // 뼈 행렬 유니폼 블록의 버퍼.
+	/** @private @type { Float32Array } */ #morphWeightValues; // 모프 가중치를 vec4 칸에 맞춰 채우는 자리.
 	/** @private @type { WebGLTexture } */ #emptyShadowTexture; // 그림자를 받지 않을 때 섀도우 유닛에 묶는 1x1 비교 깊이 텍스처.
 	/** @private @type { Float32Array | null } */ #lightViewProjectionElements;
 	/** @private @type { number } */ #shadowStrength;
@@ -375,6 +378,8 @@ export class SkinnedModelRenderer extends Object {
 		this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
 		this.#wireframeShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_WIREFRAME_VERTEXSHADER_SOURCE.trim(), SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE.trim());
 		this.#shadowMapTexture = null;
+		this.#jointBlockBuffer = new JointBlockBuffer(webGL2RenderingContext);
+		this.#morphWeightValues = new System.Float32Array(MORPH_WEIGHT_VECTOR_COUNT * 4);
 		this.#emptyShadowTexture = this.createEmptyShadowTexture();
 		this.#lightViewProjectionElements = null;
 		this.#shadowStrength = 0;
@@ -382,6 +387,16 @@ export class SkinnedModelRenderer extends Object {
 		this.#sunDirection = [0, 1, 0];
 		this.#fogColor = [0.8, 0.85, 0.92];
 		this.#fogRange = [55, 250];
+	}
+
+	//==============================================================================
+	// 뼈 행렬 올리기. (JointBlock 유니폼 블록, 프로그램은 ShaderProgram 이 링크 뒤에 같은 바인딩 자리로 묶는다)
+	//==============================================================================
+	/**
+	 * @param { Float32Array } jointMatrixArray 뼈 행렬의 수. (16 의 배수)
+	 */
+	uploadJointMatrices(jointMatrixArray) {
+		this.#jointBlockBuffer.upload(jointMatrixArray);
 	}
 
 	//==============================================================================
@@ -459,12 +474,11 @@ export class SkinnedModelRenderer extends Object {
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		}
 
-		const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
 		const skinList = skinnedModel.getSkinList();
 		const drawableList = skinnedModel.getDrawableList();
 		for (const drawable of drawableList) {
 			const skin = skinList[drawable.skinIndex];
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+			this.uploadJointMatrices(skin.jointMatrixArray);
 			this.applyMorphUniforms(shaderProgram, drawable);
 			drawable.material.apply();
 			webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
@@ -494,12 +508,11 @@ export class SkinnedModelRenderer extends Object {
 		webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
 		const modelMatrixLocation = depthShaderProgram.getUniformLocation("modelMatrix");
 		webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
-		const jointMatricesLocation = depthShaderProgram.getUniformLocation("jointMatrices[0]");
 		const skinList = skinnedModel.getSkinList();
 		const drawableList = skinnedModel.getDrawableList();
 		for (const drawable of drawableList) {
 			const skin = skinList[drawable.skinIndex];
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+			this.uploadJointMatrices(skin.jointMatrixArray);
 			this.applyMorphUniforms(depthShaderProgram, drawable);
 			webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
 			if (drawable.isIndexed) {
@@ -560,7 +573,6 @@ export class SkinnedModelRenderer extends Object {
 		webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
 		const wireframeColorLocation = wireframeShaderProgram.getUniformLocation("wireframeColor");
 		webGL2RenderingContext.uniform4f(wireframeColorLocation, red, green, blue, alpha);
-		const jointMatricesLocation = wireframeShaderProgram.getUniformLocation("jointMatrices[0]");
 		const skinList = skinnedModel.getSkinList();
 		const drawableList = skinnedModel.getDrawableList();
 		for (const drawable of drawableList) {
@@ -568,7 +580,7 @@ export class SkinnedModelRenderer extends Object {
 				skinnedModel.uploadWireframeIndices(drawable);
 			}
 			const skin = skinList[drawable.skinIndex];
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+			this.uploadJointMatrices(skin.jointMatrixArray);
 			this.applyMorphUniforms(wireframeShaderProgram, drawable);
 			webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
 			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, drawable.wireframeIndexBuffer);
@@ -598,7 +610,11 @@ export class SkinnedModelRenderer extends Object {
 		const morphTextureWidthLocation = shaderProgram.getUniformLocation("morphTextureWidth");
 		webGL2RenderingContext.uniform1i(morphTextureWidthLocation, drawable.morphTextureWidth);
 		const morphWeightsLocation = shaderProgram.getUniformLocation("morphWeights[0]");
-		webGL2RenderingContext.uniform1fv(morphWeightsLocation, drawable.morphWeights);
+		// 가중치는 vec4 배열로 올린다. (float 배열은 원소마다 한 칸이라 96 칸을 쓴다, 넷씩 묶으면 24 칸)
+		const morphWeightValues = this.#morphWeightValues;
+		morphWeightValues.fill(0);
+		morphWeightValues.set(drawable.morphWeights.length > MORPH_TARGET_MAXIMUM ? drawable.morphWeights.subarray(0, MORPH_TARGET_MAXIMUM) : drawable.morphWeights);
+		webGL2RenderingContext.uniform4fv(morphWeightsLocation, morphWeightValues);
 		const morphTextureLocation = shaderProgram.getUniformLocation("morphTexture");
 		webGL2RenderingContext.uniform1i(morphTextureLocation, MORPH_TEXTURE_UNIT);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + MORPH_TEXTURE_UNIT);

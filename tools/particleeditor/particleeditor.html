@@ -6988,6 +6988,8 @@
 
   // src/core/graphic/shaderprogram.js
   var System12 = globalThis;
+  var JOINT_BLOCK_NAME = "JointBlock";
+  var JOINT_BLOCK_BINDING = 3;
   function reportShaderBuildFailure(webGL2RenderingContext, name, error) {
     if (webGL2RenderingContext.isContextLost()) {
       return false;
@@ -7090,6 +7092,20 @@
       webGL2RenderingContext.deleteShader(vertexShader);
       webGL2RenderingContext.deleteShader(fragmentShader);
       this.#program = program;
+      this.bindKnownBlocks();
+    }
+    //==============================================================================
+    // 엔진이 이름으로 정한 유니폼 블록 묶기. (링크 뒤에 한 번, 블록이 없으면 아무것도 하지 않는다)
+    //==============================================================================
+    /**
+     * @private
+     */
+    bindKnownBlocks() {
+      const webGL2RenderingContext = this.#webGL2RenderingContext;
+      const blockIndex = webGL2RenderingContext.getUniformBlockIndex(this.#program, JOINT_BLOCK_NAME);
+      if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
+        webGL2RenderingContext.uniformBlockBinding(this.#program, blockIndex, JOINT_BLOCK_BINDING);
+      }
     }
     //==============================================================================
     // 병렬 셰이더 컴파일 확장이 있는지. (KHR_parallel_shader_compile, 있으면 컴파일과 링크를 맡기고 주 스레드를 막지 않고 끝을 물을 수 있다)
@@ -7150,6 +7166,7 @@
         webGL2RenderingContext.deleteProgram(program);
         throw new Error(errorMessage);
       }
+      this.bindKnownBlocks();
     }
     //==============================================================================
     // 셰이더 객체 생성.

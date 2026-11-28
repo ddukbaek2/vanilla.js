@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { SkinnedModelRenderer, MORPH_GLSL } from "./skinnedmodelrenderer.js";
+import { JOINT_BLOCK_GLSL } from "./jointblock.js";
 import { ShaderProgram } from "../core/graphic/shaderprogram.js";
 
 
@@ -592,7 +593,7 @@ layout(location = 4) in vec4 vertexWeights;
 uniform mat4 modelMatrix;
 uniform mat4 viewProjectionMatrix;
 uniform mat4 lightViewProjectionMatrix;
-uniform mat4 jointMatrices[96];
+${JOINT_BLOCK_GLSL}
 uniform int shadingMode;
 uniform sampler2D layerNormalTexture;
 uniform vec4 hairSway;
@@ -638,7 +639,7 @@ layout(location = 3) in uvec4 vertexJoints;
 layout(location = 4) in vec4 vertexWeights;
 uniform mat4 modelMatrix;
 uniform mat4 lightViewProjectionMatrix;
-uniform mat4 jointMatrices[96];
+${JOINT_BLOCK_GLSL}
 out vec2 fragmentTextureCoordinate;
 ${MORPH_GLSL}
 void main() {
@@ -882,7 +883,6 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		webGL2RenderingContext.uniform4f(hairSwayLocation, this.#hairSway[0], this.#hairSway[1], this.#hairSway[2], 0);
 		const shadingModeLocation = shaderProgram.getUniformLocation("shadingMode");
 
-		const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
 		const skinList = skinnedModel.getSkinList();
 		const drawableList = skinnedModel.getDrawableList();
 		for (const drawable of drawableList) {
@@ -899,7 +899,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 				continue;
 			}
 			const skin = skinList[drawable.skinIndex];
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+			this.uploadJointMatrices(skin.jointMatrixArray);
 			this.applyMorphUniforms(shaderProgram, drawable);
 			webGL2RenderingContext.uniform1i(shadingModeLocation, shadingMode);
 			drawable.material.apply();
@@ -936,7 +936,6 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 			webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
 			const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
 			webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
-			const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
 			const coverageTextureLocation = shaderProgram.getUniformLocation("coverageTexture");
 			for (const drawable of drawableList) {
 				const shadingMode = this.getMaterialShadingMode(drawable.material);
@@ -951,7 +950,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 					continue;
 				}
 				const skin = skinList[drawable.skinIndex];
-				webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+				this.uploadJointMatrices(skin.jointMatrixArray);
 				this.applyMorphUniforms(shaderProgram, drawable);
 				if (useCutout) {
 					// 커버리지 텍스처. (머리카락은 기본 색 알파, 그 외는 오파시티 텍스처)

@@ -7,6 +7,14 @@ import { WebGLStateCache } from "./webglstatecache.js";
 
 
 //==============================================================================
+// 엔진이 이름으로 정한 유니폼 블록의 바인딩 자리. (링크한 프로그램에 이 이름의 블록이 있으면 이 자리에 묶는다)
+// - 뼈 행렬 같은 큰 배열은 기본 블록 유니폼 한도(WebGL2 가 보장하는 최솟값 MAX_VERTEX_UNIFORM_VECTORS 256 칸)에 들지 않아 유니폼 블록으로 넘긴다.
+//   (툰 재질 블록 0, 바깥선 블록 1, 프레임 블록 2 는 툰 렌더러가 따로 묶는다)
+//==============================================================================
+export const JOINT_BLOCK_NAME = "JointBlock";
+export const JOINT_BLOCK_BINDING = 3;
+
+//==============================================================================
 // 셰이더 짓기 실패 알리기. (엔진이 짓는 프로그램이 실패해 건너뛰기로 할 때 부른다)
 // - 컨텍스트를 이미 잃은 뒤의 실패는 셰이더 탓이 아니다. 알리지 않고 거짓을 돌려, 부른 쪽이 실패를 기억하지 않고 되살린 뒤 다시 짓게 한다.
 // - 그 밖의 실패는 엔진 오류 길(addGraphicErrorListener)로 { kind, name, error } 를 한 번 알리고 참을 돌려 기억하게 한다.
@@ -180,6 +188,21 @@ export class ShaderProgram extends Object {
 		webGL2RenderingContext.deleteShader(fragmentShader);
 
 		this.#program = program;
+		this.bindKnownBlocks();
+	}
+
+	//==============================================================================
+	// 엔진이 이름으로 정한 유니폼 블록 묶기. (링크 뒤에 한 번, 블록이 없으면 아무것도 하지 않는다)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	bindKnownBlocks() {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const blockIndex = webGL2RenderingContext.getUniformBlockIndex(this.#program, JOINT_BLOCK_NAME);
+		if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
+			webGL2RenderingContext.uniformBlockBinding(this.#program, blockIndex, JOINT_BLOCK_BINDING);
+		}
 	}
 
 	//==============================================================================
@@ -246,6 +269,7 @@ export class ShaderProgram extends Object {
 			webGL2RenderingContext.deleteProgram(program);
 			throw new Error(errorMessage);
 		}
+		this.bindKnownBlocks();
 	}
 
 	//==============================================================================

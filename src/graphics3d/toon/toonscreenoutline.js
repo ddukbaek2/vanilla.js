@@ -3,7 +3,8 @@
 //==============================================================================
 const System = globalThis;
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
-import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, writeInstanceBufferSphere, isSphereInFrustum, readHypot, createMeshInstanceVertexArray } from "./toonrenderer.js";
+import { JOINT_BLOCK_GLSL, JointBlockBuffer } from "../jointblock.js";
+import { TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant, writeInstanceBufferSphere, isSphereInFrustum, readHypot, createMeshInstanceVertexArray } from "./toonrenderer.js";
 import { TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_LINE_ID_LOCATION } from "./toonmaterial.js";
 import { readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../../core/graphic/colorspace.js";
 
@@ -95,7 +96,7 @@ in vec4 instanceMatrix2;
 in vec4 instanceMatrix3;
 in vec4 instanceTint;
 in float instanceLineId;
-uniform mat4 jointMatrices[${TOON_MAXIMUM_JOINTS}];
+${JOINT_BLOCK_GLSL}
 uniform float skinned;
 uniform float instanced;
 uniform float instanceLineIds;
@@ -697,6 +698,7 @@ export class ToonScreenOutline {
 	/** @private @type { Array<number> } */ #lineWidths; // 이번 프레임의 바깥 선과 꺾임 선 굵기. (그리는 영역 픽셀)
 	/** @private @type { Uint8Array } */ #lineColorTable; // 번호마다의 선 색. (번호 x 4 자리의 sRGB 와 알파 바이트, 알파 0 은 표에 없음)
 	/** @private @type { number } */ #lineColorCount; // 표에 넣은 번호 수. (0 이면 섞을 때 표를 보지 않는다)
+	/** @private @type { JointBlockBuffer } */ #jointBlockBuffer; // 뼈 행렬 유니폼 블록의 버퍼.
 	/** @private @type { WebGLTexture | null } */ #lineColorTexture; // 번호 색 표 텍스처. (처음 넣을 때 짓는다)
 	/** @private @type { boolean } */ #isLineColorTableDirty; // 표를 텍스처에 다시 올릴지.
 	/** @private @type { Uint32Array } */ #lineColorWords; // #lineColorTable 을 4 바이트씩 본 것. (올린 표와 견줄 때)
@@ -713,6 +715,7 @@ export class ToonScreenOutline {
 	constructor(webGL2RenderingContext, options = null) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#colorSpace = options !== null && options.colorSpace !== undefined ? readColorSpace(options.colorSpace) : readEngineColorSpace();
+		this.#jointBlockBuffer = new JointBlockBuffer(webGL2RenderingContext);
 		this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, System.Object.assign({ instanceLineId: TOON_INSTANCE_LINE_ID_LOCATION }, TOON_ATTRIBUTE_LOCATIONS));
 		this.#seedProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_FRAGMENT_SHADER, {});
 		this.#seedGatherProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_GATHER_FRAGMENT_SHADER, {});
@@ -1431,9 +1434,7 @@ export class ToonScreenOutline {
 			webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
 		}
 		if (isSkinned) {
-			const jointFloatCount = System.Math.floor(System.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
-			const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
-			webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("jointMatrices"), false, jointValues);
+			this.#jointBlockBuffer.upload(jointMatrices);
 		}
 		const indexStart = options.indexStart !== undefined ? System.Math.max(0, options.indexStart) : 0;
 		const indexCount = options.indexCount !== undefined ? System.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
@@ -2143,6 +2144,7 @@ export class ToonScreenOutline {
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		this.deleteLineTarget();
+		this.#jointBlockBuffer.destroy();
 		if (this.#lineColorTexture !== null) {
 			webGL2RenderingContext.deleteTexture(this.#lineColorTexture);
 			this.#lineColorTexture = null;
