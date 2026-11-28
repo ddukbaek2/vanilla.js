@@ -15,6 +15,7 @@ import { ImageTextureCache } from "./graphic/imagetexturecache.js";
 import { DecodedImageStore } from "./graphic/decodedimagestore.js";
 import { TextStringTextureCache } from "./graphic/textstringtexturecache.js";
 import { WebGLStateCache } from "./graphic/webglstatecache.js";
+import { GpuMemoryTracker } from "./graphic/gpumemorytracker.js";
 import { ColorSpace, readColorSpace } from "./graphic/colorspace.js";
 import * as Math from "../base/math.js";
 
@@ -719,6 +720,9 @@ export class Graphic extends Object {
 	/** @private @type { boolean } */ #isImageMipmapEnabled;
 	/** @private @type { number } */ #imageMipmapBias;
 	/** @private @type { string } */ #imageSmoothingQuality;
+	/** @private @type { boolean } */ #isContextLost; // WebGL 컨텍스트를 잃은 동안 참. (webglcontextlost 로 세우고 되살려 다시 지은 뒤 내린다, 엔진이 이 동안 그리지 않는다)
+	/** @private @type { ((event: string) => void) | null } */ #contextEventCallback; // 잃음과 되살림을 알리는 함수. (엔진이 건다, "lost" 와 "restored")
+	/** @private @type { GpuMemoryTracker } */ #gpuMemoryTracker; // GPU 메모리 셈. (텍스처, 렌더버퍼, 버퍼)
 	/** @private @type { ShaderProgram } */ #shaderProgram;
 	/** @private @type { Map<string, ShaderProgram | null> } */ #resolvedShaderProgramTable = new System.Map(); // resolveShaderProgram 이 담아 둔 프로그램. ("묶음\u0000이름" → 프로그램, 실패는 null)
 	/** @private @type { ShaderProgram | null } */ #shaderProgramOverride; // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
@@ -880,11 +884,15 @@ export class Graphic extends Object {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		// 그리는 중에 GL 상태를 읽지 않게 컨텍스트의 상태 함수를 가로채 기억한다. (다른 GL 호출보다 먼저 건다)
 		this.#webGLStateCache = WebGLStateCache.attach(webGL2RenderingContext);
+		// GPU 메모리 셈. (텍스처, 렌더버퍼, 버퍼를 짓고 크기를 정하는 함수를 가로챈다, 엔진 자원을 짓기 전에 건다)
+		this.#gpuMemoryTracker = GpuMemoryTracker.attach(webGL2RenderingContext);
+		this.#isContextLost = false;
+		this.#contextEventCallback = null;
 
-		// 컨텍스트를 잃으면 기하 캐시와 남긴 묶음을 잊는다. (GL 묶음 기억은 상태 캐시가 스스로 잊는다, 잃은 뒤의 호출이 옛 기억을 믿지 않게 하는 것뿐이다)
-		// 엔진은 컨텍스트를 되살리지 않는다. webglcontextlost 에서 preventDefault 를 하지 않아 브라우저가 webglcontextrestored 를 보내지 않는다.
-		// 게임이 preventDefault 로 되살려도 셰이더 프로그램, 버텍스 어레이, 흰 텍스처, 글자 아틀라스, 그림 텍스처는 잃은 컨텍스트의 객체라 그려지지 않는다. (되살림은 아직 없다)
-		const contextChangeCallback = () => {
+		// 컨텍스트를 잃으면 preventDefault 로 되살림을 받고, 그리기를 멈추고, 기하 캐시와 남긴 묶음을 잊는다. (GL 묶음 기억은 상태 캐시가 스스로 잊는다)
+		// 되살아나면 엔진이 짓는 기본 자원(셰이더 프로그램, 버텍스 어레이, 흰 텍스처, 묶어 그리기, 파티클, 섞기 프로그램, 그림 텍스처, 글자 아틀라스)을 다시 짓고 그리기를 잇는다.
+		// 게임이 지은 GL 객체(자기 셰이더 프로그램, 렌더 타겟, 3D 렌더러와 메시)는 잃은 컨텍스트의 객체라 엔진이 다시 짓지 못한다. 엔진이 알리는 "restored" 에서 게임이 다시 짓는다.
+		const forgetGeometry = () => {
 			this.#geometryCacheGeneration += 1;
 			for (const retainedFlush of this.#batchRetainedFlushList) {
 				retainedFlush.vertexArray = null;
@@ -893,42 +901,37 @@ export class Graphic extends Object {
 				retainedFlush.isValid = false;
 			}
 		};
-		canvas.addEventListener("webglcontextlost", contextChangeCallback);
-		canvas.addEventListener("webglcontextrestored", contextChangeCallback);
+		canvas.addEventListener("webglcontextlost", (event) => {
+			event.preventDefault();
+			this.#isContextLost = true;
+			this.#batchVertexCount = 0;
+			this.#batchTextureCount = 0;
+			this.#isBatchSegmentDeferring = false;
+			forgetGeometry();
+			this.notifyContextEvent("lost");
+		});
+		canvas.addEventListener("webglcontextrestored", () => {
+			forgetGeometry();
+			try {
+				this.restoreContextResources(webGL2RenderingContext);
+			}
+			catch (error) {
+				console.error(error);
+				console.error("Graphic: WebGL2 context restored, but the engine failed to rebuild its resources. Drawing stays stopped.");
+				return;
+			}
+			this.#isContextLost = false;
+			this.notifyContextEvent("restored");
+		});
 		this.#isForceGizmosVisible = false;
 		this.#isImageSmoothingEnabled = true;
 		this.#isImageMipmapEnabled = false;
 		this.#imageMipmapBias = 0;
 		this.#imageSmoothingQuality = "high";
 
-		// 셰이더 프로그램.
-		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, FRAGMENTSHADER_SOURCE);
-		this.#shaderProgramOverride = null;
-
-		// 버텍스 어레이 / 버텍스 버퍼. (스트리밍, 인터리브 x/y/u/v)
-		this.#vertexData = new Float32Array(VERTEX_CAPACITY * FLOATS_PER_VERTEX);
-		this.#vertexArray = webGL2RenderingContext.createVertexArray();
-		this.#vertexBuffer = webGL2RenderingContext.createBuffer();
-		webGL2RenderingContext.bindVertexArray(this.#vertexArray);
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+		// 셰이더 프로그램, 버텍스 어레이와 버퍼, 흰 텍스처. (컨텍스트를 되살릴 때 같은 길로 다시 짓는다)
+		this.createCoreResources(webGL2RenderingContext);
 		const shaderProgram = this.getShaderProgram();
-		const vertexPositionLocation = shaderProgram.getAttributeLocation("vertexPosition");
-		const vertexTextureCoordinateLocation = shaderProgram.getAttributeLocation("vertexTextureCoordinate");
-		const strideBytes = FLOATS_PER_VERTEX * 4;
-		webGL2RenderingContext.enableVertexAttribArray(vertexPositionLocation);
-		webGL2RenderingContext.vertexAttribPointer(vertexPositionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
-		webGL2RenderingContext.enableVertexAttribArray(vertexTextureCoordinateLocation);
-		webGL2RenderingContext.vertexAttribPointer(vertexTextureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
-		webGL2RenderingContext.bindVertexArray(null);
-
-		// 단색 도형용 1x1 흰색 텍스처.
-		this.#whiteTexture = webGL2RenderingContext.createTexture();
-		this.bindTexture(this.#whiteTexture);
-		const whitePixel = new Uint8Array([255, 255, 255, 255]);
-		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, whitePixel);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
 
 		// 파티클 배치 자원. (처음 쓸 때 만든다)
 		this.#particleShaderProgram = null;
@@ -2232,6 +2235,170 @@ export class Graphic extends Object {
 			this.#uploadedGlobalAlpha = globalAlpha;
 			this.#isUploadedUniformKnown = true;
 		}
+	}
+
+	//==============================================================================
+	// 기본 GL 자원 짓기. (기본 셰이더 프로그램, 버텍스 어레이와 버퍼, 흰 텍스처)
+	// - 생성자와 컨텍스트를 되살린 뒤에 같이 쓴다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 */
+	createCoreResources(webGL2RenderingContext) {
+		// 셰이더 프로그램.
+		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, FRAGMENTSHADER_SOURCE);
+		this.#shaderProgramOverride = null;
+
+		// 버텍스 어레이 / 버텍스 버퍼. (스트리밍, 인터리브 x/y/u/v)
+		this.#vertexData = new Float32Array(VERTEX_CAPACITY * FLOATS_PER_VERTEX);
+		this.#vertexArray = webGL2RenderingContext.createVertexArray();
+		this.#vertexBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindVertexArray(this.#vertexArray);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+		const shaderProgram = this.getShaderProgram();
+		const vertexPositionLocation = shaderProgram.getAttributeLocation("vertexPosition");
+		const vertexTextureCoordinateLocation = shaderProgram.getAttributeLocation("vertexTextureCoordinate");
+		const strideBytes = FLOATS_PER_VERTEX * 4;
+		webGL2RenderingContext.enableVertexAttribArray(vertexPositionLocation);
+		webGL2RenderingContext.vertexAttribPointer(vertexPositionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
+		webGL2RenderingContext.enableVertexAttribArray(vertexTextureCoordinateLocation);
+		webGL2RenderingContext.vertexAttribPointer(vertexTextureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
+		webGL2RenderingContext.bindVertexArray(null);
+
+		// 단색 도형용 1x1 흰색 텍스처.
+		this.#whiteTexture = webGL2RenderingContext.createTexture();
+		this.bindTexture(this.#whiteTexture);
+		const whitePixel = new Uint8Array([255, 255, 255, 255]);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, whitePixel);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+	}
+
+	//==============================================================================
+	// 컨텍스트를 되살린 뒤 엔진 자원 다시 짓기. (잃은 컨텍스트의 객체는 모두 죽었다)
+	// - 기본 자원은 다시 짓고, 지연 생성 자원은 비워 다음에 쓸 때 짓게 하고, 그림 텍스처와 글자 아틀라스는 새 캐시로 바꿔 다시 올린다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 */
+	restoreContextResources(webGL2RenderingContext) {
+		this.#resolvedShaderProgramTable.clear();
+		this.createCoreResources(webGL2RenderingContext);
+		this.#particleShaderProgram = null;
+		this.#particleVertexArray = null;
+		this.#particleVertexBuffer = null;
+		this.#particleVertexData = null;
+		this.#softDiscTexture = null;
+		this.#batchShaderProgram = null;
+		this.#batchVertexArray = null;
+		this.#batchVertexBuffer = null;
+		this.#batchVertexData = null;
+		this.#batchVertexCount = 0;
+		this.#blendShaderProgram = null;
+		this.#particleBlendShaderProgram = null;
+		this.#backdropTargetTable.clear();
+		this.#framebufferFormatTable.clear();
+		this.#layerTarget = null;
+		this.#opacityLayerStack = [];
+		this.#opacityLayerTargetPool = [];
+		this.#uniformLocationProgram = null;
+		this.#isUploadedUniformKnown = false;
+		this.#appliedViewportWidth = 0;
+		this.#appliedViewportHeight = 0;
+		const textureBinder = (texture) => {
+			this.bindTexture(texture);
+		};
+		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
+		const beforeTextureOverwrite = () => {
+			this.flushBatch();
+		};
+		this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder, beforeTextureOverwrite);
+
+		// 고정 렌더 상태와 텍스처 유닛. (생성자와 같다)
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		const shaderProgram = this.#shaderProgram;
+		this.useShaderProgram(shaderProgram);
+		webGL2RenderingContext.uniform1i(shaderProgram.getUniformLocation("mainTexture"), 0);
+		this.applyImageMipmapBias(shaderProgram);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		if (this.#isBatchingEnabled) {
+			this.ensureSpriteBatchResources();
+		}
+	}
+
+	//==============================================================================
+	// 컨텍스트 잃음, 되살림 알리기. (엔진이 건 함수에, 그 함수의 예외는 알리고 넘어간다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { string } event "lost" 나 "restored".
+	 */
+	notifyContextEvent(event) {
+		if (this.#contextEventCallback === null) {
+			return;
+		}
+		try {
+			this.#contextEventCallback(event);
+		}
+		catch (error) {
+			console.error(error);
+		}
+	}
+
+	//==============================================================================
+	// 컨텍스트 잃음, 되살림을 알릴 함수 걸기. (엔진이 건다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { ((event: string) => void) | null } contextEventCallback "lost" 와 "restored" 를 받는 함수. (null 이면 끈다)
+	 */
+	setContextEventCallback(contextEventCallback) {
+		this.#contextEventCallback = contextEventCallback;
+	}
+
+	//==============================================================================
+	// WebGL 컨텍스트를 잃은 상태인지.
+	//==============================================================================
+	/**
+	 * 컨텍스트를 잃은 동안 엔진은 그리지 않는다. 되살아나 엔진이 기본 자원을 다시 지으면 false 로 돌아간다.
+	 * (webglcontextlost 이벤트로 세운 깃발이라 GL 에 묻지 않는다)
+	 * @returns { boolean } 잃었으면 true.
+	 * @example <caption>잃은 동안 게임이 하던 그리기를 건너뛰기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * if (!engine.getGraphic().isContextLost()) {
+	 * 	console.log("draw");
+	 * }
+	 */
+	isContextLost() {
+		return this.#isContextLost;
+	}
+
+	//==============================================================================
+	// GPU 메모리 읽기. (개발용)
+	//==============================================================================
+	/**
+	 * 텍스처, 렌더버퍼, 버퍼가 쓰는 GPU 메모리를 종류별과 주인별로 읽는다. (형식과 크기로 셈한 이름값, 멀티샘플 렌더버퍼는 샘플 수를 곱한다)
+	 * @returns { { totalBytes: number, canvasBytes: number, kindTable: object, ownerList: Array<{ owner: string, kind: string, count: number, bytes: number }> } }
+	 * 합(캔버스 기본 프레임 버퍼 몫 포함), 캔버스 몫, 종류별 { count, bytes }, 주인별 몫(큰 것부터, 주인은 지은 호출 스택의 위쪽 세 칸).
+	 * @example <caption>GPU 메모리 합과 가장 큰 주인 읽기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * const usage = engine.getGraphic().readGpuMemoryUsage();
+	 * console.log(usage.totalBytes, usage.ownerList.length > 0 ? usage.ownerList[0].owner : "none");
+	 */
+	readGpuMemoryUsage() {
+		return this.#gpuMemoryTracker.readUsage();
 	}
 
 	//==============================================================================

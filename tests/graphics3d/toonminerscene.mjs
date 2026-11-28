@@ -24,9 +24,10 @@ export const MINER_BUILDING_COUNT = 20;
  * @param { number } height - 캔버스 높이.
  * @param { string } path - "array" 나 "buffer".
  * @param { number } [chunkCount] - 바위를 x 쪽으로 쪼갤 청크 수. (기본 1)
+ * @param { object } [options] - { shadowResolution (기본 1024, 광부 게임은 2048), outlineResolutionScale (기본 엔진 기본값 1, 광부 게임은 CSS 화소 하나에 1.5 화소라 DPR 2 에서 0.75), shadowUpdateMode (기본 onChange) }
  * @returns { object } { renderer, queue, drawFrame(), setRock(batch, index, change), getBatchCount(), getRockCount(batch), readRock(batch, index) }
  */
-export function createMinerScene(vanilla, webGL2RenderingContext, width, height, path, chunkCount = 1) {
+export function createMinerScene(vanilla, webGL2RenderingContext, width, height, path, chunkCount = 1, options = {}) {
 	const { ToonRenderer, ToonDrawQueue, ToonScreenOutline, MeshBuilder, createBoxGeometry, createOctahedronGeometry, createFacetedChunkGeometry, createRoundedBoxGeometry, createCylinderGeometry, ShadowMap, ShadowUpdateMode, Camera3D, Matrix4, Vector3 } = vanilla;
 	const renderer = new ToonRenderer(webGL2RenderingContext);
 	const createMesh = (geometry, matrix, color, hasOutline) => {
@@ -109,6 +110,9 @@ export function createMinerScene(vanilla, webGL2RenderingContext, width, height,
 	// 바깥선, 그림자, 카메라.
 	const screenOutline = new ToonScreenOutline(webGL2RenderingContext);
 	screenOutline.setWidth(2);
+	if (options.outlineResolutionScale !== undefined) {
+		screenOutline.setResolutionScale(options.outlineResolutionScale);
+	}
 	screenOutline.setCrease(40, 1, 0.8);
 	for (let index = 0; index < MINER_BUILDING_COUNT; index += 3) {
 		screenOutline.setLineColor(2000 + index, [0.55, 0.1, 0.05, 1]);
@@ -118,8 +122,8 @@ export function createMinerScene(vanilla, webGL2RenderingContext, width, height,
 	}
 	const queue = new ToonDrawQueue();
 	queue.setScreenOutline(screenOutline);
-	const shadowMap = new ShadowMap(webGL2RenderingContext, 1024);
-	shadowMap.setUpdateMode(ShadowUpdateMode.onChange);
+	const shadowMap = new ShadowMap(webGL2RenderingContext, options.shadowResolution ?? 1024);
+	shadowMap.setUpdateMode(options.shadowUpdateMode ?? ShadowUpdateMode.onChange);
 	shadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(-0.45, -1, -0.35), 16, 0.1, 40);
 	renderer.setShadow(shadowMap, 0.6);
 	const camera = new Camera3D();

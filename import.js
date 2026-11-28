@@ -252,6 +252,8 @@ export { SpriteAtlas } from "./src/resource/spriteatlas.js";
 
 // 코어, 플랫폼, 기반 갈래. (러스트 판과 맞춘 페이지 이벤트)
 export { PageEvent } from "./src/core/engine.js";
+export { GraphicContextEvent } from "./src/core/engine.js";
+export { GpuMemoryTracker, GpuMemoryKind } from "./src/core/graphic/gpumemorytracker.js";
 // 효과 갈래. (아지랑이 컴포넌트)
 export { HeatHazeEffect } from "./src/effect/heathazeeffect.js";
 export { TweenProperty, applyTweenProperty } from "./src/core/tween.js";
