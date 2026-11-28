@@ -553,7 +553,13 @@ float readShadeLevel(vec3 rampColor, float cosine) {
 	}
 	else {
 		bottom = readLuminance(shadeStopColors[0]);
-		top = readLuminance(shadeStopColors[shadeStopCount - 1]);
+		// 마지막 칸은 고리로 찾는다. (색 칸이 0 개일 때 동적 첨자 shadeStopColors[shadeStopCount - 1] 읽기가 아이폰 SE2 (A13) 의 GPU 프로세스를 죽였다)
+		top = readLuminance(shadeStopColors[0]);
+		for (int index = 1; index < 8; ++index) {
+			if (index < shadeStopCount) {
+				top = readLuminance(shadeStopColors[index]);
+			}
+		}
 	}
 	return clamp((readLuminance(rampColor) - bottom) / max(top - bottom, 0.0001), 0.0, 1.0);
 }

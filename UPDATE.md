@@ -676,6 +676,7 @@
   - 지금까지는 칸 수의 제곱근으로 격자를 나눠 점광 하나가 682 였는데 이제 512, 스포트라이트 하나는 2048 이었는데 이제 1024 다. 더 곱게 하려면 해상도와 칸 해상도를 올린다
 - 예제 toonstyle: ?roll=라디안 으로 카메라를 기울인다 (천사 고리 기울임 되돌리기)
 - 맨 위 내보내기에 여섯을 더함(러스트와 같게): import.js 가 AudioManager, DevTools, Pane, PaneStyle, PaneTheme, WebSocketClient 를 내보낸다(러스트 판 lib.rs 의 pub use 와 같다). 문서와 예제도 채웠다.
+- 툰 몸 셰이더의 읽기 readShadeLevel 이 음영 단 색이 0 개일 때 동적 첨자 shadeStopColors[shadeStopCount - 1] 를 읽던 것을 고리로 바꿈: 아이폰 SE2(A13, iOS 27.2.1) 사파리에서 그 읽기가 있는 툰 프로그램으로 처음 그리면 GPU 프로세스가 죽어 WebGL 문맥을 잃었다(그 뒤 첫 셰이더 짓기가 'compile failed: null' 로 보임). 단이 둘 이상인 화면은 셈이 같아 바이트까지 그대로다. 옮기는 법: 없다.
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
