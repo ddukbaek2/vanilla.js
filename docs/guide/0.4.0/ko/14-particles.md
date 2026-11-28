@@ -348,7 +348,7 @@ engine.run(new DissolveScene());
 
 ## ScreenEffect
 
-씬 전체에 거는 후처리 사슬입니다. 씬은 화면에 그대로 그리고, `end` 에서 화면(또는 정한 영역)을 떠 와 켜진 효과를 차례로 건 뒤 같은 자리에 되돌려 놓습니다. `ScreenEffectType` 에 58 가지 효과가 있습니다(비네트 `vignette`, 충격파 `shockwave`, 번짐 `bloom`, 색 보정 `colorGrade`, 색수차 `chromatic`, 그레인 `grain`, 안개 `fog`, 페이드 `fade` 같은 것).
+씬 전체에 거는 후처리 사슬입니다. 씬은 화면에 그대로 그리고, `end` 에서 화면(또는 정한 영역)을 떠 와 켜진 효과를 차례로 건 뒤 같은 자리에 되돌려 놓습니다. `ScreenEffectType` 에 59 가지 효과가 있습니다(비네트 `vignette`, 충격파 `shockwave`, 번짐 `bloom`, 색 보정 `colorGrade`, 색수차 `chromatic`, 그레인 `grain`, 안개 `fog`, 페이드 `fade` 같은 것).
 
 ![Sprite Effects 예제: ScreenEffect 의 godRays 를 화면 전체에 건 빛줄기](../images/screen-effect.webp)
 

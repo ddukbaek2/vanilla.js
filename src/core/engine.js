@@ -280,7 +280,7 @@ export class Engine extends Object {
 		this.#frameLimitFramePerSecond = 0;
 
 		this.#statisticsTextRect = Rect.zero();
-		this.#version = Version.create(0, 3, 2);
+		this.#version = Version.create(0, 4, 0);
 		this.#frameCaptureRequests = new System.Map();
 		this.#isCaptureTimeStepFixed = false;
 		this.#engineFrameCallbacks = [];

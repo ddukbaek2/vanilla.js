@@ -4,7 +4,7 @@
 
 **외부 의존성 없이 바닐라 자바스크립트로 만드는 경량 웹게임 엔진**
 
-[![version](https://img.shields.io/badge/version-0.3.2-d4b06a?style=flat-square)](UPDATE.md)
+[![version](https://img.shields.io/badge/version-0.4.0-d4b06a?style=flat-square)](UPDATE.md)
 [![license](https://img.shields.io/badge/license-MIT-3f3f46?style=flat-square)](LICENSE)
 [![dependencies](https://img.shields.io/badge/dependencies-0-3f3f46?style=flat-square)](import.js)
 [![renderer](https://img.shields.io/badge/renderer-WebGL2-3f3f46?style=flat-square)](src/core/graphic.js)
@@ -79,7 +79,7 @@ const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D
 | 코어 | `Engine` 루프(최대 FPS, 페이지 이벤트, 검증용 화면 저장), `Scene` / `SceneManager`, `Node` 계층(`WorldNode` / `UINode`), `Component`, `TimeManager`, `InputManager`(마우스 단추, 손가락 목록, 마지막 입력 장치, 막을 키), `InputActions`(입력 동작), `GamepadManager`(진동, 패드 종류), `ViewManager`(해상도 대응, 세이프 에어리어, 렌더 배율 상한), `TouchRaycaster` / `TouchRecognizer`, `PointerCursor` |
 | 렌더링 | WebGL2 `Graphic`(스프라이트, 텍스트, 리치 텍스트, 도형, 둥근 사각형, 고리와 호, 선분 묶음, 스텐실 클립, 블렌드 모드 26 가지), 묶어 그리기와 화면 밖 거르기(기본 켬), `Mask`, `Outline`, `SoftShade`, `ShadowText`, `ShadowImage`, `Camera2D`, 글자 텍스처 캐시, 셰이더 프로그램 교체, `ShaderWarmer` |
 | UI | 버튼 / 토글 / 스크롤 뷰 / 스크롤 바 / 슬라이더 / 입력 필드 / 진행 바 / 진행 고리 / 리스트 뷰 / 드롭다운 / 컨텍스트 메뉴 / 다이얼로그 / 토스트 / 스피너 / 선, 막대 차트, 창 쌓기(`UIWindowLayer`, `UIWindow`, `UIConfirmWindow`), `ButtonMotion`, `ToastMotion`, `UIHitArea`, `UIScale`, `UIDocument`, 제약 기반 레이아웃(`LayoutSolver`) |
-| 효과 | `ParticleSystem`(방출 모양, 렌더 모양, 버스트, 수명 곡선, 끌개, 월드 공간), `TrailRenderer`, `ShaderSprite` 49 종, `ScreenEffect` 58 종, `HeatHazeEffect`, `Shaker`, `FloatingText` |
+| 효과 | `ParticleSystem`(방출 모양, 렌더 모양, 버스트, 수명 곡선, 끌개, 월드 공간), `TrailRenderer`, `ShaderSprite` 49 종, `ScreenEffect` 59 종, `HeatHazeEffect`, `Shaker`, `FloatingText` |
 | 애니메이션 | `Timeline` 런타임(트랙 보간, 이징 31 종 + 베지어, 이벤트 / 마커 / 사운드 / 파티클), `Animator` 상태 기계, `Tween`(노드 속성 트윈 포함), `SpriteAnimator` |
 | 3D | `SkinnedModel`(glTF / GLB / FBX, 스키닝, 모프 타깃), `SkinnedModelRenderer`, `HumanSkinRenderer`, `ShadowMap`, `BloomEffect`, `MultiLevelBloomEffect`, `AmbientOcclusionEffect`, `SubsurfaceScatteringEffect`, `Camera3D`, `Material` / `RenderTarget`(멀티샘플) / `FullscreenPass` |
 | 툰 3D | `ToonRenderer`(그늘 램프 셀 셰이딩: 바탕과 1 차, 2 차 그늘의 Step, Feather, 램프 텍스처, 그림자가 그늘 색으로, 단단한 툰 하이라이트와 림, 그늘 쪽 림, 매트캡, 천사 고리(2 번 UV), 색마다 빛 색 켜고 끄기, 거리에 따라 굵기를 맞추고 멀면 사라지는 껍데기 바깥선, 인스턴싱, 해 그림자와 점광, 스포트라이트 그림자 아틀라스(`ShadowAtlas`), `ToonLightSet` 빛 묶음과 점광, 스포트라이트, `ToonMaterial` 셰이더 조각, 인스턴스 꼴과 영구 인스턴스 버퍼), `MeshBuilder`, `readGlbArrays`, `ToonDrawQueue`(그리기 단계 콜백, 화면 공간 바깥선 맡기기), `ToonScreenOutline`(바로 이웃 경계에서 잡고 점프 플러딩으로 넓히는 화면 공간 바깥선, 실루엣과 꺾임 선 굵기 따로, 모형마다 끄고 켜기), `ToonVfx`, `ToonPostProcess`(MSAA, 다단 블룸, 색 보정), `ToonView3D` |
@@ -126,7 +126,7 @@ const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D
 | UI Showcase | UI 컴포넌트 전시. 버튼, 스크롤 뷰, 리스트, 차트, 다이얼로그, 레이아웃 | [열기](https://vanillapunch.com/tools/demo/uishowcase/) | [`examples/uishowcase`](examples/uishowcase) |
 | Particle Effects | 불 / 분수 / 눈 / 비 / 폭발 등 파티클 프리셋 18 종 | [열기](https://vanillapunch.com/tools/demo/particleeffects/) | [`examples/particleeffects`](examples/particleeffects) |
 | Timeline Showcase | 타임라인 편집기로 만든 문서 8 종 재생. 트랜스포트, 스크럽, 마커 / 이벤트 | [열기](https://vanillapunch.com/tools/demo/timelineshowcase/) | [`examples/timelineshowcase`](examples/timelineshowcase) |
-| Sprite Effects | `ShaderSprite` 49 종, `ScreenEffect` 58 종, 게임 연출 조합 시연 | [열기](https://vanillapunch.com/tools/demo/spriteeffects/) | [`examples/spriteeffects`](examples/spriteeffects) |
+| Sprite Effects | `ShaderSprite` 49 종, `ScreenEffect` 59 종, 게임 연출 조합 시연 | [열기](https://vanillapunch.com/tools/demo/spriteeffects/) | [`examples/spriteeffects`](examples/spriteeffects) |
 
 배포본이 없는 예제: [`examples/cameratour`](examples/cameratour)(돌아가는 `Camera2D`, 노드 트윈, `Indicator`), [`examples/toonmaterial`](examples/toonmaterial)(툰 확장 시험 장면: 머티리얼 셰이더 조각, 텍스처와 데칼, 점광, 반 램버트 띠, 더하기 홀로그램, 평면 거울, 영구 인스턴스 버퍼), [`examples/toonstyle`](examples/toonstyle)(툰 셰이딩과 바깥선 견주기 장면, 러스트 예제 toonstyle 과 같은 장면)
 

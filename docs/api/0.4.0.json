@@ -1,7 +1,7 @@
 {
 	"engine": "vanilla.js",
 	"version": "0.4.0",
-	"date": "2026-11-26",
+	"date": "2026-11-28",
 	"modules": [
 		{
 			"name": "base/wait",

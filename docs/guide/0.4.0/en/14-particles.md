@@ -348,7 +348,7 @@ engine.run(new DissolveScene());
 
 ## ScreenEffect
 
-A post-processing chain applied to the whole scene. The scene draws to the screen as usual, and in `end` the screen (or a chosen region) is captured, the enabled effects are applied in order, and the result is put back in the same place. `ScreenEffectType` has 58 effects (such as `vignette`, `shockwave`, `bloom`, `colorGrade`, `chromatic`, `grain`, `fog`, and `fade`).
+A post-processing chain applied to the whole scene. The scene draws to the screen as usual, and in `end` the screen (or a chosen region) is captured, the enabled effects are applied in order, and the result is put back in the same place. `ScreenEffectType` has 59 effects (such as `vignette`, `shockwave`, `bloom`, `colorGrade`, `chromatic`, `grain`, `fog`, and `fade`).
 
 ![Sprite Effects example: ScreenEffect godRays light shafts over the whole screen](../images/screen-effect.webp)
 
