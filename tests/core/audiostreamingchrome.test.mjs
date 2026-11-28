@@ -126,10 +126,15 @@ try {
 			record.duration = longAsset.getDuration();
 			const player = new AudioPlayer(audioContext, tapNode);
 			player.setAudioAsset(longAsset);
+			// 위치는 오디오 컨텍스트 시계로 흐르므로 벽시계 sleep 이 아니라 그 시계가 0.4 초 흐를 때까지 기다리고, 읽은 때의 흘러간 시간과 견준다. (기계 부하로 타이머가 늦어도 어긋나지 않게)
+			const playContextStart = audioContext.currentTime;
 			player.play(false);
-			await sleep(400);
+			while (audioContext.currentTime - playContextStart < 0.4) {
+				await sleep(10);
+			}
 			record.playingAfterPlay = player.isPlaying();
 			record.timeAfterPlay = player.getTime();
+			record.contextElapsedAfterPlay = audioContext.currentTime - playContextStart;
 			record.peakFull = await readPeak(analyser);
 			player.setVolume(0.5);
 			await sleep(60);
@@ -274,7 +279,7 @@ for (const [loadType, record] of Object.entries(result.modeResult)) {
 	check(record.hasBuffer === !isStreamingMode, loadType + " 버퍼 " + record.hasBuffer);
 	check(near(record.duration, 2.0, 0.05), loadType + " 길이 " + record.duration);
 	check(record.playingAfterPlay, loadType + " 틀면 재생 중");
-	check(record.timeAfterPlay > 0.2 && record.timeAfterPlay < 0.8, loadType + " 흐르는 위치 " + record.timeAfterPlay);
+	check(record.timeAfterPlay > record.contextElapsedAfterPlay - 0.25 && record.timeAfterPlay < record.contextElapsedAfterPlay + 0.1, loadType + " 흐르는 위치 " + record.timeAfterPlay + " (컨텍스트 시계로 " + record.contextElapsedAfterPlay + " 초 흐름)");
 	check(near(record.peakFull, 0.5, 0.05), loadType + " 음량 1 의 진폭 " + record.peakFull);
 	check(near(record.peakHalf, 0.25, 0.04), loadType + " 음량 0.5 의 진폭 " + record.peakHalf);
 	check(record.peakMuted < 0.01, loadType + " 음소거 진폭 " + record.peakMuted);
