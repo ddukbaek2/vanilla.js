@@ -56,6 +56,14 @@ export const PageEvent = System.Object.freeze({
 });
 
 
+//==============================================================================
+// 그래픽 컨텍스트 이벤트. (엔진이 리스너에 넘긴다, addGraphicContextEventListener)
+//==============================================================================
+export const GraphicContextEvent = System.Object.freeze({
+	lost: "lost", // WebGL 컨텍스트를 잃음. (GPU 메모리 부족, 드라이버 재설정, 백그라운드 회수. 잃은 동안 엔진은 그리지 않고 씬 갱신만 한다)
+	restored: "restored", // 컨텍스트가 되살아나 엔진이 기본 자원을 다시 지음. (게임이 지은 GL 객체와 3D 렌더러, 렌더 타겟은 죽었으니 이때 다시 짓는다)
+});
+
 
 //==============================================================================
 // 엔진 설정.
@@ -207,6 +215,7 @@ export class Engine extends Object {
 	/** @private @type { Array<() => boolean> } */ #engineFrameCallbacks; // 엔진 프레임마다 시간을 올린 바로 뒤 부를 함수 목록. (참을 돌려주면 뺀다, 찍기 모드의 로딩 기다림)
 	/** @private @type { boolean } */ #isExitRequested; // 종료를 요청했는지.
 	/** @private @type { boolean } */ #isPageHidden; // 페이지가 가려져 있는지.
+	/** @private @type { Array<Function> } */ #graphicContextEventListeners; // 그래픽 컨텍스트 이벤트 리스너. ((graphicContextEvent) => void)
 	/** @private @type { Array<Function> } */ #pageEventListeners; // 페이지 이벤트 리스너. ((pageEvent) => void)
 	/** @private @type { object | null } */ #gpuThroughputMeasurement; // 재고 있는 GPU 처리량. (없으면 null, measureGpuThroughput)
 
@@ -264,6 +273,17 @@ export class Engine extends Object {
 		this.#isExitRequested = false;
 		this.#isPageHidden = System.document.visibilityState === "hidden";
 		this.#pageEventListeners = [];
+		this.#graphicContextEventListeners = [];
+		// 컨텍스트를 잃으면 엔진 오류 길(console.error)로 한 번 알리고 리스너에 넘긴다. 되살아나면 리스너에 넘긴다.
+		this.#graphic.setContextEventCallback((graphicContextEvent) => {
+			if (graphicContextEvent === GraphicContextEvent.lost) {
+				console.error("Engine: WebGL2 context lost. Drawing is paused until the context is restored.");
+			}
+			else {
+				console.warn("Engine: WebGL2 context restored. Engine resources were rebuilt, rebuild game-owned GL objects now.");
+			}
+			this.dispatchGraphicContextEvent(graphicContextEvent);
+		});
 		this.#gpuThroughputMeasurement = null;
 
 		// 현재 엔진 인스턴스 글로벌 등록. (루트 노드 등 컨텍스트 없는 객체에서 ViewManager 등 접근용)
@@ -1078,9 +1098,11 @@ export class Engine extends Object {
 			this.resize();
 		}
 
-		// 렌더러 처리.
+		// 렌더러 처리. (컨텍스트를 잃은 동안은 GL 을 부르지 않는다)
 		const graphic = this.getGraphic();
-		graphic.applySettings(this);
+		if (!graphic.isContextLost()) {
+			graphic.applySettings(this);
+		}
 
 		// 시간 처리.
 		// 찍기 모드는 결정적으로 찍게 실제 시각 대신 프레임 번호 x 1/60 초를 쓴다. (기계 빠르기와 상관없이 같은 프레임에 같은 시간, 러스트 판과 같은 셈)
@@ -1163,6 +1185,9 @@ export class Engine extends Object {
 	 * @param { boolean } isTickEnabled 거짓이면 씬을 갱신하지 않고 그리기만 한다.
 	 */
 	#tickAndDrawScenes(graphic, timeDelta, isTickEnabled) {
+		// 컨텍스트를 잃은 동안은 씬만 갱신하고 그리지 않는다. (GL 이 null 을 주어 그리기 길마다 예외를 프레임마다 던지지 않게, 되살아나면 다음 프레임부터 그린다)
+		const isContextLost = graphic.isContextLost();
+
 		// 그리기 통계. (지난 프레임 값을 넘겨 두고 이번 프레임을 새로 센다)
 		graphic.beginFrameStatistics();
 
@@ -1176,14 +1201,20 @@ export class Engine extends Object {
 			try {
 				if (!loadedScene.isLoaded()) {
 					// 로딩 중: 로딩 전용 출력만 호출. 씬의 tick/draw는 호출하지 않음.
-					viewManager.applyViewRect(graphic);
-					loadedScene.drawOnLoad(graphic);
+					if (!isContextLost) {
+						viewManager.applyViewRect(graphic);
+						loadedScene.drawOnLoad(graphic);
+					}
 					continue;
 				}
 
 				// 갱신. (질문 창이 떠 있거나 GPU 처리량을 재는 중이면 멈춘 화면 그대로 그리기만 한다)
 				if (isTickEnabled) {
 					loadedScene.tick(timeDelta);
+				}
+
+				if (isContextLost) {
+					continue;
 				}
 
 				// 출력. (앞 씬의 그리기와 이 씬의 갱신 사이에 바깥 WebGL 이 바꾼 묶음과 상태는 Graphic 이 그리기 앞에 상태 캐시에 견주어 다시 건다)
@@ -1198,8 +1229,16 @@ export class Engine extends Object {
 				}
 			}
 			catch (error) {
+				// 컨텍스트를 막 잃어 webglcontextlost 가 오기 전의 프레임이면 GL 이 null 을 주어 던진 것이다. (이벤트가 와서 한 번 알리므로 여기서는 알리지 않는다, 오류 길에서만 GL 에 묻는다)
+				if (!isContextLost && graphic.getWebGL2RenderingContext().isContextLost()) {
+					continue;
+				}
 				console.error(error);
 			}
+		}
+
+		if (isContextLost) {
+			return;
 		}
 
 		// 개발 정보 출력.
@@ -1942,6 +1981,92 @@ export class Engine extends Object {
 			return;
 		}
 		this.#pageEventListeners.splice(listenerIndex, 1);
+	}
+
+	//==============================================================================
+	// 그래픽 컨텍스트 이벤트 리스너 더하기. ((graphicContextEvent) => void, GraphicContextEvent 의 값을 받는다)
+	//==============================================================================
+	/**
+	 * WebGL 컨텍스트를 잃으면 lost, 되살아나 엔진이 기본 자원을 다시 지으면 restored 를 넘긴다. 잃은 동안 엔진은 그리지 않고 씬 갱신만 한다.
+	 * @param { Function } graphicContextEventListener (graphicContextEvent) => void. 같은 함수는 한 번만 더한다.
+	 * @example <caption>컨텍스트를 되살리면 게임의 GL 객체 다시 짓기</caption>
+	 * import { Engine, EngineConfiguration, Scene, GraphicContextEvent } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * let isRebuildNeeded = false;
+	 * engine.addGraphicContextEventListener((graphicContextEvent) => {
+	 * 	if (graphicContextEvent === GraphicContextEvent.restored) {
+	 * 		isRebuildNeeded = true;
+	 * 	}
+	 * });
+	 * console.log(isRebuildNeeded);
+	 */
+	addGraphicContextEventListener(graphicContextEventListener) {
+		if (this.#graphicContextEventListeners.includes(graphicContextEventListener)) {
+			return;
+		}
+		this.#graphicContextEventListeners.push(graphicContextEventListener);
+	}
+
+	//==============================================================================
+	// 그래픽 컨텍스트 이벤트 리스너 빼기.
+	//==============================================================================
+	/**
+	 * @param { Function } graphicContextEventListener 더했던 리스너. (없으면 아무것도 하지 않는다)
+	 * @example <caption>더한 리스너 빼기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * const graphicContextEventListener = (graphicContextEvent) => {
+	 * 	console.log(graphicContextEvent);
+	 * };
+	 * engine.addGraphicContextEventListener(graphicContextEventListener);
+	 * engine.removeGraphicContextEventListener(graphicContextEventListener);
+	 */
+	removeGraphicContextEventListener(graphicContextEventListener) {
+		const listenerIndex = this.#graphicContextEventListeners.indexOf(graphicContextEventListener);
+		if (listenerIndex < 0) {
+			return;
+		}
+		this.#graphicContextEventListeners.splice(listenerIndex, 1);
+	}
+
+	//==============================================================================
+	// 그래픽 컨텍스트 이벤트 알리기. (리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)
+	//==============================================================================
+	/**
+	 * @param { string } graphicContextEvent GraphicContextEvent 의 값.
+	 */
+	dispatchGraphicContextEvent(graphicContextEvent) {
+		const graphicContextEventListeners = this.#graphicContextEventListeners.slice();
+		for (const graphicContextEventListener of graphicContextEventListeners) {
+			try {
+				graphicContextEventListener(graphicContextEvent);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
+	}
+
+	//==============================================================================
+	// GPU 메모리 읽기. (개발용, Graphic.readGpuMemoryUsage 와 같다)
+	//==============================================================================
+	/**
+	 * @returns { { totalBytes: number, canvasBytes: number, kindTable: object, ownerList: Array<{ owner: string, kind: string, count: number, bytes: number }> } }
+	 * 합(캔버스 몫 포함), 캔버스 몫, 종류별 { count, bytes }, 주인별 몫(큰 것부터).
+	 * @example <caption>종류별 GPU 메모리 읽기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engine = new Engine(new EngineConfiguration());
+	 * engine.run(new Scene());
+	 * const usage = engine.readGpuMemoryUsage();
+	 * console.log(usage.kindTable.texture.bytes, usage.kindTable.renderbuffer.bytes, usage.kindTable.buffer.bytes);
+	 */
+	readGpuMemoryUsage() {
+		return this.getGraphic().readGpuMemoryUsage();
 	}
 
 	//==============================================================================
