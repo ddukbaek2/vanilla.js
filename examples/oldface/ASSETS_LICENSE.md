@@ -7,3 +7,6 @@ The MetaHuman assets in this folder (`assets/`: heads, textures, expressions, ha
 이 폴더(`assets/`)의 MetaHuman 에셋(머리, 텍스처, 표정, 머리카락 카드)은 Epic Games 의 것입니다. 이 데모 전용이고 vanilla.js 엔진 라이선스(LICENSE)에 들지 않습니다.
 - Epic Games / MetaHuman: https://www.metahuman.com/ , 라이선스: https://www.metahuman.com/en-US/license
 - 에셋: MetaHuman Creator 의 Walter 프리셋, https://www.metahuman.com/
+
+For questions or removal requests, contact contact@vanillapunch.com
+문의나 제외 요청은 contact@vanillapunch.com 으로 보내 주세요.
