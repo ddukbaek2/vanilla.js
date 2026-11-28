@@ -4,7 +4,7 @@
 const System = globalThis;
 import { ToonBlendMode } from "./toonmaterial.js";
 import { TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID } from "./toonscreenoutline.js";
-import { writeInstanceBufferSphere, readMatrixDeterminant, isSameBatchState, DRAW_STATE_JOINT_MATRICES, DRAW_STATE_INDEX_START, DRAW_STATE_INDEX_COUNT, DRAW_STATE_IS_MIRRORED, DRAW_STATE_MATERIAL, DRAW_STATE_IS_TRANSPARENT, DRAW_STATE_HAS_OUTLINE, DRAW_STATE_IS_CULLED, DRAW_STATE_CASTS_SHADOW, DRAW_STATE_LINE_ID, DRAW_STATE_GROUP, DRAW_STATE_IS_DEPTH_PREPASSED, DRAW_STATE_BASE_COLOR_TEXTURE, EMPTY_OPTIONS } from "./toonrenderer.js";
+import { writeInstanceBufferSphere, readMatrixDeterminant, isSameBatchState, DRAW_STATE_JOINT_MATRICES, DRAW_STATE_INDEX_START, DRAW_STATE_INDEX_COUNT, DRAW_STATE_IS_MIRRORED, DRAW_STATE_MATERIAL, DRAW_STATE_IS_TRANSPARENT, DRAW_STATE_HAS_OUTLINE, DRAW_STATE_IS_CULLED, DRAW_STATE_CASTS_SHADOW, DRAW_STATE_LINE_ID, DRAW_STATE_GROUP, DRAW_STATE_IS_DEPTH_PREPASSED, DRAW_STATE_BASE_COLOR_TEXTURE, DRAW_STATE_IS_BODY_DRAWN, DRAW_STATE_LIGHT_SET, EMPTY_OPTIONS } from "./toonrenderer.js";
 import { ShadowUpdateMode } from "../shadowmap.js";
 import { Matrix4 } from "../../base/matrix4.js";
 
@@ -687,6 +687,45 @@ export class ToonDrawQueue {
 		this.#isResolved = false;
 		this.#itemCount = itemCount + 1;
 		return item;
+	}
+
+	//==============================================================================
+	// 담은 것이 그릴 때 쓸 프로그램 변형 읽기. (렌더러의 prewarmDrawQueue 가 부른다, 그리지 않는다)
+	// - 같은 변형은 한 번만 담는다. (머티리얼, 인스턴스 꼴, 몸 기능 비트가 같은 것)
+	//==============================================================================
+	/**
+	 * @param { object } renderer - ToonRenderer.
+	 * @returns { object } { isAmbientOcclusion, requests } (requests 는 { material, instanceLayout, featureMask, isBodyDrawn } 의 배열, isAmbientOcclusion 은 이 줄이 모서리 어둠을 켠 것)
+	 * @private
+	 */
+	readProgramRequests(renderer) {
+		renderer.beginTrustedOptions();
+		try {
+			this.resolveItems(renderer);
+			const requests = [];
+			const keySet = new System.Set();
+			const itemList = this.#itemList;
+			for (let index = 0; index < this.#itemCount; ++index) {
+				const item = itemList[index];
+				const state = item.state;
+				const material = state[DRAW_STATE_MATERIAL];
+				const instanceLayout = item.instanceBuffer !== null ? item.instanceBuffer.layout : null;
+				const lightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : renderer.getLightSet();
+				const isBodyDrawn = state[DRAW_STATE_IS_BODY_DRAWN];
+				const featureMask = isBodyDrawn ? renderer.readFeatureMask(state, lightSet) : -1;
+				const key = `${material !== null ? material.getId() : 0}/${instanceLayout !== null ? instanceLayout.getId() : 0}/${featureMask}`;
+				if (keySet.has(key)) {
+					continue;
+				}
+				keySet.add(key);
+				requests.push({ material: material, instanceLayout: instanceLayout, featureMask: featureMask, isBodyDrawn: isBodyDrawn });
+			}
+			const postProcess = this.#postProcess;
+			return { isAmbientOcclusion: postProcess !== null && postProcess.isAmbientOcclusionEnabled(), requests: requests };
+		}
+		finally {
+			renderer.endTrustedOptions();
+		}
 	}
 
 	//==============================================================================
