@@ -104,6 +104,50 @@ try {
 		const queue = new ToonDrawQueue();
 		queue.addMesh(mesh, Matrix4.createTranslation(-1.2, 0.8, 0), { castsShadow: false });
 		queue.addMesh(mesh, Matrix4.createTranslation(0, -0.8, 0), { castsShadow: false, material: material });
+
+		// 미리 짓기를 맡기고 그리지 않고 waitFrames 프레임 넘긴 뒤 그린다. (불러오기 화면 다음에 판을 그리는 꼴) 그려진 화소 수를 센다.
+		const projectionMatrix = Matrix4.createIdentity();
+		const projectionElements = projectionMatrix.getElements();
+		projectionElements[0] = 1.5;
+		projectionElements[5] = 2.4;
+		projectionElements[10] = -1.02;
+		projectionElements[11] = -1;
+		projectionElements[14] = -0.2;
+		projectionElements[15] = 0;
+		const viewMatrix = Matrix4.createTranslation(0, 0, -4);
+		const drawAfterWait = async (waitFrames, options) => {
+			const renderer2 = new ToonRenderer(gl);
+			const builder2 = new MeshBuilder();
+			builder2.addPart(createSphereGeometry(0.6, 16, 10), identity, "#c8b090");
+			const mesh2 = renderer2.createMesh(builder2.readArrays());
+			const material2 = renderer2.createMaterial({ name: "tint", surfaceChunk: "void applySurface(inout ToonSurface surface) { surface.baseColor *= 0.8; }" });
+			const queue2 = new ToonDrawQueue();
+			queue2.addMesh(mesh2, Matrix4.createTranslation(-1.2, 0.8, 0), { castsShadow: false });
+			queue2.addMesh(mesh2, Matrix4.createTranslation(1.2, -0.8, 0), { castsShadow: false, material: material2 });
+			const prewarm2 = renderer2.prewarmDrawQueue(queue2, options);
+			for (let frame = 0; frame < waitFrames; ++frame) {
+				await nextFrame();
+			}
+			const wasReady = prewarm2.isReady();
+			gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+			gl.clearColor(0, 0, 0, 1);
+			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+			queue2.drawWithMatrices(renderer2, viewMatrix, projectionMatrix);
+			const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+			gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+			let drawnCount = 0;
+			for (let index = 0; index < pixels.length; index += 4) {
+				if (pixels[index] + pixels[index + 1] + pixels[index + 2] > 0) {
+					drawnCount += 1;
+				}
+			}
+			return { wasReady, drawnCount };
+		};
+		const drawResult = {};
+		for (const waitFrames of [0, 1, 2, 45]) {
+			drawResult["wait" + waitFrames] = await drawAfterWait(waitFrames, {});
+			drawResult["listed" + waitFrames] = await drawAfterWait(waitFrames, { lightFeatureList: lightFeatureList });
+		}
 		counts.flush = 0;
 		counts.status = 0;
 		const prewarm = renderer.prewarmDrawQueue(queue, { lightFeatureList: lightFeatureList });
@@ -126,7 +170,7 @@ try {
 				break;
 			}
 		}
-		return { flushAfterStart, flushPerFrame, statusCount: counts.status, remainList: remainList.join(""), isParallel, readyFrame, frameLimit, maxMilliseconds, counts };
+		return { drawResult, flushAfterStart, flushPerFrame, statusCount: counts.status, remainList: remainList.join(""), isParallel, readyFrame, frameLimit, maxMilliseconds, counts };
 	});
 }
 finally {
@@ -135,6 +179,9 @@ finally {
 }
 console.log(JSON.stringify(result));
 check(result.isParallel, "헤드리스 크롬이 KHR_parallel_shader_compile 을 주지 않음");
+for (const name of Object.keys(result.drawResult)) {
+	check(result.drawResult[name].drawnCount > 1000, `미리 짓고 그리지 않고 기다린 뒤 그려도 화소가 나와야 함 (${name}: ${result.drawResult[name].drawnCount}, 끝남 ${result.drawResult[name].wasReady})`);
+}
 check(result.readyFrame > 0, `그리지 않는 프레임 ${result.frameLimit} 개 안에 미리 짓기가 끝나지 않음`);
 check(result.flushAfterStart > 0, "미리 짓기를 맡긴 뒤 gl.flush 로 명령을 보내지 않음");
 check(result.flushPerFrame >= 1, "그리지 않는 프레임에 gl.flush 가 없음");
