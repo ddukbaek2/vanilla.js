@@ -32511,6 +32511,7 @@ var TOON_FEATURE_SHADE_RIM = 256;
 var TOON_FEATURE_SHADOW = 512;
 var TOON_FEATURE_INTENSITY_LIMIT = 1024;
 var TOON_FEATURE_ALL = 2047;
+var TOON_FEATURE_LIGHT_BIT_TABLE = { rampTexture: TOON_FEATURE_RAMP_TEXTURE, shadeStops: TOON_FEATURE_SHADE_STOPS, rim: TOON_FEATURE_RIM, shadeRim: TOON_FEATURE_SHADE_RIM, intensityLimit: TOON_FEATURE_INTENSITY_LIMIT };
 var PREWARM_FINISH_PER_STEP = 3;
 var TOON_FEATURE_DRAW_BITS = TOON_FEATURE_BASE_TEXTURE | TOON_FEATURE_EMISSIVE_TEXTURE | TOON_FEATURE_DECAL_TEXTURE | TOON_FEATURE_MATCAP | TOON_FEATURE_ANGEL_RING | TOON_FEATURE_SHADOW;
 var SOLID_FRAGMENT_HEAD = `#version 300 es
@@ -33754,6 +33755,7 @@ var ToonRenderer = class {
   #webGL2RenderingContext;
   #programSets;
   #defaultProgramSet;
+  #isAsyncProgramBuild = true;
   #pendingBuilds;
   #emptyShadowTexture;
   #whiteTexture;
@@ -34017,9 +34019,15 @@ var ToonRenderer = class {
   prepareMaterial(material, instanceLayout = null) {
     return this.readProgramSet(material, instanceLayout) !== null;
   }
-  prewarmDrawQueue(queue) {
+  setAsyncProgramBuild(isAsync) {
+    this.#isAsyncProgramBuild = isAsync === true;
+  }
+  isAsyncProgramBuild() {
+    return this.#isAsyncProgramBuild;
+  }
+  prewarmDrawQueue(queue, options = {}) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    const programRequests = queue.readProgramRequests(this);
+    const programRequests = this.expandPrewarmRequests(queue, options);
     const isAmbientOcclusion = programRequests.isAmbientOcclusion || this.#ambientOcclusionInput !== null;
     const unitList = [];
     if (!ShaderProgram.isParallelCompileSupported(webGL2RenderingContext)) {
@@ -34072,6 +34080,75 @@ var ToonRenderer = class {
       }
     }
     return new ToonProgramPrewarm(this, unitList);
+  }
+  expandPrewarmRequests(queue, options) {
+    const programRequests = queue.readProgramRequests(this);
+    let isAmbientOcclusion = programRequests.isAmbientOcclusion;
+    const requests = programRequests.requests;
+    const keySet = new System82.Set();
+    const requestKey = __name((request) => `${request.material !== null ? request.material.getId() : 0}/${request.instanceLayout !== null ? request.instanceLayout.getId() : 0}/${request.featureMask}`, "requestKey");
+    for (const request of requests) {
+      keySet.add(requestKey(request));
+    }
+    if (options.queueList !== void 0) {
+      for (const otherQueue of options.queueList) {
+        const otherRequests = otherQueue.readProgramRequests(this);
+        isAmbientOcclusion = isAmbientOcclusion || otherRequests.isAmbientOcclusion;
+        for (const request of otherRequests.requests) {
+          const key = requestKey(request);
+          if (!keySet.has(key)) {
+            keySet.add(key);
+            requests.push(request);
+          }
+        }
+      }
+    }
+    const lightMaskList = [];
+    const addedMaskList = [];
+    if (options.lightSetList !== void 0) {
+      for (const lightSet of options.lightSetList) {
+        lightMaskList.push(this.readLightFeatureMask(lightSet));
+      }
+    }
+    if (options.lightFeatureList !== void 0) {
+      for (const nameList of options.lightFeatureList) {
+        let lightMask = 0;
+        for (const name of nameList) {
+          const bit = TOON_FEATURE_LIGHT_BIT_TABLE[name];
+          if (bit === void 0) {
+            throw new System82.Error(`ToonRenderer.prewarmDrawQueue: \uC54C \uC218 \uC5C6\uB294 \uBE5B \uAE30\uB2A5 \uC774\uB984 ${name} (rampTexture, shadeStops, rim, shadeRim, intensityLimit)`);
+          }
+          lightMask |= bit;
+        }
+        addedMaskList.push(lightMask);
+      }
+    }
+    const baseCount = requests.length;
+    for (let index = 0; index < baseCount; ++index) {
+      const request = requests[index];
+      if (request.featureMask < 0) {
+        continue;
+      }
+      const featureMaskList = [];
+      for (const lightMask of lightMaskList) {
+        featureMaskList.push(request.featureMask & TOON_FEATURE_DRAW_BITS | lightMask);
+      }
+      for (const addedMask of addedMaskList) {
+        featureMaskList.push(request.featureMask | addedMask);
+      }
+      for (const featureMask of featureMaskList) {
+        const expanded = { material: request.material, instanceLayout: request.instanceLayout, featureMask, isBodyDrawn: request.isBodyDrawn };
+        const key = requestKey(expanded);
+        if (!keySet.has(key)) {
+          keySet.add(key);
+          requests.push(expanded);
+        }
+      }
+    }
+    return { isAmbientOcclusion, requests };
+  }
+  readLightFeatureMask(lightSet) {
+    return (lightSet.getRampTexture() !== null ? TOON_FEATURE_RAMP_TEXTURE : 0) | (lightSet.getShadeRamp().positions.length >= 2 ? TOON_FEATURE_SHADE_STOPS : 0) | (lightSet.getRimLight().power > 0 ? TOON_FEATURE_RIM : 0) | (lightSet.getShadeRimLight().power > 0 ? TOON_FEATURE_SHADE_RIM : 0) | (lightSet.isLightIntensityLimited() ? TOON_FEATURE_INTENSITY_LIMIT : 0);
   }
   advancePrewarm(unitList) {
     let finishBudget = PREWARM_FINISH_PER_STEP;
@@ -34157,6 +34234,14 @@ var ToonRenderer = class {
     try {
       const isAmbientOcclusion = programSet.isAmbientOcclusion === true;
       const pendingKey = this.readProgramKey(material, instanceLayout, isAmbientOcclusion, featureMask);
+      const pendingProgram = this.#pendingBuilds.get(pendingKey);
+      if (pendingProgram !== void 0 && this.#isAsyncProgramBuild && !pendingProgram.isBuildComplete()) {
+        return programSet.solid;
+      }
+      if (pendingProgram === void 0 && this.#isAsyncProgramBuild && ShaderProgram.isParallelCompileSupported(this.getWebGL2RenderingContext())) {
+        this.#pendingBuilds.set(pendingKey, this.startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, true));
+        return programSet.solid;
+      }
       let solidProgram = this.takePendingBuild(pendingKey);
       if (solidProgram === null) {
         solidProgram = this.startSolidVariant(material, instanceLayout, isAmbientOcclusion, featureMask, false);

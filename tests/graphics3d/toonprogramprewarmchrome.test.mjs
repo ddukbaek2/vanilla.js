@@ -175,7 +175,83 @@ try {
 		deleted.renderer.deleteMaterial(deleted.material);
 		const deletedPrewarm = deleted.renderer.prewarmDrawQueue(deleted.queue);
 		await deletedPrewarm.wait();
-		return { isParallel, plainFrame, plainSecond, wasReadyAtOnce, prewarmBuilt, warmedFrame, warmedSecond, earlyFrame, earlySecond, earlyReady: earlyPrewarm.isReady(), deletedReady: deletedPrewarm.isReady() };
+		// 5. 장면 중간에 빛 묶음 쪽 기능 비트가 바뀌는 꼴. (림, 림에 음영 림, 램프 텍스처가 차례로 켜진다)
+		const rampTexture = (renderer) => renderer.createTexture({ width: 4, height: 1, data: new Uint8Array([60, 60, 70, 255, 120, 120, 130, 255, 200, 200, 210, 255, 255, 255, 255, 255]) }, { isMipmapped: false, isRepeated: false });
+		const stepList = [
+			(light, renderer) => {},
+			(light, renderer) => light.setRimLight([0.6, 0.65, 0.8], 2.5, 0, 1),
+			(light, renderer) => light.setShadeRimLight([0.3, 0.3, 0.5], 2),
+			(light, renderer) => light.setRampTexture(rampTexture(renderer), true),
+		];
+		const createLightScene = () => {
+			const renderer = new ToonRenderer(gl);
+			const builder = new MeshBuilder();
+			builder.addPart(createSphereGeometry(0.9, 16, 10), identity, "#c8b090");
+			const mesh = renderer.createMesh(builder.readArrays());
+			const light = renderer.createLightSet();
+			const queue = new ToonDrawQueue();
+			queue.addMesh(mesh, identity, { castsShadow: false, lightSet: light });
+			return { renderer, queue, light };
+		};
+		const runSteps = async (scene, waitFrames) => {
+			const frameList = [];
+			for (const step of stepList) {
+				step(scene.light, scene.renderer);
+				if (waitFrames > 0) {
+					drawFrame(scene); // 처음 보는 변형이면 맡기고 기본 몸으로 그린다.
+					await sleepFrames(waitFrames); // 지어질 때까지.
+				}
+				frameList.push(drawFrame(scene));
+			}
+			return frameList;
+		};
+		// 5-1. 미리 짓기 없이, 기본 몸으로 그리지 않고(동기) 짓는다. (기준 화면과 짓기 수)
+		const syncScene = createLightScene();
+		syncScene.renderer.setAsyncProgramBuild(false);
+		const syncFrameList = await runSteps(syncScene, 0);
+		// 5-2. 현재 빛 묶음만 미리 짓고(옛 방식) 동기로 그린다. (켜질 때마다 짓는다)
+		const narrowScene = createLightScene();
+		narrowScene.renderer.setAsyncProgramBuild(false);
+		const narrowPrewarm = narrowScene.renderer.prewarmDrawQueue(narrowScene.queue);
+		await narrowPrewarm.wait();
+		const narrowFrameList = await runSteps(narrowScene, 0);
+		// 5-3. 켜질 조합 목록을 넘겨 미리 짓고 동기로 그린다. (프레임마다 짓기 0)
+		const listedScene = createLightScene();
+		listedScene.renderer.setAsyncProgramBuild(false);
+		const listedPrewarm = listedScene.renderer.prewarmDrawQueue(listedScene.queue, { lightFeatureList: [["rim"], ["rim", "shadeRim"], ["rim", "shadeRim", "rampTexture"]] });
+		await listedPrewarm.wait();
+		const listedFrameList = await runSteps(listedScene, 0);
+		// 5-4. 빛 묶음 값으로 넘겨도 같다. (lightSetList)
+		const setScene = createLightScene();
+		setScene.renderer.setAsyncProgramBuild(false);
+		const futureLight = setScene.renderer.createLightSet();
+		futureLight.setRimLight([0.6, 0.65, 0.8], 2.5, 0, 1);
+		const futureLight2 = setScene.renderer.createLightSet();
+		futureLight2.setRimLight([0.6, 0.65, 0.8], 2.5, 0, 1);
+		futureLight2.setShadeRimLight([0.3, 0.3, 0.5], 2);
+		const futureLight3 = setScene.renderer.createLightSet();
+		futureLight3.setRimLight([0.6, 0.65, 0.8], 2.5, 0, 1);
+		futureLight3.setShadeRimLight([0.3, 0.3, 0.5], 2);
+		futureLight3.setRampTexture(rampTexture(setScene.renderer), true);
+		const setPrewarm = setScene.renderer.prewarmDrawQueue(setScene.queue, { lightSetList: [futureLight, futureLight2, futureLight3] });
+		await setPrewarm.wait();
+		const setFrameList = await runSteps(setScene, 0);
+		// 5-5. 맡기고 기본 몸으로 그린다. (기본값, 프레임을 막지 않고 같은 화면, 기다리면 지은 변형으로 바뀌어도 같은 화면)
+		const asyncScene = createLightScene();
+		const asyncDefault = asyncScene.renderer.isAsyncProgramBuild();
+		const asyncFrameList = await runSteps(asyncScene, 0);
+		const settledScene = createLightScene();
+		const asyncSettledFrameList = await runSteps(settledScene, 8);
+		// 5-6. 잘못된 이름은 던진다.
+		let badNameMessage = "";
+		try {
+			setScene.renderer.prewarmDrawQueue(setScene.queue, { lightFeatureList: [["noSuchFeature"]] });
+		}
+		catch (error) {
+			badNameMessage = error.message;
+		}
+		const lightResult = { syncFrameList, narrowFrameList, listedFrameList, setFrameList, asyncFrameList, asyncSettledFrameList, asyncDefault, badNameMessage };
+		return { lightResult, isParallel, plainFrame, plainSecond, wasReadyAtOnce, prewarmBuilt, warmedFrame, warmedSecond, earlyFrame, earlySecond, earlyReady: earlyPrewarm.isReady(), deletedReady: deletedPrewarm.isReady() };
 	});
 }
 finally {
@@ -199,3 +275,20 @@ check(result.deletedReady === true, "머티리얼을 지운 뒤에도 미리 짓
 const scriptErrorList = errorMessageList.filter((message) => message.startsWith("pageerror") || message.includes("ToonRenderer"));
 check(scriptErrorList.length === 0, "스크립트 오류 없음: " + scriptErrorList.join(" | "));
 console.log("프로그램 변형 미리 짓기 크롬 시험 통과 (" + checkCount + " 검사)");
+
+// 장면 중간에 빛 묶음 쪽 기능 비트가 바뀌는 꼴. (이슈 2)
+const lightResult = result.lightResult;
+const builtList = (frameList) => frameList.map((frame) => frame.built.compile);
+console.log("  빛 묶음이 바뀌는 프레임별 짓기(컴파일) 수: 미리 짓기 없이 " + JSON.stringify(builtList(lightResult.syncFrameList)) + ", 지금 값만 미리 짓기 " + JSON.stringify(builtList(lightResult.narrowFrameList)) + ", 조합 목록 미리 짓기 " + JSON.stringify(builtList(lightResult.listedFrameList)) + ", 빛 묶음 목록 " + JSON.stringify(builtList(lightResult.setFrameList)) + ", 맡기고 기본 몸으로 " + JSON.stringify(builtList(lightResult.asyncFrameList)));
+const millisecondList = (frameList) => JSON.stringify(frameList.map((frame) => Number(frame.milliseconds.toFixed(1))));
+console.log("  프레임별 그리기 시간(ms): 그 자리에서 짓기 " + millisecondList(lightResult.syncFrameList) + ", 지금 값만 미리 짓기 " + millisecondList(lightResult.narrowFrameList) + ", 조합 목록 미리 짓기 " + millisecondList(lightResult.listedFrameList) + ", 맡기고 기본 몸으로 " + millisecondList(lightResult.asyncFrameList));
+check(builtList(lightResult.syncFrameList).slice(1).every((count) => count > 0), "미리 짓기 없이는 빛이 바뀔 때마다 짓는다");
+check(builtList(lightResult.narrowFrameList).slice(1).every((count) => count > 0), "지금 빛 값만 미리 지으면 장면 중간에 켜진 조합은 그때 짓는다");
+check(builtList(lightResult.listedFrameList).every((count) => count === 0), "조합 목록(lightFeatureList)으로 미리 지으면 프레임마다 짓기 0 번 (" + JSON.stringify(builtList(lightResult.listedFrameList)) + ")");
+check(builtList(lightResult.setFrameList).every((count) => count === 0), "빛 묶음 목록(lightSetList)으로 미리 지으면 프레임마다 짓기 0 번 (" + JSON.stringify(builtList(lightResult.setFrameList)) + ")");
+const hashList = (frameList) => frameList.map((frame) => frame.hash).join(",");
+check(hashList(lightResult.listedFrameList) === hashList(lightResult.syncFrameList) && hashList(lightResult.setFrameList) === hashList(lightResult.syncFrameList) && hashList(lightResult.narrowFrameList) === hashList(lightResult.syncFrameList), "미리 짓기 인자가 있어도 화면은 바이트까지 같음");
+check(lightResult.asyncDefault === true, "맡기고 기본 몸으로 그리기가 기본");
+check(hashList(lightResult.asyncFrameList) === hashList(lightResult.syncFrameList), "기본 몸으로 그린 프레임이 짓고 그린 화면과 바이트까지 같음");
+check(hashList(lightResult.asyncSettledFrameList) === hashList(lightResult.syncFrameList) && builtList(lightResult.asyncSettledFrameList).every((count) => count === 0), "지어진 뒤 변형으로 바뀌어도 같은 화면, 그때는 더 짓지 않음 (" + JSON.stringify(builtList(lightResult.asyncSettledFrameList)) + ")");
+check(lightResult.badNameMessage.includes("noSuchFeature"), "잘못된 빛 기능 이름은 던짐: " + lightResult.badNameMessage);

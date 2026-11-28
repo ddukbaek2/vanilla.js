@@ -10628,5 +10628,11 @@
 	"모두 지었으면 true. (그려도 되지만 안 지은 것은 그 자리에서 짓는다)": "True if everything is built. (Drawing is allowed anyway; anything not built is built on the spot)",
 	"다 지었는지.": "Whether everything is built.",
 	"다 지으면 풀리는 약속.": "Promise that resolves when everything is built.",
-	"다 지을 때까지 기다리기.": "Waiting until everything is built."
+	"다 지을 때까지 기다리기.": "Waiting until everything is built.",
+	"true 면 장면 중간에 처음 보는 몸 변형을 그 자리에서 짓지 않고, 다 지어질 때까지 전부 켠 기본 몸(같은 화면)으로 그린다. false 면 그 자리에서 짓고 기다린다.": "If true, a body variant first seen mid-scene is not built on the spot; it is drawn with the default body with every feature on (same picture) until it finishes building. If false, it is built on the spot and waited for.",
+	"처음 보는 몸 변형을 맡기고 기본 몸으로 그릴지. (기본 true, KHR_parallel_shader_compile 이 없으면 이 값과 상관없이 그 자리에서 짓는다)": "Whether to hand off a body variant first seen and draw with the default body meanwhile. (Default true; without KHR_parallel_shader_compile it is built on the spot regardless of this value)",
+	"처음 보는 몸 변형을 맡기고 기본 몸으로 그리면 true.": "True if a body variant first seen is handed off and the default body is drawn meanwhile.",
+	"게임이 장면 중간에 쓸 조합 목록. (유니티 ShaderVariantCollection 처럼, 기본은 빈 객체)": "List of combinations the game will use mid-scene. (Like Unity ShaderVariantCollection; default is an empty object)",
+	"장면 중간에 켜질 림 라이트 조합까지 미리 짓기": "Prewarming up to the rim light combinations that turn on mid-scene",
+	"처음 보는 몸 변형을 맡기고 기본 몸으로 그리는지 읽기.": "Reads whether a body variant first seen is handed off and the default body is drawn meanwhile."
 }

@@ -22849,6 +22849,18 @@
 			"vanilla-engine": {
 				"module": "graphics3d/toon/toonrenderer",
 				"class": "ToonRenderer",
+				"name": "update_instance_buffer_range"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
+				"name": "updateInstanceBufferRange"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"class": "ToonRenderer",
 				"name": "delete_instance_buffer"
 			},
 			"vanilla.js": {
@@ -23604,6 +23616,26 @@
 		{
 			"vanilla-engine": {
 				"module": "graphics3d/toon/toonrenderer",
+				"name": "read_instance_buffer_sphere"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"name": "readInstanceBufferSphere"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
+				"name": "is_sphere_in_frustum"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonrenderer",
+				"name": "isSphereInFrustum"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonrenderer",
 				"name": "extract_frustum_planes"
 			},
 			"vanilla.js": {
@@ -23785,6 +23817,18 @@
 				"module": "graphics3d/toon/toondrawqueue",
 				"class": "ToonDrawQueue",
 				"name": "addMeshInstanced"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toondrawqueue",
+				"class": "ToonDrawQueue",
+				"name": "add_mesh_instance_buffer"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toondrawqueue",
+				"class": "ToonDrawQueue",
+				"name": "addMeshInstanceBuffer"
 			}
 		},
 		{
@@ -24295,6 +24339,18 @@
 				"module": "graphics3d/toon/toonscreenoutline",
 				"class": "ToonScreenOutline",
 				"name": "drawMeshInstanced"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "draw_mesh_instance_buffer"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonscreenoutline",
+				"class": "ToonScreenOutline",
+				"name": "drawMeshInstanceBuffer"
 			}
 		},
 		{
@@ -25543,6 +25599,18 @@
 			"vanilla-engine": {
 				"module": "graphics3d/toon/toonmaterial",
 				"class": "ToonInstanceLayout",
+				"name": "has_line_id"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonmaterial",
+				"class": "ToonInstanceLayout",
+				"name": "hasLineId"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonmaterial",
+				"class": "ToonInstanceLayout",
 				"name": "read_declaration_source"
 			},
 			"vanilla.js": {
@@ -25619,6 +25687,26 @@
 			"vanilla.js": {
 				"module": "graphics3d/toon/toonmaterial",
 				"name": "TOON_INSTANCE_TINT_NAME"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonmaterial",
+				"name": "TOON_INSTANCE_LINE_ID_NAME"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonmaterial",
+				"name": "TOON_INSTANCE_LINE_ID_NAME"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/toon/toonmaterial",
+				"name": "TOON_INSTANCE_LINE_ID_LOCATION"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/toon/toonmaterial",
+				"name": "TOON_INSTANCE_LINE_ID_LOCATION"
 			}
 		},
 		{

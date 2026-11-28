@@ -66540,8 +66540,68 @@
 						},
 						{
 							"kind": "method",
+							"name": "setAsyncProgramBuild",
+							"signature": "setAsyncProgramBuild(isAsync)",
+							"params": [
+								{
+									"name": "isAsync",
+									"type": "boolean",
+									"description": {
+										"ko": "true 면 장면 중간에 처음 보는 몸 변형을 그 자리에서 짓지 않고, 다 지어질 때까지 전부 켠 기본 몸(같은 화면)으로 그린다. false 면 그 자리에서 짓고 기다린다.",
+										"en": "If true, a body variant first seen mid-scene is not built on the spot; it is drawn with the default body with every feature on (same picture) until it finishes building. If false, it is built on the spot and waited for."
+									}
+								}
+							],
+							"description": {
+								"ko": "처음 보는 몸 변형을 맡기고 기본 몸으로 그릴지. (기본 true, KHR_parallel_shader_compile 이 없으면 이 값과 상관없이 그 자리에서 짓는다)",
+								"en": "Whether to hand off a body variant first seen and draw with the default body meanwhile. (Default true; without KHR_parallel_shader_compile it is built on the spot regardless of this value)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonrenderer.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "",
+										"en": ""
+									},
+									"code": "import { ToonRenderer } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nrenderer.setAsyncProgramBuild(false);\nif (renderer.isAsyncProgramBuild() !== false) {\n\tthrow new Error(\"async program build must be off\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isAsyncProgramBuild",
+							"signature": "isAsyncProgramBuild()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "처음 보는 몸 변형을 맡기고 기본 몸으로 그리면 true.",
+									"en": "True if a body variant first seen is handed off and the default body is drawn meanwhile."
+								}
+							},
+							"description": {
+								"ko": "처음 보는 몸 변형을 맡기고 기본 몸으로 그리는지 읽기.",
+								"en": "Reads whether a body variant first seen is handed off and the default body is drawn meanwhile."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/toon/toonrenderer.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "",
+										"en": ""
+									},
+									"code": "import { ToonRenderer } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nif (typeof renderer.isAsyncProgramBuild() !== \"boolean\") {\n\tthrow new Error(\"not boolean\");\n}",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "prewarmDrawQueue",
-							"signature": "prewarmDrawQueue(queue)",
+							"signature": "prewarmDrawQueue(queue, options = {})",
 							"params": [
 								{
 									"name": "queue",
@@ -66549,6 +66609,14 @@
 									"description": {
 										"ko": "변형을 읽을 그리기 줄. (담은 것만 읽고 그리지 않는다)",
 										"en": "Draw queue to read the variants from. (Only reads what was added; does not draw)"
+									}
+								},
+								{
+									"name": "options",
+									"type": "object",
+									"description": {
+										"ko": "게임이 장면 중간에 쓸 조합 목록. (유니티 ShaderVariantCollection 처럼, 기본은 빈 객체)",
+										"en": "List of combinations the game will use mid-scene. (Like Unity ShaderVariantCollection; default is an empty object)"
 									}
 								}
 							],
@@ -66572,6 +66640,14 @@
 										"en": "Prewarming variants after adding the scene and before the first frame"
 									},
 									"code": "import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 16, 10), Matrix4.createIdentity(), \"#f0e8e0\");\nconst mesh = renderer.createMesh(builder.readArrays());\nconst queue = new ToonDrawQueue();\nqueue.addMesh(mesh, Matrix4.createIdentity(), { castsShadow: false });\nconst prewarm = renderer.prewarmDrawQueue(queue);\nprewarm.wait().then(() => {\n\tif (!prewarm.isReady()) {\n\t\tthrow new Error(\"prewarm is not ready\");\n\t}\n});",
+									"language": "javascript"
+								},
+								{
+									"title": {
+										"ko": "장면 중간에 켜질 림 라이트 조합까지 미리 짓기",
+										"en": "Prewarming up to the rim light combinations that turn on mid-scene"
+									},
+									"code": "import { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } from \"./vanilla.js\";\nconst renderer = new ToonRenderer(document.createElement(\"canvas\").getContext(\"webgl2\"));\nconst builder = new MeshBuilder();\nbuilder.addPart(createSphereGeometry(0.5, 16, 10), Matrix4.createIdentity(), \"#f0e8e0\");\nconst mesh = renderer.createMesh(builder.readArrays());\nconst queue = new ToonDrawQueue();\nqueue.addMesh(mesh, Matrix4.createIdentity(), { castsShadow: false });\nconst prewarm = renderer.prewarmDrawQueue(queue, { lightFeatureList: [[\"rim\"], [\"rim\", \"shadeRim\"]] });\nprewarm.wait().then(() => {\n\tif (!prewarm.isReady()) {\n\t\tthrow new Error(\"prewarm is not ready\");\n\t}\n});",
 									"language": "javascript"
 								}
 							]
@@ -66828,6 +66904,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonrenderer.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonrenderer",
+								"class": "ToonRenderer",
+								"name": "update_instance_buffer_range"
+							},
 							"examples": [
 								{
 									"title": {
@@ -69770,6 +69852,11 @@
 					},
 					"since": "0.4.0",
 					"source": "src/graphics3d/toon/toonrenderer.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/toon/toonrenderer",
+						"name": "read_instance_buffer_sphere"
+					},
 					"examples": [
 						{
 							"title": {
@@ -69870,6 +69957,11 @@
 					},
 					"since": "0.4.0",
 					"source": "src/graphics3d/toon/toonrenderer.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/toon/toonrenderer",
+						"name": "is_sphere_in_frustum"
+					},
 					"examples": [
 						{
 							"title": {
@@ -101696,6 +101788,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toondrawqueue.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toondrawqueue",
+								"class": "ToonDrawQueue",
+								"name": "add_mesh_instance_buffer"
+							},
 							"examples": [
 								{
 									"title": {
@@ -105665,6 +105763,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonscreenoutline.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonscreenoutline",
+								"class": "ToonScreenOutline",
+								"name": "draw_mesh_instance_buffer"
+							},
 							"examples": [
 								{
 									"title": {
@@ -114450,6 +114554,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/graphics3d/toon/toonmaterial.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/toon/toonmaterial",
+								"class": "ToonInstanceLayout",
+								"name": "has_line_id"
+							},
 							"examples": [
 								{
 									"title": {
@@ -114603,7 +114713,12 @@
 						"en": "The name the screen-space outline reads from an instance layout as the per-instance line ID. (1 value, 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID)"
 					},
 					"since": "0.4.0",
-					"source": "src/graphics3d/toon/toonmaterial.js"
+					"source": "src/graphics3d/toon/toonmaterial.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/toon/toonmaterial",
+						"name": "TOON_INSTANCE_LINE_ID_NAME"
+					}
 				},
 				{
 					"kind": "field",
@@ -114615,7 +114730,12 @@
 						"en": "Location of the line ID attribute. (The last user attribute location, the line target shader reads from this location)"
 					},
 					"since": "0.4.0",
-					"source": "src/graphics3d/toon/toonmaterial.js"
+					"source": "src/graphics3d/toon/toonmaterial.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/toon/toonmaterial",
+						"name": "TOON_INSTANCE_LINE_ID_LOCATION"
+					}
 				}
 			],
 			"enums": [
