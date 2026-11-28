@@ -69109,7 +69109,7 @@
 				{
 					"kind": "method",
 					"name": "composeToonProgramSources",
-					"signature": "composeToonProgramSources(material, instanceLayout, isAmbientOcclusion = false, colorSpace = readEngineColorSpace())",
+					"signature": "composeToonProgramSources(material, instanceLayout, isAmbientOcclusion = false, colorSpace = readEngineColorSpace(), disabledFeatures = [])",
 					"params": [
 						{
 							"name": "material",
@@ -69141,6 +69141,14 @@
 							"description": {
 								"ko": "색 공간. (ColorSpace, 기본은 엔진의 색 공간, linear 면 소스마다 #define VANILLA_COLOR_SPACE_LINEAR 1 이 들어간다)",
 								"en": "Color space. (ColorSpace, default is the engine's color space, in linear every source gets #define VANILLA_COLOR_SPACE_LINEAR 1)"
+							}
+						},
+						{
+							"name": "disabledFeatures",
+							"type": "Array<string>",
+							"description": {
+								"ko": "몸 조각 셰이더에서 컴파일 때 지울 기능 갈래. (baseTexture, emissiveTexture, decalTexture, matcap, angelRing, rampTexture, shadeStops, rim, shadeRim, shadow, intensityLimit 가운데, 기본은 없음, 지운 갈래를 그리기 때 켜면 그 갈래는 그려지지 않는다. 렌더러는 그리기가 쓰지 않는 갈래를 스스로 알아 넘긴다)",
+								"en": "Feature branches to remove from the body fragment shader at compile time. (Any of baseTexture, emissiveTexture, decalTexture, matcap, angelRing, rampTexture, shadeStops, rim, shadeRim, shadow, intensityLimit, default none; a removed branch is not drawn if a draw turns it on. The renderer finds the branches a draw does not use and passes them itself)"
 							}
 						}
 					],

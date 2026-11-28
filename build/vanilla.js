@@ -32377,10 +32377,81 @@ void main() {
 	gl_Position = viewProjectionMatrix * position;
 }
 `;
+var SOLID_FEATURE_CHUNK = `#ifdef TOON_NO_BASE_TEXTURE
+#define TOON_USES_BASE_TEXTURE false
+#else
+#define TOON_USES_BASE_TEXTURE (textureEnabled.x > 0.5)
+#endif
+#ifdef TOON_NO_EMISSIVE_TEXTURE
+#define TOON_USES_EMISSIVE_TEXTURE false
+#else
+#define TOON_USES_EMISSIVE_TEXTURE (textureEnabled.y > 0.5)
+#endif
+#ifdef TOON_NO_DECAL_TEXTURE
+#define TOON_USES_DECAL_TEXTURE false
+#else
+#define TOON_USES_DECAL_TEXTURE (textureEnabled.z > 0.5)
+#endif
+#ifdef TOON_NO_MATCAP
+#define TOON_USES_MATCAP false
+#else
+#define TOON_USES_MATCAP (matcapSettings.x > 0.5)
+#endif
+#ifdef TOON_NO_ANGEL_RING
+#define TOON_USES_ANGEL_RING false
+#else
+#define TOON_USES_ANGEL_RING (angelRingSettings.x > 0.5)
+#endif
+#ifdef TOON_NO_RAMP_TEXTURE
+#define TOON_USES_RAMP_TEXTURE false
+#else
+#define TOON_USES_RAMP_TEXTURE (rampTextureEnabled > 0.5)
+#endif
+#ifdef TOON_NO_SHADE_STOPS
+#define TOON_USES_SHADE_STOPS false
+#else
+#define TOON_USES_SHADE_STOPS (shadeStopCount >= 2)
+#endif
+#ifdef TOON_NO_SHADOW
+#define TOON_USES_SHADOW false
+#else
+#define TOON_USES_SHADOW (receivesShadow > 0.5)
+#endif
+#ifdef TOON_NO_INTENSITY_LIMIT
+#define TOON_USES_INTENSITY_LIMIT false
+#else
+#define TOON_USES_INTENSITY_LIMIT (lightIntensityLimit > 0.5)
+#endif
+#ifdef TOON_NO_RIM
+#define TOON_USES_RIM false
+#else
+#define TOON_USES_RIM (rimLight.a > 0.0)
+#endif
+#ifdef TOON_NO_SHADE_RIM
+#define TOON_USES_SHADE_RIM false
+#else
+#define TOON_USES_SHADE_RIM (shadeRimLight.a > 0.0)
+#endif
+`;
+var TOON_FEATURE_DEFINE_LIST = ["baseTexture", "emissiveTexture", "decalTexture", "matcap", "angelRing", "rampTexture", "shadeStops", "rim", "shadeRim", "shadow", "intensityLimit"];
+var TOON_FEATURE_DEFINE_TABLE = { baseTexture: "TOON_NO_BASE_TEXTURE", emissiveTexture: "TOON_NO_EMISSIVE_TEXTURE", decalTexture: "TOON_NO_DECAL_TEXTURE", matcap: "TOON_NO_MATCAP", angelRing: "TOON_NO_ANGEL_RING", rampTexture: "TOON_NO_RAMP_TEXTURE", shadeStops: "TOON_NO_SHADE_STOPS", rim: "TOON_NO_RIM", shadeRim: "TOON_NO_SHADE_RIM", shadow: "TOON_NO_SHADOW", intensityLimit: "TOON_NO_INTENSITY_LIMIT" };
+var TOON_FEATURE_BASE_TEXTURE = 1;
+var TOON_FEATURE_EMISSIVE_TEXTURE = 2;
+var TOON_FEATURE_DECAL_TEXTURE = 4;
+var TOON_FEATURE_MATCAP = 8;
+var TOON_FEATURE_ANGEL_RING = 16;
+var TOON_FEATURE_RAMP_TEXTURE = 32;
+var TOON_FEATURE_SHADE_STOPS = 64;
+var TOON_FEATURE_RIM = 128;
+var TOON_FEATURE_SHADE_RIM = 256;
+var TOON_FEATURE_SHADOW = 512;
+var TOON_FEATURE_INTENSITY_LIMIT = 1024;
+var TOON_FEATURE_ALL = 2047;
+var TOON_FEATURE_DRAW_BITS = TOON_FEATURE_BASE_TEXTURE | TOON_FEATURE_EMISSIVE_TEXTURE | TOON_FEATURE_DECAL_TEXTURE | TOON_FEATURE_MATCAP | TOON_FEATURE_ANGEL_RING | TOON_FEATURE_SHADOW;
 var SOLID_FRAGMENT_HEAD = `#version 300 es
 precision highp float;
 precision highp sampler2DShadow;
-${FRAME_BLOCK_CHUNK}in vec3 worldPosition;
+${SOLID_FEATURE_CHUNK}${FRAME_BLOCK_CHUNK}in vec3 worldPosition;
 in vec3 localPosition;
 in vec3 worldNormal;
 in vec3 surfaceColor;
@@ -32513,11 +32584,11 @@ float readLightIntensity(vec3 color) {
 }
 vec3 readLimitedDirectionalColor(vec3 color) {
 	float energyScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
-	return lightIntensityLimit > 0.5 ? clamp(color * energyScale, 0.0, 1.0) / energyScale : color;
+	return TOON_USES_INTENSITY_LIMIT ? clamp(color * energyScale, 0.0, 1.0) / energyScale : color;
 }
 vec3 readLimitedLocalColor(vec3 color) {
 	float energyScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
-	return lightIntensityLimit > 0.5 ? color * min(1.0, 1.0 / max(0.001, readLightIntensity(color * energyScale))) : color;
+	return TOON_USES_INTENSITY_LIMIT ? color * min(1.0, 1.0 / max(0.001, readLightIntensity(color * energyScale))) : color;
 }
 float readShadow() {
 	if (shadowEnabled < 0.5) {
@@ -32600,14 +32671,14 @@ float readToonCoordinate(float cosine, float offset) {
 	return (shadeHalfLambert > 0.5 ? cosine * 0.5 + 0.5 : max(cosine, 0.0)) + offset;
 }
 vec3 readShadeRamp(float coordinate) {
-	if (rampTextureEnabled > 0.5) {
+	if (TOON_USES_RAMP_TEXTURE) {
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		return textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb;
 #else
 		return toLinear(textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb);
 #endif
 	}
-	if (shadeStopCount < 2) {
+	if (!TOON_USES_SHADE_STOPS) {
 		return vec3(clamp(coordinate, 0.0, 1.0));
 	}
 	float edgeWidth = max(fwidth(coordinate), 0.0001);
@@ -32622,14 +32693,14 @@ vec3 readShadeRamp(float coordinate) {
 	return color;
 }
 vec3 readShadeRampWithWidth(float coordinate, float edgeWidth) {
-	if (rampTextureEnabled > 0.5) {
+	if (TOON_USES_RAMP_TEXTURE) {
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		return textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb;
 #else
 		return toLinear(textureLod(rampTexture, vec2(clamp(coordinate, 0.0, 1.0), 0.5), 0.0).rgb);
 #endif
 	}
-	if (shadeStopCount < 2) {
+	if (!TOON_USES_SHADE_STOPS) {
 		return vec3(clamp(coordinate, 0.0, 1.0));
 	}
 	vec3 color = shadeStopColors[0];
@@ -32645,7 +32716,7 @@ vec3 readShadeRampWithWidth(float coordinate, float edgeWidth) {
 float readShadeLevel(vec3 rampColor, float cosine) {
 	float bottom;
 	float top;
-	if (rampTextureEnabled > 0.5) {
+	if (TOON_USES_RAMP_TEXTURE) {
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		bottom = readLuminance(textureLod(rampTexture, vec2(0.0, 0.5), 0.0).rgb);
 		top = readLuminance(textureLod(rampTexture, vec2(1.0, 0.5), 0.0).rgb);
@@ -32654,7 +32725,7 @@ float readShadeLevel(vec3 rampColor, float cosine) {
 		top = readLuminance(toLinear(textureLod(rampTexture, vec2(1.0, 0.5), 0.0).rgb));
 #endif
 	}
-	else if (shadeStopCount < 2) {
+	else if (!TOON_USES_SHADE_STOPS) {
 		return clamp(cosine, 0.0, 1.0);
 	}
 	else {
@@ -32706,27 +32777,27 @@ var SOLID_FRAGMENT_BODY = `ToonSurface readSurface() {
 #endif
 	float opacity = alpha * tintColor.a * surfaceTint.a;
 	vec2 uv = surfaceUv * uvTransform.zw + uvTransform.xy;
-	if (textureEnabled.x > 0.5) {
+	if (TOON_USES_BASE_TEXTURE) {
 		vec4 texel = texture(baseColorTexture, uv);
 		color *= texel.rgb;
 		opacity *= texel.a;
 	}
 	vec3 emission = toLinear(emissiveColor.rgb) * emissiveColor.a;
 #ifdef VANILLA_COLOR_SPACE_LINEAR
-	if (textureEnabled.y > 0.5) {
+	if (TOON_USES_EMISSIVE_TEXTURE) {
 		emission *= texture(emissiveTexture, uv).rgb;
 	}
-	if (textureEnabled.z > 0.5) {
+	if (TOON_USES_DECAL_TEXTURE) {
 		vec4 decal = texture(decalTexture, surfaceUv * decalUvTransform.zw + decalUvTransform.xy);
 		vec3 decalTint = decal.rgb * toLinear(decalColor.rgb);
 		color = mix(color, decalTint, decal.a);
 		emission += decalTint * decal.a * decalColor.a;
 	}
 #else
-	if (textureEnabled.y > 0.5) {
+	if (TOON_USES_EMISSIVE_TEXTURE) {
 		emission *= toLinear(texture(emissiveTexture, uv).rgb);
 	}
-	if (textureEnabled.z > 0.5) {
+	if (TOON_USES_DECAL_TEXTURE) {
 		vec4 decal = texture(decalTexture, surfaceUv * decalUvTransform.zw + decalUvTransform.xy);
 		vec3 decalTint = decal.rgb * decalColor.rgb;
 		color = mix(color, decalTint, decal.a);
@@ -32754,7 +32825,7 @@ ToonLighting readLighting(ToonSurface surface) {
 	ToonLighting lighting;
 	vec3 normal = surface.normal;
 	vec3 viewDirection = surface.viewDirection;
-	float shadow = receivesShadow > 0.5 ? readShadow() : 1.0;
+	float shadow = TOON_USES_SHADOW ? readShadow() : 1.0;
 	float specularNormalization = energyNormalized > 0.5 ? (specularLight.y + 8.0) * RECIPROCAL_PI / 8.0 : 1.0;
 	bool hasSpecular = specularLight.x > 0.0;
 	vec3 specularSum = vec3(0.0);
@@ -32793,7 +32864,7 @@ ToonLighting readLighting(ToonSurface surface) {
 		vec3 shape = pointLightShapes[index];
 		float lightShadow = 1.0;
 		int shadowSlot = int(pointLightShadowSlots[index] + 0.5) - 1;
-		if (shadowSlot >= 0 && receivesShadow > 0.5) {
+		if (shadowSlot >= 0 && TOON_USES_SHADOW) {
 			lightShadow = readLocalShadow(shadowSlot, surface.worldPosition, normal);
 		}
 		float cosine = (dot(normal, lightDirection) + shape.z) / (1.0 + shape.z);
@@ -32832,13 +32903,13 @@ ToonLighting readLighting(ToonSurface surface) {
 	lighting.irradiance = irradiance;
 	lighting.specular = hasSpecular ? specularSum * specularColor * specularLight.x * specularNormalization : vec3(0.0);
 	lighting.rim = vec3(0.0);
-	if (rimLight.a > 0.0) {
+	if (TOON_USES_RIM) {
 		float rimTerm = pow(1.0 - clamp(dot(normal, viewDirection), 0.0, 1.0), rimLight.a);
 		float edgeWidth = max(fwidth(rimTerm), 0.0001);
 		float rim = mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, rimTerm), rimTerm, rimShape.x);
 		lighting.rim = rimLight.rgb * mix(vec3(1.0), sunLightColor, lightColorUsage.w) * rim * mix(1.0, sunLevel, rimShape.y);
 	}
-	if (shadeRimLight.a > 0.0) {
+	if (TOON_USES_SHADE_RIM) {
 		float shadeRimTerm = pow(1.0 - clamp(dot(normal, viewDirection), 0.0, 1.0), shadeRimLight.a);
 		float edgeWidth = max(fwidth(shadeRimTerm), 0.0001);
 		float shadeRim = mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, shadeRimTerm), shadeRimTerm, rimShape.x);
@@ -32872,9 +32943,10 @@ void main() {
 		float diffuseScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
 		color = albedo * lighting.irradiance * diffuseScale + lighting.specular * surface.specularMask + lighting.rim * surface.rimMask + emission;
 	}
-	vec3 viewNormal = normalize(viewRotation * surface.normal);
-	vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
-	if (matcapSettings.x > 0.5) {
+	// \uBCF4\uAE30 \uB178\uBA40\uACFC \uD574 \uBE5B\uC0C9\uC740 \uB9E4\uCEA1\uACFC \uCC9C\uC0AC \uACE0\uB9AC\uAC00 \uCF1C\uC9C4 \uB54C\uB9CC \uC4F0\uB2C8 \uADF8 \uAC08\uB798 \uC548\uC5D0\uC11C \uC148\uD55C\uB2E4. (\uB044\uBA74 \uBAA8\uB4E0 \uD654\uC18C\uAC00 \uC148\uD558\uB358 \uB178\uBA40 \uC815\uADDC\uD654\uC640 \uBE5B \uC81C\uD55C\uC744 \uAC74\uB108\uB700, \uAC12\uC740 \uAC19\uB2E4)
+	if (TOON_USES_MATCAP) {
+		vec3 viewNormal = normalize(viewRotation * surface.normal);
+		vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
 #ifdef VANILLA_COLOR_SPACE_LINEAR
 		vec3 matcap = texture(matcapTexture, vec2(viewNormal.x * 0.5 + 0.5, 0.5 - viewNormal.y * 0.5)).rgb * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.y);
 #else
@@ -32882,7 +32954,9 @@ void main() {
 #endif
 		color = matcapSettings.z > 0.5 ? color + matcap * matcapSettings.y : color * mix(vec3(1.0), matcap, matcapSettings.y);
 	}
-	if (angelRingSettings.x > 0.5) {
+	if (TOON_USES_ANGEL_RING) {
+		vec3 viewNormal = normalize(viewRotation * surface.normal);
+		vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
 		vec2 ringOffset = mix(viewNormal, vec3(0.0, 0.0, 1.0), angelRingSettings.y).xy * 0.5;
 		vec2 ringNormal = vec2(ringOffset.x * cameraRoll.x + ringOffset.y * cameraRoll.y, ringOffset.y * cameraRoll.x - ringOffset.x * cameraRoll.y) + 0.5;
 		vec2 ringUv = vec2(ringNormal.x, 1.0 - mix(1.0 - surface.uv1.y, ringNormal.y, angelRingSettings.z));
@@ -32975,7 +33049,19 @@ precision highp float;
 void main() {
 }
 `;
-function composeToonProgramSources(material, instanceLayout, isAmbientOcclusion = false, colorSpace = readEngineColorSpace()) {
+function composeToonProgramSources(material, instanceLayout, isAmbientOcclusion = false, colorSpace = readEngineColorSpace(), disabledFeatures = []) {
+  const featureList = disabledFeatures;
+  let fragmentDefines = isAmbientOcclusion ? "#define TOON_AMBIENT_OCCLUSION\n" : "";
+  for (const feature of featureList) {
+    const defineName = TOON_FEATURE_DEFINE_TABLE[feature];
+    if (defineName === void 0) {
+      throw new System82.Error(`unknown toon shader feature: ${feature}`);
+    }
+    fragmentDefines += `#define ${defineName}
+`;
+  }
+  const fragmentHead = fragmentDefines !== "" ? SOLID_FRAGMENT_HEAD.replace("#version 300 es\n", `#version 300 es
+${fragmentDefines}`) : SOLID_FRAGMENT_HEAD;
   const vertexChunk = material !== null && material.getVertexChunk() !== "" ? material.getVertexChunk() : DEFAULT_VERTEX_CHUNK;
   const uniformChunk = material !== null ? material.getUniformChunk() : "";
   const surfaceChunk = material !== null && material.getSurfaceChunk() !== "" ? material.getSurfaceChunk() : DEFAULT_SURFACE_CHUNK;
@@ -32990,7 +33076,7 @@ function composeToonProgramSources(material, instanceLayout, isAmbientOcclusion 
       }
     }
   }
-  return { solidVertexShader: addColorSpaceDefine(vertexHead + SOLID_VERTEX_BODY, colorSpace), solidFragmentShader: addColorSpaceDefine((isAmbientOcclusion ? SOLID_FRAGMENT_HEAD.replace("#version 300 es\n", "#version 300 es\n#define TOON_AMBIENT_OCCLUSION\n") : SOLID_FRAGMENT_HEAD) + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY, colorSpace), outlineVertexShader: addColorSpaceDefine(vertexHead + OUTLINE_VERTEX_BODY, colorSpace), outlineFragmentShader: addColorSpaceDefine(OUTLINE_FRAGMENT_SHADER, colorSpace), depthVertexShader: addColorSpaceDefine(vertexHead + DEPTH_VERTEX_BODY, colorSpace), depthFragmentShader: addColorSpaceDefine(DEPTH_FRAGMENT_SHADER, colorSpace), attributeLocationTable };
+  return { solidVertexShader: addColorSpaceDefine(vertexHead + SOLID_VERTEX_BODY, colorSpace), solidFragmentShader: addColorSpaceDefine(fragmentHead + uniformChunk + surfaceChunk + lightChunk + SOLID_FRAGMENT_BODY, colorSpace), outlineVertexShader: addColorSpaceDefine(vertexHead + OUTLINE_VERTEX_BODY, colorSpace), outlineFragmentShader: addColorSpaceDefine(OUTLINE_FRAGMENT_SHADER, colorSpace), depthVertexShader: addColorSpaceDefine(vertexHead + DEPTH_VERTEX_BODY, colorSpace), depthFragmentShader: addColorSpaceDefine(DEPTH_FRAGMENT_SHADER, colorSpace), attributeLocationTable };
 }
 __name(composeToonProgramSources, "composeToonProgramSources");
 function extractFrustumPlanes(matrix) {
@@ -33473,7 +33559,8 @@ var DRAW_STATE_CASTS_SHADOW = 25;
 var DRAW_STATE_LINE_ID = 26;
 var DRAW_STATE_GROUP = 27;
 var DRAW_STATE_IS_DEPTH_PREPASSED = 28;
-var DRAW_STATE_COUNT = 29;
+var DRAW_STATE_FEATURE_BITS = 29;
+var DRAW_STATE_COUNT = 30;
 function isSameBatchState(state, other) {
   if (state === other) {
     return state[DRAW_STATE_JOINT_MATRICES] === null && state[DRAW_STATE_ON_BEFORE_DRAW] === null && !state[DRAW_STATE_IS_TRANSPARENT];
@@ -33537,6 +33624,7 @@ function writeDrawState(state, options) {
   state[DRAW_STATE_LINE_ID] = typeof lineId === "number" ? lineId : null;
   state[DRAW_STATE_GROUP] = group !== void 0 && group !== null ? group : null;
   state[DRAW_STATE_IS_DEPTH_PREPASSED] = options.isDepthPrepassed === true;
+  state[DRAW_STATE_FEATURE_BITS] = (state[DRAW_STATE_BASE_COLOR_TEXTURE] !== null ? TOON_FEATURE_BASE_TEXTURE : 0) | (state[DRAW_STATE_EMISSIVE_TEXTURE] !== null ? TOON_FEATURE_EMISSIVE_TEXTURE : 0) | (state[DRAW_STATE_DECAL_TEXTURE] !== null ? TOON_FEATURE_DECAL_TEXTURE : 0) | (state[DRAW_STATE_MATCAP_TEXTURE] !== null ? TOON_FEATURE_MATCAP : 0) | (state[DRAW_STATE_ANGEL_RING_TEXTURE] !== null ? TOON_FEATURE_ANGEL_RING : 0) | (options.receivesShadow !== false ? TOON_FEATURE_SHADOW : 0);
 }
 __name(writeDrawState, "writeDrawState");
 function isNumberArray(value) {
@@ -33611,6 +33699,9 @@ var ToonRenderer = class {
   #lightSet;
   #outlineColor;
   #isHdrOutput;
+  #featureLightSet = null;
+  #featureLightVersion = -1;
+  #featureLightMask = 0;
   #shadowInput;
   #ambientOcclusionInput;
   #isShadowPass;
@@ -33723,6 +33814,31 @@ var ToonRenderer = class {
     const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, colorSpace);
     return [{ vertexShader: sources.solidVertexShader, fragmentShader: sources.solidFragmentShader, attributeLocationTable: sources.attributeLocationTable }, { vertexShader: sources.outlineVertexShader, fragmentShader: sources.outlineFragmentShader, attributeLocationTable: sources.attributeLocationTable }, { vertexShader: sources.depthVertexShader, fragmentShader: sources.depthFragmentShader, attributeLocationTable: sources.attributeLocationTable }];
   }
+  prepareSolidProgram(solidProgram, isAmbientOcclusion) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const previousProgram = webGL2RenderingContext.getParameter(webGL2RenderingContext.CURRENT_PROGRAM);
+    solidProgram.useProgram();
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("shadowTexture"), SHADOW_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("baseColorTexture"), BASE_COLOR_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("emissiveTexture"), EMISSIVE_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("decalTexture"), DECAL_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("rampTexture"), RAMP_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("matcapTexture"), MATCAP_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("localShadowTexture"), LOCAL_SHADOW_TEXTURE_UNIT);
+    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("angelRingTexture"), ANGEL_RING_TEXTURE_UNIT);
+    if (isAmbientOcclusion) {
+      webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("ambientOcclusionTexture"), AMBIENT_OCCLUSION_TEXTURE_UNIT);
+    }
+    const blockIndex = webGL2RenderingContext.getUniformBlockIndex(solidProgram.getProgram(), MATERIAL_BLOCK_NAME);
+    if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
+      webGL2RenderingContext.uniformBlockBinding(solidProgram.getProgram(), blockIndex, MATERIAL_BLOCK_BINDING);
+    }
+    const frameBlockIndex = webGL2RenderingContext.getUniformBlockIndex(solidProgram.getProgram(), FRAME_BLOCK_NAME);
+    if (frameBlockIndex !== webGL2RenderingContext.INVALID_INDEX) {
+      webGL2RenderingContext.uniformBlockBinding(solidProgram.getProgram(), frameBlockIndex, FRAME_BLOCK_BINDING);
+    }
+    webGL2RenderingContext.useProgram(previousProgram);
+  }
   createProgramSet(material, instanceLayout, baseProgramSet = null) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const sources = composeToonProgramSources(material, instanceLayout, baseProgramSet !== null, this.#colorSpace);
@@ -33741,25 +33857,13 @@ var ToonRenderer = class {
     }
     const solidProgram = programList[0];
     const previousProgram = webGL2RenderingContext.getParameter(webGL2RenderingContext.CURRENT_PROGRAM);
-    solidProgram.useProgram();
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("shadowTexture"), SHADOW_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("baseColorTexture"), BASE_COLOR_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("emissiveTexture"), EMISSIVE_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("decalTexture"), DECAL_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("rampTexture"), RAMP_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("matcapTexture"), MATCAP_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("localShadowTexture"), LOCAL_SHADOW_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("angelRingTexture"), ANGEL_RING_TEXTURE_UNIT);
-    if (baseProgramSet !== null) {
-      webGL2RenderingContext.uniform1i(solidProgram.getUniformLocation("ambientOcclusionTexture"), AMBIENT_OCCLUSION_TEXTURE_UNIT);
-    }
+    this.prepareSolidProgram(solidProgram, baseProgramSet !== null);
     const bindBlock = __name((shaderProgram, blockName, binding) => {
       const blockIndex = webGL2RenderingContext.getUniformBlockIndex(shaderProgram.getProgram(), blockName);
       if (blockIndex !== webGL2RenderingContext.INVALID_INDEX) {
         webGL2RenderingContext.uniformBlockBinding(shaderProgram.getProgram(), blockIndex, binding);
       }
     }, "bindBlock");
-    bindBlock(solidProgram, MATERIAL_BLOCK_NAME, MATERIAL_BLOCK_BINDING);
     for (const shaderProgram of programList) {
       bindBlock(shaderProgram, FRAME_BLOCK_NAME, FRAME_BLOCK_BINDING);
     }
@@ -33835,11 +33939,64 @@ var ToonRenderer = class {
       this.#programSets.delete(key);
     }
   }
+  readFeatureMask(state, lightSet) {
+    let lightMask = 0;
+    if (this.#featureLightSet === lightSet && this.#featureLightVersion === lightSet.getVersion()) {
+      lightMask = this.#featureLightMask;
+    } else {
+      lightMask = (lightSet.getRampTexture() !== null ? TOON_FEATURE_RAMP_TEXTURE : 0) | (lightSet.getShadeRamp().positions.length >= 2 ? TOON_FEATURE_SHADE_STOPS : 0) | (lightSet.getRimLight().power > 0 ? TOON_FEATURE_RIM : 0) | (lightSet.getShadeRimLight().power > 0 ? TOON_FEATURE_SHADE_RIM : 0) | (lightSet.isLightIntensityLimited() ? TOON_FEATURE_INTENSITY_LIMIT : 0);
+      this.#featureLightSet = lightSet;
+      this.#featureLightVersion = lightSet.getVersion();
+      this.#featureLightMask = lightMask;
+    }
+    return state[DRAW_STATE_FEATURE_BITS] | lightMask;
+  }
+  readSolidVariant(programSet, material, instanceLayout, featureMask) {
+    if (featureMask === TOON_FEATURE_ALL || programSet.isShared === true) {
+      return programSet.solid;
+    }
+    let variants = programSet.variants;
+    if (variants === void 0) {
+      variants = new System82.Map();
+      programSet.variants = variants;
+    }
+    let entry = variants.get(featureMask);
+    if (entry !== void 0) {
+      return entry;
+    }
+    entry = programSet.solid;
+    try {
+      const disabledFeatures = [];
+      for (let index = 0; index < TOON_FEATURE_DEFINE_LIST.length; ++index) {
+        if ((featureMask & 1 << index) === 0) {
+          disabledFeatures.push(TOON_FEATURE_DEFINE_LIST[index]);
+        }
+      }
+      const isAmbientOcclusion = programSet.isAmbientOcclusion === true;
+      const sources = composeToonProgramSources(material, instanceLayout, isAmbientOcclusion, this.#colorSpace, disabledFeatures);
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      const solidProgram = new ShaderProgram(webGL2RenderingContext, sources.solidVertexShader, sources.solidFragmentShader, sources.attributeLocationTable);
+      this.prepareSolidProgram(solidProgram, isAmbientOcclusion);
+      entry = { program: solidProgram, kind: ToonProgramKind.solid, lightSet: null, lightVersion: -1 };
+    } catch (error) {
+      System82.console.error(`ToonRenderer: \uAE30\uB2A5 \uAC08\uB798 ${featureMask} \uC758 \uBAB8 \uC170\uC774\uB354\uB97C \uC9D3\uC9C0 \uBABB\uD574 \uAE30\uBCF8 \uBAB8 \uC170\uC774\uB354\uB85C \uADF8\uB9BD\uB2C8\uB2E4.`, error);
+    }
+    variants.set(featureMask, entry);
+    return entry;
+  }
   deleteProgramSet(programSet) {
     if (programSet === null) {
       return;
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    if (programSet.variants !== void 0) {
+      for (const entry of programSet.variants.values()) {
+        if (entry !== programSet.solid) {
+          webGL2RenderingContext.deleteProgram(entry.program.getProgram());
+        }
+      }
+      programSet.variants.clear();
+    }
     if (programSet.isAmbientOcclusion === true) {
       if (programSet.isShared !== true) {
         webGL2RenderingContext.deleteProgram(programSet.solid.program.getProgram());
@@ -35210,11 +35367,11 @@ var ToonRenderer = class {
       this.applyFrontFace(webGL2RenderingContext.CCW);
       return;
     }
-    const solidEntry = programSet.solid;
+    const lightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
+    const solidEntry = this.readSolidVariant(programSet, material, instanceLayout, this.readFeatureMask(state, lightSet));
     const solidProgram = solidEntry.program;
     solidProgram.useProgram();
     this.uploadFrameUniforms(solidEntry);
-    const lightSet = state[DRAW_STATE_LIGHT_SET] !== null ? state[DRAW_STATE_LIGHT_SET] : this.#lightSet;
     this.uploadLightUniforms(solidEntry, lightSet);
     this.uploadDrawUniforms(solidProgram, modelElements, isSkinned, instancedMode, jointMatrices);
     const materialBlocks = this.#materialBlocks;
