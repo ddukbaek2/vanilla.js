@@ -309,6 +309,9 @@ void main() {
 //   이 예는 감마 쪽(감마를 건 색 g)에서 곱하던 배일 때만 맞다. 선형 색에 곱하던 배와 블룸 문턱, 무릎처럼 처음부터 선형인 값은 바꾸지 않고 그대로 넘긴다.
 // - 실수 판을 못 쓰는 기기: useFloatColor(기본 true)여도 ToonPostProcess.isFloatColorSupported 가 false 면 RGBA8 판으로 짓는다. (getUseFloatColor 가 false)
 //   그때와 useFloatColor: false 는 LDR 길이다. 씬에는 화면 색(감마를 건 색, ToonRenderer.setHdrOutput(false))을 그리고, 합성은 톤매핑과 감마 없이 블룸을 더해 색 보정만 건다.
+// - 캔버스 antialias: 이 후처리가 자기 MSAA 판(sampleCount)에 그리므로 쓰는 게임은 EngineConfiguration.antialias 를 false 로 짓는다.
+//   true 면 캔버스 자체가 MSAA 라 화면에 옮기는 패스와 UI 가 표본마다 섞여 값이 더 든다. (맥미니 2560x1440 툰 후처리 장면 GPU 처리량 6.89 → 6.49 ms, 끈 판 6.81 → 5.22 ms)
+//   예: engineConfiguration.antialias = false;
 // - 블룸: 기본은 반 해상도 9 탭 가우시안(BloomEffect, 문턱 0.9 ~ 1.6, 주고받는 판 RGBA8, setBloomFloatColor 로 RGBA16F).
 //   setBloomLevels(단 수, 문턱, 무릎) 로 단 수를 1 이상 주면 MultiLevelBloomEffect(반씩 줄였다 천막 꼴로 키우며 더함, 씬과 같은 정밀도의 판)로 바꾼다. 0 이면 기본으로 돌린다. 세기는 setBloom 이 둘 다에 쓴다.
 // - 톤매핑은 ACES 근사(Krzysztof Narkowicz 2016, 원문이 CC0 또는 MIT 로 쓰게 함)다. 노출(setExposure)을 곱한 뒤 매핑하고 sRGB 감마를 건다.
