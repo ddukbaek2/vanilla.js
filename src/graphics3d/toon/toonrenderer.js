@@ -5,6 +5,7 @@ const System = globalThis;
 import { Matrix4 } from "../../base/matrix4.js";
 import { ShaderProgram, reportShaderBuildFailure } from "../../core/graphic/shaderprogram.js";
 import { WebGLStateCache } from "../../core/graphic/webglstatecache.js";
+import { JOINT_BLOCK_GLSL, JOINT_BLOCK_MAXIMUM, JointBlockBuffer } from "../jointblock.js";
 import { ColorSpace, readColorSpace, readEngineColorSpace, addColorSpaceDefine } from "../../core/graphic/colorspace.js";
 import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
 import { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./toonlightset.js";
@@ -40,7 +41,7 @@ import { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonB
 // 전역 상수 목록.
 //==============================================================================
 // 한 모형이 쓰는 뼈대 수의 상한. (셰이더의 유니폼 배열 크기, 엔진 SkinnedModelRenderer 와 같은 96)
-export const TOON_MAXIMUM_JOINTS = 96;
+export const TOON_MAXIMUM_JOINTS = JOINT_BLOCK_MAXIMUM;
 
 // 인스턴스 하나의 수 개수. (행렬 16, 틴트 4)
 // - 행렬은 아핀 3x4 로 읽는다. 아래 줄 네 칸(원소 3, 7, 11, 15)은 인스턴스 빛남(sRGB r, g, b 와 선형 세기)이다. (Godot MultiMesh, 유니티 BatchRendererGroup 의 3x4 행렬 꼴)
@@ -162,7 +163,7 @@ in vec4 instanceMatrix1;
 in vec4 instanceMatrix2;
 in vec4 instanceMatrix3;
 in vec4 instanceTint;
-uniform mat4 jointMatrices[96];
+${JOINT_BLOCK_GLSL}
 uniform float skinned;
 uniform float instanced;
 uniform mat4 modelMatrix;
@@ -2195,6 +2196,7 @@ export class ToonRenderer {
 	/** @private @type { object | null } */ #hintOptions; // 그리기 줄이 지금 그리는 담은 칸의 꼴 객체. (readDrawEntry 가 #hintEntry 를 바로 쓴다, 맡긴 판에서만)
 	/** @private @type { object | null } */ #hintEntry; // 그 칸이 푼 기억 칸.
 	/** @private @type { Float32Array } */ #batchModelElements; // drawMeshBatch 의 첫 인스턴스 행렬 칸. (다시 쓴다)
+	/** @private @type { JointBlockBuffer } */ #jointBlockBuffer; // 뼈 행렬 유니폼 블록의 버퍼. (뼈 행렬 96 개는 기본 블록 정점 유니폼 한도를 넘어 블록으로 올린다)
 	/** @private @type { object } */ #materialBlocks; // 몸의 재질 블록 갈래. (createBlockCache)
 	/** @private @type { object } */ #outlineBlocks; // 바깥선 껍데기의 블록 갈래.
 	/** @private @type { object | null } */ #lastProgramKey; // 마지막으로 찾은 프로그램 셋의 머티리얼과 인스턴스 꼴. ({ material, instanceLayout, programSet })
@@ -2223,6 +2225,7 @@ export class ToonRenderer {
 		this.#batchModelElements = new System.Float32Array(16);
 		this.#trustSerial = 1;
 		this.#isTrusting = false;
+		this.#jointBlockBuffer = new JointBlockBuffer(webGL2RenderingContext);
 		this.#materialBlocks = createBlockCache(MATERIAL_BLOCK_BINDING, MATERIAL_BLOCK_FLOAT_COUNT);
 		this.#outlineBlocks = createBlockCache(OUTLINE_BLOCK_BINDING, OUTLINE_BLOCK_FLOAT_COUNT);
 		this.#lastProgramKey = null;
@@ -3547,6 +3550,7 @@ export class ToonRenderer {
 		this.#lastProgramKey = null;
 		this.clearBlockCache(this.#materialBlocks);
 		this.clearBlockCache(this.#outlineBlocks);
+		this.#jointBlockBuffer.destroy();
 		webGL2RenderingContext.deleteTexture(this.#emptyShadowTexture);
 		webGL2RenderingContext.deleteTexture(this.#whiteTexture);
 		for (const page of this.#frameBlocks.pages) {
@@ -4628,9 +4632,7 @@ export class ToonRenderer {
 		this.writeUniformFloats(shaderProgram, "instanced", 1, instancedMode);
 		this.writeUniformFloats(shaderProgram, "skinned", 1, isSkinned ? 1 : 0);
 		if (isSkinned) {
-			const jointFloatCount = System.Math.floor(System.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
-			const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
-			this.writeUniformMatrix4(shaderProgram, "jointMatrices", jointValues);
+			this.#jointBlockBuffer.upload(jointMatrices);
 		}
 	}
 

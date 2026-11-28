@@ -63684,6 +63684,27 @@
 						},
 						{
 							"kind": "method",
+							"name": "uploadJointMatrices",
+							"signature": "uploadJointMatrices(jointMatrixArray)",
+							"params": [
+								{
+									"name": "jointMatrixArray",
+									"type": "Float32Array",
+									"description": {
+										"ko": "뼈 행렬의 수. (16 의 배수)",
+										"en": "Joint matrix values. (a multiple of 16)"
+									}
+								}
+							],
+							"description": {
+								"ko": "뼈 행렬 올리기. (JointBlock 유니폼 블록, 프로그램은 ShaderProgram 이 링크 뒤에 같은 바인딩 자리로 묶는다)",
+								"en": "Uploads the joint matrices. (the JointBlock uniform block, ShaderProgram binds each program to the same binding point after linking)"
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/skinnedmodelrenderer.js"
+						},
+						{
+							"kind": "method",
 							"name": "createEmptyShadowTexture",
 							"signature": "createEmptyShadowTexture()",
 							"params": [],
@@ -64261,6 +64282,58 @@
 						"module": "graphics3d/skinnedmodelrenderer",
 						"name": "MORPH_GLSL"
 					}
+				}
+			],
+			"enums": []
+		},
+		{
+			"name": "graphics3d/jointblock",
+			"summary": {
+				"ko": "뼈 행렬 유니폼 블록. (버텍스 셰이더의 jointMatrices 를 기본 블록 유니폼이 아닌 유니폼 블록으로 넘긴다)",
+				"en": "Joint matrix uniform block. (passes the vertex shader's jointMatrices through a uniform block instead of a default block uniform)"
+			},
+			"examples": [
+				{
+					"title": {
+						"ko": "대체 스키닝 버텍스 셰이더에 뼈 행렬 블록 끼우기",
+						"en": "Inserting the joint matrix block into a replacement skinning vertex shader"
+					},
+					"code": "import { JOINT_BLOCK_GLSL, JOINT_BLOCK_MAXIMUM } from \"./vanilla.js\";\nconst vertexShaderSource = `#version 300 es\nlayout(location = 0) in vec3 vertexPosition;\nlayout(location = 3) in uvec4 vertexJoints;\nlayout(location = 4) in vec4 vertexWeights;\n${JOINT_BLOCK_GLSL}\nvoid main() {\n\tmat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x] + vertexWeights.y * jointMatrices[vertexJoints.y];\n\tgl_Position = skinMatrix * vec4(vertexPosition, 1.0);\n}`;\nconsole.log(vertexShaderSource.includes(\"uniform JointBlock\"), JOINT_BLOCK_MAXIMUM);",
+					"language": "javascript"
+				}
+			],
+			"classes": [],
+			"functions": [
+				{
+					"kind": "field",
+					"name": "JOINT_BLOCK_MAXIMUM",
+					"signature": "JOINT_BLOCK_MAXIMUM = 96",
+					"params": [],
+					"returns": {
+						"type": "number",
+						"description": {
+							"ko": "",
+							"en": ""
+						}
+					},
+					"description": {
+						"ko": "뼈 행렬 블록의 뼈 최대 수. (툰 렌더러 TOON_MAXIMUM_JOINTS 와 스키닝 렌더러가 같다)",
+						"en": "Maximum joint count of the joint matrix block. (the same as the toon renderer's TOON_MAXIMUM_JOINTS and the skinning renderer)"
+					},
+					"since": "0.4.0",
+					"source": "src/graphics3d/jointblock.js"
+				},
+				{
+					"kind": "field",
+					"name": "JOINT_BLOCK_GLSL",
+					"signature": "JOINT_BLOCK_GLSL",
+					"params": [],
+					"description": {
+						"ko": "버텍스 셰이더에 끼우는 뼈 행렬 블록 선언.\n- 뼈 행렬 96 개는 vec4 384 칸이라 WebGL2 가 보장하는 최소 정점 유니폼 256 칸을 넘는다. 유니폼 블록은 따로 센다(MAX_UNIFORM_BLOCK_SIZE 최소 16384 바이트, 이 블록은 6144 바이트).\n- 모바일에서 유니티는 스키닝 행렬을 상수 버퍼(GPU 스키닝)로, 언리얼은 뼈 버퍼를 읽어 넘기는 것과 같은 길이다.\n- 인스턴스 이름이 없어 셰이더 본문은 jointMatrices[번호] 그대로 쓴다. 바인딩 자리는 ShaderProgram 이 링크 뒤에 JOINT_BLOCK_BINDING 으로 묶는다.\n- SkinnedModelRenderer 에 대체 버텍스 셰이더를 줄 때는 uniform mat4 jointMatrices[96] 대신 이 선언을 끼운다.",
+						"en": "The joint matrix block declaration inserted into a vertex shader.\n- 96 joint matrices take 384 vec4 slots, over the 256 vertex uniform slots WebGL2 guarantees at minimum. A uniform block is counted separately (MAX_UNIFORM_BLOCK_SIZE is at least 16384 bytes, this block is 6144 bytes).\n- On mobile, Unity passes skinning matrices through a constant buffer (GPU skinning) and Unreal reads a bone buffer, which is the same route.\n- With no instance name, the shader body keeps using jointMatrices[index]. ShaderProgram binds it to JOINT_BLOCK_BINDING after linking.\n- When giving SkinnedModelRenderer a replacement vertex shader, insert this declaration in place of uniform mat4 jointMatrices[96]."
+					},
+					"since": "0.4.0",
+					"source": "src/graphics3d/jointblock.js"
 				}
 			],
 			"enums": []
@@ -69632,15 +69705,8 @@
 				{
 					"kind": "field",
 					"name": "TOON_MAXIMUM_JOINTS",
-					"signature": "TOON_MAXIMUM_JOINTS = 96",
+					"signature": "TOON_MAXIMUM_JOINTS",
 					"params": [],
-					"returns": {
-						"type": "number",
-						"description": {
-							"ko": "",
-							"en": ""
-						}
-					},
 					"description": {
 						"ko": "한 모형이 쓰는 뼈대 수의 상한. (셰이더의 유니폼 배열 크기, 엔진 SkinnedModelRenderer 와 같은 96)",
 						"en": "Upper limit on the number of joints one model uses. (shader uniform array size, 96, same as the engine's SkinnedModelRenderer)"

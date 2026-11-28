@@ -438,6 +438,7 @@
 	const SkinnedModel = engineModule.SkinnedModel;
 	const SkinnedModelRenderer = engineModule.SkinnedModelRenderer;
 	const MORPH_GLSL = engineModule.MORPH_GLSL;
+	const JOINT_BLOCK_GLSL = engineModule.JOINT_BLOCK_GLSL;
 	const ShadowMap = engineModule.ShadowMap;
 	const ShaderProgram = engineModule.ShaderProgram;
 
@@ -778,7 +779,7 @@
 	layout(location = 4) in vec4 vertexWeights;
 	uniform mat4 modelMatrix;
 	uniform mat4 viewProjectionMatrix;
-	uniform mat4 jointMatrices[96];
+	${JOINT_BLOCK_GLSL}
 	${MORPH_GLSL}
 	void main() {
 		vec3 morphedPosition = vertexPosition;
@@ -808,7 +809,7 @@
 	layout(location = 4) in vec4 vertexWeights;
 	uniform mat4 modelMatrix;
 	uniform mat4 viewProjectionMatrix;
-	uniform mat4 jointMatrices[96];
+	${JOINT_BLOCK_GLSL}
 	uniform sampler2D outlineMaskTexture;
 	uniform int useOutlineMask;
 	uniform float outlineWidth;
@@ -2415,13 +2416,12 @@
 		depthProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(depthProgram.getUniformLocation("viewProjectionMatrix"), false, viewProjectionElements);
 		webGL2RenderingContext.uniformMatrix4fv(depthProgram.getUniformLocation("modelMatrix"), false, modelElements);
-		const jointMatricesLocation = depthProgram.getUniformLocation("jointMatrices[0]");
 		let drawCount = 0;
 		for (const info of drawableInfoList) {
 			if (!info.isHair) {
 				continue;
 			}
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skinList[info.drawable.skinIndex].jointMatrixArray);
+			toonRenderer.uploadJointMatrices(skinList[info.drawable.skinIndex].jointMatrixArray);
 			toonRenderer.applyMorphUniforms(depthProgram, info.drawable);
 			drawDrawable(info.drawable);
 			drawCount += 1;
@@ -2479,7 +2479,6 @@
 		webGL2RenderingContext.uniform1i(shaderProgram.getUniformLocation("isSeeThrough"), isSeeThroughPass ? 1 : 0);
 		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("seeThroughAlpha"), frame.seeThroughAlpha);
 
-		const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
 		const materialTypeLocation = shaderProgram.getUniformLocation("materialType");
 		const shadeColorLocation = shaderProgram.getUniformLocation("shadeColor");
 		const useAlphaTestLocation = shaderProgram.getUniformLocation("useAlphaTest");
@@ -2488,7 +2487,7 @@
 			if (isSeeThroughPass && !info.isSeeThroughPart) {
 				continue;
 			}
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skinList[info.drawable.skinIndex].jointMatrixArray);
+			toonRenderer.uploadJointMatrices(skinList[info.drawable.skinIndex].jointMatrixArray);
 			toonRenderer.applyMorphUniforms(shaderProgram, info.drawable);
 			info.drawable.material.apply();
 			webGL2RenderingContext.uniform1i(materialTypeLocation, info.materialType);
@@ -2512,7 +2511,6 @@
 		webGL2RenderingContext.uniform2f(outlineProgram.getUniformLocation("outlinePixelRange"), sliderStates.outlineMinimum, System.Math.max(sliderStates.outlineMinimum, sliderStates.outlineMaximum));
 		webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineTint"), sliderStates.outlineTint);
 		webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineBrightness"), sliderStates.outlineBrightness);
-		const jointMatricesLocation = outlineProgram.getUniformLocation("jointMatrices[0]");
 		const outlineWidthLocation = outlineProgram.getUniformLocation("outlineWidth");
 		const useOutlineMaskLocation = outlineProgram.getUniformLocation("useOutlineMask");
 		const outlineColorLocation = outlineProgram.getUniformLocation("outlineColorFactor");
@@ -2521,7 +2519,7 @@
 			if (info.outlineWidth <= 0) {
 				continue;
 			}
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skinList[info.drawable.skinIndex].jointMatrixArray);
+			toonRenderer.uploadJointMatrices(skinList[info.drawable.skinIndex].jointMatrixArray);
 			toonRenderer.applyMorphUniforms(outlineProgram, info.drawable);
 			bindMaterialTextures(outlineProgram, info.drawable.material);
 			webGL2RenderingContext.uniform1f(outlineWidthLocation, info.outlineWidth * sliderStates.outlineWidth);

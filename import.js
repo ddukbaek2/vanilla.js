@@ -158,6 +158,7 @@ export { BloomEffect } from "./src/graphics3d/bloomeffect.js";
 export { SkinnedModel, MORPH_TARGET_MAXIMUM } from "./src/graphics3d/skinnedmodel.js";
 export { SkinnedModelAsset } from "./src/graphics3d/skinnedmodelasset.js";
 export { SkinnedModelRenderer, MORPH_GLSL } from "./src/graphics3d/skinnedmodelrenderer.js";
+export { JOINT_BLOCK_GLSL, JOINT_BLOCK_MAXIMUM } from "./src/graphics3d/jointblock.js";
 export { MeshBuilder, VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT, readColorValues, createPartMatrix, createBoxGeometry, createRoundedBoxGeometry, createCylinderGeometry, createSphereGeometry, createLatheGeometry, createCapsuleGeometry, createTorusGeometry, createOctahedronGeometry, createFacetedChunkGeometry } from "./src/graphics3d/toon/meshbuilder.js";
 export { readGlbArrays, readGlbImages, decodeGlbImage, readGlbNodeArrays, readGlbNodeInfos, readAnimationSwing, writeSkinPose, adjustBones, BoneModifyMode } from "./src/graphics3d/toon/glbmeshreader.js";
 export { ToonRenderer, ToonProgramPrewarm, extractFrustumPlanes, readInstanceBufferSphere, writeInstanceBufferSphere, isSphereInFrustum, TOON_MAXIMUM_JOINTS, TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT } from "./src/graphics3d/toon/toonrenderer.js";
