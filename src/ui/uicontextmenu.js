@@ -24,6 +24,34 @@ import { UIButton } from "./uibutton.js";
 //         { text: "삭제", handler: () => {} },
 //     ]);
 //==============================================================================
+/**
+ * @example <caption>뿌리 맨 위에 붙여 메뉴 띄우기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIContextMenu, Color, Vector2 } from "./build/vanilla.js";
+ *
+ * class ContextMenuScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const contextMenu = new UIContextMenu({ menuWidth: 180, fontSize: 13, panelColor: new Color(0.1, 0.12, 0.18, 1) });
+ * 		const root = this.getRoot();
+ * 		root.addChild(contextMenu);
+ * 		contextMenu.show(Vector2.create(200, 120), [
+ * 			{ text: "Copy", handler: () => {
+ * 				console.log("copy");
+ * 			} },
+ * 			{ text: "Paste", isDisabled: true },
+ * 			{ text: "Delete", handler: () => {
+ * 				console.log("delete");
+ * 			} },
+ * 		]);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ContextMenuScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIContextMenu extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -87,7 +115,7 @@ export class UIContextMenu extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { Vector2 } position 뷰 좌표. (메뉴 좌상단)
-	 * @param { object[] } itemList
+	 * @param { object[] } itemList 항목 목록. ({ text, handler?, isDisabled? }, 막은 항목은 흐린 글로 보이고 눌리지 않는다)
 	 */
 	show(position, itemList) {
 		// 이전 행 제거 후 다시 만든다. (항목 수가 적어 부담 없음)
@@ -163,7 +191,7 @@ export class UIContextMenu extends WorldNode {
 	// 표시 중 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 떠 있으면 참.
 	 */
 	isShowing() {
 		return this.isActive();

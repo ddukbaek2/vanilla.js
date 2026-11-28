@@ -36,7 +36,7 @@
 	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
 	// - 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
 	//==============================================================================
-	const ENGINE_CACHE_STAMP = "20260908a";
+	const ENGINE_CACHE_STAMP = "20261126a";
 	let engineModule = null;
 	try {
 		try {
@@ -351,7 +351,7 @@
 				if (elapsed >= state.nextJump) {
 					state.nextJump = elapsed + 2.2;
 					state.jumpTime = elapsed;
-					scene.heroAnimator.play("jump", { onComplete: () => { scene.heroAnimator.play("idle"); } });
+					scene.heroAnimator.playClip("jump", { onComplete: () => { scene.heroAnimator.playClip("idle"); } });
 				}
 				if (state.jumpTime >= 0) {
 					const jumpPhase = System.Math.min(1, (elapsed - state.jumpTime) / 0.7);
@@ -1046,7 +1046,7 @@
 			root.setPivot(Pivot.topLeft.clone());
 			root.setAnchor(Pivot.topLeft.clone());
 			this.#touchRecognizer = new TouchRecognizer();
-			this.#touchRecognizer.setRootNode(root);
+			this.setTouchRaycaster(this.#touchRecognizer); // 씬이 이것으로 위젯에 터치와 휠을 넘긴다. (스크롤 칸 끌기 손짓까지)
 		}
 
 		//==============================================================================
@@ -1055,7 +1055,7 @@
 		async load(engine) {
 			const viewManager = engine.getViewManager();
 			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
-			this.screenEffect = new ScreenEffect(engine.getGraphic());
+			this.screenEffect = new ScreenEffect();
 			await System.Promise.all(IMAGE_NAME_LIST.map((imageName) => {
 				return new System.Promise((resolve) => {
 					const imageElement = new System.Image();
@@ -1403,7 +1403,7 @@
 			}
 			this.heroAnimator.addClip("idle", slimeImage, idleRects, 10, true);
 			this.heroAnimator.addClip("jump", slimeImage, [idleRects[2], idleRects[3], idleRects[4], idleRects[5], idleRects[6], idleRects[7], idleRects[0]], 14, false);
-			this.heroAnimator.play("idle");
+			this.heroAnimator.playClip("idle");
 
 			this.worldNode.addChild(this.modeRoot);
 			this.floatingText = new FloatingText();
@@ -1439,7 +1439,7 @@
 			this.hero.setLocalOpacity(1);
 			this.heroSprite.setHorizontalFlip(false);
 			this.heroSprite.setEffect(ShaderSpriteEffect.none);
-			this.heroAnimator.play("idle");
+			this.heroAnimator.playClip("idle");
 			this.subjectTable.bat.node.setLocalPosition(Vector2.create(800, 220));
 			for (const subjectName of System.Object.keys(this.subjectTable)) {
 				this.subjectTable[subjectName].sprite.setEffect(ShaderSpriteEffect.none);
@@ -1527,70 +1527,6 @@
 				STAGE_WIDTH * pixelScale,
 				STAGE_HEIGHT * pixelScale,
 				14 * pixelScale);
-		}
-
-		//==============================================================================
-		// 터치 전달.
-		//==============================================================================
-		touchPress(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchPress(viewInputPosition);
-			}
-		}
-
-		touchMove(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchMove(viewInputPosition);
-			}
-		}
-
-		touchRelease(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchRelease(viewInputPosition);
-			}
-		}
-
-		//==============================================================================
-		// 마우스 휠. (포인터 아래 가장 안쪽 스크롤 뷰로 전달 — UIScene 이 아닌 씬은 직접 넘겨야 한다)
-		//==============================================================================
-		/**
-		 * @param { Vector2 } viewInputPosition
-		 * @param { Vector2 } wheelDelta
-		 */
-		touchWheel(viewInputPosition, wheelDelta) {
-			const scrollView = this.findScrollViewAt(this.getRoot(), viewInputPosition);
-			if (scrollView) {
-				scrollView.wheel(wheelDelta);
-			}
-		}
-
-		/**
-		 * @param { WorldNode } node
-		 * @param { Vector2 } viewInputPosition
-		 * @returns { UIScrollView | null }
-		 */
-		findScrollViewAt(node, viewInputPosition) {
-			if (!node.isActive()) {
-				return null;
-			}
-			const children = node.getChildren();
-			for (let childIndex = children.length - 1; childIndex >= 0; --childIndex) {
-				const found = this.findScrollViewAt(children[childIndex], viewInputPosition);
-				if (found) {
-					return found;
-				}
-			}
-			const scrollView = (typeof node.getComponent === "function") ? node.getComponent(UIScrollView) : null;
-			if (scrollView && typeof node.contains === "function" && node.contains(viewInputPosition)) {
-				return scrollView;
-			}
-			return null;
-		}
-
-		touchCancel(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchCancel(viewInputPosition);
-			}
 		}
 	}
 

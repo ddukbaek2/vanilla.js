@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Blend Modes</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 블렌드 모드 예제. (러스트 예제 blendmodes 와 같은 장면, Graphic 의 블렌드 모드 26 가지를 칸마다 하나씩 건다)
+// - 칸마다 네 가지 색 줄무늬와 흰색, 회색, 검정, 보라 바탕 위에, 그 칸의 모드로 그린다.
+//   고정 블렌딩 13 가지와 그릴 영역 아래를 떠 와 셰이더로 섞는 13 가지(overlay ~ luminosity)가 모두 나온다.
+// - 60 프레임마다 장면이 바뀐다. (오른쪽 아래에 장면 이름)
+//   0. 반투명 그림, 사각형, 다각형.  1. 글자, 나인슬라이스, 자르기 안의 그림.
+//   2. 겹치는 파티클 24 개를 drawColoredQuads 로. 3. 같은 쿼드를 하나씩 drawVertices 로. (둘이 같아야 한다)
+//   4. 기본 셰이더와 같은 글로 만든 바꿔 끼운 셰이더로 돌리고 틴트를 건 그림과 자르기 안의 나인슬라이스. 5. 같은 장면을 기본 셰이더로. (둘이 같아야 한다)
+//   6, 7. 투명하게 비운 렌더 타겟(RGBA8)에 바탕 열마다 알파를 255, 192, 102, 0 으로 깔고 장면 0 을 그린 뒤, 6 은 검정 위에, 7 은 흰색 위에 옮긴다.
+// - 렌더 배율을 1 로 묶어 1120x640 그대로 그린다.
+//==============================================================================
+const { Engine, EngineConfiguration, Scene, Color, Rect, Vector2, ViewScaleMode, TextAlign, TextBaseline, RenderTarget, ShaderProgram } = await import("../../import.js");
+
+// 화면과 칸.
+const VIEW_WIDTH = 1120;
+const VIEW_HEIGHT = 640;
+const CELL_SIZE = 160;
+const COLUMN_COUNT = 7;
+const PAGE_FRAME_COUNT = 60;
+const PAGE_COUNT = 8;
+const IMAGE_SIZE = 96;
+const NINE_SLICE_IMAGE_SIZE = 30;
+const PARTICLE_COUNT = 24;
+const BLEND_MODE_NAME_LIST = ["source-over", "source-in", "source-out", "source-atop", "destination-over", "destination-in", "destination-out", "destination-atop", "lighter", "copy", "xor", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"];
+const STRIPE_COLOR_LIST = [[224, 60, 49], [47, 168, 79], [45, 108, 223], [242, 193, 78]];
+const BAND_COLOR_LIST = [[255, 255, 255], [128, 128, 128], [0, 0, 0], [138, 43, 226]];
+// 반투명 렌더 타겟 장면의 바탕 열 알파.
+const TRANSLUCENT_COLUMN_ALPHA_LIST = [255, 192, 102, 0];
+const OPAQUE_COLUMN_ALPHA_LIST = [255, 255, 255, 255];
+const PAGE_NAME_LIST = ["그림, 사각형, 다각형", "글자, 나인슬라이스, 자르기", "파티클 (묶음)", "파티클 (낱장)", "바꿔 끼운 셰이더", "기본 셰이더", "반투명 렌더 타겟 (검정 위)", "반투명 렌더 타겟 (흰색 위)"];
+// 기본 셰이더와 같은 글의 바꿔 끼울 셰이더. (덧그림 칸을 거쳐 섞어도 기본 셰이더로 그린 것과 같아야 한다)
+const IDENTITY_VERTEXSHADER_SOURCE = `#version 300 es
+in vec2 vertexPosition;
+in vec2 vertexTextureCoordinate;
+uniform mat3 projectionMatrix;
+uniform mat3 modelMatrix;
+out vec2 fragmentTextureCoordinate;
+void main() {
+	vec3 transformedPosition = projectionMatrix * (modelMatrix * vec3(vertexPosition, 1.0));
+	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+}
+`;
+const IDENTITY_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D mainTexture;
+uniform vec4 mainColor;
+uniform vec4 tintColor;
+uniform float globalAlpha;
+out vec4 outputColor;
+void main() {
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	vec3 tintedColor = mix(textureColor.rgb, tintColor.rgb * textureColor.a, tintColor.a);
+	float finalAlpha = textureColor.a * mainColor.a * globalAlpha;
+	vec3 finalColor = tintedColor * mainColor.rgb * mainColor.a * globalAlpha;
+	outputColor = vec4(finalColor, finalAlpha);
+}
+`;
+
+//==============================================================================
+// 칸의 왼쪽 위.
+//==============================================================================
+/**
+ * @param { number } modeIndex
+ * @returns { Array<number> }
+ */
+function getCellOrigin(modeIndex) {
+	return [(modeIndex % COLUMN_COUNT) * CELL_SIZE, System.Math.floor(modeIndex / COLUMN_COUNT) * CELL_SIZE];
+}
+
+//==============================================================================
+// 화소로 그림 만들기. (캔버스에 RGBA 를 그대로 놓는다)
+//==============================================================================
+/**
+ * @param { number } width
+ * @param { number } height
+ * @param { Uint8ClampedArray } pixels
+ * @returns { HTMLCanvasElement }
+ */
+function createImageFromPixels(width, height, pixels) {
+	const canvas = System.document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	canvas.getContext("2d").putImageData(new System.ImageData(pixels, width, height), 0, 0);
+	return canvas;
+}
+
+//==============================================================================
+// 시험 그림. (96x96, 왼쪽에서 오른쪽으로 빨강이, 위에서 아래로 초록이 늘고 가운데에서 멀수록 투명해진다)
+//==============================================================================
+/**
+ * @returns { HTMLCanvasElement }
+ */
+function createTestImage() {
+	const pixels = new System.Uint8ClampedArray(IMAGE_SIZE * IMAGE_SIZE * 4);
+	for (let y = 0; y < IMAGE_SIZE; y++) {
+		for (let x = 0; x < IMAGE_SIZE; x++) {
+			const offset = (y * IMAGE_SIZE + x) * 4;
+			const deltaX = x - 48;
+			const deltaY = y - 48;
+			const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+			pixels[offset] = System.Math.trunc(x * 255 / 95);
+			pixels[offset + 1] = System.Math.trunc(y * 255 / 95);
+			pixels[offset + 2] = System.Math.trunc((95 - x) * 255 / 95);
+			pixels[offset + 3] = distanceSquared >= 2304 ? 0 : System.Math.trunc(255 - distanceSquared * 255 / 2304);
+		}
+	}
+	return createImageFromPixels(IMAGE_SIZE, IMAGE_SIZE, pixels);
+}
+
+//==============================================================================
+// 나인슬라이스 그림. (30x30, 테두리 6 픽셀은 짙은 반투명, 가운데는 옅은 반투명)
+//==============================================================================
+/**
+ * @returns { HTMLCanvasElement }
+ */
+function createNineSliceImage() {
+	const pixels = new System.Uint8ClampedArray(NINE_SLICE_IMAGE_SIZE * NINE_SLICE_IMAGE_SIZE * 4);
+	for (let y = 0; y < NINE_SLICE_IMAGE_SIZE; y++) {
+		for (let x = 0; x < NINE_SLICE_IMAGE_SIZE; x++) {
+			const offset = (y * NINE_SLICE_IMAGE_SIZE + x) * 4;
+			const isBorder = x < 6 || y < 6 || x >= 24 || y >= 24;
+			pixels.set(isBorder ? [250, 230, 40, 230] : [90, 200, 250, 120], offset);
+		}
+	}
+	return createImageFromPixels(NINE_SLICE_IMAGE_SIZE, NINE_SLICE_IMAGE_SIZE, pixels);
+}
+
+//==============================================================================
+// 원을 닮은 다각형의 꼭짓점. (Graphic.drawCircle 과 같은 분할)
+//==============================================================================
+/**
+ * @param { number } centerX
+ * @param { number } centerY
+ * @param { number } radius
+ * @returns { Array<Vector2> }
+ */
+function createPolygonPositions(centerX, centerY, radius) {
+	const segmentCount = System.Math.min(System.Math.max(System.Math.ceil(radius * 0.5), 16), 64);
+	const positions = [];
+	for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex++) {
+		const radian = System.Math.PI * 2 * (segmentIndex / segmentCount);
+		positions.push(Vector2.create(centerX + System.Math.cos(radian) * radius, centerY + System.Math.sin(radian) * radius));
+	}
+	return positions;
+}
+
+//==============================================================================
+// 칸의 파티클. (서로 겹치는 부드러운 원 24 개, 색 여러 가지)
+//==============================================================================
+/**
+ * @param { number } cellX
+ * @param { number } cellY
+ * @returns { Array<object> }
+ */
+function listParticleQuads(cellX, cellY) {
+	const particleQuadList = [];
+	for (let index = 0; index < PARTICLE_COUNT; index++) {
+		particleQuadList.push({
+			x: cellX + 20 + (index * 37) % 120,
+			y: cellY + 20 + (index * 53) % 120,
+			size: 18 + (index * 7) % 30,
+			color: [(index * 97) % 256, (index * 61 + 80) % 256, (index * 31 + 150) % 256, 120 + (index * 17) % 136],
+		});
+	}
+	return particleQuadList;
+}
+
+//==============================================================================
+// 블렌드 모드 장면.
+//==============================================================================
+class BlendModeScene extends Scene {
+	/** @private @type { HTMLCanvasElement } */ #testImage;
+	/** @private @type { HTMLCanvasElement } */ #nineSliceImage;
+	/** @private @type { RenderTarget | null } */ #renderTarget;
+	/** @private @type { ShaderProgram | null } */ #identityShaderProgram;
+
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.#testImage = createTestImage();
+		this.#nineSliceImage = createNineSliceImage();
+		this.#renderTarget = null;
+		this.#identityShaderProgram = null;
+	}
+
+	//==============================================================================
+	// 칸 바탕. (네 가지 색 줄무늬와 흰색, 회색, 검정, 보라 띠, 열마다 columnAlphaList 의 알파, source-over)
+	//==============================================================================
+	drawCellBackground(graphic, cellX, cellY, columnAlphaList) {
+		graphic.setBlendMode("source-over");
+		for (let columnIndex = 0; columnIndex < 4; columnIndex++) {
+			const columnX = cellX + columnIndex * 40;
+			const columnAlpha = columnAlphaList[columnIndex];
+			const stripeColor = STRIPE_COLOR_LIST[columnIndex];
+			graphic.setFillColor(Color.createFromBytes(stripeColor[0], stripeColor[1], stripeColor[2], columnAlpha));
+			graphic.drawRect(Rect.create(columnX, cellY, 40, 120));
+			const bandColor = BAND_COLOR_LIST[columnIndex];
+			graphic.setFillColor(Color.createFromBytes(bandColor[0], bandColor[1], bandColor[2], columnAlpha));
+			graphic.drawRect(Rect.create(columnX, cellY + 120, 40, 40));
+		}
+	}
+
+	//==============================================================================
+	// 장면 0. (반투명 그림, 반투명 사각형, 반투명 다각형)
+	//==============================================================================
+	drawShapePage(graphic, cellX, cellY) {
+		graphic.drawImage(this.#testImage, Vector2.create(cellX + 8, cellY + 8), Vector2.create(IMAGE_SIZE, IMAGE_SIZE));
+		graphic.setFillColor(Color.createFromBytes(40, 220, 255, 140));
+		graphic.drawRect(Rect.create(cellX + 56, cellY + 28, 88, 52));
+		graphic.drawConvexPolygon(createPolygonPositions(cellX + 104, cellY + 104, 38), Color.createFromBytes(255, 140, 0, 179));
+	}
+
+	//==============================================================================
+	// 장면 1. (글자, 나인슬라이스, 자르기 안의 그림)
+	//==============================================================================
+	drawPathPage(graphic, cellX, cellY) {
+		graphic.setFontString("bold 30px sans-serif");
+		graphic.setFillColor(Color.createFromBytes(255, 255, 255, 204));
+		graphic.setTextBaseline(TextBaseline.alphabetic);
+		graphic.setTextAlign(TextAlign.left);
+		graphic.drawFillText("Ag가", cellX + 6, cellY + 36);
+		graphic.drawImageWithNineSlice(this.#nineSliceImage, Vector2.create(cellX + 8, cellY + 50), Vector2.create(92, 56), Rect.create(10, 10, 10, 10));
+		graphic.beginClipRect(Rect.create(cellX + 104, cellY + 8, 48, 144), 0);
+		graphic.drawImage(this.#testImage, Vector2.create(cellX + 90, cellY + 60), Vector2.create(IMAGE_SIZE, IMAGE_SIZE));
+		graphic.endClipRect();
+	}
+
+	//==============================================================================
+	// 장면 2, 3. (겹치는 파티클, isBatched 면 drawColoredQuads 한 번, 아니면 쿼드마다 drawVertices)
+	//==============================================================================
+	drawParticlePage(graphic, cellX, cellY, isBatched) {
+		const softDiscTexture = graphic.getSoftDiscTexture();
+		const particleQuadList = listParticleQuads(cellX, cellY);
+		if (isBatched) {
+			const vertexData = graphic.getParticleVertexData(particleQuadList.length * 48);
+			let offset = 0;
+			for (const particleQuad of particleQuadList) {
+				const halfSize = particleQuad.size * 0.5;
+				const cornerList = [[-halfSize, -halfSize, 0, 0], [halfSize, -halfSize, 1, 0], [halfSize, halfSize, 1, 1], [-halfSize, -halfSize, 0, 0], [halfSize, halfSize, 1, 1], [-halfSize, halfSize, 0, 1]];
+				for (const corner of cornerList) {
+					vertexData.set([particleQuad.x + corner[0], particleQuad.y + corner[1], corner[2], corner[3], particleQuad.color[0] / 255, particleQuad.color[1] / 255, particleQuad.color[2] / 255, particleQuad.color[3] / 255], offset);
+					offset += 8;
+				}
+			}
+			graphic.drawColoredQuads(offset / 8, softDiscTexture);
+		}
+		else {
+			for (const particleQuad of particleQuadList) {
+				const halfSize = particleQuad.size * 0.5;
+				const vertexCount = graphic.writeQuad(0, particleQuad.x - halfSize, particleQuad.y - halfSize, particleQuad.x + halfSize, particleQuad.y + halfSize, 0, 0, 1, 1) / 4;
+				const color = Color.createFromBytes(particleQuad.color[0], particleQuad.color[1], particleQuad.color[2], particleQuad.color[3]);
+				graphic.drawVertices(vertexCount, softDiscTexture, color);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 바꿔 끼울 셰이더. (처음 부를 때 기본 셰이더의 어트리뷰트 자리로 만든다)
+	//==============================================================================
+	resolveIdentityShaderProgram(graphic) {
+		if (this.#identityShaderProgram === null) {
+			const defaultShaderProgram = graphic.getShaderProgram();
+			const attributeLocationTable = {
+				vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
+				vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate"),
+			};
+			this.#identityShaderProgram = new ShaderProgram(graphic.getWebGL2RenderingContext(), IDENTITY_VERTEXSHADER_SOURCE, IDENTITY_FRAGMENTSHADER_SOURCE, attributeLocationTable);
+		}
+		return this.#identityShaderProgram;
+	}
+
+	//==============================================================================
+	// 장면 4, 5. (돌리고 틴트를 건 그림과 자르기 안의 나인슬라이스, isOverridden 이면 바꿔 끼운 셰이더로)
+	//==============================================================================
+	drawOverridePage(graphic, cellX, cellY, isOverridden) {
+		if (isOverridden) {
+			graphic.setShaderProgramOverride(this.resolveIdentityShaderProgram(graphic));
+		}
+		graphic.pushState();
+		graphic.translate(cellX + 60, cellY + 60);
+		graphic.rotate(0.3);
+		graphic.setGlobalAlpha(0.85);
+		graphic.setImageTintColor(new Color(1, 0, 0.5, 0.3));
+		graphic.drawImage(this.#testImage, Vector2.create(-48, -48), Vector2.create(IMAGE_SIZE, IMAGE_SIZE));
+		graphic.setImageTintColor(null);
+		graphic.popState();
+		graphic.beginClipRect(Rect.create(cellX + 80, cellY + 70, 70, 80), 0);
+		graphic.drawImageWithNineSlice(this.#nineSliceImage, Vector2.create(cellX + 60, cellY + 80), Vector2.create(96, 70), Rect.create(10, 10, 10, 10));
+		graphic.endClipRect();
+		if (isOverridden) {
+			graphic.setShaderProgramOverride(null);
+		}
+	}
+
+	//==============================================================================
+	// 장면 6, 7. (투명하게 비운 렌더 타겟에 반투명 바탕과 장면 0 을 칸마다 그 칸의 모드로 그리고, 검정이나 흰색 위에 옮긴다)
+	//==============================================================================
+	drawRenderTargetPage(graphic, isWhiteBackground) {
+		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+		const drawingBufferWidth = graphic.getDrawingBufferWidth();
+		const drawingBufferHeight = graphic.getDrawingBufferHeight();
+		graphic.flushBatch();
+		if (this.#renderTarget === null) {
+			this.#renderTarget = new RenderTarget(webGL2RenderingContext, drawingBufferWidth, drawingBufferHeight, false);
+		}
+		const renderTargetTexture = this.#renderTarget.getColorTexture(0);
+		this.#renderTarget.bind();
+		webGL2RenderingContext.clearColor(0, 0, 0, 0);
+		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT);
+		for (let modeIndex = 0; modeIndex < BLEND_MODE_NAME_LIST.length; modeIndex++) {
+			const [cellX, cellY] = getCellOrigin(modeIndex);
+			this.drawCellBackground(graphic, cellX, cellY, TRANSLUCENT_COLUMN_ALPHA_LIST);
+			graphic.setBlendMode(BLEND_MODE_NAME_LIST[modeIndex]);
+			this.drawShapePage(graphic, cellX, cellY);
+		}
+		graphic.setBlendMode("source-over");
+		graphic.flushBatch();
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+		webGL2RenderingContext.viewport(0, 0, drawingBufferWidth, drawingBufferHeight);
+		// 바탕을 칠하고 렌더 타겟을 그대로 옮긴다. (렌더 타겟은 아래가 0 이라 위아래를 뒤집어 짚는다, 프리멀티플라이드라 source-over)
+		graphic.setFillColor(isWhiteBackground ? Color.white() : Color.black());
+		graphic.drawRect(Rect.create(0, 0, VIEW_WIDTH, VIEW_HEIGHT));
+		const vertexCount = graphic.writeQuad(0, 0, 0, VIEW_WIDTH, VIEW_HEIGHT, 0, 1, 1, 0) / 4;
+		graphic.drawVertices(vertexCount, renderTargetTexture, Color.white());
+	}
+
+	//==============================================================================
+	// 출력. (칸마다 바탕을 깔고 그 칸의 블렌드 모드로 지금 장면을 그린다)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	draw(graphic) {
+		const pageIndex = System.Math.floor(this.getEngine().getFrameNumber() / PAGE_FRAME_COUNT) % PAGE_COUNT;
+		if (pageIndex >= 6) {
+			this.drawRenderTargetPage(graphic, pageIndex === 7);
+		}
+		else {
+			for (let modeIndex = 0; modeIndex < BLEND_MODE_NAME_LIST.length; modeIndex++) {
+				const [cellX, cellY] = getCellOrigin(modeIndex);
+				this.drawCellBackground(graphic, cellX, cellY, OPAQUE_COLUMN_ALPHA_LIST);
+				graphic.setBlendMode(BLEND_MODE_NAME_LIST[modeIndex]);
+				if (pageIndex === 0) {
+					this.drawShapePage(graphic, cellX, cellY);
+				}
+				else if (pageIndex === 1) {
+					this.drawPathPage(graphic, cellX, cellY);
+				}
+				else if (pageIndex === 2 || pageIndex === 3) {
+					this.drawParticlePage(graphic, cellX, cellY, pageIndex === 2);
+				}
+				else {
+					this.drawOverridePage(graphic, cellX, cellY, pageIndex === 4);
+				}
+			}
+		}
+		// 남는 두 칸에 장면 이름.
+		graphic.setBlendMode("source-over");
+		graphic.setFontString("20px sans-serif");
+		graphic.setFillColor(Color.white());
+		graphic.setTextBaseline(TextBaseline.top);
+		graphic.setTextAlign(TextAlign.left);
+		graphic.drawFillText("블렌드 모드 26 가지", 816, 500);
+		graphic.drawFillText(PAGE_NAME_LIST[pageIndex], 816, 532);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.getViewManager().setViewScaleMode(ViewScaleMode.referenceResolution);
+engine.getViewManager().setMaxRenderPixelRatio(1);
+engine.run(new BlendModeScene());
+</script>
+</body>
+</html>

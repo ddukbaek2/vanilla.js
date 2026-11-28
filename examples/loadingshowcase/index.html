@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Loading Showcase</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #05090d; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 로딩 쇼케이스 예제. (러스트 예제 loadingshowcase 와 같은 장면, AssetLoader + 바꾼 GameScene 로딩 화면 + FixedStepper)
+// - examples/timelineshowcase 의 그림 일곱 장과 문서 하나를 AssetLoader 로 셋씩 함께 받고, 없는 파일 하나(missing.png)는 실패 목록에 남긴다.
+//   (없는 파일을 받으려다 난 404 는 일부러 낸 것이다)
+// - 받은 뒤에 하는 단계(지형 짓기 같은 것)를 흉내 내어 일 열 개를 addTask 로 넣고 10 프레임마다 하나씩 끝낸다.
+// - 로딩 화면은 setLoadingColors 로 색을, setLoadingDrawer 로 그림(도는 점 셋, 둥근 막대, 받은 수)을 바꿨다. 막대는 LoadingProgress 가 부드럽게 따라간다.
+// - 다 받으면 받은 그림, 실패 목록, FixedStepper(1/30 초 걸음)로 움직이고 남은 몫으로 섞어 그리는 공을 보인다.
+// - BuildInfo 의 판도 보인다. (페이지의 meta build-version, 없으면 엔진 판, 읽기도 AssetLoader 에 넣어 같이 기다린다)
+//==============================================================================
+const { Engine, EngineConfiguration, AssetLoader, BuildInfo, Color, FixedStepper, Rect, Vector2, ViewScaleMode, TextAlign, TextBaseline } = await import("../../import.js");
+const { GameScene } = await import("../../src/game/gamescene.js");
+
+// 전역 상수 목록.
+const EXAMPLE_ASSET_DIRECTORY = "../timelineshowcase/assets/";
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const IMAGE_NAME_LIST = ["emblem.png", "slime.png", "star.png", "coin.png", "bat.png", "gem.png", "cover.png"];
+const STAGE_COUNT = 10;
+const STAGE_FRAME_INTERVAL = 10;
+const ACCENT_COLOR = "#ffcc33";
+const STEP_SECONDS = 1 / 30;
+// 글꼴. (러스트 판의 "default" 는 엔진 기본 글꼴 별칭, 브라우저에는 없어 sans-serif 로 쓴다)
+const FONT_FAMILY = "sans-serif";
+
+//==============================================================================
+// 로딩 쇼케이스 씬.
+//==============================================================================
+class LoadingShowcaseScene extends GameScene {
+	/** @private @type { AssetLoader } */ #assetLoader;
+	/** @private @type { Array<object> } */ #imageAssetList;
+	/** @private @type { object | null } */ #jsonAsset;
+	/** @private @type { Array<Function> } */ #stageResolveList;
+	/** @private @type { number } */ #loadingFrameCount;
+	/** @private @type { FixedStepper } */ #fixedStepper;
+	/** @private @type { number } */ #ballPositionX;
+	/** @private @type { number } */ #previousBallPositionX;
+	/** @private @type { number } */ #ballVelocityX;
+	/** @private @type { number } */ #lastAlpha;
+	/** @private @type { BuildInfo } */ #buildInfo;
+
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.#assetLoader = new AssetLoader();
+		this.#imageAssetList = [];
+		this.#jsonAsset = null;
+		this.#stageResolveList = [];
+		this.#loadingFrameCount = 0;
+		this.#fixedStepper = new FixedStepper(STEP_SECONDS, 5);
+		this.#ballPositionX = 200;
+		this.#previousBallPositionX = 200;
+		this.#ballVelocityX = 360;
+		this.#lastAlpha = 0;
+		this.#buildInfo = new BuildInfo("");
+
+		// 로딩 화면을 바꾼다.
+		this.setViewScaleMode(ViewScaleMode.stretchShort);
+		this.setLoadingMinDurationMs(0);
+		this.setLoadingColors("#16324a", "#0b1a27", ACCENT_COLOR);
+		this.setLoadingOutsideColor("#05090d");
+		const assetLoader = this.#assetLoader;
+		this.setLoadingDrawer((graphic, viewSize, progress, elapsedSeconds) => {
+			const centerX = viewSize.x * 0.5;
+			const centerY = viewSize.y * 0.42;
+			const orbitRadius = 56;
+			graphic.setStrokeColor(Color.createFromHEX(ACCENT_COLOR).withAlpha(0.25));
+			graphic.drawStrokeCircle(Vector2.create(centerX, centerY), orbitRadius, 3);
+			for (let dotIndex = 0; dotIndex < 3; dotIndex++) {
+				const angle = elapsedSeconds * 2.4 + dotIndex * System.Math.PI * 2 / 3;
+				graphic.setFillColor(ACCENT_COLOR);
+				graphic.drawCircle(Vector2.create(centerX + System.Math.cos(angle) * orbitRadius, centerY + System.Math.sin(angle) * orbitRadius), 12);
+			}
+			const barWidth = 360;
+			const barHeight = 12;
+			const barLeft = centerX - barWidth * 0.5;
+			const barTop = centerY + 120;
+			graphic.setFillColor(new Color(1, 1, 1, 0.15));
+			graphic.drawRoundRect(Rect.create(barLeft, barTop, barWidth, barHeight), barHeight * 0.5);
+			const fillWidth = barWidth * progress;
+			if (fillWidth >= barHeight) {
+				graphic.setFillColor(ACCENT_COLOR);
+				graphic.drawRoundRect(Rect.create(barLeft, barTop, fillWidth, barHeight), barHeight * 0.5);
+			}
+			graphic.setFontString(`20px ${FONT_FAMILY}`);
+			graphic.setTextAlign(TextAlign.center);
+			graphic.setTextBaseline(TextBaseline.top);
+			graphic.setFillColor(new Color(1, 1, 1, 0.85));
+			graphic.drawFillText(`받는 중 ${assetLoader.getFinishedCount()} / ${assetLoader.getTotalCount()}  (${System.Math.round(progress * 100)}%)`, centerX, barTop + 28);
+		});
+	}
+
+	//==============================================================================
+	// 불러오기. (받을 것을 넣고 셋씩 함께 받는다)
+	//==============================================================================
+	async loadAssets() {
+		await super.loadAssets();
+		const assetLoader = this.#assetLoader;
+		assetLoader.setConcurrency(3);
+		for (const imageName of IMAGE_NAME_LIST) {
+			this.#imageAssetList.push(assetLoader.addImage(EXAMPLE_ASSET_DIRECTORY + imageName));
+		}
+		this.#jsonAsset = assetLoader.addJson(EXAMPLE_ASSET_DIRECTORY + "title.timeline.json");
+		this.#imageAssetList.push(assetLoader.addImage(EXAMPLE_ASSET_DIRECTORY + "missing.png"));
+		for (let stageIndex = 0; stageIndex < STAGE_COUNT; stageIndex++) {
+			const stagePromise = new System.Promise((resolve) => this.#stageResolveList.push(resolve));
+			assetLoader.addTask(`stage${stageIndex}`, () => stagePromise);
+		}
+		this.#buildInfo.setPackageVersion(this.getEngine().getVersionString());
+		assetLoader.addTask("buildInfo", () => this.#buildInfo.load());
+		this.trackAssetLoader(assetLoader);
+		await assetLoader.load();
+	}
+
+	//==============================================================================
+	// 로딩 화면 출력. (10 프레임마다 흉내 단계 하나를 끝낸다)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	drawOnLoad(graphic) {
+		this.#loadingFrameCount += 1;
+		const finishedStageCount = System.Math.floor(this.#loadingFrameCount / STAGE_FRAME_INTERVAL);
+		for (let stageIndex = 0; stageIndex < System.Math.min(finishedStageCount, this.#stageResolveList.length); stageIndex++) {
+			this.#stageResolveList[stageIndex]();
+		}
+		super.drawOnLoad(graphic);
+	}
+
+	//==============================================================================
+	// 갱신. (공은 고정 걸음으로 움직인다. 벽에 닿으면 튕긴다)
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta
+	 */
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#lastAlpha = this.#fixedStepper.advance(timeDelta, (stepSeconds) => {
+			this.#previousBallPositionX = this.#ballPositionX;
+			this.#ballPositionX += this.#ballVelocityX * stepSeconds;
+			if (this.#ballPositionX > VIEW_WIDTH - 200 || this.#ballPositionX < 200) {
+				this.#ballVelocityX = -this.#ballVelocityX;
+			}
+			return true;
+		});
+	}
+
+	//==============================================================================
+	// 출력. (받은 그림, 받은 수와 실패 목록, 고정 걸음 공)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	draw(graphic) {
+		graphic.setFillColor("#16324a");
+		graphic.drawRect(Rect.create(0, 0, VIEW_WIDTH, VIEW_HEIGHT));
+		const assetLoader = this.#assetLoader;
+		graphic.setFontString(`24px ${FONT_FAMILY}`);
+		graphic.setTextAlign(TextAlign.left);
+		graphic.setTextBaseline(TextBaseline.top);
+		graphic.setFillColor(Color.white());
+		graphic.drawFillText(`AssetLoader: 받은 수 ${assetLoader.getLoadedCount()} / 전체 ${assetLoader.getTotalCount()}, 실패 ${assetLoader.getFailedList().length}, 동시 ${assetLoader.getConcurrency()}`, 60, 50);
+		let imageLeft = 60;
+		for (const imageAsset of this.#imageAssetList) {
+			const image = imageAsset.getImage();
+			if (!image || !imageAsset.isLoaded()) {
+				continue;
+			}
+			// 한 칸(140 x 120) 안에 비를 지켜 넣는다. (가로로 긴 스프라이트 시트도 칸을 넘지 않게)
+			const boxWidth = 140;
+			const boxHeight = 120;
+			const imageWidth = image.width;
+			const imageHeight = image.height;
+			const fitScale = System.Math.min(boxWidth / System.Math.max(imageWidth, 1), boxHeight / System.Math.max(imageHeight, 1));
+			const drawnSize = Vector2.create(imageWidth * fitScale, imageHeight * fitScale);
+			graphic.drawImage(image, Vector2.create(imageLeft + (boxWidth - drawnSize.x) * 0.5, 110 + (boxHeight - drawnSize.y) * 0.5), drawnSize);
+			imageLeft += boxWidth + 20;
+		}
+		graphic.setFontString(`20px ${FONT_FAMILY}`);
+		const jsonData = this.#jsonAsset !== null ? this.#jsonAsset.data : null;
+		const jsonKeyCount = jsonData !== null && typeof jsonData === "object" && !System.Array.isArray(jsonData) ? System.Object.keys(jsonData).length : 0;
+		graphic.drawFillText(`title.timeline.json: 맨 위 키 ${jsonKeyCount} 개`, 60, 270);
+		graphic.drawFillText(`BuildInfo: ${this.#buildInfo.readText()}`, 700, 270);
+		let failureTop = 310;
+		for (const failure of assetLoader.getFailedList()) {
+			graphic.setFillColor("#ff8a80");
+			graphic.drawFillText(`실패: ${failure.path.split("/").pop()}`, 60, failureTop);
+			failureTop += 30;
+		}
+		const shownBallPositionX = this.#previousBallPositionX + (this.#ballPositionX - this.#previousBallPositionX) * this.#lastAlpha;
+		graphic.setFillColor("#0b1a27");
+		graphic.drawRoundRect(Rect.create(180, 470, VIEW_WIDTH - 360, 80), 40);
+		graphic.setFillColor(ACCENT_COLOR);
+		graphic.drawCircle(Vector2.create(shownBallPositionX, 510), 28);
+		graphic.setFillColor(Color.white());
+		graphic.drawFillText(`FixedStepper: 1/30 초 걸음, 지난 프레임 ${this.#fixedStepper.getLastStepCount()} 걸음, 남은 몫 ${this.#lastAlpha.toFixed(2)}`, 180, 570);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.run(new LoadingShowcaseScene());
+</script>
+</body>
+</html>

@@ -3,8 +3,9 @@
 //==============================================================================
 const fs = require('fs');
 const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
+// fluent-ffmpeg, ffmpeg-static 은 설치 여부를 확인한 뒤 main 에서 읽는다. (없으면 설치 안내를 보이고 끝낸다)
+let ffmpeg = null;
+let ffmpegPath = null;
 
 
 //==============================================================================
@@ -120,7 +121,7 @@ function main() {
 	const args = process.argv.slice(2);
 
 	if (args.length === 0) {
-		console.log('[ConvertWebm] 사용법: node webm.cjs <폴더경로>');
+		console.log('[ConvertWebm] 사용법: node tools/webm.cjs <폴더경로>');
 		process.exit(1);
 	}
 
@@ -135,6 +136,8 @@ function main() {
 		process.exit(1);
 	}
 
+	ffmpeg = require('fluent-ffmpeg');
+	ffmpegPath = require('ffmpeg-static');
 	ffmpeg.setFfmpegPath(ffmpegPath);
 
 	const targetDirectory = path.resolve(args[0]);

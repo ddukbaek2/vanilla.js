@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toon FX</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #21242b; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 툰 화면 공간 바깥선과 3D 효과 예제. (ToonScreenOutline, ToonVfx, 러스트 예제 toonfx 와 같은 장면)
+// - 바닥판 위의 도형과 인스턴싱한 돌을 ToonRenderer 로 칠하고(껍데기 바깥선 없이), ToonScreenOutline 으로 실루엣, 맞닿은 곳, 꺾인 곳에 선을 긋는다.
+//   카메라는 원근이고 굵기는 월드 길이 0.022 (보는 점까지의 거리에서 셈), 깊이 문턱 0.08, 맞닿음 0.015, 꺾임 60 도.
+//   돌 일곱은 인스턴스마다 번호를 따로(인스턴스의 lineId), 나머지 일곱은 공통 번호로 그려 서로 맞닿은 곳의 선이 다른 것을 본다.
+// - ToonVfx 로 3 초마다 터짐(충격파, 불덩이, 그을음, 불꽃 줄기, 연기, 흙 알갱이)과 연기 기둥, 흐르는 테 자국을 내고,
+//   프레임마다 빔(겉집과 심), 번개, 리본, 빛 점을 넘긴다. 램프 색은 예제가 정한 넷(불, 푸른 빛, 보라, 연기)이다.
+// - 터질 때 화면 섬광(addFlash)과 카메라 흔들림(addShake, readShake 를 카메라 오른쪽과 위쪽으로 더함), 1.2 초 사는 번개(addLightning, 번짐 색)를 낸다.
+//   테를 두른 빛살 파티클(rim 1)과 빛 점(rim 1, 하나 걸러), 번짐 색 리본(glow)은 가장자리를 테 색으로 덮는다.
+// - 원본 ToonVfx 는 자리를 x, y, z 로 받고(러스트는 position), 리본과 번개와 빛 점은 alpha 를 꼭 준다(러스트는 기본 1).
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, Vector2, Vector3, Rect, Matrix4, MeshBuilder, createBoxGeometry, createPartMatrix, createRoundedBoxGeometry, createSphereGeometry, createTorusGeometry, createCylinderGeometry, createOctahedronGeometry, ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "../../import.js";
+
+const PI = System.Math.PI;
+const BACKGROUND_COLOR = "#21242b";
+
+//==============================================================================
+// 도형 하나로 모형 짓기. (껍데기 바깥선 없이)
+//==============================================================================
+function buildMesh(renderer, geometry, matrix, color) {
+	const builder = new MeshBuilder();
+	builder.addPart(geometry, matrix, color, { hasOutline: false });
+	return renderer.createMesh(builder.readArrays());
+}
+
+//==============================================================================
+// 터짐 한 번. (충격파, 불덩이, 그을음, 불꽃 줄기, 연기, 흙 알갱이, 연기 기둥, 흐르는 테)
+//==============================================================================
+function emitBurst(vfx) {
+	const blast = [-0.4, 0.0, 0.45];
+	vfx.addShockwave({ x: blast[0], z: blast[2], startRadius: 0.2, endRadius: 2.0, width: 0.7, life: 1.1, ramp: 0 });
+	vfx.addFireball({ position: [blast[0], 0.45, blast[2]], radius: 0.7, life: 1.5, ramp: 0 });
+	vfx.addDecal({ x: blast[0], z: blast[2], radius: 1.1, life: 3.0, heatSeconds: 1.5, slot: ToonVfxSlot.scorch, mode: ToonVfxDecalMode.scorch, ramp: 0, alpha: 0.9 });
+	vfx.emitParticles({ count: 70, position: [blast[0], 0.3, blast[2]], shape: ToonVfxShape.sphere, radius: 0.2, isUpward: true, speed: [3.0, 6.0], gravity: 6.0, drag: 1.2, size: [0.05, 0.09], life: [0.5, 1.0], ramp: 0, look: ToonVfxLook.streak, stretch: 0.05, brightness: 1.6, isGrounded: true });
+	vfx.emitParticles({ count: 24, position: [blast[0], 0.3, blast[2]], shape: ToonVfxShape.disc, radius: 0.5, speed: [0.4, 1.0], rise: [0.6, 1.2], drag: 0.8, size: [0.5, 0.8], sizeEnd: 2.2, life: [1.4, 2.2], color: [0.32, 0.3, 0.29], look: ToonVfxLook.smoke, alpha: 0.8, fadeIn: 0.1 });
+	vfx.emitParticles({ count: 30, position: [blast[0], 0.2, blast[2]], shape: ToonVfxShape.ring, radius: 0.4, speed: [1.5, 2.5], rise: [0.2, 0.6], gravity: 2.0, drag: 1.5, size: [0.06, 0.12], life: [0.6, 1.2], color: [0.45, 0.4, 0.36], look: ToonVfxLook.grit, isGrounded: true });
+	vfx.addPlume({ x: 3.3, z: 0.4, height: 2.4, capRadius: 0.9, stemRadius: 0.22, life: 3.0, ramp: 0 });
+	vfx.addDecal({ x: 1.4, z: 0.5, radius: 0.7, life: 3.0, slot: ToonVfxSlot.glow, mode: ToonVfxDecalMode.ring, ramp: 1, tint: [0.6, 1.4, 1.4], alpha: 1.0, ring: [0.75, 0.08, 3.0, 0.6] });
+	vfx.emitParticles({ count: 14, position: [blast[0], 0.6, blast[2]], shape: ToonVfxShape.sphere, radius: 0.3, speed: [1.2, 2.4], drag: 1.5, size: [0.3, 0.45], sizeEnd: 0.4, life: [0.6, 1.0], color: [1.0, 0.8, 0.45], look: ToonVfxLook.star, brightness: 1.3, rim: 1.0 });
+	vfx.addLightning({ start: [blast[0], 3.2, blast[2]], end: [blast[0], 0.1, blast[2]], radius: 0.1, count: 2, width: 0.12, turns: 0.6, alpha: 1.0, brightness: 1.3, glow: [0.55, 0.85, 1.0], life: 1.2 });
+	vfx.addFlash({ color: [1.0, 0.9, 0.7], strength: 0.45, life: 0.25 });
+	vfx.addShake(0.08);
+}
+
+//==============================================================================
+// 이번 프레임에만 그리는 효과. (빔 겉집과 심, 번개, 리본, 빛 점)
+//==============================================================================
+function queueFrameEffects(vfx, elapsedSeconds) {
+	vfx.queueBeam({ start: [1.4, 5.0, 0.5], end: [1.4, 0.0, 0.5], radius: 0.28, isCore: false, alpha: 1.0, brightness: 1.3, ramp: 1, wobble: 0.14, flowSpeed: 8.0, grainRepeat: 1.4 });
+	vfx.queueBeam({ start: [1.4, 5.0, 0.5], end: [1.4, 0.0, 0.5], radius: 0.1, isCore: true, alpha: 1.0, brightness: 1.5, ramp: 1, wobble: 0.05, flowSpeed: 14.0, grainRepeat: 2.0 });
+	vfx.queueLightning({ start: [-2.4, 1.1, -0.8], end: [0.2, 1.2, -0.9], radius: 0.12, count: 2, width: 0.07, turns: 1.5, ramp: 2, alpha: 1.0, brightness: 1.4, seed: 3.0 });
+	const arcPoints = [];
+	for (let index = 0; index <= 24; index++) {
+		const ratio = index / 24;
+		arcPoints.push([2.7 - ratio * 3.0, 0.3 + System.Math.sin(ratio * PI) * 1.4, -0.4 + ratio * 1.8]);
+	}
+	vfx.queueRibbon({ points: arcPoints, width: 0.14, taper: 0.5, ramp: 2, alpha: 1.0, brightness: 1.2 });
+	const glowPoints = [];
+	for (let index = 0; index <= 24; index++) {
+		const ratio = index / 24;
+		glowPoints.push([-3.4 + ratio * 1.6, 0.4 + ratio * 1.6, 1.4 + System.Math.sin(ratio * PI * 2.0 + elapsedSeconds * 2.0) * 0.25]);
+	}
+	vfx.queueRibbon({ points: glowPoints, width: 0.22, taper: 0.4, alpha: 1.0, brightness: 1.2, glow: [1.0, 0.45, 0.8] });
+	for (let glintIndex = 0; glintIndex < 12; glintIndex++) {
+		const angle = glintIndex / 12 * PI * 2.0 + elapsedSeconds;
+		const look = glintIndex % 2 === 0 ? ToonVfxLook.star : ToonVfxLook.soft;
+		vfx.queueGlint({ position: [0.2 + System.Math.cos(angle) * 0.75, 0.55 + System.Math.sin(angle * 2.0) * 0.1, -0.9 + System.Math.sin(angle) * 0.75], size: 0.22, color: [0.6, 1.0, 1.0], look, alpha: 1.0, brightness: 1.3, rim: glintIndex % 2 === 0 ? 1.0 : 0.0 });
+	}
+}
+
+//==============================================================================
+// 툰 바깥선과 효과 씬.
+//==============================================================================
+class ToonFxScene extends Scene {
+	/** @private */ #renderer = null;
+	/** @private */ #screenOutline = null;
+	/** @private */ #vfx = null;
+	/** @private */ #nextBurstSeconds = 0;
+	/** @private */ #groundMesh = null;
+	/** @private */ #rockMesh = null;
+	/** @private */ #placedList = [];
+	/** @private */ #rockInstanceList = [];
+	/** @private */ #elapsedSeconds = 0;
+
+	//==============================================================================
+	// 렌더러, 바깥선, 모형 준비. (처음 그릴 때 한 번)
+	//==============================================================================
+	createResources(webGL2RenderingContext) {
+		const renderer = new ToonRenderer(webGL2RenderingContext);
+		renderer.setBandCount(3);
+		renderer.setLight([-0.5, -1.0, -0.35], [0.85, 0.8, 0.75], [0.55, 0.6, 0.7], [0.25, 0.22, 0.2]);
+		this.#groundMesh = buildMesh(renderer, createBoxGeometry(8.0, 0.2, 5.0), createPartMatrix(null, [0, -0.1, 0], null, null), "#c9c2b4");
+		const shapeList = [
+			[createBoxGeometry(1.0, 1.0, 1.0), createPartMatrix(null, [0, 0.5, 0], null, null), "#ff8844", [-2.4, 0, -0.8], 0.5],
+			[createRoundedBoxGeometry(1.0, 1.0, 1.0, 3, 0.2), createPartMatrix(null, [0, 0.5, 0], null, null), "#45b585", [-1.35, 0, -0.8], 0.3],
+			[createSphereGeometry(0.55, 24, 16, PI), createPartMatrix(null, [0, 0.55, 0], null, null), "#ffd257", [0.2, 0, -0.9], 0.0],
+			[createTorusGeometry(0.45, 0.16, 12, 32, PI * 2.0), createPartMatrix(null, [0, 0.6, 0], [PI * 0.5, 0, 0], null), "#78c8ff", [1.6, 0, -0.6], 0.7],
+			[createCylinderGeometry(0.0, 0.5, 1.0, 20), createPartMatrix(null, [0, 0.5, 0], null, null), "#8d7dff", [2.7, 0, -0.9], 0.0],
+		];
+		for (const [geometry, matrix, color, position, spin] of shapeList) {
+			const mesh = buildMesh(renderer, geometry, matrix, color);
+			if (mesh !== null) {
+				this.#placedList.push({ mesh, position, spin });
+			}
+		}
+		this.#rockMesh = buildMesh(renderer, createOctahedronGeometry(0.22), createPartMatrix(null, [0, 0.15, 0], null, [1.0, 0.7, 1.0]), "#a89a88");
+		for (let rockIndex = 0; rockIndex < 14; rockIndex++) {
+			const modelMatrix = Matrix4.createTranslation(-3.0 + rockIndex * 0.46, 0.0, 1.3 + (rockIndex % 2) * 0.25);
+			modelMatrix.rotateY(rockIndex * 0.9);
+			const instance = { modelMatrix };
+			if (rockIndex < 7) {
+				instance.lineId = 100 + rockIndex;
+			}
+			this.#rockInstanceList.push(instance);
+		}
+		const screenOutline = new ToonScreenOutline(webGL2RenderingContext);
+		screenOutline.setColor([0.078, 0.086, 0.11, 1.0]);
+		screenOutline.setWidth(0.022, ToonOutlineWidthUnit.world);
+		screenOutline.setDepthThreshold(0.08);
+		screenOutline.setCrease(60.0, 0.011, 0.8);
+		this.#screenOutline = screenOutline;
+		// 효과. (예제의 램프 넷, 바닥은 판 윗면 0 이고 판 밖은 -1)
+		const vfx = new ToonVfx(webGL2RenderingContext, TOON_VFX_DEFAULT_PARTICLE_CAPACITY);
+		vfx.setRamps([
+			["#ffffff", "#fff0b0", "#ffb040", "#e05020", "#601810", "#180808"],
+			["#ffffff", "#c0fff8", "#40e0d0", "#108890", "#083038", "#041014"],
+			["#ffffff", "#f0d0ff", "#b070ff", "#6030c0", "#281050", "#100818"],
+			["#e8e4de", "#b8b0a8", "#888078", "#5a544e", "#36322e", "#1a1816"],
+		]);
+		vfx.setFloorHeightReader((x, z) => System.Math.abs(x) <= 4.0 && System.Math.abs(z) <= 2.5 ? 0.0 : -1.0);
+		vfx.prepare();
+		this.#vfx = vfx;
+		this.#renderer = renderer;
+	}
+
+	//==============================================================================
+	// 갱신. (효과를 흘리고 3 초마다 터뜨린다)
+	//==============================================================================
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#elapsedSeconds += timeDelta;
+		const vfx = this.#vfx;
+		if (vfx === null) {
+			return;
+		}
+		vfx.update(System.Math.min(timeDelta, 0.1));
+		if (this.#elapsedSeconds >= this.#nextBurstSeconds) {
+			this.#nextBurstSeconds = this.#elapsedSeconds + 3.0;
+			emitBurst(vfx);
+		}
+		// 기둥 밑에서 오르는 불씨.
+		if (System.Math.trunc(this.#elapsedSeconds * 10.0) !== System.Math.trunc((this.#elapsedSeconds - timeDelta) * 10.0)) {
+			vfx.emitParticles({ count: 6, position: [3.3, 0.2, 0.4], shape: ToonVfxShape.disc, radius: 0.3, speed: 0.3, rise: [1.0, 1.8], size: [0.04, 0.07], life: [0.8, 1.4], ramp: 0, look: ToonVfxLook.ember, brightness: 1.4 });
+		}
+	}
+
+	//==============================================================================
+	// 3D 출력. (2D 묶음 내보내기 → 선 번호 → 툰 몸 → 바깥선 → 2D 상태 복구)
+	//==============================================================================
+	preDraw(graphic) {
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+		graphic.flushBatch();
+		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+		if (this.#renderer === null) {
+			this.createResources(webGL2RenderingContext);
+		}
+		const canvasPixelSize = viewManager.getCanvasPixelSize();
+		const aspectRatio = canvasPixelSize.x / System.Math.max(canvasPixelSize.y, 1);
+		let eyePosition = Vector3.create(0.0, 4.2, 6.2);
+		let lookPosition = Vector3.create(0.0, 0.4, 0.0);
+		// 카메라 흔들림. (오른쪽과 위쪽으로 자리와 보는 곳을 같이 옮긴다)
+		const shake = this.#vfx.readShake();
+		const forward = lookPosition.subtract(eyePosition).normalize();
+		const right = forward.cross(Vector3.create(0.0, 1.0, 0.0)).normalize();
+		const up = right.cross(forward);
+		const offset = right.multiplyScalar(shake.x).add(up.multiplyScalar(shake.y));
+		eyePosition = eyePosition.add(offset);
+		lookPosition = lookPosition.add(offset);
+		const viewMatrix = Matrix4.createLookAt(eyePosition, lookPosition, Vector3.create(0.0, 1.0, 0.0));
+		const projectionMatrix = Matrix4.createPerspective(0.75, aspectRatio, 0.1, 100.0);
+		const viewProjectionMatrix = Matrix4.createPerspective(0.75, aspectRatio, 0.1, 100.0);
+		viewProjectionMatrix.multiply(viewMatrix);
+		const renderer = this.#renderer;
+		const screenOutline = this.#screenOutline;
+		const groundMesh = this.#groundMesh;
+		const rockMesh = this.#rockMesh;
+		const modelMatrixList = this.#placedList.map((placed) => {
+			const modelMatrix = Matrix4.createTranslation(placed.position[0], placed.position[1], placed.position[2]);
+			modelMatrix.rotateY(0.6 + placed.spin + this.#elapsedSeconds * placed.spin * 0.3);
+			return modelMatrix;
+		});
+		const identityMatrix = Matrix4.createIdentity();
+
+		// 1. 선 번호. (바닥 1, 도형 10 ~, 돌 일곱은 인스턴스마다, 나머지는 공통 99)
+		screenOutline.setFocusDistance(eyePosition.subtract(lookPosition).length());
+		if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
+			screenOutline.drawMesh(groundMesh, identityMatrix, 1, {});
+			for (let placedIndex = 0; placedIndex < this.#placedList.length; placedIndex++) {
+				screenOutline.drawMesh(this.#placedList[placedIndex].mesh, modelMatrixList[placedIndex], 10 + placedIndex, {});
+			}
+			screenOutline.drawMeshInstanced(rockMesh, this.#rockInstanceList, 99, {});
+			screenOutline.endLineIds();
+		}
+
+		// 2. 툰 몸. (앞 프레임의 깊이를 비우고)
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+		const noOutline = { hasOutline: false };
+		renderer.beginFrame(viewProjectionMatrix);
+		renderer.drawMesh(groundMesh, identityMatrix, noOutline);
+		for (let placedIndex = 0; placedIndex < this.#placedList.length; placedIndex++) {
+			renderer.drawMesh(this.#placedList[placedIndex].mesh, modelMatrixList[placedIndex], noOutline);
+		}
+		renderer.drawMeshInstanced(rockMesh, this.#rockInstanceList, noOutline);
+		renderer.endFrame();
+
+		// 3. 바깥선.
+		screenOutline.drawOutline();
+
+		// 4. 효과. (프레임마다 넘기는 빔, 번개, 리본, 빛 점)
+		queueFrameEffects(this.#vfx, this.#elapsedSeconds);
+		this.#vfx.draw(viewMatrix, projectionMatrix);
+		graphic.restoreRenderState();
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "툰 바깥선과 효과 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new ToonFxScene());
+</script>
+</body>
+</html>

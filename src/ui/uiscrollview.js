@@ -24,8 +24,8 @@ const WHEEL_SCROLL_SCALE = 1.0;
 // - elastic: 경계를 초과하면 저항이 생기고 놓으면 스프링처럼 튕겨 돌아오는 모드.
 //==============================================================================
 export const ScrollMode = {
-	clamp: "clamp",
-	elastic: "elastic",
+	clamp: "clamp", // 경계를 넘지 않게 자른다.
+	elastic: "elastic", // 경계를 넘으면 저항이 생기고 놓으면 튕겨 돌아온다.
 };
 
 
@@ -37,6 +37,52 @@ export const ScrollMode = {
 //   Mask 가 추가되어 자식 클리핑이 동작한다.
 // - 중첩 ScrollView를 지원한다. (TouchRaycaster와 연동)
 //==============================================================================
+/**
+ * @example <caption>세로로 끄는 목록과 스크롤바</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIScrollView, UILabel, WorldNode, Paint, Color, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class ScrollScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const viewportNode = new WorldNode();
+ * 		viewportNode.setPivot(Pivot.topLeft.clone());
+ * 		viewportNode.setAnchor(Pivot.topLeft.clone());
+ * 		viewportNode.setContentSize(Vector2.create(320, 240));
+ * 		viewportNode.setLocalPosition(Vector2.create(160, 60));
+ * 		const scrollView = viewportNode.addComponent(UIScrollView);
+ * 		scrollView.setBackgroundColor(new Color(0.1, 0.12, 0.16, 1));
+ * 		scrollView.setHorizontal(false);
+ * 		scrollView.setScrollMode("elastic");
+ * 		scrollView.setShowsVerticalScrollBar(true);
+ *
+ * 		const rowCount = 20;
+ * 		const rowHeight = 40;
+ * 		const content = scrollView.getContent();
+ * 		for (let rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
+ * 			const rowNode = new WorldNode();
+ * 			rowNode.setPivot(Pivot.topLeft.clone());
+ * 			rowNode.setAnchor(Pivot.topLeft.clone());
+ * 			rowNode.setContentSize(Vector2.create(280, rowHeight - 4));
+ * 			rowNode.setLocalPosition(Vector2.create(8, rowIndex * rowHeight + 2));
+ * 			const rowPaint = rowNode.addComponent(Paint);
+ * 			rowPaint.setColor(new Color(1, 1, 1, 0.06));
+ * 			const rowLabel = rowNode.addComponent(UILabel);
+ * 			rowLabel.setText("Row " + rowIndex);
+ * 			content.addChild(rowNode);
+ * 		}
+ * 		scrollView.setScrollContentSize(Vector2.create(320, rowCount * rowHeight));
+ * 		scrollView.setScrollOffset(Vector2.create(0, -120));
+ * 		const root = this.getRoot();
+ * 		root.addChild(viewportNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ScrollScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIScrollView extends UIView {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -90,11 +136,11 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 의존 컴포넌트 — 자식 클리핑을 위해 Mask 가 필요.
+	// 의존 컴포넌트, 자식 클리핑을 위해 Mask 가 필요.
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { Function[] }
+	 * @returns { Function[] } 같은 노드에 함께 붙일 컴포넌트 목록. ([Mask])
 	 */
 	require() {
 		return [Mask];
@@ -105,7 +151,7 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 붙을 노드. (내용 크기가 보이는 영역이 된다)
 	 */
 	attach(node) {
 		super.attach(node);
@@ -119,7 +165,7 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 		this.#isDragging = true;
@@ -136,7 +182,7 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표, 끄는 중일 때만 담아 두고 tick 에서 반영한다)
 	 */
 	touchMove(viewInputPosition) {
 		if (this.isDragging()) {
@@ -149,7 +195,7 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표, 쓰지 않는다)
 	 */
 	touchRelease(viewInputPosition) {
 		this.#isDragging = false;
@@ -160,7 +206,7 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표, 쓰지 않는다)
 	 */
 	touchCancel(viewInputPosition) {
 		this.#isDragging = false;
@@ -171,7 +217,7 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const node = this.getNode();
@@ -323,7 +369,7 @@ export class UIScrollView extends UIView {
 	// 스크롤 오프셋 적용. (클램핑 포함)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } offset
+	 * @param { Vector2 } offset 스크롤 오프셋. (콘텐츠 노드의 자리, 0 이 맨 위 왼쪽이고 내릴수록 음수, 끌 수 있는 축만 범위로 자르고 다른 축은 0)
 	 */
 	applyScrollOffset(offset) {
 		const node = this.getNode();
@@ -352,7 +398,20 @@ export class UIScrollView extends UIView {
 	// 스크롤 오프셋 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } offset
+	 * @param { Vector2 } offset 스크롤 오프셋. (0 이 맨 위 왼쪽이고 내릴수록 음수, 범위로 자른다)
+	 * @example <caption>오프셋의 부호와 범위 자르기</caption>
+	 * import { UIScrollView, WorldNode, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const viewportNode = new WorldNode();
+	 * viewportNode.setContentSize(Vector2.create(200, 100));
+	 * const scrollView = viewportNode.addComponent(UIScrollView);
+	 * scrollView.setScrollContentSize(Vector2.create(200, 500));
+	 * scrollView.setScrollOffset(Vector2.create(0, -1000));
+	 * const clampedOffset = scrollView.getScrollOffset();
+	 * console.log(clampedOffset.y);
+	 * scrollView.wheel(Vector2.create(0, -150));
+	 * const wheeledOffset = scrollView.getScrollOffset();
+	 * console.log(wheeledOffset.y);
 	 */
 	setScrollOffset(offset) {
 		this.applyScrollOffset(offset);
@@ -362,7 +421,7 @@ export class UIScrollView extends UIView {
 	// 스크롤 오프셋 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 스크롤 오프셋. (복사하지 않은 원본, 0 이 맨 위 왼쪽이고 내릴수록 음수)
 	 */
 	getScrollOffset() {
 		return this.#scrollOffset;
@@ -372,7 +431,7 @@ export class UIScrollView extends UIView {
 	// 가로 스크롤 활성 설정. (false = 가로 스크롤 비활성)
 	//==============================================================================
 	/**
-	 * @param { boolean } horizontal
+	 * @param { boolean } horizontal 참이면 가로로 끌 수 있다.
 	 */
 	setHorizontal(horizontal) {
 		this.#horizontalEnabled = horizontal;
@@ -382,7 +441,7 @@ export class UIScrollView extends UIView {
 	// 가로 스크롤 활성 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 가로로 끌 수 있으면 참.
 	 */
 	isHorizontal() {
 		return this.#horizontalEnabled;
@@ -392,7 +451,7 @@ export class UIScrollView extends UIView {
 	// 세로 스크롤 활성 설정. (false = 세로 스크롤 비활성)
 	//==============================================================================
 	/**
-	 * @param { boolean } vertical
+	 * @param { boolean } vertical 참이면 세로로 끌 수 있다.
 	 */
 	setVertical(vertical) {
 		this.#verticalEnabled = vertical;
@@ -402,7 +461,7 @@ export class UIScrollView extends UIView {
 	// 세로 스크롤 활성 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 세로로 끌 수 있으면 참.
 	 */
 	isVertical() {
 		return this.#verticalEnabled;
@@ -415,7 +474,18 @@ export class UIScrollView extends UIView {
 	//   누른 노드(슬라이더 등)가 곧바로 누름을 받아 끝까지 끈다. 두 축 모두 스크롤하면 늘 가져간다.
 	//==============================================================================
 	/**
-	 * @param { boolean } passes
+	 * @param { boolean } passes 참이면 스크롤하지 않는 축의 드래그를 누른 노드에 남긴다.
+	 * @example <caption>세로 목록 안의 가로 드래그 남기기</caption>
+	 * import { UIScrollView, WorldNode, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const viewportNode = new WorldNode();
+	 * viewportNode.setContentSize(Vector2.create(200, 100));
+	 * const scrollView = viewportNode.addComponent(UIScrollView);
+	 * scrollView.setHorizontal(false);
+	 * scrollView.setPassesCrossAxisDrag(true);
+	 * const isSidewaysTaken = scrollView.isScrollDrag(30, 5);
+	 * const isDownwardTaken = scrollView.isScrollDrag(5, 30);
+	 * console.log(isSidewaysTaken, isDownwardTaken);
 	 */
 	setPassesCrossAxisDrag(passes) {
 		this.#passesCrossAxisDrag = !!passes;
@@ -425,7 +495,7 @@ export class UIScrollView extends UIView {
 	// 스크롤하지 않는 축으로 끄는 손가락을 누른 노드에 남기는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 스크롤하지 않는 축의 드래그를 남기면 참.
 	 */
 	isPassingCrossAxisDrag() {
 		return this.#passesCrossAxisDrag;
@@ -435,9 +505,9 @@ export class UIScrollView extends UIView {
 	// 끈 방향이 이 뷰가 가져갈 드래그인지. (스크롤하지 않는 축의 드래그를 남기는 옵션을 켰을 때만 가려낸다)
 	//==============================================================================
 	/**
-	 * @param { number } deltaX
-	 * @param { number } deltaY
-	 * @returns { boolean }
+	 * @param { number } deltaX 누른 자리에서 끈 가로 거리. (픽셀, 부호는 보지 않는다)
+	 * @param { number } deltaY 누른 자리에서 끈 세로 거리. (픽셀, 부호는 보지 않는다)
+	 * @returns { boolean } 이 뷰가 가져가면 참. (옵션이 꺼졌거나 두 축 모두 스크롤하면 늘 참, 끌 수 있는 축이 없으면 거짓)
 	 */
 	isScrollDrag(deltaX, deltaY) {
 		if (!this.#passesCrossAxisDrag) {
@@ -463,7 +533,7 @@ export class UIScrollView extends UIView {
 	// 드래그 반영량 배율 설정. (1.0 = 기본, 2.0 = 두 배 빠르게)
 	//==============================================================================
 	/**
-	 * @param { number } dragSensitivity
+	 * @param { number } dragSensitivity 드래그 반영량 배율. (끈 거리에 곱한다)
 	 */
 	setDragSensitivity(dragSensitivity) {
 		this.#dragSensitivity = dragSensitivity;
@@ -473,7 +543,7 @@ export class UIScrollView extends UIView {
 	// 드래그 반영량 배율 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 드래그 반영량 배율. (기본 1)
 	 */
 	getDragSensitivity() {
 		return this.#dragSensitivity;
@@ -483,7 +553,7 @@ export class UIScrollView extends UIView {
 	// 스크롤 모드 설정.
 	//==============================================================================
 	/**
-	 * @param { string } scrollMode
+	 * @param { string } scrollMode "clamp" 면 경계에서 멈추고, "elastic" 이면 경계를 넘을 때 저항이 생기고 놓으면 튕겨 돌아온다.
 	 */
 	setScrollMode(scrollMode) {
 		this.#scrollMode = scrollMode;
@@ -493,7 +563,7 @@ export class UIScrollView extends UIView {
 	// 스크롤 모드 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } "clamp" 나 "elastic". (기본 "clamp")
 	 */
 	getScrollMode() {
 		return this.#scrollMode;
@@ -503,7 +573,7 @@ export class UIScrollView extends UIView {
 	// 스크롤 콘텐츠 크기 설정. (가시 영역보다 크게 설정해야 스크롤 가능)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } scrollContentSize
+	 * @param { Vector2 } scrollContentSize 스크롤할 콘텐츠 크기. (픽셀, 복제해 콘텐츠 노드의 내용 크기에도 넣는다)
 	 */
 	setScrollContentSize(scrollContentSize) {
 		scrollContentSize = scrollContentSize.clone();
@@ -520,7 +590,7 @@ export class UIScrollView extends UIView {
 	// 스크롤 콘텐츠 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 스크롤할 콘텐츠 크기. (픽셀)
 	 */
 	getScrollContentSize() {
 		return this.#scrollContentSize;
@@ -531,7 +601,7 @@ export class UIScrollView extends UIView {
 	// 드래그 중 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 누르고 있으면 참.
 	 */
 	isDragging() {
 		return this.#isDragging;
@@ -541,7 +611,7 @@ export class UIScrollView extends UIView {
 	// 현재 스크롤 속도 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 스크롤 속도. (초당 픽셀, elastic 모드에서만 셈한다)
 	 */
 	getScrollVelocity() {
 		return this.#scrollVelocity;
@@ -551,7 +621,7 @@ export class UIScrollView extends UIView {
 	// 세로 스크롤바 노출 여부 설정. true 면 자동 생성하여 호스트 노드의 자식으로 추가.
 	//==============================================================================
 	/**
-	 * @param { boolean } shows
+	 * @param { boolean } shows 참이면 보인다. (노드에 붙기 전이면 스크롤바를 만들지 못한다)
 	 */
 	setShowsVerticalScrollBar(shows) {
 		this.#showsVerticalScrollBar = !!shows;
@@ -576,7 +646,7 @@ export class UIScrollView extends UIView {
 	// 가로 스크롤바 노출 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } shows
+	 * @param { boolean } shows 참이면 보인다. (처음 켤 때 만들어 노드의 자식으로 붙인다, 노드에 붙기 전이면 만들지 못한다)
 	 */
 	setShowsHorizontalScrollBar(shows) {
 		this.#showsHorizontalScrollBar = !!shows;
@@ -600,9 +670,19 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	// 세로 / 가로 스크롤바 인스턴스 반환. (커스터마이즈 용)
 	//==============================================================================
+	/**
+	 * @returns { UIScrollBar | null } 세로 스크롤바. (한 번도 켜지 않았으면 null)
+	 */
 	getVerticalScrollBar() {
 		return this.#verticalScrollBar;
 	}
+
+	//==============================================================================
+	// 가로 스크롤바 반환. (커스터마이즈 용)
+	//==============================================================================
+	/**
+	 * @returns { UIScrollBar | null } 가로 스크롤바. (한 번도 켜지 않았으면 null)
+	 */
 	getHorizontalScrollBar() {
 		return this.#horizontalScrollBar;
 	}
@@ -610,11 +690,21 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	// 스크롤바가 차지하는(reserved) 영역의 두께. (스크롤바가 활성/표시 중일 때만)
 	//==============================================================================
+	/**
+	 * @returns { number } 세로 스크롤바가 차지하는 너비. (픽셀, 보일 때 24, 아니면 0)
+	 */
 	getVerticalScrollBarReservedWidth() {
 		return (this.#showsVerticalScrollBar && this.#verticalScrollBar)
 			? SCROLLBAR_THICKNESS + SCROLLBAR_MARGIN * 2
 			: 0;
 	}
+
+	//==============================================================================
+	// 가로 스크롤바가 차지하는 영역의 두께. (스크롤바가 보일 때만)
+	//==============================================================================
+	/**
+	 * @returns { number } 가로 스크롤바가 차지하는 높이. (픽셀, 보일 때 24, 아니면 0)
+	 */
 	getHorizontalScrollBarReservedHeight() {
 		return (this.#showsHorizontalScrollBar && this.#horizontalScrollBar)
 			? SCROLLBAR_THICKNESS + SCROLLBAR_MARGIN * 2
@@ -626,7 +716,7 @@ export class UIScrollView extends UIView {
 	// - 가로 스크롤바가 있으면 그 만큼 세로가 줄고, 세로 스크롤바가 있으면 가로가 준다.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 스크롤바 몫을 뺀 보이는 영역 크기. (픽셀, 노드에 붙기 전이면 0)
 	 */
 	getInnerContentSize() {
 		const node = this.getNode();
@@ -673,7 +763,7 @@ export class UIScrollView extends UIView {
 	// - delta: 마우스 휠 누적값 (DOM WheelEvent 의 deltaX/deltaY 와 동일 부호. 아래 = +y)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } delta
+	 * @param { Vector2 } delta 휠 누적값. (휠 스크롤 배율을 곱해 오프셋에서 뺀다, 없으면 아무것도 하지 않는다)
 	 */
 	wheel(delta) {
 		if (!delta) return;
@@ -688,6 +778,9 @@ export class UIScrollView extends UIView {
 	//==============================================================================
 	// 휠 스크롤 배율 설정.
 	//==============================================================================
+	/**
+	 * @param { number } scale 휠 누적값에 곱할 배율. (기본 1)
+	 */
 	setWheelScrollScale(scale) {
 		this.#wheelScrollScale = scale;
 	}

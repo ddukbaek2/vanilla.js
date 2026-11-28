@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Gamepad List</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #15171c; color: #e8e2d0; }
+#output { margin: 0; padding: 24px; font: 16px/1.6 monospace; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<pre id="output"></pre>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 게임패드 목록 예제. (러스트 예제 gamepadlist 와 같은 일)
+// - GamepadManager 를 만들어 1초 동안 갱신하면서 연결된 게임패드를 화면과 콘솔에 남기고 끝난다. (엔진을 돌리지 않는다)
+// - 브라우저는 패드 단추를 한 번 눌러야 그 패드를 알려 준다. 목록이 비면 단추를 누르고 새로 고친다.
+//==============================================================================
+const { GamepadManager, Wait } = await import("../../import.js");
+
+const outputElement = System.document.getElementById("output");
+
+//==============================================================================
+// 한 줄 남기기. (화면과 콘솔)
+//==============================================================================
+/**
+ * @param { string } line
+ */
+function writeLine(line) {
+	outputElement.textContent += line + "\n";
+	console.log(line);
+}
+
+const gamepadManager = new GamepadManager(null);
+const frameIntervalSeconds = 0.016;
+const runDurationMilliseconds = 1000;
+const startTime = System.performance.now();
+while (System.performance.now() - startTime < runDurationMilliseconds) {
+	gamepadManager.tick(frameIntervalSeconds);
+	await Wait.seconds(frameIntervalSeconds);
+}
+
+const connectedGamepadCount = gamepadManager.getConnectedGamepadCount();
+writeLine(`연결된 게임패드: ${connectedGamepadCount}개`);
+for (const gamepad of gamepadManager.getAllConnectedGamepads()) {
+	writeLine(`- index ${gamepad.index}: ${gamepad.id} (버튼 ${gamepad.buttons.length}개, 축 ${gamepad.axes.length}개)`);
+}
+</script>
+</body>
+</html>

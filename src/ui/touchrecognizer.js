@@ -38,6 +38,38 @@ const DELAY_PRESS_MS = 150;
 //   "프레스 트렌지션 도중 취소" 가 발생하지 않는다. 짧은 탭은 release 시점에
 //   보류된 press 를 즉시 발동 후 release 를 이어 보내 보정한다.
 //==============================================================================
+/**
+ * @example <caption>일반 씬에서 위젯에 터치 넘기기</caption>
+ * import { Engine, EngineConfiguration, Scene, TouchRecognizer, UIButton, Paint, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		this.setTouchRaycaster(new TouchRecognizer());
+ *
+ * 		const root = this.getRoot();
+ * 		const buttonNode = new WorldNode();
+ * 		buttonNode.setPivot(Pivot.topLeft);
+ * 		buttonNode.setAnchor(Pivot.topLeft);
+ * 		buttonNode.setLocalPosition(Vector2.create(40, 40));
+ * 		buttonNode.setContentSize(Vector2.create(160, 56));
+ * 		const paint = buttonNode.addComponent(Paint);
+ * 		paint.setColor(new Color(0.2, 0.45, 0.85, 1));
+ * 		const button = buttonNode.addComponent(UIButton);
+ * 		button.setClickedEvent(() => {
+ * 			console.log("clicked");
+ * 		});
+ * 		root.addChild(buttonNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "mainCanvas";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class TouchRecognizer extends TouchRaycaster {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -71,7 +103,7 @@ export class TouchRecognizer extends TouchRaycaster {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 		const target = this.raycast(viewInputPosition);
@@ -114,7 +146,7 @@ export class TouchRecognizer extends TouchRaycaster {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 옮긴 자리. (뷰 좌표)
 	 */
 	touchMove(viewInputPosition) {
 		if (this.#isDragging) {
@@ -173,7 +205,7 @@ export class TouchRecognizer extends TouchRaycaster {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (뷰 좌표)
 	 */
 	touchRelease(viewInputPosition) {
 		if (this.#isDragging) {
@@ -200,7 +232,7 @@ export class TouchRecognizer extends TouchRaycaster {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 취소된 때의 자리. (뷰 좌표)
 	 */
 	touchCancel(viewInputPosition) {
 		if (this.#isDragging) {
@@ -212,6 +244,29 @@ export class TouchRecognizer extends TouchRaycaster {
 			this.#target.touchCancel(viewInputPosition);
 		}
 		this.reset();
+	}
+
+	//==============================================================================
+	// 지금 누름을 받는 노드. (드래그를 넘겼으면 스크롤 뷰 노드, 없으면 null)
+	//==============================================================================
+	/**
+	 * @returns { * } 지금 누름을 받는 노드. (없으면 null)
+	 */
+	getTouchTarget() {
+		if (this.#isDragging && this.#scrollView) {
+			return this.#scrollView.getNode();
+		}
+		return this.#target ?? null;
+	}
+
+	//==============================================================================
+	// 누르고 있는 중인지. (누름부터 뗌이나 취소까지)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 누름부터 뗌이나 취소까지 참.
+	 */
+	isTouching() {
+		return this.#pressPosition !== null;
 	}
 
 	//==============================================================================
@@ -237,8 +292,8 @@ export class TouchRecognizer extends TouchRaycaster {
 	//   드래그 핸들러로 인계되면 안 되기 때문.)
 	//==============================================================================
 	/**
-	 * @param { * } target
-	 * @returns { UIScrollView | null }
+	 * @param { * } target 누른 노드. (없으면 null 을 돌려준다)
+	 * @returns { UIScrollView | null } 가장 가까운 조상의 UIScrollView. (없으면 null)
 	 */
 	findAncestorScrollView(target) {
 		if (!target) return null;

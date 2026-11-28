@@ -1,0 +1,397 @@
+//==============================================================================
+// 포함 모듈 목록.
+//==============================================================================
+const System = globalThis;
+import { Rect } from "../../base/rect.js";
+import { Graphic } from "../graphic.js";
+import { Component } from "../component.js";
+import { Color } from "../../base/color.js";
+import { buildRGBAString, readColor } from "./shadowtext.js";
+import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
+
+
+//==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 구운 캔버스의 가장자리 여유. (안티앨리어싱, 픽셀)
+const BAKE_PADDING = 2;
+
+// 그림마다 붙이는 번호. (구운 그림을 나눠 쓰는 열쇠, setImage 할 때마다 새 번호를 붙여 그 그림을 다시 굽게 한다)
+const imageIdentifiers = new System.WeakMap();
+let nextImageIdentifier = 1;
+
+
+//==============================================================================
+// 그림자를 깐 그림.
+// - 그림(또는 아틀라스의 한 조각)을 노드 안에 비를 지켜 가장 크게, 가운데로 그린다.
+// - ShadowText 와 같이 그림의 모양(불투명도) 밑에 그림자를 칠한 모습을 캔버스 한 장에 구워 그 한 장을 그린다.
+//   노드의 불투명도가 그림과 그림자에 한 장째로 먹는다.
+// - 그림 색을 주면 그림을 그 색 한 빛의 모양으로 칠한다. (같은 자리 위에 원래 그림을 얹어 그림자만 남기는 감쌈 등)
+// - 그리는 배율(기기의 DPR, 뷰 배율), 그림, 색, 그림자, 노드 크기가 바뀌면 다시 굽는다. 그림자가 번지는 만큼 가장자리를 넓힌다.
+//==============================================================================
+/**
+ * @example <caption>그림자를 깐 아이콘</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, ShadowImage, ImageAsset } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const imageAsset = new ImageAsset();
+ * 		await imageAsset.load("assets/icons/icon.png");
+ * 		const iconNode = new WorldNode();
+ * 		iconNode.setContentSize(Vector2.create(128, 128));
+ * 		iconNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const shadowImage = iconNode.addComponent(ShadowImage);
+ * 		shadowImage.setImage(imageAsset.image);
+ * 		shadowImage.setShadow("#000000", 0.6, 6, 8);
+ * 		const root = this.getRoot();
+ * 		root.addChild(iconNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
+export class ShadowImage extends Component {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @private @type { HTMLImageElement | HTMLCanvasElement | null } */ #image; // 그림.
+	/** @private @type { string } */ #imagePath; // 그림 경로. (UIDocument 가 그림 대신 적고 읽는다, 그리기에는 쓰지 않는다)
+	/** @private @type { Rect | null } */ #imageRect; // 그림 안의 조각. (null 이면 그림 전체)
+	/** @private @type { Color | null } */ #imageColor; // 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
+	/** @private @type { Color } */ #shadowColor; // 알파는 읽지 않는다. (불투명도는 #shadowOpacity)
+	/** @private @type { number } */ #shadowOpacity;
+	/** @private @type { number } */ #shadowOffset; // 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
+	/** @private @type { number } */ #shadowBlur; // 그림자가 번지는 만큼. (내용 크기 단위, 0 이면 번지지 않는다)
+	/** @private @type { number } */ #imageVersion; // 그림이나 조각을 바꾼 횟수. (바뀌면 다시 굽는다)
+	/** @private @type { HTMLCanvasElement | null } */ #bakeCanvas; // 구운 한 장. (굽지 않았으면 null)
+	/** @private @type { string } */ #bakeKey; // 구운 조건.
+	/** @private @type { object } */ #bakeMetrics; // 구운 한 장의 논리 좌표 치수. { scale, imageLeft, imageTop }
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.setComponentType("ShadowImage");
+		this.#imagePath = "";
+		this.#image = null;
+		this.#imageRect = null;
+		this.#imageColor = null;
+		this.#shadowColor = Color.black();
+		this.#shadowOpacity = 1;
+		this.#shadowOffset = 0;
+		this.#shadowBlur = 0;
+		this.#imageVersion = 0;
+		this.#bakeCanvas = null;
+		this.#bakeKey = "";
+		this.#bakeMetrics = { scale: 1, imageLeft: 0, imageTop: 0 };
+	}
+
+	//==============================================================================
+	// 출력.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그래픽.
+	 */
+	draw(graphic) {
+		const image = this.getImage();
+		if (image === null) {
+			return;
+		}
+		const sourceRect = this.readSourceRect();
+		if (sourceRect.width <= 0 || sourceRect.height <= 0) {
+			return;
+		}
+		const node = this.getNode();
+		const contentSize = node.getContentSize();
+		const contentWidth = contentSize.x;
+		const contentHeight = contentSize.y;
+		if (contentWidth <= 0 || contentHeight <= 0) {
+			return;
+		}
+
+		// 노드 안에 그림의 비를 지켜 가장 크게, 가운데로.
+		const fitScale = System.Math.min(contentWidth / sourceRect.width, contentHeight / sourceRect.height);
+		const imageWidth = sourceRect.width * fitScale;
+		const imageHeight = sourceRect.height * fitScale;
+		const bakeScale = graphic.calculateTextBakeScale();
+		let imageIdentifier = imageIdentifiers.get(image);
+		if (imageIdentifier === undefined) {
+			imageIdentifier = nextImageIdentifier;
+			nextImageIdentifier += 1;
+			imageIdentifiers.set(image, imageIdentifier);
+		}
+		const bakeKey = ["ShadowImage", imageIdentifier, sourceRect.left, sourceRect.top, sourceRect.width, sourceRect.height, this.#imageColor === null ? "" : this.#imageColor.toRGBAString(), this.#shadowColor.toHEXString(), this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, imageWidth, imageHeight, bakeScale].join("|");
+		if (bakeKey !== this.#bakeKey) {
+			// 같은 그림과 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
+			releaseSharedBake(this.#bakeKey, this);
+			this.#bakeKey = bakeKey;
+			const bake = acquireSharedBake(bakeKey, this, () => {
+				this.bakeImage(image, sourceRect, imageWidth, imageHeight, bakeScale);
+				return { canvas: this.getBakeCanvas(), metrics: this.#bakeMetrics };
+			});
+			this.#bakeCanvas = bake.canvas;
+			this.#bakeMetrics = bake.metrics;
+		}
+		const bakeCanvas = this.getBakeCanvas();
+		if (bakeCanvas === null) {
+			return;
+		}
+		const bakeMetrics = this.#bakeMetrics;
+		const quadX = (contentWidth - imageWidth) * 0.5 - bakeMetrics.imageLeft;
+		const quadY = (contentHeight - imageHeight) * 0.5 - bakeMetrics.imageTop;
+		const quadWidth = bakeCanvas.width / bakeMetrics.scale;
+		const quadHeight = bakeCanvas.height / bakeMetrics.scale;
+		graphic.drawImageWithSourceAndDestination(bakeCanvas, 0, 0, bakeCanvas.width, bakeCanvas.height, quadX, quadY, quadWidth, quadHeight);
+	}
+
+	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 그림은 내용 영역 안에 비를 지켜 들어가고, 그림자가 번짐과 내림만큼 넘친다)
+	// - 내용 영역을 사방으로 번짐의 두 배와 굽는 칸의 여유만큼, 아래(내림이 음수면 위)로 그림자 내림만큼 더 넓힌다.
+	//   (캔버스 shadowBlur 는 표준 편차 blur / 2 의 가우스라 꼬리가 1.5 배까지 간다, 넉넉히 두 배)
+	// - 그림이 있는지와 상관없이 같은 사각형을 알린다. (그림을 바꿔도 다시 셈하지 않는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 노드에 붙어 있으면 참.
+	 * @example <caption>그림자 그림이 그리는 곳 보기</caption>
+	 * import { WorldNode, ShadowImage, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(64, 64));
+	 * const shadowImage = node.addComponent(ShadowImage);
+	 * shadowImage.setShadow("#000000", 0.6, 6, 8);
+	 * const drawnRect = Rect.zero();
+	 * shadowImage.calculateDrawnRect(drawnRect);
+	 * console.log(drawnRect.position.x, drawnRect.size.y);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (node === null || node === undefined) {
+			return false;
+		}
+		const contentSize = node.getContentSize();
+		const blurMargin = System.Math.max(0, this.#shadowBlur) * 2 + BAKE_PADDING;
+		const shadowOffset = this.#shadowOffset;
+		const topY = -blurMargin + System.Math.min(0, shadowOffset);
+		const bottomY = contentSize.y + blurMargin + System.Math.max(0, shadowOffset);
+		rect.position.set(-blurMargin, topY);
+		rect.size.set(contentSize.x + blurMargin * 2, bottomY - topY);
+		return true;
+	}
+
+	//==============================================================================
+	// 노드에서 떨어짐. (나눠 쓰던 구운 그림을 놓는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node 떨어지는 노드.
+	 */
+	detach(node) {
+		releaseSharedBake(this.#bakeKey, this);
+		this.#bakeKey = "";
+		this.#bakeCanvas = null;
+		super.detach(node);
+	}
+
+	//==============================================================================
+	// 그림 안의 조각 읽기. (조각이 없으면 그림 전체)
+	//==============================================================================
+	/**
+	 * @returns { { left: number, top: number, width: number, height: number } } 그림 안의 조각. (픽셀, 조각이 없으면 그림 전체)
+	 */
+	readSourceRect() {
+		const imageRect = this.getImageRect();
+		if (imageRect !== null) {
+			return { left: imageRect.left, top: imageRect.top, width: imageRect.width, height: imageRect.height };
+		}
+		const image = this.getImage();
+		const imageWidth = image.naturalWidth || image.width;
+		const imageHeight = image.naturalHeight || image.height;
+		return { left: 0, top: 0, width: imageWidth, height: imageHeight };
+	}
+
+	//==============================================================================
+	// 굽기. (그림을 한 번 칠하면 캔버스가 그 밑에 그림자를 먼저 칠한다)
+	// - 텍스처 캐시가 캔버스마다 한 번 올리므로 구울 때마다 새 캔버스를 만든다.
+	//==============================================================================
+	/**
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그림.
+	 * @param { object } sourceRect 그림 안의 조각. ({ left, top, width, height }, 픽셀)
+	 * @param { number } imageWidth 그릴 너비. (내용 크기 단위)
+	 * @param { number } imageHeight 그릴 높이. (내용 크기 단위)
+	 * @param { number } bakeScale 굽는 배율. (Graphic.calculateTextBakeScale)
+	 */
+	bakeImage(image, sourceRect, imageWidth, imageHeight, bakeScale) {
+		const scaledImageWidth = System.Math.max(1, System.Math.round(imageWidth * bakeScale));
+		const scaledImageHeight = System.Math.max(1, System.Math.round(imageHeight * bakeScale));
+		const scaledShadowOffset = this.#shadowOffset * bakeScale;
+		const scaledShadowBlur = this.#shadowBlur * bakeScale;
+
+		// 번지는 그림자가 잘리지 않게 사방을 번지는 만큼 넓힌다.
+		const bakePadding = BAKE_PADDING + System.Math.ceil(scaledShadowBlur);
+		const bakeCanvas = System.document.createElement("canvas");
+		bakeCanvas.width = scaledImageWidth + bakePadding * 2;
+		bakeCanvas.height = scaledImageHeight + bakePadding * 2 + System.Math.ceil(scaledShadowOffset);
+		const canvasRenderingContext = bakeCanvas.getContext("2d");
+		if (canvasRenderingContext === null) {
+			this.#bakeCanvas = null;
+			return;
+		}
+		const sourceImage = this.readScaledImage(image, sourceRect, scaledImageWidth, scaledImageHeight);
+		if (sourceImage === null) {
+			this.#bakeCanvas = null;
+			return;
+		}
+		canvasRenderingContext.shadowColor = buildRGBAString(this.#shadowColor, this.#shadowOpacity);
+		canvasRenderingContext.shadowBlur = scaledShadowBlur;
+		canvasRenderingContext.shadowOffsetX = 0;
+		canvasRenderingContext.shadowOffsetY = scaledShadowOffset;
+		canvasRenderingContext.drawImage(sourceImage, bakePadding, bakePadding);
+		this.#bakeCanvas = bakeCanvas;
+		this.#bakeMetrics = { scale: bakeScale, imageLeft: bakePadding / bakeScale, imageTop: bakePadding / bakeScale };
+	}
+
+	//==============================================================================
+	// 그릴 크기로 줄인 그림. (그림 색이 있으면 그 색 한 빛의 모양, 그림자 없이)
+	//==============================================================================
+	/**
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그림.
+	 * @param { object } sourceRect 그림 안의 조각. ({ left, top, width, height }, 픽셀)
+	 * @param { number } scaledImageWidth 줄인 너비. (픽셀)
+	 * @param { number } scaledImageHeight 줄인 높이. (픽셀)
+	 * @returns { HTMLCanvasElement | null } 줄인 그림을 담은 새 캔버스. (2D 컨텍스트를 얻지 못하면 null)
+	 */
+	readScaledImage(image, sourceRect, scaledImageWidth, scaledImageHeight) {
+		const scaledCanvas = System.document.createElement("canvas");
+		scaledCanvas.width = scaledImageWidth;
+		scaledCanvas.height = scaledImageHeight;
+		const canvasRenderingContext = scaledCanvas.getContext("2d");
+		if (canvasRenderingContext === null) {
+			return null;
+		}
+		canvasRenderingContext.imageSmoothingEnabled = true;
+		canvasRenderingContext.imageSmoothingQuality = "high";
+		canvasRenderingContext.drawImage(image, sourceRect.left, sourceRect.top, sourceRect.width, sourceRect.height, 0, 0, scaledImageWidth, scaledImageHeight);
+		const imageColor = this.getImageColor();
+		if (imageColor !== null) {
+			canvasRenderingContext.globalCompositeOperation = "source-in";
+			canvasRenderingContext.fillStyle = imageColor.toRGBAString();
+			canvasRenderingContext.fillRect(0, 0, scaledImageWidth, scaledImageHeight);
+		}
+		return scaledCanvas;
+	}
+
+	//==============================================================================
+	// 그림 설정. (조각을 주지 않으면 그림 전체)
+	//==============================================================================
+	/**
+	 * @param { HTMLImageElement | HTMLCanvasElement | null } image 그림. (null 이면 그리지 않는다)
+	 * @param { Rect | null } imageRect 그림 안의 조각. (픽셀, 사본을 둔다, null 이면 그림 전체)
+	 */
+	setImage(image, imageRect = null) {
+		this.#image = image;
+		this.#imageRect = imageRect === null ? null : imageRect.clone();
+		this.#imageVersion += 1;
+		if (image !== null && image !== undefined) {
+			imageIdentifiers.set(image, nextImageIdentifier);
+			nextImageIdentifier += 1;
+		}
+	}
+
+	//==============================================================================
+	// 그림 반환.
+	//==============================================================================
+	/**
+	 * @returns { HTMLImageElement | HTMLCanvasElement | null } 그림. (없으면 null)
+	 */
+	getImage() {
+		return this.#image;
+	}
+
+	//==============================================================================
+	// 그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)
+	//==============================================================================
+	/**
+	 * @param { string } imagePath 그림 경로.
+	 */
+	setImagePath(imagePath) {
+		this.#imagePath = imagePath ?? "";
+	}
+
+	//==============================================================================
+	// 그림 경로 반환. (정하지 않았으면 빈 글)
+	//==============================================================================
+	/**
+	 * @returns { string } 그림 경로. (정하지 않았으면 빈 글)
+	 */
+	getImagePath() {
+		return this.#imagePath;
+	}
+
+	//==============================================================================
+	// 그림 안의 조각 반환. (null 이면 그림 전체)
+	//==============================================================================
+	/**
+	 * @returns { Rect | null } 그림 안의 조각. (null 이면 그림 전체)
+	 */
+	getImageRect() {
+		return this.#imageRect;
+	}
+
+	//==============================================================================
+	// 그림을 한 빛으로 칠할 색 설정. (null 이면 그림 그대로)
+	//==============================================================================
+	/**
+	 * @param { Color | string | null } imageColor 그림을 한 빛으로 칠할 색. (Color 나 "#rrggbb" 같은 색 글, 알파가 칠의 불투명도, null 이면 그림 그대로)
+	 */
+	setImageColor(imageColor) {
+		this.#imageColor = imageColor === null ? null : readColor(imageColor);
+	}
+
+	//==============================================================================
+	// 그림을 한 빛으로 칠할 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color | null } 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
+	 */
+	getImageColor() {
+		return this.#imageColor;
+	}
+
+	//==============================================================================
+	// 그림자 설정. (색, 불투명도, 그림 아래로 내려가는 만큼, 번지는 만큼)
+	//==============================================================================
+	/**
+	 * @param { Color | string } shadowColor 그림자 색. (Color 나 "#rrggbb" 같은 색 글, 알파는 읽지 않는다)
+	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
+	 * @param { number } shadowOffset 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
+	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
+	 */
+	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
+		shadowColor = readColor(shadowColor);
+		this.#shadowColor = shadowColor;
+		this.#shadowOpacity = shadowOpacity;
+		this.#shadowOffset = shadowOffset;
+		this.#shadowBlur = shadowBlur;
+		this.markDrawnRectDirty();
+	}
+
+	//==============================================================================
+	// 구운 캔버스 반환. (아직 굽지 않았으면 null)
+	//==============================================================================
+	/**
+	 * @returns { HTMLCanvasElement | null } 구운 캔버스. (아직 굽지 않았으면 null)
+	 */
+	getBakeCanvas() {
+		return this.#bakeCanvas;
+	}
+}

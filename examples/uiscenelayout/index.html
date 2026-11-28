@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Scene Layout</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #10141c; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// UI 씬과 오토레이아웃 예제. (러스트 예제 uiscenelayout 과 같은 장면)
+// - UIScene 으로 씬을 만들고, UINode 를 제약으로 놓는다. (UIScene, UINode, LayoutSolver)
+// - 머리 띠: 세이프 에어리어 가이드의 왼쪽, 위, 오른쪽에 붙고 높이 72. 제목 글은 띠 가운데, 크기는 글의 자연 크기(intrinsic content size)다.
+// - 옆 판: 머리 띠 아래부터 바닥까지, 너비는 화면의 25% 를 바라되(약한 제약) 200 ~ 320 사이. 본문: 옆 판 오른쪽의 나머지, 여백 가이드 안쪽에 단추 셋을 같은 너비로.
+//   단추는 가로 hug 우선순위를 낮춰(fittingSizeLevel) 글의 자연 너비로 줄어들려는 힘이 옆 판을 밀지 않게 한다.
+// - 세이프 에어리어는 위 40, 아래 30 을 흉내 낸다. 창 크기를 바꾸면 제약대로 다시 놓인다.
+// - 1 초 뒤 제목 글을 바꿔 자연 크기가 따라가는지 보인다.
+// - 주소 ?devtools=1 이면 개발자 도구(F2)를 처음부터 연다. (러스트 VANILLA_EXAMPLE_DEVTOOLS=1)
+//==============================================================================
+import { Engine, EngineConfiguration, Vector2, Color, UIScene, UINode, UILabel, Paint, LayoutStrength, LayoutPriority, LayoutConstraintAxis } from "../../import.js";
+
+const query = new System.URLSearchParams(System.location.search);
+const isDevToolsOpen = query.get("devtools") === "1";
+
+//==============================================================================
+// Paint 를 붙인 UINode 만들기.
+//==============================================================================
+function createUINode(parentNode, name, color) {
+	const node = new UINode();
+	node.setName(name);
+	parentNode.addChild(node);
+	if (color !== "") {
+		const paint = node.addComponent(Paint);
+		paint.setColor(color);
+		paint.setRoundSize(10);
+	}
+	return node;
+}
+
+//==============================================================================
+// 노드에 제약 걸기.
+//==============================================================================
+function constrain(node, constraintList) {
+	for (const constraint of constraintList) {
+		node.addConstraint(constraint);
+	}
+}
+
+//==============================================================================
+// 글 붙이기.
+//==============================================================================
+function addLabel(node, text, fontSize, color) {
+	const label = node.addComponent(UILabel);
+	label.setFontSize(fontSize);
+	label.setText(text);
+	label.setTextColor(color);
+	return label;
+}
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class LayoutScene extends UIScene {
+	/** @private @type { UILabel } */ #titleLabel = null;
+	/** @private @type { number } */ #elapsedSeconds = 0;
+	/** @private @type { boolean } */ #isTitleChanged = false;
+
+	//==============================================================================
+	// 애셋 읽기 자리. (세이프 에어리어를 흉내 낸다)
+	//==============================================================================
+	async loadAssets() {
+		await super.loadAssets();
+		this.getEngine().getViewManager().setSafeAreaOverride({ top: 40, right: 0, bottom: 30, left: 0 });
+	}
+
+	//==============================================================================
+	// 초기화. (노드를 짓고 제약을 건다)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		const screenWidth = this.getScreenNode().widthAnchor;
+		const safeArea = this.getSafeAreaLayoutGuide();
+
+		// 머리 띠.
+		const header = createUINode(root, "header", "#3a5a8c");
+		constrain(header, [header.leftAnchor.equalTo(safeArea.leftAnchor), header.topAnchor.equalTo(safeArea.topAnchor), header.rightAnchor.equalTo(safeArea.rightAnchor), header.heightAnchor.equalTo(72)]);
+
+		// 제목. (크기는 글의 자연 크기)
+		const title = createUINode(header, "title", "");
+		this.#titleLabel = addLabel(title, "오토레이아웃 (UIScene + UINode)", 30, "#ffffff");
+		constrain(title, [title.centerXAnchor.equalTo(header.centerXAnchor), title.centerYAnchor.equalTo(header.centerYAnchor)]);
+		title.addComponent(Paint).setColor(new Color(1, 1, 1, 0.12));
+
+		// 옆 판. (화면 25% 를 바라되 200 ~ 320)
+		const side = createUINode(root, "side", "#2a3346");
+		const preferredStrength = LayoutStrength.fromPriority(LayoutPriority.defaultLow);
+		constrain(side, [
+			side.leftAnchor.equalTo(safeArea.leftAnchor.add(12)),
+			side.topAnchor.equalTo(header.bottomAnchor.add(12)),
+			side.bottomAnchor.equalTo(safeArea.bottomAnchor.subtract(12)),
+			side.widthAnchor.equalTo(screenWidth.multiply(0.25)).withStrength(preferredStrength),
+			side.widthAnchor.greaterThanOrEqualTo(200),
+			side.widthAnchor.lessThanOrEqualTo(320),
+		]);
+
+		// 본문. (여백 가이드 24)
+		const body = createUINode(root, "body", "#1f2636");
+		constrain(body, [body.leftAnchor.equalTo(side.rightAnchor.add(12)), body.topAnchor.equalTo(header.bottomAnchor.add(12)), body.rightAnchor.equalTo(safeArea.rightAnchor.subtract(12)), body.bottomAnchor.equalTo(safeArea.bottomAnchor.subtract(12))]);
+		body.setLayoutMargins({ top: 24, left: 24, bottom: 24, right: 24 });
+		const marginGuide = body.getLayoutMarginsGuide();
+
+		// 같은 너비 단추 셋. (사이 16)
+		const buttonColors = ["#e07a5f", "#81b29a", "#f2cc8f"];
+		const buttonList = [];
+		for (let buttonIndex = 0; buttonIndex < buttonColors.length; buttonIndex++) {
+			const button = createUINode(body, `button${buttonIndex}`, buttonColors[buttonIndex]);
+			addLabel(button, `단추 ${buttonIndex + 1}`, 24, "#1d1d1d");
+			buttonList.push(button);
+		}
+		for (let buttonIndex = 0; buttonIndex < buttonList.length; buttonIndex++) {
+			const button = buttonList[buttonIndex];
+			// 단추 글의 자연 너비로 줄어들려는 힘(hug)을 낮춰 옆 판의 바라는 너비를 밀어내지 않게 한다.
+			button.setContentHuggingPriority(LayoutPriority.fittingSizeLevel, LayoutConstraintAxis.horizontal);
+			const constraintList = [button.topAnchor.equalTo(marginGuide.topAnchor), button.heightAnchor.equalTo(64)];
+			if (buttonIndex > 0) {
+				const previousButton = buttonList[buttonIndex - 1];
+				constraintList.push(button.leftAnchor.equalTo(previousButton.rightAnchor.add(16)));
+				constraintList.push(button.widthAnchor.equalTo(previousButton.widthAnchor));
+			}
+			else {
+				constraintList.push(button.leftAnchor.equalTo(marginGuide.leftAnchor));
+			}
+			if (buttonIndex + 1 === buttonList.length) {
+				constraintList.push(button.rightAnchor.equalTo(marginGuide.rightAnchor));
+			}
+			constrain(button, constraintList);
+		}
+
+		// 자연 크기 글. (왼쪽 위만 정하고 크기는 글이 정한다)
+		const note = createUINode(body, "note", "");
+		note.addComponent(Paint).setColor(new Color(1, 1, 1, 0.08));
+		addLabel(note, "이 글 칸의 크기는 글의 자연 크기다", 22, "#d0d8e8");
+		constrain(note, [note.leftAnchor.equalTo(marginGuide.leftAnchor), note.topAnchor.equalTo(buttonList[0].bottomAnchor.add(24))]);
+
+		// UIScene 의 개발자 도구 손잡이(getDevTools)는 원본에 아직 없어 있을 때만 연다. (GameScene 에는 있다)
+		if (isDevToolsOpen && typeof this.getDevTools === "function") {
+			const devTools = this.getDevTools();
+			if (devTools !== null && devTools !== undefined) {
+				devTools.setVisible(true);
+				devTools.setSelectedNode(side);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 갱신. (1 초 뒤 제목 글을 바꿔 자연 크기가 따라가는지 보인다)
+	//==============================================================================
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#elapsedSeconds += timeDelta;
+		if (this.#isTitleChanged || this.#elapsedSeconds < 1) {
+			return;
+		}
+		this.#isTitleChanged = true;
+		this.#titleLabel.setText("제목 글이 길어지면 칸도 자연 크기로 따라 커진다");
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "UI 씬과 오토레이아웃 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+const layoutScene = new LayoutScene();
+layoutScene.setLoadingMinDurationMs(0);
+layoutScene.setSceneBackgroundColor("#10141c");
+engine.run(layoutScene);
+</script>
+</body>
+</html>

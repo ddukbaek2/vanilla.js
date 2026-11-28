@@ -11,12 +11,47 @@ import { OBB } from "../../base/obb.js";
 import { TransformNode } from "./transformnode.js";
 import { Engine } from "../engine.js";
 import { Mask } from "../component/mask.js";
+import { Component } from "../component.js";
+
+
+//==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 화면 밖 거르기 판정에 고쳐 쓰는 칸. (graphic.isLocalRectVisible 은 받은 영역을 그 자리에서 읽기만 한다)
+const cullContentSize = Vector2.zero();
+const cullRect = new Rect();
+const cullDrawnRect = new Rect();
+// 뷰 좌표를 로컬 좌표로 바꿀 때 내용 크기를 읽어 두는 칸. (convertViewToLocal)
+const convertContentSize = Vector2.zero();
+// contains 가 네 귀퉁이와 판정을 쓰는 칸. (UIButton 이 프레임마다 마우스가 올라왔는지 물어도 할당하지 않게)
+const containsCorners = [Vector2.zero(), Vector2.zero(), Vector2.zero(), Vector2.zero()];
+const containsObb = new OBB();
+const containsScale = Vector2.zero();
+const containsVector = Vector2.zero();
 
 
 //==============================================================================
 // 계층적 영역 객체.
 // - Anchor, Pivot, ConetentSize 기능.
 //==============================================================================
+/**
+ * @example <caption>부모 안에 사각형으로 놓고 맞는지 보기</caption>
+ * import { WorldNode, Vector2 } from "./build/vanilla.js";
+ *
+ * const panel = new WorldNode();
+ * panel.setPivot(Vector2.create(0, 0));
+ * panel.setContentSize(Vector2.create(400, 300));
+ * const button = new WorldNode();
+ * button.setRect(20, 20, 120, 40);
+ * button.setInteractable(true);
+ * panel.addChild(button);
+ * const corners = button.getWorldCorners();
+ * console.log(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+ * const touchPosition = Vector2.create(50, 30);
+ * const isInside = button.contains(touchPosition);
+ * const localPosition = button.convertViewToLocal(touchPosition);
+ * console.log(isInside, localPosition.x, localPosition.y);
+ */
 export class WorldNode extends TransformNode {
     //==============================================================================
     // 멤버 변수 목록.
@@ -46,7 +81,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @param { Graphic } graphic
+     * @param { Graphic } graphic 변환을 걸 그래픽.
      */
     pushTransform(graphic) {
 
@@ -59,20 +94,22 @@ export class WorldNode extends TransformNode {
             // 트랜스폼 반영.
             // localPosition 은 부모 영역 내 자기 객체의 중심점 좌표 (anchor / pivot 영향 없음).
             // anchor 는 anchoredPosition 계산용 메타데이터일 뿐 렌더에 직접 영향 주지 않는다.
-            const localPosition = this.getLocalPosition();
-            const localRotation = this.getLocalRotation();
-            const radian = Math.degreeToRadian(localRotation);
-            const localScale = this.getLocalScale();
-            graphic.translate(localPosition.x, localPosition.y);
-            graphic.rotate(radian);
-            graphic.scale(localScale.x, localScale.y);
+            this.applyLocalTransform(graphic);
 
             // 현재 노드의 피봇 반영.
             // 캔버스2D는 기준점을 좌상으로 여기고 우하방향으로 그림을 그리므로.
             // 마지막 원점에서 현재 컨텐트사이즈 크기를 기준으로한 피봇만큼 상대적으로 당김.
-            const pivot = this.getPivot();
-            const contentSize = this.getContentSize();
-            graphic.translate(-contentSize.x * pivot.x, -contentSize.y * pivot.y);
+            // 피봇과 내용 크기는 복제하지 않고 읽는다. getPivot() / getContentSize() 를 덮어쓴 하위 클래스면 그 함수로 읽는다.
+            const isPivotOverridden = this.getPivot !== WorldNode.prototype.getPivot;
+            const isContentSizeOverridden = this.getContentSize !== WorldNode.prototype.getContentSize;
+            if (isPivotOverridden || isContentSizeOverridden) {
+                const pivot = this.getPivot();
+                const contentSize = this.getContentSize();
+                graphic.translate(-contentSize.x * pivot.x, -contentSize.y * pivot.y);
+            }
+            else {
+                graphic.translate(-this.#contentSize.x * this.#pivot.x, -this.#contentSize.y * this.#pivot.y);
+            }
 
             // 투명도 반영.
             const localOpacity = this.getLocalOpacity();
@@ -85,22 +122,35 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @param { Graphic } graphic
+     * @param { Graphic } graphic 그릴 그래픽.
      */
     draw(graphic) {
-        const isVisible = this.isVisible();
-        if (!isVisible) {
+        const isDrawn = this.isActive() && this.isVisible() && this.getLocalOpacity() > 0;
+        if (!isDrawn) {
             return;
         }
 
+        // 투명도 층이면 이 노드와 자손을 층에 모아 그렸다가 한 번에 얹는다. (CSS opacity)
+        const isOpacityLayer = this.isOpacityLayer() && graphic.getGlobalAlpha() < 1;
+        if (isOpacityLayer) {
+            graphic.beginOpacityLayer();
+        }
+
         // 컴포넌트 출력. 동시에 Mask 컴포넌트가 있는지 확인.
+        // 화면 밖이라 걸러진 노드는 컴포넌트만 건너뛴다. (마스크의 클립과 자식은 그대로)
         const components = this.getAllComponents();
+        const isComponentDrawCulled = this.#isComponentDrawCulled(graphic, components);
+        if (isComponentDrawCulled) {
+            graphic.addCulledNodeCount(1);
+        }
         let maskComponent = null;
         for (const component of components) {
             if (!component.isEnable()) {
                 continue;
             }
-            component.draw(graphic);
+            if (!isComponentDrawCulled) {
+                graphic.drawComponent(component);
+            }
             if (component instanceof Mask) {
                 maskComponent = component;
             }
@@ -111,16 +161,203 @@ export class WorldNode extends TransformNode {
             maskComponent.beginClip(graphic);
         }
 
-        // 자식 출력.
-        const children = this.getChildren();
-        for (const child of children) {
-            graphic.drawNode(child);
-        }
+        // 자식 출력. (보이는 범위만, TransformNode.drawChildren)
+        this.drawChildren(graphic);
 
         // 마스크가 있으면 클리핑 종료.
         if (maskComponent) {
             maskComponent.endClip(graphic);
         }
+
+        if (isOpacityLayer) {
+            graphic.endOpacityLayer();
+        }
+    }
+
+    //==============================================================================
+    // 화면 밖이라 이 노드의 컴포넌트 그리기를 건너뛸지 반환. (draw 가 부른다)
+    // - Graphic 의 화면 밖 거르기가 켜져 있고, 켜진 컴포넌트가 하나 이상이며 모두 그리는 곳을 알리고,
+    //   그 사각형들을 합쳐 지금 변환으로 옮긴 사각형이 화면에 걸치지 않으면 true.
+    // - 내용 영역 안에서만 그린다고 알리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 본다. (나인 슬라이스가 크기를 올림해 한 단위 안쪽으로 넘칠 수 있다)
+    // - 밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 가 알려 준 사각형으로 본다. (넘친 글 등, 모르면 거르지 않는다)
+    // - 자식은 여기서 보지 않는다. 자식은 저마다 따로 본다.
+    // - 하위 트리가 보이는 사각형 안에 다 든 노드를 그리는 중이면(Graphic.isInsideVisibleBounds) 견주지 않는다. (컴포넌트가 그리는 곳은 하위 트리 경계 안이다)
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic 화면 밖 거르기를 물을 그래픽.
+     * @param { Component[] } components 이 노드의 컴포넌트 목록.
+     * @returns { boolean } 컴포넌트 그리기를 건너뛰어도 되면 참.
+     */
+    #isComponentDrawCulled(graphic, components) {
+        if (!graphic.isCullingEnabled() || (typeof graphic.isInsideVisibleBounds === "function" && graphic.isInsideVisibleBounds())) {
+            return false;
+        }
+
+        // 켜진 컴포넌트가 모두 그리는 곳을 알리는지. (내용 영역 안이거나 알려 준 사각형)
+        let enabledComponentCount = 0;
+        let isInsideContentReported = false;
+        let isDrawnRectFound = false;
+        let minimumX = 0;
+        let minimumY = 0;
+        let maximumX = 0;
+        let maximumY = 0;
+        const drawnRect = cullDrawnRect;
+        for (const component of components) {
+            if (!component.isEnable()) {
+                continue;
+            }
+            // draw 를 덮어쓰지 않은 컴포넌트(갱신만 하는 것)는 아무것도 그리지 않는다.
+            if (component.draw === Component.prototype.draw) {
+                continue;
+            }
+            enabledComponentCount += 1;
+            if (component.isDrawnInsideContent()) {
+                isInsideContentReported = true;
+                continue;
+            }
+            if (!component.calculateDrawnRect(drawnRect)) {
+                return false;
+            }
+            if (!(drawnRect.size.x > 0 && drawnRect.size.y > 0)) {
+                continue;
+            }
+            const drawnRightX = drawnRect.position.x + drawnRect.size.x;
+            const drawnBottomY = drawnRect.position.y + drawnRect.size.y;
+            if (!isDrawnRectFound) {
+                minimumX = drawnRect.position.x;
+                minimumY = drawnRect.position.y;
+                maximumX = drawnRightX;
+                maximumY = drawnBottomY;
+                isDrawnRectFound = true;
+            }
+            else {
+                minimumX = System.Math.min(minimumX, drawnRect.position.x);
+                minimumY = System.Math.min(minimumY, drawnRect.position.y);
+                maximumX = System.Math.max(maximumX, drawnRightX);
+                maximumY = System.Math.max(maximumY, drawnBottomY);
+            }
+        }
+        if (enabledComponentCount === 0) {
+            return false;
+        }
+
+        // 내용 영역. (복제본 없이 읽는다)
+        if (isInsideContentReported) {
+            const contentSize = cullContentSize;
+            this.copyContentSizeTo(contentSize);
+            if (!(contentSize.x > 0 && contentSize.y > 0)) {
+                return false;
+            }
+            if (!isDrawnRectFound) {
+                minimumX = -1;
+                minimumY = -1;
+                maximumX = contentSize.x + 1;
+                maximumY = contentSize.y + 1;
+                isDrawnRectFound = true;
+            }
+            else {
+                minimumX = System.Math.min(minimumX, -1);
+                minimumY = System.Math.min(minimumY, -1);
+                maximumX = System.Math.max(maximumX, contentSize.x + 1);
+                maximumY = System.Math.max(maximumY, contentSize.y + 1);
+            }
+        }
+        if (!isDrawnRectFound) {
+            return false;
+        }
+        const rect = cullRect;
+        rect.position.set(minimumX, minimumY);
+        rect.size.set(maximumX - minimumX, maximumY - minimumY);
+        const isVisible = graphic.isLocalRectVisible(rect);
+        return !isVisible;
+    }
+
+    //==============================================================================
+    // 노드 스스로(컴포넌트와 자식 밖에) 그리는 사각형을 rect 에 적기. (내용 영역의 왼쪽 위가 원점, 알면 true)
+    // - draw 를 덮어쓰지 않은 노드는 스스로 그리는 것이 없으므로 크기 0 을 적고 true.
+    // - draw 를 덮어쓴 노드는 어디에 그리는지 모르므로 false. (그 노드의 조상은 하위 트리 그리기를 건너뛰지 않는다)
+    //   덮어쓴 노드가 이 함수도 덮어써 그리는 사각형을 알리면 건너뛸 수 있다. 사각형이 바뀌면 markDrawBoundsDirty 를 부른다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+     * @returns { boolean } 알면 참.
+     * @example <caption>스스로 그리는 노드가 그리는 곳 알리기</caption>
+     * import { WorldNode, Rect, Vector2, Colors } from "./build/vanilla.js";
+     *
+     * class Badge extends WorldNode {
+     * 	draw(graphic) {
+     * 		super.draw(graphic);
+     * 		const contentSize = this.getContentSize();
+     * 		graphic.setFillColor(Colors.white);
+     * 		graphic.drawRect(Rect.create(contentSize.x - 6, -6, 12, 12));
+     * 	}
+     * 	calculateDrawnRect(rect) {
+     * 		const contentSize = this.getContentSize();
+     * 		rect.position.set(contentSize.x - 6, -6);
+     * 		rect.size.set(12, 12);
+     * 		return true;
+     * 	}
+     * }
+     *
+     * const badge = new Badge();
+     * badge.setContentSize(Vector2.create(40, 40));
+     * const drawnRect = Rect.zero();
+     * console.log(badge.calculateDrawnRect(drawnRect), drawnRect.position.x);
+     */
+    calculateDrawnRect(rect) {
+        if (this.draw !== WorldNode.prototype.draw) {
+            return false;
+        }
+        rect.position.set(0, 0);
+        rect.size.set(0, 0);
+        return true;
+    }
+
+    //==============================================================================
+    // 하위 트리 그리기 경계를 부모의 내용 좌표로 옮기기. (오버라이드: 위치, 회전, 배율, 피봇으로, pushTransform 과 같은 차례)
+    // - pushTransform 이나 위치, 배율, 회전, 피봇, 내용 크기 읽기를 덮어쓴 노드는 어디에 놓이는지 모르므로 false. (부모는 건너뛰지 않고 이 노드 아래는 저마다 건너뛸 수 있다)
+    //==============================================================================
+    /**
+     * @override
+     * @param { Rect } rect 옮길 경계. (이 노드의 내용 좌표, 부모의 내용 좌표로 바뀐 경계 상자를 적는다)
+     * @returns { boolean } 놓이는 곳을 알면 참.
+     * @example <caption>자식의 그리기 경계를 부모 좌표로 옮기기</caption>
+     * import { WorldNode, Rect, Vector2, Pivot } from "./build/vanilla.js";
+     *
+     * const node = new WorldNode();
+     * node.setPivot(Pivot.topLeft);
+     * node.setLocalPosition(Vector2.create(100, 20));
+     * node.setLocalScale(Vector2.create(2, 2));
+     * const drawBounds = Rect.create(0, 0, 10, 10);
+     * node.transformDrawBoundsToParent(drawBounds);
+     * console.log(drawBounds.position.x, drawBounds.size.x);
+     */
+    transformDrawBoundsToParent(rect) {
+        if (!this.#isPlacementKnown()) {
+            return false;
+        }
+        const pivotOffsetX = this.#contentSize.x * this.#pivot.x;
+        const pivotOffsetY = this.#contentSize.y * this.#pivot.y;
+        const localPosition = this.getLocalPosition();
+        this.transformLocalRectToParent(rect, pivotOffsetX, pivotOffsetY, localPosition.x, localPosition.y);
+        return true;
+    }
+
+    //==============================================================================
+    // 부모 내용 좌표에 어디에 놓이는지 아는지 반환. (pushTransform 과 변환 읽기를 덮어쓰지 않았으면 참, calculateSubtreeDrawBounds 가 부른다)
+    //==============================================================================
+    /**
+     * @returns { boolean } 놓이는 곳을 알면 참.
+     */
+    #isPlacementKnown() {
+        return this.pushTransform === WorldNode.prototype.pushTransform
+            && this.applyLocalTransform === TransformNode.prototype.applyLocalTransform
+            && this.getLocalPosition === TransformNode.prototype.getLocalPosition
+            && this.getLocalScale === TransformNode.prototype.getLocalScale
+            && this.getLocalRotation === TransformNode.prototype.getLocalRotation
+            && this.getPivot === WorldNode.prototype.getPivot
+            && this.getContentSize === WorldNode.prototype.getContentSize;
     }
 
     //==============================================================================
@@ -128,7 +365,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @param { Graphic } graphic
+     * @param { Graphic } graphic 그릴 그래픽.
      */
     drawGizmos(graphic) {
         // const isGizmoVisible = this.isGizmoVisible();
@@ -179,32 +416,119 @@ export class WorldNode extends TransformNode {
     // 기준점 설정.
     //==============================================================================
     /**
-     * @param { Vector2 } pivot
+     * @param { Vector2 } pivot 기준점. (내용 크기에 대한 비, 0 ~ 1 로 자르고, (0, 0) 이 왼쪽 위)
      */
     setPivot(pivot) {
-        this.#pivot = pivot.clone();
-        this.#pivot.x = Math.clamp(pivot.x, 0, 1);
-        this.#pivot.y = Math.clamp(pivot.y, 0, 1);
+        // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getPivot() 은 복제해 준다)
+        const pivotX = Math.clamp(pivot.x, 0, 1);
+        const pivotY = Math.clamp(pivot.y, 0, 1);
+        const isChanged = this.#pivot.x !== pivotX || this.#pivot.y !== pivotY;
+        this.#pivot.x = pivotX;
+        this.#pivot.y = pivotY;
+        if (isChanged) {
+            this.markParentDrawBoundsDirty();
+        }
     }
 
     //==============================================================================
     // 기준점 반환.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 기준점의 사본.
      */
     getPivot() {
         return this.#pivot.clone();
     }
 
     //==============================================================================
+    // 기준점을 주어진 벡터에 쓰기. (getPivot 과 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>기준점 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setPivot(Vector2.create(0.5, 1));
+     * const pivot = node.readPivot(Vector2.create(0, 0));
+     * if (pivot.x !== 0.5 || pivot.y !== 1) {
+     * 	throw new Error("pivot failed");
+     * }
+     */
+    readPivot(out) {
+        if (this.getPivot !== WorldNode.prototype.getPivot) {
+            const pivot = this.getPivot();
+            out.x = pivot.x;
+            out.y = pivot.y;
+            return out;
+        }
+        out.x = this.#pivot.x;
+        out.y = this.#pivot.y;
+        return out;
+    }
+
+    //==============================================================================
     // 실제 내용 크기 설정.
     //==============================================================================
     /**
-     * @param { Vector2 } contentSize
+     * @param { Vector2 } contentSize 내용 크기. (값을 옮겨 적는다)
      */
     setContentSize(contentSize) {
-        this.#contentSize = contentSize.clone();
+        // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getContentSize() 는 복제해 준다)
+        const isChanged = this.#contentSize.x !== contentSize.x || this.#contentSize.y !== contentSize.y;
+        this.#contentSize.x = contentSize.x;
+        this.#contentSize.y = contentSize.y;
+        // 같은 크기면 경계를 다시 셈하지 않는다. (프레임마다 같은 크기를 다시 놓는 배치)
+        if (isChanged) {
+            this.markDrawBoundsDirty();
+        }
+    }
+
+    //==============================================================================
+    // 실제 내용 크기 설정. (너비, 높이를 바로 받는다, Vector2 를 만들지 않는다)
+    // - setContentSize() 를 덮어쓴 하위 클래스면 setContentSize 로 넘긴다.
+    //==============================================================================
+    /**
+     * @param { number } width 내용 너비.
+     * @param { number } height 내용 높이.
+     */
+    setContentSizeXY(width, height) {
+        const isContentSizeOverridden = this.setContentSize !== WorldNode.prototype.setContentSize;
+        if (isContentSizeOverridden) {
+            this.setContentSize(Vector2.create(width, height));
+            return;
+        }
+        const isChanged = this.#contentSize.x !== width || this.#contentSize.y !== height;
+        this.#contentSize.x = width;
+        this.#contentSize.y = height;
+        if (isChanged) {
+            this.markDrawBoundsDirty();
+        }
+    }
+
+    //==============================================================================
+    // 부모 영역 안의 사각형에 놓기. (x, y 는 이 노드의 왼쪽 위, 부모 내용 영역의 왼쪽 위가 원점)
+    // - 내용 크기를 width, height 로 두고, 피봇이 어디든 왼쪽 위가 (x, y) 에 오게 로컬 위치를 정한다. (x + width * pivot.x, y + height * pivot.y)
+    // - 앵커는 바꾸지 않는다. 로컬 위치는 앵커와 무관하게 부모 왼쪽 위 기준이라 앵커가 어디든 같은 자리다. (getAnchoredPosition 은 그 앵커 기준으로 다시 셈해 준다)
+    // - 로컬 배율과 회전은 보지 않는다. (배율 1, 회전 0 일 때 화면에서도 그 사각형이다)
+    //==============================================================================
+    /**
+     * @param { number } x 왼쪽 위 X. (부모 내용 영역의 왼쪽 위가 원점)
+     * @param { number } y 왼쪽 위 Y. (부모 내용 영역의 왼쪽 위가 원점)
+     * @param { number } width 내용 너비.
+     * @param { number } height 내용 높이.
+     */
+    setRect(x, y, width, height) {
+        this.setContentSizeXY(width, height);
+        const isPivotOverridden = this.getPivot !== WorldNode.prototype.getPivot;
+        let pivotX = this.#pivot.x;
+        let pivotY = this.#pivot.y;
+        if (isPivotOverridden) {
+            const pivot = this.getPivot();
+            pivotX = pivot.x;
+            pivotY = pivot.y;
+        }
+        this.setLocalPositionXY(x + width * pivotX, y + height * pivotY);
     }
 
     //==============================================================================
@@ -212,17 +536,64 @@ export class WorldNode extends TransformNode {
     // - 부모가 없고(루트 노드) 명시적으로 설정된 적 없으면 현재 뷰 크기를 반환한다.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 내용 크기의 사본.
      */
     getContentSize() {
         return this.#contentSize.clone();
     }
 
     //==============================================================================
+    // 내용 크기를 주어진 벡터에 쓰기. (getContentSize 와 같은 값, 복제하지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out.
+     * @example <caption>내용 크기 읽기</caption>
+     * import { WorldNode, Vector2 } from "./vanilla.js";
+     * const node = new WorldNode();
+     * node.setContentSize(Vector2.create(120, 40));
+     * const contentSize = node.readContentSize(Vector2.create(0, 0));
+     * if (contentSize.x !== 120 || contentSize.y !== 40) {
+     * 	throw new Error("content size failed");
+     * }
+     */
+    readContentSize(out) {
+        if (this.getContentSize !== WorldNode.prototype.getContentSize) {
+            const contentSize = this.getContentSize();
+            out.x = contentSize.x;
+            out.y = contentSize.y;
+            return out;
+        }
+        out.x = this.#contentSize.x;
+        out.y = this.#contentSize.y;
+        return out;
+    }
+
+    //==============================================================================
+    // 실제 내용 크기를 target 에 적는다. (복제본을 만들지 않는다, Paint 가 그릴 때마다 쓴다)
+    // - getContentSize() 를 덮어쓴 하위 클래스면 그 함수가 주는 값을 적는다.
+    //==============================================================================
+    /**
+     * @param { Vector2 } target 내용 크기를 받을 벡터.
+     */
+    copyContentSizeTo(target) {
+        const isContentSizeOverridden = this.getContentSize !== WorldNode.prototype.getContentSize;
+        if (isContentSizeOverridden) {
+            const contentSize = this.getContentSize();
+            target.x = contentSize.x;
+            target.y = contentSize.y;
+            return;
+        }
+
+        target.x = this.#contentSize.x;
+        target.y = this.#contentSize.y;
+    }
+
+    //==============================================================================
     // 앵커 설정.
     //==============================================================================
     /**
-     * @param { Vector2 } anchor
+     * @param { Vector2 } anchor 앵커. (부모 내용 크기에 대한 비, 0 ~ 1 로 자른다)
      */
     setAnchor(anchor) {
         this.#anchor = anchor.clone();
@@ -234,7 +605,7 @@ export class WorldNode extends TransformNode {
     // 앵커 반환.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 앵커. (안의 벡터 그대로)
      */
     getAnchor() {
         return this.#anchor;
@@ -247,7 +618,19 @@ export class WorldNode extends TransformNode {
     //   (localPosition 은 anchor 와 무관하게 부모 영역 내 자기 중심점 좌표를 나타냄)
     //==============================================================================
     /**
-     * @param { Vector2 } anchoredPosition
+     * @param { Vector2 } anchoredPosition 앵커 기준 자리. (부모가 WorldNode 가 아니면 로컬 위치로 쓰고, null 이면 아무것도 하지 않는다)
+     * @example <caption>부모의 오른쪽 위 귀퉁이에서 띄워 놓기</caption>
+     * import { WorldNode, Vector2 } from "./build/vanilla.js";
+     *
+     * const parent = new WorldNode();
+     * parent.setContentSize(Vector2.create(800, 600));
+     * const closeButton = new WorldNode();
+     * parent.addChild(closeButton);
+     * closeButton.setAnchor(Vector2.create(1, 0));
+     * closeButton.setAnchoredPosition(Vector2.create(-50, 40));
+     * const localPosition = closeButton.getLocalPosition();
+     * const anchoredPosition = closeButton.getAnchoredPosition();
+     * console.log(localPosition.x, localPosition.y, anchoredPosition.x, anchoredPosition.y);
      */
     setAnchoredPosition(anchoredPosition) {
         if (anchoredPosition === null || anchoredPosition === undefined) {
@@ -273,7 +656,7 @@ export class WorldNode extends TransformNode {
     // - localPosition - anchorRef 로 역산해서 반환한다.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 앵커 기준 자리. (부모가 WorldNode 가 아니면 로컬 위치)
      */
     getAnchoredPosition() {
         const localPosition = this.getLocalPosition();
@@ -297,7 +680,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @returns { Vector2 }
+     * @returns { Vector2 } 월드 자리. (기준점의 자리)
      */
     getPosition() {
         const parent = this.getParent();
@@ -327,10 +710,95 @@ export class WorldNode extends TransformNode {
     }
 
     //==============================================================================
+    // 글로벌 위치를 주어진 벡터에 쓰기. (getPosition 과 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    // - getPosition 이나 부모의 내용 크기, 기준점 읽기를 덮어쓴 하위 클래스면 그 함수로 읽는다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } out 쓸 벡터.
+     * @returns { Vector2 } out. (기준점의 자리)
+     */
+    readPosition(out) {
+        const parent = this.getParent();
+        if (this.getPosition !== WorldNode.prototype.getPosition || !(parent instanceof WorldNode)) {
+            return super.readPosition(out);
+        }
+        this.readLocalPosition(out);
+        const localX = out.x;
+        const localY = out.y;
+        parent.readPosition(out);
+        const parentPositionX = out.x;
+        const parentPositionY = out.y;
+        parent.readContentSize(out);
+        const parentContentSizeX = out.x;
+        const parentContentSizeY = out.y;
+        parent.readPivot(out);
+        const parentPivotX = out.x;
+        const parentPivotY = out.y;
+        const parentRotation = parent.getRotation();
+        parent.readScale(out);
+        const parentScaleX = out.x;
+        const parentScaleY = out.y;
+
+        const totalLocalX = localX - parentContentSizeX * parentPivotX;
+        const totalLocalY = localY - parentContentSizeY * parentPivotY;
+        const radian = Math.degreeToRadian(parentRotation);
+        const cosRadian = Math.cos(radian);
+        const sinRadian = Math.sin(radian);
+        const sx = totalLocalX * parentScaleX;
+        const sy = totalLocalY * parentScaleY;
+        const rx = sx * cosRadian - sy * sinRadian;
+        const ry = sx * sinRadian + sy * cosRadian;
+        out.x = parentPositionX + rx;
+        out.y = parentPositionY + ry;
+        return out;
+    }
+
+    //==============================================================================
+    // 글로벌 위치 설정. (getPosition 의 거꾸로)
+    // - parent.getPosition() (= 부모 pivot 점의 월드 좌표) 에서 본 차이를 부모 회전/스케일을 풀어 부모 pivot 점 기준 오프셋으로 되돌린 뒤
+    //   부모 content top-left 기준(localPosition)으로 옮긴다. 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } position 월드 자리. (기준점의 자리, 부모의 회전과 배율을 풀어 로컬 위치로 바꾼다)
+     */
+    setPosition(position) {
+        const parent = this.getParent();
+        if (!(parent instanceof WorldNode)) {
+            super.setPosition(position);
+            return;
+        }
+
+        const parentPosition = parent.getPosition();
+        const parentContentSize = parent.getContentSize();
+        const parentPivot = parent.getPivot();
+        const parentRotation = parent.getRotation();
+        const parentScale = parent.getScale();
+
+        // 부모 pivot 점 기준 차이.
+        const dx = position.x - parentPosition.x;
+        const dy = position.y - parentPosition.y;
+
+        // 역회전, 역스케일.
+        const radian = Math.degreeToRadian(-parentRotation);
+        const cosRadian = Math.cos(radian);
+        const sinRadian = Math.sin(radian);
+        const rx = dx * cosRadian - dy * sinRadian;
+        const ry = dx * sinRadian + dy * cosRadian;
+        const sx = parentScale.x !== 0 ? rx / parentScale.x : 0;
+        const sy = parentScale.y !== 0 ? ry / parentScale.y : 0;
+
+        // 부모 content top-left 기준으로 옮김.
+        const newLocalPosition = Vector2.create(sx + parentContentSize.x * parentPivot.x, sy + parentContentSize.y * parentPivot.y);
+        this.setLocalPosition(newLocalPosition);
+    }
+
+    //==============================================================================
     // 실제 화면에 그려지는 영역 반환. (OBB)
     //==============================================================================
     /**
-     * @returns { Vector2[] }
+     * @returns { Vector2[] } 네 귀퉁이. (왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래 차례, 뷰 좌표)
      */
     getWorldCorners() {
         const position = this.getPosition();
@@ -363,7 +831,7 @@ export class WorldNode extends TransformNode {
     // getWorldCorners()를 기반으로 최소, 최대위치를 만들어 바운딩박스를 형성.
     //==============================================================================
     /**
-     * @returns { Rect }
+     * @returns { Rect } 네 귀퉁이를 감싸는 축 정렬 사각형.
      */
     getWorldBounds() {
         const worldCorners = this.getWorldCorners();
@@ -393,25 +861,218 @@ export class WorldNode extends TransformNode {
     // getWorldCorners() 를 통한 충돌 검출.
     //==============================================================================
     /**
-     * @param { Vector2 } viewPosition
-     * @returns { boolean }
+     * @param { Vector2 } viewPosition 볼 뷰 좌표.
+     * @returns { boolean } 네 귀퉁이 안이면 참. (null 이면 거짓)
      */
     contains(viewPosition) {
         if (viewPosition === null || viewPosition === undefined) {
             return false;
         }
+        // getWorldCorners 를 덮어쓰지 않았으면 같은 셈을 다시 쓰는 칸에 한다. (프레임마다 마우스 올림을 물어도 할당하지 않는다)
+        if (this.getWorldCorners !== WorldNode.prototype.getWorldCorners) {
+            const worldCorners = this.getWorldCorners();
+            const obb = new OBB();
+            obb.setEdges(worldCorners);
+            return obb.contains(viewPosition);
+        }
+        this.writeWorldCorners(containsCorners);
+        containsObb.setEdges(containsCorners);
+        return containsObb.contains(viewPosition);
+    }
+
+    //==============================================================================
+    // 네 귀퉁이를 주어진 벡터 넷에 쓰기. (getWorldCorners 와 같은 셈과 차례, 새 벡터를 짓지 않는다)
+    //==============================================================================
+    /**
+     * @param { Vector2[] } corners 쓸 벡터 넷. (왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래 차례)
+     * @returns { Vector2[] } corners.
+     * @private
+     */
+    writeWorldCorners(corners) {
+        const position = this.readPosition(containsVector);
+        const positionX = position.x;
+        const positionY = position.y;
+        const scale = this.readScale(containsScale);
+        const rotation = this.getRotation();
+        const contentSize = this.readContentSize(corners[0]);
+        const contentSizeX = contentSize.x;
+        const contentSizeY = contentSize.y;
+        const pivot = this.readPivot(corners[1]);
+        const pivotX = pivot.x;
+        const pivotY = pivot.y;
+
+        const width = contentSizeX * Math.abs(scale.x);
+        const height = contentSizeY * Math.abs(scale.y);
+
+        const left = -(width * pivotX);
+        const right = width * (1 - pivotX);
+        const top = -(height * pivotY);
+        const bottom = height * (1 - pivotY);
+
+        const radian = Math.degreeToRadian(rotation);
+        const cosR = Math.cos(radian);
+        const sinR = Math.sin(radian);
+
+        corners[0].x = left * cosR - top * sinR + positionX;
+        corners[0].y = left * sinR + top * cosR + positionY;
+        corners[1].x = right * cosR - top * sinR + positionX;
+        corners[1].y = right * sinR + top * cosR + positionY;
+        corners[2].x = right * cosR - bottom * sinR + positionX;
+        corners[2].y = right * sinR + bottom * cosR + positionY;
+        corners[3].x = left * cosR - bottom * sinR + positionX;
+        corners[3].y = left * sinR + bottom * cosR + positionY;
+        return corners;
+    }
+
+    //==============================================================================
+    // 뷰 좌표 → 이 노드의 로컬 좌표. (내용 영역의 왼쪽 위가 원점, 오른쪽 아래가 내용 크기)
+    // - 부모들의 위치, 배율, 회전을 모두 거친 네 귀퉁이(getWorldCorners)로 셈하므로 contains 와 같은 판정이다.
+    // - 내용 크기가 0 인 축은 0 을 돌려준다.
+    //==============================================================================
+    /**
+     * @param { Vector2 } viewPosition 바꿀 뷰 좌표.
+     * @returns { Vector2 } 로컬 좌표. (내용 영역의 왼쪽 위가 원점)
+     */
+    convertViewToLocal(viewPosition) {
         const worldCorners = this.getWorldCorners();
-        const obb = new OBB();
-        obb.setEdges(worldCorners);
-        const inside = obb.contains(viewPosition);
-        return inside;
+        const topLeft = worldCorners[0];
+        const topRight = worldCorners[1];
+        const bottomLeft = worldCorners[3];
+        const contentSize = convertContentSize;
+        this.copyContentSizeTo(contentSize);
+        const axisXX = topRight.x - topLeft.x;
+        const axisXY = topRight.y - topLeft.y;
+        const axisYX = bottomLeft.x - topLeft.x;
+        const axisYY = bottomLeft.y - topLeft.y;
+        const axisXLengthSquared = axisXX * axisXX + axisXY * axisXY;
+        const axisYLengthSquared = axisYX * axisYX + axisYY * axisYY;
+        const offsetX = viewPosition.x - topLeft.x;
+        const offsetY = viewPosition.y - topLeft.y;
+        let ratioX = 0;
+        if (axisXLengthSquared > 0) {
+            ratioX = (offsetX * axisXX + offsetY * axisXY) / axisXLengthSquared;
+        }
+        let ratioY = 0;
+        if (axisYLengthSquared > 0) {
+            ratioY = (offsetX * axisYX + offsetY * axisYY) / axisYLengthSquared;
+        }
+        return Vector2.create(ratioX * contentSize.x, ratioY * contentSize.y);
+    }
+
+    //==============================================================================
+    // 이 노드에서 뿌리까지 쌓은 월드 변환. (원소 여섯 { a, b, c, d, e, f }, 뷰 x = a * x + c * y + e, 뷰 y = b * x + d * y + f)
+    // - 노드마다 이동, 회전, 크기, 피봇 보정(내용 크기 x 피봇) 차례로 곱한다. (pushTransform, 러스트 판 calculate_local_matrix 와 같은 차례)
+    //==============================================================================
+    /**
+     * @private
+     * @returns { { a: number, b: number, c: number, d: number, e: number, f: number } }
+     */
+    calculateWorldAffine() {
+        let a = 1;
+        let b = 0;
+        let c = 0;
+        let d = 1;
+        let e = 0;
+        let f = 0;
+        let current = this;
+        while (current !== null && current !== undefined) {
+            const localPosition = current.getLocalPosition();
+            const localScale = current.getLocalScale();
+            const radian = Math.degreeToRadian(current.getLocalRotation());
+            const cosRadian = Math.cos(radian);
+            const sinRadian = Math.sin(radian);
+            let pivotOffsetX = 0;
+            let pivotOffsetY = 0;
+            if (typeof current.getContentSize === "function" && typeof current.getPivot === "function") {
+                const contentSize = current.getContentSize();
+                const pivot = current.getPivot();
+                pivotOffsetX = -contentSize.x * pivot.x;
+                pivotOffsetY = -contentSize.y * pivot.y;
+            }
+            // 이 노드의 로컬 행렬. (T(위치) R(회전) S(크기) T(피봇 보정))
+            const localA = cosRadian * localScale.x;
+            const localB = sinRadian * localScale.x;
+            const localC = -sinRadian * localScale.y;
+            const localD = cosRadian * localScale.y;
+            const localE = localA * pivotOffsetX + localC * pivotOffsetY + localPosition.x;
+            const localF = localB * pivotOffsetX + localD * pivotOffsetY + localPosition.y;
+            // 쌓인 행렬 앞에 부모 쪽 행렬을 곱한다. (local x accumulated)
+            const nextA = localA * a + localC * b;
+            const nextB = localB * a + localD * b;
+            const nextC = localA * c + localC * d;
+            const nextD = localB * c + localD * d;
+            const nextE = localA * e + localC * f + localE;
+            const nextF = localB * e + localD * f + localF;
+            a = nextA;
+            b = nextB;
+            c = nextC;
+            d = nextD;
+            e = nextE;
+            f = nextF;
+            const parent = current.getParent();
+            current = (parent !== null && parent !== undefined && typeof parent.getLocalPosition === "function") ? parent : null;
+        }
+        return { a, b, c, d, e, f };
+    }
+
+    //==============================================================================
+    // 노드 영역 안의 점 → 뷰 좌표. (내용 영역의 왼쪽 위가 원점, 부모들의 변환을 모두 거친다, 러스트 판 NodeTree::convert_node_position_to_view_position)
+    //==============================================================================
+    /**
+     * @param { Vector2 } nodePosition 이 노드 내용 좌표의 점.
+     * @returns { Vector2 } 뷰 좌표의 점.
+     * @example <caption>단추 오른쪽 아래 귀퉁이의 뷰 자리</caption>
+     * import { Vector2, WorldNode } from "./build/vanilla.js";
+     *
+     * const rootNode = new WorldNode();
+     * const buttonNode = new WorldNode();
+     * rootNode.addChild(buttonNode);
+     * buttonNode.setLocalPosition(Vector2.create(100, 100));
+     * buttonNode.setContentSize(Vector2.create(40, 20));
+     * const corner = buttonNode.convertNodePositionToViewPosition(Vector2.create(40, 20));
+     * console.log(corner.x, corner.y);
+     */
+    convertNodePositionToViewPosition(nodePosition) {
+        const affine = this.calculateWorldAffine();
+        return Vector2.create(affine.a * nodePosition.x + affine.c * nodePosition.y + affine.e, affine.b * nodePosition.x + affine.d * nodePosition.y + affine.f);
+    }
+
+    //==============================================================================
+    // 뷰 좌표 → 노드 영역 안의 점. (행렬을 뒤집을 수 없으면(배율 0) null, 러스트 판 NodeTree::convert_view_position_to_node_position)
+    //==============================================================================
+    /**
+     * @param { Vector2 } viewPosition 뷰 좌표의 점.
+     * @returns { Vector2 | null } 이 노드 내용 좌표의 점. (배율이 0 이라 뒤집을 수 없으면 null)
+     * @example <caption>뷰 자리를 노드 안 자리로 바꾸고 되돌리기</caption>
+     * import { Vector2, WorldNode } from "./build/vanilla.js";
+     *
+     * const rootNode = new WorldNode();
+     * const panelNode = new WorldNode();
+     * rootNode.addChild(panelNode);
+     * panelNode.setLocalPosition(Vector2.create(200, 100));
+     * panelNode.setContentSize(Vector2.create(100, 50));
+     * panelNode.setLocalScale(Vector2.create(2, 2));
+     * const nodePosition = panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100));
+     * console.log(nodePosition.x, nodePosition.y);
+     * panelNode.setLocalScale(Vector2.create(0, 1));
+     * console.log(panelNode.convertViewPositionToNodePosition(Vector2.create(200, 100)));
+     */
+    convertViewPositionToNodePosition(viewPosition) {
+        const affine = this.calculateWorldAffine();
+        const determinant = affine.a * affine.d - affine.b * affine.c;
+        if (determinant === 0 || !System.Number.isFinite(determinant)) {
+            return null;
+        }
+        const offsetX = viewPosition.x - affine.e;
+        const offsetY = viewPosition.y - affine.f;
+        return Vector2.create((affine.d * offsetX - affine.c * offsetY) / determinant, (affine.a * offsetY - affine.b * offsetX) / determinant);
     }
 
     //==============================================================================
     // 터치 인터랙션 활성화 설정.
     //==============================================================================
     /**
-     * @param { boolean } isInteractable
+     * @param { boolean } isInteractable 참이면 TouchRaycaster 가 이 노드를 맞힌다.
      */
     setInteractable(isInteractable) {
         this.#isInteractable = isInteractable;
@@ -421,7 +1082,7 @@ export class WorldNode extends TransformNode {
     // 터치 인터랙션 활성화 여부 반환.
     //==============================================================================
     /**
-     * @returns { boolean }
+     * @returns { boolean } 누를 수 있으면 참.
      */
     isInteractable() {
         return this.#isInteractable;
@@ -432,7 +1093,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchPress(viewInputPosition) {
         const components = this.getAllComponents();
@@ -448,7 +1109,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchMove(viewInputPosition) {
         const components = this.getAllComponents();
@@ -464,7 +1125,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchRelease(viewInputPosition) {
         const components = this.getAllComponents();
@@ -480,7 +1141,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchCancel(viewInputPosition) {
         const components = this.getAllComponents();

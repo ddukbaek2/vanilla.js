@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Engine Extras</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1b1f2a; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 엔진에 더한 범용 기능 예제. (러스트 예제 engineextras 와 같은 장면, 외계행성 광부 키우기에서 엔진으로 옮긴 것)
+// - 테(Outline), 진행 고리(UIProgressRing), 부드러운 그늘(SoftShade), 마우스 커서(PointerCursor), 카메라 손짓(CameraGestures),
+//   입력 매니저의 마우스 단추와 손가락 목록을 한 화면에 놓는다. 입력은 흉내 내지 않는다. (직접 눌러 본다)
+// - 오른쪽 위: 글자 꾸밈. (밑줄, 취소선, 기울임, 그림자 글의 기울임과 밑줄, 글자 단위 줄바꿈, 안티앨리어싱을 끈 도트 글자)
+// - 오른쪽 단추로 끌면 가운데 사각형이 돌고, 가운데 단추로 끌면 움직이고, 휠이나 두 손가락으로 키운다.
+//==============================================================================
+const { Engine, EngineConfiguration, Scene, WorldNode, Text, TextAlign, TextBaseline, Paint, Outline, SoftShade, SoftShadeShape, ShadowText, ShadowImage, UILabel, UIButton, UIProgressRing, UIHitArea, ToastMotion, ButtonMotionStyle, attachButtonMotion, setButtonMotionArea, attachToastMotion, CameraGestures, TouchRecognizer, PointerCursor, MouseButton, Color, Pivot, Rect, Vector2, ViewScaleMode } = await import("../../import.js");
+
+// 뷰 크기.
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+// 색.
+const BACKGROUND_COLOR = "#1b1f2a";
+const PANEL_COLOR = "#2a3040";
+const TEXT_COLOR = "#e8ebf2";
+const CAPTION_COLOR = "#9aa2b2";
+const ACCENT_COLOR = "#6d7dff";
+
+//==============================================================================
+// 상자 노드 만들기. (왼쪽 위 피봇)
+//==============================================================================
+function createBoxNode(parent, name, position, size) {
+	const node = new WorldNode();
+	node.setName(name);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(position);
+	node.setContentSize(size);
+	parent.addChild(node);
+	return node;
+}
+
+//==============================================================================
+// 글자 노드 만들기. (UILabel)
+//==============================================================================
+function createLabelNode(parent, name, position, size, text, fontSize, color) {
+	const labelNode = createBoxNode(parent, name, position, size);
+	const label = labelNode.addComponent(UILabel);
+	label.setText(text);
+	label.setFontSize(fontSize);
+	label.setTextColor(color);
+	label.setTextAlign(TextAlign.left);
+	label.setTextBaseline(TextBaseline.middle);
+	return labelNode;
+}
+
+//==============================================================================
+// 안티앨리어싱을 끄고 굽는 글. (도트 글꼴 흉내. 보통은 게임 시작 때 한 번 끄고, 여기서는 이 글을 그리는 동안만 끄고 되돌린다)
+//==============================================================================
+class AliasedText extends Text {
+	constructor() {
+		super();
+		this.setComponentType("AliasedText");
+	}
+
+	draw(graphic) {
+		graphic.setTextAntialiasEnabled(false);
+		super.draw(graphic);
+		graphic.setTextAntialiasEnabled(true);
+	}
+}
+
+//==============================================================================
+// 예제 씬.
+//==============================================================================
+class EngineExtrasScene extends Scene {
+	/** @private @type { CameraGestures | null } */ #cameraGestures;
+	/** @private @type { number } */ #elapsedSeconds;
+	/** @private @type { number } */ #clickCount;
+	/** @private @type { Array<UIProgressRing> } */ #ringList;
+	/** @private @type { WorldNode | null } */ #targetNode;
+	/** @private @type { UILabel | null } */ #statusLabel;
+	/** @private @type { number } */ #targetRotation;
+	/** @private @type { number } */ #targetScale;
+	/** @private @type { Vector2 } */ #targetPosition;
+
+	constructor() {
+		super();
+		this.#cameraGestures = null;
+		this.#elapsedSeconds = 0;
+		this.#clickCount = 0;
+		this.#ringList = [];
+		this.#targetNode = null;
+		this.#statusLabel = null;
+		this.#targetRotation = 0;
+		this.#targetScale = 1;
+		this.#targetPosition = Vector2.create(980, 420);
+	}
+
+	//==============================================================================
+	// 테와 고리 구역.
+	//==============================================================================
+	createOutlineSection(root) {
+		const cardNode = createBoxNode(root, "card", Vector2.create(40, 100), Vector2.create(260, 150));
+		const cardPaint = cardNode.addComponent(Paint);
+		cardPaint.setColor(PANEL_COLOR);
+		cardPaint.setRoundSize(22);
+		const cardOutline = cardNode.addComponent(Outline);
+		cardOutline.setColor("#ffcc55");
+		cardOutline.setLineWidth(4);
+		cardOutline.setRoundSize(22);
+		createLabelNode(cardNode, "cardCaption", Vector2.create(20, 50), Vector2.create(220, 50), "Outline (둥근 네모)", 20, TEXT_COLOR);
+		const circleNode = createBoxNode(root, "circle", Vector2.create(330, 100), Vector2.create(150, 150));
+		const circleOutline = circleNode.addComponent(Outline);
+		circleOutline.setColor("#78c8ff");
+		circleOutline.setLineWidth(6);
+		circleOutline.setCircle(true);
+		for (let ringIndex = 0; ringIndex < 2; ringIndex++) {
+			const ringPosition = ringIndex === 0 ? Vector2.create(510, 100) : Vector2.create(690, 120);
+			const ringSize = ringIndex === 0 ? Vector2.create(150, 150) : Vector2.create(240, 110);
+			const ringNode = createBoxNode(root, "ring", ringPosition, ringSize);
+			const ring = ringNode.addComponent(UIProgressRing);
+			ring.setRoundSize(ringIndex === 0 ? 75 : 24);
+			ring.setLineWidth(ringIndex === 0 ? 10 : 6);
+			ring.setFillColor(ringIndex === 0 ? "#45b585" : "#ff7755");
+			this.#ringList.push(ring);
+		}
+	}
+
+	//==============================================================================
+	// 그늘 구역. (밝은 판 위에 띠 그늘을 깔고 흰 글을 얹는다, 아래에는 바닥 그늘)
+	//==============================================================================
+	createShadeSection(root) {
+		const brightNode = createBoxNode(root, "bright", Vector2.create(40, 290), Vector2.create(560, 150));
+		brightNode.addComponent(Paint).setColor("#c9d1dd");
+		const bandNode = createBoxNode(brightNode, "band", Vector2.create(0, 35), Vector2.create(560, 80));
+		bandNode.addComponent(SoftShade).setShade(SoftShadeShape.band, "#000000", 0.6, 120);
+		createLabelNode(brightNode, "bandText", Vector2.create(40, 50), Vector2.create(500, 50), "SoftShade 띠 위의 흰 글", 30, "#ffffff");
+		// 그림자를 깐 글과 그림. (밝은 판 아래쪽)
+		const shadowTextNode = createBoxNode(brightNode, "shadowText", Vector2.create(20, 110), Vector2.create(300, 36));
+		const shadowText = shadowTextNode.addComponent(ShadowText);
+		shadowText.setText("ShadowText 그림자 글");
+		shadowText.setTextStyle(26, true, "#ffffff");
+		shadowText.setShadow("#000000", 0.8, 3, 4);
+		const iconCanvas = System.document.createElement("canvas");
+		iconCanvas.width = 64;
+		iconCanvas.height = 64;
+		const iconPixels = new System.Uint8ClampedArray(64 * 64 * 4);
+		for (let y = 0; y < 64; y++) {
+			for (let x = 0; x < 64; x++) {
+				if (System.Math.abs(x - 32) * 2 < y && y > 4 && y < 60) {
+					iconPixels.set([255, 85, 119, 255], (y * 64 + x) * 4);
+				}
+			}
+		}
+		iconCanvas.getContext("2d").putImageData(new System.ImageData(iconPixels, 64, 64), 0, 0);
+		const shadowImageNode = createBoxNode(brightNode, "shadowImage", Vector2.create(440, 20), Vector2.create(100, 100));
+		const shadowImage = shadowImageNode.addComponent(ShadowImage);
+		shadowImage.setImage(iconCanvas, null);
+		shadowImage.setShadow("#000000", 0.7, 6, 8);
+		const bottomNode = createBoxNode(root, "bottomShade", Vector2.create(0, 620), Vector2.create(VIEW_WIDTH, 100));
+		bottomNode.addComponent(SoftShade).setShade(SoftShadeShape.bottom, "#4466ff", 0.8, 0);
+	}
+
+	//==============================================================================
+	// 글자 꾸밈 구역. (오른쪽 위)
+	//==============================================================================
+	createTextDecorationSection(root) {
+		createLabelNode(root, "decorationCaption", Vector2.create(960, 90), Vector2.create(280, 22), "글자 꾸밈", 15, CAPTION_COLOR);
+		createLabelNode(root, "underline", Vector2.create(960, 114), Vector2.create(130, 30), "밑줄 글", 20, TEXT_COLOR).getComponent(UILabel).setUnderline(true);
+		createLabelNode(root, "strikethrough", Vector2.create(1100, 114), Vector2.create(140, 30), "취소선 글", 20, TEXT_COLOR).getComponent(UILabel).setStrikethrough(true);
+		createLabelNode(root, "italic", Vector2.create(960, 146), Vector2.create(130, 30), "기울임 Italic", 20, TEXT_COLOR).getComponent(UILabel).setItalic(true);
+		const aliasedNode = createBoxNode(root, "aliasedText", Vector2.create(1100, 146), Vector2.create(140, 30));
+		const aliasedText = aliasedNode.addComponent(AliasedText);
+		aliasedText.setText("도트 Aliased");
+		aliasedText.setFontSize(20);
+		aliasedText.setTextColor("#9fe870");
+		aliasedText.setTextAlign(TextAlign.left);
+		const decoratedNode = createBoxNode(root, "decoratedShadowText", Vector2.create(960, 178), Vector2.create(280, 32));
+		const decoratedText = decoratedNode.addComponent(ShadowText);
+		decoratedText.setText("그림자 글 기울임 밑줄");
+		decoratedText.setTextStyle(22, true, "#ffcc55");
+		decoratedText.setTextAlign(TextAlign.left);
+		decoratedText.setItalic(true);
+		decoratedText.setUnderline(true);
+		decoratedText.setShadow("#000000", 0.9, 2, 2);
+		const wrapLabel = createLabelNode(root, "characterWrap", Vector2.create(960, 214), Vector2.create(280, 36), "Character 줄바꿈은 낱말도 Characters 글자 단위로 끊는다", 14, TEXT_COLOR).getComponent(UILabel);
+		wrapLabel.setTextBaseline(TextBaseline.top);
+		wrapLabel.setWordWrapWidth(280);
+		wrapLabel.setWrapMode("char");
+	}
+
+	//==============================================================================
+	// 단추와 손짓 구역.
+	//==============================================================================
+	createInputSection(root) {
+		const buttonNode = createBoxNode(root, "button", Vector2.create(40, 480), Vector2.create(220, 56));
+		const buttonPaint = buttonNode.addComponent(Paint);
+		buttonPaint.setColor(ACCENT_COLOR);
+		buttonPaint.setRoundSize(28);
+		const buttonLabel = buttonNode.addComponent(UILabel);
+		buttonLabel.setText("눌러 보세요");
+		buttonLabel.setFontSize(22);
+		buttonLabel.setTextColor("#ffffff");
+		buttonLabel.setBold(true);
+		const counterLabel = createLabelNode(root, "counter", Vector2.create(280, 480), Vector2.create(300, 56), "클릭 0번", 22, TEXT_COLOR).getComponent(UILabel);
+		// 알림 노드. (위에서 내려오는 토스트)
+		const toastNode = createBoxNode(root, "toast", Vector2.create(900, 30), Vector2.create(320, 50));
+		const toastPaint = toastNode.addComponent(Paint);
+		toastPaint.setColor("#45b585");
+		toastPaint.setRoundSize(25);
+		const toastLabel = toastNode.addComponent(UILabel);
+		toastLabel.setFontSize(20);
+		toastLabel.setTextColor("#ffffff");
+		toastNode.setActive(false);
+		const toastMotion = attachToastMotion(toastNode, -1);
+		const button = buttonNode.addComponent(UIButton);
+		button.setClickEvent(() => {
+			this.#clickCount += 1;
+			counterLabel.setText(`클릭 ${this.#clickCount}번`);
+			toastMotion.show(`${this.#clickCount}번 눌렀어요`, 1.5, (text) => toastLabel.setText(text));
+			return true;
+		});
+		attachButtonMotion(buttonNode);
+		// 창 안 꼴(Inset) 단추. (판에 꼴을 걸고 그 안의 단추는 커지지 않고 밝힌다)
+		const insetPanelNode = createBoxNode(root, "insetPanel", Vector2.create(330, 640), Vector2.create(330, 70));
+		const insetPanelPaint = insetPanelNode.addComponent(Paint);
+		insetPanelPaint.setColor(PANEL_COLOR);
+		insetPanelPaint.setRoundSize(14);
+		setButtonMotionArea(insetPanelNode, ButtonMotionStyle.inset);
+		const insetButtonNode = createBoxNode(insetPanelNode, "insetButton", Vector2.create(12, 10), Vector2.create(306, 50));
+		const insetPaint = insetButtonNode.addComponent(Paint);
+		insetPaint.setColor("#3c4457");
+		insetPaint.setRoundSize(10);
+		const insetLabel = insetButtonNode.addComponent(UILabel);
+		insetLabel.setText("창 안 단추 (Inset)");
+		insetLabel.setFontSize(20);
+		insetLabel.setTextColor(TEXT_COLOR);
+		insetButtonNode.addComponent(UIButton);
+		attachButtonMotion(insetButtonNode);
+		const areaNode = createBoxNode(root, "gestureArea", Vector2.create(700, 260), Vector2.create(540, 330));
+		const areaOutline = areaNode.addComponent(Outline);
+		areaOutline.setColor("#394154");
+		areaOutline.setLineWidth(2);
+		areaOutline.setRoundSize(16);
+		createLabelNode(areaNode, "areaCaption", Vector2.create(16, 6), Vector2.create(520, 30), "CameraGestures: 오른쪽 끌기 돌리기, 가운데 끌기 밀기, 휠 키우기", 16, CAPTION_COLOR);
+		const targetNode = new WorldNode();
+		targetNode.setName("target");
+		targetNode.setPivot(Pivot.middleCenter);
+		targetNode.setContentSize(Vector2.create(120, 120));
+		const targetPaint = targetNode.addComponent(Paint);
+		targetPaint.setColor("#f3e5ab");
+		targetPaint.setRoundSize(16);
+		root.addChild(targetNode);
+		this.#targetNode = targetNode;
+		// 작은 단추와 넓힌 누름 자리. (누름 자리를 옅게 칠해 보인다)
+		let smallClickCount = 0;
+		const smallButtonNode = createBoxNode(root, "smallButton", Vector2.create(520, 490), Vector2.create(40, 30));
+		const smallPaint = smallButtonNode.addComponent(Paint);
+		smallPaint.setColor("#e06058");
+		smallPaint.setRoundSize(6);
+		const smallCounterLabel = createLabelNode(root, "smallCounter", Vector2.create(600, 490), Vector2.create(90, 30), "0", 20, TEXT_COLOR).getComponent(UILabel);
+		const smallButton = smallButtonNode.addComponent(UIButton);
+		smallButton.setClickEvent(() => {
+			smallClickCount += 1;
+			smallCounterLabel.setText(`${smallClickCount}`);
+			return true;
+		});
+		const hitNode = UIHitArea.attach(smallButtonNode, 100);
+		if (hitNode !== null) {
+			hitNode.addComponent(Paint).setColor(new Color(1, 1, 1, 0.12));
+		}
+		this.#statusLabel = createLabelNode(root, "status", Vector2.create(40, 560), Vector2.create(620, 40), "", 18, CAPTION_COLOR).getComponent(UILabel);
+	}
+
+	//==============================================================================
+	// 카메라 손짓을 가운데 사각형에 걸기.
+	//==============================================================================
+	applyGestures() {
+		const engine = this.getEngine();
+		const cameraGestures = this.#cameraGestures;
+		this.#targetRotation += cameraGestures.takeRotation() * 180 / System.Math.PI;
+		const pan = cameraGestures.takePan();
+		this.#targetPosition = this.#targetPosition.add(Vector2.create(pan.x, pan.y));
+		this.#targetScale = System.Math.min(System.Math.max(this.#targetScale * cameraGestures.takeZoom(), 0.3), 3);
+		const inputManager = engine.getInputManager();
+		if (inputManager.hasWheelDelta()) {
+			this.#targetScale = System.Math.min(System.Math.max(this.#targetScale * (1 - inputManager.getWheelDeltaY() * 0.001), 0.3), 3);
+		}
+		const dragCursor = cameraGestures.readMouseDragCursor();
+		PointerCursor.getInstance().setScreenCursor(dragCursor === "" ? "default" : dragCursor);
+		this.#targetNode.setLocalPosition(this.#targetPosition);
+		this.#targetNode.setLocalRotation(this.#targetRotation);
+		this.#targetNode.setLocalScale(Vector2.create(this.#targetScale, this.#targetScale));
+	}
+
+	//==============================================================================
+	// 입력 상태 글.
+	//==============================================================================
+	updateStatus() {
+		const inputManager = this.getEngine().getInputManager();
+		const buttonMarks = [MouseButton.left, MouseButton.middle, MouseButton.right].map((mouseButton) => inputManager.isMouseButtonDown(mouseButton) ? "●" : "○");
+		this.#statusLabel.setText(`마우스 왼 ${buttonMarks[0]} 가운데 ${buttonMarks[1]} 오른 ${buttonMarks[2]}  손가락 ${inputManager.getTouchPoints().length}개  장치 ${inputManager.getLastInputDevice()} (${inputManager.getLastGamepadKind()})  손짓 중 ${this.#cameraGestures.isGestureActive()}`);
+	}
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	create() {
+		super.create();
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		createLabelNode(root, "title", Vector2.create(40, 30), Vector2.create(900, 50), "엔진에 더한 범용 기능", 34, TEXT_COLOR);
+		this.createOutlineSection(root);
+		this.createShadeSection(root);
+		this.createTextDecorationSection(root);
+		this.createInputSection(root);
+	}
+
+	//==============================================================================
+	// 초기화. (카메라 손짓은 엔진의 캔버스에 사건을 붙이므로 엔진을 받은 뒤 만든다, 누름은 TouchRecognizer 로 넘긴다)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		this.#cameraGestures = new CameraGestures();
+		const touchRecognizer = new TouchRecognizer();
+		touchRecognizer.setRootNode(this.getRoot());
+		this.setTouchRaycaster(touchRecognizer);
+		PointerCursor.getInstance().setEnabled(true);
+	}
+
+	//==============================================================================
+	// 주기적 갱신.
+	//==============================================================================
+	tick(timeDelta) {
+		this.#elapsedSeconds += timeDelta;
+		const ringRatio = (this.#elapsedSeconds * 0.25) % 1;
+		for (let ringIndex = 0; ringIndex < this.#ringList.length; ringIndex++) {
+			this.#ringList[ringIndex].setRatio(ringIndex === 0 ? ringRatio : 1 - ringRatio);
+		}
+		this.applyGestures();
+		this.updateStatus();
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (캔버스 전체를 배경색으로 칠하고 기준 해상도 좌표계를 건다)
+	//==============================================================================
+	preDraw(graphic) {
+		super.preDraw(graphic);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
+engine.run(new EngineExtrasScene());
+</script>
+</body>
+</html>

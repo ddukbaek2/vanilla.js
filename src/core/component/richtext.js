@@ -214,9 +214,35 @@ function parseMarkupToSegments(input) {
 //   - <size=N>...</size>                    : 폰트 크기
 //   - 알 수 없는 태그는 그대로 텍스트로 출력.
 // - 마크업이 없는 plain text 면 부모 (Text) 의 draw 동작으로 fallback.
+// - 글자 방향: segment 를 이은 글로 문단 방향을 정하고 (이 글자의 방향, "inherit" 면 Graphic 의 방향), 오른쪽에서 왼쪽이면 segment 를 오른쪽부터 놓는다.
+//   segment 마다 그 방향으로 굽고, 정렬 "start" / "end" 도 그 방향으로 푼다.
 // - segment 별 미지정 속성은 부모 Text 의 전역 속성을 fallback.
 // - 비활성화 상태 (isEnable() === false) 면 draw / 측정에서 건너뛴다.
 //==============================================================================
+/**
+ * @example <caption>마크업으로 글 조각마다 꾸미기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, RichText } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const labelNode = new WorldNode();
+ * 		labelNode.setContentSize(Vector2.create(560, 60));
+ * 		labelNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const richText = labelNode.addComponent(RichText);
+ * 		richText.setFontSize(28);
+ * 		richText.setTextColor("#ffffff");
+ * 		richText.setText("Get <color=#ffcc00><b>100</b></color> gold and <i>a <u>key</u></i>");
+ * 		const root = this.getRoot();
+ * 		root.addChild(labelNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class RichText extends Text {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -233,13 +259,116 @@ export class RichText extends Text {
 	}
 
 	//==============================================================================
-	// 텍스트 설정 — 마크업 자동 파싱.
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 조각이 없으면 Text 와 같고, 있으면 조각을 이은 한 줄의 사각형)
+	// - 조각마다 제 글꼴로 잰 너비를 더한 합산 폭을 정렬대로 놓고(그리기와 같은 자리), 가장 큰 글꼴 크기의 반과 가장 굵은 외곽선만큼 양옆에 더한다.
+	//   "start" 와 "end" 는 그릴 때의 방향으로 왼쪽이나 오른쪽이 되므로 둘 다 품는다.
+	// - 세로는 베이스라인 자리에서 위아래로 가장 큰 글꼴 크기의 1.5 배와 가장 굵은 외곽선만큼. (밑줄, 취소선도 이 안)
+	// - 잴 수 없으면 false. (거르지 않는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 적었으면 참. (잴 수 없으면 거짓)
+	 * @example <caption>조각을 이은 글이 그리는 곳 보기</caption>
+	 * import { WorldNode, RichText, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(200, 40));
+	 * const richText = node.addComponent(RichText);
+	 * richText.appendSegment("HP ", { bold: true });
+	 * richText.appendSegment("42", { fontSize: 32 });
+	 * const drawnRect = Rect.zero();
+	 * const isKnown = richText.calculateDrawnRect(drawnRect);
+	 * console.log(isKnown, drawnRect.size.y >= 32);
+	 */
+	calculateDrawnRect(rect) {
+		if (this.hasSegments() === false) {
+			return super.calculateDrawnRect(rect);
+		}
+		const node = this.getNode();
+		if (node === null || node === undefined) {
+			return false;
+		}
+		const measurementContext = getMeasurementCanvasRenderingContext();
+		if (measurementContext === null) {
+			return false;
+		}
+		const fallbackFontFace = this.getFontFace();
+		const fallbackFontSize = this.getFontSize();
+		const fallbackStrokeWidth = this.getStrokeWidth();
+		const fallbackBold = this.isBold();
+		const fallbackItalic = this.isItalic();
+		let totalWidth = 0;
+		let maximumFontSize = 0;
+		let maximumStrokeWidth = 0;
+		for (const segment of this.#segments) {
+			const segmentText = segment.text;
+			if (!segmentText || segmentText.length === 0) {
+				continue;
+			}
+			const segmentFontSize = (typeof segment.attributes.fontSize === "number") ? segment.attributes.fontSize : fallbackFontSize;
+			const segmentFontFace = this.resolveSegmentFontFace(segment.attributes.fontFace, fallbackFontFace);
+			const segmentStrokeWidth = (typeof segment.attributes.strokeWidth === "number") ? segment.attributes.strokeWidth : fallbackStrokeWidth;
+			const segmentBold = (segment.attributes.bold === true) || fallbackBold;
+			const segmentItalic = (segment.attributes.italic === true) || fallbackItalic;
+			measurementContext.save();
+			measurementContext.font = buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic);
+			totalWidth += measurementContext.measureText(segmentText).width;
+			measurementContext.restore();
+			maximumFontSize = System.Math.max(maximumFontSize, segmentFontSize);
+			maximumStrokeWidth = System.Math.max(maximumStrokeWidth, segmentStrokeWidth);
+		}
+		if (maximumFontSize === 0) {
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
+		}
+		const contentSize = node.getContentSize();
+		const textAlign = this.getTextAlign();
+		let leftX;
+		let rightX;
+		if (textAlign === "left") {
+			leftX = 0;
+			rightX = totalWidth;
+		}
+		else if (textAlign === "right") {
+			leftX = contentSize.x - totalWidth;
+			rightX = contentSize.x;
+		}
+		else if (textAlign === "start" || textAlign === "end") {
+			leftX = System.Math.min(0, contentSize.x - totalWidth);
+			rightX = System.Math.max(totalWidth, contentSize.x);
+		}
+		else {
+			leftX = (contentSize.x - totalWidth) * 0.5;
+			rightX = leftX + totalWidth;
+		}
+		const textBaseline = this.getTextBaseline();
+		let baselineY;
+		if (textBaseline === "top" || textBaseline === "hanging") {
+			baselineY = 0;
+		}
+		else if (textBaseline === "bottom" || textBaseline === "ideographic" || textBaseline === "alphabetic") {
+			baselineY = contentSize.y;
+		}
+		else {
+			baselineY = contentSize.y * 0.5;
+		}
+		const horizontalMargin = maximumFontSize * 0.5 + maximumStrokeWidth;
+		const verticalMargin = maximumFontSize * 1.5 + maximumStrokeWidth;
+		rect.position.set(leftX - horizontalMargin, baselineY - verticalMargin);
+		rect.size.set(rightX - leftX + horizontalMargin * 2, verticalMargin * 2);
+		return true;
+	}
+
+	//==============================================================================
+	// 텍스트 설정, 마크업 자동 파싱.
 	// - 알려진 태그가 있으면 segment 배열로 분해해 보관.
 	// - 마크업이 없으면 segment 비우고 plain text 동작으로 fallback.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } text
+	 * @param { string } text 보일 글. (알려진 마크업 태그가 있으면 segment 로 나눈다)
 	 */
 	setText(text) {
 		super.setText(text);
@@ -248,16 +377,43 @@ export class RichText extends Text {
 	}
 
 	//==============================================================================
-	// segment 1 개 추가. (편의 API — 마크업 외에 프로그래밍 방식으로 segment 쌓기)
+	// segment 1 개 추가. (편의 API, 마크업 외에 프로그래밍 방식으로 segment 쌓기)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @param { object } [attributes]
-	 * @returns { RichText }
+	 * @param { string } text segment 글.
+	 * @param { object } [attributes] segment 속성. ({ fontFace, fontSize, textColor, strokeColor, strokeWidth, bold, italic, underline, strikethrough }, 색은 Color, 빠진 것은 Text 의 속성을 쓴다)
+	 * @returns { RichText } 이 컴포넌트. (이어 부를 수 있다)
+	 * @example <caption>segment 를 코드로 쌓기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, RichText, Color } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const labelNode = new WorldNode();
+	 * 		labelNode.setContentSize(Vector2.create(400, 60));
+	 * 		labelNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		const richText = labelNode.addComponent(RichText);
+	 * 		richText.setFontSize(24);
+	 * 		const healthColor = Color.createFromHEX("#ff4444");
+	 * 		richText.appendSegment("HP ", { bold: true });
+	 * 		richText.appendSegment("42", { textColor: healthColor, fontSize: 32 });
+	 * 		richText.appendSegment(" / 100");
+	 * 		const segments = richText.getSegments();
+	 * 		console.log(segments.length);
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(labelNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	appendSegment(text, attributes) {
 		const finalAttributes = (attributes !== null && attributes !== undefined) ? attributes : {};
 		this.#segments.push({ text: text, attributes: finalAttributes });
+		this.markDrawnRectDirty();
 		return this;
 	}
 
@@ -266,13 +422,14 @@ export class RichText extends Text {
 	//==============================================================================
 	clearSegments() {
 		this.#segments = [];
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// segment 목록 반환. (사본)
 	//==============================================================================
 	/**
-	 * @returns { { text: string, attributes: object }[] }
+	 * @returns { { text: string, attributes: object }[] } segment 목록의 사본. ({ text, attributes } 배열)
 	 */
 	getSegments() {
 		return this.#segments.slice();
@@ -282,7 +439,7 @@ export class RichText extends Text {
 	// segment 보유 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 글이 있는 segment 가 하나라도 있으면 참.
 	 */
 	hasSegments() {
 		const segments = this.#segments;
@@ -302,7 +459,7 @@ export class RichText extends Text {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		if (this.isEnable() === false) {
@@ -322,8 +479,8 @@ export class RichText extends Text {
 	// - 정렬 / baseline 은 합산 폭 / 최대 폰트 크기 기준.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { Vector2 } contentSize
+	 * @param { Graphic } graphic 그래픽.
+	 * @param { Vector2 } contentSize 노드의 내용 크기.
 	 */
 	drawSegments(graphic, contentSize) {
 		const segments = this.#segments;
@@ -337,8 +494,17 @@ export class RichText extends Text {
 		const fallbackItalic = this.isItalic();
 		const fallbackUnderline = this.isUnderline();
 		const fallbackStrikethrough = this.isStrikethrough();
-		const textAlign = this.getTextAlign();
 		const textBaseline = this.getTextBaseline();
+
+		// 문단의 방향은 segment 를 이은 글로 정한다. ("start" / "end" 정렬과 segment 를 놓는 차례가 그 방향을 따른다)
+		if (this.getTextDirection() !== "inherit") {
+			graphic.setTextDirection(this.getTextDirection());
+		}
+		const joinedText = segments.map((segment) => segment.text || "").join("");
+		const textDirection = graphic.resolveTextDirection(joinedText);
+		graphic.setTextDirection(textDirection);
+		const isRightToLeft = textDirection === "rtl";
+		const textAlign = graphic.resolveTextAlign(this.getTextAlign(), textDirection);
 
 		// 합산 폭 / 최대 폰트 크기 계산.
 		let totalWidth = 0;
@@ -359,16 +525,19 @@ export class RichText extends Text {
 			}
 		}
 
-		// 시작 X 좌표.
+		// 시작 X 좌표. (오른쪽에서 왼쪽이면 오른쪽 끝에서 왼쪽으로 놓아 간다)
 		let cursorX;
-		if (textAlign === "left" || textAlign === "start") {
+		if (textAlign === "left") {
 			cursorX = 0;
 		}
-		else if (textAlign === "right" || textAlign === "end") {
+		else if (textAlign === "right") {
 			cursorX = contentSize.x - totalWidth;
 		}
 		else {
 			cursorX = (contentSize.x - totalWidth) * 0.5;
+		}
+		if (isRightToLeft) {
+			cursorX += totalWidth;
 		}
 
 		// Y 좌표.
@@ -402,6 +571,10 @@ export class RichText extends Text {
 			const segmentStrikethrough = (segment.attributes.strikethrough === true) || fallbackStrikethrough;
 
 			graphic.setFontString(buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic));
+			const segmentWidth = graphic.measureText(segmentText).width;
+			if (isRightToLeft) {
+				cursorX -= segmentWidth;
+			}
 			if (segmentStrokeColor && segmentStrokeWidth > 0) {
 				graphic.setStrokeColor(segmentStrokeColor.toHEXString());
 				graphic.drawStrokeText(segmentText, cursorX, baselineY, segmentStrokeWidth);
@@ -409,7 +582,6 @@ export class RichText extends Text {
 			graphic.setFillColor(segmentTextColor.toHEXString());
 			graphic.drawFillText(segmentText, cursorX, baselineY);
 
-			const segmentWidth = graphic.measureText(segmentText).width;
 			const segmentLineWidth = System.Math.max(1, segmentFontSize / 16);
 			if (segmentUnderline) {
 				const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
@@ -421,7 +593,9 @@ export class RichText extends Text {
 				graphic.setStrokeColor(segmentTextColor.toHEXString());
 				this.strokeHorizontalLine(graphic, cursorX, strikeY, segmentWidth, segmentLineWidth);
 			}
-			cursorX += segmentWidth;
+			if (!isRightToLeft) {
+				cursorX += segmentWidth;
+			}
 		}
 	}
 
@@ -429,9 +603,9 @@ export class RichText extends Text {
 	// segment 의 fontFace 입력값을 해석해 적용 가능한 FontFace 로 변환.
 	//==============================================================================
 	/**
-	 * @param { FontFace | FontAsset | null | undefined } input
-	 * @param { FontFace | null } fallback
-	 * @returns { FontFace | null }
+	 * @param { FontFace | FontAsset | null | undefined } input segment 의 글꼴 값. (FontAsset 이면 그 글꼴, null 이나 undefined 면 fallback)
+	 * @param { FontFace | null } fallback 대신 쓸 글꼴.
+	 * @returns { FontFace | null } 쓸 글꼴. (null 이면 시스템 글꼴)
 	 */
 	resolveSegmentFontFace(input, fallback) {
 		if (input === null || input === undefined) {
@@ -450,7 +624,7 @@ export class RichText extends Text {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 자연 크기. (segment 너비 합과 가장 큰 글자 크기, 잴 수 없거나 비활성이면 (-1, -1))
 	 */
 	getIntrinsicContentSize() {
 		if (this.isEnable() === false) {

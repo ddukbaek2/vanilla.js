@@ -27,6 +27,12 @@ const GIZMO_CHECKBOX_MARGIN = 4;
 const FONT_SIZE = 12;
 const PADDING = 7;
 const LABEL_COLUMN_WIDTH = 144;
+
+// 속성 칸에서 빼는 게터. (러스트 판에서 #[reflect(skip)] 인 게터의 짝)
+const COMPONENT_GETTER_EXCLUDE_NAMES = new System.Set([
+	"constructor", "getNode",
+	"getImagePath", // 그림 경로. (UIDocument 가 imagePath 로 따로 적는다, 러스트 판 Sprite, ShadowImage, UIImageView 의 get_image_path 는 #[reflect(skip)])
+]);
 const RESIZE_HANDLE_SIZE = 10;
 const SPLITTER_HIT_SIZE = 8;
 const MIN_PANEL_WIDTH = 300;
@@ -83,15 +89,16 @@ const ResizeMode = {
 //==============================================================================
 // 트리 목록 항목.
 //==============================================================================
-class DEVToolsFlatItem {
+class DevToolsFlatItem {
 	/** @type { TransformNode } */ node;
 	/** @type { number } */ depth;
 	/** @type { boolean } */ effectiveActive;
 
+	//==============================================================================
+	// 생성.
+	//==============================================================================
 	/**
-	 * @param { TransformNode } node
-	 * @param { number } depth
-	 * @param { boolean } effectiveActive
+	 * @constructor
 	 */
 	constructor(node, depth, effectiveActive) {
 		this.node = node;
@@ -114,6 +121,9 @@ class InspectorLine {
 	/** @type { Component | null } */ componentRef;
 	/** @type { boolean } */ isComponentProperty;
 
+	//==============================================================================
+	// 생성.
+	//==============================================================================
 	/**
 	 * @param { string | null } text
 	 * @param { string } value
@@ -146,7 +156,17 @@ class InspectorLine {
 // - 중앙 구분선 드래그로 좌우 비율 조절.
 // - 컴포넌트 헤더 클릭으로 프로퍼티 목록 펼침/접힘 (기본값: 펼침).
 //==============================================================================
-export class DEVTools extends Object {
+/**
+ * @example <caption>패널을 열고 탭 고르기</caption>
+ * import { DevTools } from "./build/vanilla.js";
+ *
+ * const devTools = new DevTools();
+ * devTools.setActiveTab(1);
+ * devTools.setVisible(true);
+ * console.log(devTools.isVisible(), devTools.getActiveTab());
+ * console.log(devTools.getPanelRect().width > 0, devTools.isFramePerSecondVisible());
+ */
+export class DevTools extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -175,7 +195,7 @@ export class DEVTools extends Object {
 	/** @private @type { number } */ #treeScrollY;
 	/** @private @type { number } */ #inspectorScrollY;
 	/** @private @type { boolean } */ #prevIsKeyF2;
-	/** @private @type { DEVToolsFlatItem[] } */ #flatList;
+	/** @private @type { DevToolsFlatItem[] } */ #flatList;
 	/** @private @type { Set } */ #expandedNodes;
 	/** @private @type { Set } */ #collapsedComponents;
 	/** @private @type { InspectorLine[] } */ #cachedInspectorLines;
@@ -268,7 +288,7 @@ export class DEVTools extends Object {
 	// 엔진 설정.
 	//==============================================================================
 	/**
-	 * @param { Engine } engine
+	 * @param { Engine } engine 개발 도구가 들여다볼 엔진. (기즈모 표시는 도구가 맡으므로 강제 기즈모를 끈다)
 	 */
 	setEngine(engine) {
 		this.#engine = engine;
@@ -280,7 +300,7 @@ export class DEVTools extends Object {
 	// 루트 노드 목록 설정.
 	//==============================================================================
 	/**
-	 * @param { TransformNode[] } rootNodes
+	 * @param { TransformNode[] } rootNodes 트리에 보일 루트 노드 목록. (루트는 처음부터 펼친다)
 	 */
 	setRootNodes(rootNodes) {
 		this.#rootNodes = rootNodes;
@@ -293,17 +313,148 @@ export class DEVTools extends Object {
 	// 표시 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 패널이 보이면 참.
 	 */
 	isVisible() {
 		return this.#isVisible;
 	}
 
 	//==============================================================================
+	// 보이기와 숨기기. (F2 와 같다. 보일 때 패널을 창 오른쪽 아래에 붙이고, 모든 기즈모 설정을 건다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isVisible 패널을 보이면 참, 숨기면 거짓.
+	 */
+	setVisible(isVisible) {
+		this.#isVisible = isVisible;
+		if (!this.#engine) {
+			return;
+		}
+		const graphic = this.#engine.getGraphic();
+		const isForceGizmosVisible = this.#isVisible && this.#isAllGizmosVisible;
+		graphic.setForceGizmosVisible(isForceGizmosVisible);
+		if (this.#isVisible) {
+			// 패널 좌표는 canvas-native 픽셀 기준, ViewScaleMode 와 무관하게 항상 동일한 사이즈로 우측하단에 고정.
+			const viewManager = this.#engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			this.#panelX = canvasNativeSize.x - this.#panelWidth;
+			this.#panelY = canvasNativeSize.y - this.#panelHeight;
+		}
+	}
+
+	//==============================================================================
+	// 지금 탭 반환. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
+	//==============================================================================
+	/**
+	 * @returns { number } 지금 탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
+	 */
+	getActiveTab() {
+		return this.#activeTab;
+	}
+
+	//==============================================================================
+	// 탭 설정. (없는 탭이면 무시)
+	//==============================================================================
+	/**
+	 * @param { number } tabIndex 탭 번호. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
+	 */
+	setActiveTab(tabIndex) {
+		if (tabIndex >= 0 && tabIndex < TABS.length) {
+			this.#activeTab = tabIndex;
+		}
+	}
+
+	//==============================================================================
+	// 고른 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { TransformNode | null } 고른 노드. (없으면 null)
+	 */
+	getSelectedNode() {
+		return this.#selectedNode;
+	}
+
+	//==============================================================================
+	// 노드 고르기. (인스펙터 스크롤은 맨 위로)
+	//==============================================================================
+	/**
+	 * @param { TransformNode | null } node 고를 노드. (null 이면 선택을 푼다)
+	 */
+	setSelectedNode(node) {
+		this.#selectedNode = node;
+		this.#inspectorScrollY = 0;
+	}
+
+	//==============================================================================
+	// 트리에서 노드를 펼쳤는지.
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node 확인할 노드.
+	 * @returns { boolean } 트리에서 그 노드를 펼쳤으면 참.
+	 */
+	isNodeExpanded(node) {
+		return this.#expandedNodes.has(node);
+	}
+
+	//==============================================================================
+	// 트리에서 노드 펼치기와 접기.
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node 펼치거나 접을 노드.
+	 * @param { boolean } isExpanded 펼치면 참, 접으면 거짓.
+	 */
+	setNodeExpanded(node, isExpanded) {
+		if (isExpanded) {
+			this.#expandedNodes.add(node);
+		}
+		else {
+			this.#expandedNodes.delete(node);
+		}
+	}
+
+	//==============================================================================
+	// 노드 검사. (보이고, Node Hierarchy 탭으로, 조상을 펼치고 그 노드를 고른다, 그 노드 자신은 펼치지 않는다)
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node 검사할 노드.
+	 * @example <caption>자식 노드를 검사하면 부모가 펼쳐진다</caption>
+	 * import { DevTools, WorldNode } from "./build/vanilla.js";
+	 *
+	 * const parentNode = new WorldNode();
+	 * const childNode = new WorldNode();
+	 * parentNode.addChild(childNode);
+	 * const devTools = new DevTools();
+	 * devTools.inspectNode(childNode);
+	 * console.log(devTools.isVisible(), devTools.getActiveTab(), devTools.isNodeExpanded(parentNode), devTools.getSelectedNode() === childNode);
+	 */
+	inspectNode(node) {
+		if (!this.#isVisible) {
+			this.setVisible(true);
+		}
+		this.setActiveTab(1);
+		let ancestorNode = node.getParent();
+		while (ancestorNode) {
+			this.#expandedNodes.add(ancestorNode);
+			ancestorNode = ancestorNode.getParent();
+		}
+		this.setSelectedNode(node);
+	}
+
+	//==============================================================================
+	// 패널 영역 반환. (창 안쪽 논리 좌표)
+	//==============================================================================
+	/**
+	 * @returns { Rect } 패널 영역. (창 안쪽 논리 좌표)
+	 */
+	getPanelRect() {
+		return Rect.create(this.#panelX, this.#panelY, this.#panelWidth, this.#panelHeight);
+	}
+
+	//==============================================================================
 	// 현재 터치 위치가 패널 내부에 있는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 지금 포인터가 패널 안에 있으면 참. (패널이 숨겨져 있으면 거짓)
 	 */
 	isPointerInsidePanel() {
 		if (!this.#isVisible || !this.#engine) {
@@ -322,7 +473,7 @@ export class DEVTools extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임과의 간격. (초)
 	 */
 	tick(timeDelta) {
 		if (!this.#engine) {
@@ -334,17 +485,8 @@ export class DEVTools extends Object {
 
 		// F2 just-pressed 감지.
 		if (isKeyF2 && !this.#prevIsKeyF2) {
-			this.#isVisible = !this.#isVisible;
-			const graphic = this.#engine.getGraphic();
-			const isForceGizmosVisible = this.#isVisible && this.#isAllGizmosVisible;
-			graphic.setForceGizmosVisible(isForceGizmosVisible);
-			if (this.#isVisible) {
-				// 패널 좌표는 canvas-native 픽셀 기준 — ViewScaleMode 와 무관하게 항상 동일한 사이즈로 우측하단에 고정.
-				const viewManager = this.#engine.getViewManager();
-				const canvasNativeSize = viewManager.getCanvasNativeSize();
-				this.#panelX = canvasNativeSize.x - this.#panelWidth;
-				this.#panelY = canvasNativeSize.y - this.#panelHeight;
-			}
+			const isNextVisible = !this.#isVisible;
+			this.setVisible(isNextVisible);
 		}
 		this.#prevIsKeyF2 = isKeyF2;
 
@@ -378,6 +520,7 @@ export class DEVTools extends Object {
 	// 리사이즈 드래그 시작.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { string } mode
 	 * @param { number } touchX
 	 * @param { number } touchY
@@ -397,6 +540,7 @@ export class DEVTools extends Object {
 	// 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 */
@@ -599,6 +743,7 @@ export class DEVTools extends Object {
 	// 이동 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 */
@@ -697,6 +842,7 @@ export class DEVTools extends Object {
 	// 뗌 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 */
@@ -713,6 +859,7 @@ export class DEVTools extends Object {
 	// 로컬 스토리지 탭 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 * @param { number } panelX
@@ -731,21 +878,28 @@ export class DEVTools extends Object {
 		// + Add 버튼 클릭.
 		if (touchX >= addBtnX && touchX <= addBtnX + addBtnWidth &&
 		    touchY >= btnY && touchY <= btnY + btnHeight) {
-			const newKey = System.window.prompt("키 입력:");
-			if (newKey !== null && newKey.trim() !== "") {
-				const newValue = System.window.prompt("값 입력:") || "";
-				LocalStorage.setString(newKey.trim(), newValue);
-			}
+			// 엔진이 그린 질문 창으로 묻는다. (러스트 판 DevTools 와 같다)
+			this.#engine.prompt("키 입력:", "").setCallback((keyResult) => {
+				const newKey = keyResult.isConfirmed() ? keyResult.getText() : null;
+				if (newKey !== null && newKey.trim() !== "") {
+					this.#engine.prompt("값 입력:", "").setCallback((valueResult) => {
+						const newValue = valueResult.isConfirmed() ? valueResult.getText() : "";
+						LocalStorage.setString(newKey.trim(), newValue);
+					});
+				}
+			});
 			return;
 		}
 
 		// Clear 버튼 클릭.
 		if (touchX >= clearBtnX && touchX <= clearBtnX + clearBtnWidth &&
 		    touchY >= btnY && touchY <= btnY + btnHeight) {
-			if (System.window.confirm("모든 로컬 스토리지 항목을 삭제하시겠습니까?")) {
-				LocalStorage.clear();
-				this.#selectedLocalStorageKey = null;
-			}
+			this.#engine.confirm("모든 로컬 스토리지 항목을 삭제하시겠습니까?").setCallback((result) => {
+				if (result.isConfirmed()) {
+					LocalStorage.clear();
+					this.#selectedLocalStorageKey = null;
+				}
+			});
 			return;
 		}
 
@@ -770,22 +924,25 @@ export class DEVTools extends Object {
 					switch (buttonIndex) {
 						case 0: {
 							// Edit Key.
-							const newKey = System.window.prompt("키 이름 수정:", selectedKey);
-							if (newKey !== null && newKey.trim() !== "" && newKey.trim() !== selectedKey) {
-								const existingValue = LocalStorage.getString(selectedKey) || "";
-								LocalStorage.remove(selectedKey);
-								LocalStorage.setString(newKey.trim(), existingValue);
-								this.#selectedLocalStorageKey = newKey.trim();
-							}
+							this.#engine.prompt("키 이름 수정:", selectedKey).setCallback((result) => {
+								const newKey = result.isConfirmed() ? result.getText() : null;
+								if (newKey !== null && newKey.trim() !== "" && newKey.trim() !== selectedKey) {
+									const existingValue = LocalStorage.getString(selectedKey) || "";
+									LocalStorage.remove(selectedKey);
+									LocalStorage.setString(newKey.trim(), existingValue);
+									this.#selectedLocalStorageKey = newKey.trim();
+								}
+							});
 							break;
 						}
 						case 1: {
 							// Edit Value.
 							const currentValue = LocalStorage.getString(selectedKey) || "";
-							const newValue = System.window.prompt(`"${selectedKey}" 값 수정:`, currentValue);
-							if (newValue !== null) {
-								LocalStorage.setString(selectedKey, newValue);
-							}
+							this.#engine.prompt(`"${selectedKey}" 값 수정:`, currentValue).setCallback((result) => {
+								if (result.isConfirmed()) {
+									LocalStorage.setString(selectedKey, result.getText());
+								}
+							});
 							break;
 						}
 						case 2: {
@@ -798,10 +955,12 @@ export class DEVTools extends Object {
 						}
 						case 3: {
 							// Remove.
-							if (System.window.confirm(`"${selectedKey}" 항목을 삭제하시겠습니까?`)) {
-								LocalStorage.remove(selectedKey);
-								this.#selectedLocalStorageKey = null;
-							}
+							this.#engine.confirm(`"${selectedKey}" 항목을 삭제하시겠습니까?`).setCallback((result) => {
+								if (result.isConfirmed()) {
+									LocalStorage.remove(selectedKey);
+									this.#selectedLocalStorageKey = null;
+								}
+							});
 							break;
 						}
 					}
@@ -823,12 +982,14 @@ export class DEVTools extends Object {
 			// 삭제(×) 버튼 클릭.
 			const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
 			if (touchX >= delBtnX) {
-				if (System.window.confirm(`"${clickedKey}" 항목을 삭제하시겠습니까?`)) {
-					LocalStorage.remove(clickedKey);
-					if (this.#selectedLocalStorageKey === clickedKey) {
-						this.#selectedLocalStorageKey = null;
+				this.#engine.confirm(`"${clickedKey}" 항목을 삭제하시겠습니까?`).setCallback((result) => {
+					if (result.isConfirmed()) {
+						LocalStorage.remove(clickedKey);
+						if (this.#selectedLocalStorageKey === clickedKey) {
+							this.#selectedLocalStorageKey = null;
+						}
 					}
-				}
+				});
 				return;
 			}
 
@@ -856,6 +1017,9 @@ export class DEVTools extends Object {
 	//==============================================================================
 	// 트리 목록 재구성.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	rebuildFlatList() {
 		this.#flatList = [];
 		for (let rootIndex = 0; rootIndex < this.#rootNodes.length; ++rootIndex) {
@@ -868,6 +1032,7 @@ export class DEVTools extends Object {
 	// 노드를 플랫 목록에 재귀 추가.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { TransformNode } node
 	 * @param { number } depth
 	 * @param { boolean } parentActive
@@ -875,7 +1040,7 @@ export class DEVTools extends Object {
 	collectNode(node, depth, parentActive) {
 		const isNodeActive = node.isActive();
 		const effectiveActive = parentActive && isNodeActive;
-		const flatItem = new DEVToolsFlatItem(node, depth, effectiveActive);
+		const flatItem = new DevToolsFlatItem(node, depth, effectiveActive);
 		this.#flatList.push(flatItem);
 
 		const isExpanded = this.#expandedNodes.has(node);
@@ -893,6 +1058,7 @@ export class DEVTools extends Object {
 	// 컴포넌트의 get*/is* 프로퍼티 목록 수집.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Component } component
 	 * @returns { { name: string, value: * }[] }
 	 */
@@ -921,7 +1087,7 @@ export class DEVTools extends Object {
 				if (!isGetter) {
 					continue;
 				}
-				if (methodName === "constructor" || methodName === "getNode") {
+				if (COMPONENT_GETTER_EXCLUDE_NAMES.has(methodName)) {
 					continue;
 				}
 				try {
@@ -942,6 +1108,7 @@ export class DEVTools extends Object {
 	// get* 메서드명을 프로퍼티명 형식으로 변환. (getTextColor → textColor)
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { string } methodName
 	 * @returns { string }
 	 */
@@ -957,6 +1124,7 @@ export class DEVTools extends Object {
 	// 프로퍼티 값을 문자열로 포맷.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { * } value
 	 * @returns { string }
 	 */
@@ -1014,6 +1182,7 @@ export class DEVTools extends Object {
 	// 인스펙터 라인 목록 구성.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { TransformNode } node
 	 * @returns { InspectorLine[] }
 	 */
@@ -1115,10 +1284,12 @@ export class DEVTools extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		if (!this.#isVisible) {
+			// 패널을 닫아도 FPS 표시는 그린다.
+			this.drawFramePerSecond(graphic);
 			return;
 		}
 
@@ -1243,12 +1414,49 @@ export class DEVTools extends Object {
 		graphic.drawStrokeRect(Rect.create(panelX + 0.5, panelY + 0.5, panelWidth - 1, panelHeight - 1), isResizing ? 2 : 1);
 
 		graphic.popState();
+
+		// FPS 표시. (패널 위에)
+		this.drawFramePerSecond(graphic);
+	}
+
+	//==============================================================================
+	// FPS 표시 출력. (Settings 의 Show FPS 를 켜면 패널을 닫아도 창 왼쪽 위에 지난 1 초의 프레임 수를 그린다)
+	// - 패널처럼 ViewScaleMode 와 무관하게 canvas-native 좌표계에서 그린다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { Graphic } graphic 그릴 그래픽. (끝나면 들어올 때의 그리기 상태로 돌린다)
+	 */
+	drawFramePerSecond(graphic) {
+		if (!this.#isFramePerSecondVisible || !this.#engine) {
+			return;
+		}
+		const timeManager = this.#engine.getTimeManager();
+		const framePerSecond = timeManager.getFramePerSecond();
+		const framePerSecondText = `FPS ${framePerSecond}`;
+
+		graphic.pushState();
+		const viewManager = this.#engine.getViewManager();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFontString(`${FONT_SIZE}px monospace`);
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline("middle");
+		const textMetrics = graphic.measureText(framePerSecondText);
+		const boxWidth = System.Math.ceil(textMetrics.width) + PADDING * 2;
+		graphic.setFillColor(COLOR_BACKGROUND);
+		graphic.drawRect(Rect.create(PADDING, PADDING, boxWidth, ITEM_HEIGHT));
+		graphic.setStrokeColor(COLOR_BORDER_NORMAL);
+		graphic.drawStrokeRect(Rect.create(PADDING + 0.5, PADDING + 0.5, boxWidth - 1, ITEM_HEIGHT - 1), 1);
+		graphic.setFillColor(COLOR_TRUE);
+		graphic.drawFillText(framePerSecondText, PADDING * 2, PADDING + ITEM_HEIGHT * 0.5);
+		graphic.popState();
 	}
 
 	//==============================================================================
 	// 트리 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -1402,6 +1610,7 @@ export class DEVTools extends Object {
 	// 인스펙터 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -1533,6 +1742,7 @@ export class DEVTools extends Object {
 	// 로컬 스토리지 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -1735,6 +1945,7 @@ export class DEVTools extends Object {
 	// 화면 비율 가이드라인 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 */
 	drawAspectGuide(graphic) {
@@ -1793,6 +2004,7 @@ export class DEVTools extends Object {
 	// 세팅 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -1910,6 +2122,7 @@ export class DEVTools extends Object {
 	// 세팅 탭 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 * @param { number } panelX
@@ -1983,6 +2196,9 @@ export class DEVTools extends Object {
 	//==============================================================================
 	// 설정 불러오기.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	loadSettings() {
 		if (!LocalStorage.containsKey(SETTINGS_STORAGE_KEY)) {
 			return;
@@ -2014,6 +2230,9 @@ export class DEVTools extends Object {
 	//==============================================================================
 	// 설정 저장.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	saveSettings() {
 		const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
 		const settingsJson = System.JSON.stringify(settingsObject);
@@ -2024,7 +2243,7 @@ export class DEVTools extends Object {
 	// FPS 표시 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } Settings 의 Show FPS 가 켜졌으면 참. (켜지면 draw 가 패널을 닫아도 창 왼쪽 위에 FPS 를 그린다)
 	 */
 	isFramePerSecondVisible() {
 		return this.#isFramePerSecondVisible;
@@ -2033,6 +2252,9 @@ export class DEVTools extends Object {
 	//==============================================================================
 	// 통계 항목 수집.
 	//==============================================================================
+	/**
+	 * @private
+	 */
 	gatherStatisticsItems() {
 		const items = [];
 		const platform = this.#engine.getPlatform();
@@ -2094,14 +2316,17 @@ export class DEVTools extends Object {
 		items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
 
 		items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
+		// 러스트 판과 같은 규칙: 쓰는 중과 잡아 둔 힙을 못 읽으면 셋 다 "(N/A)", 한도만 못 읽으면 그 칸만 "(N/A)".
+		// (러스트 데스크탑은 같은 칸에 운영체제 API 로 읽은 같은 뜻의 값을 적는다)
 		const performanceMemory = System.window.performance ? System.window.performance.memory : null;
-		if (performanceMemory) {
+		const isHeapRead = !!performanceMemory && typeof performanceMemory.usedJSHeapSize === "number" && typeof performanceMemory.totalJSHeapSize === "number";
+		if (isHeapRead) {
 			const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
 			items.push({ key: "usedJSHeapSize", value: `${usedHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
 			const totalHeapMegabytes = (performanceMemory.totalJSHeapSize / (1024 * 1024)).toFixed(2);
 			items.push({ key: "totalJSHeapSize", value: `${totalHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
-			const heapLimitMegabytes = (performanceMemory.jsHeapSizeLimit / (1024 * 1024)).toFixed(2);
-			items.push({ key: "jsHeapSizeLimit", value: `${heapLimitMegabytes} MB`, isSeparator: false, isSectionHeader: false });
+			const heapLimitText = typeof performanceMemory.jsHeapSizeLimit === "number" ? `${(performanceMemory.jsHeapSizeLimit / (1024 * 1024)).toFixed(2)} MB` : "(N/A)";
+			items.push({ key: "jsHeapSizeLimit", value: heapLimitText, isSeparator: false, isSectionHeader: false });
 		}
 		else {
 			items.push({ key: "usedJSHeapSize", value: "(N/A)", isSeparator: false, isSectionHeader: false });
@@ -2116,6 +2341,7 @@ export class DEVTools extends Object {
 	// 통계 패널 출력.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { Graphic } graphic
 	 * @param { number } panelX
 	 * @param { number } panelY
@@ -2242,6 +2468,7 @@ export class DEVTools extends Object {
 	// 통계 탭 눌림 처리.
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } touchX
 	 * @param { number } touchY
 	 * @param { number } panelX

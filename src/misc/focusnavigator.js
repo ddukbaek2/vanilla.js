@@ -13,6 +13,20 @@ import { Rect } from "../base/rect.js";
 //   항목으로 포커스를 옮긴다. (콘솔 UI 내비게이션의 표준 방식)
 // - 항목은 { id, rect } 로 등록한다. 렌더 방식과 무관한 순수 좌표 알고리즘이다.
 //==============================================================================
+/**
+ * @example <caption>메뉴 항목 사이를 방향으로 옮겨 다니기</caption>
+ * import { FocusNavigator, Rect } from "./build/vanilla.js";
+ *
+ * const focusNavigator = new FocusNavigator({ crossAxisPenalty: 2.5 });
+ * focusNavigator.addItem("start", Rect.create(100, 100, 200, 60));
+ * focusNavigator.addItem("options", Rect.create(100, 180, 200, 60));
+ * focusNavigator.addItem("credits", Rect.create(320, 180, 200, 60));
+ * console.log(focusNavigator.moveFocus(0, 1));
+ * console.log(focusNavigator.moveFocus(0, 1));
+ * console.log(focusNavigator.moveFocus(1, 0));
+ * console.log(focusNavigator.moveFocus(1, 0));
+ * console.log(focusNavigator.getFocusedId());
+ */
 export class FocusNavigator extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -40,8 +54,8 @@ export class FocusNavigator extends Object {
 	// 항목 등록.
 	//==============================================================================
 	/**
-	 * @param { string } id
-	 * @param { Rect } rect
+	 * @param { string } id 항목 식별자.
+	 * @param { Rect } rect 항목의 사각형. (가운데끼리 거리를 잰다)
 	 */
 	addItem(id, rect) {
 		this.#itemList.push({ id: id, rect: rect });
@@ -59,7 +73,7 @@ export class FocusNavigator extends Object {
 	// 포커스 지정.
 	//==============================================================================
 	/**
-	 * @param { string | null } id
+	 * @param { string | null } id 포커스할 항목 식별자. (null 이면 포커스 없음)
 	 */
 	setFocusedId(id) {
 		this.#focusedId = id;
@@ -69,7 +83,7 @@ export class FocusNavigator extends Object {
 	// 현재 포커스 반환.
 	//==============================================================================
 	/**
-	 * @returns { string | null }
+	 * @returns { string | null } 지금 포커스된 항목 식별자. (없으면 null)
 	 */
 	getFocusedId() {
 		return this.#focusedId;
@@ -82,8 +96,8 @@ export class FocusNavigator extends Object {
 	// - 이동할 곳이 없으면 포커스를 그대로 두고 null 을 반환한다.
 	//==============================================================================
 	/**
-	 * @param { number } directionX
-	 * @param { number } directionY
+	 * @param { number } directionX 가로 방향. (-1, 0, 1)
+	 * @param { number } directionY 세로 방향. (-1, 0, 1)
 	 * @returns { string | null } 새로 포커스된 항목 id.
 	 */
 	moveFocus(directionX, directionY) {

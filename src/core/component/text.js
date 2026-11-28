@@ -5,21 +5,24 @@ const System = globalThis;
 import { Color } from "../../base/color.js";
 import { Rect } from "../../base/rect.js";
 import { Vector2 } from "../../base/vector2.js";
-import { SYSTEM_FONT_STRING } from "../../base/platform.js";
+import { DEFAULT_FONT_FAMILY_STRING } from "../../base/platform.js";
 import { Component } from "../component.js";
 import { Graphic } from "../graphic.js";
 import { FontAsset } from "../../resource/fontasset.js";
+import { measureTextMetrics } from "../graphic/textstringtexturecache.js";
+
+const geometryKeyContentSize = Vector2.zero(); // writeGeometryKey 가 노드의 내용 크기를 복제본 없이 받는 곳.
 
 
 //==============================================================================
 // 텍스트 수평 설정. (CanvasTextAlign)
 //==============================================================================
 export const TextAlign = {
-	left: "left",
-	center: "center",
-	right: "right",
-	start: "start",
-	end: "end",
+	left: "left", // 왼쪽 맞춤. (내용 왼쪽 끝에 놓는다)
+	center: "center", // 가운데 맞춤. (내용 가로 가운데에 놓는다)
+	right: "right", // 오른쪽 맞춤. (내용 오른쪽 끝에 놓는다)
+	start: "start", // 글 방향의 시작 쪽 맞춤. ("ltr" 은 왼쪽, "rtl" 은 오른쪽)
+	end: "end", // 글 방향의 끝 쪽 맞춤. ("ltr" 은 오른쪽, "rtl" 은 왼쪽)
 };
 
 
@@ -27,12 +30,12 @@ export const TextAlign = {
 // 텍스트 수직 설정. (CanvasTextBaseline)
 //==============================================================================
 export const TextBaseline = {
-	top: "top",
-	middle: "middle",
-	bottom: "bottom",
-	ideographic: "ideographic",
-	hanging: "hanging",
-	alphabetic: "alphabetic",
+	top: "top", // 글의 위 끝 기준. (내용 위 끝에 놓는다)
+	middle: "middle", // 글의 가운데 기준. (내용 세로 가운데에 놓는다)
+	bottom: "bottom", // 글의 아래 끝 기준. (내용 아래 끝에 놓는다)
+	ideographic: "ideographic", // 표의 문자 기준선. (내용 아래 끝에 놓는다)
+	hanging: "hanging", // 매달린 기준선. (내용 위 끝에 놓는다)
+	alphabetic: "alphabetic", // 알파벳 기준선. (내용 아래 끝에 놓는다)
 };
 
 
@@ -72,9 +75,12 @@ let wordSegmenter = null;
 // 줄바꿈 없는 빈칸. (이 빈칸으로 이은 단어 사이에서는 줄을 바꾸지 않는다)
 const NO_BREAK_SPACE = " ";
 
+//==============================================================================
+// 글자 묶음으로 나누기. (Intl.Segmenter 가 없으면 코드 포인트 단위)
+//==============================================================================
 /**
- * @param { string } text
- * @returns { string[] }
+ * @param { string } text 나눌 글.
+ * @returns { string[] } 글자 묶음 목록.
  */
 export function splitGraphemes(text) {
 	if (graphemeSegmenter === null && System.Intl && typeof System.Intl.Segmenter === "function") {
@@ -90,9 +96,21 @@ export function splitGraphemes(text) {
 	return pieces;
 }
 
+//==============================================================================
+// 단어로 나누기. (Intl.Segmenter 가 없으면 글 통째로 한 조각)
+//==============================================================================
 /**
- * @param { string } text
+ * @param { string } text 나눌 글.
  * @returns { string[] } 단어마다 한 조각. (단어가 아닌 조각은 앞 단어에 붙인다, 줄바꿈 없는 빈칸으로 이은 단어는 한 조각)
+ * @example <caption>글자 묶음과 단어로 나누기</caption>
+ * import { splitGraphemes, splitWords, countGraphemes, sliceGraphemes } from "./build/vanilla.js";
+ *
+ * const text = "Cafe\u0301 au lait";
+ * const graphemes = splitGraphemes(text);
+ * console.log(graphemes.length, text.length);
+ * console.log(countGraphemes(text));
+ * console.log(sliceGraphemes(text, 4));
+ * console.log(splitWords("Hello, world. Bye"));
  */
 export function splitWords(text) {
 	if (wordSegmenter === null && System.Intl && typeof System.Intl.Segmenter === "function") {
@@ -134,17 +152,47 @@ export function splitWords(text) {
 
 
 //==============================================================================
-// 폰트 문자열 합성 (canvas font property 형식).
+// 글자 묶음 수. (표시 글자 수가 세는 단위, 받침, 결합 부호, 이모지 묶음을 한 자로)
 //==============================================================================
 /**
- * @param { FontFace | null } fontFace
- * @param { number } fontSize
- * @param { boolean } bold
- * @param { boolean } italic
- * @returns { string }
+ * @param { string } text 셀 글.
+ * @returns { number } 글자 묶음 수.
+ */
+export function countGraphemes(text) {
+	return splitGraphemes(text).length;
+}
+
+//==============================================================================
+// 앞에서 글자 묶음 count 개까지의 글. (글이 짧으면 글 전체)
+//==============================================================================
+/**
+ * @param { string } text 자를 글.
+ * @param { number } count 남길 글자 묶음 수.
+ * @returns { string } 앞에서 count 개까지의 글. (글이 짧으면 글 그대로)
+ */
+export function sliceGraphemes(text, count) {
+	const graphemes = splitGraphemes(text);
+	if (graphemes.length <= count) {
+		return text;
+	}
+	return graphemes.slice(0, count).join("");
+}
+
+
+//==============================================================================
+// 폰트 문자열 합성. (canvas font 꼴, 러스트 판 build_font_string 과 같다)
+// - 글꼴이 없으면 엔진 기본 글꼴 사슬(글꼴 이름 "default" 다음 시스템 글꼴 사슬)이다. 러스트 판 "32px default" 와 같은 글꼴을 고른다.
+//   (캔버스에 바로 넣어도 되게 "default" 는 따옴표로 감싸고 시스템 글꼴 사슬을 잇는다)
+//==============================================================================
+/**
+ * @param { FontFace | null } fontFace 글꼴. (null 이면 엔진 기본 글꼴 사슬)
+ * @param { number } fontSize 글자 크기. (픽셀)
+ * @param { boolean } bold 굵게.
+ * @param { boolean } italic 기울임.
+ * @returns { string } canvas font 글. (예: "bold 32px DOSGothic", 글꼴이 없으면 '32px "default", -apple-system, ...')
  */
 export function buildFontString(fontFace, fontSize, bold, italic) {
-	const fontFamily = fontFace ? fontFace.family : SYSTEM_FONT_STRING;
+	const fontFamily = fontFace ? fontFace.family : DEFAULT_FONT_FAMILY_STRING;
 	const styleParts = [];
 	if (italic) {
 		styleParts.push("italic");
@@ -159,6 +207,56 @@ export function buildFontString(fontFace, fontSize, bold, italic) {
 
 
 //==============================================================================
+// 그리는 사각형을 셀 때 내용 크기를 읽어 두는 칸. (Text.calculateDrawnRect)
+//==============================================================================
+const drawnRectContentSize = Vector2.zero();
+
+
+//==============================================================================
+// 웹 글꼴의 조각이 받아진 횟수. (늘면 그릴 때 나눠 둔 줄을 다시 나눈다, ShadowText 와 같은 방식)
+//==============================================================================
+let fontLoadCount = 0;
+if (System.document !== undefined && System.document.fonts !== undefined) {
+	System.document.fonts.addEventListener("loadingdone", () => {
+		fontLoadCount += 1;
+		// 글꼴이 바뀌면 잰 너비가 달라지므로 노드들이 셈해 둔 그리기 경계를 모두 다시 셈하게 한다.
+		Component.markAllDrawnRectsDirty();
+	});
+}
+
+//==============================================================================
+// 색을 기하 캐시 열쇠에 적기. (참조와 칸을 함께, 안의 값이 바뀌어도 알아채게)
+//==============================================================================
+/**
+ * @param { GeometryKey } geometryKey 적을 열쇠.
+ * @param { Color | null } color 적을 색. (null 이면 null 만)
+ */
+function addColorToGeometryKey(geometryKey, color) {
+	geometryKey.add(color);
+	if (color !== null && typeof color === "object" && typeof color.red === "number") {
+		geometryKey.add(color.red);
+		geometryKey.add(color.green);
+		geometryKey.add(color.blue);
+		geometryKey.add(color.alpha);
+	}
+}
+
+//==============================================================================
+// 문서에 올린 글꼴 얼굴 수 반환. (다 받은 얼굴을 나중에 올리면 loadingdone 이 오지 않아 이것으로 안다, 문서가 없으면 0)
+//==============================================================================
+/**
+ * @returns { number }
+ */
+function readFontFaceCount() {
+	const document = System.document;
+	if (document === undefined || document.fonts === undefined) {
+		return 0;
+	}
+	return document.fonts.size;
+}
+
+
+//==============================================================================
 // 원시(plain) 텍스트 출력기 컴포넌트.
 // - 단일 폰트 / 단일 크기 / 단일 색상으로 텍스트를 1 라인 그리는 컴포넌트.
 // - 볼드 / 이탤릭 / 밑줄 / 취소선은 텍스트 전체에 일괄 적용된다.
@@ -166,6 +264,36 @@ export function buildFontString(fontFace, fontSize, bold, italic) {
 //   리치텍스트 (마크업 + segment 별 스타일) 가 필요하면 RichText 컴포넌트를 사용.
 // - 비활성화 상태 (isEnable() === false) 면 draw / 측정에서 건너뛴다.
 //==============================================================================
+/**
+ * @example <caption>글꼴을 불러와 한 줄 글 쓰기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Text, TextAlign, FontAsset } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const fontAsset = new FontAsset();
+ * 		await fontAsset.loadFont("DOSGothic", "examples/assets/DOSGothic.woff");
+ * 		const labelNode = new WorldNode();
+ * 		labelNode.setContentSize(Vector2.create(400, 60));
+ * 		labelNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const text = labelNode.addComponent(Text);
+ * 		text.setFont(fontAsset);
+ * 		text.setFontSize(32);
+ * 		text.setTextColor("#ffffff");
+ * 		text.setStrokeColor("#000000");
+ * 		text.setStrokeWidth(4);
+ * 		text.setTextAlign(TextAlign.center);
+ * 		text.setText("Hello, Vanilla");
+ * 		const root = this.getRoot();
+ * 		root.addChild(labelNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Text extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -186,7 +314,13 @@ export class Text extends Component {
 	/** @private @type { number } */ #wordWrapWidth; // 0 이면 한 줄. 넘으면 이 폭에서 줄을 바꾼다.
 	/** @private @type { string } */ #wrapMode; // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
 	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
-	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. -1 이면 전체.
+	/** @private @type { number } */ #letterSpacing; // 글자 간격. (픽셀, CSS letter-spacing 과 같은 뜻, 글자 묶음마다 뒤에 더한다)
+	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. (글자 묶음 단위) -1 이면 전체.
+	/** @private @type { object } */ #wrapCache; // 그릴 때 나눈 줄과 그때의 글, 글꼴, 크기, 폭, 줄바꿈 방식. (같으면 다시 나누지 않는다)
+	/** @private @type { number } */ #fitWidth; // 한 줄 글을 맞출 너비. (0 이면 맞추지 않는다)
+	/** @private @type { number } */ #fitMinimumRatio; // 맞출 때 줄이는 가장 작은 비율.
+	/** @private @type { object } */ #fitCache; // 맞춘 크기와 그때의 글, 글꼴, 크기, 너비, 비율. (같으면 다시 재지 않는다)
+	/** @private @type { string | null } */ #textColorString; // 마지막으로 받은 색 문자열. (같은 문자열이면 다시 풀지 않는다, Color 로 받았으면 null)
 
 	//==============================================================================
 	// 생성.
@@ -194,6 +328,35 @@ export class Text extends Component {
 	constructor() {
 		super();
 		this.setComponentType("Text");
+		this.#wrapCache = {
+			text: "",
+			fontFace: null,
+			fontSize: 0,
+			bold: false,
+			italic: false,
+			wrapWidth: -1,
+			wrapMode: "",
+			letterSpacing: 0,
+			fontLoadCount: -1,
+			fontFaceCount: -1,
+			lineList: null,
+		};
+		this.#fitWidth = 0;
+		this.#fitMinimumRatio = 0.55;
+		this.#fitCache = {
+			text: "",
+			fontFace: null,
+			fontSize: 0,
+			bold: false,
+			italic: false,
+			fitWidth: -1,
+			fitMinimumRatio: -1,
+			letterSpacing: 0,
+			fontLoadCount: -1,
+			fontFaceCount: -1,
+			fittedFontSize: 0,
+		};
+		this.#textColorString = null;
 		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;
@@ -210,6 +373,7 @@ export class Text extends Component {
 		this.#wordWrapWidth = 0;
 		this.#wrapMode = "word";
 		this.#lineSpacing = 1.25;
+		this.#letterSpacing = 0;
 		this.#visibleCharacterCount = -1;
 	}
 
@@ -218,10 +382,21 @@ export class Text extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// tick 이 할 일이 있는지. (그리기만 하므로 거짓, 하위 클래스가 tick 을 다시 정의하면 참)
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { boolean } tick 이 할 일이 있으면 참.
+	 */
+	isTickNeeded() {
+		return this.tick !== Text.prototype.tick;
 	}
 
 	//==============================================================================
@@ -229,7 +404,7 @@ export class Text extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		if (this.isEnable() === false) {
@@ -256,17 +431,17 @@ export class Text extends Component {
 	}
 
 	//==============================================================================
-	// 표시 글자 수만큼 앞에서 자르기.
+	// 표시 글자 수만큼 앞에서 자르기. (글자 묶음 단위, 받침, 결합 부호, 이모지 묶음이 쪼개지지 않는다)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @returns { string }
+	 * @param { string } text 자를 글.
+	 * @returns { string } 앞에서 표시 글자 수만큼 자른 글. (표시 글자 수가 -1 이면 글 그대로)
 	 */
 	applyVisibleCharacterCount(text) {
 		if (this.#visibleCharacterCount < 0) {
 			return text;
 		}
-		return text.slice(0, this.#visibleCharacterCount);
+		return sliceGraphemes(text, this.#visibleCharacterCount);
 	}
 
 	//==============================================================================
@@ -274,13 +449,13 @@ export class Text extends Component {
 	// - textBaseline 은 줄 묶음의 세로 정렬로 쓴다. (top / middle / bottom)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { Vector2 } contentSize
-	 * @param { string } fullText
+	 * @param { Graphic } graphic 그래픽.
+	 * @param { Vector2 } contentSize 노드의 내용 크기.
+	 * @param { string } fullText 그릴 온 글. (표시 글자 수로 자르기 전)
 	 */
 	drawWrappedText(graphic, contentSize, fullText) {
 		const wrapWidth = (this.#wordWrapWidth > 0) ? this.#wordWrapWidth : contentSize.x;
-		const lineList = this.wrapTextToLines(fullText, wrapWidth);
+		const lineList = this.readWrappedLines(fullText, wrapWidth);
 		const lineHeight = this.#fontSize * this.#lineSpacing;
 		const blockHeight = lineList.length * lineHeight;
 
@@ -318,6 +493,7 @@ export class Text extends Component {
 		const textColor = this.getTextColor();
 		const decorationLineWidth = System.Math.max(1, this.#fontSize / 16);
 
+		// 보일 글자 수가 정해졌으면 줄마다 남은 수만큼만 그린다. (나눈 줄의 글자 묶음 수로 세고, 0 이 되면 다음 줄부터 그리지 않는다)
 		let remainCount = this.#visibleCharacterCount;
 		for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
 			let lineText = lineList[lineIndex];
@@ -325,26 +501,27 @@ export class Text extends Component {
 				if (remainCount <= 0) {
 					break;
 				}
-				if (lineText.length > remainCount) {
-					lineText = lineText.slice(0, remainCount);
+				const lineCharacterCount = countGraphemes(lineText);
+				if (lineCharacterCount > remainCount) {
+					lineText = sliceGraphemes(lineText, remainCount);
 				}
-				remainCount -= lineList[lineIndex].length;
+				remainCount = System.Math.max(0, remainCount - lineCharacterCount);
 			}
 			if (lineText.length === 0) {
 				continue;
 			}
 			const lineY = blockTop + (lineIndex + 0.5) * lineHeight;
 			if (strokeColor && this.#strokeWidth > 0) {
-				graphic.setStrokeColor(strokeColor.toHEXString());
-				graphic.drawStrokeText(lineText, drawX, lineY, this.#strokeWidth);
+				graphic.setStrokeColor(strokeColor);
+				this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, true);
 			}
-			graphic.setFillColor(textColor.toHEXString());
-			graphic.drawFillText(lineText, drawX, lineY);
+			graphic.setFillColor(textColor);
+			this.drawTextLine(graphic, lineText, drawX, lineY, textAlign, this.#fontSize, false);
 
 			if (this.#underline || this.#strikethrough) {
 				const lineWidth = this.measurePlainTextWidth(lineText);
 				const startX = this.computeUnderlineStartX(drawX, lineWidth, textAlign);
-				graphic.setStrokeColor(textColor.toHEXString());
+				graphic.setStrokeColor(textColor);
 				if (this.#underline) {
 					this.strokeHorizontalLine(graphic, startX, lineY + this.#fontSize * 0.5 + decorationLineWidth, lineWidth, decorationLineWidth);
 				}
@@ -356,6 +533,48 @@ export class Text extends Component {
 	}
 
 	//==============================================================================
+	// 그릴 줄 배열 반환. (wrapTextToLines 의 결과를 기억해 두고 쓴다)
+	// - 글, 글꼴, 크기, 굵게, 기울임, 폭, 줄바꿈 방식이 바뀌거나 웹 글꼴이 받아지거나 올라갈 때만 다시 나눈다.
+	// - 돌려준 배열은 다음에 다시 나눌 때까지 이 컴포넌트가 들고 있으므로 고치지 않는다.
+	//==============================================================================
+	/**
+	 * @param { string } text 나눌 글.
+	 * @param { number } wrapWidth 줄을 바꾸는 폭. (내용 크기 단위)
+	 * @returns { string[] } 나눈 줄 배열. (이 컴포넌트가 들고 있으므로 고치지 않는다)
+	 */
+	readWrappedLines(text, wrapWidth) {
+		const wrapCache = this.#wrapCache;
+		const fontFaceCount = readFontFaceCount();
+		const isSame = wrapCache.lineList !== null
+			&& wrapCache.text === text
+			&& wrapCache.fontFace === this.#fontFace
+			&& wrapCache.fontSize === this.#fontSize
+			&& wrapCache.bold === this.#bold
+			&& wrapCache.italic === this.#italic
+			&& wrapCache.wrapWidth === wrapWidth
+			&& wrapCache.wrapMode === this.#wrapMode
+			&& wrapCache.letterSpacing === this.#letterSpacing
+			&& wrapCache.fontLoadCount === fontLoadCount
+			&& wrapCache.fontFaceCount === fontFaceCount;
+		if (isSame) {
+			return wrapCache.lineList;
+		}
+		const lineList = this.wrapTextToLines(text, wrapWidth);
+		wrapCache.text = text;
+		wrapCache.fontFace = this.#fontFace;
+		wrapCache.fontSize = this.#fontSize;
+		wrapCache.bold = this.#bold;
+		wrapCache.italic = this.#italic;
+		wrapCache.wrapWidth = wrapWidth;
+		wrapCache.wrapMode = this.#wrapMode;
+		wrapCache.letterSpacing = this.#letterSpacing;
+		wrapCache.fontLoadCount = fontLoadCount;
+		wrapCache.fontFaceCount = fontFaceCount;
+		wrapCache.lineList = lineList;
+		return lineList;
+	}
+
+	//==============================================================================
 	// 텍스트를 폭에 맞춰 줄 배열로 나누기.
 	// - "word": 공백 단위로 채우고, 한 단어가 폭을 넘으면 글자 단위로 강제 분할.
 	//   (공백 없는 CJK 문장은 통째로 한 단어이므로 자연히 글자 단위가 된다)
@@ -363,9 +582,9 @@ export class Text extends Component {
 	// - 명시적 개행(\n)은 항상 지켜진다.
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @param { number } maxWidth
-	 * @returns { string[] }
+	 * @param { string } text 나눌 글.
+	 * @param { number } maxWidth 줄을 바꾸는 폭. (내용 크기 단위, 0 이하면 줄바꿈 문자로만 나눈다)
+	 * @returns { string[] } 나눈 줄 배열. (잴 캔버스가 없으면 줄바꿈 문자로만 나눈다)
 	 */
 	wrapTextToLines(text, maxWidth) {
 		const measurementContext = getMeasurementCanvasRenderingContext();
@@ -375,7 +594,7 @@ export class Text extends Component {
 		measurementContext.save();
 		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
 		const measureWidth = (candidateText) => {
-			return measurementContext.measureText(candidateText).width;
+			return measurementContext.measureText(candidateText).width + countGraphemes(candidateText) * this.#letterSpacing;
 		};
 
 		const lineList = [];
@@ -449,6 +668,21 @@ export class Text extends Component {
 	}
 
 	//==============================================================================
+	// Graphic 없이 나눈 줄 목록. (지금 글과 글꼴, 폭으로 나눈다, 잴 캔버스가 없으면 null)
+	// - 그리기 전에 줄 수가 필요한 레이아웃(창의 내용 놓기 같은)이 쓴다. (러스트 판 wrap_lines_without_graphic 과 같은 쓰임)
+	//==============================================================================
+	/**
+	 * @param { number } maximumWidth 줄을 바꾸는 폭. (내용 크기 단위, 0 이하면 줄바꿈 문자로만 나눈다)
+	 * @returns { string[] | null } 나눈 줄 배열. (잴 캔버스가 없으면 null)
+	 */
+	wrapLinesWithoutGraphic(maximumWidth) {
+		if (getMeasurementCanvasRenderingContext() === null) {
+			return null;
+		}
+		return this.wrapTextToLines(this.#text, maximumWidth);
+	}
+
+	//==============================================================================
 	// 줄바꿈 반영 크기 측정. (레이아웃 용)
 	//==============================================================================
 	/**
@@ -475,9 +709,9 @@ export class Text extends Component {
 	// 일반 텍스트 그리기.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { Vector2 } contentSize
-	 * @param { string } text
+	 * @param { Graphic } graphic 그래픽.
+	 * @param { Vector2 } contentSize 노드의 내용 크기.
+	 * @param { string } text 그릴 한 줄 글. (표시 글자 수로 자른 것)
 	 */
 	drawPlainText(graphic, contentSize, text) {
 		const textDirection = graphic.resolveTextDirection(text);
@@ -505,25 +739,26 @@ export class Text extends Component {
 			drawY = contentSize.y * 0.5;
 		}
 
-		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
+		// 맞출 너비가 있으면 넘치지 않게 줄인 크기로 그린다. (표시 글자 수로 자른 글이 아니라 온 글로 잰다)
+		const fontSize = this.getFittedFontSize();
+		graphic.setFontString(buildFontString(this.#fontFace, fontSize, this.#bold, this.#italic));
 		graphic.setTextAlign(textAlign);
 		graphic.setTextBaseline(this.#textBaseline);
 
 		const strokeColor = this.getStrokeColor();
 		if (strokeColor && this.#strokeWidth > 0) {
-			graphic.setStrokeColor(strokeColor.toHEXString());
-			graphic.drawStrokeText(text, drawX, drawY, this.#strokeWidth);
+			graphic.setStrokeColor(strokeColor);
+			this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, true);
 		}
 
 		const textColor = this.getTextColor();
-		graphic.setFillColor(textColor.toHEXString());
-		graphic.drawFillText(text, drawX, drawY);
+		graphic.setFillColor(textColor);
+		this.drawTextLine(graphic, text, drawX, drawY, textAlign, fontSize, false);
 
 		if (this.#underline || this.#strikethrough) {
-			const textWidth = this.measurePlainTextWidth(text);
+			const textWidth = this.measureText(text, fontSize);
 			const startX = this.computeUnderlineStartX(drawX, textWidth, textAlign);
-			const fontSize = this.#fontSize;
-			graphic.setStrokeColor(textColor.toHEXString());
+			graphic.setStrokeColor(textColor);
 			const lineWidth = System.Math.max(1, fontSize / 16);
 			if (this.#underline) {
 				const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
@@ -540,29 +775,442 @@ export class Text extends Component {
 	// 일반 텍스트의 픽셀 너비 측정. (오프스크린 컨텍스트 사용)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @returns { number }
+	 * @param { string } text 잴 글.
+	 * @returns { number } 정한 크기로 잰 글 너비. (내용 크기 단위)
 	 */
 	measurePlainTextWidth(text) {
-		const measurementContext = getMeasurementCanvasRenderingContext();
-		if (measurementContext === null) {
+		return this.measureText(text, this.#fontSize);
+	}
+
+	//==============================================================================
+	// 글의 너비 재기. (이 글자의 글꼴, 굵게, 기울임으로, 주지 않으면 지금 글과 정한 크기로)
+	// - 글꼴 문자열과 글이 같으면 다시 재지 않는다. (measureTextMetrics 의 캐시, 웹 글꼴이 받아지면 비운다)
+	// - 문서가 없으면 0.
+	//==============================================================================
+	/**
+	 * @param { string } text 잴 글. (주지 않으면 지금 글)
+	 * @param { number } fontSize 글자 크기. (주지 않으면 정한 크기)
+	 * @returns { number } 글 너비. (내용 크기 단위, 글이 비었거나 문서가 없으면 0)
+	 */
+	measureText(text = this.#text, fontSize = this.#fontSize) {
+		if (!text) {
 			return 0;
 		}
-		measurementContext.save();
-		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-		const width = measurementContext.measureText(text).width;
-		measurementContext.restore();
-		return width;
+		const textWidth = this.measureTextWithoutSpacing(text, fontSize);
+		if (this.#letterSpacing === 0) {
+			return textWidth;
+		}
+		return textWidth + countGraphemes(text) * this.#letterSpacing;
+	}
+
+	//==============================================================================
+	// 글자 간격을 더하지 않은 글 너비. (measureText 와 drawTextLine 의 바탕)
+	//==============================================================================
+	/**
+	 * @param { string } text 잴 글.
+	 * @param { number } fontSize 글자 크기.
+	 * @returns { number } 글자 간격을 빼고 잰 너비. (문서가 없으면 0)
+	 */
+	measureTextWithoutSpacing(text, fontSize) {
+		const fontString = buildFontString(this.#fontFace, fontSize, this.#bold, this.#italic);
+		const textMetrics = measureTextMetrics(fontString, text);
+		if (textMetrics === null) {
+			return 0;
+		}
+		return textMetrics.width;
+	}
+
+	//==============================================================================
+	// 한 줄 글 그리기. (글자 간격이 0 이면 한 번에, 아니면 글자 묶음마다 간격을 더한 자리에)
+	// - 자리(k) = 자리(k-1) + (앞 글자 묶음과 이 묶음을 붙인 너비) - (이 묶음만의 너비) + 글자 간격. 짝 커닝은 그대로 남는다.
+	// - 글 전체 너비는 글자 묶음 수 x 글자 간격을 더한 값이다. (CSS letter-spacing 처럼 마지막 글자 뒤에도 더한다) 정렬은 이 너비로 잡는다.
+	// - 오른쪽에서 왼쪽으로 쓰는 글은 글자 간격 없이 그린다.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그래픽. (글꼴, 색, 정렬, 세로 기준이 이미 정해진 것)
+	 * @param { string } text 그릴 한 줄 글.
+	 * @param { number } x 정렬의 기준 X.
+	 * @param { number } y 세로 기준 Y.
+	 * @param { string } textAlign 실제 가로 정렬. ("left", "right", "center")
+	 * @param { number } fontSize 글자 크기. (자리 재기용)
+	 * @param { boolean } isStroke 참이면 바깥선, 거짓이면 채움.
+	 */
+	drawTextLine(graphic, text, x, y, textAlign, fontSize, isStroke) {
+		const letterSpacing = this.#letterSpacing;
+		if (letterSpacing === 0 || graphic.getTextDirection() === "rtl") {
+			if (isStroke) {
+				graphic.drawStrokeText(text, x, y, this.#strokeWidth);
+			}
+			else {
+				graphic.drawFillText(text, x, y);
+			}
+			return;
+		}
+		const graphemeList = splitGraphemes(text);
+		const totalWidth = this.measureTextWithoutSpacing(text, fontSize) + graphemeList.length * letterSpacing;
+		let drawX = x;
+		if (textAlign === "right") {
+			drawX = x - totalWidth;
+		}
+		else if (textAlign === "center") {
+			drawX = x - totalWidth * 0.5;
+		}
+		graphic.setTextAlign("left");
+		let previousGrapheme = null;
+		let position = 0;
+		for (const grapheme of graphemeList) {
+			if (previousGrapheme !== null) {
+				const pairWidth = this.measureTextWithoutSpacing(previousGrapheme + grapheme, fontSize);
+				const graphemeWidth = this.measureTextWithoutSpacing(grapheme, fontSize);
+				position += pairWidth - graphemeWidth + letterSpacing;
+			}
+			if (isStroke) {
+				graphic.drawStrokeText(grapheme, drawX + position, y, this.#strokeWidth);
+			}
+			else {
+				graphic.drawFillText(grapheme, drawX + position, y);
+			}
+			previousGrapheme = grapheme;
+		}
+		graphic.setTextAlign(textAlign);
+	}
+
+	//==============================================================================
+	// 한 줄 글을 너비에 맞추기 설정. (넘치면 처음 크기에서 최소 비율까지 줄여 그린다)
+	// - 언어마다 글의 길이가 달라 칸을 넘칠 때, 칸을 넓힐 수 없는 곳(단추, 줄 이름, 제목)에 쓴다.
+	// - 정한 크기(getFontSize)는 그대로 두고 그릴 때의 크기(getFittedFontSize)만 줄인다. 글이나 글꼴이 바뀌면 다시 맞춘다.
+	// - 최소 비율까지 줄여도 넘치면 넘친 채로 그린다. 화면 밖 거르기는 넘친 너비까지 본다. (calculateDrawnRect)
+	// - 줄을 바꾸는 글(setWordWrapWidth, 줄바꿈 문자)은 맞추지 않는다.
+	// - width 가 0 이하면 맞추지 않는다. (기본)
+	//==============================================================================
+	/**
+	 * @param { number } width 맞출 너비. (내용 크기 단위, 음수는 0, 0 이면 맞추지 않는다)
+	 * @param { number } minimumRatio 0 ~ 1, 기본 0.55.
+	 * @example <caption>칸을 넘치는 글을 줄여 맞추기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Text } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const buttonNode = new WorldNode();
+	 * 		buttonNode.setContentSize(Vector2.create(160, 48));
+	 * 		buttonNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		const text = buttonNode.addComponent(Text);
+	 * 		text.setFontSize(32);
+	 * 		text.setText("Start a new adventure");
+	 * 		text.setFitWidth(160, 0.5);
+	 * 		const fittedFontSize = text.getFittedFontSize();
+	 * 		console.log(fittedFontSize);
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(buttonNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	setFitWidth(width, minimumRatio = 0.55) {
+		this.#fitWidth = System.Math.max(0, width);
+		this.#fitMinimumRatio = System.Math.min(1, System.Math.max(0, minimumRatio));
+		this.markDrawnRectDirty();
+	}
+
+	//==============================================================================
+	// 맞출 너비 반환. (0 이면 맞추지 않는다)
+	//==============================================================================
+	/**
+	 * @returns { number } 맞출 너비. (0 이면 맞추지 않는다)
+	 */
+	getFitWidth() {
+		return this.#fitWidth;
+	}
+
+	//==============================================================================
+	// 맞출 때 줄이는 가장 작은 비율 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 맞출 때 줄이는 가장 작은 비율. (0 ~ 1)
+	 */
+	getFitMinimumRatio() {
+		return this.#fitMinimumRatio;
+	}
+
+	//==============================================================================
+	// 그릴 때의 크기 반환. (맞출 너비를 넘치면 줄인 크기, 0.1 단위로 내림, 아니면 정한 크기)
+	//==============================================================================
+	/**
+	 * @returns { number } 그릴 때의 글자 크기.
+	 */
+	getFittedFontSize() {
+		const text = this.#text;
+		if (this.#fitWidth <= 0 || !text || this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+			return this.#fontSize;
+		}
+		const fitCache = this.#fitCache;
+		const fontFaceCount = readFontFaceCount();
+		const isSame = fitCache.text === text
+			&& fitCache.fontFace === this.#fontFace
+			&& fitCache.fontSize === this.#fontSize
+			&& fitCache.bold === this.#bold
+			&& fitCache.italic === this.#italic
+			&& fitCache.fitWidth === this.#fitWidth
+			&& fitCache.fitMinimumRatio === this.#fitMinimumRatio
+			&& fitCache.letterSpacing === this.#letterSpacing
+			&& fitCache.fontLoadCount === fontLoadCount
+			&& fitCache.fontFaceCount === fontFaceCount;
+		if (isSame) {
+			return fitCache.fittedFontSize;
+		}
+		let fittedFontSize = this.#fontSize;
+		const textWidth = this.measureText(text, this.#fontSize);
+		if (textWidth > this.#fitWidth) {
+			const fitRatio = System.Math.max(this.#fitMinimumRatio, this.#fitWidth / textWidth);
+			fittedFontSize = System.Math.floor(this.#fontSize * fitRatio * 10) / 10;
+		}
+		fitCache.text = text;
+		fitCache.fontFace = this.#fontFace;
+		fitCache.fontSize = this.#fontSize;
+		fitCache.bold = this.#bold;
+		fitCache.italic = this.#italic;
+		fitCache.fitWidth = this.#fitWidth;
+		fitCache.fitMinimumRatio = this.#fitMinimumRatio;
+		fitCache.letterSpacing = this.#letterSpacing;
+		fitCache.fontLoadCount = fontLoadCount;
+		fitCache.fontFaceCount = fontFaceCount;
+		fitCache.fittedFontSize = fittedFontSize;
+		return fittedFontSize;
+	}
+
+	//==============================================================================
+	// 그릴 때의 크기를 그 자리에서 재어 반환. (맞출 너비를 넘치면 줄인 크기, 러스트 판 calculate_fitted_font_size 와 같은 쓰임)
+	// - 이 판은 Graphic 없이 잴 수 있어 getFittedFontSize 와 같은 값이다. (글이나 글꼴이 바뀌었으면 다시 잰다)
+	//==============================================================================
+	/**
+	 * @returns { number } 그릴 때의 글자 크기.
+	 */
+	calculateFittedFontSize() {
+		return this.getFittedFontSize();
+	}
+
+	//==============================================================================
+	// 그리기 입력을 기하 캐시 열쇠에 적기. (글, 글꼴, 크기, 색, 정렬, 줄바꿈, 표시 글자 수, 맞춤 너비, 내용 크기)
+	// - 웹 글꼴이 받아져 다시 구울 글은 글 캐시가 엔트리를 버리므로 Graphic 이 알아채 다시 셈한다.
+	// - draw 나 그 아래 그리기 함수를 덮어쓴 하위 클래스(RichText 등)는 무엇을 읽는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { GeometryKey } geometryKey 입력을 적을 열쇠.
+	 * @returns { boolean } 입력을 적었으면 참.
+	 */
+	writeGeometryKey(geometryKey) {
+		if (this.draw !== Text.prototype.draw || this.drawPlainText !== Text.prototype.drawPlainText || this.drawWrappedText !== Text.prototype.drawWrappedText || this.strokeHorizontalLine !== Text.prototype.strokeHorizontalLine) {
+			return false;
+		}
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		geometryKey.add(this.getText());
+		geometryKey.add(this.#fontFace);
+		geometryKey.add(this.#fontSize);
+		addColorToGeometryKey(geometryKey, this.getTextColor());
+		addColorToGeometryKey(geometryKey, this.getStrokeColor());
+		geometryKey.add(this.#strokeWidth);
+		geometryKey.add(this.#bold);
+		geometryKey.add(this.#italic);
+		geometryKey.add(this.#underline);
+		geometryKey.add(this.#strikethrough);
+		geometryKey.add(this.#textAlign);
+		geometryKey.add(this.#textBaseline);
+		geometryKey.add(this.#textDirection);
+		geometryKey.add(this.#wordWrapWidth);
+		geometryKey.add(this.#wrapMode);
+		geometryKey.add(this.#lineSpacing);
+		geometryKey.add(this.#letterSpacing);
+		geometryKey.add(this.#visibleCharacterCount);
+		geometryKey.add(this.#fitWidth);
+		geometryKey.add(this.#fitMinimumRatio);
+		const contentSize = geometryKeyContentSize;
+		if (typeof node.copyContentSizeTo === "function") {
+			node.copyContentSizeTo(contentSize);
+		}
+		else {
+			const nodeContentSize = node.getContentSize();
+			contentSize.set(nodeContentSize.x, nodeContentSize.y);
+		}
+		geometryKey.add(contentSize.x);
+		geometryKey.add(contentSize.y);
+		return true;
+	}
+
+	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (노드 내용 영역의 왼쪽 위가 원점, 화면 밖 거르기가 쓴다, 알면 true)
+	// - 한 줄 글: 정렬로 놓은 글의 너비(맞춘 크기, 넘쳐도 그 너비)에 외곽선과 글꼴 크기의 반만큼을 양옆에 더하고,
+	//   세로는 베이스라인 자리에서 위아래로 글꼴 크기의 1.5 배씩 넉넉히 잡는다.
+	// - 줄을 바꾸는 글: 나눈 줄 가운데 가장 넓은 줄로 가로를 잡고, 세로는 줄 묶음(줄 수 × 줄 높이)에 글꼴 크기만큼씩 넉넉히 잡는다.
+	// - 글이 비었으면 그리는 것이 없으므로 크기 0 을 적고 true. (draw 도 그리지 않는다, 빈 글 라벨이 든 하위 트리도 건너뛸 수 있다)
+	// - 잴 수 없으면 false. (거르지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 적었으면 참. (잴 수 없으면 거짓)
+	 */
+	calculateDrawnRect(rect) {
+		const text = this.#text;
+		if (!text) {
+			rect.position.set(0, 0);
+			rect.size.set(0, 0);
+			return true;
+		}
+		const node = this.getNode();
+		if (node === null || node === undefined || typeof node.copyContentSizeTo !== "function") {
+			return false;
+		}
+		if (getMeasurementCanvasRenderingContext() === null) {
+			return false;
+		}
+		const contentSize = drawnRectContentSize;
+		node.copyContentSizeTo(contentSize);
+		if (this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+			return this.calculateWrappedDrawnRect(rect, contentSize, text);
+		}
+		const fontSize = this.getFittedFontSize();
+		const textWidth = this.measureText(text, fontSize);
+		const textAlign = this.#textAlign;
+		let leftX;
+		let rightX;
+		if (textAlign === "left") {
+			leftX = 0;
+			rightX = textWidth;
+		}
+		else if (textAlign === "right") {
+			leftX = contentSize.x - textWidth;
+			rightX = contentSize.x;
+		}
+		else if (textAlign === "center") {
+			leftX = (contentSize.x - textWidth) * 0.5;
+			rightX = leftX + textWidth;
+		}
+		else {
+			// "start" / "end" 는 그릴 때의 방향으로 왼쪽이나 오른쪽이 되므로 둘 다 품는다.
+			leftX = System.Math.min(0, contentSize.x - textWidth);
+			rightX = System.Math.max(textWidth, contentSize.x);
+		}
+		let anchorY;
+		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
+			anchorY = 0;
+		}
+		else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") {
+			anchorY = contentSize.y;
+		}
+		else {
+			anchorY = contentSize.y * 0.5;
+		}
+		const horizontalMargin = fontSize * 0.5 + this.#strokeWidth;
+		const verticalMargin = fontSize * 1.5 + this.#strokeWidth;
+		rect.position.set(leftX - horizontalMargin, anchorY - verticalMargin);
+		rect.size.set(rightX - leftX + horizontalMargin * 2, verticalMargin * 2);
+		return true;
+	}
+
+	//==============================================================================
+	// 줄을 바꾸는 글의 그리는 사각형을 rect 에 적기. (calculateDrawnRect 가 부른다)
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 그리는 사각형을 적을 곳.
+	 * @param { Vector2 } contentSize 노드의 내용 크기.
+	 * @param { string } text 줄을 바꾸는 글.
+	 * @returns { boolean } 늘 참.
+	 */
+	calculateWrappedDrawnRect(rect, contentSize, text) {
+		const wrapWidth = (this.#wordWrapWidth > 0) ? this.#wordWrapWidth : contentSize.x;
+		const lineList = this.readWrappedLines(text, wrapWidth);
+		let maximumLineWidth = 0;
+		for (const lineText of lineList) {
+			maximumLineWidth = System.Math.max(maximumLineWidth, this.measureText(lineText, this.#fontSize));
+		}
+		const textAlign = this.#textAlign;
+		let leftX;
+		let rightX;
+		if (textAlign === "left") {
+			leftX = 0;
+			rightX = maximumLineWidth;
+		}
+		else if (textAlign === "right") {
+			leftX = contentSize.x - maximumLineWidth;
+			rightX = contentSize.x;
+		}
+		else if (textAlign === "center") {
+			leftX = (contentSize.x - maximumLineWidth) * 0.5;
+			rightX = leftX + maximumLineWidth;
+		}
+		else {
+			leftX = System.Math.min(0, contentSize.x - maximumLineWidth);
+			rightX = System.Math.max(maximumLineWidth, contentSize.x);
+		}
+		const lineHeight = this.#fontSize * this.#lineSpacing;
+		const blockHeight = lineList.length * lineHeight;
+		let blockTop;
+		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
+			blockTop = 0;
+		}
+		else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") {
+			blockTop = contentSize.y - blockHeight;
+		}
+		else {
+			blockTop = (contentSize.y - blockHeight) * 0.5;
+		}
+		const horizontalMargin = this.#fontSize * 0.5 + this.#strokeWidth;
+		const verticalMargin = this.#fontSize + this.#strokeWidth;
+		rect.position.set(leftX - horizontalMargin, blockTop - verticalMargin);
+		rect.size.set(rightX - leftX + horizontalMargin * 2, blockHeight + verticalMargin * 2);
+		return true;
+	}
+
+	//==============================================================================
+	// 마지막으로 나눈 줄의 수. (그린 뒤 글, 글꼴, 줄바꿈 폭이 그대로일 때만, 아니면 -1)
+	// - 줄은 그릴 때 나눈다. 그린 결과를 읽어 다시 놓는 레이아웃이 쓴다. 줄바꿈 폭(setWordWrapWidth)이 없는 여러 줄 글은 노드 폭으로 나누므로 -1 이다.
+	// - 한 줄 글은 1.
+	//==============================================================================
+	/**
+	 * @returns { number } 나눈 줄의 수. (모르면 -1)
+	 */
+	getMeasuredLineCount() {
+		const text = this.#text;
+		if (!text) {
+			return -1;
+		}
+		if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
+			return 1;
+		}
+		if (this.#wordWrapWidth <= 0) {
+			return -1;
+		}
+		const wrapCache = this.#wrapCache;
+		const isSame = wrapCache.lineList !== null
+			&& wrapCache.text === text
+			&& wrapCache.fontFace === this.#fontFace
+			&& wrapCache.fontSize === this.#fontSize
+			&& wrapCache.bold === this.#bold
+			&& wrapCache.italic === this.#italic
+			&& wrapCache.wrapWidth === this.#wordWrapWidth
+			&& wrapCache.wrapMode === this.#wrapMode
+			&& wrapCache.letterSpacing === this.#letterSpacing
+			&& wrapCache.fontLoadCount === fontLoadCount
+			&& wrapCache.fontFaceCount === readFontFaceCount();
+		return isSame ? wrapCache.lineList.length : -1;
 	}
 
 	//==============================================================================
 	// 밑줄 시작 X 좌표 계산. (textAlign 기준 캔버스 fillText 의 cursor 위치 보정)
 	//==============================================================================
 	/**
-	 * @param { number } drawX
-	 * @param { number } textWidth
+	 * @param { number } drawX 글을 그린 X 좌표. (정렬의 기준점)
+	 * @param { number } textWidth 글 너비.
 	 * @param { string } textAlign 실제 정렬. (기본은 이 글자의 정렬, "start" 는 왼쪽, "end" 는 오른쪽으로 본다)
-	 * @returns { number }
+	 * @returns { number } 밑줄을 시작할 X 좌표.
 	 */
 	computeUnderlineStartX(drawX, textWidth, textAlign = this.#textAlign) {
 		if (textAlign === "left" || textAlign === "start") {
@@ -578,8 +1226,8 @@ export class Text extends Component {
 	// 밑줄 Y 오프셋. (baseline 기준 텍스트 아래쪽으로의 거리)
 	//==============================================================================
 	/**
-	 * @param { number } fontSize
-	 * @returns { number }
+	 * @param { number } fontSize 글자 크기.
+	 * @returns { number } 그린 Y 에서 밑줄까지 아래로의 거리. (세로 정렬에 따라 다르다)
 	 */
 	computeUnderlineOffsetY(fontSize) {
 		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
@@ -595,8 +1243,8 @@ export class Text extends Component {
 	// 취소선 Y 오프셋.
 	//==============================================================================
 	/**
-	 * @param { number } fontSize
-	 * @returns { number }
+	 * @param { number } fontSize 글자 크기.
+	 * @returns { number } 그린 Y 에서 취소선까지 아래로의 거리. (위쪽이면 음수)
 	 */
 	computeStrikethroughOffsetY(fontSize) {
 		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
@@ -612,11 +1260,11 @@ export class Text extends Component {
 	// 가로 라인 stroke.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } width
-	 * @param { number } lineWidth
+	 * @param { Graphic } graphic 그래픽.
+	 * @param { number } x 시작 X 좌표.
+	 * @param { number } y Y 좌표.
+	 * @param { number } width 선 길이.
+	 * @param { number } lineWidth 선 굵기. (기본 1)
 	 */
 	strokeHorizontalLine(graphic, x, y, width, lineWidth = 1) {
 		graphic.drawLine([
@@ -631,7 +1279,7 @@ export class Text extends Component {
 	// - 측정 불가 (document 없음 등) 면 (-1, -1).
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 자연 크기. (글 너비와 글자 크기, 글이 비었으면 너비 0, 잴 수 없거나 비활성이면 (-1, -1))
 	 */
 	getIntrinsicContentSize() {
 		if (this.isEnable() === false) {
@@ -647,7 +1295,7 @@ export class Text extends Component {
 		}
 		measurementContext.save();
 		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-		const width = measurementContext.measureText(text).width;
+		const width = measurementContext.measureText(text).width + countGraphemes(text) * this.#letterSpacing;
 		measurementContext.restore();
 		return Vector2.create(width, this.#fontSize);
 	}
@@ -656,7 +1304,7 @@ export class Text extends Component {
 	// 폰트 설정.
 	//==============================================================================
 	/**
-	 * @param { FontFace | FontAsset } font
+	 * @param { FontFace | FontAsset } font 글꼴. (FontFace 나 FontAsset, null 이나 undefined 면 시스템 글꼴, 그 밖의 꼴은 무시한다)
 	 */
 	setFont(font) {
 		if (font === null || font === undefined) {
@@ -668,39 +1316,61 @@ export class Text extends Component {
 		else if (font instanceof FontAsset) {
 			this.#fontFace = font.fontFace;
 		}
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 폰트 반환.
 	//==============================================================================
 	/**
-	 * @returns { FontFace }
+	 * @returns { FontFace } 글꼴. (null 이면 시스템 글꼴)
 	 */
 	getFontFace() {
 		return this.#fontFace;
 	}
 
 	//==============================================================================
-	// 텍스트 설정.
-	//==============================================================================
-	/**
-	 * @param { string } text
-	 */
-	//==============================================================================
 	// 자동 줄바꿈 폭 설정. (0 이면 한 줄)
 	//==============================================================================
 	/**
-	 * @param { number } wordWrapWidth
+	 * @param { number } wordWrapWidth 자동 줄바꿈 폭. (내용 크기 단위, 음수는 0, 0 이면 한 줄)
+	 * @example <caption>폭을 정해 여러 줄로 쓰기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Text, TextAlign, TextBaseline } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const messageNode = new WorldNode();
+	 * 		messageNode.setContentSize(Vector2.create(360, 200));
+	 * 		messageNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		const text = messageNode.addComponent(Text);
+	 * 		text.setFontSize(24);
+	 * 		text.setTextAlign(TextAlign.left);
+	 * 		text.setTextBaseline(TextBaseline.top);
+	 * 		text.setWordWrapWidth(360);
+	 * 		text.setWrapMode("word");
+	 * 		text.setLineSpacing(1.4);
+	 * 		text.setText("The old bridge creaks under your feet.\nSomething moves in the water below.");
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(messageNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setWordWrapWidth(wordWrapWidth) {
 		this.#wordWrapWidth = System.Math.max(0, wordWrapWidth);
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 자동 줄바꿈 폭 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 자동 줄바꿈 폭. (0 이면 한 줄)
 	 */
 	getWordWrapWidth() {
 		return this.#wordWrapWidth;
@@ -710,17 +1380,18 @@ export class Text extends Component {
 	// 줄바꿈 방식 설정. ("word" | "char")
 	//==============================================================================
 	/**
-	 * @param { string } wrapMode
+	 * @param { string } wrapMode "word" 면 공백 단위(넘치는 단어는 글자 단위), "char" 면 글자 단위.
 	 */
 	setWrapMode(wrapMode) {
 		this.#wrapMode = wrapMode;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 줄바꿈 방식 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 줄바꿈 방식. ("word" 또는 "char")
 	 */
 	getWrapMode() {
 		return this.#wrapMode;
@@ -730,27 +1401,79 @@ export class Text extends Component {
 	// 줄 간격 배율 설정.
 	//==============================================================================
 	/**
-	 * @param { number } lineSpacing
+	 * @param { number } lineSpacing 줄 간격 배율. (글자 크기에 곱한다, 0.1 보다 작으면 0.1, 처음은 1.25)
 	 */
 	setLineSpacing(lineSpacing) {
 		this.#lineSpacing = System.Math.max(0.1, lineSpacing);
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 줄 간격 배율 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 줄 간격 배율.
 	 */
 	getLineSpacing() {
 		return this.#lineSpacing;
 	}
 
 	//==============================================================================
-	// 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용)
+	// 글자 간격 설정. (CSS letter-spacing, 언리얼 UMG 글자 간격과 같은 뜻)
 	//==============================================================================
 	/**
-	 * @param { number } visibleCharacterCount
+	 * @param { number } letterSpacing 글자 묶음마다 뒤에 더하는 간격. (픽셀, 음수는 좁힘, 처음은 0)
+	 */
+	setLetterSpacing(letterSpacing) {
+		this.#letterSpacing = letterSpacing;
+		this.markDrawnRectDirty();
+	}
+
+	//==============================================================================
+	// 글자 간격 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 글자 간격. (픽셀, 처음은 0)
+	 */
+	getLetterSpacing() {
+		return this.#letterSpacing;
+	}
+
+	//==============================================================================
+	// 표시 글자 수 설정. (-1 이면 전체, 타자기 연출용. 글자 묶음 단위)
+	//==============================================================================
+	/**
+	 * @param { number } visibleCharacterCount 표시 글자 수. (글자 묶음 단위, 내림, -1 보다 작으면 -1, -1 이면 전체)
+	 * @example <caption>한 글자씩 드러내기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Text } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const labelNode = new WorldNode();
+	 * 		labelNode.setContentSize(Vector2.create(480, 60));
+	 * 		labelNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		this.text = labelNode.addComponent(Text);
+	 * 		this.text.setFontSize(28);
+	 * 		this.text.setText("Welcome to the village.");
+	 * 		this.text.setVisibleCharacterCount(0);
+	 * 		this.elapsedTime = 0;
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(labelNode);
+	 * 	}
+	 *
+	 * 	tick(timeDelta) {
+	 * 		super.tick(timeDelta);
+	 * 		this.elapsedTime += timeDelta;
+	 * 		const visibleCharacterCount = Math.floor(this.elapsedTime * 12);
+	 * 		this.text.setVisibleCharacterCount(visibleCharacterCount);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setVisibleCharacterCount(visibleCharacterCount) {
 		this.#visibleCharacterCount = System.Math.max(-1, System.Math.floor(visibleCharacterCount));
@@ -760,21 +1483,31 @@ export class Text extends Component {
 	// 표시 글자 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 표시 글자 수. (-1 이면 전체)
 	 */
 	getVisibleCharacterCount() {
 		return this.#visibleCharacterCount;
 	}
 
+	//==============================================================================
+	// 텍스트 설정. (같은 글이면 아무것도 하지 않는다)
+	//==============================================================================
+	/**
+	 * @param { string } text 보일 글. (줄바꿈 문자에서 줄을 바꾼다)
+	 */
 	setText(text) {
+		if (this.#text === text) {
+			return;
+		}
 		this.#text = text;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 글.
 	 */
 	getText() {
 		return this.#text;
@@ -784,17 +1517,18 @@ export class Text extends Component {
 	// 텍스트 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } fontSize
+	 * @param { number } fontSize 글자 크기. (내용 크기 단위, 처음은 32)
 	 */
 	setFontSize(fontSize) {
 		this.#fontSize = fontSize;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 텍스트 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 정한 글자 크기.
 	 */
 	getFontSize() {
 		return this.#fontSize;
@@ -804,9 +1538,19 @@ export class Text extends Component {
 	// 텍스트 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string | CanvasGradient | CanvasPattern } color
+	 * @param { Color | string | CanvasGradient | CanvasPattern } color 글 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
 	 */
 	setTextColor(color) {
+		color = Color.from(color);
+		// 같은 색 문자열이고 가진 색이 그 색 그대로면 새로 만들지 않는다. (매 프레임 같은 색을 넣는 게임, 가진 색을 밖에서 고쳤으면 다시 만든다)
+		if (typeof color === "string" && color === this.#textColorString) {
+			const cachedColor = Color.fromCache(color);
+			const textColor = this.#textColor;
+			if (textColor.red === cachedColor.red && textColor.green === cachedColor.green && textColor.blue === cachedColor.blue && textColor.alpha === cachedColor.alpha) {
+				return;
+			}
+		}
+		this.#textColorString = (typeof color === "string") ? color : null;
 		if (color === null || color === undefined) {
 			this.#textColor = Color.transparent();
 		}
@@ -827,7 +1571,7 @@ export class Text extends Component {
 	// 텍스트 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 글 색.
 	 */
 	getTextColor() {
 		return this.#textColor;
@@ -837,9 +1581,10 @@ export class Text extends Component {
 	// 텍스트 외곽선 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string | CanvasGradient | CanvasPattern } color
+	 * @param { Color | string | CanvasGradient | CanvasPattern } color 외곽선 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
 	 */
 	setStrokeColor(color) {
+		color = Color.from(color);
 		if (color === null || color === undefined) {
 			this.#strokeColor = Color.transparent();
 		}
@@ -860,7 +1605,7 @@ export class Text extends Component {
 	// 텍스트 외곽선 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 외곽선 색.
 	 */
 	getStrokeColor() {
 		return this.#strokeColor;
@@ -870,17 +1615,18 @@ export class Text extends Component {
 	// 텍스트 외곽선 두께 설정.
 	//==============================================================================
 	/**
-	 * @param { number } width
+	 * @param { number } width 외곽선 두께. (내용 크기 단위, 0 이하면 외곽선을 그리지 않는다)
 	 */
 	setStrokeWidth(width) {
 		this.#strokeWidth = width;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 외곽선 두께 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 외곽선 두께.
 	 */
 	getStrokeWidth() {
 		return this.#strokeWidth;
@@ -890,17 +1636,18 @@ export class Text extends Component {
 	// 볼드 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } bold
+	 * @param { boolean } bold 굵게 할지. (true 일 때만 굵게)
 	 */
 	setBold(bold) {
 		this.#bold = bold === true;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 볼드 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 굵게면 참.
 	 */
 	isBold() {
 		return this.#bold;
@@ -910,17 +1657,18 @@ export class Text extends Component {
 	// 이탤릭 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } italic
+	 * @param { boolean } italic 기울일지. (true 일 때만 기울인다)
 	 */
 	setItalic(italic) {
 		this.#italic = italic === true;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 이탤릭 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 기울임이면 참.
 	 */
 	isItalic() {
 		return this.#italic;
@@ -930,7 +1678,7 @@ export class Text extends Component {
 	// 밑줄 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } underline
+	 * @param { boolean } underline 밑줄을 그을지. (true 일 때만 긋는다)
 	 */
 	setUnderline(underline) {
 		this.#underline = underline === true;
@@ -940,7 +1688,7 @@ export class Text extends Component {
 	// 밑줄 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 밑줄이면 참.
 	 */
 	isUnderline() {
 		return this.#underline;
@@ -950,7 +1698,7 @@ export class Text extends Component {
 	// 취소선 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } strikethrough
+	 * @param { boolean } strikethrough 취소선을 그을지. (true 일 때만 긋는다)
 	 */
 	setStrikethrough(strikethrough) {
 		this.#strikethrough = strikethrough === true;
@@ -960,7 +1708,7 @@ export class Text extends Component {
 	// 취소선 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 취소선이면 참.
 	 */
 	isStrikethrough() {
 		return this.#strikethrough;
@@ -970,17 +1718,18 @@ export class Text extends Component {
 	// 폰트 가로 정렬 설정.
 	//==============================================================================
 	/**
-	 * @param { "left" | "center" | "right" | "start" | "end" } align
+	 * @param { "left" | "center" | "right" | "start" | "end" } align 가로 정렬. ("start", "end" 는 글 방향을 따른다, 처음은 "center")
 	 */
 	setTextAlign(align) {
 		this.#textAlign = align;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 폰트 가로 정렬 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 가로 정렬. ("left", "center", "right", "start", "end")
 	 */
 	getTextAlign() {
 		return this.#textAlign;
@@ -992,7 +1741,7 @@ export class Text extends Component {
 	// - 정렬 "start" / "end" 가 이 방향에 따라 왼쪽, 오른쪽이 된다. (오른쪽에서 왼쪽 언어의 화면은 "rtl" 과 "start")
 	//==============================================================================
 	/**
-	 * @param { "inherit" | "ltr" | "rtl" | "auto" } textDirection
+	 * @param { "inherit" | "ltr" | "rtl" | "auto" } textDirection 글자 방향. (처음은 "inherit")
 	 */
 	setTextDirection(textDirection) {
 		this.#textDirection = textDirection;
@@ -1002,7 +1751,7 @@ export class Text extends Component {
 	// 글자 방향 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 글자 방향. ("inherit", "ltr", "rtl", "auto")
 	 */
 	getTextDirection() {
 		return this.#textDirection;
@@ -1012,17 +1761,18 @@ export class Text extends Component {
 	// 폰트 세로 정렬 설정.
 	//==============================================================================
 	/**
-	 * @param { "top" | "middle" | "bottom" | "alphabetic" | "hanging" | "ideographic" } baseline
+	 * @param { "top" | "middle" | "bottom" | "alphabetic" | "hanging" | "ideographic" } baseline 세로 정렬. (여러 줄 글은 줄 묶음의 세로 자리로 쓴다, 처음은 "middle")
 	 */
 	setTextBaseline(baseline) {
 		this.#textBaseline = baseline;
+		this.markDrawnRectDirty();
 	}
 
 	//==============================================================================
 	// 폰트 세로 정렬 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 세로 정렬.
 	 */
 	getTextBaseline() {
 		return this.#textBaseline;
@@ -1032,9 +1782,9 @@ export class Text extends Component {
 	// 텍스트가 출력되는 영역을 Rect로 반환. (호환용)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { Text } textComponent
-	 * @returns { Rect }
+	 * @param { Graphic } graphic 그래픽. (쓰지 않는다)
+	 * @param { Text } textComponent 잴 글자 컴포넌트.
+	 * @returns { Rect } 글 너비와 실제 높이의 사각형. (굵게, 기울임은 보지 않는다, 잴 수 없으면 빈 사각형)
 	 */
 	static calculateTextBounds(graphic, textComponent) {
 		const fontFace = textComponent.getFontFace();

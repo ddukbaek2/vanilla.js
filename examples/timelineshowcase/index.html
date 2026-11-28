@@ -36,7 +36,7 @@
 	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
 	// - 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
 	//==============================================================================
-	const ENGINE_CACHE_STAMP = "20260908a";
+	const ENGINE_CACHE_STAMP = "20261126a";
 	let engineModule = null;
 	try {
 		try {
@@ -178,6 +178,7 @@
 			root.setAnchor(Pivot.topLeft.clone());
 			this.#touchRecognizer = new TouchRecognizer();
 			this.#touchRecognizer.setRootNode(root);
+			this.setTouchRaycaster(null); // 씬 기본 넘기기는 끈다. (막대 끌기가 터치를 가로채므로 터치 훅에서 직접 넘긴다)
 		}
 
 		//==============================================================================
@@ -189,7 +190,7 @@
 		async load(engine) {
 			const viewManager = engine.getViewManager();
 			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
-			this.#screenEffect = new ScreenEffect(engine.getGraphic());
+			this.#screenEffect = new ScreenEffect();
 			Timeline.setAudioManager(engine.getAudioManager());
 
 			// 이미지 미리 읽기. (문서는 파일 이름으로 가리킨다)

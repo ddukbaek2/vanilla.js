@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Viewer</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #9eb7db; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 3D 모델 보기 예제. (examples/ancientmountain 의 3D 경로를 엔진 루프 안에서 돌린다, 러스트 예제 modelviewer 와 같은 장면)
+// - ../ancientmountain/assets 의 mannequin_female.glb, fox.glb(노멀 없음), mannequin.fbx + anims/idle.fbx, walk.fbx 를 URL 함수로 받는다. (마네킹은 Quaternius CC0)
+//   (SkinnedModel.loadFromUrl, loadFromFbxUrl 로 받고, 애니메이션은 addAnimationsFromFbxUrl)
+// - 땅은 코드로 만든 GLB 다. (정적 메시 → 합성 스킨 경로, SkinnedModel.loadFromBytes)
+// - 씬의 preDraw 에서 그린다:
+//   섀도우 깊이 패스 → 씬 패스(RenderTarget) → 블룸 → 합성(화면) → graphic.restoreRenderState() → draw 에서 2D HUD.
+// - 모델은 load 에서 받고(받기는 비동기), GL 리소스는 initialize 에서 엔진의 그래픽(engine.getGraphic)으로 만든다. 모델은 tick 에서 update 한다.
+// - 갱신 걸음은 프레임마다 1/60초 고정이다. (화면 저장이 같은 장면을 잡도록) 10초가 지나면 exitApplication 을 한 번 부른다. (브라우저가 사용자가 연 탭 닫기를 거부하면 그대로 돈다)
+// - 화면 저장: ?capture=60,180&captureExit=1 (엔진 쿼리)
+// - 자산 캐시 재기: ?measureAssetCache=1 이면 모델을 짓기 전에 같은 모형 20 개를 캐시 없이와 캐시로 지어 걸린 시간과 GPU 바이트를 콘솔에 찍는다.
+//   (assetcache_test.html 과 같은 셈, 한 번 받아 브라우저 HTTP 캐시를 데운 뒤 잰다)
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, Vector2, Vector3, Rect, Color, Matrix4, TextAlign, TextBaseline, FullscreenPass, RenderTarget, BloomEffect, SkinnedModel, SkinnedModelAsset, SkinnedModelRenderer, AmbientOcclusionEffect, SubsurfaceScatteringEffect, ShadowMap } from "../../import.js";
+
+//==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 예제 애셋 폴더. (ancientmountain 의 것을 같이 쓴다)
+const EXAMPLE_ASSET_DIRECTORY = "../ancientmountain/assets/";
+
+// 섀도우 맵 해상도.
+const SHADOWMAP_RESOLUTION = 2048;
+
+// exitApplication 을 부르는 시각. (초)
+const EXIT_SECONDS = 10.0;
+
+// 갱신 걸음. (화면 저장이 프레임 번호로 같은 장면을 잡도록 프레임마다 1/60초씩 고정으로 나아간다)
+const FIXED_TIME_STEP = 1.0 / 60.0;
+
+// 여자 마네킹 클립 순서와 바꾸는 간격. (초)
+const FEMALE_MANNEQUIN_CLIP_NAMES = ["Idle", "Walk", "Run", "Dance"];
+const FEMALE_MANNEQUIN_CLIP_SECONDS = 2.5;
+
+// 글꼴. (러스트 판의 "default" 는 엔진 기본 글꼴 별칭, 브라우저에는 없어 sans-serif 로 쓴다)
+const FONT_FAMILY = "sans-serif";
+
+// 합성 패스. (씬 + 블룸 가산 + 약한 비네트)
+const COMPOSITE_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D sceneTexture;
+uniform sampler2D bloomTexture;
+uniform float bloomStrength;
+out vec4 outputColor;
+void main() {
+	vec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+	vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
+	vec2 centered = fragmentTextureCoordinate - 0.5;
+	float vignette = 1.0 - dot(centered, centered) * 0.6;
+	outputColor = vec4((sceneColor + bloomColor * bloomStrength) * vignette, 1.0);
+}`;
+
+//==============================================================================
+// 그려 둘 모델 하나. (모델 + 놓을 자리 + 크기 배율)
+//==============================================================================
+class PlacedModel {
+	/** @type { SkinnedModel } */ skinnedModel;
+	/** @type { number } */ positionX;
+	/** @type { number } */ positionZ;
+	/** @type { number } */ rotationY;
+	/** @type { number } */ scale;
+	/** @type { string } */ label;
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	constructor(skinnedModel, positionX, positionZ, rotationY, scale, label) {
+		this.skinnedModel = skinnedModel;
+		this.positionX = positionX;
+		this.positionZ = positionZ;
+		this.rotationY = rotationY;
+		this.scale = scale;
+		this.label = label;
+	}
+
+	//==============================================================================
+	// 모델 행렬. (이동 x Y 회전 x 크기)
+	//==============================================================================
+	createModelMatrix() {
+		const modelMatrix = Matrix4.createTranslation(this.positionX, 0.0, this.positionZ);
+		modelMatrix.rotateY(this.rotationY);
+		modelMatrix.scale(this.scale, this.scale, this.scale);
+		return modelMatrix;
+	}
+}
+
+//==============================================================================
+// 모델 보기 씬.
+//==============================================================================
+class ModelViewerScene extends Scene {
+	/** @private @type { SkinnedModelRenderer | null } */ #skinnedModelRenderer = null;
+	/** @private @type { SkinnedModel | null } */ #groundModel = null;
+	/** @private @type { PlacedModel[] } */ #placedModelList = [];
+	/** @private @type { ShadowMap | null } */ #shadowMap = null;
+	/** @private @type { RenderTarget | null } */ #sceneRenderTarget = null;
+	/** @private @type { BloomEffect | null } */ #bloomEffect = null;
+	/** @private @type { FullscreenPass | null } */ #compositePass = null;
+	/** @private @type { AmbientOcclusionEffect | null } */ #ambientOcclusionEffect = null;
+	/** @private @type { SubsurfaceScatteringEffect | null } */ #subsurfaceScatteringEffect = null;
+	/** @private @type { boolean } */ #isReady = false;
+	/** @private @type { boolean } */ #isFirstFrameChecked = false;
+	/** @private @type { string | null } */ #loadErrorMessage = null;
+	/** @private @type { number } */ #elapsedTime = 0.0;
+	/** @private @type { boolean } */ #isExitCalled = false;
+	/** @private @type { number } */ #femaleMannequinClipIndex = 0;
+	/** @private @type { string } */ #mannequinClipName = "Idle";
+	/** @private @type { number } */ #loadStartTime = 0.0;
+	/** @private @type { number } */ #loadSeconds = 0.0;
+
+	//==============================================================================
+	// 읽기. (렌더러를 만들고 모델과 애니메이션과 땅을 받는다, 받은 뒤 initialize)
+	//==============================================================================
+	async load(engine) {
+		await super.load(engine);
+		this.#loadStartTime = System.performance.now();
+		const graphic = engine.getGraphic();
+		if (!graphic) {
+			this.#loadErrorMessage = "WebGL2 그래픽이 없음";
+			return;
+		}
+		try {
+			await this.loadModels(graphic.getWebGL2RenderingContext());
+		}
+		catch (error) {
+			System.console.warn(`modelviewer: ${error.message}`);
+			this.#loadErrorMessage = error.message;
+		}
+	}
+
+	//==============================================================================
+	// 렌더러와 모델 받기. (자산 캐시 재기 → 여자 마네킹, 여우, 마네킹 + 애니메이션 FBX, 땅)
+	//==============================================================================
+	async loadModels(webGL2RenderingContext) {
+		const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+		const sunDirection = Vector3.create(0.5, 0.8, 0.35).normalize();
+		skinnedModelRenderer.setSunDirection(sunDirection.x, sunDirection.y, sunDirection.z);
+		skinnedModelRenderer.setFogColor(0.62, 0.72, 0.86);
+		skinnedModelRenderer.setFogRange(25.0, 80.0);
+
+		const query = new System.URLSearchParams(System.location.search);
+		if (query.get("measureAssetCache") === "1") {
+			for (const label of ["fox.glb", "mannequin_female.glb"]) {
+				System.console.log(await measureAssetCache(webGL2RenderingContext, EXAMPLE_ASSET_DIRECTORY + label, skinnedModelRenderer, label));
+			}
+		}
+
+		const [femaleMannequinModel, foxModel, mannequinModel] = await System.Promise.all([
+			SkinnedModel.loadFromUrl(webGL2RenderingContext, EXAMPLE_ASSET_DIRECTORY + "mannequin_female.glb", skinnedModelRenderer),
+			SkinnedModel.loadFromUrl(webGL2RenderingContext, EXAMPLE_ASSET_DIRECTORY + "fox.glb", skinnedModelRenderer),
+			SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, EXAMPLE_ASSET_DIRECTORY + "mannequin.fbx", skinnedModelRenderer),
+		]);
+		const placedModelList = [];
+
+		// 여자 마네킹. (GLB, 인덱스)
+		femaleMannequinModel.playAnimation(FEMALE_MANNEQUIN_CLIP_NAMES[0], 0.0);
+		placedModelList.push(new PlacedModel(femaleMannequinModel, -1.0, 0.0, 0.4, measureModelScale(femaleMannequinModel, 1.8), "mannequin_female.glb"));
+
+		// 여우. (GLB, 노멀 없음 → 스무스 노멀, 인덱스 없음)
+		foxModel.playAnimation("Walk", 0.0);
+		placedModelList.push(new PlacedModel(foxModel, 0.1, 1.1, 1.2, measureModelScale(foxModel, 0.7), "fox.glb"));
+
+		// 마네킹. (FBX + 애니메이션 FBX 두 개를 본 이름으로 붙인다)
+		await mannequinModel.addAnimationsFromFbxUrl(EXAMPLE_ASSET_DIRECTORY + "anims/idle.fbx", "Idle", false);
+		await mannequinModel.addAnimationsFromFbxUrl(EXAMPLE_ASSET_DIRECTORY + "anims/walk.fbx", "Walk", true);
+		mannequinModel.playAnimation("Idle", 0.0);
+		placedModelList.push(new PlacedModel(mannequinModel, 1.0, -0.2, -0.4, measureModelScale(mannequinModel, 1.75), "mannequin.fbx"));
+
+		// 땅. (코드로 만든 GLB, 스킨 없는 정적 메시)
+		const groundModel = await SkinnedModel.loadFromBytes(webGL2RenderingContext, buildGroundGlb(6.0, [0.46, 0.52, 0.4]), skinnedModelRenderer);
+		groundModel.update(0.0);
+
+		this.#skinnedModelRenderer = skinnedModelRenderer;
+		this.#placedModelList = placedModelList;
+		this.#groundModel = groundModel;
+	}
+
+	//==============================================================================
+	// 초기화. (받은 모델 → 그림자, 렌더 타겟, 블룸, 합성, 이펙트)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		const graphic = engine.getGraphic();
+		if (this.#loadErrorMessage !== null || this.#skinnedModelRenderer === null || !graphic) {
+			return;
+		}
+		try {
+			const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+			this.#shadowMap = new ShadowMap(webGL2RenderingContext, SHADOWMAP_RESOLUTION);
+			this.#sceneRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, true, null);
+			this.#bloomEffect = new BloomEffect(webGL2RenderingContext);
+			this.#bloomEffect.setThreshold(0.7, 0.95);
+			this.#compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENTSHADER_SOURCE);
+
+			// 쓰지는 않지만 셰이더가 컴파일되는지 본다.
+			this.#ambientOcclusionEffect = new AmbientOcclusionEffect(webGL2RenderingContext);
+			this.#ambientOcclusionEffect.resize(64, 64);
+			this.#subsurfaceScatteringEffect = new SubsurfaceScatteringEffect(webGL2RenderingContext);
+			this.#subsurfaceScatteringEffect.resize(64, 64);
+		}
+		catch (error) {
+			System.console.warn(`modelviewer: ${error.message}`);
+			this.#loadErrorMessage = error.message;
+			return;
+		}
+		this.#loadSeconds = (System.performance.now() - this.#loadStartTime) / 1000;
+		System.console.log(`modelviewer: 모델 준비 ${this.#loadSeconds.toFixed(2)}초`);
+		for (const placedModel of this.#placedModelList) {
+			const skinnedModel = placedModel.skinnedModel;
+			const clipNameText = "[" + skinnedModel.getAnimationNameList().map((animationName) => `"${animationName}"`).join(", ") + "]";
+			System.console.log(`modelviewer: ${placedModel.label} 드로어블 ${skinnedModel.getDrawableList().length} 노드 ${skinnedModel.getNodeList().length} 클립 ${clipNameText} 배율 ${placedModel.scale.toFixed(4)}`);
+		}
+		this.#isReady = true;
+	}
+
+	//==============================================================================
+	// 갱신. (클립 바꾸기 + 모델 포즈 계산, 정해진 시각에 끝내기 요청)
+	//==============================================================================
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		const deltaTime = FIXED_TIME_STEP;
+		this.#elapsedTime += deltaTime;
+		if (this.#elapsedTime >= EXIT_SECONDS && !this.#isExitCalled) {
+			this.#isExitCalled = true;
+			this.getEngine().exitApplication();
+		}
+		if (!this.#isReady) {
+			return;
+		}
+		const placedModelList = this.#placedModelList;
+		const femaleMannequinClipIndex = System.Math.floor(this.#elapsedTime / FEMALE_MANNEQUIN_CLIP_SECONDS) % FEMALE_MANNEQUIN_CLIP_NAMES.length;
+		if (femaleMannequinClipIndex !== this.#femaleMannequinClipIndex) {
+			this.#femaleMannequinClipIndex = femaleMannequinClipIndex;
+			placedModelList[0].skinnedModel.playAnimation(FEMALE_MANNEQUIN_CLIP_NAMES[femaleMannequinClipIndex], 0.3);
+		}
+		const mannequinClipName = System.Math.floor(this.#elapsedTime / 2.0) % 2 === 0 ? "Idle" : "Walk";
+		if (mannequinClipName !== this.#mannequinClipName) {
+			this.#mannequinClipName = mannequinClipName;
+			placedModelList[2].skinnedModel.playAnimation(mannequinClipName, 0.3);
+		}
+		for (const placedModel of placedModelList) {
+			placedModel.skinnedModel.update(deltaTime);
+		}
+	}
+
+	//==============================================================================
+	// 3D 출력. (2D 묶음 내보내기 → 3D 패스 → 2D 상태 복구)
+	//==============================================================================
+	preDraw(graphic) {
+		graphic.flushBatch();
+		const canvasPixelSize = this.getEngine().getViewManager().getCanvasPixelSize();
+		if (this.#isReady) {
+			this.renderScene(graphic.getWebGL2RenderingContext(), System.Math.floor(canvasPixelSize.x), System.Math.floor(canvasPixelSize.y), this.#elapsedTime);
+		}
+		graphic.restoreRenderState();
+	}
+
+	//==============================================================================
+	// 3D 그리기. (그림자 → 씬 → 블룸 → 합성, 2D 상태는 호출자가 되돌린다)
+	//==============================================================================
+	renderScene(webGL2RenderingContext, drawingBufferWidth, drawingBufferHeight, elapsedTime) {
+		const skinnedModelRenderer = this.#skinnedModelRenderer;
+		const shadowMap = this.#shadowMap;
+		const sceneRenderTarget = this.#sceneRenderTarget;
+		const bloomEffect = this.#bloomEffect;
+		const compositePass = this.#compositePass;
+		sceneRenderTarget.resize(drawingBufferWidth, drawingBufferHeight);
+		bloomEffect.resize(drawingBufferWidth, drawingBufferHeight);
+
+		// 카메라. (천천히 도는 궤도)
+		const orbitAngle = 0.35 + elapsedTime * 0.2;
+		const cameraPosition = Vector3.create(System.Math.sin(orbitAngle) * 4.6, 1.7, System.Math.cos(orbitAngle) * 4.6);
+		const cameraTarget = Vector3.create(0.0, 0.8, 0.2);
+		const viewMatrix = Matrix4.createLookAt(cameraPosition, cameraTarget, Vector3.up());
+		const aspectRatio = drawingBufferWidth / System.Math.max(drawingBufferHeight, 1);
+		const viewProjectionMatrix = Matrix4.createPerspective(System.Math.PI / 3.5, aspectRatio, 0.1, 100.0);
+		viewProjectionMatrix.multiply(viewMatrix);
+		const modelMatrixList = this.#placedModelList.map((placedModel) => placedModel.createModelMatrix());
+		const identityMatrix = Matrix4.createIdentity();
+
+		// 1. 섀도우 깊이 패스.
+		const sunDirection = Vector3.create(0.5, 0.8, 0.35).normalize();
+		const lightTravelDirection = sunDirection.multiplyScalar(-1.0);
+		shadowMap.updateLightMatrix(Vector3.create(0.0, 0.8, 0.2), lightTravelDirection, 4.0, 0.5, 30.0);
+		const lightViewProjectionElements = shadowMap.getLightViewProjectionMatrix().getElements();
+		shadowMap.beginRender();
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		for (let placedModelIndex = 0; placedModelIndex < this.#placedModelList.length; ++placedModelIndex) {
+			skinnedModelRenderer.drawDepth(this.#placedModelList[placedModelIndex].skinnedModel, lightViewProjectionElements, modelMatrixList[placedModelIndex].getElements());
+		}
+		skinnedModelRenderer.setShadowMap(shadowMap.getDepthTexture(), lightViewProjectionElements, 1.0 / SHADOWMAP_RESOLUTION);
+		skinnedModelRenderer.setShadowStrength(1.0);
+
+		// 2. 씬 패스. (렌더 타겟에 하늘색으로 비우고 땅과 모델)
+		sceneRenderTarget.bind();
+		webGL2RenderingContext.clearColor(0.62, 0.72, 0.86, 1.0);
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
+		const viewProjectionElements = viewProjectionMatrix.getElements();
+		skinnedModelRenderer.draw(this.#groundModel, viewProjectionElements, identityMatrix.getElements(), cameraPosition.x, cameraPosition.y, cameraPosition.z);
+		for (let placedModelIndex = 0; placedModelIndex < this.#placedModelList.length; ++placedModelIndex) {
+			skinnedModelRenderer.draw(this.#placedModelList[placedModelIndex].skinnedModel, viewProjectionElements, modelMatrixList[placedModelIndex].getElements(), cameraPosition.x, cameraPosition.y, cameraPosition.z);
+		}
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+
+		// 3. 블룸.
+		const sceneColorTexture = sceneRenderTarget.getColorTexture(0);
+		bloomEffect.render(sceneColorTexture);
+
+		// 4. 합성 → 화면.
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+		webGL2RenderingContext.viewport(0, 0, drawingBufferWidth, drawingBufferHeight);
+		compositePass.useProgram();
+		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
+		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("bloomTexture"), 1);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("bloomStrength"), 0.8);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomEffect.getResultTexture());
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);
+		compositePass.draw();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+
+		// 첫 프레임에 GL 오류를 한 번 본다.
+		if (!this.#isFirstFrameChecked) {
+			this.#isFirstFrameChecked = true;
+			const errorCode = webGL2RenderingContext.getError();
+			System.console.log(`modelviewer: 첫 3D 프레임 GL 오류 코드 0x${errorCode.toString(16).toUpperCase()}`);
+		}
+	}
+
+	//==============================================================================
+	// 2D HUD 출력. (3D 위에 반투명 판과 글)
+	//==============================================================================
+	draw(graphic) {
+		this.getEngine().getViewManager().applyCanvasNativeRect(graphic);
+		const lineList = ["바닐라엔진 graphics3d modelviewer"];
+		if (this.#isReady) {
+			lineList.push(`mannequin_female.glb  ${FEMALE_MANNEQUIN_CLIP_NAMES[this.#femaleMannequinClipIndex]}`);
+			lineList.push("fox.glb  Walk (smooth normals)");
+			lineList.push(`mannequin.fbx  ${this.#mannequinClipName} (anims/*.fbx retarget)`);
+			lineList.push(`shadow ${this.#shadowMap.getResolution()} + bloom, load ${this.#loadSeconds.toFixed(1)}s, t ${this.#elapsedTime.toFixed(1)}s`);
+		}
+		else {
+			lineList.push(this.#loadErrorMessage !== null ? this.#loadErrorMessage : "loading...");
+		}
+		graphic.setFillColor(new Color(0.0, 0.0, 0.0, 0.55));
+		graphic.drawRect(Rect.create(12.0, 12.0, 430.0, 18.0 + lineList.length * 22.0));
+		graphic.setFontString(`16px ${FONT_FAMILY}`);
+		graphic.setTextAlign(TextAlign.left);
+		graphic.setTextBaseline(TextBaseline.middle);
+		for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
+			graphic.setFillColor(lineIndex === 0 ? new Color(1.0, 0.85, 0.45, 1.0) : Color.white());
+			graphic.drawFillText(lineList[lineIndex], 24.0, 32.0 + lineIndex * 22.0);
+		}
+	}
+}
+
+//==============================================================================
+// 모델 크기 배율 구하기. (바인드/첫 포즈에서 노드 월드 위치의 가장 높은 Y 를 targetHeight 로 맞춘다)
+//==============================================================================
+function measureModelScale(skinnedModel, targetHeight) {
+	skinnedModel.update(0.0);
+	let maximumHeight = 0.0;
+	for (const node of skinnedModel.getNodeList()) {
+		maximumHeight = System.Math.max(maximumHeight, node.worldMatrix.getElements()[13]);
+	}
+	if (maximumHeight > 0.0) {
+		return targetHeight / maximumHeight;
+	}
+	else {
+		return 1.0;
+	}
+}
+
+//==============================================================================
+// 자산 캐시 재기. (같은 모형 20 개를 캐시 없이(지을 때마다 캐시를 비움)와 캐시로 지어 걸린 밀리초와 서로 다른 자산의 GPU 바이트 합을 견준 한 줄)
+//==============================================================================
+async function measureAssetCache(webGL2RenderingContext, url, skinnedModelRenderer, label) {
+	const MODEL_COUNT = 20;
+	const warmModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer);
+	warmModel.destroy();
+	const measureLoad = async (useCache) => {
+		SkinnedModelAsset.clearCache();
+		const modelList = [];
+		const startTime = System.performance.now();
+		for (let modelIndex = 0; modelIndex < MODEL_COUNT; ++modelIndex) {
+			if (!useCache) {
+				SkinnedModelAsset.clearCache();
+			}
+			modelList.push(await SkinnedModel.loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer));
+		}
+		webGL2RenderingContext.finish();
+		const elapsedTime = System.performance.now() - startTime;
+		const assetSet = new System.Set(modelList.map((model) => model.getAsset()));
+		let gpuByteCount = 0;
+		for (const asset of assetSet) {
+			gpuByteCount += asset.getGpuByteCount();
+		}
+		for (const model of modelList) {
+			model.destroy();
+		}
+		return [elapsedTime, gpuByteCount, assetSet.size];
+	};
+	const [uncachedTime, uncachedByteCount, uncachedAssetCount] = await measureLoad(false);
+	const [cachedTime, cachedByteCount, cachedAssetCount] = await measureLoad(true);
+	SkinnedModelAsset.clearCache();
+	return `${label} x${MODEL_COUNT}: uncached ${uncachedTime.toFixed(1)} ms, ${uncachedByteCount} B, ${uncachedAssetCount} assets / cached ${cachedTime.toFixed(1)} ms, ${cachedByteCount} B, ${cachedAssetCount} asset (time x${(cachedTime / uncachedTime).toFixed(3)}, GPU x${(cachedByteCount / uncachedByteCount).toFixed(3)})`;
+}
+
+//==============================================================================
+// 땅 GLB 만들기. (가로세로 2 x halfSize 사각형, 위쪽 노멀, 16비트 인덱스, 단색 머티리얼)
+//==============================================================================
+function buildGroundGlb(halfSize, baseColor) {
+	const positionValues = new System.Float32Array([-halfSize, 0.0, -halfSize, -halfSize, 0.0, halfSize, halfSize, 0.0, halfSize, halfSize, 0.0, -halfSize]);
+	const normalValues = new System.Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]);
+	const indexValues = new System.Uint16Array([0, 1, 2, 0, 2, 3]);
+	const binaryLength = System.Math.ceil((positionValues.byteLength + normalValues.byteLength + indexValues.byteLength) / 4) * 4;
+	const binaryBytes = new System.Uint8Array(binaryLength);
+	const binaryView = new System.DataView(binaryBytes.buffer);
+	let binaryOffset = 0;
+	for (const value of positionValues) {
+		binaryView.setFloat32(binaryOffset, value, true);
+		binaryOffset += 4;
+	}
+	for (const value of normalValues) {
+		binaryView.setFloat32(binaryOffset, value, true);
+		binaryOffset += 4;
+	}
+	for (const value of indexValues) {
+		binaryView.setUint16(binaryOffset, value, true);
+		binaryOffset += 2;
+	}
+	const json = {
+		asset: { version: "2.0" },
+		scene: 0,
+		scenes: [{ nodes: [0] }],
+		nodes: [{ name: "Ground", mesh: 0 }],
+		materials: [{ name: "ground", pbrMetallicRoughness: { baseColorFactor: [baseColor[0], baseColor[1], baseColor[2], 1], metallicFactor: 0, roughnessFactor: 1 } }],
+		meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+		accessors: [{ bufferView: 0, componentType: 5126, count: 4, type: "VEC3" }, { bufferView: 1, componentType: 5126, count: 4, type: "VEC3" }, { bufferView: 2, componentType: 5123, count: 6, type: "SCALAR" }],
+		bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 48 }, { buffer: 0, byteOffset: 48, byteLength: 48 }, { buffer: 0, byteOffset: 96, byteLength: 12 }],
+		buffers: [{ byteLength: binaryLength }],
+	};
+	let jsonText = System.JSON.stringify(json);
+	while (jsonText.length % 4 !== 0) {
+		jsonText += " ";
+	}
+	const jsonBytes = new System.TextEncoder().encode(jsonText);
+	const totalLength = 12 + 8 + jsonBytes.length + 8 + binaryBytes.length;
+	const glbBytes = new System.Uint8Array(totalLength);
+	const glbView = new System.DataView(glbBytes.buffer);
+	glbView.setUint32(0, 0x46546c67, true);
+	glbView.setUint32(4, 2, true);
+	glbView.setUint32(8, totalLength, true);
+	glbView.setUint32(12, jsonBytes.length, true);
+	glbView.setUint32(16, 0x4e4f534a, true);
+	glbBytes.set(jsonBytes, 20);
+	glbView.setUint32(20 + jsonBytes.length, binaryBytes.length, true);
+	glbView.setUint32(24 + jsonBytes.length, 0x004e4942, true);
+	glbBytes.set(binaryBytes, 28 + jsonBytes.length);
+	return glbBytes.buffer;
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "바닐라엔진 graphics3d modelviewer";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new ModelViewerScene());
+</script>
+</body>
+</html>

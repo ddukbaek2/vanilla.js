@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>vanilla.js - Camera Tour</title>
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #14141f;
+		touch-action: none;
+		user-select: none;
+	}
+	#mainCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (저장소의 소스를 바로 쓴다)
+	// - Camera2D 회전, Tween.setTarget, Indicator 처럼 빌드본보다 새 기능을 보여 주므로 import.js 를 읽는다.
+	//==============================================================================
+	const engineModule = await import("../../import.js");
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Vector2 = engineModule.Vector2;
+	const Color = engineModule.Color;
+	const Pivot = engineModule.Pivot;
+	const Rect = engineModule.Rect;
+	const Paint = engineModule.Paint;
+	const UILabel = engineModule.UILabel;
+	const Camera2D = engineModule.Camera2D;
+	const Shaker = engineModule.Shaker;
+	const Tween = engineModule.Tween;
+	const TweenProperty = engineModule.TweenProperty;
+	const Indicator = engineModule.Indicator;
+
+	// 화면 크기와 월드 격자. (러스트 판 misctour 의 Camera2D 구역과 같은 꼴)
+	const VIEW_WIDTH = 960;
+	const VIEW_HEIGHT = 640;
+	const TILE_SIZE = 48;
+	const GRID_COLUMN_COUNT = 24;
+	const GRID_ROW_COUNT = 16;
+
+	//==============================================================================
+	// 벽 칸인지. (격자 무늬로 벽을 흩어 둔다)
+	//==============================================================================
+	/**
+	 * @param { number } column
+	 * @param { number } row
+	 * @returns { boolean }
+	 */
+	function isWall(column, row) {
+		return (column % 6 === 3 && row % 5 !== 2) || (row % 7 === 5 && column % 4 === 1);
+	}
+
+	//==============================================================================
+	// 카메라 둘러보기 씬.
+	// - 월드 격자를 Camera2D 로 비춘다. 카메라는 대상을 따라가며 천천히 좌우로 돌고(setRotation), 가끔 흔들린다(Shaker).
+	// - 끌면 돌아간 화면 방향 그대로 팬하고(panByScreen), 휠은 커서 아래를 고정한 채 키운다(zoomAt).
+	// - 왼쪽 위: Tween.createNodeTween 이 노드 배율을 바로 움직인다. 오른쪽 위: Indicator.
+	//==============================================================================
+	class CameraTourScene extends Scene {
+		//==============================================================================
+		// 멤버 변수 목록.
+		//==============================================================================
+		/** @private @type { Camera2D } */ #camera;
+		/** @private @type { Shaker } */ #shaker;
+		/** @private @type { Indicator } */ #indicator;
+		/** @private @type { WorldNode | null } */ #pulseNode;
+		/** @private @type { Vector2 | null } */ #dragPosition;
+		/** @private @type { number } */ #elapsedSeconds;
+		/** @private @type { number } */ #shakeSeconds;
+		/** @private @type { boolean } */ #isFollowing;
+
+		//==============================================================================
+		// 생성.
+		//==============================================================================
+		constructor() {
+			super();
+			this.#camera = new Camera2D();
+			this.#shaker = new Shaker();
+			this.#indicator = new Indicator();
+			this.#pulseNode = null;
+			this.#dragPosition = null;
+			this.#elapsedSeconds = 0;
+			this.#shakeSeconds = 0;
+			this.#isFollowing = true;
+		}
+
+		//==============================================================================
+		// 씬 구성.
+		//==============================================================================
+		create() {
+			super.create();
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+
+			this.#camera.setViewSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+			this.#camera.setWorldBounds(Rect.create(0, 0, GRID_COLUMN_COUNT * TILE_SIZE, GRID_ROW_COUNT * TILE_SIZE));
+			this.#camera.setZoom(1.2);
+
+			this.#indicator.setPosition(VIEW_WIDTH - 60, 60);
+			this.#indicator.setRadius(26);
+			this.#indicator.setColor("#ffd34dff");
+
+			// 배율이 숨 쉬듯 오가는 노드. (트윈이 노드에 바로 쓴다)
+			const pulseNode = new WorldNode();
+			pulseNode.setName("Pulse");
+			pulseNode.setContentSize(Vector2.create(56, 56));
+			pulseNode.setLocalPosition(Vector2.create(70, 70));
+			const paint = pulseNode.addComponent(Paint);
+			paint.setColor(new Color(0.35, 0.8, 1, 1));
+			paint.setRoundSize(12);
+			root.addChild(pulseNode);
+			this.#pulseNode = pulseNode;
+			this.startPulse(0.6, 1.2);
+
+			const captionNode = new WorldNode();
+			captionNode.setPivot(Pivot.topLeft.clone());
+			captionNode.setAnchor(Pivot.topLeft.clone());
+			captionNode.setContentSize(Vector2.create(720, 26));
+			captionNode.setLocalPosition(Vector2.create(130, 24));
+			const captionLabel = captionNode.addComponent(UILabel);
+			captionLabel.setText("Camera2D 회전: 끌면 팬, 휠은 커서 고정 줌");
+			captionLabel.setFontSize(18);
+			captionLabel.setTextColor(new Color(0.9, 0.92, 1, 1));
+			root.addChild(captionNode);
+		}
+
+		//==============================================================================
+		// 배율 트윈 시작. (끝나면 반대로 다시)
+		//==============================================================================
+		/**
+		 * @param { number } startScale
+		 * @param { number } endScale
+		 */
+		startPulse(startScale, endScale) {
+			const tween = Tween.createNodeTween(this.#pulseNode, TweenProperty.localScale, startScale, endScale, 0.8)
+				.easing(Tween.easingFunction.sinusoidal.easeInOut)
+				.setComplete(() => {
+					this.startPulse(endScale, startScale);
+				});
+			this.startTween(tween);
+		}
+
+		//==============================================================================
+		// 갱신.
+		//==============================================================================
+		/**
+		 * @param { number } timeDelta
+		 */
+		tick(timeDelta) {
+			this.#elapsedSeconds += timeDelta;
+			this.#shakeSeconds += timeDelta;
+
+			// 천천히 좌우로 돈다.
+			const rotation = System.Math.sin(this.#elapsedSeconds * 0.6) * 12;
+			this.#camera.setRotation(rotation);
+			const engine = this.getEngine();
+			const viewSize = engine.getViewManager().getViewSize();
+			this.#camera.setViewSize(viewSize);
+			if (this.#isFollowing) {
+				const followTarget = Vector2.create(11.5 * TILE_SIZE, 3.5 * TILE_SIZE);
+				this.#camera.follow([followTarget], 1.5, timeDelta);
+			}
+			this.#camera.tick(timeDelta);
+
+			if (this.#shakeSeconds >= 3) {
+				this.#shakeSeconds = 0;
+				this.#shaker.addShake(6);
+			}
+			this.#shaker.tick(timeDelta);
+			this.#indicator.tick(timeDelta);
+			super.tick(timeDelta);
+		}
+
+		//==============================================================================
+		// 이전 출력. (바탕색)
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		preDraw(graphic) {
+			super.preDraw(graphic);
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor("rgb(20, 20, 31)");
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+			viewManager.applyViewRect(graphic);
+		}
+
+		//==============================================================================
+		// 출력. (흔들림 + 카메라로 월드, 그 위에 노드와 인디케이터)
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		draw(graphic) {
+			graphic.pushState();
+			const shakeOffset = this.#shaker.getOffset();
+			graphic.translate(shakeOffset.x, shakeOffset.y);
+			this.#camera.begin(graphic);
+			this.drawWorld(graphic);
+			this.#camera.end(graphic);
+			graphic.popState();
+			super.draw(graphic);
+			this.#indicator.draw(graphic);
+		}
+
+		//==============================================================================
+		// 월드 출력. (격자 칸과 노란 길)
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		drawWorld(graphic) {
+			for (let row = 0; row < GRID_ROW_COUNT; ++row) {
+				for (let column = 0; column < GRID_COLUMN_COUNT; ++column) {
+					const tileRect = Rect.create(column * TILE_SIZE, row * TILE_SIZE, TILE_SIZE - 2, TILE_SIZE - 2);
+					if (isWall(column, row)) {
+						graphic.setFillColor(new Color(0.45, 0.32, 0.25, 1));
+					}
+					else {
+						graphic.setFillColor(new Color(0.18, 0.22, 0.3, 1));
+					}
+					graphic.drawRect(tileRect);
+				}
+			}
+			const pathPositions = [
+				Vector2.create(0.5 * TILE_SIZE, 7.5 * TILE_SIZE),
+				Vector2.create(5.5 * TILE_SIZE, 7.5 * TILE_SIZE),
+				Vector2.create(5.5 * TILE_SIZE, 2.5 * TILE_SIZE),
+				Vector2.create(11.5 * TILE_SIZE, 2.5 * TILE_SIZE),
+				Vector2.create(11.5 * TILE_SIZE, 3.5 * TILE_SIZE),
+			];
+			graphic.setStrokeColor(new Color(1, 0.85, 0.3, 1));
+			graphic.drawLine(pathPositions, 6);
+		}
+
+		//==============================================================================
+		// 누름. (끌기 시작, 추적을 멈춘다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchPress(viewInputPosition) {
+			this.#dragPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+			this.#isFollowing = false;
+		}
+
+		//==============================================================================
+		// 끌기. (돌아간 화면 방향 그대로 팬)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchMove(viewInputPosition) {
+			if (!this.#dragPosition) {
+				return;
+			}
+			this.#camera.panByScreen(viewInputPosition.x - this.#dragPosition.x, viewInputPosition.y - this.#dragPosition.y);
+			this.#dragPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+		}
+
+		//==============================================================================
+		// 놓음.
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchRelease(viewInputPosition) {
+			this.#dragPosition = null;
+		}
+
+		//==============================================================================
+		// 휠. (커서 아래 월드 지점을 고정한 채 줌)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 * @param { Vector2 } wheelDelta
+		 */
+		touchWheel(viewInputPosition, wheelDelta) {
+			const zoomFactor = wheelDelta.y < 0 ? 1.1 : 1 / 1.1;
+			this.#camera.zoomAt(viewInputPosition, zoomFactor);
+		}
+	}
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+	engineConfiguration.canvasId = "mainCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	const engine = new Engine(engineConfiguration);
+	engine.run(new CameraTourScene());
+</script>
+</body>
+</html>

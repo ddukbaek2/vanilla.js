@@ -8,8 +8,19 @@ import { Object } from "./object.js";
 //==============================================================================
 // 쿨다운.
 // - "timer -= dt; if (timer <= 0) ..." 를 매번 손으로 쓰던 것을 표준화했다.
-// - use() 로 발동하면 지정한 시간 동안 isReady() 가 거짓이 된다.
+// - activate() 로 발동하면 지정한 시간 동안 isReady() 가 거짓이 된다.
 //==============================================================================
+/**
+ * @example <caption>발동하고 시간이 지나 다시 준비되기</caption>
+ * import { Cooldown } from "./build/vanilla.js";
+ *
+ * const cooldown = new Cooldown(0.5);
+ * console.log(cooldown.activate(), cooldown.activate());
+ * cooldown.tick(0.25);
+ * console.log(cooldown.getRemainSeconds(), cooldown.getProgress());
+ * cooldown.tick(0.25);
+ * console.log(cooldown.isReady());
+ */
 export class Cooldown extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -35,7 +46,7 @@ export class Cooldown extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임과의 간격. (초, 남은 시간에서 빼고 0 아래로는 내려가지 않는다)
 	 */
 	tick(timeDelta) {
 		if (this.#remainSeconds > 0) {
@@ -47,19 +58,19 @@ export class Cooldown extends Object {
 	// 발동 가능 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 남은 시간이 0 이하이면 참.
 	 */
 	isReady() {
 		return this.#remainSeconds <= 0;
 	}
 
 	//==============================================================================
-	// 발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환)
+	// 발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환, 러스트 판 activate 와 같다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 발동했으면 참. (쿨다운 중이면 거짓, 남은 시간은 그대로)
 	 */
-	use() {
+	activate() {
 		if (!this.isReady()) {
 			return false;
 		}
@@ -78,7 +89,7 @@ export class Cooldown extends Object {
 	// 쿨다운 시간 설정.
 	//==============================================================================
 	/**
-	 * @param { number } duration
+	 * @param { number } duration 쿨다운 시간. (초, 0 보다 작으면 0, 진행 중인 남은 시간은 바꾸지 않는다)
 	 */
 	setDuration(duration) {
 		this.#duration = System.Math.max(0, duration);
@@ -88,7 +99,7 @@ export class Cooldown extends Object {
 	// 쿨다운 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 쿨다운 시간. (초)
 	 */
 	getDuration() {
 		return this.#duration;
@@ -98,7 +109,7 @@ export class Cooldown extends Object {
 	// 남은 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 다시 준비될 때까지 남은 시간. (초, 준비되었으면 0)
 	 */
 	getRemainSeconds() {
 		return this.#remainSeconds;
@@ -108,7 +119,7 @@ export class Cooldown extends Object {
 	// 진행 비율 반환. (0 = 방금 발동, 1 = 준비 완료)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 0 ~ 1. (쿨다운 시간이 0 이면 1, 쿨다운 중에 시간을 줄이면 0 보다 작아질 수 있다)
 	 */
 	getProgress() {
 		if (this.#duration <= 0) {
@@ -123,6 +134,21 @@ export class Cooldown extends Object {
 // 반복 타이머.
 // - 일정 간격마다 콜백을 부른다. 프레임이 길어져 여러 번 지나쳤으면 밀린 만큼 몰아서 부른다.
 //==============================================================================
+/**
+ * @example <caption>간격마다 콜백 부르기</caption>
+ * import { RepeatTimer } from "./build/vanilla.js";
+ *
+ * let spawnCount = 0;
+ * const repeatTimer = new RepeatTimer(0.5, () => {
+ * 	spawnCount += 1;
+ * });
+ * repeatTimer.tick(0.2);
+ * repeatTimer.tick(1.1);
+ * console.log(spawnCount);
+ * repeatTimer.pause();
+ * repeatTimer.tick(1);
+ * console.log(spawnCount, repeatTimer.isRunning());
+ */
 export class RepeatTimer extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -153,7 +179,7 @@ export class RepeatTimer extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임과의 간격. (초, 멈춰 있으면 쌓지 않는다, 한 번에 간격을 여러 번 넘으면 그 수만큼 콜백을 부른다)
 	 */
 	tick(timeDelta) {
 		if (!this.#isRunning) {
@@ -194,7 +220,7 @@ export class RepeatTimer extends Object {
 	// 간격 설정.
 	//==============================================================================
 	/**
-	 * @param { number } interval
+	 * @param { number } interval 간격. (초, 0.000001 보다 작으면 0.000001)
 	 */
 	setInterval(interval) {
 		this.#interval = System.Math.max(0.000001, interval);
@@ -204,7 +230,7 @@ export class RepeatTimer extends Object {
 	// 간격 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 간격. (초)
 	 */
 	getInterval() {
 		return this.#interval;
@@ -214,7 +240,7 @@ export class RepeatTimer extends Object {
 	// 콜백 설정.
 	//==============================================================================
 	/**
-	 * @param { Function } elapsedEvent
+	 * @param { Function } elapsedEvent 간격마다 부르는 콜백. (인자 없음, null 이면 부르지 않는다)
 	 */
 	setElapsedEvent(elapsedEvent) {
 		this.#elapsedEvent = elapsedEvent;
@@ -224,7 +250,7 @@ export class RepeatTimer extends Object {
 	// 동작 중 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 동작 중이면 참. (만들 때부터 동작한다)
 	 */
 	isRunning() {
 		return this.#isRunning;

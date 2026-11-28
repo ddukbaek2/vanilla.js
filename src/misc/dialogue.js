@@ -20,6 +20,35 @@ import { Object } from "../base/object.js";
 //     runner.getCurrent()   → { kind: "line" | "choice" | "finished", ... }
 //     대사에서 runner.advance(), 선택지에서 runner.choose(index).
 //==============================================================================
+/**
+ * @example <caption>대사를 넘기고 선택지로 갈라지기</caption>
+ * import { DialogueRunner } from "./build/vanilla.js";
+ *
+ * const dialogueRunner = new DialogueRunner();
+ * dialogueRunner.setScript([
+ * 	{ speaker: "Guide", text: "Welcome, traveler." },
+ * 	{ choice: [{ text: "Tell me more", jump: "more" }, { text: "Bye", jump: "bye" }] },
+ * 	{ label: "more" },
+ * 	{ speaker: "Guide", text: "This village is old." },
+ * 	{ end: true },
+ * 	{ label: "bye" },
+ * 	{ speaker: "Guide", text: "Safe travels." },
+ * ]);
+ * dialogueRunner.start();
+ * let current = dialogueRunner.getCurrent();
+ * console.log(current.kind, current.speaker, current.text);
+ *
+ * dialogueRunner.advance();
+ * current = dialogueRunner.getCurrent();
+ * console.log(current.kind, current.options.length);
+ *
+ * dialogueRunner.choose(1);
+ * current = dialogueRunner.getCurrent();
+ * console.log(current.kind, current.text);
+ *
+ * dialogueRunner.advance();
+ * console.log(dialogueRunner.isFinished());
+ */
 export class DialogueRunner extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -44,7 +73,7 @@ export class DialogueRunner extends Object {
 	// 대본 설정.
 	//==============================================================================
 	/**
-	 * @param { object[] } entryList
+	 * @param { object[] } entryList 대본 항목 목록. (null 이면 빈 대본)
 	 */
 	setScript(entryList) {
 		this.#entryList = entryList ? entryList : [];
@@ -63,7 +92,7 @@ export class DialogueRunner extends Object {
 	// 시작. (라벨을 넘기면 그 지점부터)
 	//==============================================================================
 	/**
-	 * @param { string | null } labelName
+	 * @param { string | null } labelName 시작할 이름표. (null 이거나 없는 이름표면 처음부터)
 	 */
 	start(labelName = null) {
 		this.#isFinished = (this.#entryList.length === 0);
@@ -79,7 +108,7 @@ export class DialogueRunner extends Object {
 	// - { kind: "line", speaker, text } | { kind: "choice", options: [{text}] } | { kind: "finished" }
 	//==============================================================================
 	/**
-	 * @returns { object }
+	 * @returns { object } 지금 보여 줄 항목.
 	 */
 	getCurrent() {
 		if (this.#isFinished) {
@@ -93,7 +122,7 @@ export class DialogueRunner extends Object {
 	}
 
 	//==============================================================================
-	// 다음으로. (대사 항목에서 부른다 — 선택지 위에서는 무시)
+	// 다음으로. (대사 항목에서 부른다, 선택지 위에서는 무시)
 	//==============================================================================
 	advance() {
 		if (this.#isFinished) {
@@ -111,7 +140,7 @@ export class DialogueRunner extends Object {
 	// 선택. (선택지 항목에서 부른다)
 	//==============================================================================
 	/**
-	 * @param { number } optionIndex
+	 * @param { number } optionIndex 고를 보기 번호. (0 부터, 없는 번호면 무시)
 	 */
 	choose(optionIndex) {
 		if (this.#isFinished) {
@@ -135,7 +164,7 @@ export class DialogueRunner extends Object {
 	}
 
 	//==============================================================================
-	// 보여 줄 수 있는 항목까지 이동. (라벨 / 점프 / 끝 처리 — 무한 루프 가드 포함)
+	// 보여 줄 수 있는 항목까지 이동. (라벨 / 점프 / 끝 처리, 무한 루프 가드 포함)
 	//==============================================================================
 	/**
 	 * @private
@@ -178,7 +207,7 @@ export class DialogueRunner extends Object {
 	// 종료 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 대본이 끝났으면 참. (start 전에도 참)
 	 */
 	isFinished() {
 		return this.#isFinished;
@@ -197,12 +226,37 @@ export class DialogueRunner extends Object {
 //     /end
 //   "/" 로 시작하지 않는 줄은 직전 화자의 /say 로 본다. "//" 는 주석.
 //==============================================================================
+/**
+ * @example <caption>명령어 대본을 읽어 진행기에 넣기</caption>
+ * import { DialogueScriptParser, DialogueRunner } from "./build/vanilla.js";
+ *
+ * const scriptText = [
+ * 	"/speaker Guide",
+ * 	"/say Welcome, traveler.",
+ * 	"Need a hand?",
+ * 	"/option Yes -> help",
+ * 	"/option No -> bye",
+ * 	"/label help",
+ * 	"/say Follow the river.",
+ * 	"/end",
+ * 	"/label bye",
+ * 	"/say Safe travels.",
+ * ].join("\n");
+ * const entryList = DialogueScriptParser.parse(scriptText);
+ * console.log(entryList.length);
+ *
+ * const dialogueRunner = new DialogueRunner();
+ * dialogueRunner.setScript(entryList);
+ * dialogueRunner.start("help");
+ * const current = dialogueRunner.getCurrent();
+ * console.log(current.speaker, current.text);
+ */
 export class DialogueScriptParser extends Object {
 	//==============================================================================
 	// 파싱. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } scriptText
+	 * @param { string } scriptText 명령어 대본 글. (줄마다 명령 하나)
 	 * @returns { object[] } DialogueRunner 대본.
 	 */
 	static parse(scriptText) {

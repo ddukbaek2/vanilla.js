@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick Start</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000000; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+
+//==============================================================================
+// 빠른 시작 예제. (README 의 빠른 시작과 같은 코드, 러스트 예제 quickstart 와 같은 장면)
+// - 씬 하나를 만들고 흰 사각형 하나를 그린다. 바탕은 검정이다. (러스트 SceneBase 의 기본 바탕색)
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, Vector2, Rect, Colors } from "../../import.js";
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class MainScene extends Scene {
+	//==============================================================================
+	// 출력.
+	//==============================================================================
+	draw(graphic) {
+		super.draw(graphic);
+		graphic.setFillColor(Colors.white);
+		graphic.drawRect(Rect.create(100, 100, 200, 120));
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "바닐라엔진";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new MainScene());
+</script>
+</body>
+</html>

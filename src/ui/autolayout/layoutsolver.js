@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: Kiwi(Nucleic Development Team) 의 dual simplex 솔버에서 옮김, BSD-3-Clause, THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { LayoutVariable } from "./layoutvariable.js";
 import { LayoutTerm } from "./layoutterm.js";
@@ -33,6 +34,31 @@ import { LayoutRow } from "./layoutrow.js";
 //   solver.suggestValue(x, 50);
 //   solver.updateVariables();
 //==============================================================================
+/**
+ * @example <caption>양옆 여백 16 을 두고 너비 풀기</caption>
+ * import { LayoutSolver, LayoutVariable, LayoutExpression, LayoutStrength } from "./build/vanilla.js";
+ *
+ * const solver = new LayoutSolver();
+ * const viewWidth = new LayoutVariable("viewWidth");
+ * const left = new LayoutVariable("left");
+ * const width = new LayoutVariable("width");
+ * const viewWidthExpression = LayoutExpression.fromVariable(viewWidth);
+ * const leftExpression = LayoutExpression.fromVariable(left);
+ * const rightExpression = leftExpression.add(width);
+ * const leftConstraint = leftExpression.equalTo(16);
+ * const rightMarginExpression = viewWidthExpression.subtract(16);
+ * const rightConstraint = rightExpression.equalTo(rightMarginExpression);
+ * solver.addConstraint(leftConstraint);
+ * solver.addConstraint(rightConstraint);
+ * solver.addEditVariable(viewWidth, LayoutStrength.strong);
+ * solver.suggestValue(viewWidth, 640);
+ * solver.updateVariables();
+ * const wideWidth = width.getValue();
+ * solver.suggestValue(viewWidth, 360);
+ * solver.updateVariables();
+ * const narrowWidth = width.getValue();
+ * console.log(wideWidth, narrowWidth);
+ */
 export class LayoutSolver {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -65,7 +91,7 @@ export class LayoutSolver {
 	// 제약 추가.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint
+	 * @param { LayoutConstraint } constraint 넣을 제약. (이미 넣은 것이거나 required 제약끼리 모순이면 예외)
 	 */
 	addConstraint(constraint) {
 		if (this.#constraintTags.has(constraint)) {
@@ -104,7 +130,7 @@ export class LayoutSolver {
 	// 제약 제거.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint
+	 * @param { LayoutConstraint } constraint 뺄 제약. (넣지 않은 것이면 예외)
 	 */
 	removeConstraint(constraint) {
 		const tag = this.#constraintTags.get(constraint);
@@ -124,7 +150,7 @@ export class LayoutSolver {
 		else {
 			const leavingSymbol = this.getMarkerLeavingSymbol(marker);
 			if (leavingSymbol.isInvalid()) {
-				throw new System.Error("[LayoutSolver] 제약 제거 실패 — leaving row 없음.");
+				throw new System.Error("[LayoutSolver] 제약 제거 실패: leaving row 없음.");
 			}
 			const leavingRow = this.#rows.get(leavingSymbol);
 			this.#rows.delete(leavingSymbol);
@@ -139,8 +165,8 @@ export class LayoutSolver {
 	// 제약 등록 여부.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint
-	 * @returns { boolean }
+	 * @param { LayoutConstraint } constraint 찾을 제약.
+	 * @returns { boolean } 솔버에 넣은 제약이면 참.
 	 */
 	hasConstraint(constraint) {
 		return this.#constraintTags.has(constraint);
@@ -150,8 +176,21 @@ export class LayoutSolver {
 	// 편집(edit) 변수 추가. suggestValue 사용 전 반드시 등록.
 	//==============================================================================
 	/**
-	 * @param { LayoutVariable } variable
-	 * @param { number } strength
+	 * @param { LayoutVariable } variable 편집 변수로 등록할 변수. (이미 등록했으면 예외)
+	 * @param { number } strength 편집 강도. (0 ~ required 로 자르고, required 이상이면 예외)
+	 * @example <caption>편집 변수를 등록하고 다시 빼기</caption>
+	 * import { LayoutSolver, LayoutVariable, LayoutStrength } from "./build/vanilla.js";
+	 *
+	 * const solver = new LayoutSolver();
+	 * const width = new LayoutVariable("width");
+	 * solver.addEditVariable(width, LayoutStrength.strong);
+	 * const isEditVariable = solver.hasEditVariable(width);
+	 * solver.suggestValue(width, 240);
+	 * solver.updateVariables();
+	 * const widthValue = width.getValue();
+	 * solver.removeEditVariable(width);
+	 * const isEditVariableAfterRemove = solver.hasEditVariable(width);
+	 * console.log(isEditVariable, widthValue, isEditVariableAfterRemove);
 	 */
 	addEditVariable(variable, strength) {
 		if (this.#editInfos.has(variable)) {
@@ -173,7 +212,7 @@ export class LayoutSolver {
 	// 편집 변수 제거.
 	//==============================================================================
 	/**
-	 * @param { LayoutVariable } variable
+	 * @param { LayoutVariable } variable 등록을 풀 편집 변수. (등록하지 않은 것이면 예외)
 	 */
 	removeEditVariable(variable) {
 		const editInfo = this.#editInfos.get(variable);
@@ -188,8 +227,8 @@ export class LayoutSolver {
 	// 편집 변수 등록 여부.
 	//==============================================================================
 	/**
-	 * @param { LayoutVariable } variable
-	 * @returns { boolean }
+	 * @param { LayoutVariable } variable 찾을 변수.
+	 * @returns { boolean } 편집 변수로 등록했으면 참.
 	 */
 	hasEditVariable(variable) {
 		return this.#editInfos.has(variable);
@@ -200,8 +239,26 @@ export class LayoutSolver {
 	// - 솔버는 가능한 그 값을 만족시키되 다른 제약과 충돌하면 강도에 따라 양보.
 	//==============================================================================
 	/**
-	 * @param { LayoutVariable } variable
-	 * @param { number } value
+	 * @param { LayoutVariable } variable addEditVariable 로 등록한 편집 변수. (등록하지 않은 것이면 예외)
+	 * @param { number } value 바라는 값.
+	 * @example <caption>끌기 값을 0 ~ 300 안에 묶기</caption>
+	 * import { LayoutSolver, LayoutVariable, LayoutExpression, LayoutStrength } from "./build/vanilla.js";
+	 *
+	 * const solver = new LayoutSolver();
+	 * const dragX = new LayoutVariable("dragX");
+	 * const dragExpression = LayoutExpression.fromVariable(dragX);
+	 * const minimumConstraint = dragExpression.greaterThanOrEqualTo(0);
+	 * const maximumConstraint = dragExpression.lessThanOrEqualTo(300);
+	 * solver.addConstraint(minimumConstraint);
+	 * solver.addConstraint(maximumConstraint);
+	 * solver.addEditVariable(dragX, LayoutStrength.strong);
+	 * solver.suggestValue(dragX, 120);
+	 * solver.updateVariables();
+	 * const insideValue = dragX.getValue();
+	 * solver.suggestValue(dragX, 480);
+	 * solver.updateVariables();
+	 * const clampedValue = dragX.getValue();
+	 * console.log(insideValue, clampedValue);
 	 */
 	suggestValue(variable, value) {
 		const editInfo = this.#editInfos.get(variable);
@@ -233,7 +290,7 @@ export class LayoutSolver {
 			return;
 		}
 
-		// 그 외 — marker 가 등장하는 모든 행의 상수를 보정.
+		// 그 외, marker 가 등장하는 모든 행의 상수를 보정.
 		for (const [symbol, row] of this.#rows) {
 			const coefficient = row.coefficientFor(markerSymbol);
 			if (coefficient === 0.0) {
@@ -249,6 +306,20 @@ export class LayoutSolver {
 	//==============================================================================
 	// 변수 값 갱신. tableau 의 external 행 상수항을 각 LayoutVariable 에 반영.
 	//==============================================================================
+	/**
+	 * @example <caption>풀이 결과를 변수에 옮기기</caption>
+	 * import { LayoutSolver, LayoutVariable, LayoutExpression } from "./build/vanilla.js";
+	 *
+	 * const solver = new LayoutSolver();
+	 * const height = new LayoutVariable("height");
+	 * const heightExpression = LayoutExpression.fromVariable(height);
+	 * const heightConstraint = heightExpression.equalTo(48);
+	 * solver.addConstraint(heightConstraint);
+	 * const valueBeforeUpdate = height.getValue();
+	 * solver.updateVariables();
+	 * const valueAfterUpdate = height.getValue();
+	 * console.log(valueBeforeUpdate, valueAfterUpdate);
+	 */
 	updateVariables() {
 		for (const [variable, symbol] of this.#variableSymbols) {
 			if (this.#rows.has(symbol)) {
@@ -265,8 +336,8 @@ export class LayoutSolver {
 	// 내부: LayoutVariable → LayoutSymbol 매핑 (없으면 생성).
 	//==============================================================================
 	/**
-	 * @param { LayoutVariable } variable
-	 * @returns { LayoutSymbol }
+	 * @param { LayoutVariable } variable 외부 변수.
+	 * @returns { LayoutSymbol } 변수에 짝지은 external 심볼. (없으면 새로 만들어 기억한다)
 	 */
 	getOrCreateSymbol(variable) {
 		if (this.#variableSymbols.has(variable)) {
@@ -281,15 +352,16 @@ export class LayoutSolver {
 	// 내부: 제약 → 행 생성. tag 에 marker / other 심볼을 채운다.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint
-	 * @param { LayoutTag } tag
-	 * @returns { LayoutRow }
+	 * @param { LayoutConstraint } constraint 행으로 바꿀 제약.
+	 * @param { LayoutTag } tag marker, other 심볼을 채울 태그.
+	 * @returns { LayoutRow } 제약을 옮긴 새 행. (상수항이 음수면 부호를 뒤집는다)
 	 */
 	createRow(constraint, tag) {
 		const expression = constraint.getExpression();
 		const row = new LayoutRow(expression.getConstant());
 
 		// 외부 변수 항 추가. basic 인 항은 substitute.
+		// 변수가 없는 항(LayoutTerm 의 값이 늘 0)과 계수가 0 인 항은 식에 아무것도 더하지 않으므로 건너뛴다.
 		const terms = expression.getTerms();
 		for (const term of terms) {
 			const coefficient = term.getCoefficient();
@@ -297,6 +369,9 @@ export class LayoutSolver {
 				continue;
 			}
 			const variable = term.getVariable();
+			if (variable === null) {
+				continue;
+			}
 			const symbol = this.getOrCreateSymbol(variable);
 			if (this.#rows.has(symbol)) {
 				const basicRow = this.#rows.get(symbol);
@@ -354,9 +429,9 @@ export class LayoutSolver {
 	// 1) 외부 변수 우선. 2) slack/error 의 음수 계수 항. 3) 둘 다 없으면 invalid.
 	//==============================================================================
 	/**
-	 * @param { LayoutRow } row
-	 * @param { LayoutTag } tag
-	 * @returns { LayoutSymbol }
+	 * @param { LayoutRow } row subject 를 고를 행.
+	 * @param { LayoutTag } tag 그 행의 제약 태그.
+	 * @returns { LayoutSymbol } 고른 심볼. (없으면 invalid 심볼)
 	 */
 	chooseSubject(row, tag) {
 		const cells = row.getCells();
@@ -384,17 +459,23 @@ export class LayoutSolver {
 	// 내부: 인공 변수로 행 강제 추가. 성공 여부 반환.
 	//==============================================================================
 	/**
-	 * @param { LayoutRow } row
-	 * @returns { boolean }
+	 * @param { LayoutRow } row 넣을 행.
+	 * @returns { boolean } 인공 변수를 0 으로 만들어 넣었으면 참.
 	 */
 	addWithArtificialVariable(row) {
 		const artificialSymbol = new LayoutSymbol(LayoutSymbolType.slack);
 		this.#rows.set(artificialSymbol, row.copy());
 		this.#artificial = row.copy();
 
-		this.optimize(this.#artificial);
-		const success = nearZero(this.#artificial.getConstant());
-		this.#artificial = null;
+		// 최적화가 예외로 끝나도 인공 행을 비운다.
+		let success = false;
+		try {
+			this.optimize(this.#artificial);
+			success = nearZero(this.#artificial.getConstant());
+		}
+		finally {
+			this.#artificial = null;
+		}
 
 		// artificial 행이 아직 basic 이면 제거.
 		if (this.#rows.has(artificialSymbol)) {
@@ -424,8 +505,8 @@ export class LayoutSolver {
 	// 내부: 모든 행과 objective 에서 symbol 의 등장을 row 로 치환.
 	//==============================================================================
 	/**
-	 * @param { LayoutSymbol } symbol
-	 * @param { LayoutRow } row
+	 * @param { LayoutSymbol } symbol 치환할 심볼.
+	 * @param { LayoutRow } row symbol 대신 넣을 행.
 	 */
 	substitute(symbol, row) {
 		for (const [basicSymbol, basicRow] of this.#rows) {
@@ -444,7 +525,7 @@ export class LayoutSolver {
 	// 내부: 1차 (primal) 최적화. objective 가 더 이상 음수 계수를 갖지 않을 때까지 반복.
 	//==============================================================================
 	/**
-	 * @param { LayoutRow } objective
+	 * @param { LayoutRow } objective 최소화할 목적 행. (솔버의 목적 행이나 인공 행)
 	 */
 	optimize(objective) {
 		const safeguard = 100000;
@@ -455,7 +536,7 @@ export class LayoutSolver {
 			}
 			const leavingSymbol = this.getLeavingSymbol(enteringSymbol);
 			if (leavingSymbol.isInvalid()) {
-				throw new System.Error("[LayoutSolver] 목적함수가 무한대 — bound 가 부족함.");
+				throw new System.Error("[LayoutSolver] 목적함수가 무한대: bound 가 부족함.");
 			}
 			const leavingRow = this.#rows.get(leavingSymbol);
 			this.#rows.delete(leavingSymbol);
@@ -485,7 +566,7 @@ export class LayoutSolver {
 			}
 			const enteringSymbol = this.getDualEnteringSymbol(row);
 			if (enteringSymbol.isInvalid()) {
-				throw new System.Error("[LayoutSolver] dual optimize 실패 — entering 없음.");
+				throw new System.Error("[LayoutSolver] dual optimize 실패: entering 없음.");
 			}
 			this.#rows.delete(leavingSymbol);
 			row.solveForPair(leavingSymbol, enteringSymbol);
@@ -499,8 +580,8 @@ export class LayoutSolver {
 	// 내부: leaving symbol 결정. (Bland's rule 변형 + 비율 테스트)
 	//==============================================================================
 	/**
-	 * @param { LayoutSymbol } enteringSymbol
-	 * @returns { LayoutSymbol }
+	 * @param { LayoutSymbol } enteringSymbol 들어올 심볼.
+	 * @returns { LayoutSymbol } 나갈 행의 심볼. (비율이 가장 작은 것, 없으면 invalid 심볼)
 	 */
 	getLeavingSymbol(enteringSymbol) {
 		let ratio = System.Number.POSITIVE_INFINITY;
@@ -525,8 +606,8 @@ export class LayoutSolver {
 	// 내부: dual entering symbol 결정.
 	//==============================================================================
 	/**
-	 * @param { LayoutRow } row
-	 * @returns { LayoutSymbol }
+	 * @param { LayoutRow } row 상수항이 음수인 행.
+	 * @returns { LayoutSymbol } 들어올 심볼. (비율이 가장 작은 것, 없으면 invalid 심볼)
 	 */
 	getDualEnteringSymbol(row) {
 		let ratio = System.Number.POSITIVE_INFINITY;
@@ -549,8 +630,8 @@ export class LayoutSolver {
 	// 내부: marker 가 leaving 으로 떠날 행 결정.
 	//==============================================================================
 	/**
-	 * @param { LayoutSymbol } marker
-	 * @returns { LayoutSymbol }
+	 * @param { LayoutSymbol } marker 제약을 빼며 내보낼 marker 심볼.
+	 * @returns { LayoutSymbol } marker 와 바꿔 피벗할 행의 심볼. (음수 계수 비율 최소, 양수 계수 비율 최소, external 행 차례, 없으면 invalid 심볼)
 	 */
 	getMarkerLeavingSymbol(marker) {
 		let ratio1 = System.Number.POSITIVE_INFINITY;
@@ -595,8 +676,8 @@ export class LayoutSolver {
 	// 내부: 제약의 오차 변수가 목적함수에 끼친 영향을 제거.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint
-	 * @param { LayoutTag } tag
+	 * @param { LayoutConstraint } constraint 뺄 제약.
+	 * @param { LayoutTag } tag 그 제약의 태그.
 	 */
 	removeConstraintEffects(constraint, tag) {
 		const markerSymbol = tag.getMarker();
@@ -613,8 +694,8 @@ export class LayoutSolver {
 	// 내부: 단일 오차 변수 영향 제거.
 	//==============================================================================
 	/**
-	 * @param { LayoutSymbol } markerSymbol
-	 * @param { number } strength
+	 * @param { LayoutSymbol } markerSymbol 오차 심볼.
+	 * @param { number } strength 제약 강도.
 	 */
 	removeMarkerEffect(markerSymbol, strength) {
 		if (this.#rows.has(markerSymbol)) {
@@ -634,19 +715,34 @@ export class LayoutSolver {
 class LayoutTag {
 	/** @private @type { LayoutSymbol | null } */ #marker;
 	/** @private @type { LayoutSymbol | null } */ #other;
+	//==============================================================================
+	// 생성. (marker, other 모두 null)
+	//==============================================================================
 	constructor() {
 		this.#marker = null;
 		this.#other = null;
 	}
+	//==============================================================================
+	// marker 심볼 반환.
+	//==============================================================================
 	getMarker() {
 		return this.#marker;
 	}
+	//==============================================================================
+	// marker 심볼 설정.
+	//==============================================================================
 	setMarker(marker) {
 		this.#marker = marker;
 	}
+	//==============================================================================
+	// other 심볼 반환.
+	//==============================================================================
 	getOther() {
 		return this.#other;
 	}
+	//==============================================================================
+	// other 심볼 설정.
+	//==============================================================================
 	setOther(other) {
 		this.#other = other;
 	}
@@ -660,20 +756,35 @@ class LayoutEditInfo {
 	/** @private @type { LayoutConstraint } */ #constraint;
 	/** @private @type { LayoutTag } */ #tag;
 	/** @private @type { number } */ #constant;
+	//==============================================================================
+	// 생성. (편집 제약, 그 태그, 처음 제안 값)
+	//==============================================================================
 	constructor(constraint, tag, constant) {
 		this.#constraint = constraint;
 		this.#tag = tag;
 		this.#constant = constant;
 	}
+	//==============================================================================
+	// 편집 제약 반환.
+	//==============================================================================
 	getConstraint() {
 		return this.#constraint;
 	}
+	//==============================================================================
+	// 편집 제약의 태그 반환.
+	//==============================================================================
 	getTag() {
 		return this.#tag;
 	}
+	//==============================================================================
+	// 마지막으로 제안한 값 반환.
+	//==============================================================================
 	getConstant() {
 		return this.#constant;
 	}
+	//==============================================================================
+	// 마지막으로 제안한 값 설정.
+	//==============================================================================
 	setConstant(constant) {
 		this.#constant = constant;
 	}
@@ -727,6 +838,9 @@ function anyPivotableSymbol(row) {
 // 부동소수 0 근접 판정. (Kiwi 의 EPS 와 동일)
 //==============================================================================
 const NEAR_ZERO_EPS = 1e-8;
+//==============================================================================
+// 0 에 가까운지. (절대값이 NEAR_ZERO_EPS 보다 작으면 참)
+//==============================================================================
 function nearZero(value) {
 	return value < 0.0 ? -value < NEAR_ZERO_EPS : value < NEAR_ZERO_EPS;
 }

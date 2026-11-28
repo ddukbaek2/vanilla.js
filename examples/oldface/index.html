@@ -392,24 +392,20 @@
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM<br>
 		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (WALTER PRESET, EXPRESSION WRINKLE MAPS, RIGLOGIC BAKED TO ARKIT SHAPES, GROOM CARDS)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
+		<br>METAHUMAN, EPIC GAMES, DEMO ONLY: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">METAHUMAN.COM</a> / <a href="https://www.metahuman.com/en-US/license" target="_blank" rel="noopener">LICENSE</a>
 	</div>
-	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
+	<a id="homeLink" href="https://vanillapunch.com/tools/" target="_blank" rel="noopener">VANILLAPUNCH.COM</a>
 	<div id="loadingOverlay"><div id="loadingLabel">LOADING</div><div id="loadingBar"><div id="loadingFill"></div></div><div id="loadingDetail"></div></div>
 	<script type="module">
 	"use strict";
 	const System = globalThis;
 
 	//==============================================================================
-	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	// 엔진 모듈 로드. (저장소 소스 ../../import.js)
 	//==============================================================================
 	let engineModule = null;
 	try {
-		try {
-			engineModule = await import("./vanilla.js");
-		}
-		catch (importError) {
-			engineModule = await import("../../build/vanilla.js");
-		}
+		engineModule = await import("../../import.js");
 	}
 	catch (engineError) {
 		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
@@ -1445,6 +1441,18 @@
 		lastPointerX: 0,
 		lastPointerY: 0,
 	};
+	// 주소 인자: ?yaw=라디안 으로 카메라를 돌리고, ?expression=이름 으로 표정 프리셋을 고른다. (화면 찍기용)
+	{
+		const queryParameters = new System.URLSearchParams(System.location.search);
+		const yawText = queryParameters.get("yaw");
+		if (yawText !== null && System.Number.isFinite(System.Number(yawText))) {
+			cameraState.yaw = cameraState.targetYaw = clampValue(System.Number(yawText), -1.25, 1.25);
+		}
+		const expressionText = queryParameters.get("expression");
+		if (expressionText !== null && expressionTable[expressionText] !== undefined) {
+			selectExpression(expressionText);
+		}
+	}
 	const DEFAULT_CAMERA_YAW = cameraState.yaw;
 	const DEFAULT_CAMERA_PITCH = cameraState.pitch;
 	const DEFAULT_CAMERA_DISTANCE = cameraState.distance;
@@ -1837,7 +1845,7 @@
 
 		// 2. 중간 버퍼 블릿. (뷰포트를 썸네일 사각형으로 제한 — 내용 영역 안에 온전히 들어온 것만)
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
-		previewPass.use();
+		previewPass.useProgram();
 		webGL2RenderingContext.uniform1i(previewPass.getUniformLocation("sourceTexture"), 0);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		for (const node of nodes) {
@@ -2193,7 +2201,7 @@
 		webGL2RenderingContext.clearColor(0, 0, 0, 0);
 		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
-		backgroundPass.use();
+		backgroundPass.useProgram();
 		webGL2RenderingContext.uniform1f(backgroundPass.getUniformLocation("aspectRatio"), aspectRatio);
 		backgroundPass.draw();
 		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
@@ -2245,7 +2253,7 @@
 		beginPass("post");
 		hdrRenderTarget.bind();
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
-		combinePass.use();
+		combinePass.useProgram();
 		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("irradianceTexture"), 0);
 		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("albedoTexture"), 1);
 		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("specularTexture"), 2);
@@ -2284,7 +2292,7 @@
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
 		}
-		compositePass.use();
+		compositePass.useProgram();
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("bloomTexture"), 1);
 		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("exposure"), sliderStates.exposure);
@@ -2306,7 +2314,7 @@
 		if (useAntialias) {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
-			antialiasPass.use();
+			antialiasPass.useProgram();
 			webGL2RenderingContext.uniform1i(antialiasPass.getUniformLocation("sourceTexture"), 0);
 			webGL2RenderingContext.uniform2f(antialiasPass.getUniformLocation("texelSize"), 1 / renderWidth, 1 / renderHeight);
 			webGL2RenderingContext.uniform1f(antialiasPass.getUniformLocation("sharpenStrength"), sliderStates.antialias >= 2 ? 0.5 : 0);
@@ -2369,6 +2377,8 @@
 		else {
 			updatePanelLimits(System.window.innerHeight - 18);
 		}
+		// 묶어 그리기로 쌓여 남은 HUD 를 이 프레임 안에 그린다. (엔진 루프 밖에서 Graphic 을 직접 쓰므로 엔진 대신 부른다)
+		uiGraphic.flushBatch();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		statistics.cpuFrameMilliseconds = statistics.cpuFrameMilliseconds * 0.9 + (System.performance.now() - cpuFrameStart) * 0.1;
 

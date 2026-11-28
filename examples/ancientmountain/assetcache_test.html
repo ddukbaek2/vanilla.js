@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>ASSET CACHE TEST</title>
+</head>
+<body style="margin:0; font-family:monospace; white-space:pre">
+	<canvas id="testCanvas" width="320" height="240"></canvas>
+	<div id="result">running</div>
+	<script type="module">
+		//==============================================================================
+		// 자산 캐시 재기. (같은 모형 MODEL_COUNT 개를 캐시 없이와 캐시로 받아 걸린 시간과 GPU 바이트를 비교한다)
+		// - 캐시 없이: 받을 때마다 SkinnedModelAsset.clearCache() 로 캐시를 비워 받기, 풀기, 올리기를 모두 한다.
+		// - 캐시로: 첫 받기만 풀고 올리고 나머지는 자산을 나눠 쓰는 인스턴스다.
+		// - 결과는 #result 와 window.assetCacheResult 에 둔다. (헤드리스 크롬으로 연다)
+		//==============================================================================
+		const System = globalThis;
+		const MODEL_COUNT = 20;
+		const MODEL_URL_LIST = ["./assets/fox.glb", "./assets/mannequin_female.glb"];
+
+		const engineModule = await import("../../build/vanilla.js");
+		const { SkinnedModel, SkinnedModelAsset, SkinnedModelRenderer } = engineModule;
+		const canvas = document.getElementById("testCanvas");
+		const webGL2RenderingContext = canvas.getContext("webgl2");
+		const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+
+		// 한 번 받아 브라우저 HTTP 캐시를 데워 둔다. (두 쪽 모두 같은 조건에서 받는다)
+		for (const modelUrl of MODEL_URL_LIST) {
+			const warmModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, modelUrl, skinnedModelRenderer);
+			warmModel.destroy();
+		}
+
+		// 모형 MODEL_COUNT 개 받기. (걸린 밀리초와 서로 다른 자산의 GPU 바이트 합)
+		async function measureLoad(modelUrl, useCache) {
+			SkinnedModelAsset.clearCache();
+			const modelList = [];
+			const startTime = System.performance.now();
+			for (let modelIndex = 0; modelIndex < MODEL_COUNT; ++modelIndex) {
+				if (!useCache) {
+					SkinnedModelAsset.clearCache();
+				}
+				const model = await SkinnedModel.loadFromUrl(webGL2RenderingContext, modelUrl, skinnedModelRenderer);
+				modelList.push(model);
+			}
+			webGL2RenderingContext.finish();
+			const elapsedTime = System.performance.now() - startTime;
+			const assetSet = new System.Set(modelList.map((model) => model.getAsset()));
+			let gpuByteCount = 0;
+			for (const asset of assetSet) {
+				gpuByteCount += asset.getGpuByteCount();
+			}
+			for (const model of modelList) {
+				model.destroy();
+			}
+			return { elapsedTime: elapsedTime, gpuByteCount: gpuByteCount, assetCount: assetSet.size };
+		}
+
+		const resultList = [];
+		for (const modelUrl of MODEL_URL_LIST) {
+			const uncachedResult = await measureLoad(modelUrl, false);
+			const cachedResult = await measureLoad(modelUrl, true);
+			resultList.push({ modelUrl: modelUrl, modelCount: MODEL_COUNT, uncached: uncachedResult, cached: cachedResult });
+		}
+		const lineList = resultList.map((result) => {
+			const timeRatio = result.cached.elapsedTime / result.uncached.elapsedTime;
+			const byteRatio = result.cached.gpuByteCount / result.uncached.gpuByteCount;
+			return `${result.modelUrl} x${result.modelCount}: uncached ${result.uncached.elapsedTime.toFixed(1)} ms, ${result.uncached.gpuByteCount} B, ${result.uncached.assetCount} assets / cached ${result.cached.elapsedTime.toFixed(1)} ms, ${result.cached.gpuByteCount} B, ${result.cached.assetCount} asset (time x${timeRatio.toFixed(3)}, GPU x${byteRatio.toFixed(3)})`;
+		});
+		document.getElementById("result").textContent = lineList.join("\n");
+		System.assetCacheResult = resultList;
+	</script>
+</body>
+</html>

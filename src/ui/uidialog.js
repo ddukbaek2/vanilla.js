@@ -23,6 +23,33 @@ import { PopupMotion } from "./popupmotion.js";
 //     scene.getRoot().addChild(dialog);
 //     dialog.show("정말 삭제할까요?", { onConfirm: () => remove(), onCancel: () => {} });
 //==============================================================================
+/**
+ * @example <caption>확인과 취소를 묻는 대화 상자</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIDialog } from "./build/vanilla.js";
+ *
+ * class DialogScene extends UIScene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const dialog = new UIDialog({ width: 360, height: 200, confirmText: "Delete", cancelText: "Keep" });
+ * 		const root = this.getRoot();
+ * 		root.addChild(dialog);
+ * 		dialog.show("Delete this save file?", {
+ * 			onConfirm: () => {
+ * 				console.log("deleted");
+ * 			},
+ * 			onCancel: () => {
+ * 				console.log("kept");
+ * 			},
+ * 		});
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new DialogScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIDialog extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -35,6 +62,7 @@ export class UIDialog extends WorldNode {
 	/** @private @type { WorldNode } */ #cancelNode;
 	/** @private @type { Function | null } */ #confirmHandler;
 	/** @private @type { Function | null } */ #cancelHandler;
+	/** @private @type { boolean | null } */ #pendingDismiss; // 다음 tick 에 닫을 때 확인인지. (null 이면 없음)
 
 	//==============================================================================
 	// 생성.
@@ -59,6 +87,7 @@ export class UIDialog extends WorldNode {
 		this.setActive(false);
 		this.#confirmHandler = null;
 		this.#cancelHandler = null;
+		this.#pendingDismiss = null;
 
 		// 어둡게 가리는 막. (누르면 취소)
 		this.#overlayNode = new WorldNode();
@@ -163,13 +192,14 @@ export class UIDialog extends WorldNode {
 	// - onCancel 을 넘기지 않으면 취소 단추를 감추고 확인 단추를 가운데로 넓힌다.
 	//==============================================================================
 	/**
-	 * @param { string } messageText
+	 * @param { string } messageText 본문 글. (카드 너비에 맞춰 줄을 바꾼다)
 	 * @param { object } options { onConfirm?, onCancel?, confirmText?, cancelText? }
 	 */
 	show(messageText, options = {}) {
 		this.#messageLabel.setText(messageText);
 		this.#confirmHandler = options.onConfirm ? options.onConfirm : null;
 		this.#cancelHandler = options.onCancel ? options.onCancel : null;
+		this.#pendingDismiss = null;
 		if (options.confirmText) {
 			this.#confirmNode.getComponents(UILabel)[0].setText(options.confirmText);
 		}
@@ -200,7 +230,7 @@ export class UIDialog extends WorldNode {
 	// 닫기. (isConfirmed 에 따라 확인 / 취소 처리를 부른다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isConfirmed
+	 * @param { boolean } isConfirmed 참이면 onConfirm, 거짓이면 onCancel 을 부른다. (다 열리기 전이면 아무것도 하지 않는다)
 	 */
 	dismiss(isConfirmed) {
 		if (!this.#popupMotion.isInteractive()) {
@@ -216,14 +246,29 @@ export class UIDialog extends WorldNode {
 	}
 
 	//==============================================================================
+	// 다음 tick 에 닫기. (tick 밖에서 닫기를 미룰 때)
+	//==============================================================================
+	/**
+	 * @param { boolean } isConfirmed 참이면 확인, 거짓이면 취소로 닫는다.
+	 */
+	requestDismiss(isConfirmed) {
+		this.#pendingDismiss = isConfirmed;
+	}
+
+	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
+		if (this.#pendingDismiss !== null) {
+			const isConfirmed = this.#pendingDismiss;
+			this.#pendingDismiss = null;
+			this.dismiss(isConfirmed);
+		}
 		this.#popupMotion.tick(timeDelta);
 		this.applyMotion();
 	}
@@ -267,7 +312,7 @@ export class UIDialog extends WorldNode {
 	// 표시 중 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 닫힘 상태가 아니면 참. (여는 중, 닫는 중도 참)
 	 */
 	isShowing() {
 		return this.#popupMotion.isVisible();
@@ -277,9 +322,66 @@ export class UIDialog extends WorldNode {
 	// 즉시 전환 여부 설정. (연출 없는 UI 톤)
 	//==============================================================================
 	/**
-	 * @param { boolean } isInstantEnabled
+	 * @param { boolean } isInstantEnabled 참이면 연출 없이 바로 열고 닫는다.
 	 */
 	setInstantEnabled(isInstantEnabled) {
 		this.#popupMotion.setInstantEnabled(isInstantEnabled);
+	}
+
+	//==============================================================================
+	// 연출 반환.
+	//==============================================================================
+	/**
+	 * @returns { PopupMotion } 여닫는 연출.
+	 */
+	getPopupMotion() {
+		return this.#popupMotion;
+	}
+
+	//==============================================================================
+	// 뒤를 덮는 막 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 막 노드.
+	 */
+	getOverlayNode() {
+		return this.#overlayNode;
+	}
+
+	//==============================================================================
+	// 판 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 판 노드.
+	 */
+	getPanelNode() {
+		return this.#panelNode;
+	}
+
+	//==============================================================================
+	// 확인 단추 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 확인 단추 노드.
+	 * @example <caption>확인 단추 노드를 찾아 이름과 크기 읽기</caption>
+	 * import { UIDialog } from "./build/vanilla.js";
+	 *
+	 * const dialog = new UIDialog({ confirmText: "OK", cancelText: "Cancel" });
+	 * const confirmNode = dialog.getConfirmNode();
+	 * const cancelNode = dialog.getCancelNode();
+	 * console.log(confirmNode.getName(), cancelNode.getName(), dialog.getPanelNode().getName());
+	 */
+	getConfirmNode() {
+		return this.#confirmNode;
+	}
+
+	//==============================================================================
+	// 취소 단추 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 취소 단추 노드.
+	 */
+	getCancelNode() {
+		return this.#cancelNode;
 	}
 }

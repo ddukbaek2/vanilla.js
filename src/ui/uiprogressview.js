@@ -26,6 +26,37 @@ export const ProgressDirection = {
 // - UIView 를 상속하여 컨테이너 표시 객체로서의 일관성을 유지하고,
 //   WorldNode 에 부착될 때 자동 마스크/콘텐츠 노드 처리를 받는다.
 //==============================================================================
+/**
+ * @example <caption>둥근 진행 막대 그리기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIProgressView, WorldNode, Color, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class ProgressScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const progressNode = new WorldNode();
+ * 		progressNode.setPivot(Pivot.topLeft.clone());
+ * 		progressNode.setAnchor(Pivot.topLeft.clone());
+ * 		progressNode.setContentSize(Vector2.create(400, 24));
+ * 		progressNode.setLocalPosition(Vector2.create(120, 168));
+ * 		const progressView = progressNode.addComponent(UIProgressView);
+ * 		progressView.setRange(0, 100);
+ * 		progressView.setValue(65);
+ * 		progressView.setTrackColor(new Color(0.2, 0.2, 0.25, 1));
+ * 		progressView.setFillColor(new Color(0.3, 0.8, 0.5, 1));
+ * 		progressView.setCornerRadius(12);
+ * 		const ratio = progressView.getRatio();
+ * 		console.log(ratio);
+ * 		const root = this.getRoot();
+ * 		root.addChild(progressNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ProgressScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIProgressView extends UIView {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -58,12 +89,24 @@ export class UIProgressView extends UIView {
 	}
 
 	//==============================================================================
+	// 내용 영역 안에서만 그리는지 반환. (트랙과 채움은 내용 크기의 사각형 안만 칠한다, 화면 밖과 자르기 밖 거르기가 쓴다)
+	// - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { boolean } 내용 영역 안에서만 그리면 참.
+	 */
+	isDrawnInsideContent() {
+		return this.draw === UIProgressView.prototype.draw;
+	}
+
+	//==============================================================================
 	// 출력. (트랙 + 채움. 트랙은 UIView.backgroundColor 사용)
 	// - cornerRadius 처리를 위해 super.draw 를 호출하지 않고 직접 그린다.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽. (노드 로컬 좌표, 내용 영역 왼쪽 위가 원점)
 	 */
 	draw(graphic) {
 		const node = this.getNode();
@@ -138,7 +181,7 @@ export class UIProgressView extends UIView {
 	// 0~1 비율 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 범위 안에서 값의 비율. (0 ~ 1, 범위가 0 이하면 0)
 	 */
 	getRatio() {
 		const range = this.#maxValue - this.#minValue;
@@ -153,7 +196,7 @@ export class UIProgressView extends UIView {
 	// 값 설정.
 	//==============================================================================
 	/**
-	 * @param { number } value
+	 * @param { number } value 값. (최소 ~ 최대로 자른다)
 	 */
 	setValue(value) {
 		this.#value = Math.clamp(value, this.#minValue, this.#maxValue);
@@ -163,7 +206,7 @@ export class UIProgressView extends UIView {
 	// 값 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 범위로 자른 값.
 	 */
 	getValue() {
 		return this.#value;
@@ -173,8 +216,8 @@ export class UIProgressView extends UIView {
 	// 최소~최대 값 범위 설정.
 	//==============================================================================
 	/**
-	 * @param { number } minValue
-	 * @param { number } maxValue
+	 * @param { number } minValue 최소 값. (비율 0)
+	 * @param { number } maxValue 최대 값. (비율 1, 최소 이하면 비율이 늘 0)
 	 */
 	setRange(minValue, maxValue) {
 		this.#minValue = minValue;
@@ -182,20 +225,38 @@ export class UIProgressView extends UIView {
 		this.setValue(this.#value);
 	}
 
+	//==============================================================================
+	// 최소 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 범위의 최소 값.
+	 */
 	getMinValue() { return this.#minValue; }
+
+	//==============================================================================
+	// 최대 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 범위의 최대 값.
+	 */
 	getMaxValue() { return this.#maxValue; }
 
 	//==============================================================================
-	// 트랙 색. (UIView.backgroundColor 의 alias)
+	// 반대편 값 설정. (null 이면 끔, 진행 방향의 반대쪽 끝에서 차오른다)
 	//==============================================================================
 	/**
-	 * @param { Color } color
-	 */
-	//==============================================================================
-	// 반대편 값 설정. (null 이면 끔 — 진행 방향의 반대쪽 끝에서 차오른다)
-	//==============================================================================
-	/**
-	 * @param { number | null } secondaryValue
+	 * @param { number | null } secondaryValue 반대편 값. (최소 ~ 최대로 자른다, null 이면 끈다)
+	 * @example <caption>한 막대에 양쪽 점유율 보이기</caption>
+	 * import { UIProgressView, Color } from "./build/vanilla.js";
+	 *
+	 * const progressView = new UIProgressView();
+	 * progressView.setRange(0, 100);
+	 * progressView.setValue(40);
+	 * progressView.setSecondaryValue(35);
+	 * progressView.setSecondaryFillColor(new Color(0.94, 0.33, 0.31, 1));
+	 * const secondaryValue = progressView.getSecondaryValue();
+	 * console.log(secondaryValue);
+	 * progressView.setSecondaryValue(null);
 	 */
 	setSecondaryValue(secondaryValue) {
 		this.#secondaryValue = (secondaryValue === null) ? null : Math.clamp(secondaryValue, this.#minValue, this.#maxValue);
@@ -205,7 +266,7 @@ export class UIProgressView extends UIView {
 	// 반대편 값 반환.
 	//==============================================================================
 	/**
-	 * @returns { number | null }
+	 * @returns { number | null } 반대편 값. (끈 상태면 null)
 	 */
 	getSecondaryValue() {
 		return this.#secondaryValue;
@@ -215,9 +276,10 @@ export class UIProgressView extends UIView {
 	// 반대편 채움 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color | string } color 반대편 채움 색. (복제하지 않고 그대로 쥔다)
 	 */
 	setSecondaryFillColor(color) {
+		color = Color.from(color);
 		this.#secondaryFillColor = color;
 	}
 
@@ -225,47 +287,83 @@ export class UIProgressView extends UIView {
 	// 반대편 채움 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 반대편 채움 색.
 	 */
 	getSecondaryFillColor() {
 		return this.#secondaryFillColor;
 	}
 
+	//==============================================================================
+	// 트랙 색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color | string } color 트랙 색. (UIView 의 배경 색으로 넣는다)
+	 */
 	setTrackColor(color) {
+		color = Color.from(color);
 		this.setBackgroundColor(color);
 	}
+
+	//==============================================================================
+	// 트랙 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 트랙 색. (UIView 의 배경 색)
+	 */
 	getTrackColor() { return this.getBackgroundColor(); }
 
 	//==============================================================================
 	// 채움 색.
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color | string } color 채움 색. (복제하지 않고 그대로 쥔다)
 	 */
 	setFillColor(color) {
+		color = Color.from(color);
 		this.#fillColor = color;
 	}
+
+	//==============================================================================
+	// 채움 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 채움 색.
+	 */
 	getFillColor() { return this.#fillColor; }
 
 	//==============================================================================
 	// 라운드 코너 반지름.
 	//==============================================================================
 	/**
-	 * @param { number } radius
+	 * @param { number } radius 반지름. (픽셀, 0 이하면 네모로 그린다)
 	 */
 	setCornerRadius(radius) {
 		this.#cornerRadius = radius;
 	}
+
+	//==============================================================================
+	// 라운드 코너 반지름 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 반지름. (픽셀)
+	 */
 	getCornerRadius() { return this.#cornerRadius; }
 
 	//==============================================================================
 	// 방향. (ProgressDirection.horizontal / vertical)
 	//==============================================================================
 	/**
-	 * @param { string } direction
+	 * @param { string } direction "horizontal" 이면 왼쪽에서 오른쪽, "vertical" 이면 아래에서 위로 채운다.
 	 */
 	setDirection(direction) {
 		this.#direction = direction;
 	}
+
+	//==============================================================================
+	// 방향 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } "horizontal" 이나 "vertical".
+	 */
 	getDirection() { return this.#direction; }
 }

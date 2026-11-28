@@ -19,6 +19,32 @@ import * as Math from "../base/math.js";
 //     scene.getRoot().addChild(floatingText);
 //     floatingText.spawn("-120", position, { color: new Color(1, 0.4, 0.4, 1) });
 //==============================================================================
+/**
+ * @example <caption>누른 자리에 피해 숫자 띄우기</caption>
+ * import { Engine, EngineConfiguration, Scene, FloatingText, Vector2, Color } from "./build/vanilla.js";
+ *
+ * const floatingText = new FloatingText();
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const root = this.getRoot();
+ * 		root.addChild(floatingText);
+ * 		floatingText.spawn("-120", Vector2.create(320, 180), { color: new Color(1, 0.4, 0.4, 1) });
+ * 		floatingText.spawn("+5", Vector2.create(200, 220), { fontSize: 30, duration: 1.2, jitter: 0 });
+ * 		console.log(floatingText.getActiveCount());
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		super.touchPress(viewInputPosition);
+ * 		floatingText.spawn("+1", viewInputPosition);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class FloatingText extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -42,8 +68,8 @@ export class FloatingText extends WorldNode {
 	// 텍스트 띄우기.
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @param { Vector2 } worldPosition
+	 * @param { string } text 띄울 글.
+	 * @param { Vector2 } worldPosition 띄울 자리. (이 노드의 지역 좌표로 놓는다, 씬 뿌리에 붙였으면 월드 좌표, 가로로 jitter 만큼 흔든다)
 	 * @param { object } options { color?, fontSize = 22, rise = 46, duration = 0.8, jitter = 10, bold = true }
 	 */
 	spawn(text, worldPosition, options = {}) {
@@ -91,7 +117,7 @@ export class FloatingText extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -114,7 +140,7 @@ export class FloatingText extends WorldNode {
 	// 떠 있는 항목 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 떠 있는 항목 수.
 	 */
 	getActiveCount() {
 		return this.#activeList.length;

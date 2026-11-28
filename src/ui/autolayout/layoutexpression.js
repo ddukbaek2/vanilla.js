@@ -13,6 +13,28 @@ import { LayoutRelation } from "./layoutrelation.js";
 // - equalTo / lessThanOrEqualTo / greaterThanOrEqualTo 는 LayoutConstraint 를 반환.
 // - 인자는 number / LayoutVariable / LayoutTerm / LayoutExpression 중 하나를 받는다.
 //==============================================================================
+/**
+ * @example <caption>왼쪽과 너비로 가운데 식을 만들어 풀기</caption>
+ * import { LayoutSolver, LayoutVariable, LayoutExpression } from "./build/vanilla.js";
+ *
+ * const solver = new LayoutSolver();
+ * const left = new LayoutVariable("left");
+ * const width = new LayoutVariable("width");
+ * const leftExpression = LayoutExpression.fromVariable(left);
+ * const widthExpression = LayoutExpression.fromVariable(width);
+ * const halfWidthExpression = widthExpression.divide(2);
+ * const centerExpression = leftExpression.add(halfWidthExpression);
+ * const leftConstraint = leftExpression.equalTo(40);
+ * const widthConstraint = widthExpression.greaterThanOrEqualTo(120);
+ * const centerConstraint = centerExpression.equalTo(200);
+ * solver.addConstraint(leftConstraint);
+ * solver.addConstraint(widthConstraint);
+ * solver.addConstraint(centerConstraint);
+ * solver.updateVariables();
+ * const widthValue = width.getValue();
+ * const centerValue = centerExpression.getValue();
+ * console.log(widthValue, centerValue);
+ */
 export class LayoutExpression {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -27,8 +49,8 @@ export class LayoutExpression {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { LayoutTerm[] } [terms]
-	 * @param { number } [constant]
+	 * @param { LayoutTerm[] } [terms] 항 목록. (사본을 갖고, 배열이 아니면 빈 목록)
+	 * @param { number } [constant] 상수항. (숫자가 아니면 0)
 	 */
 	constructor(terms, constant) {
 		this.#terms = System.Array.isArray(terms) ? terms.slice() : [];
@@ -39,8 +61,8 @@ export class LayoutExpression {
 	// 정적 팩토리: 단일 LayoutVariable 로부터 식 생성. (1 * variable + 0)
 	//==============================================================================
 	/**
-	 * @param { LayoutVariable } variable
-	 * @returns { LayoutExpression }
+	 * @param { LayoutVariable } variable 식으로 만들 변수.
+	 * @returns { LayoutExpression } 1 * variable + 0 인 새 식.
 	 */
 	static fromVariable(variable) {
 		const term = new LayoutTerm(variable, 1.0);
@@ -52,8 +74,8 @@ export class LayoutExpression {
 	// 정적 팩토리: 상수만 가진 식 생성.
 	//==============================================================================
 	/**
-	 * @param { number } value
-	 * @returns { LayoutExpression }
+	 * @param { number } value 상수항.
+	 * @returns { LayoutExpression } 항 없이 상수항만 가진 새 식.
 	 */
 	static fromConstant(value) {
 		const expression = new LayoutExpression([], value);
@@ -65,8 +87,20 @@ export class LayoutExpression {
 	// LayoutExpression 으로 정규화.
 	//==============================================================================
 	/**
-	 * @param { * } input
-	 * @returns { LayoutExpression }
+	 * @param { * } input number, LayoutVariable, LayoutTerm, LayoutExpression 가운데 하나. (그 밖이면 예외)
+	 * @returns { LayoutExpression } 식. (LayoutExpression 이면 그것 그대로, 아니면 새 식)
+	 * @example <caption>여러 꼴의 입력을 식으로 바꾸기</caption>
+	 * import { LayoutVariable, LayoutTerm, LayoutExpression } from "./build/vanilla.js";
+	 *
+	 * const width = new LayoutVariable("width");
+	 * const doubleWidth = new LayoutTerm(width, 2);
+	 * const fromNumber = LayoutExpression.toExpression(8);
+	 * const fromVariable = LayoutExpression.toExpression(width);
+	 * const fromTerm = LayoutExpression.toExpression(doubleWidth);
+	 * const sameExpression = LayoutExpression.toExpression(fromVariable);
+	 * const isNumberConstant = fromNumber.isConstant();
+	 * const termList = fromTerm.getTerms();
+	 * console.log(isNumberConstant, termList.length, sameExpression === fromVariable);
 	 */
 	static toExpression(input) {
 		if (input instanceof LayoutExpression) {
@@ -88,7 +122,7 @@ export class LayoutExpression {
 	// 항 배열 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutTerm[] }
+	 * @returns { LayoutTerm[] } 항 목록. (사본이 아닌 원본)
 	 */
 	getTerms() {
 		return this.#terms;
@@ -98,7 +132,7 @@ export class LayoutExpression {
 	// 상수항 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 상수항.
 	 */
 	getConstant() {
 		return this.#constant;
@@ -108,7 +142,7 @@ export class LayoutExpression {
 	// 항이 없는지 (= 상수항만 있는지) 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 항이 없으면 참.
 	 */
 	isConstant() {
 		const terms = this.getTerms();
@@ -119,7 +153,7 @@ export class LayoutExpression {
 	// 평가값 (sum(term.value) + constant) 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 항 값의 합에 상수항을 더한 값. (변수 값은 마지막 updateVariables 기준)
 	 */
 	getValue() {
 		let result = this.getConstant();
@@ -134,8 +168,19 @@ export class LayoutExpression {
 	// 산술: 덧셈.
 	//==============================================================================
 	/**
-	 * @param { * } input
-	 * @returns { LayoutExpression }
+	 * @param { * } input 더할 값. (number, LayoutVariable, LayoutTerm, LayoutExpression)
+	 * @returns { LayoutExpression } 더한 새 식. (같은 변수의 항도 합치지 않고 이어 붙인다)
+	 * @example <caption>오른쪽 끝 식 만들기</caption>
+	 * import { LayoutVariable, LayoutExpression } from "./build/vanilla.js";
+	 *
+	 * const left = new LayoutVariable("left");
+	 * const width = new LayoutVariable("width");
+	 * const leftExpression = LayoutExpression.fromVariable(left);
+	 * const rightExpression = leftExpression.add(width);
+	 * const paddedExpression = rightExpression.add(8);
+	 * const termList = paddedExpression.getTerms();
+	 * const constant = paddedExpression.getConstant();
+	 * console.log(termList.length, constant);
 	 */
 	add(input) {
 		const otherExpression = LayoutExpression.toExpression(input);
@@ -155,8 +200,8 @@ export class LayoutExpression {
 	// 산술: 뺄셈.
 	//==============================================================================
 	/**
-	 * @param { * } input
-	 * @returns { LayoutExpression }
+	 * @param { * } input 뺄 값. (number, LayoutVariable, LayoutTerm, LayoutExpression)
+	 * @returns { LayoutExpression } 뺀 새 식.
 	 */
 	subtract(input) {
 		const otherExpression = LayoutExpression.toExpression(input);
@@ -170,8 +215,8 @@ export class LayoutExpression {
 	// - 변수×변수 같은 비선형 곱은 지원하지 않는다 (선형 시스템 한정).
 	//==============================================================================
 	/**
-	 * @param { number } coefficient
-	 * @returns { LayoutExpression }
+	 * @param { number } coefficient 곱할 수. (number 가 아니면 예외)
+	 * @returns { LayoutExpression } 모든 항의 계수와 상수항에 곱한 새 식.
 	 */
 	multiply(coefficient) {
 		if (typeof coefficient !== "number") {
@@ -194,8 +239,8 @@ export class LayoutExpression {
 	// 산술: 나눗셈 (스칼라).
 	//==============================================================================
 	/**
-	 * @param { number } denominator
-	 * @returns { LayoutExpression }
+	 * @param { number } denominator 나눌 수. (number 가 아니거나 0 이면 예외)
+	 * @returns { LayoutExpression } 1 / denominator 를 곱한 새 식.
 	 */
 	divide(denominator) {
 		if (typeof denominator !== "number") {
@@ -212,8 +257,8 @@ export class LayoutExpression {
 	// 비교: 동등 제약 생성. (this == input)
 	//==============================================================================
 	/**
-	 * @param { * } input
-	 * @returns { import("./layoutconstraint.js").LayoutConstraint }
+	 * @param { * } input 오른쪽 값. (number, LayoutVariable, LayoutTerm, LayoutExpression)
+	 * @returns { import("./layoutconstraint.js").LayoutConstraint } this - input == 0 인 required 제약.
 	 */
 	equalTo(input) {
 		const otherExpression = LayoutExpression.toExpression(input);
@@ -227,8 +272,8 @@ export class LayoutExpression {
 	// 비교: 작거나 같음 제약 생성. (this <= input)
 	//==============================================================================
 	/**
-	 * @param { * } input
-	 * @returns { import("./layoutconstraint.js").LayoutConstraint }
+	 * @param { * } input 오른쪽 값. (number, LayoutVariable, LayoutTerm, LayoutExpression)
+	 * @returns { import("./layoutconstraint.js").LayoutConstraint } this - input <= 0 인 required 제약.
 	 */
 	lessThanOrEqualTo(input) {
 		const otherExpression = LayoutExpression.toExpression(input);
@@ -242,8 +287,8 @@ export class LayoutExpression {
 	// 비교: 크거나 같음 제약 생성. (this >= input)
 	//==============================================================================
 	/**
-	 * @param { * } input
-	 * @returns { import("./layoutconstraint.js").LayoutConstraint }
+	 * @param { * } input 오른쪽 값. (number, LayoutVariable, LayoutTerm, LayoutExpression)
+	 * @returns { import("./layoutconstraint.js").LayoutConstraint } this - input >= 0 인 required 제약.
 	 */
 	greaterThanOrEqualTo(input) {
 		const otherExpression = LayoutExpression.toExpression(input);
@@ -259,6 +304,9 @@ export class LayoutExpression {
 // LayoutConstraint 와의 순환 import 방지를 위한 lazy 로더.
 //==============================================================================
 let cachedLayoutConstraintModule = null;
+//==============================================================================
+// LayoutConstraint 모듈 반환. (첫 호출 때 받아 cachedLayoutConstraintModule 에 담아 둔다)
+//==============================================================================
 function layoutConstraintModule() {
 	if (cachedLayoutConstraintModule === null) {
 		cachedLayoutConstraintModule = require_layoutconstraint();
@@ -272,6 +320,9 @@ function layoutConstraintModule() {
 // 라서 정적 import 를 따로 두고 첫 호출 시 그 참조를 캐시한다.
 //==============================================================================
 import * as LayoutConstraintNamespace from "./layoutconstraint.js";
+//==============================================================================
+// 정적으로 들여온 LayoutConstraint 모듈 이름 공간 반환.
+//==============================================================================
 function require_layoutconstraint() {
 	return LayoutConstraintNamespace;
 }

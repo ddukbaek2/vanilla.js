@@ -7,8 +7,20 @@ import * as Math from "./math.js";
 
 
 //==============================================================================
-// 쿼터니언. (3차원 회전 — 골격 애니메이션 보간의 기본 단위)
+// 쿼터니언. (3차원 회전, 골격 애니메이션 보간의 기본 단위)
 //==============================================================================
+/**
+ * @example <caption>두 회전 사이를 보간해 방향 돌리기</caption>
+ * import { Quaternion, Matrix4 } from "./build/vanilla.js";
+ *
+ * const start = Quaternion.identity();
+ * const end = Quaternion.createFromEuler(0, Math.PI / 2, 0);
+ * const halfway = Quaternion.slerp(start, end, 0.5);
+ * console.log(halfway.x, halfway.y, halfway.z, halfway.w);
+ * const rotation = Matrix4.createRotationFromQuaternion(halfway);
+ * const direction = rotation.transformDirection(0, 0, 1);
+ * console.log(direction.x, direction.y, direction.z);
+ */
 export class Quaternion extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -38,7 +50,7 @@ export class Quaternion extends Object {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { this }
+	 * @returns { this } 성분이 같은 새 쿼터니언.
 	 */
 	clone() {
 		const obj = /** @type { this } */ (Quaternion.create(this.x, this.y, this.z, this.w));
@@ -61,7 +73,7 @@ export class Quaternion extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } X 성분.
 	 */
 	get x() {
 		return this.#x;
@@ -83,7 +95,7 @@ export class Quaternion extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } Y 성분.
 	 */
 	get y() {
 		return this.#y;
@@ -105,7 +117,7 @@ export class Quaternion extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } Z 성분.
 	 */
 	get z() {
 		return this.#z;
@@ -127,7 +139,7 @@ export class Quaternion extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } W 성분.
 	 */
 	get w() {
 		return this.#w;
@@ -137,10 +149,10 @@ export class Quaternion extends Object {
 	// 대입.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @param { number } w
+	 * @param { number } x X 성분.
+	 * @param { number } y Y 성분.
+	 * @param { number } z Z 성분.
+	 * @param { number } w W 성분.
 	 */
 	set(x, y, z, w) {
 		this.x = x;
@@ -153,7 +165,7 @@ export class Quaternion extends Object {
 	// 정규화.
 	//==============================================================================
 	/**
-	 * @returns { Quaternion }
+	 * @returns { Quaternion } 길이를 1 로 맞춘 새 쿼터니언. (길이가 0 이면 단위 쿼터니언)
 	 */
 	normalize() {
 		const length = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
@@ -169,8 +181,8 @@ export class Quaternion extends Object {
 	// 곱하기. (this 회전 뒤에 other 회전을 로컬로 누적)
 	//==============================================================================
 	/**
-	 * @param { Quaternion } other
-	 * @returns { Quaternion }
+	 * @param { Quaternion } other 뒤에 이을 회전.
+	 * @returns { Quaternion } 두 회전을 합친 새 쿼터니언. (this × other)
 	 */
 	multiply(other) {
 		const resultX = this.w * other.x + this.x * other.w + this.y * other.z - this.z * other.y;
@@ -185,11 +197,11 @@ export class Quaternion extends Object {
 	// 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @param { number } w
-	 * @returns { Quaternion }
+	 * @param { number } x X 성분.
+	 * @param { number } y Y 성분.
+	 * @param { number } z Z 성분.
+	 * @param { number } w W 성분.
+	 * @returns { Quaternion } 새 쿼터니언.
 	 */
 	static create(x, y, z, w) {
 		const quaternion = new Quaternion();
@@ -201,7 +213,7 @@ export class Quaternion extends Object {
 	// 단위 쿼터니언 생성. (정적)
 	//==============================================================================
 	/**
-	 * @returns { Quaternion }
+	 * @returns { Quaternion } 회전이 없는 (0, 0, 0, 1) 쿼터니언.
 	 */
 	static identity() {
 		const quaternion = Quaternion.create(0.0, 0.0, 0.0, 1.0);
@@ -209,13 +221,13 @@ export class Quaternion extends Object {
 	}
 
 	//==============================================================================
-	// 오일러 각으로 생성. (정적 — XYZ 순서 라디안)
+	// 오일러 각으로 생성. (정적, XYZ 순서 라디안)
 	//==============================================================================
 	/**
-	 * @param { number } xRadian
-	 * @param { number } yRadian
-	 * @param { number } zRadian
-	 * @returns { Quaternion }
+	 * @param { number } xRadian X 축 회전. (라디안)
+	 * @param { number } yRadian Y 축 회전. (라디안)
+	 * @param { number } zRadian Z 축 회전. (라디안)
+	 * @returns { Quaternion } 회전 쿼터니언.
 	 */
 	static createFromEuler(xRadian, yRadian, zRadian) {
 		const halfX = xRadian * 0.5;
@@ -237,13 +249,13 @@ export class Quaternion extends Object {
 	}
 
 	//==============================================================================
-	// 구면 선형 보간. (정적 — 최단 경로)
+	// 구면 선형 보간. (정적, 최단 경로)
 	//==============================================================================
 	/**
-	 * @param { Quaternion } from
-	 * @param { Quaternion } to
-	 * @param { number } normalizedTime
-	 * @returns { Quaternion }
+	 * @param { Quaternion } from 시작 회전.
+	 * @param { Quaternion } to 끝 회전.
+	 * @param { number } normalizedTime 0 이면 from, 1 이면 to.
+	 * @returns { Quaternion } 보간해 정규화한 새 쿼터니언. (짧은 쪽으로 돈다)
 	 */
 	static slerp(from, to, normalizedTime) {
 		let dotProduct = from.x * to.x + from.y * to.y + from.z * to.z + from.w * to.w;

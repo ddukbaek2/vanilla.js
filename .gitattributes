@@ -1,0 +1,4 @@
+# 글 파일은 모든 기계에서 LF 로 받는다. (윈도우의 git 은 core.autocrlf 로 CRLF 로 바꿔 받아,
+# include_str! 과 node 가 그대로 읽는 시험 자료(UIDocument 기대값, 물리 comparison.txt 같은)가 두 엔진 사이, 기계 사이에서 글자까지 같지 않게 된다)
+# 이진 파일은 git 이 알아보아 바꾸지 않는다.
+* text=auto eol=lf

@@ -16,6 +16,41 @@ import { Vector2 } from "../base/vector2.js";
 //     body.setHorizontalBounds(40, 920);
 //     // 이동: body.setVelocityX(±speed), 도약: body.jump(-720)
 //==============================================================================
+/**
+ * @example <caption>오른쪽으로 걷다가 누르면 뛰어오르기</caption>
+ * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, PlatformerBody, Vector2, Pivot } from "./build/vanilla.js";
+ *
+ * const playerNode = new WorldNode();
+ * const paint = playerNode.addComponent(Paint);
+ * paint.setColor("#ffcc00");
+ * const platformerBody = playerNode.addComponent(PlatformerBody);
+ * platformerBody.setGroundY(300);
+ * platformerBody.setHorizontalBounds(40, 600);
+ * platformerBody.setVelocityX(120);
+ * platformerBody.setLandedEvent(() => {
+ * 	console.log("landed");
+ * });
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		playerNode.setPivot(Pivot.bottomCenter);
+ * 		playerNode.setLocalPosition(Vector2.create(80, 100));
+ * 		playerNode.setContentSize(Vector2.create(32, 48));
+ * 		const root = this.getRoot();
+ * 		root.addChild(playerNode);
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		super.touchPress(viewInputPosition);
+ * 		platformerBody.jump(-720);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class PlatformerBody extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -48,7 +83,7 @@ export class PlatformerBody extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -87,11 +122,26 @@ export class PlatformerBody extends Component {
 	}
 
 	//==============================================================================
-	// 도약. (접지 중일 때만 — 위쪽이 음수 속도)
+	// 도약. (접지 중일 때만, 위쪽이 음수 속도)
 	//==============================================================================
 	/**
 	 * @param { number } jumpSpeed 음수면 위로.
 	 * @returns { boolean } 도약 성공 여부.
+	 * @example <caption>엔진 없이 한 번 뛰어 가장 높이 오른 자리 재기</caption>
+	 * import { WorldNode, PlatformerBody } from "./build/vanilla.js";
+	 *
+	 * const node = new WorldNode();
+	 * const platformerBody = node.addComponent(PlatformerBody);
+	 * platformerBody.setGroundY(0);
+	 * platformerBody.tick(1 / 60);
+	 * console.log(platformerBody.isGrounded(), platformerBody.jump(-600));
+	 * let highestY = 0;
+	 * for (let frame = 0; frame < 60; ++frame) {
+	 * 	platformerBody.tick(1 / 60);
+	 * 	const position = node.getLocalPosition();
+	 * 	highestY = Math.min(highestY, position.y);
+	 * }
+	 * console.log(highestY.toFixed(1), platformerBody.isGrounded());
 	 */
 	jump(jumpSpeed) {
 		if (!this.#isGrounded) {
@@ -103,39 +153,57 @@ export class PlatformerBody extends Component {
 	}
 
 	//==============================================================================
-	// 접근자.
+	// 가로 속도 설정. (픽셀 / 초)
 	//==============================================================================
-	/** @param { number } velocityX */
+	/** @param { number } velocityX 가로 속도. (픽셀 / 초) */
 	setVelocityX(velocityX) {
 		this.#velocity = Vector2.create(velocityX, this.#velocity.y);
 	}
 
-	/** @param { number } velocityY */
+	//==============================================================================
+	// 세로 속도 설정. (픽셀 / 초, 아래쪽이 양수)
+	//==============================================================================
+	/** @param { number } velocityY 세로 속도. (픽셀 / 초, 위쪽이 음수) */
 	setVelocityY(velocityY) {
 		this.#velocity = Vector2.create(this.#velocity.x, velocityY);
 	}
 
-	/** @returns { Vector2 } */
+	//==============================================================================
+	// 속도 반환. (픽셀 / 초)
+	//==============================================================================
+	/** @returns { Vector2 } 속도. (픽셀 / 초, 아래쪽이 양수) */
 	getVelocity() {
 		return this.#velocity;
 	}
 
-	/** @param { number } gravity */
+	//==============================================================================
+	// 중력 가속도 설정. (픽셀 / 초², 아래쪽이 양수, 기본 2000)
+	//==============================================================================
+	/** @param { number } gravity 중력 가속도. (픽셀 / 초², 아래쪽이 양수) */
 	setGravity(gravity) {
 		this.#gravity = gravity;
 	}
 
-	/** @returns { number } */
+	//==============================================================================
+	// 중력 가속도 반환. (픽셀 / 초²)
+	//==============================================================================
+	/** @returns { number } 중력 가속도. (픽셀 / 초²) */
 	getGravity() {
 		return this.#gravity;
 	}
 
-	/** @param { number } groundY */
+	//==============================================================================
+	// 바닥 높이 설정. (노드가 이 Y 아래로 내려가지 않는다, 기본 0)
+	//==============================================================================
+	/** @param { number } groundY 바닥의 Y. (부모 기준 지역 좌표) */
 	setGroundY(groundY) {
 		this.#groundY = groundY;
 	}
 
-	/** @returns { number } */
+	//==============================================================================
+	// 바닥 높이 반환.
+	//==============================================================================
+	/** @returns { number } 바닥의 Y. (부모 기준 지역 좌표) */
 	getGroundY() {
 		return this.#groundY;
 	}
@@ -144,15 +212,18 @@ export class PlatformerBody extends Component {
 	// 좌우 이동 경계 설정. (null 이면 해당 방향 제한 없음)
 	//==============================================================================
 	/**
-	 * @param { number | null } leftBound
-	 * @param { number | null } rightBound
+	 * @param { number | null } leftBound 왼쪽 경계 X. (null 이면 제한 없음)
+	 * @param { number | null } rightBound 오른쪽 경계 X. (null 이면 제한 없음)
 	 */
 	setHorizontalBounds(leftBound, rightBound) {
 		this.#leftBound = leftBound;
 		this.#rightBound = rightBound;
 	}
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 바닥에 닿아 있는지 여부.
+	//==============================================================================
+	/** @returns { boolean } 바닥에 닿아 있으면 참. */
 	isGrounded() {
 		return this.#isGrounded;
 	}
@@ -161,7 +232,7 @@ export class PlatformerBody extends Component {
 	// 착지 알림 설정. (공중에서 바닥에 닿는 순간)
 	//==============================================================================
 	/**
-	 * @param { Function } landedEvent
+	 * @param { Function } landedEvent 공중에서 바닥에 닿는 순간 부를 함수. () => void
 	 */
 	setLandedEvent(landedEvent) {
 		this.#landedEvent = landedEvent;

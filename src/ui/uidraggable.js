@@ -18,6 +18,49 @@ import { WorldNode } from "../core/node/worldnode.js";
 //     draggable.setSnapBackEnabled(true);
 //     draggable.setDragEndEvent((self, viewPosition) => { ... });
 //==============================================================================
+/**
+ * @example <caption>칸에 놓으면 머물고 밖에 놓으면 돌아가는 카드</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIDraggable, WorldNode, Paint, Color, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class DragScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const root = this.getRoot();
+ *
+ * 		const slotNode = new WorldNode();
+ * 		slotNode.setPivot(Pivot.topLeft.clone());
+ * 		slotNode.setAnchor(Pivot.topLeft.clone());
+ * 		slotNode.setContentSize(Vector2.create(140, 100));
+ * 		slotNode.setLocalPosition(Vector2.create(420, 130));
+ * 		const slotPaint = slotNode.addComponent(Paint);
+ * 		slotPaint.setColor(new Color(1, 1, 1, 0.1));
+ * 		root.addChild(slotNode);
+ *
+ * 		const cardNode = new WorldNode();
+ * 		cardNode.setPivot(Pivot.topLeft.clone());
+ * 		cardNode.setAnchor(Pivot.topLeft.clone());
+ * 		cardNode.setContentSize(Vector2.create(120, 80));
+ * 		cardNode.setLocalPosition(Vector2.create(80, 140));
+ * 		const cardPaint = cardNode.addComponent(Paint);
+ * 		cardPaint.setColor(new Color(0.36, 0.42, 1, 1));
+ * 		cardPaint.setRoundSize(8);
+ * 		const draggable = cardNode.addComponent(UIDraggable);
+ * 		draggable.setSnapBackEnabled(true);
+ * 		draggable.setDragEndEvent((self, viewPosition) => {
+ * 			if (slotNode.contains(viewPosition)) {
+ * 				self.settleHere();
+ * 			}
+ * 		});
+ * 		root.addChild(cardNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new DragScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIDraggable extends UIControl {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -57,7 +100,7 @@ export class UIDraggable extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { import("../core/node/componentnode.js").ComponentNode } node
+	 * @param { import("../core/node/componentnode.js").ComponentNode } node 붙을 노드. (WorldNode 면 setInteractable(true))
 	 */
 	attach(node) {
 		super.attach(node);
@@ -71,7 +114,7 @@ export class UIDraggable extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 		const node = this.getNode();
@@ -90,7 +133,7 @@ export class UIDraggable extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
 	 */
 	touchMove(viewInputPosition) {
 		if (!this.#isDragging) {
@@ -112,7 +155,7 @@ export class UIDraggable extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
 	 */
 	touchRelease(viewInputPosition) {
 		if (!this.#isDragging) {
@@ -132,7 +175,7 @@ export class UIDraggable extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
 	 */
 	touchCancel(viewInputPosition) {
 		this.touchRelease(viewInputPosition);
@@ -143,7 +186,7 @@ export class UIDraggable extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -165,7 +208,7 @@ export class UIDraggable extends UIControl {
 	}
 
 	//==============================================================================
-	// 지금 자리에 눌러앉기. (dragEnd 처리기에서 드롭 성공 시 호출 — 복귀를 멈춘다)
+	// 지금 자리에 눌러앉기. (dragEnd 처리기에서 드롭 성공 시 호출, 복귀를 멈춘다)
 	//==============================================================================
 	settleHere() {
 		const node = this.getNode();
@@ -188,37 +231,80 @@ export class UIDraggable extends UIControl {
 	//==============================================================================
 	// 설정 / 조회 메서드 목록.
 	//==============================================================================
-	/** @param { boolean } isSnapBackEnabled */
+
+	//==============================================================================
+	// 놓았을 때 잡기 전 자리로 돌아갈지 설정.
+	//==============================================================================
+	/** @param { boolean } isSnapBackEnabled 참이면 놓은 뒤 잡기 전 자리로 미끄러져 돌아간다. */
 	setSnapBackEnabled(isSnapBackEnabled) {
 		this.#isSnapBackEnabled = isSnapBackEnabled;
 	}
 
-	/** @param { number } snapBackSpeed */
+	//==============================================================================
+	// 되돌아가는 빠르기 설정. (기본 14)
+	//==============================================================================
+	/** @param { number } snapBackSpeed 초당 되돌아가는 비율 계수. (프레임마다 남은 거리의 이 값 곱하기 프레임 초 몫만큼 다가간다, 몫은 1 을 넘지 않는다) */
 	setSnapBackSpeed(snapBackSpeed) {
 		this.#snapBackSpeed = snapBackSpeed;
 	}
 
+	//==============================================================================
+	// 끌기 시작 처리기 설정. (누른 순간 한 번)
+	//==============================================================================
 	/** @param { Function } dragStartEvent (self) */
 	setDragStartEvent(dragStartEvent) {
 		this.#dragStartEvent = dragStartEvent;
 	}
 
+	//==============================================================================
+	// 끄는 중 처리기 설정. (노드를 옮긴 뒤 이동마다)
+	//==============================================================================
 	/** @param { Function } dragMoveEvent (self, viewPosition) */
 	setDragMoveEvent(dragMoveEvent) {
 		this.#dragMoveEvent = dragMoveEvent;
 	}
 
-	/** @param { Function } dragEndEvent (self, viewPosition) */
+	//==============================================================================
+	// 끌기 끝 처리기 설정. (뗐거나 취소됐을 때, 되돌아가기를 켠 뒤에 부른다)
+	// - 처리기 안에서 settleHere 를 부르면 그 자리에 머문다.
+	//==============================================================================
+	/**
+	 * @param { Function } dragEndEvent (self, viewPosition)
+	 * @example <caption>오른쪽 절반에 놓을 때만 머물기</caption>
+	 * import { UIDraggable, WorldNode, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const cardNode = new WorldNode();
+	 * cardNode.setLocalPosition(Vector2.create(100, 100));
+	 * const draggable = cardNode.addComponent(UIDraggable);
+	 * draggable.setSnapBackEnabled(true);
+	 * draggable.setDragEndEvent((self, viewPosition) => {
+	 * 	if (viewPosition.x > 320) {
+	 * 		self.settleHere();
+	 * 	}
+	 * });
+	 * draggable.touchPress(Vector2.create(110, 110));
+	 * draggable.touchMove(Vector2.create(160, 120));
+	 * draggable.touchRelease(Vector2.create(160, 120));
+	 * draggable.tick(1);
+	 * const localPosition = cardNode.getLocalPosition();
+	 * console.log(localPosition.x, localPosition.y);
+	 */
 	setDragEndEvent(dragEndEvent) {
 		this.#dragEndEvent = dragEndEvent;
 	}
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 끄는 중인지 반환.
+	//==============================================================================
+	/** @returns { boolean } 눌러서 끄는 중이면 참. (되돌아가는 중은 거짓) */
 	isDragging() {
 		return this.#isDragging;
 	}
 
-	/** @returns { Vector2 | null } */
+	//==============================================================================
+	// 잡기 전 자리 반환. (settleHere 를 불렀으면 그 자리)
+	//==============================================================================
+	/** @returns { Vector2 | null } 로컬 자리의 복사본. (한 번도 누르지 않았으면 null) */
 	getHomePosition() {
 		return this.#homePosition ? Vector2.create(this.#homePosition.x, this.#homePosition.y) : null;
 	}

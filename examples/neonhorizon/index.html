@@ -100,7 +100,7 @@
 		<div id="titleDivider"></div>
 		<div id="titleSub">VANILLA.JS</div>
 	</div>
-	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
+	<a id="homeLink" href="https://vanillapunch.com/tools/" target="_blank" rel="noopener">VANILLAPUNCH.COM</a>
 	<script type="module">
 	"use strict";
 	const System = globalThis;
@@ -1069,7 +1069,8 @@
 	try {
 		let engineModule = null;
 		try {
-			engineModule = await import("./vanilla.js");
+			// 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
+			engineModule = await import("./vanilla.js?v=20261126a");
 		}
 		catch (importError) {
 			engineModule = await import("../../build/vanilla.js");

@@ -19,6 +19,45 @@ import { ProgressDirection } from "./uiprogressview.js";
 //   속해야 하므로 UIProgressView 를 상속하지 않고 직접 그린다.
 // - thumb 까지 추가로 그린다.
 //==============================================================================
+/**
+ * @example <caption>음량 슬라이더 만들기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UISlider, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class MainScene extends UIScene {
+ * 	constructor() {
+ * 		super();
+ * 		this.setLoadingMinDurationMs(0);
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const sliderNode = new WorldNode();
+ * 		sliderNode.setPivot(Pivot.topLeft);
+ * 		sliderNode.setAnchor(Pivot.topLeft);
+ * 		sliderNode.setLocalPosition(Vector2.create(40, 60));
+ * 		sliderNode.setContentSize(Vector2.create(240, 24));
+ * 		const slider = sliderNode.addComponent(UISlider);
+ * 		slider.setRange(0, 100);
+ * 		slider.setValue(50);
+ * 		slider.setTrackThickness(6);
+ * 		slider.setCornerRadius(3);
+ * 		slider.setThumbRadius(12);
+ * 		slider.setValueChangedEvent((changedSlider) => {
+ * 			console.log("volume", changedSlider.getValue());
+ * 		});
+ * 		const root = this.getRoot();
+ * 		root.addChild(sliderNode);
+ * 		console.log(slider.getValue(), slider.getRatio());
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "mainCanvas";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class UISlider extends UIControl {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -65,7 +104,7 @@ export class UISlider extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 붙을 노드.
 	 */
 	attach(node) {
 		super.attach(node);
@@ -79,7 +118,7 @@ export class UISlider extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		const node = this.getNode();
@@ -156,10 +195,60 @@ export class UISlider extends UIControl {
 	}
 
 	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (오버라이드: 트랙과 채움은 내용 영역 안, 손잡이 원은 값이 움직이는 줄 전체에 반지름만큼 넘친다)
+	// - 값에 따라 움직이는 손잡이가 어디에 있든 품도록 값과 상관없는 사각형을 알린다. (값을 바꿔도 경계를 다시 셈하지 않는다)
+	// - 손잡이 노드를 정했으면 원을 그리지 않으므로 내용 영역만. 가장자리 매끄럽게 하기만큼 한 단위씩 넓혀 본다.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } 노드에 붙어 있으면 참.
+	 * @example <caption>손잡이 원이 넘치는 만큼 보기</caption>
+	 * import { WorldNode, UISlider, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const sliderNode = new WorldNode();
+	 * sliderNode.setContentSize(Vector2.create(200, 8));
+	 * const slider = sliderNode.addComponent(UISlider);
+	 * slider.setThumbRadius(12);
+	 * const drawnRect = Rect.zero();
+	 * slider.calculateDrawnRect(drawnRect);
+	 * console.log(drawnRect.position.x, drawnRect.position.y, drawnRect.size.x, drawnRect.size.y);
+	 */
+	calculateDrawnRect(rect) {
+		const node = this.getNode();
+		if (!node) {
+			return false;
+		}
+		const contentSize = node.getContentSize();
+		let minimumX = 0;
+		let minimumY = 0;
+		let maximumX = contentSize.x;
+		let maximumY = contentSize.y;
+		if (this.#thumbNode === null && this.#thumbRadius > 0) {
+			const thumbRadius = this.#thumbRadius;
+			if (this.#direction === ProgressDirection.vertical) {
+				minimumX = System.Math.min(minimumX, contentSize.x * 0.5 - thumbRadius);
+				maximumX = System.Math.max(maximumX, contentSize.x * 0.5 + thumbRadius);
+				minimumY = System.Math.min(minimumY, -thumbRadius);
+				maximumY = System.Math.max(maximumY, contentSize.y + thumbRadius);
+			}
+			else {
+				minimumX = System.Math.min(minimumX, -thumbRadius);
+				maximumX = System.Math.max(maximumX, contentSize.x + thumbRadius);
+				minimumY = System.Math.min(minimumY, contentSize.y * 0.5 - thumbRadius);
+				maximumY = System.Math.max(maximumY, contentSize.y * 0.5 + thumbRadius);
+			}
+		}
+		rect.position.set(minimumX - 1, minimumY - 1);
+		rect.size.set(maximumX - minimumX + 2, maximumY - minimumY + 2);
+		return true;
+	}
+
+	//==============================================================================
 	// 터치 누름.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 		if (!this.#isInteractable) {
@@ -173,7 +262,7 @@ export class UISlider extends UIControl {
 	// 터치 이동.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 옮긴 자리. (뷰 좌표)
 	 */
 	touchMove(viewInputPosition) {
 		if (!this.#isDragging) {
@@ -186,7 +275,7 @@ export class UISlider extends UIControl {
 	// 터치 뗌.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (뷰 좌표)
 	 */
 	touchRelease(viewInputPosition) {
 		if (!this.#isDragging) {
@@ -200,7 +289,7 @@ export class UISlider extends UIControl {
 	// 터치 취소.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 취소된 때의 자리. (뷰 좌표)
 	 */
 	touchCancel(viewInputPosition) {
 		this.#isDragging = false;
@@ -249,7 +338,7 @@ export class UISlider extends UIControl {
 	// 값/범위/비율.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 범위 안에서 값의 비율. (0 ~ 1, 범위가 0 이하면 0)
 	 */
 	getRatio() {
 		const range = this.#maxValue - this.#minValue;
@@ -260,22 +349,46 @@ export class UISlider extends UIControl {
 		return Math.clamp(r, 0, 1);
 	}
 
-	/** @param { number } value */
+	//==============================================================================
+	// 값 설정. (범위 안으로 자른다, 값 바뀜 이벤트는 부르지 않는다)
+	//==============================================================================
+	/** @param { number } value 새 값. (minValue ~ maxValue) */
 	setValue(value) {
 		this.#value = Math.clamp(value, this.#minValue, this.#maxValue);
 	}
+	//==============================================================================
+	// 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 지금 값. (기본 0)
+	 */
 	getValue() { return this.#value; }
 
+	//==============================================================================
+	// 범위 설정. (지금 값도 새 범위 안으로 자른다)
+	//==============================================================================
 	/**
-	 * @param { number } minValue
-	 * @param { number } maxValue
+	 * @param { number } minValue 가장 작은 값. (기본 0)
+	 * @param { number } maxValue 가장 큰 값. (기본 1)
 	 */
 	setRange(minValue, maxValue) {
 		this.#minValue = minValue;
 		this.#maxValue = maxValue;
 		this.setValue(this.#value);
 	}
+	//==============================================================================
+	// 가장 작은 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 가장 작은 값.
+	 */
 	getMinValue() { return this.#minValue; }
+	//==============================================================================
+	// 가장 큰 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 가장 큰 값.
+	 */
 	getMaxValue() { return this.#maxValue; }
 
 	//==============================================================================
@@ -288,46 +401,174 @@ export class UISlider extends UIControl {
 	}
 
 	//==============================================================================
-	// 색상.
+	// 트랙 색 설정.
 	//==============================================================================
-	/** @param { Color } color */ setTrackColor(color) { this.#trackColor = color; }
+	/** @param { Color | string } color 트랙 색. (기본 new Color(0.7, 0.7, 0.7, 1)) */ setTrackColor(color) { this.#trackColor = Color.from(color); }
+	//==============================================================================
+	// 트랙 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 트랙 색.
+	 */
 	getTrackColor() { return this.#trackColor; }
 
-	/** @param { Color } color */ setFillColor(color) { this.#fillColor = color; }
+	//==============================================================================
+	// 채움 색 설정.
+	//==============================================================================
+	/** @param { Color | string } color 값까지 채우는 색. (기본 new Color(0.23, 0.51, 0.96, 1)) */ setFillColor(color) { this.#fillColor = Color.from(color); }
+	//==============================================================================
+	// 채움 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 채움 색.
+	 */
 	getFillColor() { return this.#fillColor; }
 
-	/** @param { Color } color */ setThumbColor(color) { this.#thumbColor = color; }
+	//==============================================================================
+	// 손잡이 색 설정.
+	//==============================================================================
+	/** @param { Color | string } color 손잡이 원의 색. (기본 흰색, 손잡이 노드를 정했으면 쓰지 않는다) */ setThumbColor(color) { this.#thumbColor = Color.from(color); }
+	//==============================================================================
+	// 손잡이 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 손잡이 원의 색.
+	 */
 	getThumbColor() { return this.#thumbColor; }
 
 	//==============================================================================
-	// 모양.
+	// 손잡이 반지름 설정.
 	//==============================================================================
-	/** @param { number } radius */ setThumbRadius(radius) { this.#thumbRadius = radius; }
+	/** @param { number } radius 손잡이 원의 반지름. (기본 16, 손잡이 노드를 정했으면 쓰지 않는다) */ setThumbRadius(radius) { this.#thumbRadius = radius; this.markDrawnRectDirty(); }
+	//==============================================================================
+	// 손잡이 반지름 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 손잡이 원의 반지름.
+	 */
 	getThumbRadius() { return this.#thumbRadius; }
 
-	/** @param { number } thickness */ setTrackThickness(thickness) { this.#trackThickness = thickness; }
+	//==============================================================================
+	// 트랙 두께 설정. (노드 가운데에 이 두께로 그린다)
+	//==============================================================================
+	/** @param { number } thickness 트랙 두께. (0 이하면 노드 전체, 기본 0) */ setTrackThickness(thickness) { this.#trackThickness = thickness; }
+	//==============================================================================
+	// 트랙 두께 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 트랙 두께. (0 이면 노드 전체)
+	 */
 	getTrackThickness() { return this.#trackThickness; }
 
-	/** @param { WorldNode } node */ setThumbNode(node) { this.#thumbNode = node; }
+	//==============================================================================
+	// 손잡이 노드 설정. (정하면 원을 그리지 않고 이 노드를 손잡이 자리로 옮긴다)
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node 손잡이로 쓸 노드. (슬라이더 노드의 자식, 왼쪽 위 피봇과 앵커로 둔다, null 이면 원을 그린다)
+	 * @example <caption>그림 노드를 손잡이로 쓰기</caption>
+	 * import { Engine, EngineConfiguration, UIScene, UISlider, Paint, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends UIScene {
+	 * 	constructor() {
+	 * 		super();
+	 * 		this.setLoadingMinDurationMs(0);
+	 * 	}
+	 *
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const sliderNode = new WorldNode();
+	 * 		sliderNode.setPivot(Pivot.topLeft);
+	 * 		sliderNode.setAnchor(Pivot.topLeft);
+	 * 		sliderNode.setLocalPosition(Vector2.create(40, 60));
+	 * 		sliderNode.setContentSize(Vector2.create(240, 24));
+	 * 		const slider = sliderNode.addComponent(UISlider);
+	 * 		slider.setTrackThickness(4);
+	 *
+	 * 		const thumbNode = new WorldNode();
+	 * 		thumbNode.setPivot(Pivot.topLeft);
+	 * 		thumbNode.setAnchor(Pivot.topLeft);
+	 * 		thumbNode.setContentSize(Vector2.create(20, 28));
+	 * 		const thumbPaint = thumbNode.addComponent(Paint);
+	 * 		thumbPaint.setColor(new Color(1, 0.6, 0.2, 1));
+	 * 		thumbPaint.setRoundSize(6);
+	 * 		sliderNode.addChild(thumbNode);
+	 * 		slider.setThumbNode(thumbNode);
+	 * 		slider.setValue(0.3);
+	 *
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(sliderNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.canvasId = "mainCanvas";
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * engineConfiguration.autoResizeOnWindowResize = true;
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	setThumbNode(node) { this.#thumbNode = node; this.markDrawnRectDirty(); }
+	//==============================================================================
+	// 손잡이 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 손잡이 노드. (없으면 null)
+	 */
 	getThumbNode() { return this.#thumbNode; }
 
-	/** @param { number } radius */ setCornerRadius(radius) { this.#cornerRadius = radius; }
+	//==============================================================================
+	// 모서리 둥글기 설정.
+	//==============================================================================
+	/** @param { number } radius 트랙과 채움의 모서리 반지름. (0 이하면 각진 사각형, 기본 0) */ setCornerRadius(radius) { this.#cornerRadius = radius; }
+	//==============================================================================
+	// 모서리 둥글기 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 트랙과 채움의 모서리 반지름.
+	 */
 	getCornerRadius() { return this.#cornerRadius; }
 
-	/** @param { string } direction */ setDirection(direction) { this.#direction = direction; }
+	//==============================================================================
+	// 방향 설정.
+	//==============================================================================
+	/** @param { string } direction 방향. (horizontal 이면 왼쪽에서 오른쪽, vertical 이면 아래에서 위로 찬다, 기본 horizontal) */ setDirection(direction) { this.#direction = direction; this.markDrawnRectDirty(); }
+	//==============================================================================
+	// 방향 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } 방향. (horizontal 이나 vertical)
+	 */
 	getDirection() { return this.#direction; }
 
 	//==============================================================================
 	// 콜백 / 인터랙션.
 	//==============================================================================
-	/** @param { (slider: UISlider) => void } callback */
+	/** @param { (slider: UISlider) => void } callback 누르거나 끌어 값이 바뀌면 부를 함수. (인자는 이 슬라이더, setValue 로 바꿀 때는 부르지 않는다, null 이면 부르지 않는다) */
 	setValueChangedEvent(callback) { this.#valueChangedEvent = callback; }
+	//==============================================================================
+	// 값 바뀜 이벤트 반환.
+	//==============================================================================
+	/**
+	 * @returns { (slider: UISlider) => void } 값 바뀜 이벤트 함수. (없으면 null)
+	 */
 	getValueChangedEvent() { return this.#valueChangedEvent; }
 
-	/** @param { boolean } isInteractable */
+	//==============================================================================
+	// 입력 받기 설정.
+	//==============================================================================
+	/** @param { boolean } isInteractable 거짓이면 새 누름을 받지 않는다. (기본 참) */
 	setInteractable(isInteractable) { this.#isInteractable = isInteractable; }
+	//==============================================================================
+	// 입력 받기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 누름을 받으면 참.
+	 */
 	getInteractable() { return this.#isInteractable; }
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 끄는 중인지.
+	//==============================================================================
+	/** @returns { boolean } 누른 뒤 떼거나 취소하기 전까지 참. */
 	isDragging() { return this.#isDragging; }
 }

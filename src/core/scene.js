@@ -2,11 +2,14 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../base/object.js";
+import { Color } from "../base/color.js";
+import { Rect } from "../base/rect.js";
 import { Pivot } from "../base/pivot.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 import { Graphic } from "./graphic.js";
 import { WorldNode } from "./node/worldnode.js";
+import { TouchRaycaster } from "./touchraycaster.js";
 import { Tween } from "./tween.js";
 
 
@@ -19,7 +22,43 @@ import { Tween } from "./tween.js";
 // - preDraw(graphic) ==> draw(graphic) ==> postDraw(graphic)
 // - touchPress(viewInputPosition) ==> touchMove(viewInputPosition) ==> touchRelease(viewInputPosition)
 // - reset()
+// - 터치는 씬 꼴과 상관없이 노드의 위젯이 받는다. tickTouch 가 씬의 터치 레이캐스터(처음은 TouchRaycaster, setTouchRaycaster 로 바꾼다)로
+//   가장 앞의 누를 수 있는 노드에 먼저 넘기고, 그 뒤에 씬의 터치 훅을 부른다. (유니티 EventSystem 처럼, 러스트 판 SceneBase.tick 과 같다)
 //==============================================================================
+/**
+ * @example <caption>불러오고, 갱신하고, 그리고, 누름 받기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, Rect, Colors } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		this.boxPosition = Vector2.create(100, 100);
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		console.log("initialized");
+ * 	}
+ *
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		this.boxPosition.x += 60 * timeDelta;
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		graphic.setFillColor(Colors.white);
+ * 		graphic.drawRect(Rect.create(this.boxPosition.x, this.boxPosition.y, 80, 80));
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		this.boxPosition = viewInputPosition.clone();
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Scene extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -29,13 +68,17 @@ export class Scene extends Object {
 	/** @private @type { VTweeneen[] } */ #tweens;
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 	/** @private @type { boolean } */ #isLoaded; // 비동기 로딩 완료 여부.
+	/** @private @type { boolean } */ #isCaptureFrameHeld; // 찍기 모드에서 실제 시간이 드는 불러오기(애셋 받기) 중이라 엔진 프레임 번호와 시계를 세우는지.
+	/** @private @type { TouchRaycaster | null } */ #touchRaycaster; // 노드에 터치를 넘기는 레이캐스터. (null 이면 넘기지 않는다)
+	/** @private @type { Color } */ #sceneBackgroundColor; // drawSceneBackground 가 캔버스 전체를 칠하는 색. (기본 검정)
+	/** @private @type { boolean } */ #isTouchDispatchEnabled; // 노드에 터치를 넘기는지. (러스트 판 SceneBase 와 같은 스위치)
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		// this.#root = new WorldNode();
+		this.#sceneBackgroundColor = Color.black();
 	}
 	
 	//==============================================================================
@@ -48,16 +91,20 @@ export class Scene extends Object {
 		this.#tweens = [];
 		this.#isGizmoVisible = false;
 		this.#isLoaded = false;
+		this.#isCaptureFrameHeld = false;
 		this.#root = new WorldNode();
 		const root = this.getRoot();
 		root.setName("root");
+		this.#touchRaycaster = new TouchRaycaster();
+		this.#touchRaycaster.setRootNode(root);
+		this.#isTouchDispatchEnabled = true;
 	}
 
 	//==============================================================================
 	// 엔진 설정. (SceneManager가 load() 이전에 호출하여 drawOnLoad에서 접근 가능하게 함)
 	//==============================================================================
 	/**
-	 * @param { Engine } engine
+	 * @param { Engine } engine 이 씬을 불러온 엔진.
 	 */
 	setEngine(engine) {
 		this.#engine = engine;
@@ -67,17 +114,40 @@ export class Scene extends Object {
 	// 로딩 완료 여부 설정. (SceneManager가 load+initialize 이후 true로 전환)
 	//==============================================================================
 	/**
-	 * @param { boolean } isLoaded
+	 * @param { boolean } isLoaded 불러오기를 마쳤는지.
 	 */
 	setLoaded(isLoaded) {
 		this.#isLoaded = isLoaded;
 	}
 
 	//==============================================================================
+	// 찍기 모드의 프레임 세우기 설정. (SceneManager 가 load 동안 참, GameScene 과 UIScene 은 애셋을 다 받으면 거짓)
+	// - 찍기 모드에서 이것이 참인 불러오는 씬이 있으면 엔진이 프레임 번호와 시계를 올리지 않는다. 애셋 받기처럼 실제 시간이 드는 것은 다 받은 뒤부터 센다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { boolean } isCaptureFrameHeld 실제 시간이 드는 불러오기 중이면 참.
+	 */
+	setCaptureFrameHeld(isCaptureFrameHeld) {
+		this.#isCaptureFrameHeld = isCaptureFrameHeld;
+	}
+
+	//==============================================================================
+	// 찍기 모드의 프레임 세우기 여부 반환.
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { boolean } 실제 시간이 드는 불러오기 중이면 참.
+	 */
+	isCaptureFrameHeld() {
+		return this.#isCaptureFrameHeld === true;
+	}
+
+	//==============================================================================
 	// 로딩 완료 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 불러오기를 마쳤으면 참. (initialize 바로 앞에 참이 된다)
 	 */
 	isLoaded() {
 		return this.#isLoaded;
@@ -88,7 +158,28 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
+	 * @example <caption>불러오는 동안 글 띄우기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Colors } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		await new Promise((resolve) => {
+	 * 			setTimeout(resolve, 500);
+	 * 		});
+	 * 	}
+	 *
+	 * 	drawOnLoad(graphic) {
+	 * 		graphic.setFillColor(Colors.white);
+	 * 		graphic.setFontString("24px sans-serif");
+	 * 		graphic.drawFillText("Loading", 40, 40);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	drawOnLoad(graphic) {
 
@@ -109,7 +200,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 씬을 불러오는 엔진.
 	 */
 	async load(engine) {
 		this.#engine = engine;
@@ -128,7 +219,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 씬을 불러온 엔진.
 	 */
 	initialize(engine) {
 
@@ -139,7 +230,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine
+	 * @param { Engine } engine 씬을 내리는 엔진.
 	 */
 	finalize(engine) {
 
@@ -172,7 +263,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 씬을 내리는 엔진.
 	 */
 	async unload(engine) {
 		await Promise.resolve();
@@ -183,7 +274,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } canvasNativeSize
+	 * @param { Vector2 } canvasNativeSize 바뀐 캔버스 요소의 크기. (CSS 픽셀)
 	 */
 	resize(canvasNativeSize) {
 
@@ -202,7 +293,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		// 노드 갱신.
@@ -250,7 +341,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	preDraw(graphic) {
 		// 코드.
@@ -261,7 +352,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		// 노드 출력.
@@ -274,7 +365,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	postDraw(graphic) {
 		// 코드.
@@ -285,7 +376,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawGizmos(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
@@ -301,15 +392,25 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tickTouch(timeDelta) {
 		const engine = this.getEngine();
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
+		const isTouchPressed = inputManager.isTouchPressed();
+		const touchRaycaster = this.#isTouchDispatchEnabled ? this.#touchRaycaster : null;
 
-		// 누름.
-		if (inputManager.isTouchPressed()) {
+		// 누름. (노드에 먼저 넘기고 훅을 부른다, 아래 모두 같다)
+		if (isTouchPressed) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchPress(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchPress(viewInputPosition);
 			}
@@ -317,8 +418,17 @@ export class Scene extends Object {
 				console.error(error);
 			}
 		}
-		// 뗌.
-		else if (inputManager.isTouchReleased()) {
+
+		// 뗌. (한 프레임 안에 눌렀다 뗐으면 누름 뒤에 바로 뗌을 넘긴다)
+		if (inputManager.isTouchReleased()) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchRelease(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchRelease(viewInputPosition);
 			}
@@ -326,8 +436,16 @@ export class Scene extends Object {
 				console.error(error);
 			}
 		}
-		// 누르고 있음.
-		else if (inputManager.isTouchMoved()) {
+		// 누르고 있음. (누른 프레임에는 넘기지 않는다)
+		else if (inputManager.isTouchMoved() && !isTouchPressed) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchMove(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchMove(viewInputPosition);
 			}
@@ -337,6 +455,14 @@ export class Scene extends Object {
 		}
 		// 취소됨.
 		else if (inputManager.isTouchCancelled()) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchCancel(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchCancel(viewInputPosition);
 			}
@@ -345,10 +471,18 @@ export class Scene extends Object {
 			}
 		}
 
-		// 마우스 휠. (이번 프레임에 누적된 휠 값이 있으면 dispatch)
+		// 마우스 휠. (이번 프레임에 누적된 휠 값이 있으면 그 자리의 가장 앞 스크롤 칸에 넘기고 훅을 부른다)
 		if (typeof inputManager.hasWheelDelta === "function" && inputManager.hasWheelDelta()) {
+			const wheelDelta = Vector2.create(inputManager.getWheelDeltaX(), inputManager.getWheelDeltaY());
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchWheel(viewInputPosition, wheelDelta);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
-				const wheelDelta = Vector2.create(inputManager.getWheelDeltaX(), inputManager.getWheelDeltaY());
 				this.touchWheel(viewInputPosition, wheelDelta);
 			}
 			catch (error) {
@@ -362,7 +496,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchPress(viewInputPosition) {
 
@@ -373,7 +507,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchMove(viewInputPosition) {
 
@@ -384,7 +518,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchRelease(viewInputPosition) {
 
@@ -395,7 +529,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchCancel(viewInputPosition) {
 
@@ -406,8 +540,8 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
-	 * @param { Vector2 } wheelDelta
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 * @param { Vector2 } wheelDelta 이번 프레임에 쌓인 휠 값. (WheelEvent 의 deltaX, deltaY 를 더한 것)
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
 
@@ -417,7 +551,26 @@ export class Scene extends Object {
 	// 트윈 시작.
 	//==============================================================================
 	/**
-	 * @param { Tween } tween 
+	 * @param { Tween } tween 시작할 트윈. (이미 도는 트윈이면 아무것도 하지 않는다)
+	 * @example <caption>노드를 0.5 초 동안 나타나게 하기</caption>
+	 * import { Engine, EngineConfiguration, Scene, WorldNode, Tween, TweenProperty, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		const root = this.getRoot();
+	 * 		const node = new WorldNode();
+	 * 		node.setContentSize(Vector2.create(100, 100));
+	 * 		root.addChild(node);
+	 * 		const tween = Tween.createNodeTween(node, TweenProperty.localOpacity, 0, 1, 0.5);
+	 * 		this.startTween(tween);
+	 * 		const tweenCount = this.getTweenCount();
+	 * 		console.log(tweenCount);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	startTween(tween) {
 		const index = this.#tweens.indexOf(tween);
@@ -433,7 +586,7 @@ export class Scene extends Object {
 	// 트윈 중단.
 	//==============================================================================
 	/**
-	 * @param { Tween } tween 
+	 * @param { Tween } tween 멈출 트윈. (이 씬에서 돌지 않으면 아무것도 하지 않는다)
 	 */
 	stopTween(tween) {
 		const index = this.#tweens.indexOf(tween);
@@ -443,6 +596,16 @@ export class Scene extends Object {
 
 		tween.stop();
 		this.#tweens.splice(index, 1);
+	}
+
+	//==============================================================================
+	// 도는 트윈 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 도는 트윈 수.
+	 */
+	getTweenCount() {
+		return this.#tweens.length;
 	}
 
 	//==============================================================================
@@ -460,7 +623,7 @@ export class Scene extends Object {
 	// 엔진 반환.
 	//==============================================================================
 	/**
-	 * @returns { Engine } 
+	 * @returns { Engine } 이 씬을 불러온 엔진. (불러오기 전에는 undefined)
 	 */
 	getEngine() {
 		return this.#engine;
@@ -470,17 +633,82 @@ export class Scene extends Object {
 	// 루트 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode } 
+	 * @returns { WorldNode } 루트 노드. (create 에서 만들고, 크기는 뷰 크기)
 	 */
 	getRoot() {
 		return this.#root;
 	}
 
 	//==============================================================================
+	// 터치 레이캐스터 설정.
+	// - tickTouch 가 이 레이캐스터로 가장 앞의 누를 수 있는 노드에 터치를 넘긴다. 루트는 씬 루트로 건다.
+	// - TouchRecognizer 를 주면 스크롤 칸 안의 끌기 손짓(누름 늦추기, 끌면 스크롤 칸으로)도 넘긴다.
+	// - null 이면 노드에 넘기지 않는다. (씬이 터치 훅에서 직접 넘길 때, UIScene 과 GameScene 이 그렇게 한다)
+	//==============================================================================
+	/**
+	 * @param { TouchRaycaster | null } touchRaycaster 노드에 터치를 넘길 레이캐스터. (null 이면 넘기지 않는다)
+	 * @example <caption>스크롤 칸 끌기 손짓까지 넘기기</caption>
+	 * import { Engine, EngineConfiguration, Scene, TouchRecognizer } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		this.setTouchRaycaster(new TouchRecognizer());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	setTouchRaycaster(touchRaycaster) {
+		this.#touchRaycaster = touchRaycaster;
+		if (touchRaycaster) {
+			touchRaycaster.setRootNode(this.getRoot());
+		}
+	}
+
+	//==============================================================================
+	// 노드에 터치 넘기기 켜고 끄기. (러스트 판 SceneBase.set_touch_dispatch_enabled 와 같다)
+	// - 끄면 tickTouch 가 레이캐스터로 노드에 넘기지 않고 씬의 터치 훅만 부른다. (훅에서 가로채 직접 넘길 때)
+	// - 레이캐스터는 그대로 두어 다시 켜면 이어서 넘긴다. setTouchRaycaster(null) 과 같은 효과다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isEnabled 노드에 넘기면 참. (기본 참)
+	 * @example <caption>씬 기본 넘기기를 끄고 훅에서 직접 받기</caption>
+	 * import { Scene } from "./build/vanilla.js";
+	 * const scene = new Scene();
+	 * scene.setTouchDispatchEnabled(false);
+	 * console.log(scene.isTouchDispatchEnabled()); // false
+	 */
+	setTouchDispatchEnabled(isEnabled) {
+		this.#isTouchDispatchEnabled = isEnabled;
+	}
+
+	//==============================================================================
+	// 노드에 터치를 넘기는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 넘기면 참.
+	 */
+	isTouchDispatchEnabled() {
+		return this.#isTouchDispatchEnabled;
+	}
+
+	//==============================================================================
+	// 터치 레이캐스터 반환.
+	//==============================================================================
+	/**
+	 * @returns { TouchRaycaster | null } 노드에 터치를 넘기는 레이캐스터. (create 에서 TouchRaycaster 를 만든다, 넘기지 않으면 null)
+	 */
+	getTouchRaycaster() {
+		return this.#touchRaycaster;
+	}
+
+	//==============================================================================
 	// 기즈모 그리기 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isVisible 
+	 * @param { boolean } isVisible 참이면 기즈모를 그린다.
 	 */
 	setGizmoVisible(isVisible) {
 		this.#isGizmoVisible = isVisible;
@@ -490,9 +718,66 @@ export class Scene extends Object {
 	// 기즈모 그리기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 기즈모를 그리면 참.
 	 */
 	isGizmoVisible() {
 		return this.#isGizmoVisible;
+	}
+
+	//==============================================================================
+	// 배경색 설정. (drawSceneBackground 가 칠한다, Color 나 "#202020" 같은 색 글)
+	//==============================================================================
+	/**
+	 * @param { Color | string } color 배경색. (색 글은 Color.from 으로 읽는다, 기본 검정)
+	 */
+	setSceneBackgroundColor(color) {
+		this.#sceneBackgroundColor = Color.from(color).clone();
+	}
+
+	//==============================================================================
+	// 배경색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 배경색. (기본 검정)
+	 */
+	getSceneBackgroundColor() {
+		return this.#sceneBackgroundColor;
+	}
+
+	//==============================================================================
+	// 배경 그리기. (캔버스 전체를 배경색으로 칠하고 뷰 좌표계를 건다, 세이프 에어리어 바깥까지)
+	// - GameScene 과 UIScene 은 preDraw 에서 부른다. Scene 을 바로 잇는 씬은 preDraw 에서 불러 쓴다.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그릴 그래픽.
+	 * @example <caption>Scene 을 바로 이은 씬의 배경을 칠하기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	create() {
+	 * 		super.create();
+	 * 		this.setSceneBackgroundColor("#203040");
+	 * 	}
+	 *
+	 * 	preDraw(graphic) {
+	 * 		super.preDraw(graphic);
+	 * 		this.drawSceneBackground(graphic);
+	 * 	}
+	 * }
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	drawSceneBackground(graphic) {
+		const engine = this.getEngine();
+		const viewManager = engine.getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(this.#sceneBackgroundColor);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+
+		viewManager.applyViewRect(graphic);
 	}
 }

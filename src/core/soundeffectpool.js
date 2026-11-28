@@ -16,6 +16,23 @@ import { AudioPlayer } from "./audioplayer.js";
 //     pool.play(hitAudioAsset, 0.5);   // 이 재생만 절반 음량.
 //     pool.setVolume(0.8);             // 풀 전체의 음량. (재생 중인 것에도 곱해진다)
 //==============================================================================
+/**
+ * @example <caption>같은 효과음을 겹쳐 내기</caption>
+ * import { Engine, EngineConfiguration, AudioAsset, SoundEffectPool } from "./build/vanilla.js";
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const audioManager = engine.getAudioManager();
+ * const audioAsset = new AudioAsset();
+ * await audioAsset.load("examples/assets/beep.wav");
+ *
+ * const soundEffectPool = new SoundEffectPool(audioManager, 4);
+ * soundEffectPool.setVolume(0.8);
+ * soundEffectPool.play(audioAsset);
+ * soundEffectPool.play(audioAsset, 0.5);
+ * console.log(soundEffectPool.getVoiceCount(), soundEffectPool.getVolume());
+ * soundEffectPool.stopAll();
+ */
 export class SoundEffectPool extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -31,7 +48,7 @@ export class SoundEffectPool extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { AudioManager } audioManager
+	 * @param { AudioManager } audioManager 엔진의 AudioManager. (engine.getAudioManager(), 플레이어를 만든다)
 	 * @param { number } voiceCount 동시에 겹칠 수 있는 최대 재생 수.
 	 */
 	constructor(audioManager, voiceCount = 6) {
@@ -54,11 +71,11 @@ export class SoundEffectPool extends Object {
 	// - 음량은 이 재생의 음량(0 ~ 1)에 풀의 음량을 곱한 것이다.
 	//==============================================================================
 	/**
-	 * @param { AudioAsset } audioAsset
+	 * @param { AudioAsset } audioAsset 재생할 오디오 애셋. (없거나 음소거 중이면 내지 않는다)
 	 * @param { number } volume 이 재생의 음량. (0 ~ 1, 기본 1)
 	 */
 	play(audioAsset, volume = 1) {
-		if (this.#isMuted || !audioAsset) {
+		if (this.#isMuted || !audioAsset || this.#playerList.length === 0) {
 			return;
 		}
 		const playerIndex = this.#nextIndex;
@@ -88,7 +105,7 @@ export class SoundEffectPool extends Object {
 	// 음소거 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isMuted
+	 * @param { boolean } isMuted 참이면 모든 플레이어를 음소거하고 새 재생도 하지 않는다.
 	 */
 	setMuted(isMuted) {
 		this.#isMuted = isMuted;
@@ -106,7 +123,7 @@ export class SoundEffectPool extends Object {
 	// 풀 전체의 음량 설정. (0 ~ 1, 재생 중인 것에도 바로 곱해진다)
 	//==============================================================================
 	/**
-	 * @param { number } volume
+	 * @param { number } volume 풀 전체의 음량. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
 	 */
 	setVolume(volume) {
 		this.#volume = System.Number.isFinite(volume) ? System.Math.max(0, System.Math.min(1, volume)) : 1;
@@ -119,7 +136,7 @@ export class SoundEffectPool extends Object {
 	// 풀 전체의 음량.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 풀 전체의 음량. (0 ~ 1, 기본 1)
 	 */
 	getVolume() {
 		return this.#volume;
@@ -129,7 +146,7 @@ export class SoundEffectPool extends Object {
 	// 음소거 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 음소거 중이면 참.
 	 */
 	isMuted() {
 		return this.#isMuted;
@@ -139,7 +156,7 @@ export class SoundEffectPool extends Object {
 	// 보이스 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 플레이어 수. (동시에 겹칠 수 있는 최대 재생 수)
 	 */
 	getVoiceCount() {
 		return this.#playerList.length;

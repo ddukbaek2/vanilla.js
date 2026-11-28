@@ -7,6 +7,8 @@ import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
 import { Graphic } from "../core/graphic.js";
 import { FontAsset } from "../resource/fontasset.js";
+import { splitGraphemes } from "../core/component/text.js";
+import { DEFAULT_FONT_FAMILY_STRING } from "../base/platform.js";
 
 
 //==============================================================================
@@ -19,6 +21,16 @@ const ATLAS_PADDING = 2;      // 글리프 간 여백 (px).
 //==============================================================================
 // 글리프 정보.
 //==============================================================================
+/**
+ * @example <caption>구운 글자의 글리프 정보 보기</caption>
+ * import { DynamicFont, GlyphInfo } from "./build/vanilla.js";
+ *
+ * const dynamicFont = new DynamicFont();
+ * dynamicFont.setFontSize(32);
+ * dynamicFont.buildAtlas("AB");
+ * const glyphInfo = dynamicFont.getGlyph("A");
+ * console.log(glyphInfo instanceof GlyphInfo, glyphInfo.char, glyphInfo.advance, glyphInfo.uvRect.size.x, glyphInfo.bearingY);
+ */
 export class GlyphInfo extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -48,7 +60,38 @@ export class GlyphInfo extends Object {
 
 //==============================================================================
 // 다이나믹 폰트.
+// - 정한 글자들을 한 글꼴, 한 크기로 글자 아틀라스(캔버스 한 장)에 모아 굽고, 글을 그릴 때 아틀라스에서 글리프를 잘라 그린다.
+//   글자마다 같은 그림을 쓰므로 묶어 그리기가 끊기지 않는다. (문자열마다 텍스처를 굽는 Text 와 다르다)
+//   점수, 피해 숫자, 시계처럼 글자가 자주 바뀌고 같은 글자를 많이 그리는 곳에 쓴다.
+// - 글자는 글자 묶음(받침, 결합 부호, 이모지 묶음) 단위로 센다. 아틀라스에 없는 글자는 글자 크기의 반만큼 비우고 넘어간다.
+// - buildAtlas 로 글자를 더하면 든 글자를 모두 새 캔버스에 다시 놓는다. (앞서 구운 글자의 자리가 새 캔버스와 어긋나지 않게)
 //==============================================================================
+/**
+ * @example <caption>숫자 아틀라스를 굽고 시계 그리기</caption>
+ * import { Engine, EngineConfiguration, Scene, DynamicFont, FontAsset, Vector2 } from "./build/vanilla.js";
+ *
+ * const fontAsset = new FontAsset();
+ * await fontAsset.loadFont("DOSGothic", "examples/assets/DOSGothic.woff");
+ * const dynamicFont = new DynamicFont();
+ * dynamicFont.setFontAsset(fontAsset);
+ * dynamicFont.setFontSize(48);
+ * dynamicFont.setLetterSpacing(2);
+ * dynamicFont.buildAtlas("0123456789:");
+ * console.log(dynamicFont.measureText("12:34"));
+ *
+ * class ClockScene extends Scene {
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		const position = Vector2.create(100, 200);
+ * 		dynamicFont.drawText("12:34", position, graphic);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new ClockScene());
+ */
 export class DynamicFont extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -57,6 +100,7 @@ export class DynamicFont extends Object {
 	/** @private @type { number } */ #fontSize;                     // 폰트 크기 (px).
 	/** @private @type { number } */ #letterSpacing;                // 추가 자간 (px).
 	/** @private @type { Map<string, GlyphInfo> } */ #glyphMap;     // 글리프 정보 맵.
+	/** @private @type { string[] } */ #characterList;              // 아틀라스에 든 글자. (넣은 차례, 다시 구울 때 모두 놓는다)
 	/** @private @type { HTMLCanvasElement } */ #atlasCanvas;       // 폰트 아틀라스 텍스처 캔버스.
 
 	//==============================================================================
@@ -71,6 +115,7 @@ export class DynamicFont extends Object {
 		this.#fontSize = 32;
 		this.#letterSpacing = 0;
 		this.#glyphMap = new Map();
+		this.#characterList = [];
 		this.#atlasCanvas = null;
 	}
 
@@ -78,7 +123,7 @@ export class DynamicFont extends Object {
 	// 폰트 애셋 설정.
 	//==============================================================================
 	/**
-	 * @param { FontAsset } fontAsset
+	 * @param { FontAsset } fontAsset 구울 때 쓸 폰트 애셋. (null 이면 시스템 글꼴, 바꾼 뒤에는 rebuildAtlas 로 다시 굽는다)
 	 */
 	setFontAsset(fontAsset) {
 		this.#fontAsset = fontAsset;
@@ -88,7 +133,7 @@ export class DynamicFont extends Object {
 	// 폰트 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } fontSize
+	 * @param { number } fontSize 글자 크기. (픽셀, 처음은 32)
 	 */
 	setFontSize(fontSize) {
 		this.#fontSize = fontSize;
@@ -98,7 +143,7 @@ export class DynamicFont extends Object {
 	// 폰트 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 글자 크기. (픽셀)
 	 */
 	getFontSize() {
 		return this.#fontSize;
@@ -108,7 +153,7 @@ export class DynamicFont extends Object {
 	// 자간 설정.
 	//==============================================================================
 	/**
-	 * @param { number } letterSpacing
+	 * @param { number } letterSpacing 글자마다 더할 자간. (픽셀, 처음은 0)
 	 */
 	setLetterSpacing(letterSpacing) {
 		this.#letterSpacing = letterSpacing;
@@ -118,7 +163,7 @@ export class DynamicFont extends Object {
 	// 자간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 더하는 자간. (픽셀)
 	 */
 	getLetterSpacing() {
 		return this.#letterSpacing;
@@ -128,7 +173,7 @@ export class DynamicFont extends Object {
 	// 아틀라스 캔버스 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement }
+	 * @returns { HTMLCanvasElement } 글자 아틀라스 캔버스. 아직 굽지 않았으면 null.
 	 */
 	getAtlasCanvas() {
 		return this.#atlasCanvas;
@@ -138,8 +183,8 @@ export class DynamicFont extends Object {
 	// 글리프 정보 반환.
 	//==============================================================================
 	/**
-	 * @param { string } char
-	 * @returns { GlyphInfo | null }
+	 * @param { string } char 글자 하나. (글자 묶음 단위)
+	 * @returns { GlyphInfo | null } 그 글자의 글리프 정보. 아틀라스에 없으면 null.
 	 */
 	getGlyph(char) {
 		const glyphInfo = this.#glyphMap.get(char);
@@ -150,13 +195,32 @@ export class DynamicFont extends Object {
 	}
 
 	//==============================================================================
-	// 아틀라스 빌드 (지정 문자셋을 폰트로부터 읽어 텍스처 아틀라스 생성).
+	// 아틀라스 빌드. (charset 의 글자 가운데 아직 없는 글자를 더하고, 아틀라스를 든 글자 모두로 다시 굽는다)
 	//==============================================================================
 	/**
-	 * @param { string } charset
+	 * @param { string } charset 아틀라스에 넣을 글자들. (이미 든 글자는 건너뛴다)
 	 */
 	buildAtlas(charset) {
-		const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : "-apple-system, sans-serif";
+		let isChanged = false;
+		for (const character of splitGraphemes(charset)) {
+			if (this.#characterList.includes(character)) {
+				continue;
+			}
+			this.#characterList.push(character);
+			isChanged = true;
+		}
+		if (!isChanged && this.#atlasCanvas !== null) {
+			return;
+		}
+		this.rebuildAtlas();
+	}
+
+	//==============================================================================
+	// 든 글자를 모두 다시 굽기. (글꼴, 크기, 자간을 바꾼 뒤 부른다)
+	//==============================================================================
+	rebuildAtlas() {
+		const document = System.document;
+		const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : DEFAULT_FONT_FAMILY_STRING; // 애셋이 없으면 엔진 기본 글꼴 사슬. (러스트 판 글꼴 이름 "default", Text 와 같다)
 		const fontSize = this.getFontSize();
 		const fontString = `${fontSize}px ${fontFamily}`;
 
@@ -169,20 +233,13 @@ export class DynamicFont extends Object {
 
 		// 각 문자 메트릭스 측정.
 		const entries = [];
-		for (const char of charset) {
-			if (this.#glyphMap.has(char)) {
-				continue;
-			}
+		for (const char of this.#characterList) {
 			const metrics = measureContext.measureText(char);
 			const glyphPixelWidth = Math.ceil(metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight);
 			const glyphPixelHeight = Math.ceil(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent);
 			const slotWidth = glyphPixelWidth + ATLAS_PADDING * 2;
 			const slotHeight = glyphPixelHeight + ATLAS_PADDING * 2;
 			entries.push({ char, metrics, glyphPixelWidth, glyphPixelHeight, slotWidth, slotHeight });
-		}
-
-		if (entries.length === 0) {
-			return;
 		}
 
 		// 아틀라스 레이아웃 계산 (행 단위 배치).
@@ -202,9 +259,9 @@ export class DynamicFont extends Object {
 				rowHeight = entry.slotHeight;
 			}
 		}
-		const atlasHeight = cursorY + rowHeight;
+		const atlasHeight = Math.max(1, cursorY + rowHeight);
 
-		// 아틀라스 캔버스 생성.
+		// 아틀라스 캔버스 생성. (텍스처 캐시가 캔버스마다 한 번 올리므로 구울 때마다 새 캔버스)
 		this.#atlasCanvas = document.createElement("canvas");
 		const atlasCanvas = this.getAtlasCanvas();
 		atlasCanvas.width = ATLAS_MAX_WIDTH;
@@ -215,6 +272,8 @@ export class DynamicFont extends Object {
 		atlasContext.textBaseline = "alphabetic";
 
 		// 글리프 렌더링 및 GlyphInfo 기록.
+		this.#glyphMap.clear();
+		const letterSpacing = this.getLetterSpacing();
 		for (const entry of entries) {
 			const fillX = entry.atlasX + ATLAS_PADDING + entry.metrics.actualBoundingBoxLeft;
 			const fillY = entry.atlasY + ATLAS_PADDING + entry.metrics.actualBoundingBoxAscent;
@@ -228,7 +287,6 @@ export class DynamicFont extends Object {
 				entry.glyphPixelWidth,
 				entry.glyphPixelHeight
 			);
-			const letterSpacing = this.getLetterSpacing();
 			glyphInfo.advance = entry.metrics.width + letterSpacing;
 			glyphInfo.bearingX = entry.metrics.actualBoundingBoxLeft;
 			glyphInfo.bearingY = entry.metrics.actualBoundingBoxAscent;
@@ -240,9 +298,9 @@ export class DynamicFont extends Object {
 	// 텍스트 렌더링 (아틀라스에서 글리프 샘플링).
 	//==============================================================================
 	/**
-	 * @param { string } text
+	 * @param { string } text 그릴 글.
 	 * @param { Vector2 } position  베이스라인 기준 좌상단 위치.
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawText(text, position, graphic) {
 		const atlasCanvas = this.getAtlasCanvas();
@@ -254,10 +312,14 @@ export class DynamicFont extends Object {
 		const baselineY = position.y;
 		const fontSize = this.getFontSize();
 
-		for (const char of text) {
+		for (const char of splitGraphemes(text)) {
 			const glyphInfo = this.#glyphMap.get(char);
 			if (!glyphInfo) {
 				cursorX += fontSize * 0.5;
+				continue;
+			}
+			if (glyphInfo.uvRect.size.x <= 0 || glyphInfo.uvRect.size.y <= 0) {
+				cursorX += glyphInfo.advance;
 				continue;
 			}
 
@@ -269,10 +331,27 @@ export class DynamicFont extends Object {
 	}
 
 	//==============================================================================
+	// 글 너비 재기. (아틀라스의 전진폭 합, 없는 글자는 글자 크기의 반)
+	//==============================================================================
+	/**
+	 * @param { string } text 잴 글.
+	 * @returns { number } 글 너비. (픽셀)
+	 */
+	measureText(text) {
+		let width = 0;
+		for (const char of splitGraphemes(text)) {
+			const glyphInfo = this.#glyphMap.get(char);
+			width += glyphInfo ? glyphInfo.advance : this.getFontSize() * 0.5;
+		}
+		return width;
+	}
+
+	//==============================================================================
 	// 글리프 맵 초기화.
 	//==============================================================================
 	clearAtlas() {
 		this.#glyphMap.clear();
+		this.#characterList = [];
 		this.#atlasCanvas = null;
 	}
 }

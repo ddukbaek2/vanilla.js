@@ -400,9 +400,10 @@
 	<div id="contextMenu"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, RIGHT-DRAG OR TWO FINGERS TO PAN, DOUBLE-CLICK TO FOCUS<br>
-		CHARACTER: <a href="https://github.com/pixiv/three-vrm" target="_blank" rel="noopener">VRM1 CONSTRAINT TWIST SAMPLE &copy; 2022 PIXIV INC. (VRM PUBLIC LICENSE 1.0)</a>
+		CHARACTER: <a href="https://github.com/pixiv/three-vrm" target="_blank" rel="noopener">VRM1 CONSTRAINT TWIST SAMPLE &copy; 2022 PIXIV INC. (VRM PUBLIC LICENSE 1.0)</a><br>
+		ANIMATION: <a href="https://opengameart.org/content/universal-animation-library" target="_blank" rel="noopener">QUATERNIUS UNIVERSAL ANIMATION LIBRARY 1, 2 (CC0)</a>
 	</div>
-	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
+	<a id="homeLink" href="https://vanillapunch.com/tools/" target="_blank" rel="noopener">VANILLAPUNCH.COM</a>
 	<div id="loadingOverlay"><div id="loadingLabel">LOADING</div><div id="loadingBar"><div id="loadingFill"></div></div><div id="loadingDetail"></div></div>
 	<script type="module">
 	"use strict";
@@ -412,7 +413,7 @@
 	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
 	//==============================================================================
 	// 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
-	const ENGINE_CACHE_STAMP = "20260908b";
+	const ENGINE_CACHE_STAMP = "20261126a";
 	let engineModule = null;
 	try {
 		try {
@@ -437,6 +438,7 @@
 	const SkinnedModel = engineModule.SkinnedModel;
 	const SkinnedModelRenderer = engineModule.SkinnedModelRenderer;
 	const MORPH_GLSL = engineModule.MORPH_GLSL;
+	const JOINT_BLOCK_GLSL = engineModule.JOINT_BLOCK_GLSL;
 	const ShadowMap = engineModule.ShadowMap;
 	const ShaderProgram = engineModule.ShaderProgram;
 
@@ -510,36 +512,37 @@
 	const HUMANOID_UPPER_CHEST = "upperChest";
 	const HUMANOID_LEFT_EYE = "leftEye";
 	const HUMANOID_RIGHT_EYE = "rightEye";
-	// 신체 애니메이션. (Mixamo 클립 — 이름은 Remy T 포즈 표(mixamo_rest.json)와 같은 뼈 이름)
-	// 클립 목록. (첫 항목의 파일이 골격을 겸한다 — 버튼 순서)
+	// 신체 애니메이션. (Quaternius Universal Animation Library 클립, CC0 — 뼈 이름은 언리얼 마네킹 꼴)
+	// 클립 목록. (버튼 순서)
 	const ANIMATION_DEFINITIONS = [
 		{ name: "Idle", label: "IDLE", file: "anims/idle.fbx" },
 		{ name: "Walk", label: "WALK", file: "anims/walk.fbx" },
 		{ name: "Run", label: "RUN", file: "anims/run.fbx" },
-		{ name: "Jump", label: "JUMP", file: "anims/jump.fbx" },
-		{ name: "Greet", label: "GREET", file: "anims/greet.fbx" },
-		{ name: "Clap", label: "CLAP", file: "anims/clap.fbx" },
-		{ name: "Cheer", label: "CHEER", file: "anims/cheer.fbx" },
+		{ name: "Roll", label: "ROLL", file: "anims/roll.fbx" },
+		{ name: "Yes", label: "YES", file: "anims/yes.fbx" },
+		{ name: "Talk", label: "TALK", file: "anims/talk.fbx" },
+		{ name: "Punch", label: "PUNCH", file: "anims/punch.fbx" },
 		{ name: "Dance", label: "DANCE", file: "anims/dance.fbx" },
 	];
-	const MIXAMO_REST_FILE = "anims/mixamo_rest.json";
-	// Mixamo 뼈 → VRM 휴머노이드 뼈. (부모가 먼저 오도록 나열)
-	const MIXAMO_BONE_MAP = [
-		["Hips", "hips"], ["Spine", "spine"], ["Spine1", "chest"], ["Spine2", "upperChest"], ["Neck", "neck"], ["Head", "head"],
-		["LeftShoulder", "leftShoulder"], ["LeftArm", "leftUpperArm"], ["LeftForeArm", "leftLowerArm"], ["LeftHand", "leftHand"],
-		["LeftHandThumb1", "leftThumbMetacarpal"], ["LeftHandThumb2", "leftThumbProximal"], ["LeftHandThumb3", "leftThumbDistal"],
-		["LeftHandIndex1", "leftIndexProximal"], ["LeftHandIndex2", "leftIndexIntermediate"], ["LeftHandIndex3", "leftIndexDistal"],
-		["LeftHandMiddle1", "leftMiddleProximal"], ["LeftHandMiddle2", "leftMiddleIntermediate"], ["LeftHandMiddle3", "leftMiddleDistal"],
-		["LeftHandRing1", "leftRingProximal"], ["LeftHandRing2", "leftRingIntermediate"], ["LeftHandRing3", "leftRingDistal"],
-		["LeftHandPinky1", "leftLittleProximal"], ["LeftHandPinky2", "leftLittleIntermediate"], ["LeftHandPinky3", "leftLittleDistal"],
-		["RightShoulder", "rightShoulder"], ["RightArm", "rightUpperArm"], ["RightForeArm", "rightLowerArm"], ["RightHand", "rightHand"],
-		["RightHandThumb1", "rightThumbMetacarpal"], ["RightHandThumb2", "rightThumbProximal"], ["RightHandThumb3", "rightThumbDistal"],
-		["RightHandIndex1", "rightIndexProximal"], ["RightHandIndex2", "rightIndexIntermediate"], ["RightHandIndex3", "rightIndexDistal"],
-		["RightHandMiddle1", "rightMiddleProximal"], ["RightHandMiddle2", "rightMiddleIntermediate"], ["RightHandMiddle3", "rightMiddleDistal"],
-		["RightHandRing1", "rightRingProximal"], ["RightHandRing2", "rightRingIntermediate"], ["RightHandRing3", "rightRingDistal"],
-		["RightHandPinky1", "rightLittleProximal"], ["RightHandPinky2", "rightLittleIntermediate"], ["RightHandPinky3", "rightLittleDistal"],
-		["LeftUpLeg", "leftUpperLeg"], ["LeftLeg", "leftLowerLeg"], ["LeftFoot", "leftFoot"], ["LeftToeBase", "leftToes"],
-		["RightUpLeg", "rightUpperLeg"], ["RightLeg", "rightLowerLeg"], ["RightFoot", "rightFoot"], ["RightToeBase", "rightToes"],
+	// T 포즈 클립. (골격을 겸하고, 뼈마다 T 포즈 월드 회전과 골반 자리를 이 클립의 첫 장면에서 읽는다)
+	const REST_POSE_FILE = "anims/tpose.fbx";
+	// 원본 뼈(언리얼 마네킹 이름) → VRM 휴머노이드 뼈. (부모가 먼저 오도록 나열)
+	const SOURCE_BONE_MAP = [
+		["pelvis", "hips"], ["spine_01", "spine"], ["spine_02", "chest"], ["spine_03", "upperChest"], ["neck_01", "neck"], ["Head", "head"],
+		["clavicle_l", "leftShoulder"], ["upperarm_l", "leftUpperArm"], ["lowerarm_l", "leftLowerArm"], ["hand_l", "leftHand"],
+		["thumb_01_l", "leftThumbMetacarpal"], ["thumb_02_l", "leftThumbProximal"], ["thumb_03_l", "leftThumbDistal"],
+		["index_01_l", "leftIndexProximal"], ["index_02_l", "leftIndexIntermediate"], ["index_03_l", "leftIndexDistal"],
+		["middle_01_l", "leftMiddleProximal"], ["middle_02_l", "leftMiddleIntermediate"], ["middle_03_l", "leftMiddleDistal"],
+		["ring_01_l", "leftRingProximal"], ["ring_02_l", "leftRingIntermediate"], ["ring_03_l", "leftRingDistal"],
+		["pinky_01_l", "leftLittleProximal"], ["pinky_02_l", "leftLittleIntermediate"], ["pinky_03_l", "leftLittleDistal"],
+		["clavicle_r", "rightShoulder"], ["upperarm_r", "rightUpperArm"], ["lowerarm_r", "rightLowerArm"], ["hand_r", "rightHand"],
+		["thumb_01_r", "rightThumbMetacarpal"], ["thumb_02_r", "rightThumbProximal"], ["thumb_03_r", "rightThumbDistal"],
+		["index_01_r", "rightIndexProximal"], ["index_02_r", "rightIndexIntermediate"], ["index_03_r", "rightIndexDistal"],
+		["middle_01_r", "rightMiddleProximal"], ["middle_02_r", "rightMiddleIntermediate"], ["middle_03_r", "rightMiddleDistal"],
+		["ring_01_r", "rightRingProximal"], ["ring_02_r", "rightRingIntermediate"], ["ring_03_r", "rightRingDistal"],
+		["pinky_01_r", "rightLittleProximal"], ["pinky_02_r", "rightLittleIntermediate"], ["pinky_03_r", "rightLittleDistal"],
+		["thigh_l", "leftUpperLeg"], ["calf_l", "leftLowerLeg"], ["foot_l", "leftFoot"], ["ball_l", "leftToes"],
+		["thigh_r", "rightUpperLeg"], ["calf_r", "rightLowerLeg"], ["foot_r", "rightFoot"], ["ball_r", "rightToes"],
 	];
 
 	// 구면 노멀 중심. (눈 중심 기준 오프셋 — 얼굴은 눈 뒤, 머리카락은 두개골 중심)
@@ -776,7 +779,7 @@
 	layout(location = 4) in vec4 vertexWeights;
 	uniform mat4 modelMatrix;
 	uniform mat4 viewProjectionMatrix;
-	uniform mat4 jointMatrices[96];
+	${JOINT_BLOCK_GLSL}
 	${MORPH_GLSL}
 	void main() {
 		vec3 morphedPosition = vertexPosition;
@@ -806,7 +809,7 @@
 	layout(location = 4) in vec4 vertexWeights;
 	uniform mat4 modelMatrix;
 	uniform mat4 viewProjectionMatrix;
-	uniform mat4 jointMatrices[96];
+	${JOINT_BLOCK_GLSL}
 	uniform sampler2D outlineMaskTexture;
 	uniform int useOutlineMask;
 	uniform float outlineWidth;
@@ -1731,44 +1734,51 @@
 
 
 	//==============================================================================
-	// 신체 애니메이션. (Mixamo 골격을 숨겨 놓고 재생 → 뼈마다 T 포즈 대비 월드 회전 변화를 VRM 뼈에 그대로 — 부모부터 처리해 지연이 쌓이지 않는다)
+	// 신체 애니메이션. (원본 골격을 숨겨 놓고 재생 → 뼈마다 T 포즈 대비 월드 회전 변화를 VRM 뼈에 그대로 — 부모부터 처리해 지연이 쌓이지 않는다)
 	//==============================================================================
 	reportLoading("loading animation", 0.93);
-	const mixamoRestTable = await (await System.fetch("./assets/" + MIXAMO_REST_FILE)).json();
-	const animationModel = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/" + ANIMATION_DEFINITIONS[0].file, toonRenderer);
+	const animationModel = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/" + REST_POSE_FILE, toonRenderer);
+	const restPoseClipName = animationModel.getAnimationNameList()[0];
 	const clipNameByAnimation = new System.Map();
-	clipNameByAnimation.set(ANIMATION_DEFINITIONS[0].name, animationModel.getAnimationNameList()[0]);
-	for (let definitionIndex = 1; definitionIndex < ANIMATION_DEFINITIONS.length; ++definitionIndex) {
-		const definition = ANIMATION_DEFINITIONS[definitionIndex];
+	for (const definition of ANIMATION_DEFINITIONS) {
 		await animationModel.addAnimationsFromFbxUrl("./assets/" + definition.file, definition.name);
 		clipNameByAnimation.set(definition.name, definition.name);
 	}
 	const animationNodeList = animationModel.getNodeList();
 	const animationNodeIndexByBone = new System.Map();
 	for (let nodeIndex = 0; nodeIndex < animationNodeList.length; ++nodeIndex) {
-		const shortName = animationNodeList[nodeIndex].name.split("\u0000")[0];
-		if (shortName.startsWith("mixamorig:")) {
-			animationNodeIndexByBone.set(shortName.replace("mixamorig:", ""), nodeIndex);
+		animationNodeIndexByBone.set(animationNodeList[nodeIndex].name.split("\u0000")[0], nodeIndex);
+	}
+	// T 포즈 표. (T 포즈 클립의 첫 장면에서 뼈마다 월드 회전, 골반 월드 자리)
+	animationModel.playAnimation(restPoseClipName, 0);
+	animationModel.update(0);
+	const sourceRestRotationByBone = new System.Map();
+	for (const pair of SOURCE_BONE_MAP) {
+		const sourceIndex = animationNodeIndexByBone.get(pair[0]);
+		if (sourceIndex !== undefined) {
+			sourceRestRotationByBone.set(pair[0], quaternionFromMatrixElements(animationNodeList[sourceIndex].worldMatrix.getElements()));
 		}
 	}
+	const hipsSourceIndex = animationNodeIndexByBone.get(SOURCE_BONE_MAP[0][0]);
+	const hipsRestElements = hipsSourceIndex !== undefined ? animationNodeList[hipsSourceIndex].worldMatrix.getElements() : null;
+	const sourceHipsRestPosition = hipsRestElements ? [hipsRestElements[12], hipsRestElements[13], hipsRestElements[14]] : null;
 	// 대응표를 실제 노드 쌍으로. (둘 다 있는 뼈만, 부모 순서 유지)
 	const retargetEntryList = [];
-	for (const pair of MIXAMO_BONE_MAP) {
+	for (const pair of SOURCE_BONE_MAP) {
 		const sourceIndex = animationNodeIndexByBone.get(pair[0]);
 		const targetIndex = humanoidNodeIndexByBone.get(pair[1]);
-		const restEntry = mixamoRestTable[pair[0]];
-		if (sourceIndex === undefined || targetIndex === undefined || !restEntry) {
+		const restRotation = sourceRestRotationByBone.get(pair[0]);
+		if (sourceIndex === undefined || targetIndex === undefined || !restRotation) {
 			continue;
 		}
-		const restRotation = Quaternion.create(restEntry.rotation[0], restEntry.rotation[1], restEntry.rotation[2], restEntry.rotation[3]);
 		retargetEntryList.push({ sourceIndex: sourceIndex, targetIndex: targetIndex, sourceRestInverse: quaternionConjugate(restRotation) });
 	}
-	const mixamoHipsRestHeight = mixamoRestTable.Hips ? mixamoRestTable.Hips.position[1] : 100;
+	const sourceHipsRestHeight = sourceHipsRestPosition ? sourceHipsRestPosition[1] : 1;
 	const vrmHipsRestHeight = restWorldPositionList[humanoidNodeIndexByBone.get("hips")].y;
 	const animationState = { activeName: "", hipsOffset: makeVector(0, 0, 0), springResetPending: true };
-	let animationHipsHeightScale = vrmHipsRestHeight / System.Math.max(mixamoHipsRestHeight, 1);
+	let animationHipsHeightScale = vrmHipsRestHeight / System.Math.max(sourceHipsRestHeight, 0.01);
 
-	// 애니메이션 버튼. (표정 버튼 아래 — 실제 Mixamo 본 애니메이션)
+	// 애니메이션 버튼. (표정 버튼 아래 — 실제 뼈 애니메이션)
 	const animationPanelElement = System.document.getElementById("animationPanel");
 	const animationButtonMap = new System.Map();
 	for (const definition of ANIMATION_DEFINITIONS) {
@@ -1812,10 +1822,9 @@
 			setLocalRotationOffset(entry.targetIndex, quaternionConjugate(baseRotation).multiply(newLocal));
 		}
 		// 골반 이동. (클립의 골반 위치 변화를 키 비율로 — 체중 이동 때 골반이 실제로 옆으로 움직여야 다리가 미끄러지지 않는다)
-		const hipsSourceIndex = animationNodeIndexByBone.get("Hips");
-		if (hipsSourceIndex !== undefined && mixamoRestTable.Hips) {
+		if (hipsSourceIndex !== undefined && sourceHipsRestPosition) {
 			const hipsElements = animationNodeList[hipsSourceIndex].worldMatrix.getElements();
-			const restPosition = mixamoRestTable.Hips.position;
+			const restPosition = sourceHipsRestPosition;
 			animationState.hipsOffset = makeVector((hipsElements[12] - restPosition[0]) * animationHipsHeightScale, (hipsElements[13] - restPosition[1]) * animationHipsHeightScale, (hipsElements[14] - restPosition[2]) * animationHipsHeightScale);
 		}
 	}
@@ -2404,16 +2413,15 @@
 	// 머리카락 마스크 / 깊이 패스. (카메라 시점 — 앞머리 그림자 / 앞머리 너머 비침의 근거)
 	function drawHairDepth(viewProjectionElements, modelElements) {
 		const depthProgram = hairMaskProgram;
-		depthProgram.use();
+		depthProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(depthProgram.getUniformLocation("viewProjectionMatrix"), false, viewProjectionElements);
 		webGL2RenderingContext.uniformMatrix4fv(depthProgram.getUniformLocation("modelMatrix"), false, modelElements);
-		const jointMatricesLocation = depthProgram.getUniformLocation("jointMatrices[0]");
 		let drawCount = 0;
 		for (const info of drawableInfoList) {
 			if (!info.isHair) {
 				continue;
 			}
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skinList[info.drawable.skinIndex].jointMatrixArray);
+			toonRenderer.uploadJointMatrices(skinList[info.drawable.skinIndex].jointMatrixArray);
 			toonRenderer.applyMorphUniforms(depthProgram, info.drawable);
 			drawDrawable(info.drawable);
 			drawCount += 1;
@@ -2425,7 +2433,7 @@
 	// 셀 셰이딩 패스. (모든 드로어블 — 비침 패스면 눈 부위만, 가려진 곳만)
 	function drawToonPass(frame, isSeeThroughPass) {
 		const shaderProgram = toonRenderer.getShaderProgram();
-		shaderProgram.use();
+		shaderProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
 		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("modelMatrix"), false, frame.modelElements);
 		webGL2RenderingContext.uniformMatrix4fv(shaderProgram.getUniformLocation("viewMatrix"), false, frame.viewElements);
@@ -2471,7 +2479,6 @@
 		webGL2RenderingContext.uniform1i(shaderProgram.getUniformLocation("isSeeThrough"), isSeeThroughPass ? 1 : 0);
 		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("seeThroughAlpha"), frame.seeThroughAlpha);
 
-		const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
 		const materialTypeLocation = shaderProgram.getUniformLocation("materialType");
 		const shadeColorLocation = shaderProgram.getUniformLocation("shadeColor");
 		const useAlphaTestLocation = shaderProgram.getUniformLocation("useAlphaTest");
@@ -2480,7 +2487,7 @@
 			if (isSeeThroughPass && !info.isSeeThroughPart) {
 				continue;
 			}
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skinList[info.drawable.skinIndex].jointMatrixArray);
+			toonRenderer.uploadJointMatrices(skinList[info.drawable.skinIndex].jointMatrixArray);
 			toonRenderer.applyMorphUniforms(shaderProgram, info.drawable);
 			info.drawable.material.apply();
 			webGL2RenderingContext.uniform1i(materialTypeLocation, info.materialType);
@@ -2495,7 +2502,7 @@
 
 	// 아웃라인 패스. (뒤집힌 껍질 — 앞면 컬링)
 	function drawOutlinePass(frame) {
-		outlineProgram.use();
+		outlineProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(outlineProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
 		webGL2RenderingContext.uniformMatrix4fv(outlineProgram.getUniformLocation("modelMatrix"), false, frame.modelElements);
 		webGL2RenderingContext.uniformMatrix4fv(outlineProgram.getUniformLocation("viewMatrix"), false, frame.viewElements);
@@ -2504,7 +2511,6 @@
 		webGL2RenderingContext.uniform2f(outlineProgram.getUniformLocation("outlinePixelRange"), sliderStates.outlineMinimum, System.Math.max(sliderStates.outlineMinimum, sliderStates.outlineMaximum));
 		webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineTint"), sliderStates.outlineTint);
 		webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineBrightness"), sliderStates.outlineBrightness);
-		const jointMatricesLocation = outlineProgram.getUniformLocation("jointMatrices[0]");
 		const outlineWidthLocation = outlineProgram.getUniformLocation("outlineWidth");
 		const useOutlineMaskLocation = outlineProgram.getUniformLocation("useOutlineMask");
 		const outlineColorLocation = outlineProgram.getUniformLocation("outlineColorFactor");
@@ -2513,7 +2519,7 @@
 			if (info.outlineWidth <= 0) {
 				continue;
 			}
-			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skinList[info.drawable.skinIndex].jointMatrixArray);
+			toonRenderer.uploadJointMatrices(skinList[info.drawable.skinIndex].jointMatrixArray);
 			toonRenderer.applyMorphUniforms(outlineProgram, info.drawable);
 			bindMaterialTextures(outlineProgram, info.drawable.material);
 			webGL2RenderingContext.uniform1f(outlineWidthLocation, info.outlineWidth * sliderStates.outlineWidth);
@@ -2528,7 +2534,7 @@
 
 	// 바닥.
 	function drawFloor(frame) {
-		floorProgram.use();
+		floorProgram.useProgram();
 		webGL2RenderingContext.uniformMatrix4fv(floorProgram.getUniformLocation("viewProjectionMatrix"), false, frame.viewProjectionElements);
 		bindShadowMap(floorProgram, frame.lightViewProjectionElements);
 		webGL2RenderingContext.uniform3f(floorProgram.getUniformLocation("backgroundColor"), 0.014, 0.013, 0.016);
@@ -2862,7 +2868,7 @@
 		webGL2RenderingContext.clearColor(0, 0, 0, 0);
 		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
-		backgroundPass.use();
+		backgroundPass.useProgram();
 		webGL2RenderingContext.uniform1f(backgroundPass.getUniformLocation("aspectRatio"), aspectRatio);
 		webGL2RenderingContext.uniform3f(backgroundPass.getUniformLocation("backgroundColor"), 0.014, 0.013, 0.016);
 		webGL2RenderingContext.uniform3f(backgroundPass.getUniformLocation("glowColor"), 0.085, 0.07, 0.05);
@@ -2912,7 +2918,7 @@
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
 		}
-		compositePass.use();
+		compositePass.useProgram();
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("normalTexture"), 1);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("depthTexture"), 2);
@@ -2952,7 +2958,7 @@
 		if (useAntialias) {
 			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
-			antialiasPass.use();
+			antialiasPass.useProgram();
 			webGL2RenderingContext.uniform1i(antialiasPass.getUniformLocation("sourceTexture"), 0);
 			webGL2RenderingContext.uniform2f(antialiasPass.getUniformLocation("texelSize"), 1 / renderWidth, 1 / renderHeight);
 			webGL2RenderingContext.uniform1f(antialiasPass.getUniformLocation("sharpenStrength"), sliderStates.antialias >= 2 ? 0.5 : 0);
@@ -2997,6 +3003,8 @@
 		else {
 			updatePanelLimits(System.window.innerHeight - 18);
 		}
+		// 묶어 그리기로 쌓여 남은 HUD 를 이 프레임 안에 그린다. (엔진 루프 밖에서 Graphic 을 직접 쓰므로 엔진 대신 부른다)
+		uiGraphic.flushBatch();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		statistics.cpuFrameMilliseconds = statistics.cpuFrameMilliseconds * 0.9 + (System.performance.now() - cpuFrameStart) * 0.1;
 

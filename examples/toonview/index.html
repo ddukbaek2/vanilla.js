@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toon View</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000000; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 노드 사각형 안 툰 3D 예제. (ToonView3D, Camera3D, ToonDrawQueue, ToonPostProcess 색 보정, 러스트 예제 toonview 와 같은 장면)
+// - 왼쪽 판: 2D 바탕(Paint) 위에 ToonView3D 가 노드 사각형 안에만 툰을 그린다. 불투명한 것, 바깥선, 비치는 공 셋(먼 것부터 섞음),
+//   MeshBuilder.combine 으로 이은 각진 돌덩이 셋, 인스턴싱한 작은 돌.
+//   노란 점과 이름표는 렌더러와 같은 Camera3D 의 projectToView 로 3D 점 위에 얹은 2D 다. 판 다음 형제인 노란 띠는 3D 위에 그려진다.
+// - 오른쪽 판: 같은 장면을 ToonPostProcess 에 그려 채도 낮춤, 따뜻한 색조, 안개빛, 대비, 가장자리 어둡게를 건다.
+// - 두 판은 ToonView3D.setRenderer 로 렌더러 하나를 나눠 쓰고, 그릴 것은 setDrawCallback 의 함수가 들고 있는다.
+// - 그리기 함수는 두 엔진 모두 (렌더러, 카메라, 화면 사각형 Rect, GL, 출력) 이다. 출력은 원본 { outputFramebuffer, outputViewport }, 러스트 ToonViewOutput.
+// - ?renderScale=0.5 처럼 주면 두 판의 3D 만 그 배율로 그려 늘여 얹는다. (ToonView3D.setRenderScale, 이름표와 띠 같은 2D 는 기기 화소 그대로)
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Paint, Text, TextAlign, MeshBuilder, createPartMatrix, createFacetedChunkGeometry, createBoxGeometry, createSphereGeometry, ToonRenderer, ToonPostProcess, ToonDrawQueue, ToonView3D } from "../../import.js";
+const RENDER_SCALE = Number(new URLSearchParams(location.search).get("renderScale") ?? "1") || 1; // 3D 렌더 스케일. (?renderScale=0.5)
+
+const PI = System.Math.PI;
+const BACKGROUND_COLOR = "#000000";
+
+//==============================================================================
+// 부품 하나의 배열.
+//==============================================================================
+function buildArrays(geometry, position, colorText, options) {
+	const builder = new MeshBuilder();
+	builder.addPart(geometry, createPartMatrix(null, position, null, null), colorText, options);
+	return builder.readArrays();
+}
+
+//==============================================================================
+// 판 하나의 그리기 상태. (오른쪽 판은 ToonPostProcess 로 색 보정, ToonView3D 의 그리기 함수가 들고 있는다)
+//==============================================================================
+class PanelDrawer {
+	#isGraded;
+	#readElapsedSeconds;
+	#meshes = null;
+	#pebbleInstanceList = [];
+	#postProcess = null;
+	#frameCount = 0;
+
+	constructor(isGraded, readElapsedSeconds) {
+		this.#isGraded = isGraded;
+		this.#readElapsedSeconds = readElapsedSeconds;
+		for (let pebbleIndex = 0; pebbleIndex < 24; pebbleIndex++) {
+			const angle = pebbleIndex / 24 * PI * 2;
+			const modelMatrix = Matrix4.createTranslation(System.Math.cos(angle) * 3.3, 0, System.Math.sin(angle) * 2.4);
+			modelMatrix.rotateY(angle * 2);
+			this.#pebbleInstanceList.push({ modelMatrix });
+		}
+	}
+
+	//==============================================================================
+	// 모형 짓기. (처음 그릴 때 한 번)
+	//==============================================================================
+	static createMeshes(renderer) {
+		const outlineOptions = { outlineWidth: 0.03 };
+		const chunk = buildArrays(createFacetedChunkGeometry(0.4, [1.0, 0.85, 1.1, 0.95, 1.05, 0.9], [1.0, 0.8, 1.0]), [0, 0.3, 0], "#9a8a7a", {});
+		const pile = MeshBuilder.combine([{ arrays: chunk, offset: [0, 0, 0] }, { arrays: chunk, offset: [0.7, 0, 0.2] }, { arrays: chunk, offset: [0.3, 0.45, 0.1] }]);
+		return {
+			ground: renderer.createMesh(buildArrays(createBoxGeometry(8, 0.2, 6), [0, -0.1, 0], "#6b8f5a", { hasOutline: false })),
+			box: renderer.createMesh(buildArrays(createBoxGeometry(1, 1, 1), [0, 0.5, 0], "#ff8844", outlineOptions)),
+			sphere: renderer.createMesh(buildArrays(createSphereGeometry(0.5, 24, 16, PI), [0, 0.5, 0], "#ffd257", outlineOptions)),
+			glass: renderer.createMesh(buildArrays(createSphereGeometry(0.45, 24, 16, PI), [0, 0.45, 0], "#66ccff", { outlineWidth: 0.02 })),
+			pile: renderer.createMesh(pile),
+			pebble: renderer.createMesh(buildArrays(createFacetedChunkGeometry(0.12, [1.0, 0.8, 1.2], [1.0, 0.7, 1.0]), [0, 0.08, 0], "#c9b8a0", { outlineWidth: 0.012 })) };
+	}
+
+	//==============================================================================
+	// 판 그리기. (ToonView3D 의 그리기 함수)
+	//==============================================================================
+	draw(renderer, camera, screenRect, webGL2RenderingContext, output) {
+		if (this.#meshes === null) {
+			this.#meshes = PanelDrawer.createMeshes(renderer);
+		}
+		const meshes = this.#meshes;
+		renderer.setBandCount(3);
+		renderer.setLight([-0.5, -1.0, -0.35], [0.85, 0.8, 0.75], [0.55, 0.6, 0.7], [0.25, 0.22, 0.2]);
+
+		// 담기. (불투명, 인스턴싱, 비치는 공 셋은 앞뒤로 겹쳐 놓아 먼 것부터 섞여야 바르게 보임)
+		const queue = new ToonDrawQueue();
+		queue.addMesh(meshes.ground, Matrix4.createIdentity(), {});
+		const boxMatrix = Matrix4.createTranslation(-1.6, 0, 0);
+		boxMatrix.rotateY(0.5 + this.#readElapsedSeconds() * 0.5);
+		queue.addMesh(meshes.box, boxMatrix, {});
+		queue.addMesh(meshes.sphere, Matrix4.createTranslation(0.2, 0, -0.6), {});
+		queue.addMesh(meshes.pile, Matrix4.createTranslation(1.5, 0, 0.3), {});
+		queue.addMeshInstanced(meshes.pebble, this.#pebbleInstanceList, {});
+		const glassColors = [[1.0, 0.4, 0.4, 1.0], [0.4, 1.0, 0.4, 1.0], [0.5, 0.6, 1.0, 1.0]];
+		for (let glassIndex = 0; glassIndex < glassColors.length; glassIndex++) {
+			const glassMatrix = Matrix4.createTranslation(-0.4 + glassIndex * 0.35, 0.1, 1.6 - glassIndex * 0.7);
+			queue.addMesh(meshes.glass, glassMatrix, { alpha: 0.55, tintColor: glassColors[glassIndex] });
+		}
+
+		if (!this.#isGraded) {
+			renderer.setHdrOutput(false);
+			queue.draw(renderer, camera);
+		}
+		else {
+			// 실수 렌더 타겟에 그리고 색 보정을 걸어 노드 사각형에 낸다. (렌더러의 화면 사각형은 푼다)
+			const width = System.Math.max(1, System.Math.round(screenRect.size.x));
+			const height = System.Math.max(1, System.Math.round(screenRect.size.y));
+			if (this.#postProcess === null) {
+				const postProcess = new ToonPostProcess(webGL2RenderingContext, width, height);
+				postProcess.setBloom(false, 0.0, 0.9, 1.6);
+				postProcess.setColorGrade(0.45, 1.15, [1.0, 0.8, 0.55], 0.6, [0.35, 0.3, 0.45], 0.25);
+				postProcess.setVignette(0.8);
+				this.#postProcess = postProcess;
+			}
+			const postProcess = this.#postProcess;
+			postProcess.resize(width, height);
+			renderer.clearScreenRect();
+			renderer.setHdrOutput(true);
+			postProcess.begin([0.05, 0.06, 0.09]);
+			queue.draw(renderer, camera);
+			postProcess.end(output.outputFramebuffer, output.outputViewport);
+		}
+		this.#frameCount += 1;
+		if (this.#frameCount === 30) {
+			const frameStatistics = renderer.getFrameStatistics();
+			System.console.log(`toonview: 판 ${this.#isGraded ? "오른쪽" : "왼쪽"} 그린 것 ${frameStatistics.drawnObjectCount} 거른 것 ${frameStatistics.culledObjectCount} 드로우콜 ${frameStatistics.drawCallCount}`);
+		}
+	}
+}
+
+//==============================================================================
+// 렌더러를 짓지 못한 기기. (판에 글만, ToonView3D 의 대체 그리기 함수)
+//==============================================================================
+function drawFallback(graphic, contentSize) {
+	graphic.setFillColor("#ffffff");
+	graphic.drawFillText("3D 를 그릴 수 없는 기기", contentSize.x * 0.5, contentSize.y * 0.5);
+}
+
+//==============================================================================
+// 색 판 노드.
+//==============================================================================
+function createPanel(parentNode, rect, colorText) {
+	const node = new WorldNode();
+	node.setName("panel");
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(rect.position);
+	node.setContentSize(rect.size);
+	node.addComponent(Paint).setColor(colorText);
+	return node;
+}
+
+//==============================================================================
+// 글 노드.
+//==============================================================================
+function createText(parentNode, position, textValue, colorText) {
+	const node = new WorldNode();
+	node.setName("text");
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(position);
+	node.setContentSize(Vector2.create(700, 24));
+	const text = node.addComponent(Text);
+	text.setText(textValue);
+	text.setFontSize(18);
+	text.setTextColor(colorText);
+	text.setTextAlign(TextAlign.left);
+	return node;
+}
+
+//==============================================================================
+// 노드 사각형 안 툰 씬.
+//==============================================================================
+class ToonViewScene extends Scene {
+	#leftPanel = null;
+	#rightPanel = null;
+	#markerList = [];
+	#elapsedSeconds = 0;
+	#isRendererShared = false;
+
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		this.#leftPanel = createPanel(root, Rect.create(40, 60, 700, 460), "#2d3a4f");
+		this.#rightPanel = createPanel(root, Rect.create(780, 60, 460, 460), "#000000");
+		for (const [panel, isGraded] of [[this.#leftPanel, false], [this.#rightPanel, true]]) {
+			const panelDrawer = new PanelDrawer(isGraded, () => this.#elapsedSeconds);
+			const toonView = panel.addComponent(ToonView3D);
+			toonView.setRenderScale(RENDER_SCALE);
+			toonView.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext, output) => {
+				panelDrawer.draw(renderer, camera, screenRect, webGL2RenderingContext, output);
+			});
+			toonView.setFallbackDrawCallback(drawFallback);
+			toonView.getCamera().setPerspective(0.75, 0.1, 100);
+		}
+		const overlay = createPanel(root, Rect.create(60, 470, 260, 36), "#ffcc33");
+		createText(overlay, Vector2.create(8, 6), "2D 가 3D 위에", "#000000");
+		createText(root, Vector2.create(40, 20), "왼쪽: 노드 사각형 안 툰, 비치는 공은 먼 것부터, 노란 점은 Camera3D::project_to_view", "#ffffff");
+		createText(root, Vector2.create(780, 530), "오른쪽: ToonPostProcess 색 보정", "#ffffff");
+		for (const [point, name] of [[[-1.6, 1.15, 0.0], "상자"], [[0.2, 1.15, -0.6], "공"], [[1.85, 1.3, 0.4], "돌무더기"]]) {
+			const marker = createPanel(root, Rect.create(0, 0, 10, 10), "#ffee00");
+			marker.setPivot(Pivot.middleCenter);
+			const label = createText(root, Vector2.create(0, 0), name, "#ffee00");
+			this.#markerList.push({ point, marker, label });
+		}
+	}
+
+	//==============================================================================
+	// 카메라를 돌리고, 같은 카메라로 3D 점 위에 2D 표시를 놓는다.
+	//==============================================================================
+	tick(timeDelta) {
+		this.#elapsedSeconds += timeDelta;
+		const elapsedSeconds = this.#elapsedSeconds;
+		const eyePosition = Vector3.create(System.Math.sin(elapsedSeconds * 0.2) * 1.5, 4.2, 6.5);
+		const targetPosition = Vector3.create(0, 0.4, 0);
+		const upDirection = Vector3.create(0, 1, 0);
+		for (const panel of [this.#leftPanel, this.#rightPanel]) {
+			panel.getComponent(ToonView3D).getCamera().lookAt(eyePosition, targetPosition, upDirection);
+		}
+		const panelPosition = this.#leftPanel.getLocalPosition();
+		const panelSize = this.#leftPanel.getContentSize();
+		const panelRect = Rect.create(panelPosition.x, panelPosition.y, panelSize.x, panelSize.y);
+		const camera = this.#leftPanel.getComponent(ToonView3D).getCamera();
+		camera.setAspectRatio(panelRect.size.x / panelRect.size.y);
+		for (const marker of this.#markerList) {
+			const projected = camera.projectToView(marker.point[0], marker.point[1], marker.point[2], panelRect);
+			marker.marker.setLocalPosition(Vector2.create(projected.x, projected.y));
+			marker.label.setLocalPosition(Vector2.create(projected.x - 20, projected.y - 30));
+		}
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 처음 그릴 때 렌더러 하나를 지어 두 판에 나눠 준다. (ToonView3D.setRenderer)
+	//==============================================================================
+	preDraw(graphic) {
+		if (!this.#isRendererShared) {
+			this.#isRendererShared = true;
+			const sharedRenderer = new ToonRenderer(graphic.getWebGL2RenderingContext());
+			for (const panel of [this.#leftPanel, this.#rightPanel]) {
+				panel.getComponent(ToonView3D).setRenderer(sharedRenderer);
+			}
+			graphic.restoreRenderState();
+		}
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "노드 사각형 안 툰 3D (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new ToonViewScene());
+</script>
+</body>
+</html>

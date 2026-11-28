@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toon Showcase</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #14171e; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 툰 3D 예제. (MeshBuilder 의 기본 도형, GLB 모형과 뼈대 움직임을 ToonRenderer 로 그린다, 러스트 예제 toonshowcase 와 같은 장면)
+// - 바닥판 위에 상자, 둥근 상자, 구, 원뿔, 캡슐, 고리, 팔면체를 짓고 셀 셰이딩과 바깥선으로 그린다.
+// - ../ancientmountain/assets/mannequin_female.glb(Quaternius CC0)를 readGlbArrays 로 읽어 걷기 움직임을 writeSkinPose 로 돌린다. (텍스처는 쓰지 않고 재질 색만)
+// - 둘레에 작은 바위 2 천 개를 GPU 인스턴싱 한 번으로 그리고, 화면 밖 바위는 거른다. (그린 수와 거른 수를 콘솔에)
+// - 엔진 ShadowMap 으로 그림자를 드리우고 받는다. HDR 실수 렌더 타겟에 그려 빛나는 공에 블룸을 걸고 톤매핑한다. (ToonPostProcess)
+//   그림자 패스는 HDR 타겟을 건 뒤에 한다. endShadowPass 가 앞의 프레임버퍼(HDR 타겟)와 뷰포트로 돌린다.
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, Vector2, Vector3, Rect, Matrix4, MeshBuilder, createRoundedBoxGeometry, createPartMatrix, createBoxGeometry, createSphereGeometry, createCylinderGeometry, createCapsuleGeometry, createTorusGeometry, createOctahedronGeometry, readGlbArrays, writeSkinPose, ToonRenderer, ToonPostProcess, ShadowMap, TOON_MAXIMUM_JOINTS } from "../../import.js";
+
+const MODEL_PATH = "../ancientmountain/assets/mannequin_female.glb";
+const BACKGROUND_COLOR = "#14171e";
+
+//==============================================================================
+// 기본 도형으로 지은 배열. ([배열, 자리, 돌기])
+//==============================================================================
+function buildShapes() {
+	const PI = System.Math.PI;
+	const shapeList = [];
+	const groundBuilder = new MeshBuilder();
+	groundBuilder.addPart(createRoundedBoxGeometry(9, 0.3, 5, 3, 0.12), createPartMatrix(null, [0, -0.15, 0], null, null), "#5a4a6e", { hasOutline: false });
+	shapeList.push([groundBuilder.readArrays(), [0, 0, 0], 0]);
+	const shapes = [["box", [-3.4, 0, -1.2]], ["roundedBox", [-1.7, 0, -1.2]], ["sphere", [0, 0, -1.4]], ["cone", [1.7, 0, -1.2]], ["capsule", [3.4, 0, -1.2]], ["torus", [-3.0, 0, 1.4]], ["octahedron", [3.0, 0, 1.4]]];
+	for (const [shapeName, position] of shapes) {
+		const builder = new MeshBuilder();
+		const options = { outlineWidth: 0.03 };
+		if (shapeName === "box") {
+			builder.addPart(createBoxGeometry(0.9, 0.9, 0.9), createPartMatrix(null, [0, 0.45, 0], null, null), "#ff8844", options);
+		}
+		else if (shapeName === "roundedBox") {
+			builder.addPart(createRoundedBoxGeometry(0.9, 0.9, 0.9, 3, 0.2), createPartMatrix(null, [0, 0.45, 0], null, null), "#45b585", options);
+		}
+		else if (shapeName === "sphere") {
+			builder.addPart(createSphereGeometry(0.5, 20, 14, PI), createPartMatrix(null, [0, 0.5, 0], null, null), "#ffcc55", { ...options, glow: 4 });
+		}
+		else if (shapeName === "cone") {
+			builder.addPart(createCylinderGeometry(0, 0.5, 1, 20), createPartMatrix(null, [0, 0.5, 0], null, null), "#6d7dff", options);
+		}
+		else if (shapeName === "capsule") {
+			builder.addPart(createCapsuleGeometry(0.3, 0.6, 6, 16), createPartMatrix(null, [0, 0.6, 0], null, null), "#e06058", options);
+		}
+		else if (shapeName === "torus") {
+			builder.addPart(createTorusGeometry(0.45, 0.15, 12, 32, PI * 2), createPartMatrix(null, [0, 0.6, 0], [PI * 0.5, 0, 0], null), "#78c8ff", options);
+		}
+		else {
+			builder.addPart(createOctahedronGeometry(0.5), createPartMatrix(null, [0, 0.5, 0], null, null), "#c27bff", options);
+		}
+		shapeList.push([builder.readArrays(), position, 0.6]);
+	}
+	return shapeList;
+}
+
+//==============================================================================
+// 툰 3D 씬.
+//==============================================================================
+class ToonShowcaseScene extends Scene {
+	/** @private @type { ArrayBuffer | null } */ #mannequinBuffer = null;
+	/** @private @type { ToonRenderer | null } */ #renderer = null;
+	/** @private @type { ShadowMap | null } */ #shadowMap = null;
+	/** @private @type { ToonPostProcess | null } */ #postProcess = null;
+	/** @private @type { object | null } */ #rockMesh = null;
+	/** @private @type { object[] } */ #rockInstanceList = [];
+	/** @private @type { number } */ #frameCount = 0;
+	/** @private @type { object[] } */ #placedList = [];
+	/** @private @type { number } */ #elapsedSeconds = 0;
+
+	//==============================================================================
+	// 읽기. (마네킹 GLB)
+	//==============================================================================
+	async load(engine) {
+		await super.load(engine);
+		const response = await System.fetch(MODEL_PATH);
+		if (response.ok) {
+			this.#mannequinBuffer = await response.arrayBuffer();
+		}
+	}
+
+	//==============================================================================
+	// 렌더러와 모형 준비. (처음 그릴 때 한 번)
+	//==============================================================================
+	createResources(webGL2RenderingContext) {
+		const PI = System.Math.PI;
+		const renderer = new ToonRenderer(webGL2RenderingContext);
+		renderer.setBandCount(3);
+		for (const [arrays, position, spin] of buildShapes()) {
+			const mesh = renderer.createMesh(arrays);
+			if (mesh !== null) {
+				this.#placedList.push({ mesh, arrays, position, scale: 1, spin });
+			}
+		}
+		if (this.#mannequinBuffer !== null) {
+			let arrays = readGlbArrays(this.#mannequinBuffer, null);
+			if (arrays.outlineIndexData.length === 0) {
+				arrays = readGlbArrays(this.#mannequinBuffer, { width: 0.02 });
+			}
+			const mesh = renderer.createMesh(arrays);
+			if (mesh !== null) {
+				this.#placedList.push({ mesh, arrays, position: [-1.2, 0, 1.2], scale: 1, spin: 0.3 });
+			}
+		}
+		// 인스턴싱할 바위. (팔면체 하나, 바닥판 둘레의 띠에 2 천 개, 자리와 크기와 색을 흩는다)
+		const rockBuilder = new MeshBuilder();
+		rockBuilder.addPart(createOctahedronGeometry(0.12), createPartMatrix(null, [0, 0.08, 0], null, [1, 0.7, 1]), "#c9b8a0", { outlineWidth: 0.012 });
+		this.#rockMesh = renderer.createMesh(rockBuilder.readArrays());
+		for (let rockIndex = 0; rockIndex < 2000; rockIndex++) {
+			const ratio = rockIndex / 2000;
+			const angle = ratio * PI * 2 * 37;
+			const distance = 5.5 + (rockIndex % 97) / 97 * 9;
+			const modelMatrix = Matrix4.createTranslation(System.Math.cos(angle) * distance, -0.3, System.Math.sin(angle) * distance * 0.7);
+			modelMatrix.rotateY(angle * 3);
+			const scale = 0.6 + (rockIndex % 13) / 13 * 1.4;
+			modelMatrix.scale(scale, scale, scale);
+			const shade = 0.7 + (rockIndex % 7) / 7 * 0.5;
+			this.#rockInstanceList.push({ modelMatrix, tintColor: [shade, shade * 0.95, shade * 0.9, 1] });
+		}
+		renderer.setHdrOutput(true);
+		renderer.setLight([-0.5, -1.0, -0.4], [1.6, 1.5, 1.4], [0.35, 0.4, 0.5], [0.15, 0.13, 0.12]);
+		// HDR 블룸에 1 을 넘는 해를 쓰므로 빛 세기 막기(기본 켬, 유니티 툰 셰이더의 Limit Light Intensity)를 끈다.
+		renderer.setLightIntensityLimited(false);
+		this.#shadowMap = new ShadowMap(webGL2RenderingContext, 2048);
+		this.#renderer = renderer;
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#elapsedSeconds += timeDelta;
+	}
+
+	//==============================================================================
+	// 3D 출력. (2D 묶음 내보내기 → 툰 패스 → 2D 상태 복구)
+	//==============================================================================
+	preDraw(graphic) {
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+		graphic.flushBatch();
+		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+		if (this.#renderer === null) {
+			this.createResources(webGL2RenderingContext);
+		}
+		const canvasPixelSize = viewManager.getCanvasPixelSize();
+		const aspectRatio = canvasPixelSize.x / System.Math.max(canvasPixelSize.y, 1);
+		const viewMatrix = Matrix4.createLookAt(Vector3.create(0, 4.2, 7.5), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));
+		const viewProjectionMatrix = Matrix4.createPerspective(0.7, aspectRatio, 0.1, 100);
+		viewProjectionMatrix.multiply(viewMatrix);
+		const elapsedSeconds = this.#elapsedSeconds;
+		const pixelWidth = System.Math.floor(canvasPixelSize.x);
+		const pixelHeight = System.Math.floor(canvasPixelSize.y);
+		if (this.#postProcess === null) {
+			this.#postProcess = new ToonPostProcess(webGL2RenderingContext, pixelWidth, pixelHeight);
+		}
+		const renderer = this.#renderer;
+		const shadowMap = this.#shadowMap;
+		const postProcess = this.#postProcess;
+		postProcess.resize(pixelWidth, pixelHeight);
+
+		// 모형마다의 행렬과 자세.
+		const modelMatrixList = [];
+		const poseList = [];
+		for (const placed of this.#placedList) {
+			const modelMatrix = Matrix4.createTranslation(placed.position[0], placed.position[1], placed.position[2]);
+			modelMatrix.rotateY(elapsedSeconds * placed.spin);
+			modelMatrix.scale(placed.scale, placed.scale, placed.scale);
+			modelMatrixList.push(modelMatrix);
+			const skeleton = placed.arrays.skeleton;
+			if (skeleton !== null && skeleton !== undefined) {
+				const jointMatrices = new System.Float32Array(TOON_MAXIMUM_JOINTS * 16);
+				const animationNameList = System.Object.keys(skeleton.animations).sort();
+				const walkName = animationNameList.find((name) => name.toLowerCase().includes("walk")) || animationNameList[0] || "";
+				writeSkinPose(skeleton, walkName, elapsedSeconds, jointMatrices, null, null);
+				poseList.push(jointMatrices);
+			}
+			else {
+				poseList.push(null);
+			}
+		}
+
+		// 1. HDR 타겟 걸기, 2. 그림자 깊이(끝나면 HDR 타겟으로 돌아온다), 3. HDR 씬. (같은 그리기를 두 번)
+		const sunDirection = renderer.getSunDirection();
+		shadowMap.updateLightMatrix(Vector3.create(0, 0, 0), Vector3.create(sunDirection[0], sunDirection[1], sunDirection[2]), 9, 0.1, 40);
+		postProcess.begin([0.006, 0.007, 0.012]);
+		for (let passIndex = 0; passIndex < 2; passIndex++) {
+			if (passIndex === 0) {
+				renderer.beginShadowPass(shadowMap);
+			}
+			else {
+				renderer.setShadow(shadowMap, 0.6);
+				renderer.beginFrame(viewProjectionMatrix);
+			}
+			for (let placedIndex = 0; placedIndex < this.#placedList.length; placedIndex++) {
+				const options = poseList[placedIndex] !== null ? { jointMatrices: poseList[placedIndex] } : {};
+				renderer.drawMesh(this.#placedList[placedIndex].mesh, modelMatrixList[placedIndex], options);
+			}
+			if (this.#rockMesh !== null) {
+				renderer.drawMeshInstanced(this.#rockMesh, this.#rockInstanceList, {});
+			}
+			if (passIndex === 0) {
+				renderer.endShadowPass();
+			}
+		}
+		const frameStatistics = renderer.getFrameStatistics();
+		renderer.endFrame();
+
+		// 4. 블룸과 톤매핑을 화면에.
+		postProcess.end(null, [0, 0, pixelWidth, pixelHeight]);
+		this.#frameCount += 1;
+		if (this.#frameCount % 60 === 1) {
+			System.console.log(`toonshowcase: 그린 것 ${frameStatistics.drawnObjectCount} 거른 것 ${frameStatistics.culledObjectCount} 드로우콜 ${frameStatistics.drawCallCount}`);
+		}
+		graphic.restoreRenderState();
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "툰 3D (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new ToonShowcaseScene());
+</script>
+</body>
+</html>

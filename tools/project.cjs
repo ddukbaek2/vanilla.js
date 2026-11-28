@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 //==============================================================================
-// 프로젝트 도구. (빌드 / 자산 현황 체크)
+// 프로젝트 도구. (빌드 / 자산 현황 체크 / 배포 복사)
 //
 // 사용법:
-//   node tools/project build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리>
-//   node tools/project check --input <입력디렉토리>
+//   node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리> [-t|--template <빌드템플릿경로>]
+//   node tools/project.cjs check --input <입력디렉토리>
+//   node tools/project.cjs stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <이름1,이름2,...>]
 //
 // 서브커맨드:
-//   build    <입력>/tools/buildtemplate + <입력>/assets 를 <출력>으로 복사 후 esbuild 번들링.
-//   check    <입력>/assets/sprites 하위 이미지/아틀라스 자산 현황을 리포트로 출력.
+//   build    출력 디렉토리를 비우고 빌드 템플릿(기본은 이 파일 옆의 buildtemplate, -t 나 --template 로 바꿈)과 <입력>/assets 를 <출력>으로 복사한 뒤
+//            진입 파일을 esbuild 로 묶어 <출력>/js/bundle.min.js 에 쓴다. (iife, --minify 에 --keep-names 를 더해 줄여도 클래스와 함수 이름을 지킨다)
+//   check    <입력>/assets/sprites 하위 이미지/아틀라스 자산 현황을 리포트로 출력. (npm 패키지 canvas 가 필요하다)
+//   stage    소스 디렉토리 전체를 대상 디렉토리로 복사. (대상은 먼저 비운다, --skip 에 쉼표로 준 맨 위 이름은 건너뛴다)
 //
 // 예시:
-//   node tools/project build --script main.js --input . --output build/web
-//   node tools/project check --input .
+//   node tools/project.cjs build --script main.js --input . --output build/web
+//   node tools/project.cjs check --input .
+//   node tools/project.cjs stage --source build/web --destination ../site/game --skip README.md
 //==============================================================================
 'use strict';
 const fs = require('fs');
@@ -163,11 +167,30 @@ async function build(script, input, output, template) {
 	}
 
 	fs.mkdirSync(path.dirname(bundleDest), { recursive: true });
-	const esbuildCommand = `esbuild ${entryFile} --bundle --outfile=${bundleDest} --format=iife --minify`;
+	// 엔진은 실행 중에 클래스 이름(constructor.name)을 읽는 곳이 있어(개발자 도구의 종류 이름, UIDocument 가 등록하지 않은 종류를 적을 때) 줄여도 이름을 지킨다.
+	const esbuildCommand = `esbuild ${entryFile} --bundle --outfile=${bundleDest} --format=iife --minify --keep-names`;
 	console.log(`[3] esbuild 실행 중...`);
 	console.log(`    ${esbuildCommand}`);
 	execSync(esbuildCommand, { stdio: 'inherit' });
 	console.log(`[3] 번들 완료: ${bundleDest}`);
+
+	// 4. 엔진 라이선스 두 파일 복사. (번들에 엔진 코드와 엔진이 옮긴 제3자 코드가 실리므로 고지를 같이 낸다)
+	// - 출력 맨 위에 LICENSE, THIRD_PARTY_LICENSES.md 로 둔다. 템플릿이나 게임이 같은 이름의 파일을 이미 냈으면 덮지 않고 licenses/vanilla.js/ 아래에 둔다.
+	const engineDir = path.resolve(__dirname, '..');
+	for (const licenseFileName of ['LICENSE', 'THIRD_PARTY_LICENSES.md']) {
+		const licenseSrc = path.join(engineDir, licenseFileName);
+		if (!fs.existsSync(licenseSrc)) {
+			console.warn(`[4] 엔진 라이선스 파일 없음 (건너뜀): ${licenseSrc}`);
+			continue;
+		}
+		let licenseDest = path.join(outputDir, licenseFileName);
+		if (fs.existsSync(licenseDest)) {
+			licenseDest = path.join(outputDir, 'licenses', 'vanilla.js', licenseFileName);
+			fs.mkdirSync(path.dirname(licenseDest), { recursive: true });
+		}
+		fs.copyFileSync(licenseSrc, licenseDest);
+		console.log(`[4] 엔진 라이선스 복사 완료: ${licenseSrc} -> ${licenseDest}`);
+	}
 
 	console.log(`\n빌드 완료: ${outputDir}`);
 }
@@ -586,9 +609,9 @@ function parseArgs(argv) {
 //==============================================================================
 function printUsage() {
 	console.log('사용법:');
-	console.log('  node tools/project build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리> [-t|--template <빌드템플릿경로>]');
-	console.log('  node tools/project check --input <입력디렉토리>');
-	console.log('  node tools/project stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <파일1,파일2,...>]');
+	console.log('  node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리> [-t|--template <빌드템플릿경로>]');
+	console.log('  node tools/project.cjs check --input <입력디렉토리>');
+	console.log('  node tools/project.cjs stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <이름1,이름2,...>]');
 }
 
 //==============================================================================

@@ -24,27 +24,36 @@ export const PaneTheme = {
         inputBg: "#3c3c3c",
         resizer: "#333",
         resizerHover: "#007acc"
-    },
+    }, // 색. (CSS 색 글)
     size: {
         resizer: 5
-    },
+    }, // 크기. (픽셀)
     font: {
         family: "sans-serif",
         mono: "\"Consolas\", monospace",
         size: "13px",
         sizeSmall: "12px"
-    }
+    } // 글꼴과 글 크기.
 };
 
 
 //==============================================================================
 // 스타일 및 요소 생성 유틸리티.
 //==============================================================================
+/**
+ * @example <caption>테마 스타일이 적용된 단추 만들기</caption>
+ * import { PaneStyle, PaneTheme } from "./build/vanilla.js";
+ *
+ * const button = PaneStyle.create("button", "button", { text: "OK", accent: true });
+ * PaneStyle.apply(button, { margin: "8px" });
+ * document.body.appendChild(button);
+ * console.log(button.style.margin, PaneTheme.color.accent);
+ */
 export class PaneStyle {
     /**
-     * 엘리먼트에 여러 스타일을 일괄 적용합니다.
-     * @param { HTMLElement } el 
-     * @param { Object } styles 
+     * 엘리먼트에 여러 스타일을 한꺼번에 적용한다. (엘리먼트나 스타일이 없으면 아무것도 하지 않는다)
+     * @param { HTMLElement } el 스타일을 적용할 엘리먼트.
+     * @param { Object } styles 적용할 CSS 속성 이름과 값. (camelCase)
      */
     static apply(el, styles) {
         if (!el || !styles) return;
@@ -52,10 +61,11 @@ export class PaneStyle {
     }
 
     /**
-     * 스타일 프리셋이 적용된 엘리먼트를 생성합니다.
-     * @param { string } tagName 
-     * @param { string } preset - "panel" | "toolbar" | "button" | "input" | "textarea" | "text"
-     * @param { Object } options - { id, text, style, type, placeholder, accent, warning }
+     * 스타일 프리셋이 적용된 엘리먼트를 만든다.
+     * @param { string } tagName 만들 태그 이름.
+     * @param { string } preset 프리셋 이름. ("panel", "toolbar", "button", "input", "textarea", "text", 빈 글이면 공통 스타일만)
+     * @param { Object } options { id, text, style, type, placeholder, accent, warning }. (accent 나 warning 이 참인 단추는 그 색 바탕)
+     * @returns { HTMLElement } 만든 엘리먼트.
      */
     static create(tagName, preset = "", options = {}) {
         const el = System.document.createElement(tagName);
@@ -159,6 +169,18 @@ export class PaneStyle {
 //==============================================================================
 // 화면 분할 패널(Pane) 클래스.
 //==============================================================================
+/**
+ * @example <caption>좌우로 나누고 부모 요소에 붙이기</caption>
+ * import { Pane } from "./build/vanilla.js";
+ *
+ * const rootPane = new Pane({ direction: "horizontal" });
+ * const leftPane = new Pane({ size: 200, minSize: 100 });
+ * const rightPane = new Pane({ size: "flex" });
+ * rootPane.addPane(leftPane);
+ * rootPane.addPane(rightPane);
+ * rootPane.attachTo(document.body);
+ * console.log(leftPane.getInitialSize(), rightPane.isFlex(), leftPane.getMinSize());
+ */
 export class Pane {
     //==============================================================================
     // 멤버 변수 목록.
@@ -191,6 +213,10 @@ export class Pane {
     //==============================================================================
     // 생성.
     //==============================================================================
+    /**
+     * @constructor
+     * @param { { direction?: string, size?: number | string, minSize?: number, maxSize?: number, isResizable?: boolean, resizableEdges?: { top: boolean, bottom: boolean, left: boolean, right: boolean } } } options 나누는 방향(horizontal 이나 vertical), 처음 크기(픽셀, 1 이하의 비율, 퍼센트 글, flex), 가장 작고 큰 크기, 조절 가능 여부와 가장자리.
+     */
     constructor(options = {}) {
         this.#direction = options.direction || "horizontal";
         
@@ -220,6 +246,9 @@ export class Pane {
         this.#createContainer();
     }
 
+    //==============================================================================
+    // 컨테이너 요소 만들기. (절대 자리, 넘치는 것은 숨긴다)
+    //==============================================================================
     /** @private */
     #createContainer() {
         this.#container = System.document.createElement("div");
@@ -232,6 +261,9 @@ export class Pane {
     //==============================================================================
     // 자식 추가.
     //==============================================================================
+    /**
+     * @param { Pane } pane 자식으로 붙일 패널. (앞 자식과의 사이에 리사이저가 생긴다)
+     */
     addPane(pane) {
         if (!(pane instanceof Pane)) return;
         pane.#parentPane = this;
@@ -247,6 +279,9 @@ export class Pane {
         this.#container.appendChild(pane.getContainer());
     }
 
+    //==============================================================================
+    // 앞 패널과 뒤 패널 사이의 리사이저 요소 만들기. (부모와 두 패널이 모두 조절할 수 있을 때만 끌린다)
+    //==============================================================================
     /** @private */
     #createResizer(prev, next) {
         const resizer = System.document.createElement("div");
@@ -332,6 +367,9 @@ export class Pane {
         root.refresh();
     }
 
+    //==============================================================================
+    // 마우스 놓기. (크기 조절을 끝내고 문서에 건 이벤트를 뗀다)
+    //==============================================================================
     /** @private */
     #onMouseUp() {
         this.#isResizing = false;
@@ -345,6 +383,12 @@ export class Pane {
     //==============================================================================
     // 레이아웃 엔진
     //==============================================================================
+    /**
+     * @param { number } x 왼쪽 자리. (픽셀)
+     * @param { number } y 위쪽 자리. (픽셀)
+     * @param { number } w 너비. (픽셀)
+     * @param { number } h 높이. (픽셀)
+     */
     updateLayout(x, y, w, h) {
         this.#container.style.left = `${x}px`;
         this.#container.style.top = `${y}px`;
@@ -427,12 +471,21 @@ export class Pane {
         }
     }
 
+    //==============================================================================
+    // 부모 요소의 크기로 다시 배치. (부모가 없으면 아무것도 하지 않는다)
+    //==============================================================================
     refresh() {
         const p = this.#container.parentElement;
         if (!p) return;
         this.updateLayout(0, 0, p.clientWidth || System.window.innerWidth, p.clientHeight || System.window.innerHeight);
     }
 
+    //==============================================================================
+    // 부모 요소에 붙이기. (창 크기가 바뀔 때마다 다시 배치한다)
+    //==============================================================================
+    /**
+     * @param { HTMLElement } p 붙일 부모 요소.
+     */
     attachTo(p) {
         p.appendChild(this.#container);
         const run = () => this.refresh();
@@ -444,6 +497,9 @@ export class Pane {
     //==============================================================================
     // 보이기 / 숨기기. (숨긴 패널은 자리를 차지하지 않고, 맞닿은 리사이저도 숨는다)
     //==============================================================================
+    /**
+     * @param { boolean } isVisible 보이면 참, 숨기면 거짓.
+     */
     setVisible(isVisible) {
         this.#isVisible = isVisible;
         this.#container.style.display = isVisible ? "" : "none";
@@ -452,15 +508,91 @@ export class Pane {
         root.refresh();
     }
 
+    //==============================================================================
+    // 보이는지 반환.
+    //==============================================================================
+    /**
+     * @returns { boolean } 보이면 참.
+     */
     isVisible() { return this.#isVisible; }
+
+    //==============================================================================
+    // 남는 자리를 나눠 갖는지 반환. (처음 크기가 0 이면 참)
+    //==============================================================================
+    /**
+     * @returns { boolean } 남는 자리를 나눠 가지면 참.
+     */
     isFlex() { return this.#initialSize === 0; }
+
+    //==============================================================================
+    // 처음 크기 반환. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)
+    //==============================================================================
+    /**
+     * @returns { number } 처음 크기. (1 이하이면 부모에 대한 비율, 넘으면 픽셀)
+     */
     getInitialSize() { return this.#initialSize; }
+
+    //==============================================================================
+    // 정해진 크기 반환. (끌어서 정했거나 처음 크기가 픽셀이면 그 값, 아니면 0)
+    //==============================================================================
+    /**
+     * @returns { number } 정해진 크기. (픽셀, 정해진 것이 없으면 0)
+     */
     getFixedSize() { return this.#fixedSize; }
+
+    //==============================================================================
+    // 정해진 크기 설정. (픽셀)
+    //==============================================================================
+    /**
+     * @param { number } s 정해 둘 크기. (픽셀)
+     */
     setFixedSize(s) { this.#fixedSize = s; }
+
+    //==============================================================================
+    // 가장 작은 크기 반환. (픽셀)
+    //==============================================================================
+    /**
+     * @returns { number } 가장 작은 크기. (픽셀)
+     */
     getMinSize() { return this.#minSize; }
+
+    //==============================================================================
+    // 가장 큰 크기 반환. (픽셀)
+    //==============================================================================
+    /**
+     * @returns { number } 가장 큰 크기. (픽셀)
+     */
     getMaxSize() { return this.#maxSize; }
+
+    //==============================================================================
+    // 컨테이너 요소 반환.
+    //==============================================================================
+    /**
+     * @returns { HTMLElement } 컨테이너 요소.
+     */
     getContainer() { return this.#container; }
+
+    //==============================================================================
+    // 배치가 바뀔 때마다 부를 함수 설정.
+    //==============================================================================
+    /**
+     * @param { Function | null } c 배치가 바뀔 때마다 부를 함수.
+     */
     setCallback(c) { this.#onResizeCallback = c; }
+
+    //==============================================================================
+    // 크기를 조절할 수 있는지 반환.
+    //==============================================================================
+    /**
+     * @returns { boolean } 크기를 조절할 수 있으면 참.
+     */
     isResizable() { return this.#isResizable; }
+
+    //==============================================================================
+    // 조절할 수 있는 가장자리 반환. ({ top, right, bottom, left })
+    //==============================================================================
+    /**
+     * @returns { { top: boolean, bottom: boolean, left: boolean, right: boolean } } 조절할 수 있는 가장자리.
+     */
     getResizableEdges() { return this.#resizableEdges; }
 }
