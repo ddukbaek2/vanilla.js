@@ -5935,11 +5935,16 @@ function readSourceSize(source) {
   return { width, height };
 }
 __name(readSourceSize, "readSourceSize");
-function readOwnerName() {
+function captureOwnerTrace() {
   const previousLimit = System19.Error.stackTraceLimit;
   System19.Error.stackTraceLimit = STACK_LIMIT;
-  const stack = new System19.Error().stack;
+  const trace = new System19.Error();
   System19.Error.stackTraceLimit = previousLimit;
+  return trace;
+}
+__name(captureOwnerTrace, "captureOwnerTrace");
+function readOwnerName(trace) {
+  const stack = trace.stack;
   if (typeof stack !== "string") {
     return "unknown";
   }
@@ -6023,7 +6028,7 @@ var GpuMemoryTracker = class _GpuMemoryTracker extends Object2 {
     if (glObject === null || glObject === void 0) {
       return;
     }
-    const entry = { kind, owner: readOwnerName(), bytes: 0, levelTable: kind === GpuMemoryKind.texture ? new System19.Map() : null, width: 0, height: 0, internalFormat: 0 };
+    const entry = { kind, owner: null, trace: captureOwnerTrace(), bytes: 0, levelTable: kind === GpuMemoryKind.texture ? new System19.Map() : null, width: 0, height: 0, internalFormat: 0 };
     this.#entryTable.set(glObject, entry);
     this.#entrySet.add(entry);
     if (this.#finalizationRegistry !== null) {
@@ -6196,6 +6201,10 @@ var GpuMemoryTracker = class _GpuMemoryTracker extends Object2 {
       kindUsage.count += 1;
       kindUsage.bytes += entry.bytes;
       totalBytes += entry.bytes;
+      if (entry.owner === null) {
+        entry.owner = readOwnerName(entry.trace);
+        entry.trace = null;
+      }
       const ownerKey = entry.kind + "|" + entry.owner;
       let ownerUsage = ownerTable.get(ownerKey);
       if (ownerUsage === void 0) {
@@ -6823,7 +6832,7 @@ var Graphic = class extends Object2 {
   #lastFrameGeometryRebuildCount;
   #webGLStateCache;
   #colorSpace;
-  constructor(canvas, preserveDrawingBuffer, antialias = true, colorSpace = ColorSpace.gamma) {
+  constructor(canvas, preserveDrawingBuffer, antialias = true, colorSpace = ColorSpace.gamma, trackGpuMemory = false) {
     super();
     this.#colorSpace = readColorSpace(colorSpace);
     const webGL2RenderingContext = canvas.getContext("webgl2", { alpha: false, stencil: true, antialias: antialias !== false, premultipliedAlpha: true, preserveDrawingBuffer: preserveDrawingBuffer === true });
@@ -6833,7 +6842,7 @@ var Graphic = class extends Object2 {
     this.#canvas = canvas;
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#webGLStateCache = WebGLStateCache.attach(webGL2RenderingContext);
-    this.#gpuMemoryTracker = GpuMemoryTracker.attach(webGL2RenderingContext);
+    this.#gpuMemoryTracker = trackGpuMemory === true ? GpuMemoryTracker.attach(webGL2RenderingContext) : null;
     this.#isContextLost = false;
     this.#contextEventCallback = null;
     const forgetGeometry = __name(() => {
@@ -7684,7 +7693,16 @@ var Graphic = class extends Object2 {
   isContextLost() {
     return this.#isContextLost;
   }
+  enableGpuMemoryTracking() {
+    if (this.#gpuMemoryTracker === null) {
+      this.#gpuMemoryTracker = GpuMemoryTracker.attach(this.#webGL2RenderingContext);
+    }
+  }
+  isGpuMemoryTrackingEnabled() {
+    return this.#gpuMemoryTracker !== null;
+  }
   readGpuMemoryUsage() {
+    this.enableGpuMemoryTracking();
     return this.#gpuMemoryTracker.readUsage();
   }
   beginFrameStatistics() {
@@ -14086,6 +14104,7 @@ var EngineConfiguration = class extends Object2 {
   maxCanvasAspectRatio;
   resumeAudioOnTouchEnd;
   colorSpace;
+  trackGpuMemory;
   constructor() {
     super();
     this.referenceResolutionSize = Vector2.zero();
@@ -14096,6 +14115,7 @@ var EngineConfiguration = class extends Object2 {
     this.title = "";
     this.preserveDrawingBuffer = false;
     this.antialias = true;
+    this.trackGpuMemory = false;
     this.maximumFramePerSecond = 0;
     this.defaultFontUrl = "";
     this.ignoreVirtualKeyboardResize = false;
@@ -14151,7 +14171,7 @@ var Engine = class extends Object2 {
     }
     const canvasId = this.#engineConfiguration.canvasId;
     const canvas = this.#platform.getOrAddCanvas(canvasId);
-    this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true, engineConfiguration.antialias !== false, readColorSpace(engineConfiguration.colorSpace));
+    this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true, engineConfiguration.antialias !== false, readColorSpace(engineConfiguration.colorSpace), engineConfiguration.trackGpuMemory === true);
     this.#sceneManager = new SceneManager(this);
     this.#timeManager = new TimeManager(this);
     this.#viewManager = new ViewManager(this);
@@ -15118,6 +15138,12 @@ var Engine = class extends Object2 {
         console.error(error);
       }
     }
+  }
+  enableGpuMemoryTracking() {
+    this.getGraphic().enableGpuMemoryTracking();
+  }
+  isGpuMemoryTrackingEnabled() {
+    return this.getGraphic().isGpuMemoryTrackingEnabled();
   }
   readGpuMemoryUsage() {
     return this.getGraphic().readGpuMemoryUsage();
@@ -34805,12 +34831,21 @@ var ToonRenderer = class {
     if (entry === void 0) {
       entry = this.createDrawEntry();
       this.#drawEntryOfOptions.set(options, entry);
-    } else if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
+      return this.writeKnownDrawEntry(entry, options);
+    }
+    return this.readKnownDrawEntry(entry, options);
+  }
+  readKnownDrawEntry(entry, options) {
+    if (this.#isTrusting && entry.trustSerial === this.#trustSerial) {
       return entry;
-    } else if (isSameOptionsSnapshot(entry, options)) {
+    }
+    if (isSameOptionsSnapshot(entry, options)) {
       entry.trustSerial = this.#isTrusting ? this.#trustSerial : 0;
       return entry;
     }
+    return this.writeKnownDrawEntry(entry, options);
+  }
+  writeKnownDrawEntry(entry, options) {
     writeOptionsSnapshot(entry, options);
     writeDrawState(entry.state, options);
     entry.materialBlock = null;
@@ -34819,10 +34854,14 @@ var ToonRenderer = class {
     return entry;
   }
   findDrawEntry(options) {
-    if (!this.#drawEntryOfOptions.has(options)) {
+    const entry = this.#drawEntryOfOptions.get(options);
+    if (entry === void 0) {
       return null;
     }
-    return this.readDrawEntry(options);
+    if (options === this.#hintOptions) {
+      return this.readHeldDrawEntry(this.#hintEntry);
+    }
+    return this.readKnownDrawEntry(entry, options);
   }
   createDrawEntry() {
     return { keys: [], values: [], numbers: [], state: new System82.Array(DRAW_STATE_COUNT), materialBlock: null, outlineBlock: null, outlineColor: null, outlineLightSet: null, outlineLightVersion: -1, trustSerial: 0, options: null, generation: this.#drawEntryGeneration };

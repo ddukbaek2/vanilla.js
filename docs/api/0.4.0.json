@@ -10055,6 +10055,25 @@
 							}
 						},
 						{
+							"kind": "field",
+							"name": "trackGpuMemory",
+							"signature": "trackGpuMemory",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "GPU 메모리 셈(개발용)을 처음부터 켤지. 생성 때 정한다. 끄면(기본) GL 짓기 호출을 가로채지 않아 프레임 CPU 에 드는 값이 없다.\n켜면 엔진이 처음 짓는 자원까지 센다. 나중에 켜려면 Engine.enableGpuMemoryTracking() 이고 그 뒤에 지은 것부터 센다.\n예: engineConfiguration.trackGpuMemory = true; (프로파일링 때)",
+								"en": "Whether to turn on GPU memory tracking (for development) from the start. Set at creation. When off (the default), GL create calls are not intercepted, so there is no per-frame CPU cost.\nWhen on, the resources the engine creates first are counted too. To turn it on later use Engine.enableGpuMemoryTracking(), which counts what is created after that.\nExample: engineConfiguration.trackGpuMemory = true; (when profiling)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js"
+						},
+						{
 							"kind": "constructor",
 							"name": "constructor",
 							"signature": "constructor()",
@@ -11575,6 +11594,57 @@
 						},
 						{
 							"kind": "method",
+							"name": "enableGpuMemoryTracking",
+							"signature": "enableGpuMemoryTracking()",
+							"params": [],
+							"description": {
+								"ko": "GPU 메모리 셈 켜기. (개발용, Graphic.enableGpuMemoryTracking 과 같다)",
+								"en": "Turns on GPU memory tracking. (For development, same as Graphic.enableGpuMemoryTracking)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "GPU 메모리 셈 켜기",
+										"en": "Turning on GPU memory tracking"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nengine.enableGpuMemoryTracking();\nconsole.log(engine.isGpuMemoryTrackingEnabled());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isGpuMemoryTrackingEnabled",
+							"signature": "isGpuMemoryTrackingEnabled()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "켜져 있으면 true.",
+									"en": "true if on."
+								}
+							},
+							"description": {
+								"ko": "GPU 메모리 셈이 켜져 있는지.",
+								"en": "Whether GPU memory tracking is on."
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "GPU 메모리 셈이 켜져 있는지 읽기",
+										"en": "Reading whether GPU memory tracking is on"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nconsole.log(engine.isGpuMemoryTrackingEnabled());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "readGpuMemoryUsage",
 							"signature": "readGpuMemoryUsage()",
 							"params": [],
@@ -11597,7 +11667,7 @@
 										"ko": "종류별 GPU 메모리 읽기",
 										"en": "Reading GPU memory by kind"
 									},
-									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nconst usage = engine.readGpuMemoryUsage();\nconsole.log(usage.kindTable.texture.bytes, usage.kindTable.renderbuffer.bytes, usage.kindTable.buffer.bytes);",
+									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.trackGpuMemory = true;\nconst engine = new Engine(engineConfiguration);\nengine.run(new Scene());\nconst usage = engine.readGpuMemoryUsage();\nconsole.log(usage.kindTable.texture.bytes, usage.kindTable.renderbuffer.bytes, usage.kindTable.buffer.bytes);",
 									"language": "javascript"
 								}
 							]
@@ -18455,7 +18525,7 @@
 						{
 							"kind": "constructor",
 							"name": "constructor",
-							"signature": "constructor(canvas, preserveDrawingBuffer, antialias = true, colorSpace = ColorSpace.gamma)",
+							"signature": "constructor(canvas, preserveDrawingBuffer, antialias = true, colorSpace = ColorSpace.gamma, trackGpuMemory = false)",
 							"params": [
 								{
 									"name": "canvas",
@@ -18487,6 +18557,14 @@
 									"description": {
 										"ko": "3D 색 공간. (ColorSpace, 기본 ColorSpace.gamma, 엔진은 EngineConfiguration.colorSpace 를 넘긴다)",
 										"en": "3D color space. (ColorSpace, default ColorSpace.gamma, the engine passes EngineConfiguration.colorSpace)"
+									}
+								},
+								{
+									"name": "trackGpuMemory",
+									"type": "boolean",
+									"description": {
+										"ko": "GPU 메모리 셈을 처음부터 켤지. (기본 false, 엔진은 EngineConfiguration.trackGpuMemory 를 넘긴다)",
+										"en": "Whether to turn on GPU memory tracking from the start. (Default false, the engine passes EngineConfiguration.trackGpuMemory)"
 									}
 								}
 							],
@@ -19558,6 +19636,57 @@
 						},
 						{
 							"kind": "method",
+							"name": "enableGpuMemoryTracking",
+							"signature": "enableGpuMemoryTracking()",
+							"params": [],
+							"description": {
+								"ko": "GPU 메모리 셈 켜기. (개발용)",
+								"en": "Turning on GPU memory tracking"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "GPU 메모리 셈 켜기",
+										"en": "Turning on GPU memory tracking"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nengine.getGraphic().enableGpuMemoryTracking();\nconsole.log(engine.getGraphic().isGpuMemoryTrackingEnabled());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isGpuMemoryTrackingEnabled",
+							"signature": "isGpuMemoryTrackingEnabled()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "켜져 있으면 true.",
+									"en": "true if on."
+								}
+							},
+							"description": {
+								"ko": "GPU 메모리 셈이 켜져 있는지.",
+								"en": "Whether GPU memory tracking is on."
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"examples": [
+								{
+									"title": {
+										"ko": "GPU 메모리 셈이 켜져 있는지 읽기",
+										"en": "Reading whether GPU memory tracking is on"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nconsole.log(engine.getGraphic().isGpuMemoryTrackingEnabled());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
 							"name": "readGpuMemoryUsage",
 							"signature": "readGpuMemoryUsage()",
 							"params": [],
@@ -19580,7 +19709,7 @@
 										"ko": "GPU 메모리 합과 가장 큰 주인 읽기",
 										"en": "Reading the GPU memory total and the largest owner"
 									},
-									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engine = new Engine(new EngineConfiguration());\nengine.run(new Scene());\nconst usage = engine.getGraphic().readGpuMemoryUsage();\nconsole.log(usage.totalBytes, usage.ownerList.length > 0 ? usage.ownerList[0].owner : \"none\");",
+									"code": "import { Engine, EngineConfiguration, Scene } from \"./build/vanilla.js\";\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.trackGpuMemory = true;\nconst engine = new Engine(engineConfiguration);\nengine.run(new Scene());\nconst usage = engine.getGraphic().readGpuMemoryUsage();\nconsole.log(usage.totalBytes, usage.ownerList.length > 0 ? usage.ownerList[0].owner : \"none\");",
 									"language": "javascript"
 								}
 							]
@@ -110596,8 +110725,8 @@
 		{
 			"name": "core/graphic/gpumemorytracker",
 			"summary": {
-				"ko": "GPU 메모리 셈.\n- 컨텍스트에서 텍스처, 렌더버퍼, 버퍼를 짓고 크기를 정하는 함수(texImage2D, texStorage2D, renderbufferStorageMultisample, bufferData 같은 것)를\n  가로채, 객체마다 바이트를 적는다. 지우면 빼고, 컨텍스트를 잃으면 모두 비운다.\n- 바이트는 형식과 크기로 셈한 이름값이다. (드라이버가 맞추는 줄 정렬, 타일 메모리, 멀티샘플 압축은 모른다. 멀티샘플 렌더버퍼는 샘플 수를 곱한다)\n- 주인은 객체를 지은 호출 스택의 위쪽 세 칸이다. (엔진 안 지은 자리를 가려내는 개발용 이름, 스택은 지을 때 한 번만 읽는다)\n- 지우지 않고 버려진 객체는 가비지 컬렉션이 올 때 FinalizationRegistry 로 뺀다. (브라우저가 그때 GL 객체를 풀어 준다)\n- 같은 컨텍스트에는 하나만 건다. (Graphic 이 짓는 자리에서 걸고, 엔진 밖에서 만든 컨텍스트는 GpuMemoryTracker.attach 로 건다)",
-				"en": "GPU memory tracking.\n- Intercepts the functions that create textures, renderbuffers and buffers and set their sizes (texImage2D, texStorage2D, renderbufferStorageMultisample, bufferData and so on) on the context, and records bytes per object. Deleting subtracts, and losing the context clears everything.\n- Bytes are nominal values computed from format and size. (Driver row alignment, tile memory and multisample compression are unknown. Multisample renderbuffers are multiplied by the sample count)\n- The owner is the top three frames of the call stack that created the object. (A development name that tells which engine part created it, the stack is read once at creation)\n- Objects dropped without deleting are removed by FinalizationRegistry when garbage collection comes. (The browser releases the GL object then)\n- Only one is attached per context. (Graphic attaches it where it makes the context, attach a context made outside the engine with GpuMemoryTracker.attach)"
+				"ko": "GPU 메모리 셈.\n- 컨텍스트에서 텍스처, 렌더버퍼, 버퍼를 짓고 크기를 정하는 함수(texImage2D, texStorage2D, renderbufferStorageMultisample, bufferData 같은 것)를\n  가로채, 객체마다 바이트를 적는다. 지우면 빼고, 컨텍스트를 잃으면 모두 비운다.\n- 바이트는 형식과 크기로 셈한 이름값이다. (드라이버가 맞추는 줄 정렬, 타일 메모리, 멀티샘플 압축은 모른다. 멀티샘플 렌더버퍼는 샘플 수를 곱한다)\n- 주인은 객체를 지은 호출 스택의 위쪽 세 칸이다. (엔진 안 지은 자리를 가려내는 개발용 이름, 스택은 지을 때 한 번만 읽는다)\n- 지우지 않고 버려진 객체는 가비지 컬렉션이 올 때 FinalizationRegistry 로 뺀다. (브라우저가 그때 GL 객체를 풀어 준다)\n- 같은 컨텍스트에는 하나만 건다. (기본은 꺼 둔다. 켜는 길은 EngineConfiguration.trackGpuMemory, Graphic.enableGpuMemoryTracking, 엔진 밖에서 만든 컨텍스트는 GpuMemoryTracker.attach 이고, 걸기 전에는 GL 짓기 호출을 가로채지 않는다)",
+				"en": "GPU memory tracking.\n- Intercepts the functions that create textures, renderbuffers and buffers and set their sizes (texImage2D, texStorage2D, renderbufferStorageMultisample, bufferData and so on) on the context, and records bytes per object. Deleting subtracts, and losing the context clears everything.\n- Bytes are nominal values computed from format and size. (Driver row alignment, tile memory and multisample compression are unknown. Multisample renderbuffers are multiplied by the sample count)\n- The owner is the top three frames of the call stack that created the object. (A development name that tells which engine part created it, the stack is read once at creation)\n- Objects dropped without deleting are removed by FinalizationRegistry when garbage collection comes. (The browser releases the GL object then)\n- Only one is attached per context. (Off by default. Turn it on with EngineConfiguration.trackGpuMemory, Graphic.enableGpuMemoryTracking, or GpuMemoryTracker.attach for a context made outside the engine. Before it is attached, GL create calls are not intercepted)"
 			},
 			"examples": [
 				{
