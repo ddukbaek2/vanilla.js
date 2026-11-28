@@ -10658,5 +10658,9 @@
 	"반투명 패널 뒤를 흐리기": "Blurring behind a translucent panel",
 	"흐림 반지름. (기기 픽셀, 0 이면 꺼짐)": "Blur radius. (device pixels, off if 0)",
 	"뒤 화면 흐림 반지름 반환.": "Returns the backdrop blur radius.",
-	"글자 간격 설정. (Text 에 맡긴다)": "Sets the letter spacing. (delegated to Text)"
+	"글자 간격 설정. (Text 에 맡긴다)": "Sets the letter spacing. (delegated to Text)",
+	"지금에 더할 분. (음수는 과거, 0 이면 지금)": "Minutes to add to now. (negative is the past, 0 is now)",
+	"현지 시각. (해, 달 1 에서 12, 날, 시, 분, 초, 요일 0 이 일요일)": "Local time. (year, month 1 to 12, day, hour, minute, second, weekday with 0 as Sunday)",
+	"현지 시각 읽기. (지금에서 분 오프셋만큼 더한 때를 이 기계의 시간대로 본 달력 시각, 러스트 판 Engine::read_local_time 과 같다)\n- 웹은 Date 로 읽는다. 더한 때의 일광 절약 시간까지 반영한다. (new Date(Date.now() + 오프셋) 과 같다)": "Read the local time. (the calendar time of now plus a minute offset in this machine's time zone, same as the Rust edition's Engine::read_local_time)\n- On the web it is read with Date. Daylight saving time at the shifted moment is applied. (same as new Date(Date.now() + offset))",
+	"지금 시각과 두 시간 앞뒤": "The current time and two hours ahead and behind"
 }

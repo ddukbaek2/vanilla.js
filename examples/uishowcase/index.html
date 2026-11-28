@@ -499,8 +499,8 @@
 		 */
 		makeEventData(minuteOffset) {
 			const eventMessage = EVENT_MESSAGES[dataRandom.nextInt(0, EVENT_MESSAGES.length - 1)];
-			const now = new System.Date(System.Date.now() + minuteOffset * 60000);
-			const timeText = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+			const now = this.getEngine().readLocalTime(minuteOffset);
+			const timeText = String(now.hour).padStart(2, "0") + ":" + String(now.minute).padStart(2, "0");
 			return { time: timeText, text: eventMessage.text, tag: eventMessage.tag };
 		}
 

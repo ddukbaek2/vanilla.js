@@ -10787,6 +10787,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "open_url"
+							},
 							"examples": [
 								{
 									"title": {
@@ -10794,6 +10800,50 @@
 										"en": "A form that cannot be opened returns false"
 									},
 									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tasync load(engine) {\n\t\tawait super.load(engine);\n\t\tconst isOpened = engine.openUrl(\"javascript:alert(1)\");\n\t\tconsole.log(isOpened);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "readLocalTime",
+							"signature": "readLocalTime(minuteOffset = 0)",
+							"params": [
+								{
+									"name": "minuteOffset",
+									"type": "number",
+									"description": {
+										"ko": "지금에 더할 분. (음수는 과거, 0 이면 지금)",
+										"en": "Minutes to add to now. (negative is the past, 0 is now)"
+									}
+								}
+							],
+							"returns": {
+								"type": "{ year: number, month: number, day: number, hour: number, minute: number, second: number, weekday: number }",
+								"description": {
+									"ko": "현지 시각. (해, 달 1 에서 12, 날, 시, 분, 초, 요일 0 이 일요일)",
+									"en": "Local time. (year, month 1 to 12, day, hour, minute, second, weekday with 0 as Sunday)"
+								}
+							},
+							"description": {
+								"ko": "현지 시각 읽기. (지금에서 분 오프셋만큼 더한 때를 이 기계의 시간대로 본 달력 시각, 러스트 판 Engine::read_local_time 과 같다)\n- 웹은 Date 로 읽는다. 더한 때의 일광 절약 시간까지 반영한다. (new Date(Date.now() + 오프셋) 과 같다)",
+								"en": "Read the local time. (the calendar time of now plus a minute offset in this machine's time zone, same as the Rust edition's Engine::read_local_time)\n- On the web it is read with Date. Daylight saving time at the shifted moment is applied. (same as new Date(Date.now() + offset))"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "read_local_time"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "지금 시각과 두 시간 앞뒤",
+										"en": "The current time and two hours ahead and behind"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2 } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tasync load(engine) {\n\t\tawait super.load(engine);\n\t\tconst now = engine.readLocalTime();\n\t\tconst later = engine.readLocalTime(120);\n\t\tconst earlier = engine.readLocalTime(-120);\n\t\tconsole.log(now.hour < 24 && now.month >= 1 && now.month <= 12, later.hour !== earlier.hour);\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
 									"language": "javascript"
 								}
 							]
@@ -36738,7 +36788,13 @@
 								"en": "Sets the letter spacing. (same meaning as CSS letter-spacing and Unreal UMG letter spacing)"
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/text.js"
+							"source": "src/core/component/text.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/richtext",
+								"class": "RichText",
+								"name": "set_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
@@ -36757,7 +36813,13 @@
 								"en": "Returns the letter spacing."
 							},
 							"since": "0.4.0",
-							"source": "src/core/component/text.js"
+							"source": "src/core/component/text.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/component/richtext",
+								"class": "RichText",
+								"name": "get_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
@@ -39365,6 +39427,12 @@
 							},
 							"since": "0.4.0",
 							"source": "src/ui/uiview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiview",
+								"class": "UIView",
+								"name": "set_backdrop_blur"
+							},
 							"examples": [
 								{
 									"title": {
@@ -39393,7 +39461,13 @@
 								"en": "Returns the backdrop blur radius."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uiview.js"
+							"source": "src/ui/uiview.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uiview",
+								"class": "UIView",
+								"name": "get_backdrop_blur"
+							}
 						},
 						{
 							"kind": "method",
@@ -40748,7 +40822,13 @@
 								"en": "Sets the letter spacing. (delegated to Text)"
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uilabel.js"
+							"source": "src/ui/uilabel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uilabel",
+								"class": "UILabel",
+								"name": "set_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
@@ -40767,7 +40847,13 @@
 								"en": "Returns the letter spacing."
 							},
 							"since": "0.4.0",
-							"source": "src/ui/uilabel.js"
+							"source": "src/ui/uilabel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "ui/uilabel",
+								"class": "UILabel",
+								"name": "get_letter_spacing"
+							}
 						},
 						{
 							"kind": "method",
