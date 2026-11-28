@@ -1142,7 +1142,7 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 같은 모형과 꼴의 여럿의 번호를 인스턴스 그리기 한 번으로. (그리기 줄의 자동 인스턴싱, acceptMesh 로 고른 것, 감기는 뒤집지 않은 것만)
+	// 같은 모형과 꼴의 여럿의 번호를 인스턴스 그리기 한 번으로. (그리기 줄의 자동 인스턴싱, acceptMesh 로 고른 것, 감기를 뒤집는 것은 뒤집는 것끼리)
 	// - 번호는 인스턴스마다 틴트 칸의 x 로. (drawMeshInstanced 와 같은 길, 하나면 보통 그리기)
 	//==============================================================================
 	/**
@@ -1153,14 +1153,15 @@ export class ToonScreenOutline {
 	 * @param { number } count - 그릴 수.
 	 * @param { object } options - 모두에 같은 그리기 꼴.
 	 * @param { number } slotIndex - 묶음 자리 번호. (그리기 줄이 프레임마다 같은 차례로 준다)
+	 * @param { boolean } [isMirrored] - 감기를 뒤집어 그릴지. (모두에 같다, 기본 false)
 	 * @private
 	 */
-	drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options, slotIndex) {
+	drawMeshBatch(mesh, modelMatrixList, lineIdList, start, count, options, slotIndex, isMirrored = false) {
 		if (this.#savedState === null || count <= 0) {
 			return;
 		}
 		if (count === 1) {
-			this.drawWithCount(mesh, modelMatrixList[start].getElements(), 0, lineIdList[start], 0, false, options, mesh.bodyVertexArray);
+			this.drawWithCount(mesh, modelMatrixList[start].getElements(), 0, lineIdList[start], 0, isMirrored, options, mesh.bodyVertexArray);
 			return;
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1215,7 +1216,7 @@ export class ToonScreenOutline {
 			vertexArray = createMeshInstanceVertexArray(webGL2RenderingContext, mesh, slot.buffer);
 			slot.vertexArrays.set(mesh, vertexArray);
 		}
-		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, false, options, vertexArray);
+		this.drawWithCount(mesh, IDENTITY_ELEMENTS, count, lineIdList[start], 1, isMirrored, options, vertexArray);
 	}
 
 	//==============================================================================
