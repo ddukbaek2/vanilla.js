@@ -16,6 +16,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -70,7 +71,7 @@ async function compareAtScale(browser, deviceScaleFactor) {
 	const pageErrorList = [];
 	page.on("pageerror", (error) => pageErrorList.push(error.message));
 	await page.setViewport({ width: 640, height: 640, deviceScaleFactor: deviceScaleFactor });
-	await page.goto(`http://127.0.0.1:${port}/`);
+	await gotoPage(page, `http://127.0.0.1:${port}/`);
 	const result = await page.evaluate(async (lineList) => {
 		const System = globalThis;
 		const { Engine, EngineConfiguration, Scene, ShadowText, Vector2 } = await import("/import.js");
@@ -236,7 +237,7 @@ async function compareAtScale(browser, deviceScaleFactor) {
 	return result;
 }
 
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 try {
 	for (const deviceScaleFactor of [1, 2]) {
 		const result = await compareAtScale(browser, deviceScaleFactor);

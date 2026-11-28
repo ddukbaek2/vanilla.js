@@ -4270,7 +4270,7 @@ function advanceToTabStop(x, tabWidth) {
 	return (System.Math.floor(x / tabWidth) + 1) * tabWidth;
 }
 //==============================================================================
-// 줄 끝 공백을 뺀 글. (pre-wrap 의 매달리는 공백, 공백과 U+3000)
+// 줄 끝 공백을 뺀 글. (pre-wrap 의 매달리는 공백, 공백과 탭과 U+3000. 탭 자리가 줄 폭을 넘어도 줄 끝 탭은 매달려 새 줄을 만들지 않는다, 크롬 확인)
 //==============================================================================
 /**
  * @param { string } text 글.
@@ -4278,7 +4278,7 @@ function advanceToTabStop(x, tabWidth) {
  */
 function trimHangingSpaces(text) {
 	let end = text.length;
-	while (end > 0 && (text.charCodeAt(end - 1) === 0x20 || text.charCodeAt(end - 1) === 0x3000)) {
+	while (end > 0 && (text.charCodeAt(end - 1) === 0x20 || text.charCodeAt(end - 1) === 0x09 || text.charCodeAt(end - 1) === 0x3000)) {
 		--end;
 	}
 	return text.slice(0, end);

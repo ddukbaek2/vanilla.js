@@ -11,6 +11,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -68,7 +69,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 
 //==============================================================================
 // 한 번 열어 initialize 가 불린 프레임 번호 받기.
@@ -83,7 +84,7 @@ async function readInitializeFrameNumber(query) {
 		HTMLAnchorElement.prototype.click = function () {
 		};
 	});
-	await page.goto("http://127.0.0.1:" + port + "/" + query);
+	await gotoPage(page, "http://127.0.0.1:" + port + "/" + query);
 	let initializeFrameNumber = -1;
 	try {
 		await page.waitForFunction(() => window.initializeFrameNumber >= 0, { timeout: 10000 });

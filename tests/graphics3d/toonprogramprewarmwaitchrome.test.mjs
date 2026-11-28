@@ -11,6 +11,7 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -52,7 +53,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 let result = null;
 const errorMessageList = []; // 콘솔 오류와 페이지 예외. (시각 구분 없이 쌓고, 시험 안에서 사건 번호로 나눈다)
 try {
@@ -66,7 +67,7 @@ try {
 	page.on("pageerror", (error) => {
 		errorMessageList.push("pageerror: " + error.message);
 	});
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	result = await page.evaluate(async () => {
 		const { ToonRenderer, ToonDrawQueue, MeshBuilder, createSphereGeometry, Matrix4 } = await import("/import.js");
 		const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
@@ -77,6 +78,9 @@ try {
 		document.body.appendChild(canvas);
 		const gl = canvas.getContext("webgl2");
 		const isParallel = gl.getExtension("KHR_parallel_shader_compile") !== null;
+		if (!isParallel) {
+			return { isParallel };
+		}
 		const counts = { status: 0, flush: 0, finish: 0 };
 		const getProgramParameter = gl.getProgramParameter.bind(gl);
 		gl.getProgramParameter = (program, name) => {
@@ -178,7 +182,11 @@ finally {
 	server.close();
 }
 console.log(JSON.stringify(result));
-check(result.isParallel, "헤드리스 크롬이 KHR_parallel_shader_compile 을 주지 않음");
+// GPU 가 없는 기계(CI 의 리눅스, 윈도우)의 소프트웨어 렌더러(SwiftShader)는 KHR_parallel_shader_compile 을 주지 않는다. 확장이 없으면 엔진은 그 자리에서 짓고(병렬로 맡길 일이 없다) 이 시험이 잴 것이 없다.
+if (!result.isParallel) {
+	console.log("건너뜀: 이 크롬은 KHR_parallel_shader_compile 을 주지 않음 (소프트웨어 렌더러)");
+	process.exit(0);
+}
 for (const name of Object.keys(result.drawResult)) {
 	check(result.drawResult[name].drawnCount > 1000, `미리 짓고 그리지 않고 기다린 뒤 그려도 화소가 나와야 함 (${name}: ${result.drawResult[name].drawnCount}, 끝남 ${result.drawResult[name].wasReady})`);
 }

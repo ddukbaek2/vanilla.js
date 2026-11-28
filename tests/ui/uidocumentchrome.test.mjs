@@ -12,7 +12,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkJson, finish } from "../testcheck.mjs";
-import { gotoPage } from "../chromepage.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -49,7 +49,7 @@ const chromePathList = [
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
 
-const browser = await puppeteer.launch({ executablePath, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
 	const page = await browser.newPage();
 	page.on("pageerror", (error) => {

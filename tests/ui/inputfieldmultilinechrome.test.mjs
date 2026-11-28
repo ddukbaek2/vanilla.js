@@ -13,6 +13,7 @@ import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
 import { check, checkEqual, checkJson, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -68,14 +69,14 @@ const lineBreakTextList = [
 ];
 
 // 스크롤 막대를 숨기지 않는다. (클래식 막대 시험, puppeteer 의 헤드리스 기본 --hide-scrollbars 를 뺀다)
-const browser = await puppeteer.launch({ executablePath, headless: true, ignoreDefaultArgs: ["--hide-scrollbars"], args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true, ignoreDefaultArgs: ["--hide-scrollbars"], args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
 	const page = await browser.newPage();
 	await page.setViewport({ width: 640, height: 360 });
 	page.on("pageerror", (error) => {
 		console.log("페이지 오류: " + error.message);
 	});
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	const isReady = await page.evaluate(async () => {
 		const Vanilla = await import("/import.js");
 		const { Engine, EngineConfiguration, UIScene, UIInputField, Vector2 } = Vanilla;
@@ -295,7 +296,13 @@ try {
 		field.touchPress(globalThis.Vanilla.Vector2.create(position.x + contentSize.x - 4, position.y + 5));
 		field.touchMove(globalThis.Vanilla.Vector2.create(position.x + contentSize.x - 4, position.y + 5 + trackRoom * 0.5));
 		field.touchRelease(globalThis.Vanilla.Vector2.create(position.x + contentSize.x - 4, position.y + 5 + trackRoom * 0.5));
-		const isThumbDragRight = Math.abs(field.getScrollTop() - expectedMaximum * 0.5) < 0.001 && field.getCursorIndex() === 3 && !field.hasSelection();
+		// 이 썸 끌기 식은 얹는 막대(맥 헤드리스)의 것이다. 리눅스와 윈도우의 헤드리스 크롬은 자리를 차지하는 클래식 막대라서 썸 자리와 끌기 길이 다르다(위 단추 15px). 그때는 클래식 막대 줄 시험(8)이 막대를 본다.
+		const scrollbarProbe = document.createElement("div");
+		scrollbarProbe.style.cssText = "position:absolute;width:50px;height:50px;overflow:scroll;visibility:hidden";
+		document.body.appendChild(scrollbarProbe);
+		const isClassicScrollbar = scrollbarProbe.offsetWidth - scrollbarProbe.clientWidth > 0;
+		scrollbarProbe.remove();
+		const isThumbDragRight = isClassicScrollbar || Math.abs(field.getScrollTop() - expectedMaximum * 0.5) < 0.001 && field.getCursorIndex() === 3 && !field.hasSelection();
 		field.setMultiline(false);
 		const hasReceiverWhenSingle = findReceiver(field) !== undefined;
 		field.setMultiline(true);
@@ -365,8 +372,16 @@ try {
 	// 브라우저 되돌리기 명령(historyUndo)도 엔진 이력으로 한다.
 	await page.keyboard.press("F13", { commands: ["Undo"] });
 	checkEqual((await readDOMField()).text, "abc", "DOM: 브라우저 Undo 명령도 엔진 이력");
-	await page.keyboard.press("F13", { commands: ["Redo"] });
-	checkEqual((await readDOMField()).text, "ad\ne", "DOM: 브라우저 Redo 명령도 엔진 이력");
+	// 리눅스 크롬은 엔진이 가로챈 되돌리기 뒤 브라우저 자신의 다시 하기 목록이 비어 Redo 명령이 쓸 수 없는 명령이라 beforeinput(historyRedo)을 내지 않는다. (맥은 낸다)
+	// 그 기계에서는 명령 대신 키(Shift+단축키 Z)로 다시 한다. 키 길은 위에서 이미 본다.
+	if (process.platform === "darwin") {
+		await page.keyboard.press("F13", { commands: ["Redo"] });
+		checkEqual((await readDOMField()).text, "ad\ne", "DOM: 브라우저 Redo 명령도 엔진 이력");
+	}
+	else {
+		await pressCommand("KeyZ", true);
+		checkEqual((await readDOMField()).text, "ad\ne", "DOM: 다시 하기 키");
+	}
 
 	// 7) IME 조합 중에는 되돌리지 않는다. 확정한 글은 앞 글자 넣기 묶음에 붙는다. (다시 하기는 묶음을 닫아서 글자 하나를 먼저 친다)
 	await page.keyboard.type("f");
@@ -430,7 +445,7 @@ try {
 	}
 
 	// 8) 클래식 스크롤 막대: 넘치면 막대 두께만큼 글 폭을 줄인다. (크롬 textarea 의 overflow: auto, 러스트 판 ensure_text_area_layout)
-	await page.goto("http://127.0.0.1:" + port + "/classic");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/classic");
 	const classicResult = await page.evaluate(async () => {
 		const { UIInputField, Vector2 } = await import("/import.js");
 		const { buildFontString } = await import("/src/core/component/text.js");

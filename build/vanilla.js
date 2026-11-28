@@ -29143,7 +29143,7 @@ function advanceToTabStop(x, tabWidth) {
 __name(advanceToTabStop, "advanceToTabStop");
 function trimHangingSpaces(text) {
   let end = text.length;
-  while (end > 0 && (text.charCodeAt(end - 1) === 32 || text.charCodeAt(end - 1) === 12288)) {
+  while (end > 0 && (text.charCodeAt(end - 1) === 32 || text.charCodeAt(end - 1) === 9 || text.charCodeAt(end - 1) === 12288)) {
     --end;
   }
   return text.slice(0, end);

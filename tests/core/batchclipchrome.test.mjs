@@ -18,7 +18,8 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
-import { check, checkEqual, finish } from "../testcheck.mjs";
+import { check, checkEqual, checkNear, finish } from "../testcheck.mjs";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -247,7 +248,7 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 
 // 한 길로 그린 장면의 화소와 드로 콜 수. (화소 비율 1.5, 1280 x 720 화면이라 자르기 경계가 화소 경계에 놓인다)
 async function renderScene(rotationFlag) {
@@ -260,7 +261,7 @@ async function renderScene(rotationFlag) {
 			errorList.push(message.text());
 		}
 	});
-	await page.goto("http://127.0.0.1:" + port + "/?rotation=" + rotationFlag);
+	await gotoPage(page, "http://127.0.0.1:" + port + "/?rotation=" + rotationFlag);
 	await page.waitForFunction(() => window.capturePromise !== undefined);
 	const dataUrl = await page.evaluate(() => window.capturePromise);
 	const pixelResult = await page.evaluate(async (imageUrl) => {
@@ -309,7 +310,8 @@ try {
 	// 불투명도 층 안의 깊이를 비우지 않는 3D 패스가 보이는지. (560, 175)
 	for (const result of [shaderClipResult, stencilClipResult]) {
 		const depthOffset = ((175 * 3) * result.width + 560 * 3) * 4;
-		checkEqual([result.pixels[depthOffset], result.pixels[depthOffset + 1], result.pixels[depthOffset + 2]].join(","), "51,204,229", "불투명도 층 안의 clearDepth: false 3D 패스");
+		// 소프트웨어 렌더러(SwiftShader)는 블렌딩 끝 자리 반올림이 GPU 와 한 단계 다를 수 있다.
+		checkNear([result.pixels[depthOffset], result.pixels[depthOffset + 1], result.pixels[depthOffset + 2]], [51, 204, 229], 1, "불투명도 층 안의 clearDepth: false 3D 패스");
 	}
 	// 바꿔 끼운 셰이더와 셰이더 섞기: 자르기 밖(260, 290)은 바탕색, 자르기 안(360, 290)은 섞인 색. (화면 배율 3)
 	for (const result of [shaderClipResult, stencilClipResult]) {

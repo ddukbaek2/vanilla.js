@@ -12,6 +12,7 @@ import http from "node:http";
 import path from "node:path";
 import url from "node:url";
 import { createRequire } from "node:module";
+import { gotoPage, launchBrowser } from "../chromepage.mjs";
 
 const require = createRequire(import.meta.url);
 const puppeteer = require("puppeteer-core");
@@ -53,11 +54,11 @@ const chromePathList = [
 ];
 const executablePath = chromePathList.find((chromePath) => fs.existsSync(chromePath));
 check(executablePath !== undefined, "크롬을 찾지 못함 (CHROME_PATH)");
-const browser = await puppeteer.launch({ executablePath, headless: true });
+const browser = await launchBrowser(puppeteer, { executablePath, headless: true });
 let captures = null;
 try {
 	const page = await browser.newPage();
-	await page.goto("http://127.0.0.1:" + port + "/");
+	await gotoPage(page, "http://127.0.0.1:" + port + "/");
 	captures = await page.evaluate(async () => {
 		const { ToonRenderer, ToonScreenOutline, MeshBuilder, createOctahedronGeometry, Matrix4, Vector3 } = await import("/import.js");
 		const canvas = document.getElementById("canvas");

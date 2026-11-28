@@ -99,7 +99,7 @@ const formatNumberCaseList = [
 	["pt-PT", 1234.5, "1234,5"], ["pt-BR", 1234.5, "1.234,5"], ["zh-Hant-TW", 1234567.891, "1,234,567.891"], ["ja-JP", 1234567.891, "1,234,567.891"],
 	["ps", -1234567.891, "‎-‎۱٬۲۳۴٬۵۶۷٫۸۹۱"],
 	["it-CH", 1234567.891, "1'234'567.891"], ["et-EE", -1234.5, "−1234,5"], ["en-u-nu-latn", 1234567.891, "1,234,567.891"],
-	["EN_gb", 1234567.891, "RangeError: Invalid language tag: EN_gb"],
+	["EN_gb", 1234567.891, "RangeError"],
 ];
 for (const [locale, value, expectedText] of formatNumberCaseList) {
 	let actualText = "";
@@ -107,7 +107,8 @@ for (const [locale, value, expectedText] of formatNumberCaseList) {
 		actualText = Format.formatNumber(value, locale);
 	}
 	catch (error) {
-		actualText = error.name + ": " + error.message;
+		// 오류 글은 V8 판마다 다르다. (노드 25 "Invalid language tag: EN_gb", 노드 22 "Incorrect locale information provided") 그래서 오류 이름만 견준다.
+		actualText = error.name;
 	}
 	checkEqual(actualText, expectedText, "formatNumber(" + value + ", " + locale + ")");
 }
@@ -198,9 +199,9 @@ for (const [locale, expectedErrorTag] of languageTagCaseList) {
 		Format.formatNumber(1, locale);
 	}
 	catch (error) {
-		actualErrorText = error.name + ": " + error.message;
+		actualErrorText = error.name;
 	}
-	const expectedErrorText = expectedErrorTag === null ? null : "RangeError: Invalid language tag: " + expectedErrorTag;
+	const expectedErrorText = expectedErrorTag === null ? null : "RangeError";
 	checkEqual(actualErrorText, expectedErrorText, "formatNumber 언어 태그 " + JSON.stringify(locale));
 }
 
