@@ -8947,6 +8947,78 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "Engine",
+				"name": "add_graphic_context_event_listener"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "addGraphicContextEventListener"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "remove_graphic_context_event_listener"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "removeGraphicContextEventListener"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "dispatch_graphic_context_event"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "dispatchGraphicContextEvent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "add_graphic_error_listener"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "addGraphicErrorListener"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "remove_graphic_error_listener"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "removeGraphicErrorListener"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "dispatch_graphic_error"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "dispatchGraphicError"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
 				"name": "get_frame_number"
 			},
 			"vanilla.js": {
@@ -9011,6 +9083,26 @@
 			"vanilla.js": {
 				"module": "core/engine",
 				"class": "PageEvent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "GraphicContextEvent"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "GraphicContextEvent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "GraphicErrorKind"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "GraphicErrorKind"
 			}
 		},
 		{
@@ -11361,6 +11453,18 @@
 				"module": "core/graphic",
 				"class": "Graphic",
 				"name": "resetGLStateCache"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "is_context_lost"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "isContextLost"
 			}
 		},
 		{
